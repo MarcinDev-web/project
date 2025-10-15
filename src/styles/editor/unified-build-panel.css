@@ -1,0 +1,132 @@
+/**
+ * Unified Build Panel Styles
+ * Combines hotbar and catalog for Build Mode
+ */
+
+.unified-build-panel {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  pointer-events: none;
+  z-index: 100;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Catalog container - positioned on left or right */
+.unified-build-catalog-container {
+  position: absolute;
+  top: 60px; /* Below the top menu */
+  bottom: 0;
+  pointer-events: auto;
+  z-index: 101;
+}
+
+.unified-build-panel.catalog-left .unified-build-catalog-container {
+  left: 0;
+}
+
+.unified-build-panel.catalog-right .unified-build-catalog-container {
+  right: 0;
+}
+
+/* Hotbar container - positioned at bottom center */
+.unified-build-hotbar-container {
+  position: absolute;
+  bottom: 2rem;
+  left: 50%;
+  transform: translateX(-50%);
+  pointer-events: auto;
+  z-index: 102;
+}
+
+/* Animation for panel entrance */
+@keyframes slideInLeft {
+  from {
+    transform: translateX(-100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes slideInBottom {
+  from {
+    transform: translate(-50%, 100%);
+    opacity: 0;
+  }
+  to {
+    transform: translate(-50%, 0);
+    opacity: 1;
+  }
+}
+
+.unified-build-panel.catalog-left .unified-build-catalog-container {
+  animation: slideInLeft 0.3s ease-out;
+}
+
+.unified-build-panel.catalog-right .unified-build-catalog-container {
+  animation: slideInRight 0.3s ease-out;
+}
+
+.unified-build-hotbar-container {
+  animation: slideInBottom 0.3s ease-out;
+}
+
+/* Drag feedback */
+.unified-build-panel .catalog-asset-card.dragging {
+  cursor: grabbing;
+}
+
+.unified-build-panel .hotbar-slot.drag-over {
+  animation: hotbar-pulse 0.5s ease-in-out infinite;
+}
+
+/* Responsive adjustments */
+@media (max-width: 1200px) {
+  .unified-build-catalog-container {
+    width: 280px;
+  }
+}
+
+@media (max-width: 768px) {
+  .unified-build-catalog-container {
+    width: 100%;
+    max-width: 280px;
+  }
+  
+  .unified-build-hotbar-container {
+    bottom: 1rem;
+  }
+  
+  .hotbar-component {
+    gap: 0.25rem;
+    padding: 0.5rem;
+  }
+  
+  .hotbar-slot {
+    width: 48px;
+    height: 48px;
+  }
+}
+
+/* Hide when not in build mode */
+.unified-build-panel[style*="display: none"] {
+  display: none !important;
+}
+

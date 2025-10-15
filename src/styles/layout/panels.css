@@ -1,0 +1,136 @@
+/**
+ * Panels & Sidebars
+ * Sidebar tabs and panel organization
+ */
+
+/* ============================================
+   SIDEBAR TABS - Tabbed Interface
+   ============================================ */
+
+.sidebar-tabs {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  overflow: hidden;
+}
+
+.sidebar-tabs-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-3);
+  border-bottom: 3px solid rgba(60, 70, 85, 0.5);
+  background: rgba(20, 25, 32, 0.5);
+  flex-shrink: 0;
+  flex-wrap: wrap;
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+/* Scrollbar styling for tabs bar */
+.sidebar-tabs-bar::-webkit-scrollbar {
+  height: 6px;
+}
+
+.sidebar-tabs-bar::-webkit-scrollbar-track {
+  background: rgba(20, 25, 32, 0.5);
+}
+
+.sidebar-tabs-bar::-webkit-scrollbar-thumb {
+  background: rgba(70, 80, 95, 0.8);
+  border-radius: 3px;
+}
+
+.sidebar-tabs-bar::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 110, 125, 0.9);
+}
+
+.sidebar-tab {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-3);
+  background: rgba(45, 52, 62, 1);
+  border: 2px solid rgba(70, 80, 95, 1);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform var(--transition-fast), background var(--transition-fast), border-color var(--transition-fast);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: rgba(160, 170, 185, 1);
+  position: relative;
+  font-family: var(--font-sans);
+  box-shadow: 0 2px 0 rgba(25, 30, 38, 1);
+  flex-shrink: 0;
+  min-width: fit-content;
+}
+
+.sidebar-tab:hover {
+  background: rgba(55, 62, 72, 1);
+  color: rgba(220, 225, 235, 1);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 0 rgba(25, 30, 38, 1);
+}
+
+.sidebar-tab:focus-visible {
+  outline: 3px solid rgb(59, 130, 246);
+  outline-offset: 2px;
+}
+
+.sidebar-tab.active {
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.4) 0%, rgba(37, 99, 235, 0.4) 100%);
+  border-color: rgb(59, 130, 246);
+  color: rgba(220, 225, 235, 1);
+  box-shadow: 0 2px 0 rgba(29, 78, 216, 1);
+  font-weight: 700;
+}
+
+.sidebar-tab.active::after {
+  content: '';
+  position: absolute;
+  bottom: -5px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60%;
+  height: 3px;
+  background: rgb(59, 130, 246);
+  border-radius: 2px 2px 0 0;
+}
+
+.sidebar-tab-label {
+  flex: 1;
+  white-space: nowrap;
+}
+
+.sidebar-tab-badge {
+  min-width: 1.25rem;
+  height: 1.125rem;
+  padding: 0 var(--spacing-1);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: var(--text-xs);
+  font-weight: var(--font-semibold);
+  background: var(--color-accent-400);
+  color: white;
+  border-radius: var(--radius-full);
+}
+
+.sidebar-tab.active .sidebar-tab-badge {
+  background: var(--color-accent-500);
+}
+
+.sidebar-tabs-content {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+
+.sidebar-tab-panel {
+  flex: 1;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+

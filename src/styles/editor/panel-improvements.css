@@ -1,0 +1,144 @@
+/**
+ * Panel Improvements - Unified panel styling
+ * Ensures consistent look between sidebar and inspector
+ */
+
+/* ============================================
+   PANEL CONTENT AREAS
+   ============================================ */
+
+.editor-sidebar > *,
+.editor-inspector > * {
+  flex-shrink: 0;
+}
+
+/* Scrollable content area */
+.editor-sidebar > .panel-content,
+.editor-inspector > .panel-content {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* ============================================
+   UNIFIED PANEL HEADERS
+   ============================================ */
+
+.panel-header {
+  padding: var(--spacing-4) var(--spacing-5);
+  border-bottom: 2px solid rgba(60, 70, 85, 0.8);
+  background: rgba(255, 255, 255, 0.03);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+
+.panel-title {
+  font-size: var(--text-lg);
+  font-weight: var(--font-bold);
+  color: rgba(220, 225, 235, 1);
+  margin: 0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================
+   PANEL SECTIONS
+   ============================================ */
+
+.panel-section {
+  padding: var(--spacing-4) var(--spacing-5);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.03);
+}
+
+.panel-section:last-child {
+  border-bottom: none;
+}
+
+.panel-section-title {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: var(--text-2);
+  text-transform: uppercase;
+  letter-spacing: var(--tracking-wide);
+  margin-bottom: var(--spacing-3);
+}
+
+/* ============================================
+   PANEL ITEMS
+   ============================================ */
+
+.panel-item {
+  padding: var(--spacing-2) var(--spacing-3);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+}
+
+.panel-item:hover {
+  background: rgba(255, 255, 255, 0.08);
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.panel-item.active {
+  background: rgba(59, 130, 246, 0.18);
+  border-left: 3px solid rgb(59, 130, 246);
+  padding-left: calc(var(--spacing-3) - 3px);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3), 0 0 12px rgba(59, 130, 246, 0.2);
+}
+
+/* ============================================
+   CUSTOM SCROLLBAR FOR PANELS
+   ============================================ */
+
+.editor-sidebar::-webkit-scrollbar,
+.editor-inspector::-webkit-scrollbar,
+.panel-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.editor-sidebar::-webkit-scrollbar-track,
+.editor-inspector::-webkit-scrollbar-track,
+.panel-content::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+.editor-sidebar::-webkit-scrollbar-thumb,
+.editor-inspector::-webkit-scrollbar-thumb,
+.panel-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-full);
+}
+
+.editor-sidebar::-webkit-scrollbar-thumb:hover,
+.editor-inspector::-webkit-scrollbar-thumb:hover,
+.panel-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* ============================================
+   EMPTY STATES
+   ============================================ */
+
+.panel-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-8) var(--spacing-4);
+  text-align: center;
+  color: var(--text-3);
+  font-size: var(--text-sm);
+  gap: var(--spacing-3);
+}
+
+.panel-empty-icon {
+  font-size: 3rem;
+  opacity: 0.5;
+}
+
+.panel-empty-text {
+  max-width: 200px;
+  line-height: 1.5;
+}
+

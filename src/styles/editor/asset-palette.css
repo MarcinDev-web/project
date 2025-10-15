@@ -1,0 +1,1078 @@
+/**
+ * Asset Palette - Game-like Asset Browser
+ * Inspired by Minecraft, Kogama, and The Sims
+ */
+
+/* ============================================
+   PALETTE CONTAINER
+   ============================================ */
+
+.asset-palette-container {
+  position: fixed;
+  left: 50%;
+  bottom: 0;
+  transform: translateX(-50%);
+  z-index: calc(var(--z-sticky) + 5);
+  pointer-events: none;
+}
+
+.asset-palette-container > * {
+  pointer-events: auto;
+}
+
+/* ============================================
+   HOTBAR - Minecraft Style Bottom Bar
+   ============================================ */
+
+.asset-hotbar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-4);
+  background: linear-gradient(
+    180deg,
+    rgba(30, 35, 42, 0.98) 0%,
+    rgba(22, 27, 34, 0.98) 100%
+  );
+  backdrop-filter: blur(12px);
+  border: 3px solid rgba(60, 70, 85, 0.8);
+  border-bottom: none;
+  border-radius: 16px 16px 0 0;
+  box-shadow: 
+    0 -8px 16px rgba(0, 0, 0, 0.5),
+    0 -2px 8px rgba(0, 0, 0, 0.3);
+  margin-bottom: 0;
+  transition: none;
+}
+
+.asset-hotbar:hover {
+  transform: none;
+}
+
+/* ============================================
+   HOTBAR SLOTS - Minecraft Style
+   ============================================ */
+
+.hotbar-slot {
+  position: relative;
+  width: 4.5rem;
+  height: 4.5rem;
+  background: linear-gradient(
+    180deg,
+    rgba(45, 52, 62, 1) 0%,
+    rgba(35, 42, 52, 1) 100%
+  );
+  border: 3px solid rgba(70, 80, 95, 1);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  box-shadow: 
+    0 4px 0 rgba(20, 25, 30, 1),
+    0 6px 8px rgba(0, 0, 0, 0.4);
+}
+
+.hotbar-slot:hover {
+  border-color: rgba(100, 110, 130, 1);
+  transform: translateY(-2px);
+  box-shadow: 
+    0 6px 0 rgba(20, 25, 30, 1),
+    0 8px 12px rgba(0, 0, 0, 0.5);
+}
+
+.hotbar-slot.active {
+  border-color: rgb(59, 130, 246);
+  background: linear-gradient(
+    180deg,
+    rgba(59, 130, 246, 0.3) 0%,
+    rgba(37, 99, 235, 0.3) 100%
+  );
+  box-shadow: 
+    0 4px 0 rgba(29, 78, 216, 0.8),
+    0 6px 8px rgba(0, 0, 0, 0.4);
+  transform: translateY(-2px);
+}
+
+.hotbar-slot-number {
+  position: absolute;
+  top: 4px;
+  left: 6px;
+  font-size: 11px;
+  font-weight: 700;
+  color: rgba(255, 255, 255, 0.7);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 1);
+  pointer-events: none;
+  font-family: var(--font-mono);
+}
+
+.hotbar-slot.active .hotbar-slot-number {
+  color: rgb(147, 197, 253);
+}
+
+.hotbar-slot-icon {
+  width: 2.75rem;
+  height: 2.75rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(220, 225, 235, 1);
+}
+
+.hotbar-slot-icon svg {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+}
+
+.hotbar-slot-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+  
+  /* Performance optimization */
+}
+
+/* Empty slot styling */
+.hotbar-slot:empty .hotbar-slot-icon,
+.hotbar-slot-icon:empty {
+  opacity: 0.4;
+}
+
+/* ============================================
+   HOTBAR EXPAND BUTTON
+   ============================================ */
+
+.hotbar-expand-btn {
+  width: 5rem;
+  height: 4.5rem;
+  background: linear-gradient(
+    180deg,
+    rgb(34, 197, 94) 0%,
+    rgb(22, 163, 74) 100%
+  );
+  border: 3px solid rgb(21, 128, 61);
+  border-radius: 10px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+  margin-left: var(--spacing-3);
+  box-shadow: 
+    0 4px 0 rgb(20, 83, 45),
+    0 6px 8px rgba(0, 0, 0, 0.4);
+}
+
+.hotbar-expand-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 
+    0 6px 0 rgb(20, 83, 45),
+    0 8px 12px rgba(0, 0, 0, 0.5);
+}
+
+.hotbar-expand-btn:active {
+  transform: translateY(0);
+  box-shadow: 
+    0 2px 0 rgb(20, 83, 45),
+    0 4px 6px rgba(0, 0, 0, 0.4);
+}
+
+.hotbar-expand-btn svg {
+  width: 2.25rem;
+  height: 2.25rem;
+  color: white;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+}
+
+/* ============================================
+   HOTBAR FEEDBACK
+   ============================================ */
+
+.hotbar-feedback {
+  position: absolute;
+  bottom: calc(100% + var(--spacing-3));
+  left: 50%;
+  transform: translateX(-50%);
+  padding: var(--spacing-2) var(--spacing-4);
+  background: rgba(30, 35, 42, 0.98);
+  backdrop-filter: blur(8px);
+  border: 2px solid rgba(70, 80, 95, 1);
+  border-radius: 8px;
+  color: rgba(220, 225, 235, 1);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 6px 12px rgba(0, 0, 0, 0.5);
+  animation: feedbackSlideUp 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: none;
+}
+
+@keyframes feedbackSlideUp {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(12px) scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0) scale(1);
+  }
+}
+
+/* ============================================
+   HOTBAR COUNT BADGES
+   ============================================ */
+
+.hotbar-count-badge {
+  position: absolute;
+  bottom: 2px;
+  right: 2px;
+  min-width: 1.25rem;
+  height: 1.25rem;
+  padding: 0 4px;
+  background: rgba(59, 130, 246, 0.9);
+  border: 2px solid rgba(29, 78, 216, 1);
+  border-radius: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: white;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+  pointer-events: none;
+}
+
+.hotbar-count-badge.low {
+  background: rgba(239, 68, 68, 0.9);
+  border-color: rgba(185, 28, 28, 1);
+  animation: pulse 1s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.1);
+  }
+}
+
+/* ============================================
+   PALETTE PANEL - Expandable Build Menu
+   ============================================ */
+
+.asset-palette-panel {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%) translateY(20px);
+  width: clamp(600px, 80vw, 1000px);
+  max-height: 70vh;
+  background: linear-gradient(
+    180deg,
+    rgba(30, 35, 42, 0.98) 0%,
+    rgba(22, 27, 34, 0.98) 100%
+  );
+  backdrop-filter: blur(12px);
+  border: 3px solid rgba(60, 70, 85, 0.8);
+  border-radius: 16px;
+  box-shadow: 
+    0 -8px 24px rgba(0, 0, 0, 0.6),
+    0 -4px 12px rgba(0, 0, 0, 0.4);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  margin-bottom: var(--spacing-3);
+}
+
+.asset-palette-panel.expanded {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* ============================================
+   PALETTE HEADER
+   ============================================ */
+
+.palette-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-4) var(--spacing-5);
+  border-bottom: 3px solid rgba(60, 70, 85, 0.5);
+  background: rgba(45, 52, 62, 0.5);
+}
+
+.palette-header h2 {
+  margin: 0;
+  font-size: var(--text-2xl);
+  font-weight: 700;
+  color: rgba(220, 225, 235, 1);
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.6);
+}
+
+.palette-header-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+}
+
+.palette-close-btn {
+  width: 2.5rem;
+  height: 2.5rem;
+  background: rgba(220, 38, 38, 1);
+  border: 2px solid rgba(153, 27, 27, 1);
+  border-radius: 8px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.1s ease;
+  padding: 0;
+  box-shadow: 0 3px 0 rgba(127, 29, 29, 1);
+}
+
+.palette-close-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 0 rgba(127, 29, 29, 1);
+}
+
+.palette-close-btn:active {
+  transform: translateY(0);
+  box-shadow: 0 1px 0 rgba(127, 29, 29, 1);
+}
+
+.palette-close-btn svg {
+  width: 1.25rem;
+  height: 1.25rem;
+  color: white;
+}
+
+/* ============================================
+   SEARCH BAR
+   ============================================ */
+
+.palette-search-bar {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-3) var(--spacing-5);
+  background: rgba(20, 25, 32, 0.5);
+  border-bottom: 3px solid rgba(60, 70, 85, 0.3);
+}
+
+.search-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(160, 170, 185, 1);
+}
+
+.search-input {
+  flex: 1;
+  padding: 8px 12px;
+  background: rgba(45, 52, 62, 1);
+  border: 2px solid rgba(70, 80, 95, 1);
+  border-radius: 6px;
+  color: rgba(220, 225, 235, 1);
+  font-size: 14px;
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+
+.search-input::placeholder {
+  color: rgba(140, 150, 165, 1);
+}
+
+.search-input:focus {
+  outline: none;
+  background: rgba(50, 57, 67, 1);
+  border-color: rgb(59, 130, 246);
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+}
+
+.search-clear-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: rgba(60, 70, 85, 1);
+  border: 2px solid rgba(70, 80, 95, 1);
+  border-radius: 6px;
+  cursor: pointer;
+  color: rgba(160, 170, 185, 1);
+  transition: all 0.2s ease;
+}
+
+.search-clear-btn:hover {
+  background: rgba(70, 80, 95, 1);
+  border-color: rgba(90, 100, 115, 1);
+  color: rgba(220, 225, 235, 1);
+}
+
+/* ============================================
+   SORT DROPDOWN
+   ============================================ */
+
+.palette-sort-dropdown {
+  position: relative;
+}
+
+.sort-dropdown-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  background: rgba(45, 52, 62, 1);
+  border: 2px solid rgba(70, 80, 95, 1);
+  border-radius: 6px;
+  cursor: pointer;
+  color: rgba(180, 190, 205, 1);
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.2s ease;
+  height: 32px;
+}
+
+.sort-dropdown-btn:hover {
+  background: rgba(55, 62, 72, 1);
+  border-color: rgb(59, 130, 246);
+  color: rgba(220, 225, 235, 1);
+}
+
+.sort-dropdown-btn svg {
+  width: 14px;
+  height: 14px;
+}
+
+.sort-dropdown-menu {
+  position: absolute;
+  top: calc(100% + var(--spacing-2));
+  right: 0;
+  min-width: 12rem;
+  background: rgba(30, 35, 42, 0.98);
+  backdrop-filter: blur(12px);
+  border: 2px solid rgba(70, 80, 95, 1);
+  border-radius: 8px;
+  box-shadow: 0 8px 16px rgba(0, 0, 0, 0.5);
+  padding: var(--spacing-2);
+  z-index: 100;
+}
+
+.sort-dropdown-item {
+  display: block;
+  width: 100%;
+  padding: var(--spacing-2) var(--spacing-3);
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  text-align: left;
+  color: rgba(160, 170, 185, 1);
+  font-size: var(--text-sm);
+  cursor: pointer;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.sort-dropdown-item:hover {
+  background: rgba(55, 62, 72, 1);
+  color: rgba(220, 225, 235, 1);
+}
+
+.sort-dropdown-item.active {
+  background: rgba(59, 130, 246, 0.2);
+  color: rgb(147, 197, 253);
+  font-weight: 600;
+}
+
+/* ============================================
+   CATEGORY TABS - Minecraft Creative Menu Style
+   ============================================ */
+
+.palette-category-tabs {
+  display: flex;
+  gap: var(--spacing-2);
+  padding: var(--spacing-3) var(--spacing-4);
+  background: rgba(20, 25, 32, 0.5);
+  border-bottom: 3px solid rgba(60, 70, 85, 0.5);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.palette-category-tab {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-1);
+  min-width: 5rem;
+  padding: var(--spacing-2) var(--spacing-3);
+  background: rgba(45, 52, 62, 1);
+  border: 2px solid rgba(70, 80, 95, 1);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.1s ease;
+  box-shadow: 0 3px 0 rgba(30, 35, 42, 1);
+}
+
+.palette-category-tab:hover {
+  background: rgba(55, 62, 72, 1);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 0 rgba(30, 35, 42, 1);
+}
+
+.palette-category-tab.active {
+  background: linear-gradient(
+    180deg,
+    rgba(59, 130, 246, 0.4) 0%,
+    rgba(37, 99, 235, 0.4) 100%
+  );
+  border-color: rgb(59, 130, 246);
+  box-shadow: 0 3px 0 rgba(29, 78, 216, 1);
+  transform: translateY(-1px);
+}
+
+.category-tab-icon {
+  width: 2rem;
+  height: 2rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(160, 170, 185, 1);
+}
+
+.palette-category-tab.active .category-tab-icon {
+  color: rgb(147, 197, 253);
+}
+
+.category-tab-icon svg {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.5));
+}
+
+.category-tab-label {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: rgba(160, 170, 185, 1);
+  text-align: center;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.palette-category-tab.active .category-tab-label {
+  color: rgba(220, 225, 235, 1);
+}
+
+.category-tab-label-container {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
+}
+
+.category-tab-badge {
+  display: none !important;
+}
+
+/* Special category styling */
+.palette-category-tab.special-category.favorites-tab {
+  border-color: rgba(234, 179, 8, 0.6);
+}
+
+.palette-category-tab.special-category.favorites-tab.active {
+  background: linear-gradient(
+    180deg,
+    rgba(234, 179, 8, 0.4) 0%,
+    rgba(202, 138, 4, 0.4) 100%
+  );
+  border-color: rgb(234, 179, 8);
+  box-shadow: 0 3px 0 rgba(161, 98, 7, 1);
+}
+
+.palette-category-tab.special-category.recent-tab {
+  border-color: rgba(168, 85, 247, 0.6);
+}
+
+.palette-category-tab.special-category.recent-tab.active {
+  background: linear-gradient(
+    180deg,
+    rgba(168, 85, 247, 0.4) 0%,
+    rgba(147, 51, 234, 0.4) 100%
+  );
+  border-color: rgb(168, 85, 247);
+  box-shadow: 0 3px 0 rgba(109, 40, 217, 1);
+}
+
+/* ============================================
+   SUBCATEGORY BAR
+   ============================================ */
+
+.palette-subcategory-bar {
+  display: flex;
+  gap: var(--spacing-2);
+  padding: var(--spacing-3) var(--spacing-4);
+  background: rgba(25, 30, 38, 0.5);
+  border-bottom: 3px solid rgba(60, 70, 85, 0.3);
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+
+.palette-subcategory-bar::-webkit-scrollbar {
+  height: 6px;
+}
+
+.palette-subcategory-bar::-webkit-scrollbar-track {
+  background: rgba(20, 25, 32, 0.5);
+}
+
+.palette-subcategory-bar::-webkit-scrollbar-thumb {
+  background: rgba(70, 80, 95, 1);
+  border-radius: 3px;
+}
+
+.subcategory-chip {
+  flex-shrink: 0;
+  padding: 6px 14px;
+  background: rgba(45, 52, 62, 1);
+  border: 2px solid rgba(70, 80, 95, 1);
+  border-radius: 6px;
+  cursor: pointer;
+  color: rgba(180, 190, 205, 1);
+  font-size: 13px;
+  font-weight: 600;
+  transition: all 0.15s ease;
+  white-space: nowrap;
+  height: 32px;
+}
+
+.subcategory-chip:hover {
+  background: rgba(55, 62, 72, 1);
+  border-color: rgb(59, 130, 246);
+  color: rgba(220, 225, 235, 1);
+}
+
+.subcategory-chip.active {
+  background: rgb(59, 130, 246);
+  border-color: rgb(59, 130, 246);
+  color: white;
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.4);
+}
+
+/* ============================================
+   ASSET GRID - Kogama/Sims Style
+   ============================================ */
+
+.palette-asset-grid {
+  flex: 1;
+  overflow-y: auto;
+  overflow-x: hidden;
+  padding: var(--spacing-4);
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  gap: var(--spacing-3);
+  align-content: start;
+  background: rgba(20, 25, 32, 0.3);
+  
+  /* Performance optimizations */
+  will-change: auto;
+  contain: layout style paint;
+  content-visibility: auto;
+}
+
+/* Custom scrollbar for grid */
+.palette-asset-grid::-webkit-scrollbar {
+  width: 12px;
+}
+
+.palette-asset-grid::-webkit-scrollbar-track {
+  background: rgba(20, 25, 32, 0.5);
+  border-radius: 6px;
+}
+
+.palette-asset-grid::-webkit-scrollbar-thumb {
+  background: rgba(70, 80, 95, 1);
+  border-radius: 6px;
+  border: 2px solid rgba(20, 25, 32, 0.5);
+}
+
+.palette-asset-grid::-webkit-scrollbar-thumb:hover {
+  background: rgba(90, 100, 115, 1);
+}
+
+/* ============================================
+   ASSET CARDS - Large Icons, Game Style
+   ============================================ */
+
+.palette-asset-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-3);
+  background: linear-gradient(
+    180deg,
+    rgba(45, 52, 62, 1) 0%,
+    rgba(35, 42, 52, 1) 100%
+  );
+  border: 2px solid rgba(70, 80, 95, 1);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform 0.15s cubic-bezier(0.4, 0, 0.2, 1), 
+              box-shadow 0.15s cubic-bezier(0.4, 0, 0.2, 1), 
+              border-color 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  box-shadow: 
+    0 3px 0 rgba(25, 30, 38, 1),
+    0 5px 8px rgba(0, 0, 0, 0.3);
+  
+  /* Performance optimizations */
+  contain: layout style paint;
+  content-visibility: auto;
+  will-change: transform;
+  transform: translateZ(0); /* Force hardware acceleration */
+  backface-visibility: hidden;
+}
+
+.palette-asset-card:hover {
+  background: linear-gradient(
+    180deg,
+    rgba(55, 62, 72, 1) 0%,
+    rgba(45, 52, 62, 1) 100%
+  );
+  border-color: rgb(59, 130, 246);
+  transform: translateY(-2px) scale(1.03) translateZ(0);
+  box-shadow: 
+    0 5px 0 rgba(25, 30, 38, 1),
+    0 7px 12px rgba(0, 0, 0, 0.4);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .palette-asset-card,
+  .palette-asset-card:hover,
+  .hotbar-slot {
+    transition: none;
+    animation: none;
+  }
+}
+
+.palette-asset-card:active {
+  transform: translateY(0) scale(1.01);
+  box-shadow: 
+    0 2px 0 rgba(25, 30, 38, 1),
+    0 4px 6px rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================
+   FAVORITE STAR ON ASSET CARDS
+   ============================================ */
+
+.asset-card-favorite {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 24px;
+  height: 24px;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(20, 25, 32, 0.95);
+  backdrop-filter: blur(8px);
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  color: rgba(180, 190, 200, 0.7);
+  transition: all 0.15s ease;
+  z-index: 10;
+}
+
+.asset-card-favorite:hover {
+  background: rgba(25, 30, 38, 1);
+  color: rgb(250, 204, 21);
+  transform: scale(1.08);
+}
+
+.asset-card-favorite.active {
+  background: rgba(250, 204, 21, 0.15);
+  color: rgb(250, 204, 21);
+}
+
+.asset-card-favorite.active:hover {
+  background: rgba(250, 204, 21, 0.2);
+  color: rgb(253, 224, 71);
+  transform: scale(1.1);
+}
+
+.asset-card-favorite svg {
+  width: 14px;
+  height: 14px;
+  filter: drop-shadow(0 1px 2px rgba(0, 0, 0, 0.6));
+}
+
+.asset-card-favorite.active svg {
+  fill: currentColor;
+  stroke: currentColor;
+}
+
+.asset-card-icon {
+  width: 3.5rem;
+  height: 3.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(220, 225, 235, 1);
+}
+
+.asset-card-icon svg {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+}
+
+.asset-card-icon img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.5));
+  
+  /* Lazy loading optimization */
+}
+
+.asset-card-name {
+  font-size: var(--text-xs);
+  font-weight: 600;
+  color: rgba(160, 170, 185, 1);
+  text-align: center;
+  line-height: 1.2;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  line-clamp: 2;
+  -webkit-box-orient: vertical;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.palette-asset-card:hover .asset-card-name {
+  color: rgba(220, 225, 235, 1);
+}
+
+/* ============================================
+   EMPTY STATE
+   ============================================ */
+
+.palette-empty-state {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-3);
+  padding: var(--spacing-8);
+  color: rgba(120, 130, 145, 1);
+}
+
+.empty-state-icon {
+  width: 4rem;
+  height: 4rem;
+  opacity: 0.4;
+}
+
+.empty-state-icon svg {
+  width: 100%;
+  height: 100%;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.3));
+}
+
+.empty-state-text {
+  font-size: var(--text-base);
+  font-style: italic;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+/* ============================================
+   RESPONSIVE ADJUSTMENTS
+   ============================================ */
+
+/* Tablet */
+@media (max-width: 1024px) {
+  .asset-palette-panel {
+    width: 90vw;
+  }
+  
+  .palette-asset-grid {
+    grid-template-columns: repeat(auto-fill, minmax(90px, 1fr));
+  }
+}
+
+/* Mobile */
+@media (max-width: 768px) {
+  .asset-hotbar {
+    gap: var(--spacing-1);
+    padding: var(--spacing-2-5);
+  }
+
+  .hotbar-slot {
+    width: 3.5rem;
+    height: 3.5rem;
+  }
+
+  .hotbar-slot-icon {
+    width: 2.25rem;
+    height: 2.25rem;
+  }
+
+  .hotbar-expand-btn {
+    width: 4rem;
+    height: 3.5rem;
+    margin-left: var(--spacing-2);
+  }
+
+  .asset-palette-panel {
+    width: 95vw;
+    max-height: 60vh;
+  }
+
+  .palette-asset-grid {
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: var(--spacing-2);
+    padding: var(--spacing-3);
+  }
+
+  .asset-card-icon {
+    width: 2.5rem;
+    height: 2.5rem;
+  }
+
+  .asset-card-favorite {
+    width: 1.5rem;
+    height: 1.5rem;
+  }
+
+  .asset-card-favorite svg {
+    width: 0.875rem;
+    height: 0.875rem;
+  }
+
+  .palette-search-bar {
+    padding: var(--spacing-2) var(--spacing-3);
+  }
+
+  .subcategory-chip {
+    padding: var(--spacing-1) var(--spacing-2);
+    font-size: 10px;
+  }
+  
+  /* Disable entrance animations on mobile for better performance */
+  .palette-asset-card {
+    animation: none;
+  }
+}
+
+/* Small mobile */
+@media (max-width: 480px) {
+  .palette-asset-grid {
+    grid-template-columns: repeat(auto-fill, minmax(70px, 1fr));
+    gap: var(--spacing-1-5);
+  }
+  
+  .palette-category-tabs {
+    gap: var(--spacing-1);
+    padding: var(--spacing-2);
+  }
+  
+  .palette-category-tab {
+    min-width: 4rem;
+    padding: var(--spacing-1-5) var(--spacing-2);
+  }
+}
+
+/* ============================================
+   ENHANCED ANIMATIONS & MICRO-INTERACTIONS
+   ============================================ */
+
+/* Smooth palette expansion with better performance */
+.asset-palette-panel {
+  will-change: transform, opacity;
+  transform: translateZ(0); /* Force hardware acceleration */
+  backface-visibility: hidden;
+}
+
+/* Card entrance animation - optimized */
+.palette-asset-card {
+  animation: cardEntrance 0.25s cubic-bezier(0.4, 0, 0.2, 1) backwards;
+}
+
+@keyframes cardEntrance {
+  from {
+    opacity: 0;
+    transform: translateY(8px) scale(0.96) translateZ(0);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1) translateZ(0);
+  }
+}
+
+/* Stagger animation for cards - optimized for performance */
+.palette-asset-card:nth-child(1) { animation-delay: 0.01s; }
+.palette-asset-card:nth-child(2) { animation-delay: 0.02s; }
+.palette-asset-card:nth-child(3) { animation-delay: 0.03s; }
+.palette-asset-card:nth-child(4) { animation-delay: 0.04s; }
+.palette-asset-card:nth-child(5) { animation-delay: 0.05s; }
+.palette-asset-card:nth-child(6) { animation-delay: 0.06s; }
+
+/* Disable stagger for large grids (performance) */
+@media (min-width: 1024px) {
+  .palette-asset-card:nth-child(n+20) {
+    animation-delay: 0s;
+  }
+}
+
+/* Dragging states */
+.palette-asset-card.dragging {
+  opacity: 0.5;
+  transform: scale(0.95);
+  border-color: rgb(59, 130, 246);
+}
+
+.hotbar-slot.dragging {
+  opacity: 0.5;
+  transform: scale(0.95);
+}
+
+.hotbar-slot.drag-over {
+  border-color: rgb(34, 197, 94);
+  background: rgba(34, 197, 94, 0.1);
+  transform: scale(1.05);
+}
+
+/* Loading skeleton (for future use) */
+@keyframes shimmer {
+  0% {
+    background-position: -200% 0;
+  }
+  100% {
+    background-position: 200% 0;
+  }
+}
+
+.palette-asset-card.loading {
+  background: linear-gradient(
+    90deg,
+    rgba(45, 52, 62, 1) 0%,
+    rgba(55, 62, 72, 1) 50%,
+    rgba(45, 52, 62, 1) 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 1.5s infinite;
+}
+

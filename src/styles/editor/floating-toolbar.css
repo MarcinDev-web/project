@@ -1,0 +1,38 @@
+/**
+ * Floating Toolbar
+ * Contextual floating toolbar for selection actions
+ */
+
+/* ============================================
+   FLOATING TOOLBAR - Context actions
+   ============================================ */
+
+.floating-toolbar {
+  position: fixed;
+  top: var(--spacing-4);
+  left: 50%;
+  transform: translateX(-50%);
+  background: var(--color-surface-glass);
+  backdrop-filter: var(--blur-xl);
+  border: 1px solid var(--border-hover);
+  border-radius: var(--radius-2xl);
+  padding: var(--spacing-2);
+  box-shadow: var(--shadow-2xl);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
+  z-index: var(--z-dropdown);
+  animation: slideDownFloating var(--transition-base);
+}
+
+@keyframes slideDownFloating {
+  from {
+    opacity: 0;
+    transform: translateX(-50%) translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(-50%) translateY(0);
+  }
+}
+

@@ -1,0 +1,84 @@
+/**
+ * Main CSS Entry Point
+ * 
+ * Modular CSS architecture for the editor
+ * Imports in order: tokens → base → layout → components → editor → utilities
+ */
+
+/* ============================================
+   DESIGN SYSTEM
+   ============================================ */
+@import './design-tokens.css';
+
+/* ============================================
+   BASE
+   ============================================ */
+@import './base/reset.css';
+@import './base/typography.css';
+
+/* ============================================
+   LAYOUT
+   ============================================ */
+@import './layout/editor-layout.css';
+@import './layout/panels.css';
+
+/* ============================================
+   COMPONENTS - CORE
+   ============================================ */
+@import './components/buttons.css';
+@import './components/inputs.css';
+@import './components/forms.css';
+@import './components/checkboxes.css';
+@import './components/badges.css';
+@import './components/cards.css';
+@import './components/lists.css';
+@import './components/modals.css';
+@import './components/tooltips.css';
+@import './components/tooltips-enhanced.css';
+@import './components/notifications.css';
+@import './components/tabs.css';
+@import './components/workflow-selector.css';
+
+/* ============================================
+   EDITOR - SPECIFIC
+   ============================================ */
+@import './editor/toolbar.css';
+@import './editor/outliner.css';
+@import './editor/inspector.css';
+@import './editor/inspector-animations.css';
+@import './editor/inspector-responsive.css';
+@import './editor/logic-panel.css';
+@import './editor/asset-browser.css';
+@import './editor/asset-palette.css';
+@import './editor/assets-dropdown.css';
+@import './editor/unified-build-panel.css';
+@import './editor/hotbar-component.css';
+@import './editor/catalog-panel.css';
+@import './editor/color-picker.css';
+@import './editor/context-menu.css';
+@import './editor/status-bar.css';
+@import './editor/floating-toolbar.css';
+@import './editor/quick-menu.css';
+@import './editor/build-stats.css';
+@import './editor/floating-hints.css';
+@import './editor/panel-improvements.css';
+@import './editor/visual-polish.css';
+@import './editor/easy-place.css';
+@import './editor/asset-palette-dragdrop.css';
+@import './editor/quick-access-menu.css';
+@import './editor/script-workbench.css';
+@import './editor/entity-context-menu.css';
+@import './editor/bulk-operations.css';
+@import './editor/layers-panel.css';
+@import './editor/bookmarks-panel.css';
+@import './editor/history-panel.css';
+@import './editor/resizable-sidebar.css';
+
+/* ============================================
+   UTILITIES
+   ============================================ */
+@import './utilities/animations.css';
+@import './utilities/scrollbars.css';
+@import './utilities/spacing.css';
+@import './utilities/responsive.css';
+

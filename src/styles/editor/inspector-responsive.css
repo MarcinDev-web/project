@@ -1,0 +1,487 @@
+/**
+ * Inspector Responsive Design
+ * Adaptive layouts and touch-friendly targets
+ */
+
+/* ============================================
+   BASE RESPONSIVE BEHAVIOR
+   ============================================ */
+
+.inspector {
+  min-width: 280px;
+  max-width: 100vw;
+}
+
+.inspector-content {
+  /* Ensure minimum padding on small screens */
+  padding: clamp(var(--spacing-3), 2vw, var(--spacing-5));
+}
+
+/* ============================================
+   ENTITY CARD RESPONSIVE
+   ============================================ */
+
+.entity-card {
+  padding: clamp(var(--spacing-3), 2vw, var(--spacing-5));
+}
+
+.entity-card-icon {
+  width: clamp(2rem, 5vw, 2.5rem);
+  height: clamp(2rem, 5vw, 2.5rem);
+}
+
+.entity-card-name-input {
+  font-size: clamp(var(--text-base), 2vw, var(--text-lg));
+}
+
+.entity-badge {
+  padding: var(--spacing-1) var(--spacing-2);
+  font-size: clamp(10px, 1.5vw, var(--text-xs));
+}
+
+/* ============================================
+   NAVIGATION TABS RESPONSIVE
+   ============================================ */
+
+.inspector-tabs {
+  /* Enable horizontal scrolling on small screens */
+  overflow-x: auto;
+  overflow-y: hidden;
+  -webkit-overflow-scrolling: touch;
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-base-500) var(--color-base-300);
+}
+
+.inspector-tabs::-webkit-scrollbar {
+  height: 4px;
+}
+
+.inspector-tabs::-webkit-scrollbar-track {
+  background: var(--color-base-300);
+}
+
+.inspector-tabs::-webkit-scrollbar-thumb {
+  background: var(--color-base-500);
+  border-radius: 2px;
+}
+
+.inspector-tab {
+  min-width: var(--inspector-tab-min-width);
+  height: var(--touch-target-min);
+  padding: 0 clamp(var(--spacing-2), 2vw, var(--spacing-4));
+  font-size: clamp(11px, 1.8vw, var(--text-sm));
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+
+/* ============================================
+   PROPERTY SECTIONS RESPONSIVE
+   ============================================ */
+
+.property-section-header {
+  min-height: var(--touch-target-min);
+  padding: clamp(var(--spacing-2), 2vw, var(--spacing-3)) 
+           clamp(var(--spacing-3), 2vw, var(--spacing-4));
+}
+
+.property-content {
+  padding: clamp(var(--spacing-3), 2vw, var(--spacing-5));
+  gap: clamp(var(--spacing-3), 2vw, var(--spacing-4));
+}
+
+/* ============================================
+   VECTOR INPUT RESPONSIVE
+   ============================================ */
+
+.property-vector-v2 {
+  grid-template-columns: repeat(auto-fit, minmax(70px, 1fr));
+  gap: clamp(var(--spacing-1-5), 1.5vw, var(--spacing-2));
+}
+
+.property-vector-control {
+  min-height: var(--touch-target-min);
+  padding: clamp(var(--spacing-1-5), 1.5vw, var(--spacing-2));
+}
+
+.property-number-input {
+  font-size: clamp(12px, 2vw, var(--text-sm));
+  min-height: 24px;
+}
+
+.property-axis-label-v2 {
+  font-size: clamp(10px, 1.5vw, var(--text-xs));
+}
+
+/* ============================================
+   BUTTONS AND CONTROLS RESPONSIVE
+   ============================================ */
+
+.property-reset-btn,
+.precision-btn,
+.color-copy-btn {
+  min-width: var(--touch-target-min);
+  min-height: var(--touch-target-min);
+  padding: var(--spacing-2);
+}
+
+.precision-buttons {
+  gap: clamp(var(--spacing-1), 1vw, var(--spacing-2));
+}
+
+.script-item-delete,
+.animation-play-btn,
+.animation-pause-btn,
+.animation-stop-btn {
+  min-width: var(--touch-target-min);
+  min-height: var(--touch-target-min);
+}
+
+/* ============================================
+   COLOR PICKER RESPONSIVE
+   ============================================ */
+
+.color-picker-wrapper-v2 {
+  flex-wrap: wrap;
+  gap: clamp(var(--spacing-2), 2vw, var(--spacing-3));
+}
+
+.color-picker-swatch-v2 {
+  min-width: var(--touch-target-min);
+  min-height: var(--touch-target-min);
+}
+
+.color-value-input {
+  min-width: 80px;
+  font-size: clamp(11px, 1.8vw, var(--text-xs));
+}
+
+/* ============================================
+   SMALL SCREENS (< 360px)
+   ============================================ */
+
+@media (max-width: 360px) {
+  .inspector-content {
+    padding: var(--spacing-2);
+    gap: var(--spacing-3);
+  }
+  
+  .property-content {
+    padding: var(--spacing-3);
+    gap: var(--spacing-3);
+  }
+  
+  .property-vector-v2 {
+    grid-template-columns: 1fr;
+  }
+  
+  .entity-card-badges {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+  
+  .precision-buttons {
+    flex-wrap: wrap;
+  }
+  
+  .inspector-tab-label {
+    display: none;
+  }
+  
+  .inspector-tab {
+    min-width: var(--touch-target-min);
+    padding: 0 var(--spacing-2);
+  }
+}
+
+/* ============================================
+   MEDIUM SCREENS (360px - 768px)
+   ============================================ */
+
+@media (min-width: 361px) and (max-width: 768px) {
+  .inspector {
+    min-width: 320px;
+  }
+  
+  .property-row-v2 {
+    gap: var(--spacing-3);
+  }
+  
+  /* Better spacing for medium screens */
+  .property-content {
+    padding: var(--spacing-4);
+  }
+}
+
+/* ============================================
+   LARGE SCREENS (> 768px)
+   ============================================ */
+
+@media (min-width: 769px) {
+  .inspector {
+    min-width: var(--panel-width-md);
+  }
+  
+  .property-vector-v2 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+  
+  /* Show additional UI elements on larger screens */
+  .inspector-tab-label {
+    display: inline;
+  }
+}
+
+/* ============================================
+   TOUCH DEVICE OPTIMIZATIONS
+   ============================================ */
+
+@media (hover: none) and (pointer: coarse) {
+  /* Increase touch targets on touch devices */
+  .property-reset-btn,
+  .precision-btn,
+  .color-copy-btn,
+  .inspector-tab,
+  .property-section-header,
+  .script-item-delete {
+    min-height: var(--touch-target-comfortable);
+  }
+  
+  /* Increase spacing for touch */
+  .property-vector-v2 {
+    gap: var(--spacing-2-5);
+  }
+  
+  .precision-buttons {
+    gap: var(--spacing-2);
+  }
+  
+  /* Remove hover-only features */
+  .property-reset-btn {
+    opacity: 1;
+  }
+  
+  /* Larger tap areas */
+  .entity-card-name-input {
+    padding: var(--spacing-3);
+  }
+  
+  .property-number-input {
+    padding: var(--spacing-2);
+  }
+}
+
+/* ============================================
+   HIGH DPI SCREENS
+   ============================================ */
+
+@media (min-resolution: 2dppx) {
+  /* Sharper borders on high DPI */
+  .property-vector-control,
+  .property-input-wrapper,
+  .entity-card {
+    border-width: 1px;
+  }
+  
+  /* Thinner shadows */
+  .entity-card,
+  .property-section {
+    box-shadow: 0 2px 4px rgba(0, 0, 0, 0.15);
+  }
+}
+
+/* ============================================
+   LANDSCAPE MOBILE
+   ============================================ */
+
+@media (max-height: 500px) and (orientation: landscape) {
+  .inspector-content {
+    padding: var(--spacing-2);
+  }
+  
+  .property-content {
+    padding: var(--spacing-3);
+    gap: var(--spacing-2);
+  }
+  
+  .entity-card {
+    padding: var(--spacing-3);
+  }
+  
+  .property-section-header {
+    padding: var(--spacing-2) var(--spacing-3);
+  }
+}
+
+/* ============================================
+   ULTRA-WIDE SCREENS (> 1920px)
+   ============================================ */
+
+@media (min-width: 1921px) {
+  .inspector {
+    max-width: var(--panel-width-lg);
+  }
+  
+  /* Slightly larger fonts for ultra-wide */
+  .property-label-v2 {
+    font-size: var(--text-base);
+  }
+  
+  .property-number-input {
+    font-size: var(--text-base);
+  }
+}
+
+/* ============================================
+   PRINT STYLES (for documentation)
+   ============================================ */
+
+@media print {
+  .inspector {
+    background: white;
+    color: black;
+  }
+  
+  .inspector-tabs,
+  .property-reset-btn,
+  .precision-buttons,
+  .animation-player-controls {
+    display: none;
+  }
+  
+  .property-section-content.collapsed {
+    max-height: none !important;
+    opacity: 1 !important;
+  }
+}
+
+/* ============================================
+   ENVIRONMENT CONTROLS RESPONSIVE
+   ============================================ */
+
+@media (max-width: 480px) {
+  .skybox-preview-canvas {
+    aspect-ratio: 4 / 3;
+  }
+
+  .time-preset-buttons,
+  .fog-preset-buttons {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .time-preset-btn {
+    min-height: 55px;
+    padding: var(--spacing-2);
+  }
+
+  .time-preset-icon {
+    font-size: 20px;
+  }
+}
+
+@media (min-width: 481px) and (max-width: 768px) {
+  .time-preset-buttons {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .fog-preset-buttons {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ============================================
+   CAMERA CONTROLS RESPONSIVE
+   ============================================ */
+
+@media (max-width: 480px) {
+  .camera-preview-canvas {
+    aspect-ratio: 4 / 3;
+  }
+
+  .camera-preset-buttons {
+    grid-template-columns: 1fr;
+  }
+
+  .camera-preset-btn {
+    flex-direction: row;
+    justify-content: space-between;
+    padding: var(--spacing-2-5) var(--spacing-3);
+  }
+}
+
+@media (min-width: 481px) and (max-width: 768px) {
+  .camera-preset-buttons {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+/* ============================================
+   SCRIPT LIST RESPONSIVE
+   ============================================ */
+
+@media (max-width: 480px) {
+  .script-item {
+    grid-template-columns: auto 1fr auto;
+    gap: var(--spacing-1-5);
+  }
+
+  .script-item-duplicate {
+    display: none;
+  }
+
+  .script-item-toggle {
+    display: none;
+  }
+
+  .script-item-name-input {
+    font-size: var(--text-xs);
+  }
+
+  .script-actions-row {
+    flex-direction: column;
+  }
+
+  .script-add-btn,
+  .script-workbench-link-btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
+@media (min-width: 481px) and (max-width: 768px) {
+  .script-item {
+    grid-template-columns: auto 1fr auto auto auto;
+  }
+}
+
+/* Touch Device Optimizations for Scripts */
+@media (hover: none) and (pointer: coarse) {
+  .script-item {
+    padding: var(--spacing-2-5) var(--spacing-3);
+  }
+
+  .script-item-drag-handle,
+  .script-item-duplicate,
+  .script-item-delete {
+    min-width: var(--touch-target-comfortable);
+    min-height: var(--touch-target-comfortable);
+  }
+
+  .script-item-name-input {
+    padding: var(--spacing-2) var(--spacing-2-5);
+    font-size: var(--text-base);
+  }
+}
+
+/* ============================================
+   ACCESSIBILITY - FOCUS VISIBLE
+   ============================================ */
+
+@media (prefers-reduced-transparency) {
+  .inspector,
+  .property-section,
+  .entity-card {
+    background: var(--color-base-200);
+    backdrop-filter: none;
+  }
+}
+

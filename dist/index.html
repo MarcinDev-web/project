@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>3D Scene Editor - Professional Edition</title>
+    
+    <!-- Modern Design System -->
+    
+    <style>
+      body {
+        margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100vh;
+        overflow: hidden;
+        background: linear-gradient(180deg, #0c1018 0%, #05070d 100%);
+        color: #fafafa;
+        font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      }
+
+      #app {
+        position: fixed;
+        inset: 0;
+        width: 100%;
+        height: 100%;
+        overflow: hidden;
+      }
+
+      canvas {
+        display: block;
+        width: 100%;
+        height: 100%;
+        background: #000;
+      }
+
+      #status {
+        margin: 0;
+        font-size: 0.8125rem;
+        letter-spacing: 0.02em;
+        color: rgba(255, 255, 255, 0.8);
+        font-weight: 500;
+      }
+
+      #hud {
+        position: fixed;
+        bottom: 2rem;
+        left: 50%;
+        transform: translateX(-50%);
+        padding: 0.75rem 1.25rem;
+        border-radius: 999px;
+        backdrop-filter: blur(16px);
+        background: rgba(15, 19, 24, 0.75);
+        border: 1px solid rgba(255, 255, 255, 0.1);
+        box-shadow: 0 12px 32px rgba(0, 0, 0, 0.4);
+        z-index: 100;
+        transition: all 200ms ease;
+      }
+
+      #hud:hover {
+        background: rgba(20, 25, 32, 0.85);
+        box-shadow: 0 16px 40px rgba(0, 0, 0, 0.5);
+      }
+
+      /* Loading indicator */
+      .loading {
+        position: fixed;
+        top: 50%;
+        left: 50%;
+        transform: translate(-50%, -50%);
+        padding: 2rem 3rem;
+        background: var(--color-surface-glass);
+        backdrop-filter: blur(20px);
+        border: 1px solid var(--border-default);
+        border-radius: var(--radius-xl);
+        box-shadow: var(--shadow-2xl);
+        text-align: center;
+        z-index: 1000;
+      }
+
+      .loading-spinner {
+        width: 3rem;
+        height: 3rem;
+        border: 3px solid var(--color-base-400);
+        border-top-color: var(--color-accent-400);
+        border-radius: 50%;
+        animation: spin 1s linear infinite;
+        margin: 0 auto 1rem;
+      }
+
+      @keyframes spin {
+        to { transform: rotate(360deg); }
+      }
+    </style>
+    <script type="module" crossorigin src="/assets/index-CCc7fZ6B.js"></script>
+    <link rel="stylesheet" crossorigin href="/assets/index-Ce6-ax3k.css">
+  </head>
+  <body>
+    <div id="app">
+      <canvas></canvas>
+      <div id="hud">
+        <p id="status">Initializing WebGPU...</p>
+      </div>
+    </div>
+  </body>
+</html>

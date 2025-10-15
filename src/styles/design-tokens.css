@@ -1,0 +1,380 @@
+/**
+ * Design Tokens - Professional Editor Design System
+ * 
+ * Inspired by: Figma, VSCode, Linear, Arc Browser
+ * Style: Modern, minimal, sophisticated
+ * Theme: Dark with subtle depth and glassmorphism
+ */
+
+:root {
+  /* ============================================
+     COLOR PALETTE - Sophisticated Dark Theme
+     ============================================ */
+  
+  /* Base - Deep, rich backgrounds */
+  --color-base-100: #0a0d12;  /* Deepest - canvas background */
+  --color-base-200: #0f1318;  /* Deep - panel background */
+  --color-base-300: #15191f;  /* Medium - elevated surfaces */
+  --color-base-400: #1c2128;  /* Light - hover states */
+  --color-base-500: #252c35;  /* Lighter - active states */
+  --color-base-550: #232a34;  /* Deep surfaces - gradients */
+  --color-base-600: #2d343e;  /* Elevated surfaces */
+  --color-base-650: #373e48;  /* Hovered elevated surfaces */
+  --color-base-700: #14191e;  /* Shadow surfaces */
+  --color-base-750: #191e26;  /* Deep shadow accents */
+  
+  /* Surface - Solid layers (gaming style) */
+  --color-surface-solid: rgba(30, 35, 42, 0.98);
+  --color-surface-solid-hover: rgba(45, 52, 62, 1);
+  --color-surface-elevated: rgba(45, 52, 62, 1);
+  --color-surface-glass: rgba(30, 35, 42, 0.98);
+  --color-surface-glass-hover: rgba(45, 52, 62, 1);
+  --color-surface-elevated-50: rgba(45, 52, 62, 0.5);
+  --color-surface-elevated-70: rgba(35, 42, 52, 0.7);
+  --color-surface-deep-50: rgba(20, 25, 32, 0.5);
+  --color-surface-solid-50: rgba(30, 35, 42, 0.5);
+  --color-surface-solid-deep: rgba(22, 27, 34, 0.98);
+  
+  /* Text - High contrast, readable */
+  --color-text-primary: #e6e8eb;    /* Main text */
+  --color-text-secondary: #9ca3af;  /* Secondary text */
+  --color-text-tertiary: #6b7280;   /* Tertiary/hints */
+  --color-text-bright: #dce1eb;     /* Bright UI text */
+  --color-text-muted: #a0aab9;      /* Muted text */
+  --color-text-placeholder: #788291;/* Placeholder text */
+  --color-text-inverse: #0a0d12;    /* On light backgrounds */
+  
+  /* Accent - Professional blue */
+  --color-accent-50: #e0f2fe;
+  --color-accent-100: #bae6fd;
+  --color-accent-200: #7dd3fc;
+  --color-accent-300: #38bdf8;
+  --color-accent-400: #0ea5e9;  /* Primary accent */
+  --color-accent-500: #0284c7;
+  --color-accent-600: #0369a1;
+  --color-accent-700: #075985;
+  
+  /* Semantic colors */
+  --color-success: #10b981;
+  --color-success-light: #4ade80;
+  --color-success-strong: #22c55e;
+  --color-success-deep: #16a34a;
+  --color-success-border: #15803d;
+  --color-success-shadow: #14532d;
+  --color-success-bg: rgba(16, 185, 129, 0.1);
+  --color-success-alpha-10: rgba(34, 197, 94, 0.1);
+  --color-warning: #f59e0b;
+  --color-warning-light: #facc15;
+  --color-warning-strong: #eab308;
+  --color-warning-deep: #ca8a04;
+  --color-warning-border: #a16207;
+  --color-warning-shadow: #854d0e;
+  --color-warning-bg: rgba(245, 158, 11, 0.1);
+  --color-warning-alpha-15: rgba(234, 179, 8, 0.15);
+  --color-warning-alpha-25: rgba(234, 179, 8, 0.25);
+  --color-error: #ef4444;
+  --color-error-light: #f87171;
+  --color-error-strong: #dc2626;
+  --color-error-deep: #b91c1c;
+  --color-error-border: #991b1b;
+  --color-error-shadow: #7f1d1d;
+  --color-error-bg: rgba(239, 68, 68, 0.1);
+  --color-error-alpha-08: rgba(244, 63, 94, 0.08);
+  --color-info: #3b82f6;
+  --color-info-light: #60a5fa;
+  --color-info-strong: #2563eb;
+  --color-info-deep: #1d4ed8;
+  --color-info-border: #1d4ed8;
+  --color-info-bg: rgba(59, 130, 246, 0.1);
+  --color-info-alpha-08: rgba(59, 130, 246, 0.08);
+  --color-info-alpha-10: rgba(59, 130, 246, 0.1);
+  --color-info-alpha-15: rgba(37, 99, 235, 0.15);
+  --color-info-alpha-20: rgba(59, 130, 246, 0.2);
+  --color-info-alpha-25: rgba(37, 99, 235, 0.25);
+  --color-info-alpha-35: rgba(37, 99, 235, 0.35);
+  --color-accent-alpha-08: rgba(14, 165, 233, 0.08);
+  --color-accent-alpha-10: rgba(14, 165, 233, 0.1);
+  --color-accent-alpha-30: rgba(14, 165, 233, 0.3);
+  
+  /* Borders - Chunky, defined */
+  --color-border-subtle: rgba(70, 80, 95, 0.5);
+  --color-border-medium: rgba(70, 80, 95, 0.8);
+  --color-border-strong: rgba(70, 80, 95, 1);
+  --color-border-highlight: #646e82;
+  --color-border-accent: rgb(59, 130, 246);
+  
+  /* Overlays */
+  --color-overlay-200: rgba(0, 0, 0, 0.2);
+  --color-overlay-300: rgba(0, 0, 0, 0.3);
+  --color-overlay-400: rgba(0, 0, 0, 0.4);
+  --color-overlay-500: rgba(0, 0, 0, 0.5);
+  --color-overlay-600: rgba(0, 0, 0, 0.6);
+  --color-overlay-700: rgba(0, 0, 0, 0.7);
+  --color-overlay-800: rgba(0, 0, 0, 0.8);
+  --color-overlay-light: var(--color-overlay-300);
+  --color-overlay-medium: var(--color-overlay-500);
+  --color-overlay-heavy: rgba(0, 0, 0, 0.75);
+  
+  /* ============================================
+     SPACING SCALE - Consistent, harmonious
+     ============================================ */
+  
+  --spacing-0: 0;
+  --spacing-px: 1px;
+  --spacing-0-5: 0.125rem;  /* 2px */
+  --spacing-1: 0.25rem;     /* 4px */
+  --spacing-1-5: 0.375rem;  /* 6px */
+  --spacing-2: 0.5rem;      /* 8px */
+  --spacing-2-5: 0.625rem;  /* 10px */
+  --spacing-3: 0.75rem;     /* 12px */
+  --spacing-3-5: 0.875rem;  /* 14px */
+  --spacing-4: 1rem;        /* 16px */
+  --spacing-5: 1.25rem;     /* 20px */
+  --spacing-6: 1.5rem;      /* 24px */
+  --spacing-7: 1.75rem;     /* 28px */
+  --spacing-8: 2rem;        /* 32px */
+  --spacing-10: 2.5rem;     /* 40px */
+  --spacing-12: 3rem;       /* 48px */
+  --spacing-16: 4rem;       /* 64px */
+  
+  /* ============================================
+     TYPOGRAPHY - Clean, professional
+     ============================================ */
+  
+  /* Font families */
+  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 
+               'Helvetica Neue', Arial, sans-serif;
+  --font-mono: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 
+               'Courier New', monospace;
+  
+  /* Font sizes */
+  --text-xs: 0.6875rem;    /* 11px */
+  --text-sm: 0.8125rem;    /* 13px */
+  --text-base: 0.875rem;   /* 14px */
+  --text-md: 0.9375rem;    /* 15px */
+  --text-lg: 1rem;         /* 16px */
+  --text-xl: 1.125rem;     /* 18px */
+  --text-2xl: 1.25rem;     /* 20px */
+  --text-3xl: 1.5rem;      /* 24px */
+  
+  /* Font weights */
+  --font-normal: 400;
+  --font-medium: 500;
+  --font-semibold: 600;
+  --font-bold: 700;
+  
+  /* Line heights */
+  --leading-tight: 1.25;
+  --leading-normal: 1.5;
+  --leading-relaxed: 1.75;
+  
+  /* Letter spacing */
+  --tracking-tight: -0.01em;
+  --tracking-normal: 0;
+  --tracking-wide: 0.025em;
+  --tracking-wider: 0.05em;
+  
+  /* ============================================
+     BORDER RADIUS - Modern, soft
+     ============================================ */
+  
+  --radius-sm: 0.375rem;   /* 6px */
+  --radius-md: 0.5rem;     /* 8px */
+  --radius-lg: 0.75rem;    /* 12px */
+  --radius-xl: 1rem;       /* 16px */
+  --radius-2xl: 1.5rem;    /* 24px */
+  --radius-full: 9999px;   /* Circle */
+  
+  /* ============================================
+     SHADOWS - Clean depth (no glows)
+     ============================================ */
+  
+  /* Standard drop shadows */
+  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 6px 12px rgba(0, 0, 0, 0.5);
+  --shadow-xl: 0 8px 16px rgba(0, 0, 0, 0.6);
+  --shadow-2xl: 0 12px 24px rgba(0, 0, 0, 0.7);
+  --shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+  
+  /* Button press shadows */
+  --shadow-button-sm: 0 3px 0 rgba(20, 25, 30, 1);
+  --shadow-button-md: 0 4px 0 rgba(20, 25, 30, 1);
+  --shadow-button-lg: 0 5px 0 rgba(20, 25, 30, 1);
+  --shadow-button-hover: 0 6px 0 rgba(20, 25, 30, 1);
+  
+  /* Combined shadows for depth */
+  --shadow-depth-sm: 0 3px 0 rgba(20, 25, 30, 1), 0 5px 8px rgba(0, 0, 0, 0.3);
+  --shadow-depth-md: 0 4px 0 rgba(20, 25, 30, 1), 0 6px 12px rgba(0, 0, 0, 0.4);
+  --shadow-depth-lg: 0 5px 0 rgba(20, 25, 30, 1), 0 8px 16px rgba(0, 0, 0, 0.5);
+  
+  /* ============================================
+     Z-INDEX SCALE - Consistent layering
+     ============================================ */
+  
+  --z-base: 0;
+  --z-dropdown: 100;
+  --z-sticky: 200;
+  --z-overlay: 300;
+  --z-modal: 400;
+  --z-popover: 500;
+  --z-tooltip: 600;
+  --z-notification: 700;
+  
+  /* ============================================
+     TRANSITIONS - Fast, clean (gaming style)
+     ============================================ */
+  
+  --transition-fast: 0.1s ease;
+  --transition-base: 0.15s ease;
+  --transition-slow: 0.2s ease;
+  --transition-smooth: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-spring: 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  
+  /* Easing functions - simple and fast */
+  --ease-in: ease-in;
+  --ease-out: ease-out;
+  --ease-in-out: ease-in-out;
+  --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  
+  /* ============================================
+     BLUR EFFECTS - Glassmorphism
+     ============================================ */
+  
+  --blur-sm: blur(4px);
+  --blur-md: blur(8px);
+  --blur-lg: blur(12px);
+  --blur-xl: blur(16px);
+  --blur-2xl: blur(24px);
+  
+  /* ============================================
+     COMPONENT-SPECIFIC TOKENS
+     ============================================ */
+  
+  /* Buttons - Gaming style */
+  --button-height-sm: 2rem;      /* 32px */
+  --button-height-md: 2.5rem;    /* 40px */
+  --button-height-lg: 3rem;      /* 48px */
+  --button-border-width: 2px;
+  --button-border-width-thick: 3px;
+  
+  /* Inputs */
+  --input-height-sm: 2rem;       /* 32px */
+  --input-height-md: 2.5rem;     /* 40px */
+  --input-height-lg: 3rem;       /* 48px */
+  --input-min-width: 80px;       /* Minimum clickable width */
+  --input-number-width: 90px;    /* Number input optimal width */
+  
+  /* Panel widths */
+  --panel-width-sm: 280px;
+  --panel-width-md: 320px;
+  --panel-width-lg: 380px;
+  
+  /* Toolbar heights */
+  --toolbar-height: 3.5rem;     /* 56px */
+  --toolbar-padding: var(--spacing-4);
+  
+  /* Grid */
+  --grid-gap-sm: var(--spacing-2);
+  --grid-gap-md: var(--spacing-3);
+  --grid-gap-lg: var(--spacing-4);
+  
+  /* Inspector-specific tokens */
+  --inspector-section-padding: var(--spacing-5);
+  --inspector-section-gap: var(--spacing-4);
+  --inspector-header-height: 3.5rem;
+  --inspector-tab-height: 2.75rem;
+  --inspector-tab-min-width: 80px;
+  --inspector-entity-card-padding: var(--spacing-5);
+  --inspector-property-row-gap: var(--spacing-4);
+  --inspector-vector-control-height: 3rem;
+  --inspector-label-font-size: var(--text-sm);
+  --inspector-value-font-size: var(--text-base);
+  
+  /* Touch targets (accessibility) */
+  --touch-target-min: 44px;
+  --touch-target-comfortable: 48px;
+  
+  /* Focus ring */
+  --focus-ring-width: 3px;
+  --focus-ring-offset: 2px;
+  --focus-ring-color: var(--color-accent-400);
+  --focus-ring-alpha: var(--color-accent-alpha-30);
+  
+  /* Semantic colors for inspector */
+  --color-success-alpha-15: rgba(16, 185, 129, 0.15);
+  --color-success-alpha-25: rgba(16, 185, 129, 0.25);
+  --color-success-400: #10b981;
+  --color-danger-alpha-15: rgba(239, 68, 68, 0.15);
+  --color-danger-alpha-25: rgba(239, 68, 68, 0.25);
+  --color-danger-400: #ef4444;
+  --color-warn-400: #fbbf24;
+  --color-warn-500: #f59e0b;
+  --color-accent-alpha-15: rgba(14, 165, 233, 0.15);
+  --color-accent-alpha-25: rgba(14, 165, 233, 0.25);
+  --color-accent-alpha-35: rgba(14, 165, 233, 0.35);
+}
+
+/* ============================================
+   SEMANTIC TOKEN ALIASES
+   ============================================ */
+
+:root {
+  /* Backgrounds */
+  --bg-canvas: var(--color-base-100);
+  --bg-panel: var(--color-surface-glass);
+  --bg-elevated: var(--color-surface-elevated);
+  --bg-hover: var(--color-base-400);
+  --bg-active: var(--color-base-500);
+  
+  /* Interactive states */
+  --bg-button: var(--color-base-300);
+  --bg-button-hover: var(--color-base-400);
+  --bg-button-active: var(--color-base-500);
+  --bg-button-primary: var(--color-accent-400);
+  --bg-button-primary-hover: var(--color-accent-500);
+  
+  /* Borders */
+  --border-default: var(--color-border-subtle);
+  --border-hover: var(--color-border-medium);
+  --border-focus: var(--color-accent-400);
+  
+  /* Text */
+  --text-1: var(--color-text-primary);
+  --text-2: var(--color-text-secondary);
+  --text-3: var(--color-text-tertiary);
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+.truncate {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+/* ============================================
+   CUSTOM PROPERTIES FOR ANIMATIONS
+   ============================================ */
+
+@property --gradient-angle {
+  syntax: '<angle>';
+  initial-value: 0deg;
+  inherits: false;
+}
+

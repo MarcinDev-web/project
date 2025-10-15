@@ -1,0 +1,77 @@
+/**
+ * Entity Context Menu
+ * Right-click menu for entity operations
+ */
+
+.entity-context-menu {
+  position: fixed;
+  z-index: 10000;
+  min-width: 200px;
+  background: var(--color-base-600);
+  border: 2px solid var(--border-default);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.4);
+  padding: var(--spacing-2);
+  animation: contextMenuFadeIn 0.15s ease-out;
+}
+
+@keyframes contextMenuFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.entity-context-menu-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  width: 100%;
+  padding: var(--spacing-2) var(--spacing-3);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: background var(--transition-fast);
+  color: var(--text-1);
+  font-size: var(--text-sm);
+  text-align: left;
+}
+
+.entity-context-menu-item:hover {
+  background: var(--color-base-500);
+}
+
+.entity-context-menu-item:active {
+  background: var(--color-base-400);
+}
+
+.entity-context-menu-item.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.entity-context-menu-item.disabled:hover {
+  background: transparent;
+}
+
+.entity-context-menu-label {
+  flex: 1;
+}
+
+.entity-context-menu-shortcut {
+  font-size: var(--text-xs);
+  color: var(--text-3);
+  opacity: 0.7;
+}
+
+.entity-context-menu-separator {
+  height: 1px;
+  background: var(--border-default);
+  margin: var(--spacing-1) 0;
+}
+

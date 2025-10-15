@@ -1,0 +1,96 @@
+/**
+ * Tabs
+ * Tab navigation components - Gaming style
+ */
+
+/* ============================================
+   TABS - Gaming Style
+   ============================================ */
+
+.tabs {
+  display: flex;
+  gap: var(--spacing-2);
+  border-bottom: 3px solid rgba(60, 70, 85, 0.5);
+  padding: 0 var(--spacing-4);
+  background: rgba(20, 25, 32, 0.3);
+}
+
+.tab {
+  padding: var(--spacing-2-5) var(--spacing-4);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  color: rgba(160, 170, 185, 1);
+  background: transparent;
+  border: none;
+  border-bottom: 3px solid transparent;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  position: relative;
+  margin-bottom: -3px;
+}
+
+.tab:hover:not(.tab-active) {
+  color: rgba(220, 225, 235, 1);
+  background: rgba(45, 52, 62, 0.5);
+  border-radius: 8px 8px 0 0;
+}
+
+.tab-active {
+  color: rgb(147, 197, 253);
+  border-bottom-color: rgb(59, 130, 246);
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.tab-badge {
+  margin-left: var(--spacing-1-5);
+  padding: 2px var(--spacing-1-5);
+  font-size: var(--text-xs);
+  background: rgba(70, 80, 95, 1);
+  border-radius: 4px;
+  font-weight: 700;
+  border: 1px solid rgba(60, 70, 85, 1);
+}
+
+/* ============================================
+   TAB BAR - Gaming Style
+   ============================================ */
+
+.tab-bar {
+  display: flex;
+  gap: var(--spacing-2);
+  padding: var(--spacing-3) var(--spacing-4);
+  border-bottom: 3px solid rgba(60, 70, 85, 0.5);
+  background: rgba(20, 25, 32, 0.5);
+  flex-shrink: 0;
+}
+
+.tab-button {
+  background: rgba(45, 52, 62, 1);
+  border: 2px solid rgba(70, 80, 95, 1);
+  color: rgba(160, 170, 185, 1);
+  font-size: var(--text-sm);
+  font-weight: 600;
+  padding: var(--spacing-2) var(--spacing-3);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: transform var(--transition-fast), background var(--transition-fast);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  box-shadow: 0 2px 0 rgba(25, 30, 38, 1);
+}
+
+.tab-button:hover {
+  background: rgba(55, 62, 72, 1);
+  color: rgba(220, 225, 235, 1);
+  transform: translateY(-1px);
+  box-shadow: 0 3px 0 rgba(25, 30, 38, 1);
+}
+
+.tab-button.active {
+  background: linear-gradient(180deg, rgba(59, 130, 246, 0.4) 0%, rgba(37, 99, 235, 0.4) 100%);
+  border-color: rgb(59, 130, 246);
+  color: rgba(220, 225, 235, 1);
+  font-weight: 700;
+  box-shadow: 0 2px 0 rgba(29, 78, 216, 1);
+}

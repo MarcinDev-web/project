@@ -1,0 +1,45 @@
+/**
+ * Spacing Utilities
+ * Layout and spacing utility classes
+ */
+
+/* ============================================
+   LAYOUT UTILITIES
+   ============================================ */
+
+.flex { display: flex; }
+.inline-flex { display: inline-flex; }
+/* Note: .grid is defined in layout/editor-layout.css with gap property */
+
+.items-center { align-items: center; }
+.justify-center { justify-content: center; }
+.justify-between { justify-content: space-between; }
+
+/* ============================================
+   GAP UTILITIES
+   ============================================ */
+
+.gap-1 { gap: var(--spacing-1); }
+.gap-2 { gap: var(--spacing-2); }
+.gap-3 { gap: var(--spacing-3); }
+.gap-4 { gap: var(--spacing-4); }
+
+/* ============================================
+   PADDING UTILITIES
+   ============================================ */
+
+.p-2 { padding: var(--spacing-2); }
+.p-3 { padding: var(--spacing-3); }
+.p-4 { padding: var(--spacing-4); }
+.p-5 { padding: var(--spacing-5); }
+
+/* ============================================
+   BORDER RADIUS UTILITIES
+   ============================================ */
+
+.rounded-sm { border-radius: var(--radius-sm); }
+.rounded-md { border-radius: var(--radius-md); }
+.rounded-lg { border-radius: var(--radius-lg); }
+.rounded-xl { border-radius: var(--radius-xl); }
+.rounded-full { border-radius: var(--radius-full); }
+

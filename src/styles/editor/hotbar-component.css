@@ -1,0 +1,124 @@
+/**
+ * Hotbar Component Styles
+ * Minecraft-style bottom hotbar with 9 slots
+ */
+
+.hotbar-component {
+  display: flex;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: var(--color-bg-2);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-lg);
+  align-items: center;
+}
+
+.hotbar-slot {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  background: var(--color-bg-3);
+  border: 2px solid var(--color-border-1);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+}
+
+.hotbar-slot:hover {
+  border-color: var(--color-primary);
+  background: var(--color-bg-4);
+  transform: translateY(-2px);
+}
+
+.hotbar-slot.selected {
+  border-color: var(--color-primary);
+  background: var(--color-primary-alpha-10);
+  box-shadow: 0 0 0 2px var(--color-primary-alpha-20);
+}
+
+.hotbar-slot.has-asset {
+  border-color: var(--color-success);
+}
+
+.hotbar-slot.dragging {
+  opacity: 0.5;
+  transform: scale(0.95);
+}
+
+.hotbar-slot.drag-over {
+  border-color: var(--color-primary);
+  background: var(--color-primary-alpha-20);
+  border-style: dashed;
+}
+
+.hotbar-slot-number {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--color-text-2);
+  background: var(--color-bg-1);
+  padding: 1px 4px;
+  border-radius: 2px;
+  line-height: 1;
+  z-index: 1;
+}
+
+.hotbar-slot-icon {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.hotbar-slot-color {
+  width: 80%;
+  height: 80%;
+  border-radius: var(--radius-xs);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+.hotbar-count-badge {
+  position: absolute;
+  bottom: 2px;
+  right: 4px;
+  background: var(--color-bg-1);
+  color: var(--color-text-1);
+  font-size: 0.7rem;
+  font-weight: 600;
+  padding: 1px 4px;
+  border-radius: 2px;
+  line-height: 1;
+  border: 1px solid var(--color-border-2);
+  z-index: 2;
+  display: none;
+}
+
+.hotbar-count-badge.low {
+  background: var(--color-warning);
+  color: var(--color-bg-1);
+  border-color: var(--color-warning);
+}
+
+/* Keyboard hint animation */
+@keyframes hotbar-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 var(--color-primary-alpha-40);
+  }
+  50% {
+    box-shadow: 0 0 0 4px var(--color-primary-alpha-10);
+  }
+}
+
+.hotbar-slot.keyboard-hint {
+  animation: hotbar-pulse 2s ease-in-out infinite;
+}
+

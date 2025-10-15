@@ -1,0 +1,80 @@
+/**
+ * Bookmarks Panel
+ * Quick access to bookmarked entities
+ */
+
+.bookmarks-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.bookmarks-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-4);
+  border-bottom: 3px solid rgba(60, 70, 85, 0.5);
+  background: rgba(20, 25, 32, 0.3);
+}
+
+.bookmarks-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-2);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+}
+
+.bookmark-item {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-3);
+  background: transparent;
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+}
+
+.bookmark-item:hover {
+  background: rgba(45, 52, 62, 0.5);
+  border-color: rgba(70, 80, 95, 0.5);
+}
+
+.bookmark-item:hover .bookmark-remove {
+  opacity: 1;
+}
+
+.bookmark-name {
+  flex: 1;
+  text-align: left;
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--text-1);
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.bookmark-name:hover {
+  color: rgb(59, 130, 246);
+}
+
+.bookmark-time {
+  font-size: var(--text-xs);
+  color: var(--text-3);
+  flex-shrink: 0;
+}
+
+.bookmark-remove {
+  opacity: 0;
+  transition: opacity var(--transition-fast);
+}
+

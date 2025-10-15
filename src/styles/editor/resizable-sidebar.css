@@ -1,0 +1,58 @@
+/**
+ * Resizable Sidebar
+ * Drag handle and resizing styles
+ */
+
+.sidebar-resize-handle {
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 8px;
+  height: 100%;
+  cursor: ew-resize;
+  z-index: 100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background var(--transition-fast);
+}
+
+.sidebar-resize-handle:hover {
+  background: rgba(59, 130, 246, 0.1);
+}
+
+.sidebar-resize-handle:hover .sidebar-resize-indicator {
+  background: rgb(59, 130, 246);
+  opacity: 1;
+}
+
+.sidebar-resize-indicator {
+  width: 2px;
+  height: 100%;
+  background: var(--border-default);
+  opacity: 0.5;
+  transition: all var(--transition-fast);
+}
+
+/* Active resizing state */
+.editor-sidebar.resizing {
+  transition: none;
+  user-select: none;
+}
+
+.editor-sidebar.resizing .sidebar-resize-handle {
+  background: rgba(59, 130, 246, 0.2);
+}
+
+.editor-sidebar.resizing .sidebar-resize-indicator {
+  background: rgb(59, 130, 246);
+  opacity: 1;
+  box-shadow: 0 0 8px rgba(59, 130, 246, 0.5);
+}
+
+/* Sidebar base styles enhancement */
+.editor-sidebar {
+  position: relative;
+  transition: width 0.2s ease-out;
+}
+

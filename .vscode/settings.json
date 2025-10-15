@@ -1,0 +1,16 @@
+{
+  "vitest.enable": true,
+  "vitest.commandLine": "npx vitest",
+  "vitest.autoRun": false,
+  "editor.codeActionsOnSave": {
+    "source.fixAll.eslint": "explicit"
+  },
+  "files.watcherExclude": {
+    "**/node_modules/**": true,
+    "**/.git/**": true,
+    "**/dist/**": true,
+    "**/coverage/**": true,
+    "**/.vitest/**": true
+  }
+}
+

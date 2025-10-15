@@ -1,0 +1,257 @@
+/**
+ * Floating Hints - Contextual action hints
+ * Inspired by modern game UI feedback
+ */
+
+/* ============================================
+   CONTAINER
+   ============================================ */
+
+.floating-hints-container {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: calc(var(--z-modal) + 20);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  gap: var(--spacing-2);
+  padding: var(--spacing-4);
+}
+
+/* ============================================
+   HINT ELEMENT
+   ============================================ */
+
+.floating-hint {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  padding: var(--spacing-3) var(--spacing-5);
+  background: linear-gradient(
+    135deg,
+    rgba(0, 0, 0, 0.9) 0%,
+    rgba(10, 15, 25, 0.9) 100%
+  );
+  backdrop-filter: blur(16px);
+  border: 2px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-full);
+  box-shadow: 
+    0 8px 24px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
+  opacity: 0;
+  transform: translateY(-20px) scale(0.9);
+  transition: all var(--transition-base);
+  pointer-events: none;
+}
+
+.floating-hint.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+.floating-hint.dismissed {
+  opacity: 0;
+  transform: translateY(-20px) scale(0.9);
+}
+
+/* ============================================
+   POSITIONING
+   ============================================ */
+
+.floating-hint-top {
+  align-self: flex-start;
+}
+
+.floating-hint-center {
+  align-self: center;
+  margin-top: 20vh; /* Below toolbar area */
+}
+
+.floating-hint-bottom {
+  align-self: center;
+  margin-top: auto;
+  margin-bottom: 6rem; /* Above status bar/hotbar */
+}
+
+/* ============================================
+   CONTENT
+   ============================================ */
+
+.floating-hint-content {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  font-size: var(--text-base);
+  font-weight: var(--font-medium);
+  color: var(--text-1);
+  white-space: nowrap;
+}
+
+.floating-hint-icon {
+  font-size: var(--text-xl);
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.5));
+}
+
+.floating-hint-message {
+  letter-spacing: 0.02em;
+  text-shadow: 0 2px 4px rgba(0, 0, 0, 0.5);
+}
+
+/* ============================================
+   GLOW EFFECT
+   ============================================ */
+
+.floating-hint::before {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  background: linear-gradient(
+    135deg,
+    rgba(14, 165, 233, 0.3) 0%,
+    rgba(99, 102, 241, 0.3) 100%
+  );
+  border-radius: var(--radius-full);
+  opacity: 0;
+  transition: opacity var(--transition-base);
+  z-index: -1;
+}
+
+.floating-hint.visible::before {
+  opacity: 1;
+  animation: hintGlow 2s ease-in-out infinite;
+}
+
+@keyframes hintGlow {
+  0%, 100% {
+    opacity: 0.3;
+    filter: blur(8px);
+  }
+  50% {
+    opacity: 0.6;
+    filter: blur(12px);
+  }
+}
+
+/* ============================================
+   SPECIAL VARIANTS
+   ============================================ */
+
+/* High priority hint (urgent actions) */
+.floating-hint[data-priority="10"] {
+  border-color: rgba(239, 68, 68, 0.5);
+  animation: urgentPulse 1s ease-in-out infinite;
+}
+
+@keyframes urgentPulse {
+  0%, 100% {
+    transform: scale(1);
+  }
+  50% {
+    transform: scale(1.05);
+  }
+}
+
+/* Success hint */
+.floating-hint.hint-success {
+  border-color: rgba(16, 185, 129, 0.5);
+}
+
+.floating-hint.hint-success::before {
+  background: linear-gradient(
+    135deg,
+    rgba(16, 185, 129, 0.3) 0%,
+    rgba(5, 150, 105, 0.3) 100%
+  );
+}
+
+/* Warning hint */
+.floating-hint.hint-warning {
+  border-color: rgba(245, 158, 11, 0.5);
+}
+
+.floating-hint.hint-warning::before {
+  background: linear-gradient(
+    135deg,
+    rgba(245, 158, 11, 0.3) 0%,
+    rgba(217, 119, 6, 0.3) 100%
+  );
+}
+
+/* Error hint */
+.floating-hint.hint-error {
+  border-color: rgba(239, 68, 68, 0.5);
+}
+
+.floating-hint.hint-error::before {
+  background: linear-gradient(
+    135deg,
+    rgba(239, 68, 68, 0.3) 0%,
+    rgba(220, 38, 38, 0.3) 100%
+  );
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+
+@media (max-width: 768px) {
+  .floating-hints-container {
+    padding: var(--spacing-2);
+  }
+
+  .floating-hint {
+    padding: var(--spacing-2) var(--spacing-4);
+    font-size: var(--text-sm);
+  }
+
+  .floating-hint-content {
+    gap: var(--spacing-2);
+  }
+
+  .floating-hint-icon {
+    font-size: var(--text-lg);
+  }
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+
+/* Slide in from top */
+@keyframes hintSlideInTop {
+  from {
+    opacity: 0;
+    transform: translateY(-30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Slide in from bottom */
+@keyframes hintSlideInBottom {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Fade and scale */
+@keyframes hintFadeScale {
+  from {
+    opacity: 0;
+    transform: scale(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+

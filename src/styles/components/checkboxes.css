@@ -1,0 +1,167 @@
+/**
+ * Checkboxes & Toggles
+ * Checkbox and toggle switch components
+ */
+
+/* ============================================
+   CHECKBOXES - Modern switches
+   ============================================ */
+
+.checkbox-wrapper {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  cursor: pointer;
+  user-select: none;
+}
+
+.checkbox {
+  position: relative;
+  width: 1.125rem;
+  height: 1.125rem;
+  appearance: none;
+  background: var(--color-base-300);
+  border: 1.5px solid var(--border-default);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  outline: none;
+}
+
+.checkbox:hover:not(:disabled) {
+  border-color: var(--border-hover);
+  background: var(--color-base-400);
+}
+
+.checkbox:checked {
+  background: var(--color-accent-400);
+  border-color: var(--color-accent-400);
+}
+
+.checkbox:checked::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 1px;
+  width: 4px;
+  height: 8px;
+  border: solid white;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.checkbox:focus-visible {
+  outline: 2px solid var(--color-accent-400);
+  outline-offset: 2px;
+}
+
+.checkbox:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* ============================================
+   TOGGLE SWITCH - iOS Style
+   ============================================ */
+
+.toggle {
+  position: relative;
+  width: 2.75rem;
+  height: 1.5rem;
+  appearance: none;
+  background: var(--color-base-300);
+  border: 1.5px solid var(--border-default);
+  border-radius: var(--radius-full);
+  cursor: pointer;
+  transition: all var(--transition-base);
+  outline: none;
+}
+
+.toggle::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 1.125rem;
+  height: 1.125rem;
+  background: var(--text-2);
+  border-radius: 50%;
+  transition: all var(--transition-base);
+}
+
+.toggle:checked {
+  background: var(--color-accent-400);
+  border-color: var(--color-accent-400);
+}
+
+.toggle:checked::before {
+  left: calc(100% - 1.125rem - 2px);
+  background: white;
+}
+
+.toggle:hover:not(:disabled) {
+  border-color: var(--border-hover);
+}
+
+.toggle:focus-visible {
+  outline: 2px solid var(--color-accent-400);
+  outline-offset: 2px;
+}
+
+/* ============================================
+   TOGGLE SWITCH V2 - Alternative Style
+   ============================================ */
+
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 3rem;
+  height: 1.75rem;
+  cursor: pointer;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+}
+
+.toggle-slider {
+  position: absolute;
+  inset: 0;
+  background: var(--color-base-500);
+  border: 1px solid var(--border-hover);
+  border-radius: var(--radius-full);
+  transition: all var(--transition-fast);
+}
+
+.toggle-slider::before {
+  content: '';
+  position: absolute;
+  height: 1.25rem;
+  width: 1.25rem;
+  left: 0.1875rem;
+  bottom: 0.1875rem;
+  background: white;
+  border-radius: 50%;
+  transition: all var(--transition-fast);
+  box-shadow: var(--shadow-sm);
+}
+
+.toggle-switch:hover .toggle-slider {
+  background: var(--color-base-400);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background: var(--color-accent-400);
+  border-color: var(--color-accent-500);
+}
+
+.toggle-switch input:checked + .toggle-slider::before {
+  transform: translateX(1.25rem);
+}
+
+.toggle-switch input:focus + .toggle-slider {
+  box-shadow: 0 0 0 2px rgba(14, 165, 233, 0.2);
+}
+

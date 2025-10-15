@@ -1,0 +1,230 @@
+/**
+ * Responsive & Accessibility
+ * Media queries, responsive design, and accessibility enhancements
+ */
+
+/* ============================================
+   RESPONSIVE UTILITIES
+   ============================================ */
+
+/* Large desktop - wider panels for more space */
+@media (min-width: 1440px) {
+  .editor-sidebar,
+  .editor-inspector {
+    width: 360px;
+  }
+
+  .toolbar-v2-search {
+    max-width: 500px;
+  }
+}
+
+/* Desktop - default comfortable sizes */
+@media (min-width: 1024px) and (max-width: 1439px) {
+  .editor-inspector {
+    width: var(--panel-width-md);
+  }
+  .editor-sidebar {
+    width: var(--panel-width-md);
+  }
+}
+
+/* Tablet - narrower panels */
+@media (min-width: 768px) and (max-width: 1023px) {
+  .editor-sidebar,
+  .editor-inspector {
+    width: 280px;
+  }
+
+  .toolbar-v2-search {
+    max-width: 250px;
+  }
+
+  .toolbar-v2-breadcrumbs {
+    max-width: 200px;
+  }
+}
+
+/* Mobile - optimized for small screens */
+@media (max-width: 767px) {
+  .editor-sidebar,
+  .editor-inspector {
+    width: 85vw !important;
+    max-width: 320px;
+  }
+
+  .toolbar-v2-search {
+    max-width: 150px;
+    flex: 1;
+  }
+
+  .toolbar-v2-breadcrumbs {
+    display: none;
+  }
+
+  .status-bar {
+    bottom: var(--spacing-2);
+    padding: var(--spacing-1-5) var(--spacing-3);
+    font-size: var(--text-xs);
+    max-width: calc(100vw - var(--spacing-4));
+  }
+
+  .status-bar-item:not(:first-child) {
+    display: none;
+  }
+
+  .panel-toggle {
+    padding: var(--spacing-2) !important;
+    width: auto !important;
+    height: auto !important;
+  }
+
+  .panel-toggle svg {
+    width: 16px !important;
+    height: 16px !important;
+  }
+
+  .panel-toggle-label {
+    display: none;
+  }
+
+  /* Simplified toolbar on mobile */
+  .toolbar-v2-top-row {
+    padding: var(--spacing-1-5) var(--spacing-3);
+  }
+
+  .toolbar-v2-bottom-row {
+    padding: var(--spacing-1-5) var(--spacing-3);
+    gap: var(--spacing-2);
+  }
+
+  .toolbar-v2-group {
+    gap: var(--spacing-0-5);
+  }
+
+  .hide-mobile {
+    display: none !important;
+  }
+}
+
+/* ============================================
+   TOUCH DEVICE OPTIMIZATIONS
+   ============================================ */
+
+@media (hover: none) and (pointer: coarse) {
+  /* Larger touch targets */
+  .toolbar-v2-icon-btn,
+  .toolbar-v2-tool-btn,
+  button {
+    min-width: 2.5rem;
+    min-height: 2.5rem;
+  }
+
+  .panel-toggle {
+    padding: var(--spacing-2) !important;
+    width: auto !important;
+    height: auto !important;
+  }
+
+  .panel-toggle svg {
+    width: 20px !important;
+    height: 20px !important;
+  }
+
+  .panel-toggle-label {
+    display: none;
+  }
+  
+  /* No slide effect on touch */
+  .panel-toggle.left:hover,
+  .panel-toggle.right:hover {
+    transform: translateY(-50%) !important;
+  }
+
+  /* Remove hover effects on touch devices */
+  .hover-lift:hover {
+    transform: none;
+  }
+
+  /* More prominent tap feedback */
+  button:active,
+  .toolbar-v2-icon-btn:active,
+  .panel-toggle:active {
+    transform: scale(0.95);
+    opacity: 0.8;
+  }
+
+  /* Disable tooltips on touch */
+  .tooltip,
+  .panel-toggle::before,
+  [title]:hover::after {
+    display: none;
+  }
+}
+
+/* ============================================
+   ACCESSIBILITY ENHANCEMENTS
+   ============================================ */
+
+/* Reduced motion support */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  :root {
+    --border-default: rgba(255, 255, 255, 0.3);
+    --border-hover: rgba(255, 255, 255, 0.5);
+    --color-accent-400: #60a5fa;
+  }
+
+  .editor-sidebar,
+  .editor-inspector,
+  .toolbar-v2,
+  .status-bar {
+    border-width: 2px;
+  }
+}
+
+/* Focus visible for keyboard navigation */
+*:focus-visible {
+  outline: 2px solid var(--color-accent-400);
+  outline-offset: 2px;
+}
+
+:focus:not(:focus-visible) {
+  outline: none;
+}
+
+/* ============================================
+   PRINT STYLES - For documentation
+   ============================================ */
+
+@media print {
+  .editor-toolbar,
+  .toolbar-v2,
+  .editor-toolbar-v2,
+  .editor-sidebar,
+  .editor-inspector,
+  .panel-toggle,
+  .floating-toolbar,
+  .status-bar,
+  .notification-container {
+    display: none !important;
+  }
+  
+  .editor-canvas {
+    border: none !important;
+  }
+
+  body {
+    background: white;
+  }
+}

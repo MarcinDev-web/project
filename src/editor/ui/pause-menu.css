@@ -1,0 +1,80 @@
+.pause-menu-overlay {
+  position: fixed;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(9, 11, 18, 0.6);
+  backdrop-filter: blur(6px);
+  opacity: 0;
+  transition: opacity 150ms ease;
+  z-index: 2000;
+}
+
+.pause-menu-overlay.visible {
+  opacity: 1;
+}
+
+.pause-menu-overlay.dismissed {
+  opacity: 0;
+}
+
+.pause-menu-panel {
+  min-width: 320px;
+  max-width: 420px;
+  padding: 32px;
+  border-radius: 16px;
+  background: rgba(18, 22, 35, 0.9);
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.35);
+  color: #f3f6ff;
+  text-align: center;
+}
+
+.pause-menu-panel h2 {
+  margin: 0;
+  font-size: 28px;
+  font-weight: 600;
+}
+
+.pause-menu-panel p {
+  margin: 12px 0 24px;
+  color: #c8d2f0;
+  font-size: 14px;
+}
+
+.pause-menu-actions {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.pause-menu-button {
+  appearance: none;
+  border: none;
+  border-radius: 10px;
+  padding: 12px 18px;
+  font-size: 16px;
+  font-weight: 500;
+  color: #0c1220;
+  background: linear-gradient(135deg, #f5f7ff, #d7def5);
+  cursor: pointer;
+  transition: transform 120ms ease, box-shadow 120ms ease;
+}
+
+.pause-menu-button.primary {
+  background: linear-gradient(135deg, #64a1ff, #4f7bff);
+  color: #fff;
+  box-shadow: 0 8px 24px rgba(79, 123, 255, 0.35);
+}
+
+.pause-menu-button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.pause-menu-button:not(:disabled):hover {
+  transform: translateY(-2px);
+  box-shadow: 0 12px 28px rgba(88, 115, 168, 0.4);
+}
+
+

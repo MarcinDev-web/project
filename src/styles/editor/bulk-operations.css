@@ -1,0 +1,59 @@
+/**
+ * Bulk Operations Bar
+ * Multi-select operations for entities
+ */
+
+.bulk-operations-bar {
+  display: none;
+  align-items: center;
+  gap: var(--spacing-3);
+  padding: var(--spacing-3) var(--spacing-4);
+  background: rgba(59, 130, 246, 0.1);
+  border: 2px solid rgb(59, 130, 246);
+  border-radius: var(--radius-md);
+  margin: var(--spacing-2) var(--spacing-4);
+  opacity: 0;
+  transform: translateY(-8px);
+  transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+}
+
+.bulk-operations-bar.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.bulk-operations-info {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  flex: 1;
+}
+
+.bulk-operations-count {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  color: rgb(59, 130, 246);
+}
+
+.bulk-operations-actions {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
+}
+
+.bulk-operations-btn {
+  opacity: 0.8;
+  transition: opacity var(--transition-fast);
+}
+
+.bulk-operations-btn:hover {
+  opacity: 1;
+}
+
+.bulk-operations-separator {
+  width: 1px;
+  height: 1.5rem;
+  background: var(--border-default);
+  margin: 0 var(--spacing-1);
+}
+

@@ -1,0 +1,141 @@
+/**
+ * Color Picker
+ * Color selection and editing component
+ */
+
+/* ============================================
+   COLOR PICKER - Enhanced Design
+   ============================================ */
+
+.color-picker-wrapper,
+.color-picker-wrapper-v2 {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+}
+
+.color-picker-swatch,
+.color-picker-swatch-v2 {
+  width: 3rem;
+  height: 3rem;
+  padding: 0.25rem;
+  background: var(--color-base-300);
+  border: 2px solid var(--border-hover);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.color-picker-swatch:hover,
+.color-picker-swatch-v2:hover {
+  border-color: var(--color-accent-400);
+  transform: scale(1.05);
+  box-shadow: 0 0 0 4px rgba(14, 165, 233, 0.1);
+}
+
+.color-picker-swatch:active,
+.color-picker-swatch-v2:active {
+  transform: scale(0.98);
+}
+
+.color-picker-swatch-inner {
+  width: 100%;
+  height: 100%;
+  border-radius: var(--radius-sm);
+  border: 1px solid rgba(0, 0, 0, 0.2);
+  position: relative;
+  overflow: hidden;
+}
+
+/* Checkerboard pattern for transparency */
+.color-picker-swatch::before,
+.color-picker-swatch-inner::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    linear-gradient(45deg, rgba(0,0,0,0.1) 25%, transparent 25%),
+    linear-gradient(-45deg, rgba(0,0,0,0.1) 25%, transparent 25%),
+    linear-gradient(45deg, transparent 75%, rgba(0,0,0,0.1) 75%),
+    linear-gradient(-45deg, transparent 75%, rgba(0,0,0,0.1) 75%);
+  background-size: 6px 6px;
+  background-position: 0 0, 0 3px, 3px -3px, -3px 0px;
+  z-index: -1;
+}
+
+.color-picker-input {
+  opacity: 0;
+  position: absolute;
+  pointer-events: none;
+}
+
+.color-picker-value {
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+
+/* Color Value Display */
+.color-value-wrapper {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  background: var(--color-base-300);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  padding: var(--spacing-1-5) var(--spacing-2-5);
+  transition: all var(--transition-fast);
+}
+
+.color-value-wrapper:hover {
+  border-color: var(--border-hover);
+  background: var(--color-base-400);
+}
+
+.color-value-input {
+  flex: 1;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--text-1);
+  background: transparent;
+  border: none;
+  padding: 0;
+  cursor: default;
+  user-select: all;
+}
+
+.color-value-input:focus {
+  outline: none;
+}
+
+.color-copy-btn {
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  color: var(--text-3);
+}
+
+.color-copy-btn:hover {
+  background: var(--color-base-500);
+  border-color: var(--border-default);
+  color: var(--text-1);
+}
+
+.color-copy-btn:active {
+  transform: scale(0.95);
+}
+

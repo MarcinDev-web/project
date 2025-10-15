@@ -1,0 +1,139 @@
+/**
+ * Modals & Overlays
+ * Modal dialogs and overlay components
+ */
+
+/* ============================================
+   MODALS & OVERLAYS - Gaming Style
+   ============================================ */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: var(--color-overlay-800);
+  backdrop-filter: blur(8px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: var(--z-modal);
+  animation: fadeIn var(--transition-base);
+}
+
+.modal {
+  background: linear-gradient(180deg, var(--color-surface-solid) 0%, var(--color-surface-solid-deep) 100%);
+  border: 3px solid var(--color-border-medium);
+  border-radius: 16px;
+  padding: var(--spacing-8);
+  max-width: 90vw;
+  max-height: 80vh;
+  overflow-y: auto;
+  box-shadow: 0 12px 24px var(--color-overlay-700);
+  animation: slideUpModal var(--transition-base);
+}
+
+@keyframes slideUpModal {
+  from {
+    opacity: 0;
+    transform: translateY(15px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* ============================================
+   KEYBOARD SHORTCUTS MODAL
+   ============================================ */
+
+.shortcuts-modal-overlay {
+  backdrop-filter: blur(8px);
+}
+
+.shortcuts-modal {
+  max-width: 800px;
+  width: 90vw;
+  max-height: 85vh;
+  display: flex;
+  flex-direction: column;
+}
+
+.shortcuts-modal-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-4);
+  padding-bottom: var(--spacing-4);
+  border-bottom: 3px solid var(--color-border-subtle);
+}
+
+.shortcuts-modal-content {
+  flex: 1;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+  gap: var(--spacing-6);
+  padding: var(--spacing-4) 0;
+}
+
+.shortcuts-category {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+}
+
+.shortcuts-category-title {
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--color-text-bright);
+  margin: 0;
+  padding-bottom: var(--spacing-2);
+  border-bottom: 3px solid var(--color-info);
+}
+
+.shortcuts-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.shortcuts-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--spacing-3);
+  padding: var(--spacing-2) var(--spacing-3);
+  background: var(--color-surface-elevated);
+  border-radius: 8px;
+  border: 2px solid var(--color-border-strong);
+  transition: transform var(--transition-fast);
+  box-shadow: 0 3px 0 var(--color-base-700);
+}
+
+.shortcuts-item:hover {
+  background: var(--color-surface-glass-hover);
+  transform: translateY(-1px);
+  box-shadow: 0 4px 0 var(--color-base-700);
+}
+
+.shortcuts-keys {
+  padding: var(--spacing-1) var(--spacing-2);
+  background: var(--color-base-550);
+  border: 2px solid var(--color-border-strong);
+  border-radius: 6px;
+  font-family: var(--font-mono);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: var(--color-text-bright);
+  box-shadow: 0 2px 0 var(--color-base-700);
+  min-width: 4rem;
+  text-align: center;
+}
+
+.shortcuts-description {
+  flex: 1;
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  text-align: right;
+}
+

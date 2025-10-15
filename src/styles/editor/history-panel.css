@@ -1,0 +1,119 @@
+/**
+ * History Panel
+ * Visual history/timeline of editor actions
+ */
+
+.history-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+}
+
+.history-panel-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--spacing-4);
+  border-bottom: 3px solid rgba(60, 70, 85, 0.5);
+  background: rgba(20, 25, 32, 0.3);
+}
+
+.history-controls {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
+}
+
+.history-list {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-2);
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+
+.history-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-3);
+  padding: var(--spacing-2) var(--spacing-3);
+  background: transparent;
+  border: 2px solid transparent;
+  border-radius: var(--radius-md);
+  transition: all var(--transition-fast);
+  cursor: pointer;
+  width: 100%;
+  text-align: left;
+  position: relative;
+}
+
+.history-item::before {
+  content: '';
+  position: absolute;
+  left: 22px;
+  top: 0;
+  bottom: -4px;
+  width: 2px;
+  background: var(--border-default);
+  z-index: 0;
+}
+
+.history-item:last-child::before {
+  display: none;
+}
+
+.history-item:hover {
+  background: rgba(45, 52, 62, 0.5);
+  border-color: rgba(70, 80, 95, 0.5);
+}
+
+.history-item.current {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgb(59, 130, 246);
+}
+
+.history-item.future {
+  opacity: 0.5;
+}
+
+.history-marker {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+  z-index: 1;
+}
+
+.history-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-3);
+  border: 2px solid var(--color-base-600);
+}
+
+.history-item.current .history-marker {
+  color: rgb(59, 130, 246);
+}
+
+.history-content {
+  flex: 1;
+  min-width: 0;
+}
+
+.history-description {
+  font-size: var(--text-sm);
+  font-weight: var(--font-medium);
+  color: var(--text-1);
+  margin-bottom: var(--spacing-0-5);
+}
+
+.history-time {
+  font-size: var(--text-xs);
+  color: var(--text-3);
+}
+
