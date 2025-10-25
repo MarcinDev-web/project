@@ -1,0 +1,10 @@
+packages:
+  - packages/*
+  - apps/*
+  - shared
+
+ignoredBuiltDependencies:
+  - sharp
+
+onlyBuiltDependencies:
+  - esbuild

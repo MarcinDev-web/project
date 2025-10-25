@@ -1,56 +1,71 @@
 {
-  // Visit https://aka.ms/tsconfig to read more about this file
   "compilerOptions": {
-    // File Layout
-    "rootDir": "src",
-    "outDir": "dist",
-
     // Environment Settings
-    // See also https://aka.ms/tsconfig/module
-    "module": "esnext",
-    "target": "esnext",
-    "types": [
-      "@webgpu/types",
-      "node"
-    ],
-    // For nodejs:
-    // "lib": ["esnext"],
-    // "types": ["node"],
-    // and npm install -D @types/node
-
-    // Other Outputs
-    "sourceMap": true,
-    "declaration": true,
-    "declarationMap": true,
-
-    // Stricter Typechecking Options
-    "noUncheckedIndexedAccess": true,
-    "exactOptionalPropertyTypes": true,
-
-    // Style Options
-    // "noImplicitReturns": true,
-    // "noImplicitOverride": true,
-    "noUnusedLocals": true,
-    "noUnusedParameters": true,
-    // "noFallthroughCasesInSwitch": true,
-    // "noPropertyAccessFromIndexSignature": true,
-
-    // Recommended Options
-    "strict": true,
-    "jsx": "react-jsx",
-    "verbatimModuleSyntax": true,
-    "isolatedModules": true,
-    "noUncheckedSideEffectImports": true,
-    "moduleDetection": "force",
-    "skipLibCheck": true,
-
+    "target": "ES2022",
+    "module": "ESNext",
+    "lib": ["ES2022", "DOM", "DOM.Iterable"],
+    "types": ["@webgpu/types", "node"],
+    
+    // Module Resolution
     "moduleResolution": "bundler",
     "resolveJsonModule": true,
     "allowSyntheticDefaultImports": true,
-  }
-  ,
+    "esModuleInterop": true,
+    
+    // Output Options
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
+    
+    // Strict Checks
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    
+    // Other Options
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "jsx": "react-jsx",
+    
+    // Path Aliases for Monorepo
+    "paths": {
+      "@engine/core": ["./packages/core/src"],
+      "@engine/core/*": ["./packages/core/src/*"],
+      "@engine/world": ["./packages/world/src"],
+      "@engine/world/*": ["./packages/world/src/*"],
+      "@engine/gfx-webgpu": ["./packages/gfx-webgpu/src"],
+      "@engine/gfx-webgpu/*": ["./packages/gfx-webgpu/src/*"],
+      "@engine/voxel": ["./packages/voxel/src"],
+      "@engine/voxel/*": ["./packages/voxel/src/*"],
+      "@engine/assets": ["./packages/assets/src"],
+      "@engine/assets/*": ["./packages/assets/src/*"],
+      "@engine/script": ["./packages/script/src"],
+      "@engine/script/*": ["./packages/script/src/*"],
+      "@engine/input": ["./packages/input/src"],
+      "@engine/input/*": ["./packages/input/src/*"],
+      "@engine/camera": ["./packages/camera/src"],
+      "@engine/camera/*": ["./packages/camera/src/*"],
+      "@engine/net": ["./packages/net/src"],
+      "@engine/net/*": ["./packages/net/src/*"],
+      "@engine/stdlib": ["./packages/stdlib/src"],
+      "@engine/stdlib/*": ["./packages/stdlib/src/*"],
+      "@shared/*": ["./shared/*"]
+    }
+  },
   "include": [
     "src/**/*",
-    "src/types/**/*.d.ts"
+    "packages/*/src/**/*",
+    "apps/*/src/**/*",
+    "shared/**/*"
+  ],
+  "exclude": [
+    "node_modules",
+    "dist",
+    "**/dist",
+    "**/__tests__"
   ]
 }

@@ -1,25 +1,27 @@
 {
-  "name": "ugc-3d-platform",
-  "version": "0.1.0",
-  "private": true,
+  "name": "ugc-3d-game-platform",
+  "version": "1.0.0",
   "type": "module",
-  "workspaces": [
-    "packages/*",
-    "apps/*",
-    "shared"
-  ],
+  "main": "index.js",
   "scripts": {
-    "build": "pnpm -r build",
-    "dev": "pnpm --parallel -r dev",
-    "test": "pnpm -r test",
-    "lint": "pnpm -r lint",
-    "clean": "pnpm -r clean && rm -rf node_modules",
-    "dev:editor": "pnpm --filter @apps/editor dev",
-    "build:editor": "pnpm --filter @apps/editor build",
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "npm run test:all",
+    "test:all": "vitest run",
     "test:unit": "vitest run --project unit",
     "test:integration": "vitest run --project integration",
     "test:watch": "vitest watch --project unit --related",
-    "precommit": "pnpm lint && pnpm test:unit"
+    "test:ui": "vitest --project integration --ui",
+    "test:coverage": "vitest run --coverage",
+    "test:changed": "vitest related --project unit",
+    "test:fast": "vitest run --project unit --reporter=dot",
+    "test:profile": "vitest run --project unit --reporter=verbose --runInBand",
+    "precommit": "npm run lint && npm run test:unit",
+    "lint": "eslint . --ext .ts,.tsx",
+    "lint:fix": "eslint . --ext .ts,.tsx --fix",
+    "format": "prettier --write \"src/**/*.{ts,tsx,json}\"",
+    "format:check": "prettier --check \"src/**/*.{ts,tsx,json}\""
   },
   "keywords": [],
   "author": "",
@@ -44,7 +46,6 @@
     "@gltf-transform/functions": "^3.10.1",
     "@preact/signals-core": "^1.12.1",
     "draco3dgltf": "^1.5.7",
-    "gl-matrix": "^3.4.4",
-    "pnpm": "^10.19.0"
+    "gl-matrix": "^3.4.4"
   }
 }
