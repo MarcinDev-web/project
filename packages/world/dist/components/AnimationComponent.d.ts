@@ -1,0 +1,42 @@
+import { Component } from './Component';
+import { AnimationClip } from '../../animation/AnimationClip';
+import { AnimationController } from '../../animation/AnimationController';
+import { type AnimationStateConfig } from '../../animation/AnimationStateMachine';
+import { Skeleton, type PoseBone } from '../../animation/Skeleton';
+import type { AnimationComponentJSON, AnimationParameter, AnimationParameters } from '../../animation/types';
+export declare class AnimationComponent extends Component {
+    static readonly type = "Animation";
+    skeleton: Skeleton | null;
+    pose: PoseBone[] | null;
+    clips: Map<string, AnimationClip>;
+    controllers: Map<string, AnimationController>;
+    stateMachine: any;
+    private activeStateName;
+    onAttach(): void;
+    getType(): string;
+    addClip(clip: AnimationClip): AnimationController;
+    setSkeleton(skeleton: Skeleton): void;
+    getController(name: string): AnimationController | undefined;
+    setParameterDefinitions(parameters: AnimationParameter[]): void;
+    getParameterDefinitions(): AnimationParameter[];
+    setParameters(values: AnimationParameters | null | undefined): void;
+    getParameters(): AnimationParameters;
+    setParam(name: string, value: boolean | number): void;
+    getParam(name: string): boolean | number | null;
+    setTrigger(name: string): void;
+    resetTrigger(name: string): void;
+    setStates(states: AnimationStateConfig[]): void;
+    getStates(): AnimationStateConfig[];
+    getActiveState(): string | null;
+    setActiveState(name: string | null): void;
+    toJSON(): AnimationComponentJSON;
+    fromJSON(data: AnimationComponentJSON): void;
+    clone(): AnimationComponent;
+    private serializeState;
+    private serializeTransition;
+    private deserializeStates;
+    private deserializeTransitions;
+    private cloneTransitions;
+    private createControllerFromJSON;
+}
+//# sourceMappingURL=AnimationComponent.d.ts.map

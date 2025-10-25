@@ -10,4 +10,5 @@ export * from './ecs';
 export * from './event';
 export * from './job';
 export * from './utils';
+export * from './script';
 

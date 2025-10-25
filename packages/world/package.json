@@ -1,0 +1,29 @@
+{
+  "name": "@engine/world",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./core": "./dist/core/index.js",
+    "./components": "./dist/components/index.js",
+    "./systems": "./dist/systems/index.js",
+    "./physics": "./dist/physics/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@engine/core": "workspace:*",
+    "gl-matrix": "^3.4.4"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.3"
+  }
+}
+
