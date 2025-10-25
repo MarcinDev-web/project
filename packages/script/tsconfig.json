@@ -1,0 +1,25 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "composite": true,
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true
+  },
+  "include": ["src/**/*"],
+  "exclude": [
+    "__tests__",
+    "dist",
+    "node_modules",
+    "src/LogicCubes/LogicCubeSystem.ts",
+    "src/runtime/ScriptSystem.ts",
+    "src/LogicCubes/cubes/ActionCubes.ts"
+  ],
+  "references": [
+    { "path": "../core" },
+    { "path": "../world" }
+  ]
+}
+
