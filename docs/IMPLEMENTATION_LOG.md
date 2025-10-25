@@ -155,11 +155,15 @@ packages/world/
 
 ---
 
-## 🔄 FAZA W TRAKCIE
+## ✅ UKOŃCZONE FAZY (continued)
 
-### Faza 3: @engine/gfx-webgpu 🔄 (30% ukończone)
+### Faza 3: @engine/gfx-webgpu ✅ (UKOŃCZONA)
 
-**Commit**: `54adcac` - "Phase 3 - @engine/gfx-webgpu structure created (WIP)"
+**Commits**:
+- `54adcac` - "Phase 3 structure created (WIP)"
+- `d1bf174` - "Complete Phase 3 - @engine/gfx-webgpu package"
+
+**Tag**: `phase-3-renderer`
 
 **Utworzona struktura**:
 ```
@@ -202,9 +206,47 @@ packages/gfx-webgpu/
 
 ---
 
+## 🔄 FAZA W TRAKCIE
+
+### Faza 4: @engine/script 🔄 (50% ukończone - WIP)
+
+**Commit**: `f7bf49f` - "Phase 4 structure created (50% complete)"
+
+**Utworzona struktura**:
+```
+packages/script/
+├── src/
+│   ├── LogicCubes/
+│   │   ├── cubes/           # 9 cube types
+│   │   ├── LogicCubeSystem.ts
+│   │   └── types.ts
+│   ├── behavior/            # Behavior, BehaviorRegistry
+│   ├── coroutine/           # CoroutineScheduler
+│   ├── connection/          # LogicConnectionManager/Registry
+│   ├── storage/             # VariableStorage
+│   ├── services/            # SceneScriptContextBuilder
+│   └── runtime/             # ScriptSystem
+├── dist/                    # 112 pliki (partial build)
+└── config files
+```
+
+**Statystyki**:
+- 📦 Pliki skopiowane: 19
+- 🔨 Build output: 112 pliki (partial)
+- ⚠️ Circular dependency z @engine/world (unresolved)
+
+**Challenges**:
+- LogicCubeComponent i ScriptComponent potrzebują być w @engine/world
+- Ale te komponenty referencują typy z @engine/script
+- Circular dependency loop
+
+**Rezolucja pending**: Wymaga refactoru lub type-only package
+
+---
+
 ## ⏳ POZOSTAŁE FAZY
 
-### Faza 4: @engine/script (2 dni)
+### Faza 5: @engine/stdlib (2 dni)
 
 **Zakres**: Przenieść `src/logic/` → `packages/script/src/LogicCubes/`
 
@@ -754,6 +796,6 @@ pnpm tsc --noEmit
 
 ---
 
-*Last updated: 2025-10-26 01:25*
-*Next update: After Phase 3 completion*
+*Last updated: 2025-10-26 01:50*
+*Next update: After Phase 4/5 completion*
 
