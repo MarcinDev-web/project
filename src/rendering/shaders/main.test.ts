@@ -26,8 +26,8 @@ describe('createMainShaderCode', () => {
     expect(code).toContain('fn quat_rotate');
     expect(code).toContain('@fragment\nfn fs_main');
     expect(code).toContain('@fragment\nfn fs_overlay');
-    // Atlas-based sampling: atlasUV computed, sampled from atlasTex
-    expect(code).toMatch(/let atlasUV = atlasOffset \+ vUV \* atlasScale;/);
+    // Atlas-based sampling: atlasUV computed from rect metadata, sampled from atlasTex
+    expect(code).toMatch(/let atlasUV = rect\.xy \+ vUV \* rect\.zw;/);
     expect(code).toMatch(/textureSample\(atlasTex, texSampler, atlasUV\)/);
   });
 });

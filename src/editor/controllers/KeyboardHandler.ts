@@ -6,7 +6,7 @@ import type { SnapSystem } from '../snap/SnapSystem';
 import type { PlacementMode } from '../placement/PlacementMode';
 import type { ProjectManager } from '../managers/ProjectManager';
 import type { Clipboard } from '../utils/Clipboard';
-import type { Entity } from '../../scene';
+import type { Entity } from '../../engine/scene';
 import type { BlockDragController } from './BlockDragController';
 import { QuaternionHelper } from '../utils/QuaternionHelper';
 

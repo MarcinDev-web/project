@@ -1,7 +1,7 @@
 export { Entity, type EntityId, type EntityData } from './Entity';
 export { Transform, type TransformData } from './Transform';
-export type { Vec3, Quat } from '../math';
-export { Scene, type SceneData } from './Scene';
+export type { Vec3, Quat } from '@engine/core/math';
+export { Scene, type SceneData } from './engine/scene';
 export {
   Raycaster,
   type Ray,

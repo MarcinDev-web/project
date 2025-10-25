@@ -8,8 +8,8 @@
  * - Batch placement of entities
  */
 
-import type { Vec3 } from '../../math';
-import type { Scene, Entity } from '../../scene';
+import type { Vec3 } from '@engine/core/math';
+import type { Scene, Entity } from '../../engine/scene';
 import type { CollisionDetector } from './CollisionDetector';
 import { Entity as EntityClass } from '../../scene/Entity';
 

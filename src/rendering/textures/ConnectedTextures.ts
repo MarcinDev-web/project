@@ -12,7 +12,7 @@
  * - Random variation
  */
 
-import type { Vec3 } from '../../math';
+import type { Vec3 } from '@engine/core/math';
 
 export type CTMPattern =
   | 'none' // No connection

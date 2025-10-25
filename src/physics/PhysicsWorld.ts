@@ -7,9 +7,9 @@ import type { Scene } from '../scene/Scene';
 import { PhysicsSystem, type PhysicsConfig, type CollisionEvent, type TriggerEvent } from './PhysicsSystem';
 import { Entity } from '../scene/Entity';
 import { PhysicsComponent, RigidbodyType, type AnyCollider } from '../scene/components/PhysicsComponent';
-import { Logger } from '../logger';
+import { Logger } from '../app/utils/logger';
 import { JointComponent } from '../scene/components/JointComponent';
-import type { Vec3 } from '../math';
+import type { Vec3 } from '@engine/core/math';
 import {
   createJoint,
   type Joint,

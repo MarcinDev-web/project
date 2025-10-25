@@ -1,6 +1,6 @@
 import type { IPlayModeState, PlayModeContext, PlayModeStateType } from '../core/PlayModeStateMachine';
 import { PlayModeStateType as StateType } from '../core/PlayModeStateMachine';
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 import type { Entity } from '../../scene/Entity';
 import type { CameraDirector } from '../camera/CameraDirector';
 

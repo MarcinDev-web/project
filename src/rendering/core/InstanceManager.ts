@@ -7,7 +7,7 @@
  * Performance: Zero-allocation instance data building for large scenes.
  */
 
-import type { Entity, Scene } from '../../scene';
+import type { Entity, Scene } from '../../engine/scene';
 import { MaterialComponent } from '../../scene/components/MaterialComponent';
 import type { Frustum } from './FrustumCuller';
 

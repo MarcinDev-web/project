@@ -3,7 +3,7 @@
  * Supports box-box, sphere-sphere, sphere-box, and capsule collisions
  */
 
-import type { Vec3, Quat } from '../math';
+import type { Vec3, Quat } from '@engine/core/math';
 import type {
   AnyCollider,
   BoxCollider,
@@ -11,7 +11,7 @@ import type {
   CapsuleCollider,
   ContactPoint,
 } from '../scene/components/PhysicsComponent';
-import { normalizeVec3Out, quatToMatrix3 } from '../math';
+import { normalizeVec3Out, quatToMatrix3 } from '@engine/core/math';
 
 /**
  * Collision pair result

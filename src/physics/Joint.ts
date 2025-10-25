@@ -7,7 +7,7 @@ import {
   crossVec3Out,
   lengthVec3,
   transformVec3ByQuatOut,
-} from '../math';
+} from '@engine/core/math';
 import { PhysicsComponent, RigidbodyType } from '../scene/components/PhysicsComponent';
 
 /**
@@ -25,7 +25,7 @@ export enum JointType {
 /**
  * Base interface for all joint configurations
  */
-import type { Vec3 } from '../math';
+import type { Vec3 } from '@engine/core/math';
 
 export interface BaseJointConfig {
   /** Type of the joint */

@@ -13,7 +13,7 @@
  * - 144-464: lighting data (managed by LightingUniformWriter)
  */
 
-import type { Mat4, Vec3 } from '../../math';
+import type { Mat4, Vec3 } from '@engine/core/math';
 import type { LightingData } from '../lighting/LightManager';
 import { writeLightingUniforms } from './LightingUniforms';
 import { TEXTURE_SIZE, SHADING_AMBIENT, SHADING_TOON_BANDS, SHADING_SPECULAR_POWER } from '../config';
@@ -32,6 +32,8 @@ export class UniformManager {
 
   // Dynamic uniform data (updated per frame)
   private eyePosition: Float32Array;
+  // Shadow & camera extra
+  private viewMatrix: Float32Array;
 
   constructor(device: GPUDevice, uniformBuffer: GPUBuffer) {
     this.device = device;
@@ -51,6 +53,7 @@ export class UniformManager {
     
     this.atlasParams = new Float32Array(4);
     this.eyePosition = new Float32Array(4);
+    this.viewMatrix = new Float32Array(16);
   }
 
   /**
@@ -131,6 +134,72 @@ export class UniformManager {
     if (lightingData) {
       writeLightingUniforms(this.device, this.uniformBuffer, lightingData);
     }
+  }
+
+  /**
+   * Updates shadow-related uniforms appended after the lighting block.
+   * Layout (offsets from 464 bytes):
+   *  - 0..64: viewMatrix
+   *  - 64..320: lightViewProj[4]
+   *  - 320..336: cascadeSplits (vec4)
+   *  - 336..400: atlasRects[4] (vec4 each)
+   *  - 400..416: filterParams (vec4)
+   *  - 416..432: biasParams (vec4)
+   */
+  updateShadowUniforms(params: {
+    viewMatrix: Mat4;
+    lightViewProj: readonly Mat4[];
+    cascadeSplits: readonly [number, number, number, number];
+    atlasRects: readonly [number, number, number, number][]; // uvMin.xy, uvMax.zw per cascade
+    filterParams: readonly [number, number, number, number];
+    biasParams: readonly [number, number, number, number];
+  }): void {
+    // Base offset right after lighting block
+    const baseOffset = 464;
+    // viewMatrix
+    this.device.queue.writeBuffer(
+      this.uniformBuffer,
+      baseOffset,
+      params.viewMatrix.buffer as ArrayBuffer,
+      (params.viewMatrix as Float32Array).byteOffset ?? 0,
+      64
+    );
+
+    // lightViewProj[4]
+    for (let i = 0; i < 4; i++) {
+      const m = params.lightViewProj[i] ?? new Float32Array(16);
+      this.device.queue.writeBuffer(
+        this.uniformBuffer,
+        baseOffset + 64 + i * 64,
+        (m as Float32Array).buffer as ArrayBuffer,
+        (m as Float32Array).byteOffset ?? 0,
+        64
+      );
+    }
+
+    // cascadeSplits
+    const splits = new Float32Array(params.cascadeSplits);
+    this.device.queue.writeBuffer(this.uniformBuffer, baseOffset + 64 + 256, splits.buffer, 0, 16);
+
+    // atlasRects (as 4 vec4)
+    const rectsF32 = new Float32Array(16);
+    let rOff = 0;
+    for (let i = 0; i < 4; i++) {
+      const r = params.atlasRects[i] ?? [0, 0, 1, 1];
+      rectsF32[rOff++] = r[0];
+      rectsF32[rOff++] = r[1];
+      rectsF32[rOff++] = r[2];
+      rectsF32[rOff++] = r[3];
+    }
+    this.device.queue.writeBuffer(this.uniformBuffer, baseOffset + 64 + 256 + 16, rectsF32.buffer, 0, 64);
+
+    // filterParams
+    const filterF32 = new Float32Array(params.filterParams);
+    this.device.queue.writeBuffer(this.uniformBuffer, baseOffset + 64 + 256 + 16 + 64, filterF32.buffer, 0, 16);
+
+    // biasParams
+    const biasF32 = new Float32Array(params.biasParams);
+    this.device.queue.writeBuffer(this.uniformBuffer, baseOffset + 64 + 256 + 16 + 64 + 16, biasF32.buffer, 0, 16);
   }
 
   /**

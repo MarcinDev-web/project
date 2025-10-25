@@ -15,7 +15,7 @@
  * - Drag & drop reordering
  */
 
-import type { Scene, Entity } from '../../scene';
+import type { Scene, Entity } from '../../engine/scene';
 import type { SelectionManager } from '../../scene/Selection';
 import type { EditorState } from '../core/state';
 import { rgbaToHex, type RgbaColor, lightenColorInPlace } from '../../utils/colors';

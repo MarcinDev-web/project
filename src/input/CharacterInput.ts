@@ -1,4 +1,4 @@
-import type { Vec3 } from '../math';
+import type { Vec3 } from '@engine/core/math';
 import type { CharacterInput } from '../scene/components/CharacterController';
 import type { InputBindings } from '../editor/core/PlayManifest';
 

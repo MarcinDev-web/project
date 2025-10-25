@@ -10,7 +10,7 @@
 
 import type { Asset, AssetCollection, AssetVariant, AssetSubcategory, AssetMaterial, AssetStyle } from './AssetTypes';
 import { BLOCK_LIBRARY } from '../../rendering/blocks/BlockLibrary';
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 
 /**
  * Convert old BlockLibrary blocks to new Asset format

@@ -1,4 +1,4 @@
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 
 // Use dynamic imports so heavy deps are only loaded when needed
 type WebIOType = import('@gltf-transform/core').WebIO;

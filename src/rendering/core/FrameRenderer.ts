@@ -11,9 +11,9 @@
  * This is the core rendering loop extracted from the main Renderer.
  */
 
-import type { Scene, Entity } from '../../scene';
+import type { Scene, Entity } from '../../engine/scene';
 import type { FrameResources, GeometryData } from '../resources/resources';
-import { createDepthTexture, createMsaaColorTarget } from '../resources/resources';
+import { createDepthTexture, createMsaaColorTarget, createHdrColorTarget } from '../resources/resources';
 import { FrustumCuller } from './FrustumCuller';
 import { InstanceDataBuilder } from './InstanceManager';
 import { GPUBufferPool } from './bufferPool';
@@ -21,10 +21,14 @@ import { ComputePrepass } from './ComputePrepass';
 import { EnvironmentComponent } from '../../scene/components/EnvironmentComponent';
 import type { EnvironmentRenderer } from '../renderers/EnvironmentRenderer';
 import type { LogicConnectionRenderer } from '../LogicConnectionRenderer';
-import { mat4Invert } from '../../math';
-import type { Mat4, Vec3 } from '../../math';
-import { Logger } from '../../logger';
+import { mat4Invert } from '@engine/core/math';
+import type { Mat4, Vec3 } from '@engine/core/math';
+import { Logger } from '../../app/utils/logger';
 import { CLEAR_COLOR, MSAA_SAMPLE_COUNT, TIMESTAMP_QUERY_COUNT, TIMESTAMP_BUFFER_SIZE, GPU_TIMESTAMP_PAIRS } from '../config';
+import { TonemapLutPass } from '../postprocess/TonemapLut';
+import { BloomPass } from '../postprocess/Bloom';
+import { UniformManager } from './UniformManager';
+import { ShadowPass } from '../shadows/ShadowPass';
 
 export interface FrameRenderContext {
   device: GPUDevice;
@@ -38,6 +42,8 @@ export interface FrameRenderContext {
   gridRenderer: { render?: (p: GPURenderPassEncoder, vp: Mat4) => void } | null;
   logicConnectionRenderer: LogicConnectionRenderer | null;
   onGpuTimings?: (timings: { label: string; timeMs: number }[]) => void;
+  uniformManager: UniformManager;
+  lightingData?: import('../lighting/LightManager').LightingData;
 }
 
 /**
@@ -58,6 +64,12 @@ export class FrameRenderer {
   private bundleOverlayPipeline: GPURenderPipeline | null = null;
   private bundleUniformBindGroup: GPUBindGroup | null = null;
   private bundleTextureBindGroup: GPUBindGroup | null = null;
+  // Postprocess resources
+  private hdrColorTexture: GPUTexture | null = null;
+  private bloomTexture: GPUTexture | null = null;
+  private tonemapPass: TonemapLutPass | null = null;
+  private bloomPass: BloomPass | null = null;
+  private shadowPass: ShadowPass | null = null;
 
   constructor(initialCapacity = 1000) {
     this.frustumCuller = new FrustumCuller();
@@ -72,7 +84,9 @@ export class FrameRenderer {
     ctx: FrameRenderContext,
     viewProjectionMatrix: Mat4,
     eyePosition: Vec3,
-    passDescriptor?: GPURenderPassDescriptor
+    passDescriptor?: GPURenderPassDescriptor,
+    viewMatrix?: Mat4,
+    projectionMatrix?: Mat4
   ): GeometryData {
     const { device, canvas, context, frameResources, scene, environmentRenderer, gridRenderer } = ctx;
     let { geometry } = ctx;
@@ -81,6 +95,8 @@ export class FrameRenderer {
     if (this.depthTextureSize.width !== canvas.width || this.depthTextureSize.height !== canvas.height) {
       frameResources.depthTexture.destroy();
       frameResources.msaaColorTexture.destroy();
+      this.hdrColorTexture?.destroy();
+      this.bloomTexture?.destroy();
       frameResources.depthTexture = createDepthTexture(device, canvas, MSAA_SAMPLE_COUNT);
       frameResources.depthTextureView = frameResources.depthTexture.createView({
         label: 'frame-depth-view',
@@ -88,16 +104,48 @@ export class FrameRenderer {
       frameResources.msaaColorTexture = createMsaaColorTarget(
         device,
         canvas,
-        ctx.presentationFormat,
+        'rgba16float',
         MSAA_SAMPLE_COUNT
       );
       frameResources.msaaColorView = frameResources.msaaColorTexture.createView({
         label: 'frame-msaa-color-view',
       });
+      this.hdrColorTexture = createHdrColorTarget(device, canvas);
+      this.bloomTexture = device.createTexture({
+        label: 'frame-bloom-texture',
+        size: { width: canvas.width, height: canvas.height, depthOrArrayLayers: 1 },
+        format: 'rgba16float',
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+      });
       this.depthTextureSize = { width: canvas.width, height: canvas.height };
     }
 
     const encoder = device.createCommandEncoder({ label: 'frame-encoder' });
+
+    // Shadow map pre-pass before main render pass
+    try {
+      // Lazy initialize shadow pass
+      if (!this.shadowPass) {
+        this.shadowPass = new ShadowPass(device);
+      }
+      if (viewMatrix && projectionMatrix) {
+        this.shadowPass.render({
+          encoder,
+          frameResources,
+          geometry,
+          viewMatrix,
+          projectionMatrix,
+          uniformManager: ctx.uniformManager,
+          lightingData: ctx.lightingData,
+          ibl: {
+            brdfLut: ctx.environmentRenderer && (ctx.environmentRenderer as any).getBrdfLutTexture?.(),
+            envCube: ctx.environmentRenderer && (ctx.environmentRenderer as any).getEnvCubeTexture?.(),
+          },
+        });
+      }
+    } catch (err) {
+      Logger.warn('Shadow pass failed:', err);
+    }
 
     // Compute prepass (runs before render pass)
     try {
@@ -110,7 +158,7 @@ export class FrameRenderer {
     } catch (err) {
       Logger.warn('Compute prepass failed:', err);
     }
-    const textureView = context.getCurrentTexture().createView({ label: 'frame-color-resolve-view' });
+    const swapChainView = context.getCurrentTexture().createView({ label: 'frame-color-resolve-view' });
 
     // Base pass descriptor with required attachments
     const basePassDesc: GPURenderPassDescriptor = {
@@ -118,7 +166,7 @@ export class FrameRenderer {
       colorAttachments: [
         {
           view: frameResources.msaaColorView,
-          resolveTarget: textureView,
+          resolveTarget: (this.hdrColorTexture ??= createHdrColorTarget(device, canvas)).createView({ label: 'frame-hdr-view' }),
           clearValue: CLEAR_COLOR,
           loadOp: 'clear',
           storeOp: 'store',
@@ -284,6 +332,20 @@ export class FrameRenderer {
         TIMESTAMP_BUFFER_SIZE
       );
     }
+    // Postprocess: Bloom then Tonemap+LUT to the swap chain
+    // Initialize passes lazily
+    if (!this.bloomPass) { this.bloomPass = new BloomPass(device); this.bloomPass.initialize('rgba16float'); }
+    if (!this.tonemapPass) { this.tonemapPass = new TonemapLutPass(device); this.tonemapPass.initialize(ctx.presentationFormat); }
+    const hdrView = (this.hdrColorTexture ?? createHdrColorTarget(device, canvas)).createView();
+    const bloomView = (this.bloomTexture ?? device.createTexture({
+      label: 'frame-bloom-texture',
+      size: { width: canvas.width, height: canvas.height, depthOrArrayLayers: 1 },
+      format: 'rgba16float',
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+    })).createView();
+    this.bloomPass.render(encoder, hdrView, bloomView);
+    this.tonemapPass.render(encoder, hdrView, bloomView, swapChainView);
+
     device.queue.submit([encoder.finish()]);
 
     if (
@@ -310,6 +372,10 @@ export class FrameRenderer {
     this.computePrepass = null;
     this.pendingTimestampRead = false;
     this.invalidateBundle();
+    try { this.hdrColorTexture?.destroy(); } catch {}
+    try { this.bloomTexture?.destroy(); } catch {}
+    this.hdrColorTexture = null;
+    this.bloomTexture = null;
   }
 
   /**
@@ -567,7 +633,7 @@ export class FrameRenderer {
     }
     const bundleEncoder = device.createRenderBundleEncoder({
       label: 'frame-static-bundle',
-      colorFormats: [presentationFormat],
+      colorFormats: ['rgba16float'],
       depthStencilFormat: 'depth24plus',
       sampleCount: MSAA_SAMPLE_COUNT,
     });

@@ -9,7 +9,7 @@
  * - Multi-entity support
  */
 
-import type { Entity } from '../../scene';
+import type { Entity } from '../../engine/scene';
 import type { SelectionManager } from '../../scene/Selection';
 import { createIcon } from '../utils/icons';
 

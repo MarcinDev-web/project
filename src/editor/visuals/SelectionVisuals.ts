@@ -1,4 +1,4 @@
-import type { Entity } from '../../scene';
+import type { Entity } from '../../engine/scene';
 import type { Scene } from '../../scene/Scene';
 import type { SelectionManager } from '../../scene/Selection';
 import type { RgbaColor } from '../../utils/colors';

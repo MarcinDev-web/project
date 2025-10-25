@@ -4,7 +4,7 @@ import { Scene } from '../../scene/Scene';
 import { SelectionManager } from '../../scene/Selection';
 import { EditorState } from '../core/state';
 import { SnapSystem } from '../snap/SnapSystem';
-import type { Vec3 } from '../../math';
+import type { Vec3 } from '@engine/core/math';
 
 // Mock requestAnimationFrame
 let animationFrameId = 0;

@@ -8,7 +8,7 @@
 import type { Entity } from '../../scene/Entity';
 import type { EditorState, WorkflowPreset } from '../core/state';
 import { ScriptComponent } from '../../scene/components/ScriptComponent';
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 
 export type SuggestionChannel = 'workflow' | 'panel' | 'feature';
 

@@ -4,7 +4,7 @@
 
 import { LogicCube } from './LogicCube';
 import type { LogicCubeMetadata, LogicSignal } from './types';
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 
 /**
  * SendMessage Action - Sends a message via event bus

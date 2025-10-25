@@ -1,4 +1,4 @@
-import { Entity, type EntityData } from '../../scene';
+import { Entity, type EntityData } from '../../engine/scene';
 import type { Scene } from '../../scene/Scene';
 
 export class Clipboard {

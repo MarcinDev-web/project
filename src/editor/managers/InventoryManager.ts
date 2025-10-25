@@ -10,7 +10,7 @@
 
 import type { Asset } from '../assets/AssetTypes';
 import { storageLoad, storageSave } from '../../utils/storage';
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 
 const STORAGE_KEY_INVENTORY = 'editor:inventory';
 const STORAGE_KEY_HOTBAR = 'editor:hotbar';

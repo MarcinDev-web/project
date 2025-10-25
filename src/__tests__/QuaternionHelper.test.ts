@@ -1,7 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import { QuaternionHelper } from '../editor/utils/QuaternionHelper';
-import type { Quat } from '../math';
-import { transformVec3ByQuat } from '../math';
+import type { Quat } from '@engine/core/math';
+import { transformVec3ByQuat } from '@engine/core/math';
 
 describe('QuaternionHelper', () => {
   describe('identity', () => {

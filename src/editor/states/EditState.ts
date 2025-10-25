@@ -1,6 +1,6 @@
 import type { IPlayModeState, PlayModeContext, PlayModeStateType } from '../core/PlayModeStateMachine';
 import { PlayModeStateType as StateType } from '../core/PlayModeStateMachine';
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 
 /**
  * Dependencies for EDIT state
@@ -74,11 +74,10 @@ export class EditState implements IPlayModeState {
     if (!fromReturn) {
       this.deps.stopPhysics();
       this.deps.disableScripts();
+      // Ensure character input and FPS camera are disabled when not coming from RETURN
+      this.deps.disableCharacterInput?.();
+      this.deps.disableFPSCamera?.();
     }
-
-    // Ensure character input and FPS camera are disabled when returning to edit
-    this.deps.disableCharacterInput?.();
-    this.deps.disableFPSCamera?.();
     
     // Enable history recording
     this.deps.enableHistory();

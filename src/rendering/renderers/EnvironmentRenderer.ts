@@ -1,5 +1,6 @@
-import type { Mat4, Vec3 } from '../../math';
+import type { Mat4, Vec3 } from '@engine/core/math';
 import type { EnvironmentComponent } from '../../scene/components/EnvironmentComponent';
+import { BrdfLutPass } from '../postprocess/BrdfLut';
 
 /**
  * Skybox vertex shader - renders a full-screen quad at far plane
@@ -179,6 +180,9 @@ export class EnvironmentRenderer {
   private uniformBindGroup!: GPUBindGroup;
   private paramsBindGroups: Map<string, GPUBindGroup> = new Map();
   private initialized = false;
+  // IBL resources
+  private brdfLut: GPUTexture | null = null;
+  private envCube: GPUTexture | null = null;
 
   constructor() {
     this.device = null!; // Will be set in initialize
@@ -443,6 +447,111 @@ export class EnvironmentRenderer {
     this.pipelines.clear();
     this.paramsBindGroups.clear();
     this.initialized = false;
+  }
+
+  getBrdfLutTexture(): GPUTexture | null { return this.brdfLut; }
+  getEnvCubeTexture(): GPUTexture | null { return this.envCube; }
+
+  /**
+   * Generates IBL resources: BRDF LUT (2D) and environment cubemap from procedural sky.
+   * Returns generated textures for binding.
+   */
+  async prepareIBLResources(resolution = 128): Promise<{ brdfLut: GPUTexture; envCube: GPUTexture }> {
+    if (!this.initialized) throw new Error('EnvironmentRenderer not initialized');
+    // BRDF LUT via compute
+    const encoder = this.device.createCommandEncoder({ label: 'ibl-precompute-encoder' });
+    const brdfGen = new BrdfLutPass(this.device);
+    this.brdfLut = brdfGen.generate(encoder, 256);
+
+    // Env cubemap render (procedural sky only)
+    this.envCube = this.device.createTexture({
+      label: 'ibl-env-cubemap',
+      size: { width: resolution, height: resolution, depthOrArrayLayers: 6 },
+      format: 'rgba16float',
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+    });
+
+    // Create one pipeline that uses faceIndex uniform to compute direction
+    const shader = this.device.createShaderModule({
+      label: 'ibl-env-capture-shader',
+      code: /* wgsl */ `
+struct VSOut { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
+@vertex fn vs(@builtin(vertex_index) vid:u32)->VSOut{
+  var o:VSOut; let x=f32((vid<<1u)&2u); let y=f32(vid&2u); o.pos=vec4f(x*2.0-1.0, y*-2.0+1.0, 0.0, 1.0); o.uv=vec2f(x,y); return o;
+}
+struct SkyboxParams { skyColor: vec3f, _p0:f32, horizonColor: vec3f, _p1:f32, sunDirection: vec3f, _p2:f32, sunColor: vec3f, sunIntensity: f32 };
+@group(0) @binding(0) var<uniform> params: SkyboxParams;
+struct FaceInfo { faceIndex: u32, _pad: vec3<u32> };
+@group(1) @binding(0) var<uniform> face: FaceInfo;
+
+fn faceUVToDir(faceIndex:u32, uv: vec2<f32>) -> vec3<f32> {
+  let a = uv*2.0 - vec2<f32>(1.0,1.0);
+  switch(i32(faceIndex)){
+    case 0: { return normalize(vec3<f32>( 1.0, -a.y, -a.x)); } // +X
+    case 1: { return normalize(vec3<f32>(-1.0, -a.y,  a.x)); } // -X
+    case 2: { return normalize(vec3<f32>( a.x,  1.0,  a.y)); } // +Y
+    case 3: { return normalize(vec3<f32>( a.x, -1.0, -a.y)); } // -Y
+    case 4: { return normalize(vec3<f32>( a.x, -a.y,  1.0)); } // +Z
+    default: { return normalize(vec3<f32>(-a.x, -a.y, -1.0)); } // -Z
+  }
+}
+
+fn atmosphericScattering(viewDir: vec3f, sunDir: vec3f) -> vec3f {
+  let elevation = viewDir.y;
+  let sunDot = max(dot(viewDir, sunDir), 0.0);
+  let skyGradient = pow(max(elevation, 0.0), 0.4);
+  let horizonFade = pow(1.0 - abs(elevation), 2.0);
+  var skyColor = mix(params.horizonColor, params.skyColor, skyGradient);
+  let sunRadius = 0.02;
+  let sunGlow = pow(sunDot, 512.0);
+  let sunHalo = pow(sunDot, 8.0) * 0.5;
+  let sunContribution = (sunGlow + sunHalo) * params.sunColor * params.sunIntensity;
+  let atmosphericGlow = horizonFade * pow(max(dot(viewDir, sunDir), 0.0), 4.0) * params.sunColor * 0.3;
+  return skyColor + sunContribution + atmosphericGlow;
+}
+
+@fragment fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
+  let dir = faceUVToDir(face.faceIndex, uv);
+  let color = atmosphericScattering(normalize(dir), normalize(params.sunDirection));
+  return vec4<f32>(color, 1.0);
+}
+`,
+    });
+    const pipeline = await (this.device as any).createRenderPipelineAsync?.({
+      label: 'ibl-env-capture-pipeline',
+      layout: this.device.createPipelineLayout({ bindGroupLayouts: [this.paramsBindGroupLayout, this.device.createBindGroupLayout({ entries: [{ binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } }] })] }),
+      vertex: { module: shader, entryPoint: 'vs' },
+      fragment: { module: shader, entryPoint: 'fs', targets: [{ format: 'rgba16float' }] },
+      primitive: { topology: 'triangle-list', cullMode: 'none' },
+    }) ?? this.device.createRenderPipeline({
+      label: 'ibl-env-capture-pipeline',
+      layout: this.device.createPipelineLayout({ bindGroupLayouts: [this.paramsBindGroupLayout, this.device.createBindGroupLayout({ entries: [{ binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } }] })] }),
+      vertex: { module: shader, entryPoint: 'vs' },
+      fragment: { module: shader, entryPoint: 'fs', targets: [{ format: 'rgba16float' }] },
+      primitive: { topology: 'triangle-list', cullMode: 'none' },
+    });
+
+    // Face uniform buffer
+    const faceBuffer = this.device.createBuffer({ label: 'ibl-face-ubo', size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+    const faceLayout = (pipeline.getBindGroupLayout(1));
+
+    for (let face = 0; face < 6; face++) {
+      const view = this.envCube.createView({ baseArrayLayer: face, arrayLayerCount: 1 });
+      const pass = encoder.beginRenderPass({
+        label: `ibl-env-capture-face-${face}`,
+        colorAttachments: [{ view, clearValue: { r: 0, g: 0, b: 0, a: 1 }, loadOp: 'clear', storeOp: 'store' }],
+      });
+      pass.setPipeline(pipeline);
+      pass.setBindGroup(0, this.paramsBindGroups.get('procedural-sky') ?? this.paramsBindGroups.values().next().value);
+      this.device.queue.writeBuffer(faceBuffer, 0, new Uint32Array([face, 0, 0, 0]));
+      const faceBg = this.device.createBindGroup({ label: `ibl-face-bg-${face}`, layout: faceLayout, entries: [{ binding: 0, resource: { buffer: faceBuffer } }] });
+      pass.setBindGroup(1, faceBg);
+      pass.draw(3, 1, 0, 0);
+      pass.end();
+    }
+
+    this.device.queue.submit([encoder.finish()]);
+    return { brdfLut: this.brdfLut!, envCube: this.envCube! };
   }
 }
 

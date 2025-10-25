@@ -1,11 +1,11 @@
-import type { Mat4, Vec3 } from '../../math';
-import { mat4LookAt, mat4Perspective, mat4Invert, mat4FromQuatTranslation, mat4GetTranslationOut, mat4GetRotationOut, lerpVec3Out, quatSlerpOut } from '../../math';
+import type { Mat4, Vec3 } from '@engine/core/math';
+import { mat4LookAt, mat4Perspective, mat4Invert, mat4FromQuatTranslation, mat4GetTranslationOut, mat4GetRotationOut, lerpVec3Out, quatSlerpOut } from '@engine/core/math';
 import type { Scene } from '../../scene/Scene';
 import type { PhysicsWorld } from '../../physics/PhysicsWorld';
 import type { OrbitControls } from '../../input';
 import type { FPSCamera } from './FPSCamera';
 import { FOV_RADIANS, Z_FAR, Z_NEAR } from '../../rendering/config';
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 
 /**
  * Camera mode types

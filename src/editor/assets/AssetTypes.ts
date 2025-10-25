@@ -11,7 +11,7 @@
  * - Rich metadata (author, version, dependencies)
  */
 
-import type { Vec3 } from '../../math';
+import type { Vec3 } from '@engine/core/math';
 import type { RgbaColor } from '../../utils/colors';
 import type { BlockDefinition } from '../../rendering/blocks/BlockLibrary';
 

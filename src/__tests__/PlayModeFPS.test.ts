@@ -12,7 +12,7 @@ import { CharacterController } from '../scene/components/CharacterController';
 import { PhysicsComponent } from '../scene/components/PhysicsComponent';
 import type { OrbitControls } from '../input';
 import { createDefaultManifest } from '../editor/core/PlayManifest';
-import { quatToEuler } from '../math';
+import { quatToEuler } from '@engine/core/math';
 import type { PlayManifest } from '../editor/core/PlayManifest';
 
 function createMockCanvas(): HTMLCanvasElement {
@@ -124,6 +124,23 @@ describe('PlayModeFPS Integration Tests', () => {
       const activeScene = modeManager.getActiveScene();
       const playerEntity = activeScene.getAllEntities().find(e => e.userData.isPlayModePlayer);
       expect(playerEntity?.userData.isHidden).toBe(true);
+    });
+
+    it('should spawn player using PlayerStart yaw', () => {
+      // Create a PlayerStart with a specific yaw
+      const playerStart = new Entity('PlayerStart');
+      const yaw = Math.PI / 4; // 45 degrees
+      playerStart.transform.setEulerAngles(0, yaw, 0);
+      scene.addEntity(playerStart);
+
+      modeManager.enterPlayMode();
+
+      const activeScene = modeManager.getActiveScene();
+      const playerEntity = activeScene.getAllEntities().find(e => e.userData.isPlayModePlayer);
+      expect(playerEntity).toBeDefined();
+
+      const spawnedYaw = quatToEuler(playerEntity!.transform.rotation)[1];
+      expect(spawnedYaw).toBeCloseTo(yaw, 1e-3);
     });
 
     it('should add CharacterController component to player', () => {

@@ -1,4 +1,4 @@
-import type { Vec3, Quat } from '../math';
+import type { Vec3, Quat } from '@engine/core/math';
 
 export type AnimationInterpolation = 'step' | 'linear' | 'cubic';
 

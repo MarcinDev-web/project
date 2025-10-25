@@ -11,12 +11,12 @@
  */
 
 import type { OrbitControls } from '../../input';
-import type { Scene } from '../../scene';
+import type { Scene } from '../../engine/scene';
 import type { SelectionManager } from '../../scene/Selection';
 import type { EditorState, EasyPlacePattern } from '../core/state';
 import type { PlacementMode } from '../placement/PlacementMode';
-import type { Vec3, Quat } from '../../math';
-import { Logger } from '../../logger';
+import type { Vec3, Quat } from '@engine/core/math';
+import { Logger } from '../../app/utils/logger';
 import { PatternPlacer } from '../placement/PatternPlacer';
 import type { CollisionDetector } from '../placement/CollisionDetector';
 import type { PatternPosition } from '../placement/PatternPlacer';

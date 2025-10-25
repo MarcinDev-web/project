@@ -1,4 +1,4 @@
-import { mat4Perspective, mat4LookAt, mat4Multiply, type Mat4 } from '../../math';
+import { mat4Perspective, mat4LookAt, mat4Multiply, type Mat4 } from '@engine/core/math';
 import {
   createGeometryBuffers,
   createPipelines,

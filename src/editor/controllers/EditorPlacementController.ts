@@ -13,15 +13,15 @@
  */
 
 import type { OrbitControls } from '../../input';
-import type { Scene, Entity } from '../../scene';
+import type { Scene, Entity } from '../../engine/scene';
 import type { SelectionManager } from '../../scene/Selection';
 import type { EditorState } from '../core/state';
 import type { PlacementMode } from '../placement/PlacementMode';
 import { Raycaster } from '../../scene/Raycaster';
-import type { Vec3, Mat4 } from '../../math';
-import { mat4Perspective, mat4LookAt } from '../../math';
+import type { Vec3, Mat4 } from '@engine/core/math';
+import { mat4Perspective, mat4LookAt } from '@engine/core/math';
 import { FOV_RADIANS, Z_FAR, Z_NEAR } from '../../rendering/config';
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 
 export interface EditorPlacementControllerConfig {
   canvas: HTMLCanvasElement;

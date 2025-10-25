@@ -1,4 +1,4 @@
-import type { Vec3 } from '../../math';
+import type { Vec3 } from '@engine/core/math';
 import { createIcon } from '../utils/icons';
 
 export interface VectorInputOptions {

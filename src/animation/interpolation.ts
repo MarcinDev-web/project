@@ -1,6 +1,6 @@
 import { quat } from 'gl-matrix';
-import { lerpVec3Out, quatSlerpOut, quatNormalizeOut } from '../math';
-import type { Vec3, Quat } from '../math';
+import { lerpVec3Out, quatSlerpOut, quatNormalizeOut } from '@engine/core/math';
+import type { Vec3, Quat } from '@engine/core/math';
 import type { AnimationEasing, AnimationInterpolation, AnimationTrackType, AnimationValue } from './types';
 
 function applyEasing(t: number, easing: AnimationEasing | undefined): number {

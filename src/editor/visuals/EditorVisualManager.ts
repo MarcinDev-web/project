@@ -7,7 +7,7 @@
  * Extracted from EditorUI to reduce complexity.
  */
 
-import type { Scene } from '../../scene';
+import type { Scene } from '../../engine/scene';
 import type { SelectionManager } from '../../scene/Selection';
 import type { EditorState } from '../core/state';
 import type { Renderer } from '../../rendering/index';
@@ -17,8 +17,8 @@ import type { SnapSystem } from '../snap/SnapSystem';
 import { applySelectionVisuals } from './SelectionVisuals';
 import { DisposableGroup } from '../core/DisposableGroup';
 import { effect } from '@preact/signals-core';
-import { Logger } from '../../logger';
-import type { Vec3 } from '../../math';
+import { Logger } from '../../app/utils/logger';
+import type { Vec3 } from '@engine/core/math';
 
 export interface EditorVisualManagerConfig {
   scene: Scene;

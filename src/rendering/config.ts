@@ -6,9 +6,17 @@ export const CLEAR_COLOR = { r: 0.08, g: 0.08, b: 0.1, a: 1.0 };
 export const DEFAULT_STATUS_MESSAGE = 'Rendering simple cubes…';
 export const UI_STATUS_THROTTLE_MS = 250;
 // Lighting system adds: pointLightCount (16 bytes), directional (32 bytes), ambient (16 bytes), 4 point lights (4*64=256 bytes)
-// Total: 144 (old) + 16 + 32 + 16 + 256 = 464 bytes
-export const UNIFORM_BUFFER_SIZE = 464;
-export const UNIFORM_DATA_LENGTH = 116; // 464 bytes / 4 bytes per float32
+// Base total before shadows/IBL: 144 (static) + 16 + 32 + 16 + 256 = 464 bytes
+// Shadow uniforms appended:
+// - viewMatrix (64)
+// - 4x lightViewProj (256)
+// - cascadeSplits (16)
+// - atlasRects (4*16=64)
+// - filterParams (16)
+// - biasParams (16)
+// New total: 464 + 64 + 256 + 16 + 64 + 16 + 16 = 896 bytes
+export const UNIFORM_BUFFER_SIZE = 896;
+export const UNIFORM_DATA_LENGTH = 224; // 896 bytes / 4 bytes per float32
 export interface GpuTimestampPair {
   label: string;
   beginIndex: number;

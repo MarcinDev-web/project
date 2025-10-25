@@ -8,8 +8,8 @@
  * - Gimbal lock prevention
  */
 
-import type { Quat } from '../../math';
-import { quatToEuler, quatFromEuler } from '../../math';
+import type { Quat } from '@engine/core/math';
+import { quatToEuler, quatFromEuler } from '@engine/core/math';
 
 export interface EulerAngles {
   pitch: number; // X-axis rotation (degrees)

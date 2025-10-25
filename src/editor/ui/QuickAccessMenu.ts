@@ -11,7 +11,7 @@
 
 import type { Asset } from '../assets/AssetTypes';
 import { createIcon } from '../utils/icons';
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 
 export type QuickAccessMode = 'recent' | 'favorites' | 'hotbar';
 

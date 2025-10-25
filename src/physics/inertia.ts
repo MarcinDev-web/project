@@ -1,4 +1,4 @@
-import type { Mat3, Vec3 } from '../math';
+import type { Mat3, Vec3 } from '@engine/core/math';
 
 /**
  * Geometry descriptors supported by calculateInertiaTensor

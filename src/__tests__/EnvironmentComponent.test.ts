@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { EnvironmentComponent } from '../scene/components/EnvironmentComponent';
-import type { Vec3 } from '../math';
+import type { Vec3 } from '@engine/core/math';
 
 describe('EnvironmentComponent', () => {
   let component: EnvironmentComponent;

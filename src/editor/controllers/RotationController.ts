@@ -8,10 +8,10 @@
  * - Rotation history
  */
 
-import type { Entity } from '../../scene';
-import type { Quat } from '../../math';
+import type { Entity } from '../../engine/scene';
+import type { Quat } from '@engine/core/math';
 import { QuaternionHelper, type RotationSnapMode, type EulerAngles } from '../utils/QuaternionHelper';
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 
 export interface RotationControllerConfig {
   onRotationChanged?: (entity: Entity, rotation: Quat) => void;

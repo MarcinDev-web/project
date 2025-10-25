@@ -1,4 +1,4 @@
-import { logger } from '../../logger';
+import { logger } from '../../app/utils/logger';
 
 /**
  * Determines the GPU timestamp period in nanoseconds using queue- or adapter-provided data.

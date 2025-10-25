@@ -77,6 +77,37 @@ export function mat4Perspective(
 }
 
 /**
+ * Builds an orthographic projection matrix using WebGPU's 0..1 depth range.
+ * @param out Output matrix
+ * @param left Left plane
+ * @param right Right plane
+ * @param bottom Bottom plane
+ * @param top Top plane
+ * @param near Near plane distance
+ * @param far Far plane distance
+ */
+export function mat4Ortho(
+  out: Mat4,
+  left: number,
+  right: number,
+  bottom: number,
+  top: number,
+  near: number,
+  far: number
+): Mat4 {
+  assertMat4('out', out);
+  assertFinite('left', left);
+  assertFinite('right', right);
+  assertFinite('bottom', bottom);
+  assertFinite('top', top);
+  assertFinite('near', near);
+  assertFinite('far', far);
+  if (!(far > near)) throw new RangeError('far must be greater than near');
+  (m4 as any).orthoZO(out as unknown as m4, left, right, bottom, top, near, far);
+  return out;
+}
+
+/**
  * Builds a right-handed look-at view matrix.
  * @param out - Output matrix that receives the view transform.
  * @param eye - Viewer position in world space.

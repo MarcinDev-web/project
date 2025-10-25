@@ -11,11 +11,11 @@
  * - Orbit controls fallback
  */
 
-import { mat4Perspective, mat4LookAt, mat4Multiply } from '../../math';
-import type { Mat4, Vec3 } from '../../math';
+import { mat4Perspective, mat4LookAt, mat4Multiply } from '@engine/core/math';
+import type { Mat4, Vec3 } from '@engine/core/math';
 import type { OrbitControlsState } from '../../input';
 import { CameraComponent } from '../../scene/components/CameraComponent';
-import type { Entity, Scene } from '../../scene';
+import type { Entity, Scene } from '../../engine/scene';
 import { FOV_RADIANS, Z_NEAR, Z_FAR } from '../config';
 
 export interface CameraMatrices {

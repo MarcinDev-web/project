@@ -7,8 +7,8 @@
  * Performance: Culls objects outside camera view to reduce draw calls.
  */
 
-import type { Mat4, Vec3 } from '../../math';
-import type { Entity, AABB } from '../../scene';
+import type { Mat4, Vec3 } from '@engine/core/math';
+import type { Entity, AABB } from '../../engine/scene';
 
 export interface FrustumPlane {
   nx: number;

@@ -5,7 +5,7 @@
 
 import type { Entity } from '../../scene/Entity';
 import type { Scene } from '../../scene/Scene';
-import { normalizeVec3Out, quatNormalize, dotVec3, type Quat, type Vec3 } from '../../math';
+import { normalizeVec3Out, quatNormalize, dotVec3, type Quat, type Vec3 } from '@engine/core/math';
 
 /**
  * Axis-Aligned Bounding Box

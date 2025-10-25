@@ -2,7 +2,7 @@ import { EditorApp } from './app';
 import { requireEditorDom } from './utils/dom';
 import { assetRegistry } from './editor/assets/AssetRegistry';
 import { initializeAssetLibrary } from './editor/assets/AssetLibrary';
-import { Logger } from './logger';
+import { Logger } from './app/utils/logger';
 import { registerBuiltInLogicCubes } from './logic/cubes';
 import { LogicCubeLibrary } from './editor/managers/LogicCubeLibrary';
 

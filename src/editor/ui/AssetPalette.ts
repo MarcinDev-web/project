@@ -14,7 +14,7 @@
  * - Drag-to-place or click-to-activate
  */
 
-import type { Scene } from '../../scene';
+import type { Scene } from '../../engine/scene';
 import type { EditorState } from '../core/state';
 import type { Asset, AssetMainCategory, AssetVariant, AssetSortBy } from '../assets/AssetTypes';
 import { assetRegistry } from '../assets/AssetRegistry';

@@ -11,12 +11,12 @@
  * - Maintain backward compatibility with existing code
  */
 
-import type { Scene } from '../../scene';
+import type { Scene } from '../../engine/scene';
 import type { SelectionManager } from '../../scene/Selection';
 import type { EditorState } from '../core/state';
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 import { Entity } from '../../scene/Entity';
-import type { Vec3 } from '../../math';
+import type { Vec3 } from '@engine/core/math';
 import type { PhysicsWorld } from '../../physics/PhysicsWorld';
 import { CharacterController } from '../../scene/components/CharacterController';
 import { PhysicsComponent, RigidbodyType } from '../../scene/components/PhysicsComponent';

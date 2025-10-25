@@ -1,5 +1,5 @@
-import { mat4LookAt } from '../../math';
-import type { Mat4, Vec3 } from '../../math';
+import { mat4LookAt } from '@engine/core/math';
+import type { Mat4, Vec3 } from '@engine/core/math';
 
 /**
  * Clamp a value between min and max

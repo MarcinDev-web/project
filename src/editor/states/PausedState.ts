@@ -1,6 +1,6 @@
 import type { IPlayModeState, PlayModeContext, PlayModeStateType } from '../core/PlayModeStateMachine';
 import { PlayModeStateType as StateType } from '../core/PlayModeStateMachine';
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 
 /**
  * Dependencies for PAUSED state

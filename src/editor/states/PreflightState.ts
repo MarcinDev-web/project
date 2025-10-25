@@ -1,8 +1,11 @@
 import type { IPlayModeState, PlayModeContext, PlayModeStateType } from '../core/PlayModeStateMachine';
 import { PlayModeStateType as StateType } from '../core/PlayModeStateMachine';
 import { createDefaultManifest, validateManifest, type PlayManifest } from '../core/PlayManifest';
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
+import { quatToEuler } from '@engine/core/math';
 import type { Scene } from '../../scene/Scene';
+import { ScriptComponent } from '../../scene/components/ScriptComponent';
+import { BehaviorRegistry } from '../../logic/BehaviorRegistry';
 
 /**
  * Validation result
@@ -138,8 +141,8 @@ export class PreflightState implements IPlayModeState {
       // Check 4: Validate components
       // TODO: Add component validation when needed
       
-      // Check 5: Check for script errors
-      // TODO: Add script validation when ScriptSystem is more developed
+      // Check 5: Validate scripts
+      this.validateScripts(scene, errors, warnings);
       
       Logger.debug(`Validation complete: ${errors.length} errors, ${warnings.length} warnings`);
     } catch (error) {
@@ -188,14 +191,54 @@ export class PreflightState implements IPlayModeState {
     
     for (const entity of entities) {
       if (entity.name === 'PlayerStart' || entity.userData.playerStart === true) {
+        // Extract yaw around Y axis from quaternion
+        const euler = quatToEuler(entity.transform.rotation as any);
+        const yawY = euler[1] ?? 0;
         return {
           position: [...entity.transform.position] as [number, number, number],
-          rotation: entity.transform.rotation[1] ?? 0, // Use Y rotation as yaw
+          rotation: yawY,
         };
       }
     }
     
     return null;
+  }
+
+  /**
+   * Validate ScriptComponent definitions across the scene.
+   * Ensures each script references a registered behavior and flags basic issues.
+   */
+  private validateScripts(scene: Scene, errors: string[], warnings: string[]): void {
+    try {
+      const scripted = scene.queryEntities(ScriptComponent);
+      if (scripted.length === 0) return;
+
+      for (const entity of scripted) {
+        const comp = entity.getComponent(ScriptComponent);
+        if (!comp) continue;
+        const defs = comp.getScriptDefinitions();
+        for (let i = 0; i < defs.length; i++) {
+          const def = defs[i];
+          const label = `${entity.name ?? 'Entity'}#${entity.id}`;
+          if (!def || typeof def.name !== 'string' || def.name.trim() === '') {
+            errors.push(`Script at index ${i} on ${label} has an invalid name`);
+            continue;
+          }
+          if (!BehaviorRegistry.has(def.name)) {
+            errors.push(`Script "${def.name}" on ${label} is not registered`);
+            continue;
+          }
+          if (def.params !== undefined && (def.params === null || typeof def.params !== 'object' || Array.isArray(def.params))) {
+            warnings.push(`Script "${def.name}" on ${label} has non-object params; will be ignored`);
+          }
+          if (def.enabled === false) {
+            warnings.push(`Script "${def.name}" on ${label} is disabled`);
+          }
+        }
+      }
+    } catch (e) {
+      errors.push(`Script validation failed: ${e instanceof Error ? e.message : String(e)}`);
+    }
   }
 }
 

@@ -2,9 +2,9 @@
  * LightManager - Manages lights in the scene and prepares lighting data for shaders
  */
 
-import type { Scene, Entity } from '../../scene';
+import type { Scene, Entity } from '../../engine/scene';
 import { LightComponent } from '../../scene/components/LightComponent';
-import type { Vec3 } from '../../math';
+import type { Vec3 } from '@engine/core/math';
 
 /**
  * Maximum number of lights supported by the shader (directional + point + spot)

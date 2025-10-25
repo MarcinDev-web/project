@@ -1,7 +1,7 @@
 import { audioSystem } from './AudioSystem';
-import type { Scene } from '../scene';
+import type { Scene } from '../engine/scene';
 import type { OrbitControls } from '../input';
-import { normalizeVec3Like, type Vec3 } from '../math';
+import { normalizeVec3Like, type Vec3 } from '@engine/core/math';
 
 export interface AudioManagerConfig {
   scene: Scene;

@@ -1,12 +1,12 @@
 import { Component, type ComponentClass } from './components/Component';
 import { getComponentConstructor } from './components/registry';
 import { Transform } from './Transform';
-import type { Scene } from './Scene';
+import type { Scene } from './engine/scene';
 import { MeshComponent, type MeshKind } from './components/MeshComponent';
 import { MaterialComponent } from './components/MaterialComponent';
 import type { RgbaColor } from '../utils/colors';
 import type { MeshBounds } from './Raycaster';
-import { Logger } from '../logger';
+import { Logger } from '../app/utils/logger';
 
 /**
  * Unique identifier for entities.

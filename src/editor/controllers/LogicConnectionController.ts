@@ -8,7 +8,7 @@ import type { LogicConnectionManager } from '../../logic/LogicConnectionManager'
 import type { LogicPort } from '../../logic/cubes/types';
 import { LogicCubeComponent } from '../../scene/components/LogicCubeComponent';
 import { LogicCubeLibrary } from '../managers/LogicCubeLibrary';
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 
 type ConnectionMode = 'idle' | 'selecting-source' | 'selecting-target';
 

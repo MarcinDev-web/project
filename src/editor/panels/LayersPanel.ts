@@ -9,7 +9,7 @@
  * - Layer filtering
  */
 
-import type { Scene } from '../../scene';
+import type { Scene } from '../../engine/scene';
 import { createIcon } from '../utils/icons';
 import { storageSave, storageLoad } from '../../utils/storage';
 

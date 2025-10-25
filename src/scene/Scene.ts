@@ -1,7 +1,7 @@
 import { Entity, type EntityId, type EntityData } from './Entity';
 import type { ComponentClass } from './components/Component';
 import { CameraComponent } from './components/CameraComponent';
-import { Logger } from '../logger';
+import { Logger } from '../app/utils/logger';
 import { EventBus } from '../logic/EventBus';
 import type { ScriptRuntime } from '../logic/types';
 

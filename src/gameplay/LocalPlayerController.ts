@@ -1,4 +1,4 @@
-import { Logger } from '../logger';
+import { Logger } from '../app/utils/logger';
 import type { PlayerController, ControllerPreferences, ControllerContext } from './Controller';
 import type { CharacterInputHandler } from '../input/CharacterInput';
 import type { CameraDirector } from '../editor/camera/CameraDirector';
@@ -7,7 +7,7 @@ import type { CharacterControllerSystem } from '../scene/CharacterControllerSyst
 import { CharacterController } from '../scene/components/CharacterController';
 import type { CharacterInput } from '../scene/components/CharacterController';
 import type { Entity } from '../scene/Entity';
-import type { Vec3 } from '../math';
+import type { Vec3 } from '@engine/core/math';
 import { EMPTY_INTENT, cloneIntent, type GameplayIntent } from './Intent';
 
 export interface LocalPlayerControllerOptions {

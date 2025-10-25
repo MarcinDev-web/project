@@ -12,13 +12,13 @@ import {
 } from '../resources/resources';
 import type { FrameResources, GeometryData } from '../resources/resources';
 import { GPUBufferPool } from './bufferPool';
-import type { Scene, Entity } from '../../scene';
+import type { Scene, Entity } from '../../engine/scene';
 import { LightManager } from '../lighting/LightManager';
 import { ScriptSystem } from '../../logic/ScriptSystem';
 import { LogicCubeSystem } from '../../logic/LogicCubeSystem';
 import { LogicConnectionRenderer } from '../LogicConnectionRenderer';
 import { EnvironmentRenderer } from '../renderers/EnvironmentRenderer';
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 import { CameraSystem } from './CameraSystem';
 import { UniformManager } from './UniformManager';
 import { FrameRenderer } from './FrameRenderer';
@@ -44,7 +44,7 @@ function hasPreferredCanvasFormat(
 }
 
 // Vertex buffer layout constants
-const VERTEX_STRIDE = 20;
+const VERTEX_STRIDE = 24;
 const INSTANCE_OFFSET_STRIDE = 12;
 
 function createVertexBufferLayouts(): GPUVertexBufferLayout[] {
@@ -56,6 +56,7 @@ function createVertexBufferLayouts(): GPUVertexBufferLayout[] {
         { shaderLocation: 0, offset: 0, format: 'float32x3' }, // position
         { shaderLocation: 2, offset: 12, format: 'snorm8x4' }, // normal
         { shaderLocation: 3, offset: 16, format: 'float16x2' }, // uv
+        { shaderLocation: 7, offset: 20, format: 'unorm8x4' }, // AO (x), rest unused
       ],
     },
     { arrayStride: INSTANCE_OFFSET_STRIDE, stepMode: 'instance', attributes: [{ shaderLocation: 1, offset: 0, format: 'float32x3' }] },
@@ -305,12 +306,12 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       dataLength: UNIFORM_DATA_LENGTH,
     });
     const vertexBuffers = createVertexBufferLayouts();
-    const { textureBindGroupLayout, textureBindGroup, atlasTexture, sampler, atlas } =
+    const { textureBindGroupLayout, textureBindGroup, atlasTexture, normalAtlasTexture, sampler, atlas, atlasMetaBuffer } =
       createTextureAtlas(device, undefined, 2048, 128);
 
     const { renderPipeline, overlayPipeline } = await createPipelines(
       device,
-      presentationFormat,
+      'rgba16float',
       uniformResources.uniformBindGroupLayout,
       textureBindGroupLayout,
       vertexBuffers,
@@ -377,8 +378,10 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       timestampPeriod: getTimestampPeriod(device, adapter),
       sideTexture: atlasTexture, // Atlas texture (backward compatibility field name)
       topTexture: atlasTexture, // Same atlas texture (backward compatibility field name)
+      normalAtlasTexture,
       sampler,
       textureBindGroup,
+      atlasMetaBuffer,
       depthTexture,
       msaaColorTexture,
       depthTextureView,
@@ -395,6 +398,41 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       presentationFormat,
       sampleCount: MSAA_SAMPLE_COUNT,
     });
+    // Precompute IBL textures (best-effort)
+    try {
+      // Shadow placeholders for bindings 4 & 5
+      const shadowPlaceholder = device.createTexture({
+        label: 'shadow-atlas-placeholder-r',
+        size: [1, 1, 1],
+        format: 'depth32float',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
+      });
+      const shadowSamplerCmp = device.createSampler({
+        label: 'shadow-comparison-sampler-r',
+        compare: 'less-equal',
+        magFilter: 'linear',
+        minFilter: 'linear',
+      });
+      const { brdfLut, envCube } = await environmentRenderer.prepareIBLResources(128);
+      const newBg = device.createBindGroup({
+        label: 'material-atlas-bg+ibl',
+        layout: textureBindGroupLayout,
+        entries: [
+          { binding: 0, resource: sampler },
+          { binding: 1, resource: atlasTexture.createView({ label: 'atlas-texture-view' }) },
+          { binding: 2, resource: normalAtlasTexture.createView({ label: 'atlas-normal-texture-view' }) },
+          { binding: 3, resource: { buffer: atlasMetaBuffer } },
+          // shadow bindings (4,5) will be swapped later by ShadowPass; placeholders for now
+          { binding: 4, resource: shadowPlaceholder.createView() },
+          { binding: 5, resource: shadowSamplerCmp },
+          { binding: 6, resource: brdfLut.createView() },
+          { binding: 7, resource: envCube.createView({ dimension: 'cube' }) },
+        ],
+      });
+      (frameResources as any).textureBindGroup = newBg;
+    } catch {
+      // ignore if IBL generation fails in minimal environments
+    }
 
     // Initialize logic connection renderer
     if (logicConnectionRenderer) {
@@ -523,6 +561,8 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
         environmentRenderer,
         gridRenderer,
         logicConnectionRenderer,
+        uniformManager,
+        lightingData,
         ...(gpuTimingListeners.length
           ? {
               onGpuTimings: (timings) => {
@@ -539,7 +579,9 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       },
       viewProjectionMatrix,
       [eyeX, eyeY, eyeZ],
-      passDesc
+      passDesc,
+      cameraSystem.getViewMatrix(),
+      cameraSystem.getProjectionMatrix()
     );
 
       // For tests, ensure timestamp resolves happen (resolve/copy handled below)

@@ -1,4 +1,4 @@
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 
 /**
  * Possible play mode states

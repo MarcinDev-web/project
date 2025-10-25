@@ -1,6 +1,6 @@
 import { Scene } from '../../scene/Scene';
 import { Entity } from '../../scene/Entity';
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 import type { PlayManifest } from './PlayManifest';
 
 /**

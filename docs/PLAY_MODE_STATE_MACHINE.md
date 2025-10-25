@@ -115,8 +115,8 @@ Stack-based input context management.
   - Renderer ready
   - Scene has entities
   - Find PlayerStart entity
+  - Validate scripts (registration, params shape, disabled warnings)
   - Validate components (future)
-  - Check script errors (future)
 - Build PlayManifest
 - Store validation errors/warnings
 
@@ -298,10 +298,8 @@ async onStopButtonClick() {
 ## Future Enhancements
 
 ### Short Term
-- [ ] Implement script validation in PREFLIGHT
-- [ ] Add proper rotation handling for player spawn
-- [ ] Implement pause menu UI
-- [ ] Add restart functionality
+- [x] Implement script validation in PREFLIGHT
+- [x] Add proper rotation handling for player spawn
 
 ### Medium Term
 - [ ] GPU pipeline pre-warming in LOADING
@@ -357,3 +355,15 @@ Key areas to test:
 
 The play mode state machine provides a robust, extensible architecture for managing the Edit ↔ Play transition. It properly separates authoring from runtime, provides smooth transitions, validates before play, and maintains a clean state machine structure that's easy to understand and extend.
 
+
+## Rendering pipeline (Play Mode)
+
+W trybie gry renderer działa w łańcuchu postprocessingu:
+
+- HDR (RGBA16F) → Bloom → 3D LUT (16³) + ACES tonemap → Present
+
+Szczegóły techniczne:
+- Atlas materiałów: 1 tekstura albedo (sRGB) + 1 normal atlas (linear) + bufor metadanych (SSBO) z rectami, parametrami PBR i skalą nasycenia.
+- Geometria: 24 bajty na wierzchołek (pos FP32x3, normal SNORM8x4, uv FP16x2, AO UNORM8x4).
+- PBR (WGSL): GGX + Schlick, normal mapping w TBN z pochodnych, AO z wierzchołka (siła 0.4), rim lighting (power 3.5), prosty fog eksponencjalny.
+- Postprocess: prosty bloom (bright-pass + 9-tap blur), LUT 3D 16³ (identity domyślnie), ACES (aproksymacja Narkowicza) i gamma.

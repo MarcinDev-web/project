@@ -8,7 +8,7 @@ import { CollisionDetector } from '../editor/placement/CollisionDetector';
 import { SnapSystem } from '../editor/snap/SnapSystem';
 import { EditorState } from '../editor/core/state';
 import type { OrbitControls } from '../input';
-import { mat4Invert, mat4GetRotation, mat4GetScale } from '../math';
+import { mat4Invert, mat4GetRotation, mat4GetScale } from '@engine/core/math';
 
 function createMockControls(): OrbitControls {
   let enabled = true;

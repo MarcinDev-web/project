@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { extractFrustumFromVP, cullEntities } from './FrustumCuller';
-import { Scene, Entity } from '../../scene';
-import { mat4Perspective, mat4LookAt, mat4Multiply, type Mat4 } from '../../math';
+import { Scene, Entity } from '../../engine/scene';
+import { mat4Perspective, mat4LookAt, mat4Multiply, type Mat4 } from '@engine/core/math';
 
 function makeVP(): Mat4 {
   const proj = new Float32Array(16);

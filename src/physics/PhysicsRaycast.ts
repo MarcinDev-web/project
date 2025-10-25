@@ -1,12 +1,12 @@
 import type { Entity } from '../scene/Entity';
-import type { Vec3 } from '../math';
+import type { Vec3 } from '@engine/core/math';
 import {
   addVec3Out,
   subVec3Out,
   scaleVec3Out,
   dotVec3,
   transformVec3ByQuatOut,
-} from '../math';
+} from '@engine/core/math';
 import { PhysicsComponent, type BoxCollider, type SphereCollider, type CapsuleCollider } from '../scene/components/PhysicsComponent';
 
 /**

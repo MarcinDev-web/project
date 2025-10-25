@@ -48,11 +48,11 @@ describe('OutlinerPanel', () => {
     panel.mount(host);
 
     panel.refresh();
-    // Find the outliner item button specifically (not quick action buttons)
-    const itemButton = host.querySelector('.outliner-item');
-    expect(itemButton).toBeTruthy();
+    // Find the selectable area within the outliner item
+    const selectableArea = host.querySelector('.outliner-item-selectable');
+    expect(selectableArea).toBeTruthy();
 
-    itemButton!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    selectableArea!.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
     expect(onEntitySelected).toHaveBeenCalledWith(entity);
     expect(editorState.selection.value).toEqual([entity]);

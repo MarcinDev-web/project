@@ -93,6 +93,7 @@ describe('initRenderer', () => {
       setVertexBuffer: vi.fn(),
       setIndexBuffer: vi.fn(),
       setBindGroup: vi.fn(),
+      draw: vi.fn(),
       drawIndexed: vi.fn(),
       writeTimestamp: vi.fn(),
       end: vi.fn(),

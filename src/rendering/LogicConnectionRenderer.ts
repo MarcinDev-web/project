@@ -2,10 +2,10 @@
  * LogicConnectionRenderer - Renders 3D beams between connected logic cubes.
  */
 
-import type { Scene } from '../scene';
+import type { Scene } from '../engine/scene';
 import type { LogicConnectionManager } from '../logic/LogicConnectionManager';
 import type { LogicConnection } from '../logic/cubes/types';
-import type { Mat4, Vec3 } from '../math';
+import type { Mat4, Vec3 } from '@engine/core/math';
 import { createLineShaderCode } from './shaders/lineShader';
 import { LogicCubeComponent } from '../scene/components/LogicCubeComponent';
 import { LogicCubeLibrary } from '../editor/managers/LogicCubeLibrary';

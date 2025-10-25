@@ -10,7 +10,7 @@
  */
 
 import type { Asset, AssetVariant } from '../assets/AssetTypes';
-import type { Scene } from '../../scene';
+import type { Scene } from '../../engine/scene';
 import type { EditorState } from '../core/state';
 import type { InventoryManager } from '../managers/InventoryManager';
 import { HotbarComponent } from './HotbarComponent';
@@ -18,7 +18,7 @@ import { CatalogPanel } from './CatalogPanel';
 import { PlacementCoordinator } from './PlacementCoordinator';
 import type { PlacementMode } from '../placement/PlacementMode';
 import { assetRegistry } from '../assets/AssetRegistry';
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 
 export interface UnifiedBuildPanelConfig {
   scene: Scene;

@@ -1,6 +1,6 @@
 import { Entity } from './Entity';
-import type { Mat4 } from '../math';
-import { mat4Invert } from '../math';
+import type { Mat4 } from '@engine/core/math';
+import { mat4Invert } from '@engine/core/math';
 
 /**
  * Represents a ray in 3D space.

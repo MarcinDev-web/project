@@ -9,7 +9,7 @@
  */
 
 import type { Asset } from '../assets/AssetTypes';
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 
 interface RecentAssetEntry {
   assetId: string;

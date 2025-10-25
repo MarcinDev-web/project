@@ -12,7 +12,7 @@
  * - 208-464: pointLights array (4 * 64 bytes)
  */
 
-import type { Vec3 } from '../../math';
+import type { Vec3 } from '@engine/core/math';
 import type { LightingData, PackedLight } from '../lighting/LightManager';
 
 /** Byte offset where lighting uniforms start in the uniform buffer */

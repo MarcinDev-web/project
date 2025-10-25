@@ -1,5 +1,5 @@
 import type { Entity } from '../../scene/Entity';
-import type { Vec3 } from '../../math';
+import type { Vec3 } from '@engine/core/math';
 
 export interface CameraTargetConfig {
   offset: Vec3;

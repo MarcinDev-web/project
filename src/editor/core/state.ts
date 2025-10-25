@@ -1,5 +1,5 @@
 import { signal, computed, type Signal } from '@preact/signals-core';
-import type { Scene, Entity } from '../../scene';
+import type { Scene, Entity } from '../../engine/scene';
 import { HistoryManager } from '../history/HistoryManager';
 import type { GridConfig } from '../grid/GridConfig';
 import type { SnapConfig } from '../snap/SnapConfig';

@@ -1,6 +1,6 @@
 import type { IPlayModeState, PlayModeContext, PlayModeStateType } from '../core/PlayModeStateMachine';
 import { PlayModeStateType as StateType } from '../core/PlayModeStateMachine';
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 import type { WorldManager } from '../core/WorldManager';
 import type { InputContextManager } from '../../input/InputContext';
 import type { CameraDirector } from '../camera/CameraDirector';
@@ -123,7 +123,6 @@ export class ReturnState implements IPlayModeState {
       context.errors.push(`Return failed: ${error instanceof Error ? error.message : String(error)}`);
       this.encounteredError = error instanceof Error ? error : new Error(String(error));
     } finally {
-      this.deps.markGameplayContextInactive();
       this.teardownComplete = true;
       if (this.encounteredError) {
         Logger.warn('Return state completed with errors');

@@ -76,7 +76,7 @@ const DEFAULT_ATLAS_CONFIG: AtlasConfig = {
  * | Top   | Side  | Top   |       |       |
  * +-------+-------+-------+-------+-------+
  */
-import { logger } from '../../logger';
+import { logger } from '../../app/utils/logger';
 
 let atlasCreationLogCount = 0;
 const ATLAS_CREATION_LOG_LIMIT = 1;

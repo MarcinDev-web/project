@@ -3,8 +3,8 @@
  * Provides intelligent snapping of position, rotation, and scale to grid increments.
  */
 
-import type { Vec3, Quat } from '../../math';
-import { quatToEuler, quatFromEuler, quatNormalize } from '../../math';
+import type { Vec3, Quat } from '@engine/core/math';
+import { quatToEuler, quatFromEuler, quatNormalize } from '@engine/core/math';
 import type { SnapConfig } from './SnapConfig';
 import { DEFAULT_SNAP_CONFIG, validateSnapConfig } from './SnapConfig';
 

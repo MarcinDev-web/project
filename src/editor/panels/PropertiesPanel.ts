@@ -13,9 +13,9 @@
  * - Compact and organized layout
  */
 
-import type { Entity } from '../../scene';
-import type { Vec3 } from '../../math';
-import { quatToEuler } from '../../math';
+import type { Entity } from '../../engine/scene';
+import type { Vec3 } from '@engine/core/math';
+import { quatToEuler } from '@engine/core/math';
 import type { SelectionManager } from '../../scene/Selection';
 import { rgbaToHex, type RgbaColor } from '../../utils/colors';
 import type { EditorState, InspectorLayoutPreferences } from '../core/state';

@@ -101,10 +101,10 @@ describe('EditorUI integration', () => {
       'button[title="Redo (Ctrl+Y)"]'
     ) as HTMLButtonElement;
     // Ensure a selection so Properties panel is visible
-    const outlinerButtons = document.querySelectorAll('#outliner-list button');
-    expect(outlinerButtons.length).toBeGreaterThan(0);
-    (outlinerButtons[0] as HTMLButtonElement).click();
-    const nameInput = document.querySelector<HTMLInputElement>('section[data-tab="Properties"] input[type="text"]');
+    const outlinerSelectables = document.querySelectorAll('#outliner-list .outliner-item-selectable');
+    expect(outlinerSelectables.length).toBeGreaterThan(0);
+    (outlinerSelectables[0] as HTMLButtonElement).click();
+    const nameInput = document.querySelector<HTMLInputElement>('section[data-tab="Properties"] .entity-card-name-input');
 
     // After seed snapshot: undo/redo should be disabled
     expect(undoButton.disabled).toBe(true);
@@ -131,16 +131,16 @@ describe('EditorUI integration', () => {
 
   it('clicking Outliner updates Properties and selection highlight without manual refresh', () => {
     const { scene } = setup();
-    const outlinerButtons = document.querySelectorAll('#outliner-list button');
-    expect(outlinerButtons.length).toBeGreaterThan(0);
-    const firstButton = outlinerButtons[0] as HTMLButtonElement;
+    const outlinerSelectables = document.querySelectorAll('#outliner-list .outliner-item-selectable');
+    expect(outlinerSelectables.length).toBeGreaterThan(0);
+    const firstSelectable = outlinerSelectables[0] as HTMLButtonElement;
     // Determine the entity we expect: first root entity
     const expected = scene.rootEntities[0]!;
 
-    firstButton.click();
+    firstSelectable.click();
 
     // Properties panel shows selected entity name
-    const nameInput = document.querySelector<HTMLInputElement>('section[data-tab="Properties"] input[type="text"]');
+    const nameInput = document.querySelector<HTMLInputElement>('section[data-tab="Properties"] .entity-card-name-input');
     expect(nameInput).toBeTruthy();
     expect(nameInput!.value).toBe(expected.name);
 

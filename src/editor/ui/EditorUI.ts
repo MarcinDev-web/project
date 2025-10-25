@@ -18,10 +18,10 @@
 
 import type { OrbitControls } from '../../input';
 import type { Renderer } from '../../rendering/index';
-import { Entity, Scene } from '../../scene';
+import { Entity, Scene } from '../../engine/scene';
 import type { SelectionManager } from '../../scene/Selection';
 import { MaterialComponent } from '../../scene/components/MaterialComponent';
-import type { Vec3 } from '../../math';
+import type { Vec3 } from '@engine/core/math';
 import type { AssetPreset } from '../assets/AssetTypes';
 import { initializeBaseColor } from '../visuals/SelectionVisuals';
 import { persistCamera, restoreCamera, persistLastPlacementPreset, restoreLastPlacementPreset, persistUIPreferences, restoreUIPreferences, persistWorkflowPreset, restoreWorkflowPreset } from '../core/EditorPersistence';

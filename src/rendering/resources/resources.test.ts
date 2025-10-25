@@ -9,13 +9,14 @@ vi.mock('../../logger', () => {
 
 import type { GeometryData } from './resources';
 import { createPipelines, createTimestampResources, validateGeometryData } from './resources';
-import { logger } from '../../logger';
+import { logger } from '../../app/utils/logger';
 
 const makeVertex = (
   position: [number, number, number],
-  normal: [number, number, number] = [0, 0, 1]
+  normal: [number, number, number] = [0, 0, 1],
+  ao = 1.0
 ) => {
-  const out = new Uint8Array(20);
+  const out = new Uint8Array(24);
   const view = new DataView(out.buffer);
   view.setFloat32(0, position[0], true);
   view.setFloat32(4, position[1], true);
@@ -26,12 +27,16 @@ const makeVertex = (
   out[15] = 0;
   view.setUint16(16, 0, true);
   view.setUint16(18, 0, true);
+  out[20] = Math.max(0, Math.min(255, Math.round(ao * 255)));
+  out[21] = 0;
+  out[22] = 0;
+  out[23] = 0;
   return out;
 };
 
 const combineVertices = (verts: Uint8Array[]): Uint8Array => {
-  const buffer = new Uint8Array(verts.length * 20);
-  verts.forEach((vert, index) => buffer.set(vert, index * 20));
+  const buffer = new Uint8Array(verts.length * 24);
+  verts.forEach((vert, index) => buffer.set(vert, index * 24));
   return buffer;
 };
 
@@ -61,13 +66,13 @@ describe('validateGeometryData', () => {
     vi.clearAllMocks();
   });
 
-  it('logs an error when vertex buffer length is not a multiple of 20 bytes', () => {
+  it('logs an error when vertex buffer length is not a multiple of 24 bytes', () => {
     const geometry = cloneGeometry({ vertices: new Uint8Array(10) });
 
     validateGeometryData(geometry);
 
     expect(logger.error).toHaveBeenCalledWith(
-      'Vertex buffer byteLength must be a multiple of 20 bytes'
+      'Vertex buffer byteLength must be a multiple of 24 bytes'
     );
   });
 

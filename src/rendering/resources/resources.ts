@@ -1,7 +1,7 @@
 import { createMainShaderCode } from '../shaders/main';
 import { ShaderEntryPoint } from '../shaders/types';
 import { DEFAULT_INSTANCE_GRID } from '../config';
-import { logger } from '../../logger';
+import { logger } from '../../app/utils/logger';
 import { TextureAtlas, type MaterialTextureData } from '../textures/TextureAtlas';
 
 // Warn-once flag for mock environments lacking copyBufferToTexture
@@ -32,6 +32,9 @@ export interface FrameResources {
   overlayPipeline: GPURenderPipeline;
   uniformBindGroup: GPUBindGroup;
   textureBindGroup: GPUBindGroup;
+  /** Normal atlas texture handle for re-binding when regrouping materials */
+  normalAtlasTexture: GPUTexture;
+  atlasMetaBuffer?: GPUBuffer; // NEW: metadata buffer for atlas sampling and material params
   timestampQuerySet: GPUQuerySet | null;
   timestampResolveBuffer: GPUBuffer | null;
   timestampReadBuffer: GPUBuffer | null;
@@ -51,11 +54,11 @@ export interface FrameResources {
  * @param geometry - Packed vertex and index data alongside instancing buffers to verify.
  */
 export function validateGeometryData(geometry: GeometryData): void {
-  const strideBytes = 20;
+  const strideBytes = 24;
   const numVertices = geometry.vertices.byteLength / strideBytes;
 
   if (!Number.isInteger(numVertices)) {
-    logger.error('Vertex buffer byteLength must be a multiple of 20 bytes');
+    logger.error('Vertex buffer byteLength must be a multiple of 24 bytes');
   }
   if (geometry.indices.length % 3 !== 0) {
     logger.error('Indices length should be a multiple of 3');
@@ -187,6 +190,44 @@ function packVerticesFloat32ToPacked20(source: Float32Array): Uint8Array {
   return out;
 }
 
+/**
+ * Packs an interleaved float32 vertex buffer into the compact 24-byte-per-vertex layout:
+ * position float32x3 (12B), normal snorm8x4 (4B), uv float16x2 (4B), AO unorm8x4 (4B).
+ * AO is stored in the X channel; YZW are zero.
+ */
+function packVerticesFloat32ToPacked24(source: Float32Array, defaultAO = 1.0): Uint8Array {
+  const floatsPerVertex = 8;
+  const vertexCount = Math.floor(source.length / floatsPerVertex);
+  const out = new Uint8Array(vertexCount * 24);
+  const dv = new DataView(out.buffer);
+  let inIdx = 0;
+  const aoByte = Math.max(0, Math.min(255, Math.round(defaultAO * 255))) >>> 0;
+  for (let v = 0; v < vertexCount; v++) {
+    const base = v * 24;
+    dv.setFloat32(base + 0, source[inIdx + 0]!, true);
+    dv.setFloat32(base + 4, source[inIdx + 1]!, true);
+    dv.setFloat32(base + 8, source[inIdx + 2]!, true);
+    const nx = Math.max(-1, Math.min(1, source[inIdx + 3]!));
+    const ny = Math.max(-1, Math.min(1, source[inIdx + 4]!));
+    const nz = Math.max(-1, Math.min(1, source[inIdx + 5]!));
+    out[base + 12] = (Math.round(nx * 127) & 0xff) >>> 0;
+    out[base + 13] = (Math.round(ny * 127) & 0xff) >>> 0;
+    out[base + 14] = (Math.round(nz * 127) & 0xff) >>> 0;
+    out[base + 15] = 0;
+    const u = source[inIdx + 6]!;
+    const vCoord = source[inIdx + 7]!;
+    dv.setUint16(base + 16, float32ToFloat16Bits(u), true);
+    dv.setUint16(base + 18, float32ToFloat16Bits(vCoord), true);
+    // AO unorm8x4 at offset 20
+    out[base + 20] = aoByte;
+    out[base + 21] = 0;
+    out[base + 22] = 0;
+    out[base + 23] = 0;
+    inIdx += floatsPerVertex;
+  }
+  return out;
+}
+
 // Removed unused DEFAULT_GEOMETRY_SOURCE_VERTICES (kept subdivided cube instead)
 
 // Procedurally generate a subdivided cube to increase the number of vertices
@@ -270,7 +311,7 @@ const SUBDIVIDED_CUBE_SEGMENTS = 4;
 const SUBDIVIDED_CUBE = buildSubdividedCube(SUBDIVIDED_CUBE_SEGMENTS);
 
 export const DEFAULT_GEOMETRY: GeometryData = {
-  vertices: packVerticesFloat32ToPacked20(SUBDIVIDED_CUBE.vertices),
+  vertices: packVerticesFloat32ToPacked24(SUBDIVIDED_CUBE.vertices, 1.0),
   indices: SUBDIVIDED_CUBE.indices,
   // Generate a small grid of instances to exercise instanced rendering by default
   // dimensions x dimensions grid
@@ -734,6 +775,7 @@ export function createTextureAtlas(
   sampler: GPUSampler;
   textureBindGroupLayout: GPUBindGroupLayout;
   textureBindGroup: GPUBindGroup;
+  atlasMetaBuffer: GPUBuffer;
   atlas: TextureAtlas;
 } {
   // Note: override provided layout to include normal atlas binding
@@ -947,14 +989,49 @@ export function createTextureAtlas(
     maxAnisotropy: config.filterMode === 'anisotropic' ? (config.anisotropyLevel || 8) : 1,
   });
 
-  // Expand layout to include normal atlas at binding 2
+  // Expand layout to include normal atlas at binding 2 and metadata storage buffer at binding 3
   const extendedLayout = device.createBindGroupLayout({
     label: 'material-atlas-bgl+normal',
     entries: [
       { binding: 0, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
       { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
       { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+      { binding: 3, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'read-only-storage' } },
+      // Shadow atlas depth + comparison sampler (placeholders initially)
+      { binding: 4, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'depth' } },
+      { binding: 5, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'comparison' } },
+      // IBL resources (placeholders initially)
+      { binding: 6, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } }, // brdf LUT 2D
+      { binding: 7, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float', viewDimension: 'cube' } }, // prefiltered env cube
     ],
+  });
+
+  // Create placeholder shadow resources (1x1) to satisfy layout; replaced later by ShadowPass
+  const shadowPlaceholder = device.createTexture({
+    label: 'shadow-atlas-placeholder',
+    size: [1, 1, 1],
+    format: 'depth32float',
+    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
+  });
+  const shadowSamplerCmp = device.createSampler({
+    label: 'shadow-comparison-sampler',
+    compare: 'less-equal',
+    magFilter: 'linear',
+    minFilter: 'linear',
+  });
+
+  // Placeholders for IBL
+  const brdfLutPlaceholder = device.createTexture({
+    label: 'brdf-lut-placeholder',
+    size: [4, 4, 1],
+    format: 'rgba16float',
+    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+  });
+  const envCubePlaceholder = device.createTexture({
+    label: 'prefiltered-env-placeholder',
+    size: [1, 1, 6],
+    format: 'rgba16float',
+    usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
   });
 
   const textureBindGroup = device.createBindGroup({
@@ -964,6 +1041,11 @@ export function createTextureAtlas(
       { binding: 0, resource: sampler },
       { binding: 1, resource: atlasTexture.createView({ label: 'atlas-texture-view' }) },
       { binding: 2, resource: normalAtlasTexture.createView({ label: 'atlas-normal-texture-view' }) },
+      // binding(3) filled after atlasMetaBuffer creation below
+      { binding: 4, resource: shadowPlaceholder.createView({ label: 'shadow-atlas-depth-view' }) },
+      { binding: 5, resource: shadowSamplerCmp },
+      { binding: 6, resource: brdfLutPlaceholder.createView({ label: 'brdf-lut-view' }) },
+      { binding: 7, resource: envCubePlaceholder.createView({ dimension: 'cube' }) },
     ],
   });
 
@@ -972,12 +1054,76 @@ export function createTextureAtlas(
   // Keeping this info-level log for debugging while reducing spam compared to console.log
   logger.info(`[TextureAtlas] Created with ${atlas.getMaterialCount()} materials`);
 
+  // --------- NEW: Build atlas metadata storage buffer ---------
+  // Each material has 2 rects (side, top), and material params packed into 48 bytes per entry
+  // struct AtlasMeta {
+  //   sideRect : vec4<f32>; // xy = offset, zw = scale
+  //   topRect  : vec4<f32>;
+  //   flags    : u32;       // bit0: hasNormal
+  //   saturation: f32;      // default 1.15
+  //   metallic : f32;       // default 0.0
+  //   roughness: f32;       // default 0.6
+  // };
+  const matCount = atlas.getMaterialCount();
+  const metaStrideFloats = 12; // 48 bytes
+  const metaBufferData = new ArrayBuffer(matCount * metaStrideFloats * 4);
+  const metaF32 = new Float32Array(metaBufferData);
+  const metaU32 = new Uint32Array(metaBufferData);
+
+  for (let i = 0; i < matCount; i++) {
+    const side = atlas.getSideRegion(i)!;
+    const top = atlas.getTopRegion(i)!;
+    const base = i * metaStrideFloats;
+    // sideRect
+    metaF32[base + 0] = side.offsetX;
+    metaF32[base + 1] = side.offsetY;
+    metaF32[base + 2] = side.scaleX;
+    metaF32[base + 3] = side.scaleY;
+    // topRect
+    metaF32[base + 4] = top.offsetX;
+    metaF32[base + 5] = top.offsetY;
+    metaF32[base + 6] = top.scaleX;
+    metaF32[base + 7] = top.scaleY;
+    // flags + params
+    // flags at u32 slot (base+8 as u32), then saturation/metallic/roughness as f32
+    const hasNormals = true; // we always fill normal atlas (flat if missing)
+    metaU32[base + 8] = hasNormals ? 1 : 0;
+    metaF32[base + 9] = 1.15; // saturationScale
+    metaF32[base + 10] = 0.0; // metallic default
+    metaF32[base + 11] = 0.6; // roughness default
+  }
+
+  const atlasMetaBuffer = device.createBuffer({
+    label: 'material-atlas-meta-buffer',
+    size: metaF32.byteLength,
+    usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    mappedAtCreation: false,
+  });
+  device.queue.writeBuffer(atlasMetaBuffer, 0, metaBufferData);
+
+  // Recreate bind group with storage buffer binding 3 (cannot modify entries array in place on WebGPU)
+  const atlasBindGroup = device.createBindGroup({
+    label: 'material-atlas-bg',
+    layout: extendedLayout,
+    entries: [
+      { binding: 0, resource: sampler },
+      { binding: 1, resource: atlasTexture.createView({ label: 'atlas-texture-view' }) },
+      { binding: 2, resource: normalAtlasTexture.createView({ label: 'atlas-normal-texture-view' }) },
+      { binding: 3, resource: { buffer: atlasMetaBuffer } },
+      { binding: 4, resource: shadowPlaceholder.createView({ label: 'shadow-atlas-depth-view' }) },
+      { binding: 5, resource: shadowSamplerCmp },
+      { binding: 6, resource: brdfLutPlaceholder.createView({ label: 'brdf-lut-view' }) },
+      { binding: 7, resource: envCubePlaceholder.createView({ dimension: 'cube' }) },
+    ],
+  });
+
   return {
     atlasTexture,
     normalAtlasTexture,
     sampler,
     textureBindGroupLayout: extendedLayout,
-    textureBindGroup,
+    textureBindGroup: atlasBindGroup,
+    atlasMetaBuffer,
     atlas,
   };
 }
@@ -998,7 +1144,7 @@ const deviceIdToShaderModule = new WeakMap<GPUDevice, GPUShaderModule>();
  */
 export function createPipelines(
   device: GPUDevice,
-  presentationFormat: GPUTextureFormat,
+  colorFormat: GPUTextureFormat,
   uniformBindGroupLayout: GPUBindGroupLayout,
   textureBindGroupLayout: GPUBindGroupLayout,
   vertexBuffers: GPUVertexBufferLayout[],
@@ -1049,7 +1195,7 @@ export function createPipelines(
         fragment: {
           module: shaderModule,
           entryPoint: ShaderEntryPoint.FRAGMENT_MAIN,
-          targets: [{ format: presentationFormat }],
+          targets: [{ format: colorFormat }],
         },
         primitive: { topology: 'triangle-list', cullMode: 'back', frontFace: 'ccw' },
         depthStencil: { depthWriteEnabled: true, depthCompare: 'less', format: 'depth24plus' },
@@ -1078,7 +1224,7 @@ export function createPipelines(
           entryPoint: ShaderEntryPoint.FRAGMENT_OVERLAY,
           targets: [
             {
-              format: presentationFormat,
+              format: colorFormat,
               blend: {
                 color: {
                   srcFactor: 'src-alpha',
@@ -1157,6 +1303,22 @@ export function createMsaaColorTarget(
     sampleCount,
     'frame-msaa-color-texture'
   );
+}
+
+/**
+ * Creates an HDR color target (single-sampled) used as resolve target for the main pass.
+ */
+export function createHdrColorTarget(
+  device: GPUDevice,
+  canvasElement: HTMLCanvasElement
+): GPUTexture {
+  return device.createTexture({
+    label: 'frame-hdr-color-texture',
+    size: { width: canvasElement.width, height: canvasElement.height, depthOrArrayLayers: 1 },
+    format: 'rgba16float',
+    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+    sampleCount: 1,
+  });
 }
 
 /**

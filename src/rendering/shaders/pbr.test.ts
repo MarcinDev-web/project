@@ -19,7 +19,7 @@ describe('createPbrShaderCode', () => {
 
   it('uses atlas sampling and normal mapping', () => {
     const code = createPbrShaderCode();
-    expect(code).toMatch(/let atlasUV = atlasOffset \+ vUV \* atlasScale;/);
+    expect(code).toMatch(/let atlasUV = rect\.xy \+ vUV \* rect\.zw;/);
     expect(code).toMatch(/textureSample\(normalAtlasTex, texSampler, atlasUV\)/);
   });
 });

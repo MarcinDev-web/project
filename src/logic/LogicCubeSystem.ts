@@ -12,7 +12,7 @@ import { PlayerDetection } from './cubes/PlayerDetection';
 import type { LogicCube, LogicCubeConstructor } from './cubes/LogicCube';
 import type { LogicSignal, LogicExecutionContext } from './cubes/types';
 import type { EntityId } from '../scene/Entity';
-import { Logger } from '../logger';
+import { Logger } from '../app/utils/logger';
 
 /**
  * Registry for logic cube types

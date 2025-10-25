@@ -1,5 +1,5 @@
-import type { Vec3, Quat } from '../../math';
-import { quatFromAxisAngle, quatMultiply } from '../../math';
+import type { Vec3, Quat } from '@engine/core/math';
+import { quatFromAxisAngle, quatMultiply } from '@engine/core/math';
 import type { SelectionManager } from '../../scene/Selection';
 import type { EditorState } from '../core/state';
 import type { SnapSystem } from '../snap/SnapSystem';

@@ -1,4 +1,4 @@
-import type { Vec3 } from '../math';
+import type { Vec3 } from '@engine/core/math';
 
 interface AudioContextConstructor {
   new (contextOptions?: AudioContextOptions): AudioContext;

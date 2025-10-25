@@ -22,7 +22,7 @@ import type {
   AssetMaterial,
 } from './AssetTypes';
 import type { BlockDefinition } from '../../rendering/blocks/BlockLibrary';
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 
 export interface RegisterBlockAssetOptions {
   origin?: 'custom' | 'session';

@@ -8,7 +8,7 @@
  * - Relative positioning
  */
 
-import type { Vec3 } from '../../math';
+import type { Vec3 } from '@engine/core/math';
 
 export interface CoordinateFormat {
   precision: number;

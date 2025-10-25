@@ -9,7 +9,7 @@
  * - Lock/Unlock all
  */
 
-import type { Entity } from '../../scene';
+import type { Entity } from '../../engine/scene';
 import { createIcon } from '../utils/icons';
 
 export interface BulkOperationsBarConfig {

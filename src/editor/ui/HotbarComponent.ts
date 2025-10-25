@@ -12,7 +12,7 @@
 import type { Asset } from '../assets/AssetTypes';
 import type { InventoryManager } from '../managers/InventoryManager';
 import { createIcon } from '../utils/icons';
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 
 export interface HotbarComponentConfig {
   inventoryManager?: InventoryManager;

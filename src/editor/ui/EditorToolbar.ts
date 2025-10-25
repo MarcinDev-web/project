@@ -14,16 +14,16 @@
 
 import type { EditorState } from '../core/state';
 import type { ProjectManager } from '../managers/ProjectManager';
-import type { Entity } from '../../scene';
+import type { Entity } from '../../engine/scene';
 import type { SelectionManager } from '../../scene/Selection';
 import { DisposableGroup } from '../core/DisposableGroup';
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 import { effect } from '@preact/signals-core';
 import { createIcon, createIconButton } from '../utils/icons';
 import { CameraComponent } from '../../scene/components/CameraComponent';
 import { KeyboardShortcutsModal } from './KeyboardShortcutsModal';
 // use value import below to construct entities
-import { Entity as EntityValue } from '../../scene';
+import { Entity as EntityValue } from '../../engine/scene';
 import { EnvironmentComponent } from '../../scene/components/EnvironmentComponent';
 
 export interface EditorToolbarConfig {

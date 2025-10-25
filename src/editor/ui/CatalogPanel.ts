@@ -14,7 +14,7 @@ import { assetRegistry } from '../assets/AssetRegistry';
 import { createIcon } from '../utils/icons';
 import { FavoritesManager } from '../managers/FavoritesManager';
 import { RecentAssetsTracker } from '../managers/RecentAssetsTracker';
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 
 export interface CatalogPanelConfig {
   onAssetSelect: (asset: Asset, variant?: AssetVariant) => void;

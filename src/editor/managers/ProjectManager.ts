@@ -1,9 +1,9 @@
 import { Entity } from '../../scene/Entity';
 import { EnvironmentComponent } from '../../scene/components/EnvironmentComponent';
-import { Scene } from '../../scene';
+import { Scene } from '../../engine/scene';
 import type { EditorState } from '../core/state';
 import { ProjectStorage, type ProjectData, type ProjectMetadata } from './ProjectStorage';
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 
 export type ProjectSaveStatus = 'Saved' | 'Unsaved' | 'Saving...' | '';
 

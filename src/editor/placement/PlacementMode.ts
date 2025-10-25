@@ -5,13 +5,13 @@
 
 import { Entity } from '../../scene/Entity';
 import type { Scene } from '../../scene/Scene';
-import type { Vec3, Quat } from '../../math';
+import type { Vec3, Quat } from '@engine/core/math';
 import { CollisionDetector } from './CollisionDetector';
 import type { SnapSystem } from '../snap/SnapSystem';
 import { MaterialComponent } from '../../scene/components/MaterialComponent';
 import type { AssetPreset } from '../assets/AssetTypes';
 import { initializeBaseColor } from '../visuals/SelectionVisuals';
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 
 /**
  * State of the placement preview

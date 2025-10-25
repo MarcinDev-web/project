@@ -12,7 +12,7 @@
  * - Card and list view modes
  */
 
-import type { Scene } from '../../scene';
+import type { Scene } from '../../engine/scene';
 import type { EditorState } from '../core/state';
 import type {
   Asset,
@@ -27,7 +27,7 @@ import type {
   AssetCollection,
 } from './AssetTypes';
 import { assetRegistry } from './AssetRegistry';
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 import { createIcon } from '../utils/icons';
 import { ThumbnailRenderer } from '../../rendering/renderers/ThumbnailRenderer';
 

@@ -1,5 +1,5 @@
 import { createIcon } from '../utils/icons';
-import type { Entity } from '../../scene';
+import type { Entity } from '../../engine/scene';
 import { ScriptComponent, type ScriptComponentState } from '../../scene/components/ScriptComponent';
 import { BehaviorRegistry } from '../../logic/BehaviorRegistry';
 

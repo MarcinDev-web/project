@@ -2,7 +2,7 @@
  * BoundingVolume - Axis-Aligned Bounding Box utilities for spatial partitioning
  */
 
-import type { Vec3 } from '../math';
+import type { Vec3 } from '@engine/core/math';
 import type { Entity } from '../scene/Entity';
 import type { PhysicsComponent } from '../scene/components/PhysicsComponent';
 

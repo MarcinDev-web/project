@@ -11,9 +11,9 @@
  * Extracted from EditorUI to reduce complexity and improve maintainability.
  */
 
-import type { Scene, Entity } from '../../scene';
+import type { Scene, Entity } from '../../engine/scene';
 import type { SelectionManager } from '../../scene/Selection';
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 
 export interface SearchOptions {
   /** Case-sensitive search */

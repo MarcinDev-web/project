@@ -5,9 +5,9 @@
 
 import type { GridConfig } from './GridConfig';
 import { DEFAULT_GRID_CONFIG, validateGridConfig } from './GridConfig';
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 import { createGridShaderCode, GridShaderEntryPoint } from './GridShader';
-import type { Mat4 } from '../../math';
+import type { Mat4 } from '@engine/core/math';
 
 /**
  * Grid line vertex: position (vec3) + color (vec4)

@@ -4,7 +4,7 @@
 
 import type { Scene } from '../../scene/Scene';
 import type { Entity } from '../../scene/Entity';
-import type { Vec3 } from '../../math';
+import type { Vec3 } from '@engine/core/math';
 
 /**
  * Provides player detection utilities for trigger cubes

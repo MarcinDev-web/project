@@ -8,7 +8,7 @@
  * - ESC key and click-outside to close
  */
 
-import type { Scene } from '../../scene';
+import type { Scene } from '../../engine/scene';
 import type { EditorState } from '../core/state';
 import type { Asset, AssetVariant } from '../assets/AssetTypes';
 import { AssetBrowserV2 } from '../assets/AssetBrowser';

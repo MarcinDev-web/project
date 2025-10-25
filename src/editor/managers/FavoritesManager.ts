@@ -8,7 +8,7 @@
  */
 
 import type { Asset } from '../assets/AssetTypes';
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 
 export type FavoritesChangeListener = (favorites: Set<string>) => void;
 

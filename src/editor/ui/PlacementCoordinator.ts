@@ -7,7 +7,7 @@
 
 import type { Asset, AssetVariant, AssetPreset } from '../assets/AssetTypes';
 import type { PlacementMode } from '../placement/PlacementMode';
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 
 export interface PlacementCoordinatorConfig {
   placementMode: PlacementMode;

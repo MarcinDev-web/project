@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { CoordinateManager } from '../editor/utils/CoordinateManager';
-import type { Vec3 } from '../math';
+import type { Vec3 } from '@engine/core/math';
 
 describe('CoordinateManager', () => {
   describe('format', () => {

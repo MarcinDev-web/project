@@ -1,4 +1,4 @@
-import type { Vec3, Quat } from '../math';
+import type { Vec3, Quat } from '@engine/core/math';
 import { Skeleton, type PoseBone } from './Skeleton';
 import type { AnimationSample } from './types';
 

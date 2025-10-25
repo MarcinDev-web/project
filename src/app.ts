@@ -1,7 +1,7 @@
 import { createOrbitControls, type OrbitControls } from './input';
 import { initRenderer, type Renderer } from './rendering/index';
 import { Scene, Raycaster, SelectionManager } from './scene';
-import { mat4LookAt, mat4Multiply, mat4Perspective, type Mat4, type Vec3 } from './math';
+import { mat4LookAt, mat4Multiply, mat4Perspective, type Mat4, type Vec3 } from '@engine/core/math';
 import { FOV_RADIANS, Z_FAR, Z_NEAR } from './rendering/config';
 import { EditorUI } from './editor/ui/EditorUI';
 import { Logger } from './logger';

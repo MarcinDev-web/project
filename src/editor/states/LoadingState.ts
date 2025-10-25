@@ -1,6 +1,6 @@
 import type { IPlayModeState, PlayModeContext, PlayModeStateType } from '../core/PlayModeStateMachine';
 import { PlayModeStateType as StateType } from '../core/PlayModeStateMachine';
-import { Logger } from '../../logger';
+import { Logger } from '../../app/utils/logger';
 import type { WorldManager } from '../core/WorldManager';
 import type { PlayManifest } from '../core/PlayManifest';
 import { LightManager } from '../../rendering/lighting/LightManager';

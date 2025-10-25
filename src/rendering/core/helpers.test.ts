@@ -7,7 +7,7 @@ vi.mock('../../logger', () => {
   return { logger: { warn, error, info } };
 });
 
-import { logger } from '../../logger';
+import { logger } from '../../app/utils/logger';
 import { asBytes, getTimestampPeriod, updateCanvasSize } from './helpers';
 
 const flushMicrotasks = async () => {
