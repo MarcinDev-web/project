@@ -4,8 +4,8 @@ import {
   RigidbodyType,
   ColliderShape,
   DEFAULT_PHYSICS_MATERIAL,
-} from '../scene/components/PhysicsComponent';
-import { Entity } from '../scene/Entity';
+} from '@engine/world';
+import { Entity } from '@engine/world';
 
 describe('PhysicsComponent', () => {
   let entity: Entity;

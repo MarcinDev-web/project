@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { SelectionManager } from '../scene/Selection';
-import { Entity } from '../scene/Entity';
-import { Scene } from '../scene/Scene';
+import { SelectionManager } from '@engine/world';
+import { Entity } from '@engine/world';
+import { Scene } from '@engine/world';
 
 describe('SelectionManager', () => {
   let selection: SelectionManager;

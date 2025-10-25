@@ -21,7 +21,7 @@ export {
   RigidbodyType,
   ColliderShape,
   DEFAULT_PHYSICS_MATERIAL,
-} from '../scene/components/PhysicsComponent';
+} from '@engine/world';
 
 export type {
   AnyCollider,
@@ -30,10 +30,10 @@ export type {
   CapsuleCollider,
   ContactPoint,
   PhysicsMaterial,
-} from '../scene/components/PhysicsComponent';
+} from '@engine/world';
 
 // Joint system
-export { JointComponent } from '../scene/components/JointComponent';
+export { JointComponent } from '@engine/world';
 export {
   JointType,
   createJoint,

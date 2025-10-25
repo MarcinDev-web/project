@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Octree, DEFAULT_OCTREE_CONFIG } from '../physics/Octree';
 import { BoundingVolume, type AABB } from '../physics/BoundingVolume';
-import { Entity } from '../scene/Entity';
+import { Entity } from '@engine/world';
 
 describe('Octree', () => {
   let octree: Octree;

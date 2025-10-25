@@ -1,5 +1,5 @@
 import type { GameplayIntent } from './Intent';
-import type { Entity } from '../scene/Entity';
+import type { Entity } from '@engine/world';
 
 export type ControllerId = string;
 

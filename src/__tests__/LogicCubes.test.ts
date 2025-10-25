@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Scene } from '../scene/Scene';
-import { Entity } from '../scene/Entity';
+import { Scene } from '@engine/world';
+import { Entity } from '@engine/world';
 import {
   OnClickTrigger,
   OnTimerTrigger,

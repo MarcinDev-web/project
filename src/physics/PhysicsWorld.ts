@@ -3,12 +3,12 @@
  * Provides easy integration with the scene and entity system
  */
 
-import type { Scene } from '../scene/Scene';
+import type { Scene } from '@engine/world';
 import { PhysicsSystem, type PhysicsConfig, type CollisionEvent, type TriggerEvent } from './PhysicsSystem';
-import { Entity } from '../scene/Entity';
-import { PhysicsComponent, RigidbodyType, type AnyCollider } from '../scene/components/PhysicsComponent';
+import { Entity } from '@engine/world';
+import { PhysicsComponent, RigidbodyType, type AnyCollider } from '@engine/world';
 import { Logger } from '../app/utils/logger';
-import { JointComponent } from '../scene/components/JointComponent';
+import { JointComponent } from '@engine/world';
 import type { Vec3 } from '@engine/core/math';
 import {
   createJoint,

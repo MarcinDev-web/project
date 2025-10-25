@@ -1,5 +1,5 @@
-import type { Entity } from '../scene/Entity';
-import type { Scene } from '../scene/Scene';
+import type { Entity } from '@engine/world';
+import type { Scene } from '@engine/world';
 import type { EventBus } from './EventBus';
 import {
   CoroutineScheduler,

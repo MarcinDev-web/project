@@ -3,7 +3,7 @@
  * Divides 3D space into octants recursively for fast spatial queries
  */
 
-import type { Entity } from '../scene/Entity';
+import type { Entity } from '@engine/world';
 import { BoundingVolume, type AABB } from './BoundingVolume';
 
 /**

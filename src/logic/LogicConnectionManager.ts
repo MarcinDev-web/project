@@ -2,7 +2,7 @@
  * LogicConnectionManager - Manages connections between logic cubes.
  */
 
-import type { EntityId } from '../scene/Entity';
+import type { EntityId } from '@engine/world';
 import type { LogicConnection, LogicSignal } from './cubes/types';
 
 let nextConnectionId = 0;

@@ -4,10 +4,10 @@ import {
   CharacterState,
   DEFAULT_CHARACTER_CONFIG,
   type CharacterInput,
-} from '../scene/components/CharacterController';
-import { Entity } from '../scene/Entity';
-import { Scene } from '../scene/Scene';
-import { PhysicsComponent, RigidbodyType } from '../scene/components/PhysicsComponent';
+} from '@engine/world';
+import { Entity } from '@engine/world';
+import { Scene } from '@engine/world';
+import { PhysicsComponent, RigidbodyType } from '@engine/world';
 import { PhysicsWorld } from '../physics/PhysicsWorld';
 import { CharacterControllerSystem } from '../scene/CharacterControllerSystem';
 

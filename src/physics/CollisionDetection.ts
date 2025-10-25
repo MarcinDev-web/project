@@ -10,7 +10,7 @@ import type {
   SphereCollider,
   CapsuleCollider,
   ContactPoint,
-} from '../scene/components/PhysicsComponent';
+} from '@engine/world';
 import { normalizeVec3Out, quatToMatrix3 } from '@engine/core/math';
 
 /**

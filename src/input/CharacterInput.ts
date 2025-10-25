@@ -1,5 +1,5 @@
 import type { Vec3 } from '@engine/core/math';
-import type { CharacterInput } from '../scene/components/CharacterController';
+import type { CharacterInput } from '@engine/world';
 import type { InputBindings } from '../editor/core/PlayManifest';
 
 /**

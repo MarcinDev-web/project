@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { EditorModeManager } from '../editor/managers/EditorModeManager';
-import { Scene } from '../scene/Scene';
-import { Entity } from '../scene/Entity';
+import { Scene } from '@engine/world';
+import { Entity } from '@engine/world';
 import { EditorState } from '../editor/core/state';
-import { SelectionManager } from '../scene/Selection';
+import { SelectionManager } from '@engine/world';
 import type { OrbitControls } from '../input';
 import { CharacterInputHandler } from '../input/CharacterInput';
 import { FPSCamera } from '../editor/camera/FPSCamera';

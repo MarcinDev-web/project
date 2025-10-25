@@ -1,5 +1,5 @@
-import type { Scene } from '../scene/Scene';
-import { ScriptComponent } from '../scene/components/ScriptComponent';
+import type { Scene } from '@engine/world';
+import { ScriptComponent } from '@engine/world';
 import type { BehaviorInstance } from './Behavior';
 import { SceneScriptContextBuilder } from './services/SceneScriptContextBuilder';
 import { BehaviorRegistry } from './BehaviorRegistry';

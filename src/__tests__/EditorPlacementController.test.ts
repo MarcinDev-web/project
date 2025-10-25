@@ -1,11 +1,11 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EditorPlacementController } from '../editor/controllers/EditorPlacementController';
-import { Scene } from '../scene/Scene';
-import { SelectionManager } from '../scene/Selection';
+import { Scene } from '@engine/world';
+import { SelectionManager } from '@engine/world';
 import { EditorState } from '../editor/core/state';
 import type { PlacementMode } from '../editor/placement/PlacementMode';
 import type { OrbitControls } from '../input';
-import { Entity } from '../scene/Entity';
+import { Entity } from '@engine/world';
 
 function createMockCanvas(): HTMLCanvasElement {
   const canvas = document.createElement('canvas');

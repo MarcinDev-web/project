@@ -3,15 +3,15 @@
  * Similar to ScriptSystem but for visual logic cubes.
  */
 
-import type { Scene } from '../scene/Scene';
-import { LogicCubeComponent } from '../scene/components/LogicCubeComponent';
+import type { Scene } from '@engine/world';
+import { LogicCubeComponent } from '@engine/world';
 import { LogicConnectionManager } from './LogicConnectionManager';
 import { registerLogicConnectionManager } from './LogicConnectionRegistry';
 import { VariableStorage } from './VariableStorage';
 import { PlayerDetection } from './cubes/PlayerDetection';
 import type { LogicCube, LogicCubeConstructor } from './cubes/LogicCube';
 import type { LogicSignal, LogicExecutionContext } from './cubes/types';
-import type { EntityId } from '../scene/Entity';
+import type { EntityId } from '@engine/world';
 import { Logger } from '../app/utils/logger';
 
 /**

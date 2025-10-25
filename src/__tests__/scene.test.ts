@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import { Scene } from '../scene/Scene';
-import { Entity } from '../scene/Entity';
-import { MeshComponent } from '../scene/components/MeshComponent';
-import { MaterialComponent } from '../scene/components/MaterialComponent';
+import { Scene } from '@engine/world';
+import { Entity } from '@engine/world';
+import { MeshComponent } from '@engine/world';
+import { MaterialComponent } from '@engine/world';
 
 describe('Scene', () => {
   describe('construction', () => {

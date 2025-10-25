@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { Scene } from '../scene/Scene';
-import { Entity } from '../scene/Entity';
+import { Scene } from '@engine/world';
+import { Entity } from '@engine/world';
 import { PhysicsWorld } from '../physics/PhysicsWorld';
-import { RigidbodyType } from '../scene/components/PhysicsComponent';
+import { RigidbodyType } from '@engine/world';
 
 describe('Physics Performance Benchmarks', () => {
   /**

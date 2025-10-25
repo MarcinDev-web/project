@@ -3,8 +3,8 @@
  */
 
 import type { Vec3 } from '@engine/core/math';
-import type { Entity } from '../scene/Entity';
-import type { PhysicsComponent } from '../scene/components/PhysicsComponent';
+import type { Entity } from '@engine/world';
+import type { PhysicsComponent } from '@engine/world';
 
 /**
  * Axis-Aligned Bounding Box

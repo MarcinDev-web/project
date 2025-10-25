@@ -4,10 +4,10 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EasyPlaceController } from '../editor/controllers/EasyPlaceController';
-import { Scene } from '../scene/Scene';
-import { Entity } from '../scene/Entity';
+import { Scene } from '@engine/world';
+import { Entity } from '@engine/world';
 import { EditorState } from '../editor/core/state';
-import { SelectionManager } from '../scene/Selection';
+import { SelectionManager } from '@engine/world';
 
 describe('EasyPlaceController', () => {
   let controller: EasyPlaceController;

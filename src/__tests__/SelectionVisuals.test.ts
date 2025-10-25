@@ -4,9 +4,9 @@ import {
   applySelectionVisuals,
   HIGHLIGHT_COLOR_BOOST,
 } from '../editor/visuals/SelectionVisuals';
-import { SelectionManager } from '../scene/Selection';
-import { Scene } from '../scene/Scene';
-import { Entity } from '../scene/Entity';
+import { SelectionManager } from '@engine/world';
+import { Scene } from '@engine/world';
+import { Entity } from '@engine/world';
 import type { RgbaColor } from '../utils/colors';
 
 describe('SelectionVisuals', () => {

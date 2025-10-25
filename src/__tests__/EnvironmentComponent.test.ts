@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { EnvironmentComponent } from '../scene/components/EnvironmentComponent';
+import { EnvironmentComponent } from '@engine/world';
 import type { Vec3 } from '@engine/core/math';
 
 describe('EnvironmentComponent', () => {

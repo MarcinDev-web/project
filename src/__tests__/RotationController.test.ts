@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { RotationController } from '../editor/controllers/RotationController';
-import { Entity } from '../scene/Entity';
+import { Entity } from '@engine/world';
 import { QuaternionHelper } from '../editor/utils/QuaternionHelper';
 import type { Quat } from '@engine/core/math';
 import { transformVec3ByQuat } from '@engine/core/math';

@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { Scene } from '../scene/Scene';
+import { Scene } from '@engine/world';
 import { LogicCubeLibrary } from '../editor/managers/LogicCubeLibrary';
 import { LogicCubeRegistry } from '../logic/LogicCubeSystem';
 import type { LogicCube, LogicCubeConstructor } from '../logic/cubes/LogicCube';

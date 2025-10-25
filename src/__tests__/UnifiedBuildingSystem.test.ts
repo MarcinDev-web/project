@@ -7,9 +7,9 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EditorState } from '../editor/core/state';
-import { Scene } from '../scene/Scene';
-import { Entity } from '../scene/Entity';
-import { ScriptComponent } from '../scene/components/ScriptComponent';
+import { Scene } from '@engine/world';
+import { Entity } from '@engine/world';
+import { ScriptComponent } from '@engine/world';
 import { WORKFLOW_PRESETS, applyWorkflowPreset, detectWorkflowPreset, getAllWorkflowPresets } from '../editor/workflows/WorkflowPresets';
 import { AdaptiveUIManager } from '../editor/ui/AdaptiveUIManager';
 import { FeatureIntroduction } from '../editor/ui/FeatureIntroduction';

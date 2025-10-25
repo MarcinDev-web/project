@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Scene } from '../scene/Scene';
-import { Entity } from '../scene/Entity';
+import { Scene } from '@engine/world';
+import { Entity } from '@engine/world';
 import { PhysicsWorld } from '../physics/PhysicsWorld';
-import { PhysicsComponent, RigidbodyType } from '../scene/components/PhysicsComponent';
-import { JointComponent } from '../scene/components/JointComponent';
+import { PhysicsComponent, RigidbodyType } from '@engine/world';
+import { JointComponent } from '@engine/world';
 import { JointType } from '../physics/Joint';
 
 describe('Joint Integration Tests', () => {

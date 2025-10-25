@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { UnifiedBuildPanel } from '../editor/ui/UnifiedBuildPanel';
-import { Scene } from '../scene/Scene';
+import { Scene } from '@engine/world';
 import { EditorState } from '../editor/core/state';
 import { PlacementMode } from '../editor/placement/PlacementMode';
 import { SnapSystem } from '../editor/snap/SnapSystem';

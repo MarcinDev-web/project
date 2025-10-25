@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { EnvironmentRenderer } from '../rendering/renderers/EnvironmentRenderer';
-import { EnvironmentComponent } from '../scene/components/EnvironmentComponent';
+import { EnvironmentComponent } from '@engine/world';
 import type { Mat4, Vec3 } from '@engine/core/math';
 
 describe('EnvironmentRenderer', () => {

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { Transform } from '../scene/Transform';
+import { Transform } from '@engine/world';
 
 describe('Transform', () => {
   describe('position', () => {

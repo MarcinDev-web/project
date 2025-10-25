@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { Entity } from '../scene/Entity';
-import { Transform } from '../scene/Transform';
+import { Entity } from '@engine/world';
+import { Transform } from '@engine/world';
 
 describe('Entity', () => {
   describe('construction', () => {

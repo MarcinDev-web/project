@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { calculateInertiaTensor, type InertiaShape } from '../physics';
+import { calculateInertiaTensor, type InertiaShape } from '@engine/world/physics';
 
 describe('calculateInertiaTensor', () => {
   it('computes box inertia correctly', () => {

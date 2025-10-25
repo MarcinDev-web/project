@@ -3,10 +3,10 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Scene } from '../scene/Scene';
-import { Entity } from '../scene/Entity';
+import { Scene } from '@engine/world';
+import { Entity } from '@engine/world';
 import { LogicCubeSystem } from '../logic/LogicCubeSystem';
-import { LogicCubeComponent } from '../scene/components/LogicCubeComponent';
+import { LogicCubeComponent } from '@engine/world';
 import { registerBuiltInLogicCubes } from '../logic/cubes';
 
 describe('LogicCubeSystem', () => {

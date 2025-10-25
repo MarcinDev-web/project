@@ -5,7 +5,7 @@ import { ShadowPass } from '../rendering/shadows/ShadowPass';
 import type { GeometryData } from '../rendering/resources/resources';
 import { BrdfLutPass } from '../rendering/postprocess/BrdfLut';
 import { EnvironmentRenderer } from '../rendering/renderers/EnvironmentRenderer';
-import { EnvironmentComponent } from '../scene/components/EnvironmentComponent';
+import { EnvironmentComponent } from '@engine/world';
 
 function createBasicDeviceMock() {
   const createTexture = vi.fn((desc?: GPUTextureDescriptor) => {

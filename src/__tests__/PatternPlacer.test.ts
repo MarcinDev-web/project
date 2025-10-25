@@ -4,8 +4,8 @@
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PatternPlacer } from '../editor/placement/PatternPlacer';
-import { Scene } from '../scene/Scene';
-import { Entity } from '../scene/Entity';
+import { Scene } from '@engine/world';
+import { Entity } from '@engine/world';
 import type { CollisionDetector } from '../editor/placement/CollisionDetector';
 
 describe('PatternPlacer', () => {

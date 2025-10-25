@@ -1,5 +1,5 @@
 import { Entity } from './Entity';
-import type { Scene } from './engine/scene';
+import type { Scene } from '@engine/world';
 
 /**
  * Manages selected entities in the scene.

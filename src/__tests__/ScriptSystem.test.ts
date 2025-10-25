@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Scene } from '../scene/Scene';
-import { Entity } from '../scene/Entity';
-import { ScriptComponent } from '../scene/components/ScriptComponent';
+import { Scene } from '@engine/world';
+import { Entity } from '@engine/world';
+import { ScriptComponent } from '@engine/world';
 import { ScriptSystem } from '../logic/ScriptSystem';
 import { BehaviorInstance, type BehaviorConstructor } from '../logic/Behavior';
 import { BehaviorRegistry } from '../logic/BehaviorRegistry';

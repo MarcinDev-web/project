@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { LightComponent } from '../scene/components/LightComponent';
-import { Entity } from '../scene/Entity';
+import { LightComponent } from '@engine/world';
+import { Entity } from '@engine/world';
 
 describe('LightComponent', () => {
   it('creates with default values', () => {

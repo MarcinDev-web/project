@@ -1,4 +1,4 @@
-import type { Entity } from '../scene/Entity';
+import type { Entity } from '@engine/world';
 import {
   addVec3Out,
   subVec3Out,
@@ -8,7 +8,7 @@ import {
   lengthVec3,
   transformVec3ByQuatOut,
 } from '@engine/core/math';
-import { PhysicsComponent, RigidbodyType } from '../scene/components/PhysicsComponent';
+import { PhysicsComponent, RigidbodyType } from '@engine/world';
 
 /**
  * Joint types available in the physics system

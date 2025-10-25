@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { CollisionDetection } from '../physics/CollisionDetection';
-import type { BoxCollider, SphereCollider, CapsuleCollider } from '../scene/components/PhysicsComponent';
-import { ColliderShape } from '../scene/components/PhysicsComponent';
+import type { BoxCollider, SphereCollider, CapsuleCollider } from '@engine/world';
+import { ColliderShape } from '@engine/world';
 
 describe('CollisionDetection', () => {
   describe('box-box collision', () => {

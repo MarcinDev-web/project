@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Scene } from '../scene/Scene';
-import { Entity } from '../scene/Entity';
-import { ScriptComponent } from '../scene/components/ScriptComponent';
+import { Scene } from '@engine/world';
+import { Entity } from '@engine/world';
+import { ScriptComponent } from '@engine/world';
 import { PreflightState } from '../editor/states/PreflightState';
 import { PlayModeStateType, type PlayModeContext } from '../editor/core/PlayModeStateMachine';
 import { BehaviorInstance, type BehaviorConstructor } from '../logic/Behavior';

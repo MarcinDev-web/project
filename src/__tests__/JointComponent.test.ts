@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { JointComponent } from '../scene/components/JointComponent';
-import { Entity } from '../scene/Entity';
-import { PhysicsComponent, RigidbodyType } from '../scene/components/PhysicsComponent';
+import { JointComponent } from '@engine/world';
+import { Entity } from '@engine/world';
+import { PhysicsComponent, RigidbodyType } from '@engine/world';
 import { createJoint, JointType, type FixedJointConfig } from '../physics/Joint';
 
 describe('JointComponent', () => {

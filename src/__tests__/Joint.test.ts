@@ -15,8 +15,8 @@ import {
   type BallSocketJointConfig,
   type SliderJointConfig,
 } from '../physics/Joint';
-import { Entity } from '../scene/Entity';
-import { PhysicsComponent, RigidbodyType } from '../scene/components/PhysicsComponent';
+import { Entity } from '@engine/world';
+import { PhysicsComponent, RigidbodyType } from '@engine/world';
 
 describe('Joint System', () => {
   let entityA: Entity;

@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { EditorState } from '../editor/core/state';
-import { Scene } from '../scene/Scene';
+import { Scene } from '@engine/world';
 import { EditorPanelManager } from '../editor/panels/EditorPanelManager';
-import { SelectionManager } from '../scene/Selection';
+import { SelectionManager } from '@engine/world';
 import { WorkflowSelector } from '../editor/ui/WorkflowSelector';
 import { QuickMenu } from '../editor/ui/QuickMenu';
 import { applyWorkflowPreset } from '../editor/workflows/WorkflowPresets';

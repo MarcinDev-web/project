@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Scene } from '../scene/Scene';
+import { Scene } from '@engine/world';
 import { EditorState } from '../editor/core/state';
 import { applyWorkflowPreset, getWorkflowPreset } from '../editor/workflows/WorkflowPresets';
 

@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EditorUI } from '../editor/ui/EditorUI';
-import { SelectionManager } from '../scene/Selection';
-import { Scene } from '../scene/Scene';
+import { SelectionManager } from '@engine/world';
+import { Scene } from '@engine/world';
 import type { OrbitControls } from '../input';
 import { quatFromAxisAngle } from '@engine/core/math';
 

@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { BlockDragController } from '../editor/controllers/BlockDragController';
-import { Scene } from '../scene/Scene';
-import { Entity } from '../scene/Entity';
-import { SelectionManager } from '../scene/Selection';
+import { Scene } from '@engine/world';
+import { Entity } from '@engine/world';
+import { SelectionManager } from '@engine/world';
 import { PlacementMode } from '../editor/placement/PlacementMode';
 import { CollisionDetector } from '../editor/placement/CollisionDetector';
 import { SnapSystem } from '../editor/snap/SnapSystem';

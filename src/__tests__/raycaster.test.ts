@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { Raycaster } from '../scene/Raycaster';
-import { Entity } from '../scene/Entity';
+import { Raycaster } from '@engine/world';
+import { Entity } from '@engine/world';
 
 describe('Raycaster', () => {
   describe('ray-AABB intersection', () => {

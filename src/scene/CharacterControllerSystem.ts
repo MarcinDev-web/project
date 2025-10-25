@@ -1,4 +1,4 @@
-import type { Scene } from './engine/scene';
+import type { Scene } from '@engine/world';
 import { CharacterController, type CharacterInput } from './components/CharacterController';
 import type { PhysicsWorld } from '../physics/PhysicsWorld';
 import type { Vec3 } from '@engine/core/math';

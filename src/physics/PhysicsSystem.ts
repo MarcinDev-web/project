@@ -3,17 +3,17 @@
  * Handles gravity, forces, velocity integration, and collision resolution
  */
 
-import type { Scene } from '../scene/Scene';
-import type { Entity } from '../scene/Entity';
-import { PhysicsComponent, RigidbodyType } from '../scene/components/PhysicsComponent';
-import { JointComponent } from '../scene/components/JointComponent';
+import type { Scene } from '@engine/world';
+import type { Entity } from '@engine/world';
+import { PhysicsComponent, RigidbodyType } from '@engine/world';
+import { JointComponent } from '@engine/world';
 import type { Vec3 } from '@engine/core/math';
 import { CollisionDetection, type ColliderTransform } from './CollisionDetection';
 import { quatMultiply, quatFromAxisAngle, quatNormalize } from '@engine/core/math';
 import { Octree, type OctreeConfig, DEFAULT_OCTREE_CONFIG } from './Octree';
 import { BoundingVolume } from './BoundingVolume';
 import type { Joint } from './Joint';
-import { ScriptComponent } from '../scene/components/ScriptComponent';
+import { ScriptComponent } from '@engine/world';
 
 /**
  * Collision event data

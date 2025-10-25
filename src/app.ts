@@ -1,13 +1,13 @@
 import { createOrbitControls, type OrbitControls } from './input';
 import { initRenderer, type Renderer } from './rendering/index';
-import { Scene, Raycaster, SelectionManager } from './scene';
+import { Scene, Raycaster, SelectionManager } from '@engine/world';
 import { mat4LookAt, mat4Multiply, mat4Perspective, type Mat4, type Vec3 } from '@engine/core/math';
 import { FOV_RADIANS, Z_FAR, Z_NEAR } from './rendering/config';
 import { EditorUI } from './editor/ui/EditorUI';
 import { Logger } from './logger';
-import { CameraComponent } from './scene/components/CameraComponent';
+import { CameraComponent } from '@engine/world';
 import { PhysicsWorld } from './physics/PhysicsWorld';
-import { CharacterControllerSystem } from './scene/CharacterControllerSystem';
+import { CharacterControllerSystem } from './scene/CharacterControllerSystem'; // TODO: Move to @engine/stdlib in Phase 5
 
 export interface EditorAppOptions {
   canvas: HTMLCanvasElement;

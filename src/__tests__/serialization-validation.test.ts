@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { Transform } from '../scene/Transform';
-import { Entity } from '../scene/Entity';
-import { Scene } from '../scene/Scene';
+import { Transform } from '@engine/world';
+import { Entity } from '@engine/world';
+import { Scene } from '@engine/world';
 
 describe('Transform.fromJSON validation', () => {
   it('throws on null data', () => {

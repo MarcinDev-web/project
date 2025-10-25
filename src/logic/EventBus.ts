@@ -1,4 +1,4 @@
-import type { Entity, EntityId } from '../scene/Entity';
+import type { Entity, EntityId } from '@engine/world';
 
 export interface ScriptEvent<T = unknown> {
   /** Event type identifier */

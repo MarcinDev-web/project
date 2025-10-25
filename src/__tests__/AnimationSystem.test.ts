@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Scene } from '../scene/Scene';
-import { Entity } from '../scene/Entity';
-import { AnimationComponent } from '../scene/components/AnimationComponent';
+import { Scene } from '@engine/world';
+import { Entity } from '@engine/world';
+import { AnimationComponent } from '@engine/world';
 import { AnimationClip } from '../animation/AnimationClip';
 import { AnimationSystem } from '../animation/AnimationSystem';
 import { Skeleton } from '../animation/Skeleton';

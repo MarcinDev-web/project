@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { BoundingVolume, type AABB } from '../physics/BoundingVolume';
-import { Entity } from '../scene/Entity';
-import { PhysicsComponent } from '../scene/components/PhysicsComponent';
+import { Entity } from '@engine/world';
+import { PhysicsComponent } from '@engine/world';
 
 describe('BoundingVolume', () => {
   describe('fromCenterSize', () => {

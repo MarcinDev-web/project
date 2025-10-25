@@ -1,6 +1,6 @@
 import { Component } from './Component';
 import { registerComponent } from './registry';
-import type { Scene } from '../engine/scene';
+import type { Scene } from '@engine/world';
 import type { BehaviorConstructor, BehaviorInstance, BehaviorContext } from '../../logic/Behavior';
 import { BehaviorRegistry } from '../../logic/BehaviorRegistry';
 

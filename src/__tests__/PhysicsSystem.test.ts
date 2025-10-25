@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { PhysicsSystem, DEFAULT_PHYSICS_CONFIG } from '../physics/PhysicsSystem';
-import { PhysicsComponent, RigidbodyType } from '../scene/components/PhysicsComponent';
-import { Scene } from '../scene/Scene';
-import { Entity } from '../scene/Entity';
+import { PhysicsComponent, RigidbodyType } from '@engine/world';
+import { Scene } from '@engine/world';
+import { Entity } from '@engine/world';
 
 describe('PhysicsSystem', () => {
   let scene: Scene;

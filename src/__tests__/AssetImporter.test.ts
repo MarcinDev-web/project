@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { Scene } from '../scene/Scene';
+import { Scene } from '@engine/world';
 import { AssetImporter } from '../editor/assets/AssetImporter';
 
 function makeFile(name: string, content: string): File {
