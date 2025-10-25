@@ -6,10 +6,18 @@
     "composite": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "noUnusedLocals": false,
+    "noUnusedParameters": false,
+    "exactOptionalPropertyTypes": false
   },
   "include": ["src/**/*"],
-  "exclude": ["__tests__", "dist", "node_modules"],
+  "exclude": [
+    "__tests__",
+    "dist",
+    "node_modules",
+    "src/LogicConnectionRenderer.ts"
+  ],
   "references": [
     { "path": "../core" },
     { "path": "../world" }

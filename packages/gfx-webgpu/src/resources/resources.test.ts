@@ -9,7 +9,7 @@ vi.mock('../../logger', () => {
 
 import type { GeometryData } from './resources';
 import { createPipelines, createTimestampResources, validateGeometryData } from './resources';
-import { logger } from '@engine/core/utils';
+import { Logger } from '@engine/core/utils';
 
 const makeVertex = (
   position: [number, number, number],
@@ -71,7 +71,7 @@ describe('validateGeometryData', () => {
 
     validateGeometryData(geometry);
 
-    expect(logger.error).toHaveBeenCalledWith(
+    expect(Logger.error).toHaveBeenCalledWith(
       'Vertex buffer byteLength must be a multiple of 24 bytes'
     );
   });
@@ -81,7 +81,7 @@ describe('validateGeometryData', () => {
 
     validateGeometryData(geometry);
 
-    expect(logger.error).toHaveBeenCalledWith('Indices length should be a multiple of 3');
+    expect(Logger.error).toHaveBeenCalledWith('Indices length should be a multiple of 3');
   });
 
   it('logs an error when indices reference out-of-range vertices', () => {
@@ -89,7 +89,7 @@ describe('validateGeometryData', () => {
 
     validateGeometryData(geometry);
 
-    expect(logger.error).toHaveBeenCalledWith('Invalid index: references out-of-range vertex');
+    expect(Logger.error).toHaveBeenCalledWith('Invalid index: references out-of-range vertex');
   });
 
   it('warns and errors when a degenerate triangle is detected', () => {
@@ -101,12 +101,12 @@ describe('validateGeometryData', () => {
 
     validateGeometryData(geometry);
 
-    expect(logger.warn).toHaveBeenCalledWith('Degenerate triangle detected at tri index', 0, {
+    expect(Logger.warn).toHaveBeenCalledWith('Degenerate triangle detected at tri index', 0, {
       i0: 0,
       i1: 1,
       i2: 2,
     });
-    expect(logger.error).toHaveBeenCalledWith('Degenerate triangle found in index buffer');
+    expect(Logger.error).toHaveBeenCalledWith('Degenerate triangle found in index buffer');
   });
 });
 
@@ -200,10 +200,10 @@ describe('createPipelines error handling', () => {
       })
     ).rejects.toThrow('Shader compilation error');
 
-    expect(logger.warn).toHaveBeenCalledWith('WGSL warnings:', [
+    expect(Logger.warn).toHaveBeenCalledWith('WGSL warnings:', [
       { type: 'warning', message: 'Unused variable' },
     ]);
-    expect(logger.error).toHaveBeenCalledWith('WGSL compilation errors:', [
+    expect(Logger.error).toHaveBeenCalledWith('WGSL compilation errors:', [
       { type: 'error', message: 'Syntax error' },
     ]);
     expect(statusEl.textContent).toBe('Shader compilation error. See console for details.');
@@ -229,7 +229,7 @@ describe('createPipelines error handling', () => {
       })
     ).rejects.toThrow('Render pipeline creation failed');
 
-    expect(logger.error).toHaveBeenCalledWith('Pipeline validation error:', {
+    expect(Logger.error).toHaveBeenCalledWith('Pipeline validation error:', {
       message: 'invalid pipeline',
     });
     expect(statusEl.textContent).toBe('Pipeline error. See console for details.');
@@ -262,7 +262,7 @@ describe('createPipelines error handling', () => {
       })
     ).rejects.toThrow('Overlay pipeline creation failed');
 
-    expect(logger.error).toHaveBeenCalledWith('Overlay pipeline validation error:', {
+    expect(Logger.error).toHaveBeenCalledWith('Overlay pipeline validation error:', {
       message: 'overlay invalid',
     });
     expect(statusEl.textContent).toBe('Overlay pipeline error. See console for details.');

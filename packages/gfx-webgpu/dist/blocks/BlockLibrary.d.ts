@@ -7,7 +7,7 @@
  * - Support for both procedural and real textures
  * - Material-based rendering
  */
-import type { RgbaColor } from '../../utils/colors';
+import type { RgbaColor } from '../utils/colors';
 import type { CTMConfig } from '../textures/ConnectedTextures';
 export type BlockCategory = 'basic' | 'natural' | 'decorative' | 'mechanical' | 'glass' | 'light';
 export type BlockMaterialType = 'solid' | 'glass' | 'metal' | 'wood' | 'stone' | 'plastic' | 'emissive';

@@ -7,7 +7,7 @@ vi.mock('../../logger', () => {
   return { logger: { warn, error, info } };
 });
 
-import { logger } from '@engine/core/utils';
+import { Logger } from '@engine/core/utils';
 import { asBytes, getTimestampPeriod, updateCanvasSize } from './helpers';
 
 const flushMicrotasks = async () => {
@@ -32,7 +32,7 @@ describe('getTimestampPeriod', () => {
 
     expect(result).toBe(2.5);
     expect(queue.getTimestampPeriod).toHaveBeenCalledTimes(1);
-    expect(logger.warn).not.toHaveBeenCalled();
+    expect(Logger.warn).not.toHaveBeenCalled();
   });
 
   it('falls back to queue.timestampPeriod when getter returns invalid value', async () => {

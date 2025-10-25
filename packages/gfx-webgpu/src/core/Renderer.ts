@@ -1,4 +1,6 @@
-import type { OrbitControlsState } from '../../input';
+// TODO: Uncomment in Phase 6 when @engine/input exists
+// import type { OrbitControlsState } from '@engine/input';
+export type OrbitControlsState = { distance: number; azimuth: number; elevation: number; target: [number,number,number] }; // Temp
 import { updateCanvasSize, getTimestampPeriod } from './helpers';
 import {
   DEFAULT_GEOMETRY,
@@ -14,9 +16,10 @@ import type { FrameResources, GeometryData } from '../resources/resources';
 import { GPUBufferPool } from './bufferPool';
 import type { Scene, Entity } from '@engine/world';
 import { LightManager } from '../lighting/LightManager';
-import { ScriptSystem } from '../../logic/ScriptSystem';
-import { LogicCubeSystem } from '../../logic/LogicCubeSystem';
-import { LogicConnectionRenderer } from '../LogicConnectionRenderer';
+// TODO: Uncomment in Phase 4 when @engine/script exists
+// import { ScriptSystem } from '@engine/script';
+// import { LogicCubeSystem } from '@engine/script';
+// import { LogicConnectionRenderer } from '../LogicConnectionRenderer'; // TODO: Phase 4
 import { EnvironmentRenderer } from '../renderers/EnvironmentRenderer';
 import { Logger } from '@engine/core/utils';
 import { CameraSystem } from './CameraSystem';
@@ -246,7 +249,7 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
   device.lost
     .then((info) => {
       if (!cleanedUp && !renderAbortSignal.aborted) {
-        Logger.error('WebGPU device lost', info);
+        Logger.error('WebGPU device lost', info as unknown as Error);
         statusEl.textContent = 'WebGPU device lost. Please reload.';
         try {
           cleanup();
@@ -263,9 +266,10 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
   let frame: () => void;
   let frameResources: FrameResources;
   let frameRenderer: FrameRenderer;
-  let scriptSystem: ScriptSystem | null = null;
-  let logicCubeSystem: LogicCubeSystem | null = null;
-  let logicConnectionRenderer: LogicConnectionRenderer | null = null;
+  // TODO: Uncomment in Phase 4
+  // let scriptSystem: ScriptSystem | null = null;
+  // let logicCubeSystem: LogicCubeSystem | null = null;
+  // let logicConnectionRenderer: LogicConnectionRenderer | null = null;
   let lastFrameTimeMs: number | null = null;
 
   // Prepare geometry from scene or use default
@@ -289,15 +293,16 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       if (!currentCameraEntity) {
         currentCameraEntity = currentScene.primaryCamera;
       }
+      // TODO: Uncomment in Phase 4 when @engine/script exists
       // Initialize scripting runtime for scene
-      scriptSystem = new ScriptSystem(currentScene);
+      // scriptSystem = new ScriptSystem(currentScene);
       // Initialize logic cube system for scene
-      logicCubeSystem = new LogicCubeSystem(currentScene);
+      // logicCubeSystem = new LogicCubeSystem(currentScene);
       // Initialize logic connection renderer
-      logicConnectionRenderer = new LogicConnectionRenderer(
-        currentScene,
-        logicCubeSystem.getConnectionManager()
-      );
+      // logicConnectionRenderer = new LogicConnectionRenderer(
+      //   currentScene,
+      //   logicCubeSystem.getConnectionManager()
+      // );
     }
     const geometryBuffers = createGeometryBuffers(device, geometry);
 
@@ -434,16 +439,17 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       // ignore if IBL generation fails in minimal environments
     }
 
+    // TODO: Uncomment in Phase 4 when @engine/script exists
     // Initialize logic connection renderer
-    if (logicConnectionRenderer) {
-      try {
-        await logicConnectionRenderer.initialize(device, presentationFormat);
-        Logger.info('Logic connection renderer initialized');
-      } catch (err) {
-        Logger.warn('Failed to initialize logic connection renderer:', err);
-        logicConnectionRenderer = null;
-      }
-    }
+    // if (logicConnectionRenderer) {
+    //   try {
+    //     await logicConnectionRenderer.initialize(device, presentationFormat);
+    //     Logger.info('Logic connection renderer initialized');
+    //   } catch (err) {
+    //     Logger.warn('Failed to initialize logic connection renderer:', err);
+    //     logicConnectionRenderer = null;
+    //   }
+    // }
 
     frame = () => {
       if (animationFrameHandle !== null) {
@@ -503,33 +509,35 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
         }
       }
 
+      // TODO: Uncomment in Phase 4 when @engine/script exists
       // Per-frame system updates (runtime simulation)
-      if (scriptSystem && dtSec > 0 && shouldSimulateFn()) {
-        try {
-          scriptSystem.update(dtSec);
-          scriptSystem.lateUpdate(dtSec);
-        } catch (err) {
-          Logger.warn('ScriptSystem update failed:', err);
-        }
-      }
+      // if (scriptSystem && dtSec > 0 && shouldSimulateFn()) {
+      //   try {
+      //     scriptSystem.update(dtSec);
+      //     scriptSystem.lateUpdate(dtSec);
+      //   } catch (err) {
+      //     Logger.warn('ScriptSystem update failed:', err);
+      //   }
+      // }
 
       // Update logic cube system
-      if (logicCubeSystem && dtSec > 0 && shouldSimulateFn()) {
-        try {
-          logicCubeSystem.update(dtSec);
-        } catch (err) {
-          Logger.warn('LogicCubeSystem update failed:', err);
-        }
-      }
+      // if (logicCubeSystem && dtSec > 0 && shouldSimulateFn()) {
+      //   try {
+      //     logicCubeSystem.update(dtSec);
+      //   } catch (err) {
+      //     Logger.warn('LogicCubeSystem update failed:', err);
+      //   }
+      // }
 
+      // TODO: Uncomment in Phase 4
       // Update logic connection renderer animations
-      if (logicConnectionRenderer && dtSec > 0) {
-        try {
-          logicConnectionRenderer.update(dtSec);
-        } catch (err) {
-          Logger.warn('Logic connection renderer update failed:', err);
-        }
-      }
+      // if (logicConnectionRenderer && dtSec > 0) {
+      //   try {
+      //     logicConnectionRenderer.update(dtSec);
+      //   } catch (err) {
+      //     Logger.warn('Logic connection renderer update failed:', err);
+      //   }
+      // }
 
       // Update all dynamic uniforms (matrices, camera, lighting)
       const lightingData = lightManager ? lightManager.getLightingData(frameId) : undefined;
@@ -560,7 +568,7 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
         geometry,
         environmentRenderer,
         gridRenderer,
-        logicConnectionRenderer,
+        // logicConnectionRenderer: null, // TODO: Phase 4
         uniformManager,
         lightingData,
         ...(gpuTimingListeners.length
@@ -652,10 +660,11 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
     try {
       environmentRenderer?.cleanup();
       environmentRenderer = null;
-      logicConnectionRenderer?.dispose();
-      logicConnectionRenderer = null;
-      scriptSystem = null;
-      logicCubeSystem = null;
+      // TODO: Phase 4
+      // logicConnectionRenderer?.dispose();
+      // logicConnectionRenderer = null;
+      // scriptSystem = null;
+      // logicCubeSystem = null;
       lastFrameTimeMs = null;
     } catch (e) {
       Logger.warn('Renderer systems cleanup failed', e);

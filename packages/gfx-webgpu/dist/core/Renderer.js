@@ -3,9 +3,10 @@ import { DEFAULT_GEOMETRY, createGeometryBuffers, createTimestampResources, crea
 createPipelines, createDepthTexture, createMsaaColorTarget, } from '../resources/resources';
 import { GPUBufferPool } from './bufferPool';
 import { LightManager } from '../lighting/LightManager';
-import { ScriptSystem } from '../../logic/ScriptSystem';
-import { LogicCubeSystem } from '../../logic/LogicCubeSystem';
-import { LogicConnectionRenderer } from '../LogicConnectionRenderer';
+// TODO: Uncomment in Phase 4 when @engine/script exists
+// import { ScriptSystem } from '@engine/script';
+// import { LogicCubeSystem } from '@engine/script';
+// import { LogicConnectionRenderer } from '../LogicConnectionRenderer'; // TODO: Phase 4
 import { EnvironmentRenderer } from '../renderers/EnvironmentRenderer';
 import { Logger } from '@engine/core/utils';
 import { CameraSystem } from './CameraSystem';
@@ -172,9 +173,10 @@ export async function initRenderer(options) {
     let frame;
     let frameResources;
     let frameRenderer;
-    let scriptSystem = null;
-    let logicCubeSystem = null;
-    let logicConnectionRenderer = null;
+    // TODO: Uncomment in Phase 4
+    // let scriptSystem: ScriptSystem | null = null;
+    // let logicCubeSystem: LogicCubeSystem | null = null;
+    // let logicConnectionRenderer: LogicConnectionRenderer | null = null;
     let lastFrameTimeMs = null;
     // Prepare geometry from scene or use default
     let geometry = options.geometry ?? DEFAULT_GEOMETRY;
@@ -195,12 +197,16 @@ export async function initRenderer(options) {
             if (!currentCameraEntity) {
                 currentCameraEntity = currentScene.primaryCamera;
             }
+            // TODO: Uncomment in Phase 4 when @engine/script exists
             // Initialize scripting runtime for scene
-            scriptSystem = new ScriptSystem(currentScene);
+            // scriptSystem = new ScriptSystem(currentScene);
             // Initialize logic cube system for scene
-            logicCubeSystem = new LogicCubeSystem(currentScene);
+            // logicCubeSystem = new LogicCubeSystem(currentScene);
             // Initialize logic connection renderer
-            logicConnectionRenderer = new LogicConnectionRenderer(currentScene, logicCubeSystem.getConnectionManager());
+            // logicConnectionRenderer = new LogicConnectionRenderer(
+            //   currentScene,
+            //   logicCubeSystem.getConnectionManager()
+            // );
         }
         const geometryBuffers = createGeometryBuffers(device, geometry);
         const uniformResources = createUniformResources(device, {
@@ -314,17 +320,17 @@ export async function initRenderer(options) {
         catch {
             // ignore if IBL generation fails in minimal environments
         }
+        // TODO: Uncomment in Phase 4 when @engine/script exists
         // Initialize logic connection renderer
-        if (logicConnectionRenderer) {
-            try {
-                await logicConnectionRenderer.initialize(device, presentationFormat);
-                Logger.info('Logic connection renderer initialized');
-            }
-            catch (err) {
-                Logger.warn('Failed to initialize logic connection renderer:', err);
-                logicConnectionRenderer = null;
-            }
-        }
+        // if (logicConnectionRenderer) {
+        //   try {
+        //     await logicConnectionRenderer.initialize(device, presentationFormat);
+        //     Logger.info('Logic connection renderer initialized');
+        //   } catch (err) {
+        //     Logger.warn('Failed to initialize logic connection renderer:', err);
+        //     logicConnectionRenderer = null;
+        //   }
+        // }
         frame = () => {
             if (animationFrameHandle !== null) {
                 try {
@@ -376,34 +382,33 @@ export async function initRenderer(options) {
                     Logger.warn('Frame update callback failed:', err);
                 }
             }
+            // TODO: Uncomment in Phase 4 when @engine/script exists
             // Per-frame system updates (runtime simulation)
-            if (scriptSystem && dtSec > 0 && shouldSimulateFn()) {
-                try {
-                    scriptSystem.update(dtSec);
-                    scriptSystem.lateUpdate(dtSec);
-                }
-                catch (err) {
-                    Logger.warn('ScriptSystem update failed:', err);
-                }
-            }
+            // if (scriptSystem && dtSec > 0 && shouldSimulateFn()) {
+            //   try {
+            //     scriptSystem.update(dtSec);
+            //     scriptSystem.lateUpdate(dtSec);
+            //   } catch (err) {
+            //     Logger.warn('ScriptSystem update failed:', err);
+            //   }
+            // }
             // Update logic cube system
-            if (logicCubeSystem && dtSec > 0 && shouldSimulateFn()) {
-                try {
-                    logicCubeSystem.update(dtSec);
-                }
-                catch (err) {
-                    Logger.warn('LogicCubeSystem update failed:', err);
-                }
-            }
+            // if (logicCubeSystem && dtSec > 0 && shouldSimulateFn()) {
+            //   try {
+            //     logicCubeSystem.update(dtSec);
+            //   } catch (err) {
+            //     Logger.warn('LogicCubeSystem update failed:', err);
+            //   }
+            // }
+            // TODO: Uncomment in Phase 4
             // Update logic connection renderer animations
-            if (logicConnectionRenderer && dtSec > 0) {
-                try {
-                    logicConnectionRenderer.update(dtSec);
-                }
-                catch (err) {
-                    Logger.warn('Logic connection renderer update failed:', err);
-                }
-            }
+            // if (logicConnectionRenderer && dtSec > 0) {
+            //   try {
+            //     logicConnectionRenderer.update(dtSec);
+            //   } catch (err) {
+            //     Logger.warn('Logic connection renderer update failed:', err);
+            //   }
+            // }
             // Update all dynamic uniforms (matrices, camera, lighting)
             const lightingData = lightManager ? lightManager.getLightingData(frameId) : undefined;
             uniformManager.updateDynamicUniforms(viewProjectionMatrix, [eyeX, eyeY, eyeZ], lightingData);
@@ -430,7 +435,7 @@ export async function initRenderer(options) {
                 geometry,
                 environmentRenderer,
                 gridRenderer,
-                logicConnectionRenderer,
+                // logicConnectionRenderer: null, // TODO: Phase 4
                 uniformManager,
                 lightingData,
                 ...(gpuTimingListeners.length
@@ -518,10 +523,11 @@ export async function initRenderer(options) {
         try {
             environmentRenderer?.cleanup();
             environmentRenderer = null;
-            logicConnectionRenderer?.dispose();
-            logicConnectionRenderer = null;
-            scriptSystem = null;
-            logicCubeSystem = null;
+            // TODO: Phase 4
+            // logicConnectionRenderer?.dispose();
+            // logicConnectionRenderer = null;
+            // scriptSystem = null;
+            // logicCubeSystem = null;
             lastFrameTimeMs = null;
         }
         catch (e) {

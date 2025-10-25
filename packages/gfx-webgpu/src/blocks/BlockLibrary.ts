@@ -8,7 +8,7 @@
  * - Material-based rendering
  */
 
-import type { RgbaColor } from '../../utils/colors';
+import type { RgbaColor } from '../utils/colors';
 import type { CTMConfig } from '../textures/ConnectedTextures';
 
 export type BlockCategory = 'basic' | 'natural' | 'decorative' | 'mechanical' | 'glass' | 'light';

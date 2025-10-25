@@ -8,7 +8,7 @@
  */
 
 import type { Entity, Scene } from '@engine/world';
-import { MaterialComponent } from '../../scene/components/MaterialComponent';
+import { MaterialComponent } from '@engine/world';
 import type { Frustum } from './FrustumCuller';
 
 export interface InstanceData {

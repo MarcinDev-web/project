@@ -1,4 +1,4 @@
-import { logger } from '@engine/core/utils';
+import { Logger } from '@engine/core/utils';
 /**
  * Determines the GPU timestamp period in nanoseconds using queue- or adapter-provided data.
  *
@@ -18,11 +18,11 @@ export function getTimestampPeriod(device, adapter) {
                 determined = true;
             }
             else {
-                logger.warn('Timestamp period: getTimestampPeriod returned invalid; trying next source');
+                Logger.warn('Timestamp period: getTimestampPeriod returned invalid; trying next source');
             }
         }
         catch (err) {
-            logger.warn('Timestamp period: getTimestampPeriod threw; trying next source', err);
+            Logger.warn('Timestamp period: getTimestampPeriod threw; trying next source', err);
         }
     }
     if (!determined && typeof queueInfo.timestampPeriod === 'number') {
@@ -37,7 +37,7 @@ export function getTimestampPeriod(device, adapter) {
         }
     }
     if (!determined) {
-        logger.warn('Timestamp period: no source available; defaulting to 1');
+        Logger.warn('Timestamp period: no source available; defaulting to 1');
         timestampPeriod = 1;
     }
     return timestampPeriod;

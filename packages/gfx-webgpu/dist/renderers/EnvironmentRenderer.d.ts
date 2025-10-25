@@ -1,5 +1,5 @@
 import type { Mat4, Vec3 } from '@engine/core/math';
-import type { EnvironmentComponent } from '../../scene/components/EnvironmentComponent';
+import type { EnvironmentComponent } from '@engine/world';
 /**
  * Configuration for environment rendering pipeline
  */

@@ -1,4 +1,4 @@
-import type { RgbaColor } from '../../utils/colors';
+import type { RgbaColor } from '../utils/colors';
 export type AlphaMode = 'OPAQUE' | 'MASK' | 'BLEND';
 export declare class Material {
     color: RgbaColor;

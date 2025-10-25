@@ -6,7 +6,7 @@
  *
  * Performance: Zero-allocation instance data building for large scenes.
  */
-import { MaterialComponent } from '../../scene/components/MaterialComponent';
+import { MaterialComponent } from '@engine/world';
 /**
  * InstanceDataBuilder builds instance data by reusing internal buffers.
  * Avoids per-frame allocations for better performance.

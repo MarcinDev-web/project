@@ -13,8 +13,10 @@
 
 import { mat4Perspective, mat4LookAt, mat4Multiply } from '@engine/core/math';
 import type { Mat4, Vec3 } from '@engine/core/math';
-import type { OrbitControlsState } from '../../input';
-import { CameraComponent } from '../../scene/components/CameraComponent';
+// TODO: Uncomment in Phase 6 when @engine/input exists
+// import type { OrbitControlsState } from '@engine/input';
+export type OrbitControlsState = { distance: number; azimuth: number; elevation: number; yaw?: number; pitch?: number; target: Vec3 }; // Temp
+import { CameraComponent } from '@engine/world';
 import type { Entity, Scene } from '@engine/world';
 import { FOV_RADIANS, Z_NEAR, Z_FAR } from '../config';
 
@@ -68,12 +70,14 @@ export class CameraSystem {
       eyeZ = worldPos[2];
     } else {
       // Fallback to orbit controls
-      const { yaw, pitch, distance } = getOrbitState();
+      const { yaw, pitch, distance, azimuth, elevation } = getOrbitState();
       mat4Perspective(this.projectionMatrix, FOV_RADIANS, aspect, Z_NEAR, Z_FAR);
 
-      eyeX = Math.cos(pitch) * Math.sin(yaw) * distance;
-      eyeY = Math.sin(pitch) * distance;
-      eyeZ = Math.cos(pitch) * Math.cos(yaw) * distance;
+      const actualYaw = yaw ?? azimuth ?? 0;
+      const actualPitch = pitch ?? elevation ?? 0;
+      eyeX = Math.cos(actualPitch) * Math.sin(actualYaw) * distance;
+      eyeY = Math.sin(actualPitch) * distance;
+      eyeZ = Math.cos(actualPitch) * Math.cos(actualYaw) * distance;
 
       mat4LookAt(this.viewMatrix, [eyeX, eyeY, eyeZ], [0, 0, 0], [0, 1, 0]);
       mat4Multiply(this.viewProjectionMatrix, this.projectionMatrix, this.viewMatrix);

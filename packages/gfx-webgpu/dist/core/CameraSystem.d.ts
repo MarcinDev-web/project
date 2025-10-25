@@ -11,7 +11,14 @@
  * - Orbit controls fallback
  */
 import type { Mat4, Vec3 } from '@engine/core/math';
-import type { OrbitControlsState } from '../../input';
+export type OrbitControlsState = {
+    distance: number;
+    azimuth: number;
+    elevation: number;
+    yaw?: number;
+    pitch?: number;
+    target: Vec3;
+};
 import type { Entity, Scene } from '@engine/world';
 export interface CameraMatrices {
     projection: Mat4;

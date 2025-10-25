@@ -18,9 +18,10 @@ import { FrustumCuller } from './FrustumCuller';
 import { InstanceDataBuilder } from './InstanceManager';
 import { GPUBufferPool } from './bufferPool';
 import { ComputePrepass } from './ComputePrepass';
-import { EnvironmentComponent } from '../../scene/components/EnvironmentComponent';
+import { EnvironmentComponent } from '@engine/world';
 import type { EnvironmentRenderer } from '../renderers/EnvironmentRenderer';
-import type { LogicConnectionRenderer } from '../LogicConnectionRenderer';
+// TODO: Uncomment in Phase 4
+// import type { LogicConnectionRenderer } from '../LogicConnectionRenderer';
 import { mat4Invert } from '@engine/core/math';
 import type { Mat4, Vec3 } from '@engine/core/math';
 import { Logger } from '@engine/core/utils';
@@ -40,7 +41,8 @@ export interface FrameRenderContext {
   geometry: GeometryData;
   environmentRenderer: EnvironmentRenderer | null;
   gridRenderer: { render?: (p: GPURenderPassEncoder, vp: Mat4) => void } | null;
-  logicConnectionRenderer: LogicConnectionRenderer | null;
+  // TODO: Phase 4
+  // logicConnectionRenderer: LogicConnectionRenderer | null;
   onGpuTimings?: (timings: { label: string; timeMs: number }[]) => void;
   uniformManager: UniformManager;
   lightingData?: import('../lighting/LightManager').LightingData;
@@ -297,15 +299,16 @@ export class FrameRenderer {
       }
     }
 
+    // TODO: Uncomment in Phase 4
     // Render logic cube connections if available
-    const { logicConnectionRenderer } = ctx;
-    if (logicConnectionRenderer && ctx.scene) {
-      try {
-        logicConnectionRenderer.render(passEncoder, viewProjectionMatrix, eyePosition);
-      } catch (err) {
-        Logger.warn('Logic connection render failed:', err);
-      }
-    }
+    // const { logicConnectionRenderer } = ctx;
+    // if (logicConnectionRenderer && ctx.scene) {
+    //   try {
+    //     logicConnectionRenderer.render(passEncoder, viewProjectionMatrix, eyePosition);
+    //   } catch (err) {
+    //     Logger.warn('Logic connection render failed:', err);
+    //   }
+    // }
 
     passEncoder.end();
     // Optional: write a timestamp after the render pass for tests

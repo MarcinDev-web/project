@@ -1,5 +1,5 @@
 import { Material, type AlphaMode } from './Material';
-import type { RgbaColor } from '../../utils/colors';
+import type { RgbaColor } from '../utils/colors';
 
 export interface SerializedMaterial {
   color: RgbaColor;

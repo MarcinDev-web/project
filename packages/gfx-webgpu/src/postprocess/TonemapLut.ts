@@ -53,7 +53,7 @@ export class TonemapLutPass {
       // Write 3D via writeTexture with rowsPerImage=height and depth=layers
       this.device.queue.writeTexture(
         { texture: this.lutTexture },
-        data,
+        data as unknown as GPUAllowSharedBufferSource,
         { bytesPerRow: size * 4, rowsPerImage: size },
         { width: size, height: size, depthOrArrayLayers: size }
       );

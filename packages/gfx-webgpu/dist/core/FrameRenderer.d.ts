@@ -13,7 +13,6 @@
 import type { Scene } from '@engine/world';
 import type { FrameResources, GeometryData } from '../resources/resources';
 import type { EnvironmentRenderer } from '../renderers/EnvironmentRenderer';
-import type { LogicConnectionRenderer } from '../LogicConnectionRenderer';
 import type { Mat4, Vec3 } from '@engine/core/math';
 import { UniformManager } from './UniformManager';
 export interface FrameRenderContext {
@@ -28,7 +27,6 @@ export interface FrameRenderContext {
     gridRenderer: {
         render?: (p: GPURenderPassEncoder, vp: Mat4) => void;
     } | null;
-    logicConnectionRenderer: LogicConnectionRenderer | null;
     onGpuTimings?: (timings: {
         label: string;
         timeMs: number;

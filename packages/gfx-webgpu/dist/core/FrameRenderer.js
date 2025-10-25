@@ -15,7 +15,9 @@ import { FrustumCuller } from './FrustumCuller';
 import { InstanceDataBuilder } from './InstanceManager';
 import { GPUBufferPool } from './bufferPool';
 import { ComputePrepass } from './ComputePrepass';
-import { EnvironmentComponent } from '../../scene/components/EnvironmentComponent';
+import { EnvironmentComponent } from '@engine/world';
+// TODO: Uncomment in Phase 4
+// import type { LogicConnectionRenderer } from '../LogicConnectionRenderer';
 import { mat4Invert } from '@engine/core/math';
 import { Logger } from '@engine/core/utils';
 import { CLEAR_COLOR, MSAA_SAMPLE_COUNT, TIMESTAMP_QUERY_COUNT, TIMESTAMP_BUFFER_SIZE, GPU_TIMESTAMP_PAIRS } from '../config';
@@ -245,16 +247,16 @@ export class FrameRenderer {
                 Logger.warn('Grid render failed:', err);
             }
         }
+        // TODO: Uncomment in Phase 4
         // Render logic cube connections if available
-        const { logicConnectionRenderer } = ctx;
-        if (logicConnectionRenderer && ctx.scene) {
-            try {
-                logicConnectionRenderer.render(passEncoder, viewProjectionMatrix, eyePosition);
-            }
-            catch (err) {
-                Logger.warn('Logic connection render failed:', err);
-            }
-        }
+        // const { logicConnectionRenderer } = ctx;
+        // if (logicConnectionRenderer && ctx.scene) {
+        //   try {
+        //     logicConnectionRenderer.render(passEncoder, viewProjectionMatrix, eyePosition);
+        //   } catch (err) {
+        //     Logger.warn('Logic connection render failed:', err);
+        //   }
+        // }
         passEncoder.end();
         // Optional: write a timestamp after the render pass for tests
         if (frameResources.timestampQuerySet) {

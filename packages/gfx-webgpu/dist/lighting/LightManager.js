@@ -1,7 +1,7 @@
 /**
  * LightManager - Manages lights in the scene and prepares lighting data for shaders
  */
-import { LightComponent } from '../../scene/components/LightComponent';
+import { LightComponent } from '@engine/world';
 /**
  * Maximum number of lights supported by the shader (directional + point + spot)
  */

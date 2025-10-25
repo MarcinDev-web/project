@@ -76,7 +76,7 @@ const DEFAULT_ATLAS_CONFIG: AtlasConfig = {
  * | Top   | Side  | Top   |       |       |
  * +-------+-------+-------+-------+-------+
  */
-import { logger } from '@engine/core/utils';
+import { Logger } from '@engine/core/utils';
 
 let atlasCreationLogCount = 0;
 const ATLAS_CREATION_LOG_LIMIT = 1;
@@ -100,7 +100,7 @@ export class TextureAtlas {
     this.maxMaterials = Math.floor(totalCells / 2);
 
     if (atlasCreationLogCount < ATLAS_CREATION_LOG_LIMIT) {
-      logger.info(
+      Logger.info(
         `[TextureAtlas] Created: ${this.config.atlasSize}x${this.config.atlasSize}, max ${this.maxMaterials} materials (${this.materialsPerRow} textures/row)`
       );
       atlasCreationLogCount++;

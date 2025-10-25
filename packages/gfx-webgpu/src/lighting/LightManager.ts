@@ -3,7 +3,7 @@
  */
 
 import type { Scene, Entity } from '@engine/world';
-import { LightComponent } from '../../scene/components/LightComponent';
+import { LightComponent } from '@engine/world';
 import type { Vec3 } from '@engine/core/math';
 
 /**

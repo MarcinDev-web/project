@@ -1,4 +1,9 @@
-import type { OrbitControlsState } from '../../input';
+export type OrbitControlsState = {
+    distance: number;
+    azimuth: number;
+    elevation: number;
+    target: [number, number, number];
+};
 import type { GeometryData } from '../resources/resources';
 import type { Scene, Entity } from '@engine/world';
 import { FrameRenderer } from './FrameRenderer';

@@ -1,7 +1,7 @@
 import { createMainShaderCode } from '../shaders/main';
 import { ShaderEntryPoint } from '../shaders/types';
 import { DEFAULT_INSTANCE_GRID } from '../config';
-import { logger } from '@engine/core/utils';
+import { Logger } from '@engine/core/utils';
 import { TextureAtlas } from '../textures/TextureAtlas';
 // Warn-once flag for mock environments lacking copyBufferToTexture
 let warnedNoCopyBufferToTexture = false;
@@ -14,16 +14,16 @@ export function validateGeometryData(geometry) {
     const strideBytes = 24;
     const numVertices = geometry.vertices.byteLength / strideBytes;
     if (!Number.isInteger(numVertices)) {
-        logger.error('Vertex buffer byteLength must be a multiple of 24 bytes');
+        Logger.error('Vertex buffer byteLength must be a multiple of 24 bytes');
     }
     if (geometry.indices.length % 3 !== 0) {
-        logger.error('Indices length should be a multiple of 3');
+        Logger.error('Indices length should be a multiple of 3');
     }
     if (!geometry.indices.every((i) => i >= 0 && i < numVertices)) {
-        logger.error('Invalid index: references out-of-range vertex');
+        Logger.error('Invalid index: references out-of-range vertex');
     }
     if (geometry.indices.byteLength % 2 !== 0) {
-        logger.error('Index buffer byteLength not 2-byte aligned');
+        Logger.error('Index buffer byteLength not 2-byte aligned');
     }
     // Minimum squared area threshold to treat triangles as non-degenerate.
     // Accounts for floating-point imprecision in normalized model units.
@@ -58,7 +58,7 @@ export function validateGeometryData(geometry) {
         const cxZ = abx * acy - aby * acx;
         const area2 = cxX * cxX + cxY * cxY + cxZ * cxZ;
         if (!(area2 > eps)) {
-            logger.warn('Degenerate triangle detected at tri index', i / 3, {
+            Logger.warn('Degenerate triangle detected at tri index', i / 3, {
                 i0: geometry.indices[i],
                 i1: geometry.indices[i + 1],
                 i2: geometry.indices[i + 2],
@@ -68,7 +68,7 @@ export function validateGeometryData(geometry) {
         }
     }
     if (!degenerateOk) {
-        logger.error('Degenerate triangle found in index buffer');
+        Logger.error('Degenerate triangle found in index buffer');
     }
 }
 /**
@@ -818,7 +818,7 @@ export function createTextureAtlas(device, _textureBindGroupLayout, atlasSize = 
     // Limit noisy logs by routing through logger (which can be filtered) and avoid repeats here
     // Note: creation count is already logged in TextureAtlas itself (once per session)
     // Keeping this info-level log for debugging while reducing spam compared to console.log
-    logger.info(`[TextureAtlas] Created with ${atlas.getMaterialCount()} materials`);
+    Logger.info(`[TextureAtlas] Created with ${atlas.getMaterialCount()} materials`);
     // --------- NEW: Build atlas metadata storage buffer ---------
     // Each material has 2 rects (side, top), and material params packed into 48 bytes per entry
     // struct AtlasMeta {
@@ -917,11 +917,11 @@ export function createPipelines(device, colorFormat, uniformBindGroupLayout, tex
         const messages = Array.isArray(compilationInfo.messages) ? compilationInfo.messages : [];
         const shaderWarnings = messages.filter((m) => m.type === 'warning');
         if (shaderWarnings.length > 0) {
-            logger.warn('WGSL warnings:', shaderWarnings);
+            Logger.warn('WGSL warnings:', shaderWarnings);
         }
         const shaderErrors = messages.filter((m) => m.type === 'error');
         if (shaderErrors.length > 0) {
-            logger.error('WGSL compilation errors:', shaderErrors);
+            Logger.error('WGSL compilation errors:', shaderErrors);
             options.statusEl.textContent = 'Shader compilation error. See console for details.';
             throw new Error('Shader compilation error');
         }
@@ -955,7 +955,7 @@ export function createPipelines(device, colorFormat, uniformBindGroupLayout, tex
         if (hasErrorScope) {
             const pipelineError = await devAny.popErrorScope();
             if (pipelineError) {
-                logger.error('Pipeline validation error:', pipelineError);
+                Logger.error('Pipeline validation error:', pipelineError);
                 options.statusEl.textContent = 'Pipeline error. See console for details.';
                 throw new Error('Render pipeline creation failed');
             }
@@ -1000,7 +1000,7 @@ export function createPipelines(device, colorFormat, uniformBindGroupLayout, tex
         if (hasErrorScope) {
             const overlayPipelineError = await devAny.popErrorScope();
             if (overlayPipelineError) {
-                logger.error('Overlay pipeline validation error:', overlayPipelineError);
+                Logger.error('Overlay pipeline validation error:', overlayPipelineError);
                 options.statusEl.textContent = 'Overlay pipeline error. See console for details.';
                 throw new Error('Overlay pipeline creation failed');
             }
@@ -1144,7 +1144,7 @@ export function createTextureFromData(device, width, height, data, label) {
             // In minimal/mock environments, copyBufferToTexture may be unavailable.
             // Skip the copy to avoid runtime errors; tests typically don't assert texel values.
             if (!warnedNoCopyBufferToTexture) {
-                logger.warn('[WebGPU Mock] copyBufferToTexture not available; skipping texture upload');
+                Logger.warn('[WebGPU Mock] copyBufferToTexture not available; skipping texture upload');
                 warnedNoCopyBufferToTexture = true;
             }
         }
