@@ -442,6 +442,35 @@ See [MANUAL_TEST_CHECKLIST.md](../MANUAL_TEST_CHECKLIST.md) for complete checkli
 
 ---
 
+## 🔄 Subsequent Simplifications
+
+### Workflow System Removal (2025-10-26)
+
+**Context:** Following the successful packages refactoring, further simplified editor architecture
+
+**Changes:**
+- ❌ Removed workflow preset system (4 presets → 1 fixed layout)
+- ❌ Deleted WorkflowSelector, WorkflowPresets, AdaptiveUIManager
+- ✅ Build Mode as single default configuration
+- ✅ Preserved full panel customization for users
+
+**Impact:**
+- **Files removed:** 4 (~800 LoC)
+- **Documentation removed:** 2 (~1400 LoC)  
+- **Bundle size:** -34 kB additional savings
+- **Complexity:** Significantly reduced
+- **UX:** Simplified, more intuitive
+
+**Rationale:**
+- Most users stuck with Build Mode anyway
+- Manual customization preferred over preset switching
+- Reduced maintenance burden
+- Cleaner, more focused architecture
+
+**See:** [WORKFLOW_SIMPLIFICATION.md](./WORKFLOW_SIMPLIFICATION.md) for full details
+
+---
+
 ## 📞 Next Actions
 
 ### For Maintainer:
