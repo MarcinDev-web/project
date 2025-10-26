@@ -17,6 +17,7 @@
     "@engine/input": "workspace:*",
     "@engine/camera": "workspace:*",
     "@engine/stdlib": "workspace:*",
+    "@engine/editor-utils": "workspace:*",
     "@webgpu/types": "^0.1.65",
     "@gltf-transform/core": "^3.10.1",
     "@gltf-transform/extensions": "^3.10.1",

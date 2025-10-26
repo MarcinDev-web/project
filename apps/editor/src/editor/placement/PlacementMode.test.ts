@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { PlacementMode } from './PlacementMode';
 import { Scene } from '@engine/world';
 import { Entity } from '@engine/world';
-import { SnapSystem } from '../snap/SnapSystem';
+import { SnapSystem } from '@engine/editor-utils';
 import { CollisionDetector } from './CollisionDetector';
 import type { AssetPreset } from '@engine/assets';
 import type { Vec3 } from '@engine/world';

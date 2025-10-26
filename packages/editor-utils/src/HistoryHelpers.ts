@@ -45,3 +45,4 @@ export function hydrateScene(scene: Scene, json: string): void {
     scene.addEntity(entity);
   });
 }
+

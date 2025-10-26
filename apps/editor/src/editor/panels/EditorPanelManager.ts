@@ -20,7 +20,7 @@ import { LayersPanel } from './LayersPanel';
 import { BookmarksPanel } from './BookmarksPanel';
 import { HistoryPanel } from './HistoryPanel';
 import { AssetPalette } from '../ui/AssetPalette';
-import { DisposableGroup } from '../core/DisposableGroup';
+import { DisposableGroup } from '@engine/core/utils';
 import { initializeBaseColor } from '../visuals/SelectionVisuals';
 import { ResizableSidebar } from '../ui/ResizableSidebar';
 import { SidebarTabs } from '../ui/SidebarTabs';

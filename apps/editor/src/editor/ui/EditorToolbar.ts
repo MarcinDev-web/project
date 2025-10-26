@@ -16,7 +16,7 @@ import type { EditorState } from '../core/state';
 import type { ProjectManager } from '../managers/ProjectManager';
 import type { Entity } from '@engine/world';
 import type { SelectionManager } from '@engine/world';
-import { DisposableGroup } from '../core/DisposableGroup';
+import { DisposableGroup } from '@engine/core/utils';
 import { Logger } from '../../utils/logger';
 import { effect } from '@preact/signals-core';
 import { createIcon, createIconButton } from '../utils/icons';

@@ -3,7 +3,7 @@ import { EditorVisualManager } from './EditorVisualManager';
 import { Scene } from '@engine/world';
 import { SelectionManager } from '@engine/world';
 import { EditorState } from '../core/state';
-import { SnapSystem } from '../snap/SnapSystem';
+import { SnapSystem } from '@engine/editor-utils';
 import type { Vec3 } from '@engine/core/math';
 
 // Mock requestAnimationFrame

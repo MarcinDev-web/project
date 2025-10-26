@@ -139,3 +139,4 @@ export function snapshotsEqual(a: SceneSnapshot | null, b: SceneSnapshot | null)
   }
   return true;
 }
+

@@ -219,3 +219,4 @@ export class SnapSystem {
     this.setConfig({ increment: cellSize });
   }
 }
+

@@ -34,7 +34,7 @@ import { PlayIntroState } from '../states/PlayIntroState';
 import { PlayingState } from '../states/PlayingState';
 import { PausedState } from '../states/PausedState';
 import { ReturnState } from '../states/ReturnState';
-import { computeEntityPath, resolveEntityByPath } from '../history/HistoryHelpers';
+import { computeEntityPath, resolveEntityByPath } from '@engine/editor-utils';
 import { DefaultControllerFactory, PlayerSession } from '@engine/stdlib/CharacterController';
 import type { PlayManifest } from '../core/PlayManifest';
 

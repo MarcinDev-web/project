@@ -137,3 +137,4 @@ export function isDisposable(obj: unknown): obj is IDisposable {
 export function toDisposable(obj: IDisposable): () => void {
   return () => obj.dispose();
 }
+

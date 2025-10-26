@@ -2,7 +2,7 @@ import type { Vec3, Quat } from '@engine/core/math';
 import { quatFromAxisAngle, quatMultiply } from '@engine/core/math';
 import type { SelectionManager } from '@engine/world';
 import type { EditorState } from '../core/state';
-import type { SnapSystem } from '../snap/SnapSystem';
+import type { SnapSystem } from '@engine/editor-utils';
 
 type AxisKey = 'x' | 'y' | 'z';
 

@@ -97,3 +97,4 @@ export function validateSnapConfig(config: Partial<SnapConfig>): string[] {
 
   return errors;
 }
+
