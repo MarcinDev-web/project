@@ -2,7 +2,7 @@ import type { IPlayModeState, PlayModeContext, PlayModeStateType } from '../core
 import { PlayModeStateType as StateType } from '../core/PlayModeStateMachine';
 import { Logger } from '../../utils/logger';
 import type { Entity } from '@engine/world';
-import type { CameraDirector } from '../camera/CameraDirector';
+import type { CameraDirector } from '@engine/camera';
 
 /**
  * Dependencies for PLAYING state

@@ -67,7 +67,7 @@ import { FeatureIntroduction } from './FeatureIntroduction';
 import type { PhysicsWorld } from '@engine/world/PhysicsWorld';
 import type { CharacterControllerSystem } from '@engine/stdlib/CharacterController';
 import { CharacterInputHandler } from '@engine/input';
-import { FPSCamera } from '../camera/FPSCamera';
+import { FPSCamera } from '@engine/camera';
 import { PauseMenu } from './PauseMenu';
 
 export interface EditorUIConfig {

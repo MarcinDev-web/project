@@ -37,6 +37,10 @@ export interface CameraDirectorConfig {
   canvas: HTMLCanvasElement;
   scene?: Scene;
   physicsWorld?: PhysicsWorld | null;
+  logger?: {
+    debug: (...args: unknown[]) => void;
+    warn: (...args: unknown[]) => void;
+  };
 }
 
 /**
@@ -68,6 +72,9 @@ export class CameraDirector {
   
   // Player position for FPS mode (injected from outside)
   private playerPosition: Vec3 | null = null;
+  
+  // Logger for debugging
+  private logger: CameraDirectorConfig['logger'];
 
   constructor(config: CameraDirectorConfig) {
     this.orbitControls = config.orbitControls;
@@ -75,6 +82,11 @@ export class CameraDirector {
     this.canvas = config.canvas;
     this.scene = config.scene ?? null;
     this.physicsWorld = config.physicsWorld ?? null;
+    
+    this.logger = config.logger ?? {
+      debug: console.debug,
+      warn: console.warn,
+    };
     
     this.viewMatrix = new Float32Array(16) as Mat4;
     this.projectionMatrix = new Float32Array(16) as Mat4;
@@ -91,7 +103,7 @@ export class CameraDirector {
       return;
     }
 
-    console.debug(`Camera mode: ${this.currentMode} → ${mode}`);
+    this.logger?.debug(`Camera mode: ${this.currentMode} → ${mode}`);
     this.currentMode = mode;
     this.blend = null;
     
@@ -108,14 +120,14 @@ export class CameraDirector {
 
     // Treat non-positive durations as an instant switch (no blend)
     if (duration <= 0) {
-      console.debug(`Camera instant switch: ${this.currentMode} → ${toMode}`);
+      this.logger?.debug(`Camera instant switch: ${this.currentMode} → ${toMode}`);
       this.currentMode = toMode;
       this.blend = null;
       this.updateCameraState();
       return;
     }
 
-    console.debug(`Camera blend: ${this.currentMode} → ${toMode} (${duration}s)`);
+    this.logger?.debug(`Camera blend: ${this.currentMode} → ${toMode} (${duration}s)`);
     
     // Capture current matrices for blending
     const fromView = new Float32Array(16) as Mat4;
@@ -315,7 +327,7 @@ export class CameraDirector {
       }
       
       default: {
-        console.warn(`Unknown camera mode: ${mode}`);
+        this.logger?.warn(`Unknown camera mode: ${mode}`);
         this.computeViewMatrix('orbit', outMatrix);
       }
     }

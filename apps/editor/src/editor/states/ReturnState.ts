@@ -3,7 +3,7 @@ import { PlayModeStateType as StateType } from '../core/PlayModeStateMachine';
 import { Logger } from '../../utils/logger';
 import type { WorldManager } from '../core/WorldManager';
 import type { InputContextManager } from '@engine/input';
-import type { CameraDirector } from '../camera/CameraDirector';
+import type { CameraDirector } from '@engine/camera';
 
 /**
  * Dependencies for RETURN state

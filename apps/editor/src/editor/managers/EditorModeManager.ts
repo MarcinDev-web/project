@@ -20,13 +20,12 @@ import type { Vec3 } from '@engine/core/math';
 import type { PhysicsWorld } from '@engine/world/PhysicsWorld';
 import { CharacterController } from '@engine/world/components/CharacterController';
 import { PhysicsComponent, RigidbodyType } from '@engine/world/components/PhysicsComponent';
-import type { OrbitControls } from '@engine/camera';
+import { CameraDirector } from '@engine/camera';
+import type { OrbitControls, FPSCamera } from '@engine/camera';
 import type { CharacterControllerSystem } from '@engine/stdlib/CharacterController';
 import type { CharacterInputHandler } from '@engine/input';
-import type { FPSCamera } from '../camera/FPSCamera';
 import { PlayModeStateMachine, PlayModeStateType } from '../core/PlayModeStateMachine';
 import { WorldManager } from '../core/WorldManager';
-import { CameraDirector } from '../camera/CameraDirector';
 import { InputContextManager, EditorInputContext } from '@engine/input';
 import { EditState } from '../states/EditState';
 import { PreflightState } from '../states/PreflightState';
@@ -101,6 +100,10 @@ export class EditorModeManager {
       canvas: config.canvas,
       scene: config.scene,
       physicsWorld: this.physicsWorld,
+      logger: {
+        debug: Logger.debug.bind(Logger),
+        warn: Logger.warn.bind(Logger),
+      },
     });
     this.inputContext = new InputContextManager(config.canvas);
     
