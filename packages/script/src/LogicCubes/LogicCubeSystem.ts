@@ -4,10 +4,10 @@
  */
 
 import type { Scene } from '@engine/world';
-import { LogicCubeComponent } from '@engine/world';
+import { LogicCubeComponent } from '../components/LogicCubeComponent';
 import { LogicConnectionManager } from '../connection/LogicConnectionManager';
 import { registerLogicConnectionManager } from '../connection/LogicConnectionRegistry';
-import { VariableStorage } from './VariableStorage';
+import { VariableStorage } from '../storage/VariableStorage';
 import { PlayerDetection } from './cubes/PlayerDetection';
 import type { LogicCube, LogicCubeConstructor } from './cubes/LogicCube';
 import type { LogicSignal, LogicExecutionContext } from './cubes/types';

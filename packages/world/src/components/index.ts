@@ -5,11 +5,11 @@ export * from './CharacterController';
 export * from './EnvironmentComponent';
 export * from './JointComponent';
 export * from './LightComponent';
-// export * from './LogicCubeComponent'; // Will uncomment after @engine/script built
+// LogicCubeComponent → @engine/script (moved in Phase 4)
 export * from './MaterialComponent';
 export * from './MeshComponent';
 export * from './PhysicsComponent';
 export * from './RuntimePlayerTag';
-// export * from './ScriptComponent'; // Will uncomment after @engine/script built
+// ScriptComponent → @engine/script (moved in Phase 4)
 export * from './registry';
 

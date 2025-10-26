@@ -12,10 +12,7 @@
   "exclude": [
     "__tests__",
     "dist",
-    "node_modules",
-    "src/LogicCubes/LogicCubeSystem.ts",
-    "src/runtime/ScriptSystem.ts",
-    "src/LogicCubes/cubes/ActionCubes.ts"
+    "node_modules"
   ],
   "references": [
     { "path": "../core" },

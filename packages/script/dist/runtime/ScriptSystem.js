@@ -1,3 +1,4 @@
+import { ScriptComponent } from '../components/ScriptComponent';
 import { SceneScriptContextBuilder } from '../services/SceneScriptContextBuilder';
 import { BehaviorRegistry } from '../behavior/BehaviorRegistry';
 import { CoroutineScheduler } from '../coroutine/CoroutineScheduler';

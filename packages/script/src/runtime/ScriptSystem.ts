@@ -1,5 +1,5 @@
 import type { Scene } from '@engine/world';
-// import { ScriptComponent } from '@engine/world'; // Circular - will add after build
+import { ScriptComponent } from '../components/ScriptComponent';
 import type { BehaviorInstance } from '../behavior/Behavior';
 import { SceneScriptContextBuilder } from '../services/SceneScriptContextBuilder';
 import { BehaviorRegistry } from '../behavior/BehaviorRegistry';

@@ -4,7 +4,7 @@
  */
 import type { Scene } from '@engine/world';
 import { LogicConnectionManager } from '../connection/LogicConnectionManager';
-import { VariableStorage } from './VariableStorage';
+import { VariableStorage } from '../storage/VariableStorage';
 import { PlayerDetection } from './cubes/PlayerDetection';
 import type { LogicCube, LogicCubeConstructor } from './cubes/LogicCube';
 import type { LogicSignal } from './cubes/types';

@@ -13,9 +13,7 @@
     "__tests__",
     "dist",
     "node_modules",
-    "src/components/AnimationComponent.ts",
-    "src/components/LogicCubeComponent.ts",
-    "src/components/ScriptComponent.ts"
+    "src/components/AnimationComponent.ts"
   ],
   "references": [
     { "path": "../core" }
