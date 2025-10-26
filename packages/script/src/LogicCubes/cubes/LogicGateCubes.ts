@@ -3,7 +3,7 @@
  */
 
 import { LogicCube } from './LogicCube';
-import type { LogicCubeMetadata, LogicSignal, LogicExecutionContext } from '../types';
+import type { LogicCubeMetadata, LogicSignal, LogicExecutionContext } from './types';
 
 /**
  * AND Gate - Outputs true when all inputs are triggered

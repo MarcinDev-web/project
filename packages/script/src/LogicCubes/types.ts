@@ -2,8 +2,11 @@ import type { BehaviorInstance } from '../behavior/Behavior';
 import type { CoroutineScheduler } from '../coroutine/CoroutineScheduler';
 import type { SceneScriptContextBuilder } from '../services/SceneScriptContextBuilder';
 import type { PhysicsWorld } from '@engine/world/physics';
-import type { AnimationSystem } from '@engine/core/script';
-import type { Renderer } from '@engine/core/script';
+// TODO: Uncomment in Phase 5 when @engine/stdlib exists
+// import type { AnimationSystem } from '@engine/stdlib/Animation';
+type AnimationSystem = any; // Temp placeholder
+// NOTE: Renderer placeholder
+type Renderer = any; // Temp placeholder
 
 export interface ScriptRuntime {
   scheduler: CoroutineScheduler;
@@ -13,5 +16,6 @@ export interface ScriptRuntime {
   physicsWorld?: PhysicsWorld | null;
   animationSystem?: AnimationSystem | null;
   renderingPipeline?: Renderer | null;
+  [key: string]: unknown; // Index signature for core compatibility
 }
 

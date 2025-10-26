@@ -3,7 +3,7 @@
  */
 
 import { LogicCube } from './LogicCube';
-import type { LogicCubeMetadata, LogicSignal, LogicExecutionContext } from '../types';
+import type { LogicCubeMetadata, LogicSignal, LogicExecutionContext } from './types';
 
 /**
  * Variable Data - Stores a variable

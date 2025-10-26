@@ -36,5 +36,14 @@ export declare class EventBus {
      * Check if event has subscribers.
      */
     hasSubscribers(event: string): boolean;
+    /**
+     * Alias for emit (compatibility with old EventBus API).
+     */
+    publish(event: {
+        type: string;
+        payload?: unknown;
+        sender?: unknown;
+        target?: unknown;
+    }): void;
 }
 //# sourceMappingURL=EventBus.d.ts.map

@@ -5,4 +5,4 @@ export * from './LogicCube';
 export * from './LogicGateCubes';
 export * from './PlayerDetection';
 export * from './TriggerCubes';
-export * from '../types';
+export * from './types';

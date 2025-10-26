@@ -3,7 +3,7 @@
  */
 
 import { LogicCube } from './LogicCube';
-import type { LogicCubeMetadata, LogicSignal, LogicExecutionContext } from '../types';
+import type { LogicCubeMetadata, LogicSignal } from './types';
 
 /**
  * CompareVariable Condition - Compares a variable to a value

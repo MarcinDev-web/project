@@ -64,7 +64,7 @@ export class SceneScriptContextBuilder {
 
   private getPhysicsFromScene(): PhysicsWorld | null {
     const runtime = this.scene.scriptRuntime;
-    return runtime?.physicsWorld ?? null;
+    return (runtime?.physicsWorld as PhysicsWorld) ?? null;
   }
 
   private getAnimationSystem(): AnimationSystem | null {

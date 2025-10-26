@@ -1,0 +1,12 @@
+* [33m1912315[m[33m ([m[1;36mHEAD[m[33m -> [m[1;32mmain[m[33m)[m refactor: Resolve circular dependency - Move script components to @engine/script
+* [33me19b9f6[m docs: Update IMPLEMENTATION_LOG.md - Phase 3 complete, Phase 4 WIP
+* [33mf7bf49f[m wip: Phase 4 - @engine/script structure created (50% complete)
+* [33md1bf174[m[33m ([m[1;33mtag: [m[1;33mphase-3-renderer[m[33m)[m feat: Complete Phase 3 - @engine/gfx-webgpu package
+* [33m646532e[m docs: Add IMPLEMENTATION_LOG.md - progress tracking
+* [33m54adcac[m wip: Phase 3 - @engine/gfx-webgpu structure created (30% complete)
+* [33m164f117[m[33m ([m[1;33mtag: [m[1;33mphase-2-world[m[33m)[m feat: Update imports to use @engine/world (Phase 2 continued)
+* [33mca04bc5[m feat: Create @engine/world package (Phase 2 - partial)
+* [33m67f0dc9[m feat: Complete Phase 1 - @engine/core with updated imports
+* [33m8626ef8[m feat: Create @engine/core package (Phase 1 - partial)
+* [33m9a5bd6b[m chore: Setup monorepo with pnpm workspaces (Phase 0)
+* [33m4a8e85b[m[33m ([m[1;32mchore-add-preact-vite-preset-7TTx6[m[33m, [m[1;32m2025-10-25-o5zh-9NPrM[m[33m, [m[1;32m2025-10-25-nrpc-7Omud[m[33m, [m[1;32m2025-10-25-mi5l-lLvRf[m[33m, [m[1;32m2025-10-25-atum-UWKVk[m[33m, [m[1;32m2025-10-25-4zhd-mgNu4[m[33m, [m[1;32m2025-10-24-umx2-OFhBd[m[33m, [m[1;32m2025-10-24-te39--vrML[m[33m, [m[1;32m2025-10-24-nr7r-eKI14[m[33m, [m[1;32m2025-10-24-ipfv-c7Q5O[m[33m, [m[1;32m2025-10-24-but5-Tr42S[m[33m, [m[1;32m2025-10-24-8ngb-yUk7v[m[33m, [m[1;32m2025-10-24-7tl6-GQdIX[m[33m, [m[1;32m2025-10-24-0qm7-Bw_Pu[m[33m)[m Initial commit

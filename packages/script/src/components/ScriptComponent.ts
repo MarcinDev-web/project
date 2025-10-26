@@ -88,8 +88,9 @@ export class ScriptComponent extends Component {
     }
     this.instances = [];
     const entity = this.entity;
-    if (scene && entity) {
-      scene.scriptRuntime?.contextBuilder.invalidate(entity.id);
+    const runtime = scene?.scriptRuntime;
+    if (scene && entity && runtime) {
+      (runtime.contextBuilder as any)?.invalidate?.(entity.id);
     }
   }
 
@@ -137,7 +138,7 @@ export class ScriptComponent extends Component {
     if (!ctor) return; // behavior not registered yet
 
     const runtime = scene.scriptRuntime;
-    const services = runtime?.contextBuilder.getServices(entity);
+    const services = (runtime?.contextBuilder as any).getServices(entity);
 
     // Lazy import: create instance with context
     const context: BehaviorContext = {
@@ -149,8 +150,8 @@ export class ScriptComponent extends Component {
     const instance = new ctor(context, def.params);
     instance.enabled = def.enabled ?? true;
     if (runtime) {
-      runtime.behaviors.add(instance);
-      runtime.scheduler.attachBehaviorInstance(instance);
+      (runtime.behaviors as any).add(instance);
+      (runtime.scheduler as any).attachBehaviorInstance(instance);
     }
     try {
       instance.onInit();
@@ -168,8 +169,8 @@ export class ScriptComponent extends Component {
       // ignore script destroy errors
     }
     const runtime = currentScene?.scriptRuntime;
-    runtime?.scheduler.detachBehaviorInstance(inst);
-    runtime?.behaviors.delete(inst);
+    (runtime?.scheduler as any)?.detachBehaviorInstance?.(inst);
+    (runtime?.behaviors as any)?.delete?.(inst);
   }
 }
 

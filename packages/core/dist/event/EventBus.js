@@ -79,5 +79,11 @@ export class EventBus {
         const set = this.subscribers.get(event);
         return set ? set.size > 0 : false;
     }
+    /**
+     * Alias for emit (compatibility with old EventBus API).
+     */
+    publish(event) {
+        this.emit(event.type, event);
+    }
 }
 //# sourceMappingURL=EventBus.js.map

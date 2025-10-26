@@ -3,9 +3,15 @@
  * Full implementation will be in @engine/script.
  */
 
-// Placeholder for ScriptRuntime (will be implemented in @engine/script)
+// ScriptRuntime interface (used by Scene)
+// Full implementation in @engine/script
 export interface ScriptRuntime {
-  // TODO: Define full API in @engine/script
+  scheduler?: unknown;
+  behaviors?: unknown;
+  contextBuilder?: unknown;
+  physicsWorld?: unknown;
+  animationSystem?: unknown;
+  renderer?: unknown;
   [key: string]: unknown;
 }
 

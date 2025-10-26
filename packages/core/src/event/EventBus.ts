@@ -89,5 +89,12 @@ export class EventBus {
     const set = this.subscribers.get(event);
     return set ? set.size > 0 : false;
   }
+
+  /**
+   * Alias for emit (compatibility with old EventBus API).
+   */
+  publish(event: { type: string; payload?: unknown; sender?: unknown; target?: unknown }): void {
+    this.emit(event.type, event);
+  }
 }
 

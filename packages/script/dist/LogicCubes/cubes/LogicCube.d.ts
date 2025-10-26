@@ -4,7 +4,7 @@
  */
 import type { Entity } from '@engine/world';
 import type { Scene } from '@engine/world';
-import type { LogicPort, LogicSignal, LogicExecutionContext, LogicCubeMetadata } from '../types';
+import type { LogicPort, LogicSignal, LogicExecutionContext, LogicCubeMetadata } from './types';
 /**
  * Abstract base class for logic cubes
  */

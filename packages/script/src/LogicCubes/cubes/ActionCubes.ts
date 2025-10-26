@@ -3,7 +3,7 @@
  */
 
 import { LogicCube } from './LogicCube';
-import type { LogicCubeMetadata, LogicSignal } from '../types';
+import type { LogicCubeMetadata, LogicSignal } from './types';
 import { Logger } from '@engine/core/utils';
 
 /**

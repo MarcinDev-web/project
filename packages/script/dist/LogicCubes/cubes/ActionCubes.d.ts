@@ -2,7 +2,7 @@
  * Action Cubes - Perform actions when triggered
  */
 import { LogicCube } from './LogicCube';
-import type { LogicCubeMetadata, LogicSignal } from '../types';
+import type { LogicCubeMetadata, LogicSignal } from './types';
 /**
  * SendMessage Action - Sends a message via event bus
  */

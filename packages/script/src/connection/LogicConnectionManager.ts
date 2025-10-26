@@ -3,7 +3,7 @@
  */
 
 import type { EntityId } from '@engine/world';
-import type { LogicConnection, LogicSignal } from '../LogicCubes/cubes/types';
+import type { LogicConnection } from '../LogicCubes/cubes/types';
 
 let nextConnectionId = 0;
 

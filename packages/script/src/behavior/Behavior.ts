@@ -125,7 +125,7 @@ export class BehaviorInstance {
     if (!runtime) {
       throw new Error('CoroutineScheduler not available: ScriptSystem not initialized for scene');
     }
-    return runtime.scheduler;
+    return runtime.scheduler as CoroutineScheduler;
   }
 }
 

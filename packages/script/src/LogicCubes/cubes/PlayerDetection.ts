@@ -44,7 +44,7 @@ export class PlayerDetection {
     // Search by common player names
     const playerNames = ['Player', 'player', 'MainPlayer', 'Character'];
     for (const name of playerNames) {
-      const found = this.scene.findEntityByName(name);
+      const found = this.scene.findEntitiesByName(name)[0]; // Changed to findEntitiesByName
       if (found) {
         this.playerEntity = found;
         return found;

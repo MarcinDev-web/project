@@ -64,8 +64,9 @@ export class ScriptComponent extends Component {
         }
         this.instances = [];
         const entity = this.entity;
-        if (scene && entity) {
-            scene.scriptRuntime?.contextBuilder.invalidate(entity.id);
+        const runtime = scene?.scriptRuntime;
+        if (scene && entity && runtime) {
+            runtime.contextBuilder?.invalidate?.(entity.id);
         }
     }
     toJSON() {
@@ -112,7 +113,7 @@ export class ScriptComponent extends Component {
         if (!ctor)
             return; // behavior not registered yet
         const runtime = scene.scriptRuntime;
-        const services = runtime?.contextBuilder.getServices(entity);
+        const services = (runtime?.contextBuilder).getServices(entity);
         // Lazy import: create instance with context
         const context = {
             entity,
@@ -143,8 +144,8 @@ export class ScriptComponent extends Component {
             // ignore script destroy errors
         }
         const runtime = currentScene?.scriptRuntime;
-        runtime?.scheduler.detachBehaviorInstance(inst);
-        runtime?.behaviors.delete(inst);
+        runtime?.scheduler?.detachBehaviorInstance?.(inst);
+        runtime?.behaviors?.delete?.(inst);
     }
 }
 registerComponent(ScriptComponent.type, ScriptComponent);
