@@ -11,14 +11,15 @@ Modularny silnik 3D oparty na WebGPU z profesjonalnym edytorem scen. Architektur
 ```
 ugc-3d-platform/
 ├── packages/           # Pakiety silnika (@engine/*)
-│   ├── core/          # Fundament (math, ECS types, event, job)
+│   ├── core/          # Fundament (math, ECS types, event, job, utils)
 │   ├── world/         # ECS runtime + fizyka
 │   ├── gfx-webgpu/    # Renderer WebGPU
 │   ├── assets/        # Zarządzanie assetami
 │   ├── script/        # Skryptowanie UGC (LogicCubes)
 │   ├── input/         # Input management
 │   ├── camera/        # Systemy kamer
-│   └── stdlib/        # Biblioteka standardowa
+│   ├── stdlib/        # Biblioteka standardowa
+│   └── editor-utils/  # Narzędzia edytorskie (NEW)
 ├── apps/              # Aplikacje
 │   └── editor/        # Edytor scen 3D
 └── docs/              # Dokumentacja
@@ -34,7 +35,13 @@ ugc-3d-platform/
 - ECS types (EntityId, Component, System) - typy bazowe
 - EventBus - pub/sub messaging
 - JobSystem - scheduler zadań async
-- Utils (UUID, BitFlags, Logger)
+- Utils (UUID, BitFlags, Logger, DisposableGroup)
+
+**Utils:**
+- `DisposableGroup` - universal resource cleanup pattern (Oct 2025)
+- `UUID` - unique identifier generation
+- `BitFlags` - bit manipulation utilities
+- `Logger` - logging utilities
 
 **Bez zależności zewnętrznych**
 
@@ -135,6 +142,30 @@ ugc-3d-platform/
 
 **Cyclic dependency z world** - dozwolone, oba pakiety się kompilują
 
+### @engine/editor-utils
+**Narzędzia edytorskie** - reużywalne utilities dla edytorów (NEW - Oct 2025)
+
+**Eksportuje:**
+- HistoryManager - system undo/redo z scene snapshots
+- HistoryHelpers - entity path computation, serialization
+- SnapSystem - grid snapping (position, rotation, scale)
+- SnapConfig - konfiguracja snappingu, presety (FINE/NORMAL/COARSE)
+
+**Zależności:** `@engine/core`, `@engine/world`
+
+**Przeznaczenie:**
+- Reużywalne narzędzia edytorskie (nie UI)
+- Mogą być używane w różnych edytorach/toolach
+- Logika bez zależności od DOM/UI
+
+**Przykład użycia:**
+```typescript
+import { HistoryManager, SnapSystem } from '@engine/editor-utils';
+
+const history = new HistoryManager(100);
+const snap = new SnapSystem({ increment: 0.5 });
+```
+
 ## Aplikacje
 
 ### @apps/editor
@@ -231,6 +262,71 @@ pnpm dev
 # Testy pakietu
 pnpm test
 ```
+
+## Organizacja Pakietów (Package Guidelines)
+
+### Zasady alokacji kodu
+
+**Kod należy do `packages/` gdy:**
+- Jest reużywalny poza editorem
+- Nie ma zależności od editor-specific UI
+- Implementuje logikę biznesową/core functionality
+- Może być używany w innych aplikacjach (playground, viewer, etc.)
+
+**Kod należy do `apps/editor/` gdy:**
+- Jest ściśle związany z editor UI
+- Zarządza editor-specific state
+- Implementuje workflows/UX edytora
+- Ma zależności od DOM/browser APIs specyficzne dla edytora
+
+### Import Policy
+
+✅ **Zawsze:**
+```typescript
+import { Something } from '@engine/package-name';
+```
+
+❌ **Nigdy:**
+```typescript
+import { Something } from '../../../packages/package-name/src/...';
+```
+
+### Szczegółowe guidelines
+Zobacz [PACKAGE_GUIDELINES.md](./PACKAGE_GUIDELINES.md) dla decision tree, examples, i anti-patterns.
+
+---
+
+## Niedawny Refactoring (Oct 2025)
+
+### Code Duplication Elimination
+
+Przeprowadzono major refactoring eliminujący duplikację kodu między `apps/editor` a `packages/`:
+
+**Faza 1:** Camera & Asset Loaders
+- Usunięto duplikaty: CameraDirector, FPSCamera, AssetImporter, GltfOptimizer
+- Impact: -805 linii
+
+**Faza 2:** AssetRegistry & AssetTypes Unification
+- AssetRegistry: 689 → 38 linii (thin wrapper)
+- AssetTypes: usunięty z editora
+- Impact: -1018 linii
+
+**Faza 3:** Utilities Migration
+- Utworzono `@engine/editor-utils` package
+- DisposableGroup → `@engine/core/utils`
+- HistoryManager, SnapSystem → `@engine/editor-utils`
+- Impact: ~850 linii moved to packages
+
+**Rezultaty:**
+- -1823 linie duplikatów wyeliminowane
+- +1 nowy pakiet (@engine/editor-utils)
+- -10.35 kB bundle size
+- 100% import consistency
+- 0 breaking changes
+
+**Szczegóły:** Zobacz [REFACTORING_COMPLETE.md](./REFACTORING_COMPLETE.md)
+
+---
 
 ## Szczegóły Techniczne
 

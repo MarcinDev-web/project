@@ -13,14 +13,15 @@ This project follows a **modular monorepo architecture** with clear separation b
 ```
 ugc-3d-platform/
 ├── packages/           # Engine modules (@engine/*)
-│   ├── core/          # Foundation (math, ECS, event, job)
+│   ├── core/          # Foundation (math, ECS, event, job, utils)
 │   ├── world/         # ECS runtime (entities, components, systems)
 │   ├── gfx-webgpu/    # WebGPU renderer
 │   ├── assets/        # Asset loading & streaming
 │   ├── script/        # UGC scripting (LogicCubes)
 │   ├── input/         # Input management
 │   ├── camera/        # Camera systems
-│   └── stdlib/        # Standard library (animation, audio, character)
+│   ├── stdlib/        # Standard library (animation, audio, character)
+│   └── editor-utils/  # Editor tools (history, snap) [NEW]
 ├── apps/              # Applications
 │   ├── editor/        # Professional 3D scene editor
 │   └── playground/    # Demo/sandbox (future)
@@ -83,6 +84,12 @@ ugc-3d-platform/
 - Audio system
 - Character controller
 - Player session management
+
+### @engine/editor-utils
+**Editor utilities** - Reusable tools for building editors (NEW - Oct 2025)
+- History manager (undo/redo system)
+- Snap system (grid snapping)
+- Entity path helpers
 
 ## 🎨 Applications
 
@@ -156,30 +163,179 @@ pnpm dev
 
 ## 🧪 Testing
 
-The project has comprehensive test coverage:
+The project has comprehensive test automation with CI/CD, pre-commit hooks, coverage tracking, and reusable test utilities.
+
+### Quick Start
 
 ```bash
-# Run all tests
-pnpm test
+# Setup test environment (first time)
+.\scripts\setup-tests.ps1  # Windows
+# or
+pnpm install && pnpm prepare  # Linux/Mac
 
-# Run tests in specific packages
-pnpm --filter @engine/core test
-pnpm --filter @engine/assets test
+# Watch mode (recommended for development)
+pnpm test:watch
 
-# Run editor tests
-pnpm --filter @apps/editor test
+# Run only changed tests (fast!)
+pnpm test:changed
+
+# Full coverage report
+pnpm test:coverage
+open coverage/index.html
 ```
+
+### Test Automation Features
+
+✅ **CI/CD Pipeline** - GitHub Actions with test sharding (4 parallel jobs)  
+✅ **Pre-commit Hooks** - Automatic linting & testing before commit  
+✅ **Coverage Tracking** - Codecov integration with PR comments (60% threshold)  
+✅ **Test Utilities** - Reusable mocks, fixtures, assertions (`@engine/test-utils`)  
+✅ **Snapshot Testing** - Serialization stability verification  
+✅ **VSCode Integration** - Debug configs, tasks, test explorer  
+
+### Available Commands
+
+```bash
+# Development
+pnpm test:watch         # Watch mode with instant feedback (1-3s)
+pnpm test:changed       # Only changed files (2-5s)
+pnpm test:unit:fast     # Quick run without coverage (~8s)
+pnpm test:ui            # Visual test runner
+
+# Coverage
+pnpm test:coverage      # Full coverage report
+pnpm test:unit:coverage # Unit tests only
+
+# CI/Debugging
+pnpm test:ci            # Optimized for CI
+pnpm test:affected      # Bail on first failure
+pnpm test              # All tests (unit + integration)
+```
+
+### Using Test Utilities
+
+```typescript
+import { 
+  createMockCanvas,
+  entityFixtures,
+  expectVec3ToBeCloseTo,
+  waitFor 
+} from '@engine/test-utils';
+
+test('example', async () => {
+  const canvas = createMockCanvas(800, 600);
+  const entity = entityFixtures.withTransform();
+  
+  await waitFor(() => entity.isReady, 5000);
+  expectVec3ToBeCloseTo(entity.position, [1, 2, 3]);
+});
+```
+
+### Documentation
+
+- **Quick Start**: [QUICK_START_TESTING.md](QUICK_START_TESTING.md)
+- **Full Guide**: [docs/TESTING_AUTOMATION.md](docs/TESTING_AUTOMATION.md)
+- **Commands Cheatsheet**: [TEST_COMMANDS_CHEATSHEET.md](TEST_COMMANDS_CHEATSHEET.md)
+- **Test Utils API**: [packages/test-utils/README.md](packages/test-utils/README.md)
+- **Philosophy**: [docs/TESTING.md](docs/TESTING.md)
+
+## 📦 Package Organization
+
+**Monorepo Structure:**
+- **packages/** (@engine/*) - Shared, reusable code
+- **apps/** - Applications (editor, playground)
+
+**Key Rules:**
+- ✅ Reusable logic → `packages/`
+- ✅ App UI/UX → `apps/`
+- ✅ Always import: `@engine/package-name`
+- ❌ Never duplicate package code in apps
+
+**See:** [PACKAGE_GUIDELINES.md](docs/PACKAGE_GUIDELINES.md) for decision tree and examples.
+
+**Recent:** Oct 2025 refactoring eliminated 6 major duplicates (-1823 lines), created `@engine/editor-utils` package, and achieved 100% import consistency.
 
 ## 📖 Documentation
 
 Detailed documentation available in the `docs/` directory:
 
 - [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture
-- [MIGRATION_PLAN.md](docs/MIGRATION_PLAN.md) - Migration to modular architecture
-- [MODULE_SPECIFICATIONS.md](docs/MODULE_SPECIFICATIONS.md) - Package specifications
+- [**PACKAGE_GUIDELINES.md**](docs/PACKAGE_GUIDELINES.md) - **Where code belongs (Must Read)**
+- [CODE_REVIEW_CHECKLIST.md](docs/CODE_REVIEW_CHECKLIST.md) - PR review checklist
+- [TEAM_ONBOARDING.md](docs/TEAM_ONBOARDING.md) - New developer guide
 - [TESTING.md](docs/TESTING.md) - Testing philosophy and guidelines
 - [PERFORMANCE_PHILOSOPHY.md](docs/PERFORMANCE_PHILOSOPHY.md) - Performance guidelines
-- [**🔴 EDITOR-PACKAGES ANALYSIS**](docs/editor-analysis/README.md) - **Critical: Code duplication issues**
+- [REFACTORING_COMPLETE.md](docs/REFACTORING_COMPLETE.md) - Recent refactoring (Oct 2025)
+
+## Quick Start
+
+```bash
+# Install dependencies
+pnpm install
+
+# Setup test environment (first time)
+.\scripts\setup-tests.ps1  # Windows
+# or
+pnpm install && pnpm prepare  # Linux/Mac
+
+# Development
+pnpm dev
+
+# Testing
+pnpm test:watch  # Watch mode (recommended)
+pnpm test:changed  # Only changed files
+pnpm test:coverage  # With coverage report
+```
+
+## Testing
+
+**Quick Start**: [QUICK_START_TESTING.md](QUICK_START_TESTING.md)
+
+**Full Guide**: [docs/TESTING_AUTOMATION.md](docs/TESTING_AUTOMATION.md)
+
+**Commands**: [TEST_COMMANDS_CHEATSHEET.md](TEST_COMMANDS_CHEATSHEET.md)
+
+### Test Automation Features
+
+✅ **CI/CD Pipeline** - GitHub Actions with test sharding  
+✅ **Pre-commit Hooks** - Automatic linting & testing  
+✅ **Coverage Tracking** - Codecov integration with PR comments  
+✅ **Test Utilities** - Reusable mocks, fixtures, assertions (@engine/test-utils)  
+✅ **Snapshot Testing** - Serialization stability  
+✅ **VSCode Integration** - Debug configs, tasks, test explorer  
+
+## Documentation
+
+- [Testing Automation](docs/TESTING_AUTOMATION.md) - Full testing guide
+- [Architecture](docs/ARCHITECTURE.md) - System architecture
+- [Testing Philosophy](docs/TESTING.md) - Testing principles
+- [Quick Fix Guide](docs/QUICK_FIX_GUIDE.md) - Common issues
+
+## Development
+
+```bash
+# Watch mode with live test feedback
+pnpm test:watch  # Terminal 1
+pnpm dev         # Terminal 2
+
+# Before commit (automatic via pre-commit hook)
+pnpm test:changed
+
+# Coverage report
+pnpm test:coverage
+open coverage/index.html
+```
+
+## CI/CD
+
+- **Automatic testing** on every PR/push
+- **Test sharding** (4 parallel jobs) for faster CI
+- **Coverage reports** with PR comments
+- **Build artifacts** preserved for 7 days
+
+See [TEST_AUTOMATION_IMPROVEMENTS.md](TEST_AUTOMATION_IMPROVEMENTS.md) for details.
+
+README.md) - **Critical: Code duplication issues**
 
 ## 🎯 Key Features
 
