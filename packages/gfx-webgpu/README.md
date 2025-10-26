@@ -44,7 +44,18 @@ function render() {
 
 ## Status
 
-🚧 **W budowie** - Placeholder dla przyszłej migracji
+✅ **Zmigrowany** - Faza 3 zakończona (26.10.2025)
+
+## Features
+
+- 57 plików źródłowych
+- ~8,000 linii kodu
+- 224 dist files (największy pakiet!)
+- PBR rendering pipeline
+- Cascaded shadow maps
+- Post-processing (Bloom, Tonemap, LUT)
+- Material system z texture atlas
+- 14 internal test files
 
 Zobacz: [MIGRATION_PLAN.md](../../docs/MIGRATION_PLAN.md)
 
