@@ -12,9 +12,7 @@
 import type { Scene, Entity } from '@engine/world';
 import type { SelectionManager } from '@engine/world';
 import type { EditorState } from '../core/state';
-import type { AssetPreset, AssetMainCategory, AssetCategory } from '../assets/AssetTypes';
-import type { Asset, AssetVariant } from '../assets/AssetTypes';
-import type { RgbaColor } from '../../utils/colors';
+import type { AssetPreset, AssetMainCategory, AssetCategory, Asset, AssetVariant, RgbaColor } from '@engine/assets';
 import { OutlinerPanel } from './OutlinerPanel';
 import { PropertiesPanel } from './PropertiesPanel';
 import { LogicPanel } from './LogicPanel';

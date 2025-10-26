@@ -27,6 +27,14 @@ export interface RegisterBlockAssetOptions {
   origin?: 'custom' | 'session';
 }
 
+export interface AssetRegistryConfig {
+  logger?: {
+    debug: (msg: string, ...args: unknown[]) => void;
+    warn: (msg: string, ...args: unknown[]) => void;
+    error: (msg: string, error?: Error) => void;
+  };
+}
+
 export class AssetRegistry {
   private assets = new Map<string, Asset>();
   private collections = new Map<string, AssetCollection>();
@@ -38,6 +46,21 @@ export class AssetRegistry {
   private typeCacheMap = new Map<AssetType, Asset[]>();
   private readonly CACHE_TTL = 5000; // 5 seconds cache
   private lastModified = Date.now();
+  
+  // Logger
+  private logger: {
+    debug: (msg: string, ...args: unknown[]) => void;
+    warn: (msg: string, ...args: unknown[]) => void;
+    error: (msg: string, error?: Error) => void;
+  };
+  
+  constructor(config?: AssetRegistryConfig) {
+    this.logger = config?.logger ?? {
+      debug: console.debug.bind(console),
+      warn: console.warn.bind(console),
+      error: (msg: string, error?: Error) => console.error(msg, error),
+    };
+  }
 
 
   /**
@@ -45,7 +68,7 @@ export class AssetRegistry {
    */
   public async initialize(): Promise<void> {
     if (this.initialized) {
-      console.warn('AssetRegistry already initialized');
+      this.logger?.warn('AssetRegistry already initialized');
       return;
     }
 
@@ -56,7 +79,7 @@ export class AssetRegistry {
     await this.loadCustomAssets();
 
     this.initialized = true;
-    console.debug(`AssetRegistry initialized with ${this.assets.size} assets`);
+    this.logger?.debug(`AssetRegistry initialized with ${this.assets.size} assets`);
   }
 
   /**
@@ -70,18 +93,18 @@ export class AssetRegistry {
 
     // Check for duplicates
     if (this.assets.has(asset.metadata.id)) {
-      console.warn(`Asset with id ${asset.metadata.id} already exists, overwriting`);
+      this.logger?.warn(`Asset with id ${asset.metadata.id} already exists, overwriting`);
     }
 
     this.assets.set(asset.metadata.id, asset);
     this.invalidateCache();
-    console.debug(`Registered asset: ${asset.metadata.name} (${asset.metadata.id})`);
+    this.logger?.debug(`Registered asset: ${asset.metadata.name} (${asset.metadata.id})`);
   }
 
   /**
    * Register a custom block definition as an asset
    */
-  public registerBlockAsset(block: BlockDefinition & { id: string; name: string; category: string; material: string; textures: { top: { color: [number, number, number, number] } } }, options?: RegisterBlockAssetOptions): Asset {
+  public registerBlockAsset(block: BlockDefinition, options?: RegisterBlockAssetOptions): Asset {
     const existing = this.assets.get(block.id);
     const asset: Asset = {
       type: 'block',
@@ -99,7 +122,7 @@ export class AssetRegistry {
       material: this.mapBlockMaterial(block.material),
       color: block.textures.top.color,
       scale: [1, 1, 1],
-      blockData: block as unknown as BlockDefinition,
+      blockData: block,
       isPlaceable: true,
       isEditable: true,
       tags: ['block', block.category, block.material],
@@ -237,7 +260,7 @@ export class AssetRegistry {
     const deleted = this.assets.delete(id);
     if (deleted) {
       this.invalidateCache();
-      console.debug(`Removed asset: ${id}`);
+      this.logger?.debug(`Removed asset: ${id}`);
     }
     return deleted;
   }
@@ -248,7 +271,7 @@ export class AssetRegistry {
   public update(id: string, updates: Partial<Asset>): boolean {
     const asset = this.assets.get(id);
     if (!asset) {
-      console.warn(`Cannot update asset ${id}: not found`);
+      this.logger?.warn(`Cannot update asset ${id}: not found`);
       return false;
     }
 
@@ -257,13 +280,13 @@ export class AssetRegistry {
 
     // Validate
     if (!this.validateAsset(updated)) {
-      console.error('Updated asset failed validation');
+      this.logger?.error('Updated asset failed validation');
       return false;
     }
 
     this.assets.set(id, updated);
     this.invalidateCache();
-    console.debug(`Updated asset: ${id}`);
+    this.logger?.debug(`Updated asset: ${id}`);
     return true;
   }
 
@@ -276,7 +299,7 @@ export class AssetRegistry {
    */
   public registerCollection(collection: AssetCollection): void {
     this.collections.set(collection.id, collection);
-    console.debug(`Registered collection: ${collection.name}`);
+    this.logger?.debug(`Registered collection: ${collection.name}`);
   }
 
   /**
@@ -320,9 +343,9 @@ export class AssetRegistry {
     try {
       const data = JSON.stringify(customAssets);
       localStorage.setItem('customAssets', data);
-      console.debug(`Saved ${customAssets.length} custom assets`);
+      this.logger?.debug(`Saved ${customAssets.length} custom assets`);
     } catch (error) {
-      console.error('Failed to save custom assets:', error);
+      this.logger?.error('Failed to save custom assets:', error as Error);
     }
   }
 
@@ -346,9 +369,9 @@ export class AssetRegistry {
         this.register(asset);
       });
 
-      console.debug(`Loaded ${assets.length} custom assets`);
+      this.logger?.debug(`Loaded ${assets.length} custom assets`);
     } catch (error) {
-      console.error('Failed to load custom assets:', error);
+      this.logger?.error('Failed to load custom assets:', error as Error);
     }
   }
 
@@ -379,14 +402,14 @@ export class AssetRegistry {
           this.register(asset);
           imported++;
         } catch (error) {
-          console.warn(`Failed to import asset ${asset.metadata.name}:`, error);
+          this.logger?.warn(`Failed to import asset ${asset.metadata.name}:`, error);
         }
       }
 
-      console.debug(`Imported ${imported}/${assets.length} assets`);
+      this.logger?.debug(`Imported ${imported}/${assets.length} assets`);
       return imported;
     } catch (error) {
-      console.error('Failed to import assets:', error);
+      this.logger?.error('Failed to import assets:', error as Error);
       return 0;
     }
   }
@@ -401,7 +424,7 @@ export class AssetRegistry {
   private async loadBuiltInAssets(): Promise<void> {
     // This will be populated by the AssetLibrary conversion
     // For now, just a placeholder
-    console.debug('Loading built-in assets...');
+    this.logger?.debug('Loading built-in assets...');
   }
 
   /**
@@ -410,22 +433,22 @@ export class AssetRegistry {
   private validateAsset(asset: Asset): boolean {
     // Basic validation
     if (!asset.metadata?.id || !asset.metadata?.name) {
-      console.error('Asset missing required metadata');
+      this.logger?.error('Asset missing required metadata');
       return false;
     }
 
     if (!asset.type || !asset.category) {
-      console.error('Asset missing type or category');
+      this.logger?.error('Asset missing type or category');
       return false;
     }
 
     if (!asset.scale || asset.scale.length !== 3) {
-      console.error('Asset has invalid scale');
+      this.logger?.error('Asset has invalid scale');
       return false;
     }
 
     if (!asset.color || asset.color.length !== 4) {
-      console.error('Asset has invalid color');
+      this.logger?.error('Asset has invalid color');
       return false;
     }
 

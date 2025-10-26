@@ -8,7 +8,7 @@
  * - Persistence
  */
 
-import type { Asset } from '../assets/AssetTypes';
+import type { Asset } from '@engine/assets';
 import { storageLoad, storageSave } from '../../utils/storage';
 import { Logger } from '../../utils/logger';
 

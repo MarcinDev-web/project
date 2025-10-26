@@ -31,7 +31,7 @@ export interface QuickMenuConfig {
 export class QuickMenu {
   private container: HTMLElement | null = null;
   private activeMenu: HTMLElement | null = null;
-  private searchInput: HTMLInputElement | null = null;
+  // private searchInput: HTMLInputElement | null = null; // REMOVED - searchbar disabled
   private btnUndo: HTMLButtonElement | null = null;
   private btnRedo: HTMLButtonElement | null = null;
   private saveStatusEl: HTMLSpanElement | null = null;
@@ -55,9 +55,9 @@ export class QuickMenu {
     const left = this.createLeftSection();
     root.appendChild(left);
 
-    // Center: search
-    const center = this.createCenterSection();
-    root.appendChild(center);
+    // Center: search - REMOVED for cleaner UI
+    // const center = this.createCenterSection();
+    // root.appendChild(center);
 
     // New: Transform tools section
     const transformTools = this.createTransformToolsSection();
@@ -78,11 +78,11 @@ export class QuickMenu {
     });
 
     document.addEventListener('keydown', (e) => {
-      // Ctrl+K focus search
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        this.searchInput?.focus();
-      }
+      // Ctrl+K focus search - REMOVED (searchbar disabled)
+      // if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      //   e.preventDefault();
+      //   this.searchInput?.focus();
+      // }
       // Escape closes dropdowns
       if (e.key === 'Escape') {
         this.closeAllMenus();
@@ -139,29 +139,30 @@ export class QuickMenu {
     return left;
   }
 
-  private createCenterSection(): HTMLElement {
-    const center = document.createElement('div');
-    center.className = 'top-bar-center';
+  // REMOVED - Searchbar disabled for cleaner UI
+  // private createCenterSection(): HTMLElement {
+  //   const center = document.createElement('div');
+  //   center.className = 'top-bar-center';
 
-    const search = document.createElement('div');
-    search.className = 'top-bar-search';
+  //   const search = document.createElement('div');
+  //   search.className = 'top-bar-search';
 
-    const searchIcon = createIcon('search', 14);
-    searchIcon.classList.add('top-bar-search-icon');
-    const input = document.createElement('input');
-    input.type = 'search';
-    input.className = 'top-bar-search-input';
-    input.placeholder = 'Search entities... (Ctrl+K)';
-    input.addEventListener('input', () => {
-      this.config.onSearch?.(input.value);
-    });
+  //   const searchIcon = createIcon('search', 14);
+  //   searchIcon.classList.add('top-bar-search-icon');
+  //   const input = document.createElement('input');
+  //   input.type = 'search';
+  //   input.className = 'top-bar-search-input';
+  //   input.placeholder = 'Search entities... (Ctrl+K)';
+  //   input.addEventListener('input', () => {
+  //     this.config.onSearch?.(input.value);
+  //   });
 
-    search.appendChild(searchIcon);
-    search.appendChild(input);
-    center.appendChild(search);
-    this.searchInput = input;
-    return center;
-  }
+  //   search.appendChild(searchIcon);
+  //   search.appendChild(input);
+  //   center.appendChild(search);
+  //   this.searchInput = input;
+  //   return center;
+  // }
 
   private createTransformToolsSection(): HTMLElement {
     const section = document.createElement('div');
@@ -539,7 +540,7 @@ export class QuickMenu {
     }
     this.container = null;
     this.activeMenu = null;
-    this.searchInput = null;
+    // this.searchInput = null; // REMOVED - searchbar disabled
     this.btnUndo = null;
     this.btnRedo = null;
     this.saveStatusEl = null;

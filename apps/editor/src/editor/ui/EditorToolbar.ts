@@ -67,7 +67,7 @@ export class EditorToolbar {
   private historyLimitInput: HTMLInputElement | null = null;
   private saveStatusEl: HTMLSpanElement | null = null;
   private breadcrumbsEl: HTMLElement | null = null;
-  private searchInput: HTMLInputElement | null = null;
+  // private searchInput: HTMLInputElement | null = null; // Removed - searchbar disabled
   private activeMenu: HTMLElement | null = null;
   private shortcutsModal: KeyboardShortcutsModal | null = null;
 
@@ -128,9 +128,9 @@ export class EditorToolbar {
     const menuBar = this.createMenuBar();
     row.appendChild(menuBar);
 
-    // Search bar
-    const search = this.createSearchBar();
-    row.appendChild(search);
+    // Search bar - removed for cleaner UI
+    // const search = this.createSearchBar();
+    // row.appendChild(search);
 
     // Actions section (right-aligned)
     const actions = this.createQuickActions();
@@ -401,38 +401,39 @@ export class EditorToolbar {
 
   /**
    * Creates search bar
+   * REMOVED - Searchbar disabled for cleaner UI
    */
-  private createSearchBar(): HTMLElement {
-    const container = document.createElement('div');
-    container.className = 'toolbar-v2-search';
+  // private createSearchBar(): HTMLElement {
+  //   const container = document.createElement('div');
+  //   container.className = 'toolbar-v2-search';
 
-    const searchIcon = createIcon('search', 16);
-    searchIcon.setAttribute('class', 'toolbar-v2-search-icon');
-    
-    this.searchInput = document.createElement('input');
-    this.searchInput.type = 'search';
-    this.searchInput.className = 'toolbar-v2-search-input';
-    this.searchInput.placeholder = 'Search entities... (Ctrl+K)';
+  //   const searchIcon = createIcon('search', 16);
+  //   searchIcon.setAttribute('class', 'toolbar-v2-search-icon');
+  //   
+  //   this.searchInput = document.createElement('input');
+  //   this.searchInput.type = 'search';
+  //   this.searchInput.className = 'toolbar-v2-search-input';
+  //   this.searchInput.placeholder = 'Search entities... (Ctrl+K)';
 
-    this.searchInput.addEventListener('input', () => {
-      if (this.config.onSearch) {
-        this.config.onSearch(this.searchInput!.value);
-      }
-    });
+  //   this.searchInput.addEventListener('input', () => {
+  //     if (this.config.onSearch) {
+  //       this.config.onSearch(this.searchInput!.value);
+  //     }
+  //   });
 
-    // Focus on Ctrl+K
-    document.addEventListener('keydown', (e) => {
-      if (e.ctrlKey && e.key === 'k') {
-        e.preventDefault();
-        this.searchInput?.focus();
-      }
-    });
+  //   // Focus on Ctrl+K
+  //   document.addEventListener('keydown', (e) => {
+  //     if (e.ctrlKey && e.key === 'k') {
+  //       e.preventDefault();
+  //       this.searchInput?.focus();
+  //     }
+  //   });
 
-    container.appendChild(searchIcon);
-    container.appendChild(this.searchInput);
+  //   container.appendChild(searchIcon);
+  //   container.appendChild(this.searchInput);
 
-    return container;
-  }
+  //   return container;
+  // }
 
   /**
    * Creates quick actions section
@@ -1022,7 +1023,7 @@ export class EditorToolbar {
     this.btnRedo = null;
     this.saveStatusEl = null;
     this.breadcrumbsEl = null;
-    this.searchInput = null;
+    // this.searchInput = null; // Removed - searchbar disabled
     this.activeMenu = null;
   }
 }

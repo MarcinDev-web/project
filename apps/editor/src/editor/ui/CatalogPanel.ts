@@ -10,7 +10,7 @@
  */
 
 import type { Asset, AssetVariant, AssetMainCategory, AssetFilter } from '@engine/assets';
-import { assetRegistry } from '../assets/AssetRegistry';
+import { assetRegistry } from '@engine/assets';
 import { createIcon } from '../utils/icons';
 import { FavoritesManager } from '../managers/FavoritesManager';
 import { RecentAssetsTracker } from '@engine/assets';

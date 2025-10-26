@@ -16,8 +16,10 @@ import type { Vec3 } from '@engine/core/math';
 // RgbaColor type - RGBA color values [r, g, b, a] in range [0, 1]
 export type RgbaColor = [number, number, number, number];
 
-// BlockDefinition type placeholder - will be imported from @engine/gfx-webgpu
-export type BlockDefinition = unknown;
+// BlockDefinition placeholder - applications should import the real type from @engine/gfx-webgpu
+// This prevents circular dependency between assets and gfx-webgpu packages
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export type BlockDefinition = any;
 
 // ============================================================================
 // CORE ASSET TYPES

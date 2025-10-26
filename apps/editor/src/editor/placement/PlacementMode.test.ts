@@ -4,7 +4,7 @@ import { Scene } from '@engine/world';
 import { Entity } from '@engine/world';
 import { SnapSystem } from '../snap/SnapSystem';
 import { CollisionDetector } from './CollisionDetector';
-import type { AssetPreset } from '../assets/AssetTypes';
+import type { AssetPreset } from '@engine/assets';
 import type { Vec3 } from '@engine/world';
 import { MaterialComponent } from '@engine/world/components/MaterialComponent';
 

@@ -25,8 +25,8 @@ import type {
   AssetSortBy,
   AssetVariant,
   AssetCollection,
-} from './AssetTypes';
-import { assetRegistry } from './AssetRegistry';
+} from '@engine/assets';
+import { assetRegistry } from '@engine/assets';
 import { Logger } from '../../utils/logger';
 import { createIcon } from '../utils/icons';
 import { ThumbnailRenderer } from '@engine/gfx-webgpu/renderers/ThumbnailRenderer';
