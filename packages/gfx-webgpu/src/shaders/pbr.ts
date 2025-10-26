@@ -99,17 +99,18 @@ fn sampleShadowPCF(uv: vec2<f32>, zRef: f32, kernel: i32, texelSize: vec2<f32>) 
   var count = 0.0;
   let k = max(kernel, 1);
   let r = k / 2;
-  // Use fixed loop bounds for uniform control flow
+  // Use fixed loop bounds for uniform control flow - required by WebGPU
   const MAX_KERNEL = 9;
   let halfMax = MAX_KERNEL / 2;
   for (var y = -halfMax; y <= halfMax; y++) {
     for (var x = -halfMax; x <= halfMax; x++) {
-      // Only sample within the actual kernel radius
-      if (x >= -r && x < k - r && y >= -r && y < k - r) {
-        let off = vec2<f32>(f32(x), f32(y)) * texelSize;
-        sum += textureSampleCompare(shadowAtlas, shadowSamplerCmp, uv + off, zRef);
-        count += 1.0;
-      }
+      let off = vec2<f32>(f32(x), f32(y)) * texelSize;
+      // Always sample to maintain uniform control flow
+      let shadowValue = textureSampleCompare(shadowAtlas, shadowSamplerCmp, uv + off, zRef);
+      // Use weight to include/exclude samples based on kernel radius
+      let inKernel = f32(x >= -r && x < k - r && y >= -r && y < k - r);
+      sum += shadowValue * inKernel;
+      count += inKernel;
     }
   }
   return sum / max(count, 1.0);
