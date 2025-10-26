@@ -1,13 +1,13 @@
 import { Component } from './Component';
 import { registerComponent } from './registry';
-import { AnimationClip } from '../../animation/AnimationClip';
-import { AnimationController } from '../../animation/AnimationController';
+import { AnimationClip } from '@engine/stdlib/Animation';
+import { AnimationController } from '@engine/stdlib/Animation';
 import {
   AnimationStateMachine,
   type AnimationStateConfig,
   type AnimationTransitionConfig,
-} from '../../animation/AnimationStateMachine';
-import { Skeleton, type PoseBone } from '../../animation/Skeleton';
+} from '@engine/stdlib/Animation';
+import { Skeleton, type PoseBone } from '@engine/stdlib/Animation';
 import type {
   AnimationComponentJSON,
   AnimationControllerJSON,
@@ -15,7 +15,7 @@ import type {
   AnimationStateJSON,
   AnimationTransitionJSON,
   AnimationParameters,
-} from '../../animation/types';
+} from '@engine/stdlib/Animation';
 
 export class AnimationComponent extends Component {
   static readonly type = 'Animation';

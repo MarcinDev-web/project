@@ -9,7 +9,7 @@ import {
   type WaitForSeconds,
 } from './CoroutineScheduler';
 import type { PhysicsWorld } from '../physics/PhysicsWorld';
-import type { AnimationSystem } from '../animation/AnimationSystem';
+import type { AnimationSystem } from '@engine/stdlib/Animation';
 import type { Renderer } from '../rendering/core/Renderer';
 
 export interface BehaviorContext {

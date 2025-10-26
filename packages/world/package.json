@@ -19,6 +19,7 @@
   },
   "dependencies": {
     "@engine/core": "workspace:*",
+    "@engine/stdlib": "workspace:*",
     "gl-matrix": "^3.4.4"
   },
   "devDependencies": {

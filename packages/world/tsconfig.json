@@ -12,11 +12,12 @@
   "exclude": [
     "__tests__",
     "dist",
-    "node_modules",
-    "src/components/AnimationComponent.ts"
+    "node_modules"
   ],
   "references": [
-    { "path": "../core" }
+    { "path": "../core" },
+    { "path": "../stdlib" },
+    { "path": "../script" }
   ]
 }
 

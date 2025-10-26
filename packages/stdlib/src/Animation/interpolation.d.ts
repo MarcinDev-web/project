@@ -1,0 +1,3 @@
+import type { AnimationEasing, AnimationInterpolation, AnimationTrackType, AnimationValue } from './types';
+export declare function interpolate(valueType: AnimationTrackType, a: AnimationValue, b: AnimationValue, t: number, interpolation: AnimationInterpolation, easing?: AnimationEasing, tangentA?: AnimationValue, tangentB?: AnimationValue): AnimationValue;
+//# sourceMappingURL=interpolation.d.ts.map
