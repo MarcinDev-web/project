@@ -1,18 +1,18 @@
 # @engine/camera
 
-**Camera Systems** - Orbit, FPS, TPS cameras.
+**Camera Systems** - Orbit camera, FPS camera, camera director with smooth transitions.
 
 ## Zawartość
 
-- **CameraDirector** - Unified camera director
-- **OrbitCamera** - Editor orbit camera
-- **FPSCamera** - First-person camera
-- **TPSCamera** - Third-person camera
+- **OrbitCamera** - Orbit-style mouse controls (class-based)
+- **FPSCamera** - First-person camera with pointer lock
+- **CameraDirector** - Manages camera modes and smooth transitions
+- **createOrbitControls** - Factory function (backward compatibility)
 
 ## Zależności
 
-- `@engine/core`
-- `@engine/world`
+- `@engine/core` (math)
+- `@engine/world` (Scene, PhysicsWorld)
 
 ## Instalacja
 
@@ -22,28 +22,106 @@ pnpm add @engine/camera
 
 ## Użycie
 
+### Orbit Camera
+
 ```typescript
-import { CameraDirector, OrbitCamera, FPSCamera } from '@engine/camera';
+import { OrbitCamera, createOrbitControls } from '@engine/camera';
 
-const orbitCam = new OrbitCamera(Vec3.zero(), 10);
-const fpsCam = new FPSCamera(Vec3.create(0, 1.6, 0));
+const canvas = document.querySelector('canvas');
 
-const director = new CameraDirector(orbitCam);
+// Class-based
+const orbitCamera = new OrbitCamera(canvas, {
+  initialDistance: 5,
+  minDistance: 1,
+  maxDistance: 20,
+});
 
-// Switch to FPS
-director.blendTo(fpsCam, 0.5); // 0.5s blend
+const state = orbitCamera.getState();
+// state: { yaw, pitch, distance }
 
-// Update
-function update(dt: number) {
-  director.update(dt);
-  const viewMatrix = director.getViewMatrix();
-  renderer.render(world, viewMatrix);
-}
+orbitCamera.setEnabled(false); // Disable when UI is focused
+orbitCamera.cleanup(); // Cleanup
+
+// Or use factory function (backward compatibility)
+const controls = createOrbitControls(canvas);
+```
+
+### FPS Camera
+
+```typescript
+import { FPSCamera } from '@engine/camera';
+
+const fpsCamera = new FPSCamera(canvas, {
+  eyeHeight: 1.6,
+  sensitivity: 0.0025,
+  pitchLimit: Math.PI / 2 - 0.05,
+});
+
+// Enable pointer lock
+fpsCamera.enable();
+
+// Get view matrix
+const viewMatrix = fpsCamera.getViewMatrix(playerPosition);
+
+// Get direction vectors
+const forward = fpsCamera.getForwardDirection();
+const right = fpsCamera.getRightDirection();
+```
+
+### Camera Director
+
+```typescript
+import { CameraDirector } from '@engine/camera';
+import { createOrbitControls } from '@engine/camera';
+
+const orbitControls = createOrbitControls(canvas);
+const fpsCamera = new FPSCamera(canvas);
+
+const director = new CameraDirector({
+  orbitControls,
+  fpsCamera,
+  canvas,
+  scene,
+  physicsWorld,
+});
+
+// Switch modes
+director.setMode('orbit');
+director.setMode('fps');
+
+// Blend between modes
+director.startBlend('fps', 0.5); // Blend to FPS over 0.5s
+
+// Update (in game loop)
+director.update(deltaTime);
+
+// Get matrices
+const viewMatrix = director.getViewMatrix();
+const projectionMatrix = director.getProjectionMatrix();
 ```
 
 ## Status
 
-🚧 **W budowie** - Placeholder dla przyszłej migracji
+✅ **Zmigrowany** - Faza 6 zakończona (26.10.2025)
+
+## Testy
+
+Pakiet jest testowany przez @engine/input (input.test.ts testuje OrbitCamera)
+
+```bash
+pnpm test
+```
+
+## Struktura
+
+```
+packages/camera/
+├── src/
+│   ├── OrbitCamera.ts (refactored from src/input.ts)
+│   ├── FPSCamera.ts
+│   ├── CameraDirector.ts
+│   └── index.ts
+└── __tests__/ (tested via @engine/input)
+```
 
 Zobacz: [MIGRATION_PLAN.md](../../docs/MIGRATION_PLAN.md)
-

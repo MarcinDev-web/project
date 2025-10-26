@@ -1,4 +1,4 @@
-import { createOrbitControls, type OrbitControls } from './input';
+import { createOrbitControls, type OrbitControls } from '@engine/camera';
 import { initRenderer, type Renderer } from './rendering/index';
 import { Scene, Raycaster, SelectionManager } from '@engine/world';
 import { mat4LookAt, mat4Multiply, mat4Perspective, type Mat4, type Vec3 } from '@engine/core/math';

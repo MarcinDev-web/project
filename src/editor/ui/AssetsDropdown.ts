@@ -10,7 +10,7 @@
 
 import type { Scene } from '../../engine/scene';
 import type { EditorState } from '../core/state';
-import type { Asset, AssetVariant } from '../assets/AssetTypes';
+import type { Asset, AssetVariant } from '@engine/assets';
 import { AssetBrowserV2 } from '../assets/AssetBrowser';
 import { createIcon } from '../utils/icons';
 

@@ -9,11 +9,11 @@
  * - Drag support for adding to hotbar
  */
 
-import type { Asset, AssetVariant, AssetMainCategory, AssetFilter } from '../assets/AssetTypes';
+import type { Asset, AssetVariant, AssetMainCategory, AssetFilter } from '@engine/assets';
 import { assetRegistry } from '../assets/AssetRegistry';
 import { createIcon } from '../utils/icons';
 import { FavoritesManager } from '../managers/FavoritesManager';
-import { RecentAssetsTracker } from '../managers/RecentAssetsTracker';
+import { RecentAssetsTracker } from '@engine/assets';
 import { Logger } from '../../app/utils/logger';
 
 export interface CatalogPanelConfig {

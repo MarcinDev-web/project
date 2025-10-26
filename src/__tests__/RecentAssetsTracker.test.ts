@@ -3,8 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { RecentAssetsTracker } from '../editor/managers/RecentAssetsTracker';
-import type { Asset } from '../editor/assets/AssetTypes';
+import { RecentAssetsTracker, type Asset } from '@engine/assets';
 
 describe('RecentAssetsTracker', () => {
   let tracker: RecentAssetsTracker;

@@ -7,7 +7,7 @@ import { PlacementMode } from '../editor/placement/PlacementMode';
 import { CollisionDetector } from '../editor/placement/CollisionDetector';
 import { SnapSystem } from '../editor/snap/SnapSystem';
 import { EditorState } from '../editor/core/state';
-import type { OrbitControls } from '../input';
+import type { OrbitControls } from '@engine/camera';
 import { mat4Invert, mat4GetRotation, mat4GetScale } from '@engine/core/math';
 
 function createMockControls(): OrbitControls {

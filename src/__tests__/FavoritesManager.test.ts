@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { FavoritesManager } from '../editor/managers/FavoritesManager';
-import type { Asset } from '../editor/assets/AssetTypes';
+import type { Asset } from '@engine/assets';
 
 describe('FavoritesManager', () => {
   let manager: FavoritesManager;

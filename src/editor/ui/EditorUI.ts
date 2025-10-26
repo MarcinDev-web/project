@@ -16,13 +16,13 @@
  * - DisposableGroup - Resource cleanup
  */
 
-import type { OrbitControls } from '../../input';
+import type { OrbitControls } from '@engine/camera';
 import type { Renderer } from '../../rendering/index';
 import { Entity, Scene } from '../../engine/scene';
 import type { SelectionManager } from '../../scene/Selection';
 import { MaterialComponent } from '../../scene/components/MaterialComponent';
 import type { Vec3 } from '@engine/core/math';
-import type { AssetPreset } from '../assets/AssetTypes';
+import type { AssetPreset } from '@engine/assets';
 import { initializeBaseColor } from '../visuals/SelectionVisuals';
 import { persistCamera, restoreCamera, persistLastPlacementPreset, restoreLastPlacementPreset, persistUIPreferences, restoreUIPreferences, persistWorkflowPreset, restoreWorkflowPreset } from '../core/EditorPersistence';
 import { storageLoad, storageSave } from '../../utils/storage';
@@ -66,7 +66,7 @@ import { AdaptiveUIManager } from './AdaptiveUIManager';
 import { FeatureIntroduction } from './FeatureIntroduction';
 import type { PhysicsWorld } from '../../physics/PhysicsWorld';
 import type { CharacterControllerSystem } from '../../scene/CharacterControllerSystem';
-import { CharacterInputHandler } from '../../input/CharacterInput';
+import { CharacterInputHandler } from '@engine/input';
 import { FPSCamera } from '../camera/FPSCamera';
 import { PauseMenu } from './PauseMenu';
 

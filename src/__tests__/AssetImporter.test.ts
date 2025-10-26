@@ -1,6 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
 import { Scene } from '@engine/world';
-import { AssetImporter } from '../editor/assets/AssetImporter';
+import { AssetImporter } from '@engine/assets';
 
 function makeFile(name: string, content: string): File {
   return new File([content], name, { type: 'model/gltf+json' });

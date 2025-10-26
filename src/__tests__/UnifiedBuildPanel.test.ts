@@ -9,8 +9,7 @@ import { EditorState } from '../editor/core/state';
 import { PlacementMode } from '../editor/placement/PlacementMode';
 import { SnapSystem } from '../editor/snap/SnapSystem';
 import { CollisionDetector } from '../editor/placement/CollisionDetector';
-import { assetRegistry } from '../editor/assets/AssetRegistry';
-import type { Asset } from '../editor/assets/AssetTypes';
+import { assetRegistry, type Asset } from '@engine/assets';
 
 describe('UnifiedBuildPanel', () => {
   let scene: Scene;

@@ -9,7 +9,7 @@
  * - Keyboard shortcuts (1-9, Ctrl+K for search)
  */
 
-import type { Asset, AssetVariant } from '../assets/AssetTypes';
+import type { Asset, AssetVariant } from '@engine/assets';
 import type { Scene } from '../../engine/scene';
 import type { EditorState } from '../core/state';
 import type { InventoryManager } from '../managers/InventoryManager';

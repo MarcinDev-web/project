@@ -2,9 +2,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { EditorUI } from '../editor/ui/EditorUI';
 import { SelectionManager } from '@engine/world';
 import { Scene } from '@engine/world';
-import type { OrbitControls } from '../input';
-import { initializeAssetLibrary } from '../editor/assets/AssetLibrary';
-import { assetRegistry } from '../editor/assets/AssetRegistry';
+import type { OrbitControls } from '@engine/camera';
+import { initializeAssetLibrary, assetRegistry } from '@engine/assets';
 
 function createMockControls(): OrbitControls {
   let state = { yaw: 0, pitch: 0, distance: 3 };

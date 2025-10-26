@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { InventoryManager } from '../editor/managers/InventoryManager';
-import type { Asset } from '../editor/assets/AssetTypes';
+import type { Asset } from '@engine/assets';
 
 // Mock asset
 const createMockAsset = (id: string, name: string): Asset => ({

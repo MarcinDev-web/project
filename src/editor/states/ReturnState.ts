@@ -2,7 +2,7 @@ import type { IPlayModeState, PlayModeContext, PlayModeStateType } from '../core
 import { PlayModeStateType as StateType } from '../core/PlayModeStateMachine';
 import { Logger } from '../../app/utils/logger';
 import type { WorldManager } from '../core/WorldManager';
-import type { InputContextManager } from '../../input/InputContext';
+import type { InputContextManager } from '@engine/input';
 import type { CameraDirector } from '../camera/CameraDirector';
 
 /**

@@ -2,8 +2,8 @@ import type { IPlayModeState, PlayModeContext, PlayModeStateType } from '../core
 import { PlayModeStateType as StateType } from '../core/PlayModeStateMachine';
 import { Logger } from '../../app/utils/logger';
 import type { CameraDirector } from '../camera/CameraDirector';
-import type { InputContextManager } from '../../input/InputContext';
-import { GameplayInputContext } from '../../input/InputContext';
+import type { InputContextManager } from '@engine/input';
+import { GameplayInputContext } from '@engine/input';
 import type { Entity } from '../../scene/Entity';
 import type { Vec3 } from '@engine/core/math';
 import type { PlayManifest } from '../core/PlayManifest';

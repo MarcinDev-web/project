@@ -12,7 +12,7 @@
  * Extracted from EditorUI to reduce complexity and improve maintainability.
  */
 
-import type { OrbitControls } from '../../input';
+import type { OrbitControls } from '@engine/camera';
 import type { Scene, Entity } from '../../engine/scene';
 import type { SelectionManager } from '../../scene/Selection';
 import type { EditorState } from '../core/state';

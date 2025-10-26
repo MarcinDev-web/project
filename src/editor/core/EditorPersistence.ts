@@ -1,4 +1,4 @@
-import type { OrbitControls } from '../../input';
+import type { OrbitControls } from '@engine/camera';
 import { storageLoad, storageSave } from '../../utils/storage';
 import type { EditorState } from './state';
 

@@ -8,8 +8,7 @@
  * - Auto-deduplicate (move to front)
  */
 
-import type { Asset } from '../assets/AssetTypes';
-import { Logger } from '../../app/utils/logger';
+import type { Asset } from './AssetTypes';
 
 interface RecentAssetEntry {
   assetId: string;
@@ -137,7 +136,7 @@ export class RecentAssetsTracker {
       const data = JSON.stringify(this.recent);
       localStorage.setItem(this.storageKey, data);
     } catch (error) {
-      Logger.error('Failed to save recent assets:', error as Error);
+      console.error('Failed to save recent assets:', error);
     }
   }
 
@@ -151,7 +150,7 @@ export class RecentAssetsTracker {
         this.recent = JSON.parse(data) as RecentAssetEntry[];
       }
     } catch (error) {
-      Logger.error('Failed to load recent assets:', error as Error);
+      console.error('Failed to load recent assets:', error);
       this.recent = [];
     }
   }
@@ -165,7 +164,7 @@ export class RecentAssetsTracker {
       try {
         listener(recentIds);
       } catch (error) {
-        Logger.error('Error in recent assets listener:', error as Error);
+        console.error('Error in recent assets listener:', error);
       }
     });
   }

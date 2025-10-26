@@ -4,7 +4,7 @@ import { Scene } from '@engine/world';
 import { SelectionManager } from '@engine/world';
 import { EditorState } from '../editor/core/state';
 import type { PlacementMode } from '../editor/placement/PlacementMode';
-import type { OrbitControls } from '../input';
+import type { OrbitControls } from '@engine/camera';
 import { Entity } from '@engine/world';
 
 function createMockCanvas(): HTMLCanvasElement {

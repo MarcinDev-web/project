@@ -10,7 +10,7 @@
  * - Alt+Click to copy properties
  */
 
-import type { OrbitControls } from '../../input';
+import type { OrbitControls } from '@engine/camera';
 import type { Scene } from '../../engine/scene';
 import type { SelectionManager } from '../../scene/Selection';
 import type { EditorState, EasyPlacePattern } from '../core/state';

@@ -3,8 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { AssetRegistry } from '../editor/assets/AssetRegistry';
-import type { Asset } from '../editor/assets/AssetTypes';
+import { AssetRegistry, type Asset } from '@engine/assets';
 
 describe('AssetRegistry', () => {
   let registry: AssetRegistry;

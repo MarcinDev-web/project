@@ -1,5 +1,3 @@
-import { Logger } from '../app/utils/logger';
-
 /**
  * Input context types
  */
@@ -58,7 +56,7 @@ export class InputContextManager {
    * Push a new context onto the stack
    */
   push(config: InputContextConfig): void {
-    Logger.debug(`Pushing input context: ${config.type}`);
+    console.debug(`Pushing input context: ${config.type}`);
     
     // Handle pointer lock for new context
     if (config.requiresPointerLock && !this.pointerLocked) {
@@ -73,12 +71,12 @@ export class InputContextManager {
    */
   pop(): InputContextConfig | null {
     if (this.contextStack.length === 0) {
-      Logger.warn('Cannot pop: context stack is empty');
+      console.warn('Cannot pop: context stack is empty');
       return null;
     }
 
     const popped = this.contextStack.pop()!;
-    Logger.debug(`Popped input context: ${popped.type}`);
+    console.debug(`Popped input context: ${popped.type}`);
     
     // Handle pointer lock after pop
     const topContext = this.getActiveContext();
@@ -110,7 +108,7 @@ export class InputContextManager {
    * Clear all contexts
    */
   clear(): void {
-    Logger.debug('Clearing input context stack');
+    console.debug('Clearing input context stack');
     
     if (this.pointerLocked) {
       this.releasePointerLock();
@@ -185,10 +183,10 @@ export class InputContextManager {
       if (typeof requestPointerLock === 'function') {
         requestPointerLock.call(this.canvas);
       } else {
-        Logger.debug('Pointer lock not available on canvas element');
+        console.debug('Pointer lock not available on canvas element');
       }
     } catch (error) {
-      Logger.warn('Failed to request pointer lock:', error as Error);
+      console.warn('Failed to request pointer lock:', error);
     }
   }
 
@@ -208,10 +206,10 @@ export class InputContextManager {
       if (typeof exitPointerLock === 'function') {
         exitPointerLock.call(document);
       } else {
-        Logger.debug('Pointer lock release not available');
+        console.debug('Pointer lock release not available');
       }
     } catch (error) {
-      Logger.warn('Failed to release pointer lock:', error as Error);
+      console.warn('Failed to release pointer lock:', error);
     }
   }
 
@@ -285,7 +283,7 @@ export class InputContextManager {
     
     if (locked !== this.pointerLocked) {
       this.pointerLocked = locked;
-      Logger.debug(`Pointer lock ${locked ? 'acquired' : 'released'}`);
+      console.debug(`Pointer lock ${locked ? 'acquired' : 'released'}`);
     }
   };
 }

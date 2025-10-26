@@ -1,6 +1,20 @@
 import type { Vec3 } from '@engine/core/math';
 import type { CharacterInput } from '@engine/world';
-import type { InputBindings } from '../editor/core/PlayManifest';
+
+// Placeholder interface for InputBindings (will be properly defined when editor is migrated)
+export interface InputBindings {
+  movement: {
+    forward: string[];
+    backward: string[];
+    left: string[];
+    right: string[];
+  };
+  actions: {
+    jump: string[];
+    sprint: string[];
+    interact: string[];
+  };
+}
 
 /**
  * Keyboard input handler for character controller
@@ -223,6 +237,8 @@ export class CharacterGamepadHandler {
       moveDirection: [x, 0, -y], // Invert Y for forward/backward
       sprint,
       jump,
+      cameraForward: [0, 0, -1],
+      cameraRight: [1, 0, 0],
     };
   }
 

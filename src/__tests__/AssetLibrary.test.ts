@@ -8,7 +8,7 @@ import {
   getAllBuiltInAssets,
   getAllCollections,
   ASSET_COLLECTIONS,
-} from '../editor/assets/AssetLibrary';
+} from '@engine/assets';
 
 describe('AssetLibrary', () => {
   describe('Block Conversion', () => {

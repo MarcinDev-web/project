@@ -16,13 +16,13 @@
 
 import type { Scene } from '../../engine/scene';
 import type { EditorState } from '../core/state';
-import type { Asset, AssetMainCategory, AssetVariant, AssetSortBy } from '../assets/AssetTypes';
+import type { Asset, AssetMainCategory, AssetVariant, AssetSortBy } from '@engine/assets';
 import { assetRegistry } from '../assets/AssetRegistry';
 import { createIcon, iconHTML } from '../utils/icons';
 import type { IconName } from '../utils/icons';
 import type { InventoryManager } from '../managers/InventoryManager';
 import { FavoritesManager } from '../managers/FavoritesManager';
-import { RecentAssetsTracker } from '../managers/RecentAssetsTracker';
+import { RecentAssetsTracker } from '@engine/assets';
 
 export interface AssetPaletteConfig {
   scene: Scene;

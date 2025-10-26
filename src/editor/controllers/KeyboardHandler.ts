@@ -1,4 +1,4 @@
-import type { OrbitControls } from '../../input';
+import type { OrbitControls } from '@engine/camera';
 import type { Scene } from '../../scene/Scene';
 import type { SelectionManager } from '../../scene/Selection';
 import type { EditorState } from '../core/state';

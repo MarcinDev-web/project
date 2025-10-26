@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EditorUI } from '../editor/ui/EditorUI';
 import { SelectionManager } from '@engine/world';
 import { Scene } from '@engine/world';
-import type { OrbitControls } from '../input';
+import type { OrbitControls } from '@engine/camera';
 import { quatFromAxisAngle } from '@engine/core/math';
 
 // Mock heavy UI modules to keep test minimal

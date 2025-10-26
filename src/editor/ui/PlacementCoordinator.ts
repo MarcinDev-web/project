@@ -5,7 +5,7 @@
  * preventing conflicts when assets are selected from multiple sources.
  */
 
-import type { Asset, AssetVariant, AssetPreset } from '../assets/AssetTypes';
+import type { Asset, AssetVariant, AssetPreset } from '@engine/assets';
 import type { PlacementMode } from '../placement/PlacementMode';
 import { Logger } from '../../app/utils/logger';
 
