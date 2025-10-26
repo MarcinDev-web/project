@@ -9,7 +9,7 @@
  */
 import type { RgbaColor } from '../utils/colors';
 import type { CTMConfig } from '../textures/ConnectedTextures';
-export type BlockCategory = 'basic' | 'natural' | 'decorative' | 'mechanical' | 'glass' | 'light';
+export type BlockCategory = 'basic' | 'natural' | 'gameplay';
 export type BlockMaterialType = 'solid' | 'glass' | 'metal' | 'wood' | 'stone' | 'plastic' | 'emissive';
 export interface BlockFaceTexture {
     /** Base color for this face */
@@ -68,6 +68,7 @@ export interface BlockDefinition {
 }
 /**
  * Built-in block library with Kogama/Roblox/Minecraft inspired blocks
+ * Reduced to 10 essential blocks across 3 categories
  */
 export declare const BLOCK_LIBRARY: Record<string, BlockDefinition>;
 /**

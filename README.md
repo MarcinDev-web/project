@@ -1,187 +1,256 @@
-# 🎨 3D Scene Editor - Professional Edition
+# UGC 3D Platform
 
-A **production-grade 3D scene editor** built with WebGPU, featuring professional UI/UX, comprehensive tooling, and modern architecture.
+**Modular WebGPU/TypeScript game engine** for UGC platforms with professional scene editor.
 
-## ⭐ **NEW: Complete Professional Redesign!**
+## 🎯 Overview
 
-**World-class editor transformation** - From code to design, everything elevated to professional standards:
+A production-grade 3D engine built from the ground up with modern web technologies, featuring a complete modular architecture, comprehensive testing, and a professional editor.
 
-✨ **Modern UI/UX** - Glassmorphism, smooth animations, professional aesthetics  
-🏗️ **Clean Architecture** - Modular, tested, documented  
-🎯 **Icon System** - 40+ professional SVG icons  
-♿ **Accessible** - WCAG 2.1 AA compliant  
-🧪 **358 Tests** - 100% passing  
-📖 **2650+ Lines Docs** - Complete documentation  
+## 🏗️ Architecture
 
-**Transformation complete!** [Read the full story →](TESTING.md)
+This project follows a **modular monorepo architecture** with clear separation between engine packages and applications.
 
-## 🎉 Nowość: Minecraft-Style Block Placement! (Fazy 1-3 UKOŃCZONE)
-
-Pełny system budowania w stylu Minecrafta z snap-to-grid, wizualizacją siatki 3D i placement mode!
-
-**Faza 1 - SnapSystem (✅ UKOŃCZONA):**
-- ✅ Snap podczas przesuwania, obracania i skalowania
-- ✅ Konfigurowalne rozmiary (0.25 - 10 jednostek)
-- ✅ Per-axis snapping (X, Y, Z osobno)
-- ✅ 37 testów jednostkowych (100% pass)
-
-**Faza 2 - GridRenderer (✅ UKOŃCZONA):**
-- ✅ Wizualizacja siatki 3D w WebGPU
-- ✅ Major/minor lines + origin highlight
-- ✅ Reaktywna synchronizacja z konfiguracją
-- ✅ 25 testów jednostkowych (100% pass)
-
-**Faza 3 - PlacementMode + Collision (✅ UKOŃCZONA):**
-- ✅ Ghost preview z collision detection (green/red)
-- ✅ AABB collision system
-- ✅ Real-time raycasting do ground plane
-- ✅ Rotation controls (Q/E)
-- ✅ History integration (undo/redo)
-- ✅ 63 testy jednostkowe (100% pass)
-
-**Keyboard shortcuts:**
-- `X` - Włącz/wyłącz snap
-- `[` / `]` - Zmień rozmiar siatki + snap
-- `G` - Pokaż/ukryj siatkę 3D
-- `Q` / `E` - Obróć preview (placement mode)
-- `Enter` - Potwierdź umieszczenie
-- `Esc` - Anuluj umieszczanie
-
-**Jak używać:**
-1. Kliknij na asset w AssetBrowser
-2. Ghost preview pojawi się na kursorem
-3. Q/E - Obróć, Enter - Potwierdź, Esc - Anuluj
-4. Green = OK, Red = Kolizja!
-
-📖 Przewodnik użycia: w przygotowaniu (linki do `docs/` usunięte, brak katalogu w repo)
-
-**Total: 307/307 testy ✅ (100% pass rate)**
-
----
-
-## 🎨 Texture Atlas System (NEW!)
-
-**Performance Optimization** - Massive reduction in GPU bind calls!
-
-```typescript
-// Before: 100 materials = 200 bind calls
-// After:  100 materials = 2 bind calls (100x reduction!)
-
-const { atlasTexture, textureBindGroup, atlas } = createTextureAtlas(device);
-atlas.addMaterial(woodMaterial);
-atlas.addMaterial(metalMaterial);
-// ... up to 112 materials in single 2048x2048 atlas
+```
+ugc-3d-platform/
+├── packages/           # Engine modules (@engine/*)
+│   ├── core/          # Foundation (math, ECS, event, job)
+│   ├── world/         # ECS runtime (entities, components, systems)
+│   ├── gfx-webgpu/    # WebGPU renderer
+│   ├── assets/        # Asset loading & streaming
+│   ├── script/        # UGC scripting (LogicCubes)
+│   ├── input/         # Input management
+│   ├── camera/        # Camera systems
+│   └── stdlib/        # Standard library (animation, audio, character)
+├── apps/              # Applications
+│   ├── editor/        # Professional 3D scene editor
+│   └── playground/    # Demo/sandbox (future)
+└── docs/              # Documentation
 ```
 
-**Features:**
-- ✅ Packs multiple materials into single atlas texture
-- ✅ 100x reduction in bind calls (200 → 2 for 100 materials)
-- ✅ Better GPU cache locality
-- ✅ Supports up to 112 materials per atlas
-- ✅ Automatic UV offset calculation
-- ✅ 23 unit tests (100% pass)
+## 📦 Engine Packages
 
-📖 Kompletny przewodnik/migracja: w przygotowaniu (linki do `docs/` usunięte)
+### @engine/core
+**Foundation layer** - Core utilities, math, ECS types, event system, job scheduler
+- High-performance 3D math (Vec3, Mat4, Quat, AABB, Ray)
+- ECS base types and interfaces
+- Event bus for pub/sub messaging
+- Job system for async task scheduling
 
----
+### @engine/world
+**ECS runtime** - Entity-component-system, scene graph, physics
+- Complete ECS implementation
+- Scene management and serialization
+- Physics simulation (collision detection, rigid bodies, joints)
+- Components: Transform, Mesh, Material, Light, Camera, Physics, etc.
 
-## Features
+### @engine/gfx-webgpu
+**WebGPU renderer** - Modern GPU-accelerated graphics
+- Forward+ rendering pipeline
+- PBR materials with texture support
+- Shadow mapping (cascaded + point light shadows)
+- Post-processing effects (bloom, tone mapping)
+- Texture atlas system (100x bind call reduction)
 
-- **WebGPU Rendering**: Utilizes the latest WebGPU API for high-performance 3D graphics
-- **Orbit Camera Controls**: Interactive camera controls with mouse/touch support
-- **TypeScript**: Fully typed codebase for better development experience
-- **Modern Build System**: Powered by Vite for fast development and optimized builds
-- **Comprehensive Testing**: Unit tests with Vitest
+### @engine/assets
+**Asset management** - Loading, caching, and streaming
+- GLTF/GLB model loading
+- Texture management
+- Asset registry and library system
+- Recent assets tracking
 
-## Architecture
+### @engine/script
+**UGC scripting** - Visual scripting with LogicCubes
+- LogicCube system (triggers, actions, conditions, data, gates)
+- Behavior system
+- Coroutine scheduler
+- Logic connections and variable storage
 
-Struktura architektury została uproszczona; aktualny kod znajduje się w `src/rendering/core`, `src/rendering/resources`, `src/rendering/shaders`.
+### @engine/input
+**Input management** - Keyboard, mouse, gamepad
+- Input context system
+- Character input handling
+- Configurable bindings
 
-## Prerequisites
+### @engine/camera
+**Camera systems** - Orbit, FPS, and director
+- Orbit camera for editor
+- FPS camera for play mode
+- Camera director for mode switching
 
-Before running this project, ensure you have:
+### @engine/stdlib
+**Standard library** - Common gameplay systems
+- Animation system with state machines
+- Audio system
+- Character controller
+- Player session management
 
-- **Node.js** (version 16 or higher recommended)
-- **npm** (comes with Node.js)
+## 🎨 Applications
+
+### Editor (@apps/editor)
+Professional 3D scene editor with:
+- ✨ Modern glassmorphic UI with smooth animations
+- 🏗️ Block placement system (Minecraft-style)
+- 🎯 Snap-to-grid with visual 3D grid
+- 🎮 Play mode with FPS controls
+- 📝 Undo/redo history
+- 🔧 Logic cubes visual scripting
+- 🎬 Animation editor
+- 💡 Lighting and environment settings
+- 📦 Asset browser and management
+
+## 🚀 Getting Started
+
+### Prerequisites
+
+- **Node.js** 18+ (with npm)
+- **pnpm** 8+ (install with `npm install -g pnpm`)
 - **WebGPU-compatible browser**:
-  - Chrome/Edge 113+ (enable `chrome://flags/#enable-unsafe-webgpu` if needed)
+  - Chrome/Edge 113+
   - Firefox Nightly with WebGPU enabled
   - Safari Technology Preview
 
-## Installation
-
-1. Clone the repository or navigate to the project directory
-
-2. Install dependencies:
-```bash
-npm install
-```
-
-## Running the Project
-
-### Development Mode
-
-Start the development server with hot module replacement:
+### Installation
 
 ```bash
-npm run dev
+# Install dependencies
+pnpm install
+
+# Build all packages
+pnpm build
 ```
 
-Then open your browser and navigate to the URL shown in the terminal (typically `http://localhost:5173`).
-
-### Build for Production
-
-Create an optimized production build:
+### Development
 
 ```bash
-npm run build
+# Run editor in dev mode (with hot reload)
+pnpm dev
+
+# Or explicitly
+pnpm dev:editor
+
+# Build editor for production
+pnpm build:editor
+
+# Run all tests
+pnpm test
+
+# Run linter
+pnpm lint
 ```
 
-The built files will be generated in the `dist/` directory.
-
-### Preview Production Build
-
-Preview the production build locally:
+### Working with Packages
 
 ```bash
-npm run preview
+# Build a specific package
+cd packages/core
+pnpm build
+
+# Run tests for a specific package
+cd packages/world
+pnpm test
+
+# Watch mode for development
+cd packages/gfx-webgpu
+pnpm dev
 ```
 
-### Run Tests
+## 🧪 Testing
 
-Execute the test suite:
+The project has comprehensive test coverage:
 
 ```bash
-npm test
+# Run all tests
+pnpm test
+
+# Run tests in specific packages
+pnpm --filter @engine/core test
+pnpm --filter @engine/assets test
+
+# Run editor tests
+pnpm --filter @apps/editor test
 ```
 
-## Project Structure
+## 📖 Documentation
 
-Zobacz katalog `src/` w repozytorium, struktura jest opisana w nazwach plików/katalogów.
+Detailed documentation available in the `docs/` directory:
 
-## Technology Stack
+- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture
+- [MIGRATION_PLAN.md](docs/MIGRATION_PLAN.md) - Migration to modular architecture
+- [MODULE_SPECIFICATIONS.md](docs/MODULE_SPECIFICATIONS.md) - Package specifications
+- [TESTING.md](docs/TESTING.md) - Testing philosophy and guidelines
+- [PERFORMANCE_PHILOSOPHY.md](docs/PERFORMANCE_PHILOSOPHY.md) - Performance guidelines
+- [**🔴 EDITOR-PACKAGES ANALYSIS**](docs/editor-analysis/README.md) - **Critical: Code duplication issues**
 
-- **WebGPU**: Modern GPU API for web graphics
-- **TypeScript**: Type-safe JavaScript
-- **Vite**: Next-generation frontend build tool
-- **gl-matrix**: High-performance 3D math library
-- **Vitest**: Fast unit testing framework
-- **jsdom**: DOM testing environment
+## 🎯 Key Features
 
-## Browser Compatibility
+### WebGPU Rendering
+- Modern GPU API with high performance
+- PBR materials and lighting
+- Shadow mapping and post-processing
+- Texture atlas optimization
 
-WebGPU is a cutting-edge technology. Please ensure your browser supports WebGPU:
+### ECS Architecture
+- Clean entity-component-system design
+- Efficient spatial queries
+- Physics integration
+- Serialization support
 
-- Visit [WebGPU.io](https://webgpu.io/) to check browser compatibility
-- For Chrome/Edge: You may need to enable experimental features in `chrome://flags`
+### Visual Scripting
+- LogicCubes drag-and-drop system
+- 40+ built-in cube types
+- Triggers, actions, conditions, and logic gates
+- Runtime execution with coroutines
 
-## Development
+### Professional Editor
+- Modern UI with glassmorphism design
+- Block placement with snap-to-grid
+- Full play mode with character controller
+- History system (undo/redo)
+- Asset management
 
-The project uses:
-- **Hot Module Replacement (HMR)** for instant updates during development
-- **TypeScript strict mode** for maximum type safety
-- **Source maps** for easier debugging
+## 🛠️ Technology Stack
 
-## License
+- **WebGPU** - Modern GPU API
+- **TypeScript** - Type-safe development
+- **pnpm** - Fast, efficient package manager
+- **Vite** - Next-generation build tool
+- **Vitest** - Fast unit testing
+- **gl-matrix** - High-performance 3D math
+- **@gltf-transform** - GLTF processing
+
+## 🔮 Roadmap
+
+- [ ] **@engine/voxel** - Voxel/microblock system
+- [ ] **@engine/net** - Multiplayer networking
+- [ ] **apps/playground** - Demo application
+- [ ] Advanced terrain system
+- [ ] Procedural generation tools
+- [ ] Mobile support
+
+## 🤝 Contributing
+
+This project follows professional development practices:
+
+1. **Code in English**, comments in Polish (or English)
+2. **Test behavior**, not implementation
+3. **Performance mindset** - question every allocation
+4. **TypeScript strict mode** - no `any` without justification
+5. **Functional components** and modern patterns
+
+## 📝 License
 
 ISC
+
+## 🎓 Learning Resources
+
+Check the `examples/` directory for sample projects and tutorials demonstrating:
+- Basic engine usage
+- LogicCubes scripting
+- Custom component creation
+- Renderer integration
+
+---
+
+**Built with ❤️ using modern web technologies**
+
+*Migration to modular architecture completed: Phases 0-8 ✅*

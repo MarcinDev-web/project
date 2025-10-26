@@ -9,9 +9,10 @@
  */
 /**
  * Built-in block library with Kogama/Roblox/Minecraft inspired blocks
+ * Reduced to 10 essential blocks across 3 categories
  */
 export const BLOCK_LIBRARY = {
-    // ===== BASIC BLOCKS (Roblox style - colorful plastic) =====
+    // ===== BASIC BLOCKS (5) - Colorful building blocks =====
     plastic_red: {
         id: 'plastic_red',
         name: 'Red Block',
@@ -84,7 +85,25 @@ export const BLOCK_LIBRARY = {
             metallic: 0,
         },
     },
-    // ===== NATURAL BLOCKS (Minecraft style) =====
+    concrete_white: {
+        id: 'concrete_white',
+        name: 'White Concrete',
+        category: 'basic',
+        material: 'stone',
+        textures: {
+            top: { color: [0.9, 0.9, 0.9, 1], pattern: 'smooth', brightness: 1.0 },
+            bottom: { color: [0.9, 0.9, 0.9, 1], pattern: 'smooth', brightness: 0.8 },
+            sides: { color: [0.9, 0.9, 0.9, 1], pattern: 'smooth', brightness: 0.9 },
+        },
+        properties: {
+            solid: true,
+            transparent: false,
+            emissive: 0,
+            roughness: 0.4,
+            metallic: 0,
+        },
+    },
+    // ===== NATURAL BLOCKS (3) - Terrain blocks =====
     grass: {
         id: 'grass',
         name: 'Grass Block',
@@ -94,7 +113,6 @@ export const BLOCK_LIBRARY = {
             top: { color: [0.35, 0.7, 0.25, 1], pattern: 'noise', brightness: 1.0 },
             bottom: { color: [0.45, 0.35, 0.25, 1], pattern: 'noise', brightness: 0.8 },
             sides: { color: [0.45, 0.35, 0.25, 1], pattern: 'noise', brightness: 0.9 },
-            // Grass on top part of sides
         },
         properties: {
             solid: true,
@@ -140,94 +158,29 @@ export const BLOCK_LIBRARY = {
             metallic: 0,
         },
     },
-    wood_oak: {
-        id: 'wood_oak',
-        name: 'Oak Wood',
-        category: 'natural',
-        material: 'wood',
+    // ===== GAMEPLAY BLOCKS (2) - Interactive/special blocks =====
+    light_white: {
+        id: 'light_white',
+        name: 'White Light',
+        category: 'gameplay',
+        material: 'emissive',
         textures: {
-            top: { color: [0.65, 0.45, 0.25, 1], pattern: 'grid', brightness: 1.0 },
-            bottom: { color: [0.65, 0.45, 0.25, 1], pattern: 'grid', brightness: 0.8 },
-            sides: { color: [0.55, 0.38, 0.2, 1], pattern: 'planks', brightness: 0.9 },
+            top: { color: [1.0, 1.0, 1.0, 1], pattern: 'smooth', brightness: 2.0 },
+            bottom: { color: [1.0, 1.0, 1.0, 1], pattern: 'smooth', brightness: 2.0 },
+            sides: { color: [1.0, 1.0, 1.0, 1], pattern: 'smooth', brightness: 2.0 },
         },
         properties: {
             solid: true,
             transparent: false,
-            emissive: 0,
-            roughness: 0.7,
+            emissive: 1.0,
+            roughness: 0.5,
             metallic: 0,
         },
     },
-    wood_planks: {
-        id: 'wood_planks',
-        name: 'Wood Planks',
-        category: 'natural',
-        material: 'wood',
-        textures: {
-            top: { color: [0.6, 0.4, 0.22, 1], pattern: 'planks', brightness: 1.0 },
-            bottom: { color: [0.6, 0.4, 0.22, 1], pattern: 'planks', brightness: 0.8 },
-            sides: { color: [0.6, 0.4, 0.22, 1], pattern: 'planks', brightness: 0.9 },
-        },
-        properties: {
-            solid: true,
-            transparent: false,
-            emissive: 0,
-            roughness: 0.75,
-            metallic: 0,
-        },
-        ctm: {
-            pattern: 'horizontal',
-            matchSameType: false,
-            matchCategory: true, // All wood types connect
-        },
-    },
-    // ===== DECORATIVE BLOCKS =====
-    bricks_red: {
-        id: 'bricks_red',
-        name: 'Red Bricks',
-        category: 'decorative',
-        material: 'stone',
-        textures: {
-            top: { color: [0.7, 0.25, 0.2, 1], pattern: 'bricks', brightness: 1.0 },
-            bottom: { color: [0.7, 0.25, 0.2, 1], pattern: 'bricks', brightness: 0.8 },
-            sides: { color: [0.7, 0.25, 0.2, 1], pattern: 'bricks', brightness: 0.9 },
-        },
-        properties: {
-            solid: true,
-            transparent: false,
-            emissive: 0,
-            roughness: 0.8,
-            metallic: 0,
-        },
-        ctm: {
-            pattern: 'horizontal',
-            matchSameType: true,
-            matchCategory: false,
-        },
-    },
-    concrete_white: {
-        id: 'concrete_white',
-        name: 'White Concrete',
-        category: 'decorative',
-        material: 'stone',
-        textures: {
-            top: { color: [0.9, 0.9, 0.9, 1], pattern: 'smooth', brightness: 1.0 },
-            bottom: { color: [0.9, 0.9, 0.9, 1], pattern: 'smooth', brightness: 0.8 },
-            sides: { color: [0.9, 0.9, 0.9, 1], pattern: 'smooth', brightness: 0.9 },
-        },
-        properties: {
-            solid: true,
-            transparent: false,
-            emissive: 0,
-            roughness: 0.4,
-            metallic: 0,
-        },
-    },
-    // ===== GLASS BLOCKS =====
     glass_clear: {
         id: 'glass_clear',
         name: 'Clear Glass',
-        category: 'glass',
+        category: 'gameplay',
         material: 'glass',
         textures: {
             top: { color: [0.85, 0.95, 1.0, 0.3], pattern: 'smooth', brightness: 1.2 },
@@ -247,149 +200,6 @@ export const BLOCK_LIBRARY = {
             matchCategory: false,
         },
     },
-    glass_red: {
-        id: 'glass_red',
-        name: 'Red Glass',
-        category: 'glass',
-        material: 'glass',
-        textures: {
-            top: { color: [0.9, 0.2, 0.2, 0.5], pattern: 'smooth', brightness: 1.2 },
-            bottom: { color: [0.9, 0.2, 0.2, 0.5], pattern: 'smooth', brightness: 1.0 },
-            sides: { color: [0.9, 0.2, 0.2, 0.5], pattern: 'smooth', brightness: 1.1 },
-        },
-        properties: {
-            solid: true,
-            transparent: true,
-            emissive: 0,
-            roughness: 0.1,
-            metallic: 0.2,
-        },
-    },
-    // ===== METAL BLOCKS =====
-    metal_iron: {
-        id: 'metal_iron',
-        name: 'Iron Block',
-        category: 'mechanical',
-        material: 'metal',
-        textures: {
-            top: { color: [0.75, 0.75, 0.75, 1], pattern: 'smooth', brightness: 1.3 },
-            bottom: { color: [0.75, 0.75, 0.75, 1], pattern: 'smooth', brightness: 0.9 },
-            sides: { color: [0.75, 0.75, 0.75, 1], pattern: 'smooth', brightness: 1.1 },
-        },
-        properties: {
-            solid: true,
-            transparent: false,
-            emissive: 0,
-            roughness: 0.2,
-            metallic: 0.9,
-        },
-    },
-    metal_gold: {
-        id: 'metal_gold',
-        name: 'Gold Block',
-        category: 'mechanical',
-        material: 'metal',
-        textures: {
-            top: { color: [1.0, 0.85, 0.2, 1], pattern: 'smooth', brightness: 1.4 },
-            bottom: { color: [1.0, 0.85, 0.2, 1], pattern: 'smooth', brightness: 0.9 },
-            sides: { color: [1.0, 0.85, 0.2, 1], pattern: 'smooth', brightness: 1.2 },
-        },
-        properties: {
-            solid: true,
-            transparent: false,
-            emissive: 0,
-            roughness: 0.15,
-            metallic: 0.95,
-        },
-    },
-    // ===== LIGHT BLOCKS (Kogama style) =====
-    light_white: {
-        id: 'light_white',
-        name: 'White Light',
-        category: 'light',
-        material: 'emissive',
-        textures: {
-            top: { color: [1.0, 1.0, 1.0, 1], pattern: 'smooth', brightness: 2.0 },
-            bottom: { color: [1.0, 1.0, 1.0, 1], pattern: 'smooth', brightness: 2.0 },
-            sides: { color: [1.0, 1.0, 1.0, 1], pattern: 'smooth', brightness: 2.0 },
-        },
-        properties: {
-            solid: true,
-            transparent: false,
-            emissive: 1.0,
-            roughness: 0.5,
-            metallic: 0,
-        },
-    },
-    light_red: {
-        id: 'light_red',
-        name: 'Red Light',
-        category: 'light',
-        material: 'emissive',
-        textures: {
-            top: { color: [1.0, 0.2, 0.2, 1], pattern: 'smooth', brightness: 1.8 },
-            bottom: { color: [1.0, 0.2, 0.2, 1], pattern: 'smooth', brightness: 1.8 },
-            sides: { color: [1.0, 0.2, 0.2, 1], pattern: 'smooth', brightness: 1.8 },
-        },
-        properties: {
-            solid: true,
-            transparent: false,
-            emissive: 0.9,
-            roughness: 0.5,
-            metallic: 0,
-        },
-    },
-    light_blue: {
-        id: 'light_blue',
-        name: 'Blue Light',
-        category: 'light',
-        material: 'emissive',
-        textures: {
-            top: { color: [0.2, 0.5, 1.0, 1], pattern: 'smooth', brightness: 1.8 },
-            bottom: { color: [0.2, 0.5, 1.0, 1], pattern: 'smooth', brightness: 1.8 },
-            sides: { color: [0.2, 0.5, 1.0, 1], pattern: 'smooth', brightness: 1.8 },
-        },
-        properties: {
-            solid: true,
-            transparent: false,
-            emissive: 0.9,
-            roughness: 0.5,
-            metallic: 0,
-        },
-    },
-    // ===== TEXTURED BLOCKS (with real texture files) =====
-    stone_textured: {
-        id: 'stone_textured',
-        name: 'Stone',
-        category: 'natural',
-        material: 'stone',
-        textures: {
-            top: {
-                color: [0.5, 0.5, 0.5, 1],
-                pattern: 'cobble',
-                // Texture URLs would be populated at runtime via TextureManager
-                // Example: textureUrl: '/textures/stone.png'
-            },
-            bottom: {
-                color: [0.5, 0.5, 0.5, 1],
-                pattern: 'cobble',
-            },
-            sides: {
-                color: [0.5, 0.5, 0.5, 1],
-                pattern: 'cobble',
-            },
-        },
-        properties: {
-            solid: true,
-            transparent: false,
-            emissive: 0,
-            roughness: 0.8,
-            metallic: 0,
-        },
-    },
-    // Note: Texture URLs removed to avoid type errors.
-    // In production, textures would be loaded from actual files or texture packs.
-    // Use TextureManager to load textures dynamically based on textureUrl properties.
 };
 /**
  * Get all blocks in a category
@@ -407,6 +217,6 @@ export function getBlock(id) {
  * Get all block categories
  */
 export function getAllCategories() {
-    return ['basic', 'natural', 'decorative', 'mechanical', 'glass', 'light'];
+    return ['basic', 'natural', 'gameplay'];
 }
 //# sourceMappingURL=BlockLibrary.js.map

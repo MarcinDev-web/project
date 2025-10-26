@@ -55,14 +55,17 @@ struct Uniforms {
 @group(1) @binding(2) var normalAtlasTex : texture_2d<f32>;
 // NEW: Atlas metadata storage buffer
 struct AtlasMeta {
-  sideRect : vec4<f32>; // xy offset, zw scale
-  topRect  : vec4<f32>;
-  flags    : u32;       // bit0: hasNormal
-  saturation: f32;      // saturation scale
-  metallic : f32;       // base metallic
-  roughness: f32;       // base roughness
+  sideRect : vec4<f32>, // xy offset, zw scale
+  topRect  : vec4<f32>,
+  flags    : u32,       // bit0: hasNormal
+  saturation: f32,      // saturation scale
+  metallic : f32,       // base metallic
+  roughness: f32,       // base roughness
 };
-@group(1) @binding(3) var<storage, read> atlasMeta : array<AtlasMeta>;
+struct AtlasMetaBuffer {
+  entries: array<AtlasMeta>,
+};
+@group(1) @binding(3) var<storage, read> atlasMeta : AtlasMetaBuffer;
 // Shadows
 @group(1) @binding(4) var shadowAtlas : texture_depth_2d;
 @group(1) @binding(5) var shadowSamplerCmp : sampler_comparison;
@@ -92,16 +95,23 @@ fn selectCascade(linearDepth: f32, splits: vec4<f32>) -> u32 {
 
 fn sampleShadowPCF(uv: vec2<f32>, zRef: f32, kernel: i32, texelSize: vec2<f32>) -> f32 {
   var sum = 0.0;
+  var count = 0.0;
   let k = max(kernel, 1);
   let r = k / 2;
-  let count = f32((k) * (k));
-  for (var y = -r; y < k - r; y++) {
-    for (var x = -r; x < k - r; x++) {
-      let off = vec2<f32>(f32(x), f32(y)) * texelSize;
-      sum += textureSampleCompare(shadowAtlas, shadowSamplerCmp, uv + off, zRef);
+  // Use fixed loop bounds for uniform control flow
+  const MAX_KERNEL = 9;
+  let halfMax = MAX_KERNEL / 2;
+  for (var y = -halfMax; y <= halfMax; y++) {
+    for (var x = -halfMax; x <= halfMax; x++) {
+      // Only sample within the actual kernel radius
+      if (x >= -r && x < k - r && y >= -r && y < k - r) {
+        let off = vec2<f32>(f32(x), f32(y)) * texelSize;
+        sum += textureSampleCompare(shadowAtlas, shadowSamplerCmp, uv + off, zRef);
+        count += 1.0;
+      }
     }
   }
-  return sum / count;
+  return sum / max(count, 1.0);
 }
 
 fn sampleShadowPCSS(worldPos: vec3<f32>, normal: vec3<f32>, cascadeIndex: u32) -> f32 {
@@ -113,12 +123,12 @@ fn sampleShadowPCSS(worldPos: vec3<f32>, normal: vec3<f32>, cascadeIndex: u32) -
   let rect = uniforms.atlasRect[cascadeIndex];
   let uvMin = rect.xy; let uvMax = rect.zw;
   let atlasUV = uvMin + uv * (uvMax - uvMin);
-  let zRef = ndc.z * 0.5 + 0.5; // 0..1
+  var zRef = ndc.z * 0.5 + 0.5; // 0..1
   // Apply small depth bias
   zRef -= uniforms.biasParams.x;
 
   // Compute blocker search radius in texel units
-  let dims = vec2<f32>(textureDimensions(shadowAtlas));
+  let dims = vec2<f32>(textureDimensions(shadowAtlas, 0));
   let texel = 1.0 / dims;
   let baseRadius = max(1.0, uniforms.filterParams.x);
 
@@ -197,9 +207,9 @@ fn fs_main(
   let materialsPerRowF = max(uniforms.atlasParams.x, 1.0);
   let maxMatIdF = max(0.0, floor(materialsPerRowF * materialsPerRowF * 0.5 - 1.0));
   let matId = u32(clamp(materialId, 0.0, maxMatIdF));
-  let meta = atlasMeta[matId];
+  let matMeta = atlasMeta.entries[matId];
   let isTop = step(0.5, abs(Ngeom.y));
-  let rect = mix(meta.sideRect, meta.topRect, vec4<f32>(isTop, isTop, isTop, isTop));
+  let rect = mix(matMeta.sideRect, matMeta.topRect, vec4<f32>(isTop, isTop, isTop, isTop));
   let atlasUV = rect.xy + vUV * rect.zw;
   var baseColor = textureSample(atlasTex, texSampler, atlasUV).rgb * vColor;
 
@@ -219,8 +229,8 @@ fn fs_main(
   let N = normalize(mat3x3<f32>(T, B, Ngeom) * nTangent);
 
   // Material params from metadata
-  let metallic = clamp(meta.metallic, 0.0, 1.0);
-  let roughness = clamp(meta.roughness, 0.04, 1.0);
+  let metallic = clamp(matMeta.metallic, 0.0, 1.0);
+  let roughness = clamp(matMeta.roughness, 0.04, 1.0);
 
   // Fresnel base reflectance (F0)
   let dielectricF0 = vec3<f32>(0.04, 0.04, 0.04);
@@ -230,7 +240,7 @@ fn fs_main(
   let Y = dot(baseColor, vec3<f32>(0.299, 0.587, 0.114));
   let U = baseColor.b - Y;
   let Vc = baseColor.r - Y;
-  baseColor = clamp(vec3<f32>(Y + Vc * meta.saturation, Y + (baseColor.g - Y) * meta.saturation, Y + U * meta.saturation), vec3<f32>(0.0), vec3<f32>(1.0));
+  baseColor = clamp(vec3<f32>(Y + Vc * matMeta.saturation, Y + (baseColor.g - Y) * matMeta.saturation, Y + U * matMeta.saturation), vec3<f32>(0.0), vec3<f32>(1.0));
 
   // Ambient term
   let ambient = uniforms.ambientColor * uniforms.ambientIntensity * baseColor;

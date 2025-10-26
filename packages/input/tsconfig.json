@@ -9,6 +9,7 @@
   },
   "include": ["src/**/*"],
   "references": [
+    { "path": "../camera" },
     { "path": "../core" },
     { "path": "../world" }
   ]

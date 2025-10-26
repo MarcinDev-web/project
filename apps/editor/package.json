@@ -1,0 +1,37 @@
+{
+  "name": "@apps/editor",
+  "version": "0.1.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "test": "vitest"
+  },
+  "dependencies": {
+    "@engine/core": "workspace:*",
+    "@engine/world": "workspace:*",
+    "@engine/gfx-webgpu": "workspace:*",
+    "@engine/assets": "workspace:*",
+    "@engine/script": "workspace:*",
+    "@engine/input": "workspace:*",
+    "@engine/camera": "workspace:*",
+    "@engine/stdlib": "workspace:*",
+    "@webgpu/types": "^0.1.65",
+    "@gltf-transform/core": "^3.10.1",
+    "@gltf-transform/extensions": "^3.10.1",
+    "@gltf-transform/functions": "^3.10.1",
+    "@preact/signals-core": "^1.12.1",
+    "draco3dgltf": "^1.5.7",
+    "gl-matrix": "^3.4.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.2",
+    "typescript": "^5.9.3",
+    "vite": "^7.1.9",
+    "vitest": "^2.1.3",
+    "jsdom": "^27.0.0",
+    "fake-indexeddb": "^6.2.2"
+  }
+}
+

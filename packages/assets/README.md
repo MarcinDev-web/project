@@ -1,15 +1,16 @@
 # @engine/assets
 
-**Asset Management** - Asset registry, library, loaders, streaming.
+**Asset Management** - Asset registry, loaders, streaming.
 
 ## Zawartość
 
-- **AssetRegistry** - Central asset storage and querying
-- **AssetLibrary** - Built-in asset collections (Furniture, Architecture, Nature, etc.)
+- **AssetRegistry** - Central asset storage and querying (primarily for blocks)
 - **AssetTypes** - Unified type system for all assets
 - **RecentAssetsTracker** - Track recently used assets
 - **AssetImporter** - GLTF/GLB asset importing
 - **GltfOptimizer** - GLTF optimization with Draco compression
+
+**Uwaga:** System obecnie koncentruje się na blokach z `@engine/gfx-webgpu/BlockLibrary` (10 bloków w 3 kategoriach: basic, natural, gameplay). AssetRegistry automatycznie konwertuje bloki na assety.
 
 ## Zależności
 
@@ -30,25 +31,32 @@ pnpm add @engine/assets
 
 ```typescript
 import { assetRegistry, type Asset } from '@engine/assets';
+import { BLOCK_LIBRARY } from '@engine/gfx-webgpu';
 
-// Initialize with built-in assets
+// Initialize registry
 await assetRegistry.initialize();
 
-// Query assets
-const furniture = assetRegistry.query({ category: 'Furniture' });
-const featured = assetRegistry.getFeatured();
-const searchResults = assetRegistry.search('chair');
+// Register blocks from BlockLibrary
+for (const [blockId, block] of Object.entries(BLOCK_LIBRARY)) {
+  assetRegistry.registerBlockAsset(block);
+}
 
-// Register custom asset
-const customAsset: Asset = {
-  type: 'primitive',
-  category: 'Custom',
-  metadata: { id: 'my-asset', name: 'My Asset', isBuiltIn: false },
+// Query assets (blocks)
+const buildingBlocks = assetRegistry.query({ category: 'Building' }); // basic blocks
+const naturalBlocks = assetRegistry.query({ category: 'Nature' }); // grass, dirt, stone
+const gameplayBlocks = assetRegistry.query({ category: 'Gameplay' }); // light, glass
+const searchResults = assetRegistry.search('red');
+
+// Register custom block asset
+const customBlock: Asset = {
+  type: 'block',
+  category: 'Building',
+  metadata: { id: 'my-block', name: 'My Block', isBuiltIn: false },
   color: [1, 0, 0, 1],
   scale: [1, 1, 1],
   isPlaceable: true,
 };
-assetRegistry.register(customAsset);
+assetRegistry.register(customBlock);
 ```
 
 ### Asset Importer
@@ -87,9 +95,8 @@ const recent = tracker.getRecentAssets((id) => assetRegistry.get(id));
 
 ## Testy
 
-Pakiet posiada 81 przechodzących testów:
+Pakiet posiada przechodzące testy:
 - AssetRegistry.test.ts (27 testów)
-- AssetLibrary.test.ts (34 testy)
 - RecentAssetsTracker.test.ts (19 testów)
 - AssetImporter.test.ts (1 test)
 
@@ -103,15 +110,23 @@ pnpm test
 packages/assets/
 ├── src/
 │   ├── core/
-│   │   ├── AssetTypes.ts
-│   │   ├── AssetRegistry.ts
-│   │   ├── AssetLibrary.ts
-│   │   └── RecentAssetsTracker.ts
+│   │   ├── AssetTypes.ts       # Unified asset type system
+│   │   ├── AssetRegistry.ts    # Asset storage & querying
+│   │   └── RecentAssetsTracker.ts  # Usage history
 │   ├── loaders/
-│   │   ├── AssetImporter.ts
-│   │   └── GltfOptimizer.ts
+│   │   ├── AssetImporter.ts    # GLTF/GLB importer
+│   │   └── GltfOptimizer.ts    # GLTF optimization
 │   └── index.ts
-└── __tests__/ (81 testów)
+└── __tests__/ (47 testów)
 ```
+
+## Bloki
+
+System używa bloków z `@engine/gfx-webgpu/BlockLibrary`:
+- **Basic (5 bloków)**: plastic_red, plastic_blue, plastic_green, plastic_yellow, concrete_white
+- **Natural (3 bloki)**: grass, dirt, stone
+- **Gameplay (2 bloki)**: light_white, glass_clear
+
+Każdy blok może być automatycznie zarejestrowany jako asset przez AssetRegistry.
 
 Zobacz: [MIGRATION_PLAN.md](../../docs/MIGRATION_PLAN.md)

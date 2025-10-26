@@ -643,10 +643,7 @@ export class AssetRegistry {
     const mapping: Record<string, AssetMainCategory> = {
       basic: 'Building',
       natural: 'Nature',
-      decorative: 'Decoration',
-      mechanical: 'Building',
-      glass: 'Building',
-      light: 'Lighting',
+      gameplay: 'Gameplay',
     };
     return mapping[category] || 'Building';
   }
@@ -655,10 +652,7 @@ export class AssetRegistry {
     const mapping: Record<string, AssetSubcategory> = {
       basic: 'Walls',
       natural: 'Rocks',
-      decorative: 'WallDecor',
-      mechanical: 'Other',
-      glass: 'Windows',
-      light: 'CeilingLights',
+      gameplay: 'Interactive',
     };
     return mapping[category] || 'Other';
   }

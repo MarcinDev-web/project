@@ -1034,20 +1034,7 @@ export function createTextureAtlas(
     usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
   });
 
-  const textureBindGroup = device.createBindGroup({
-    label: 'material-atlas-bg',
-    layout: extendedLayout,
-    entries: [
-      { binding: 0, resource: sampler },
-      { binding: 1, resource: atlasTexture.createView({ label: 'atlas-texture-view' }) },
-      { binding: 2, resource: normalAtlasTexture.createView({ label: 'atlas-normal-texture-view' }) },
-      // binding(3) filled after atlasMetaBuffer creation below
-      { binding: 4, resource: shadowPlaceholder.createView({ label: 'shadow-atlas-depth-view' }) },
-      { binding: 5, resource: shadowSamplerCmp },
-      { binding: 6, resource: brdfLutPlaceholder.createView({ label: 'brdf-lut-view' }) },
-      { binding: 7, resource: envCubePlaceholder.createView({ dimension: 'cube' }) },
-    ],
-  });
+  // Note: bind group will be created after atlasMetaBuffer is ready to satisfy all layout entries
 
   // Limit noisy logs by routing through logger (which can be filtered) and avoid repeats here
   // Note: creation count is already logged in TextureAtlas itself (once per session)

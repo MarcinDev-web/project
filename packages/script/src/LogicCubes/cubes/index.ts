@@ -1,3 +1,6 @@
+import { LogicCubeRegistry } from '../LogicCubeSystem';
+
+// Export all cube types
 export * from './ActionCubes';
 export * from './ConditionCubes';
 export * from './DataCubes';
@@ -6,3 +9,65 @@ export * from './LogicGateCubes';
 export * from './PlayerDetection';
 export * from './TriggerCubes';
 export * from './types';
+
+// Import specific cubes for registration
+import {
+  OnClickTrigger,
+  OnTimerTrigger,
+  OnGameStartTrigger,
+  OnPlayerEnterTrigger,
+  OnPlayerLeaveTrigger,
+} from './TriggerCubes';
+
+import {
+  SendMessageAction,
+  SetVariableAction,
+  SpawnEntityAction,
+  DestroyEntityAction,
+  LogAction,
+} from './ActionCubes';
+
+import {
+  CompareVariableCondition,
+  IsPlayerNearCondition,
+  CheckDistanceCondition,
+} from './ConditionCubes';
+
+import { VariableData, CounterData, TimerData } from './DataCubes';
+
+import { ANDGate, ORGate, NOTGate, DelayGate } from './LogicGateCubes';
+
+/**
+ * Registers all built-in logic cube types
+ */
+export function registerBuiltInLogicCubes(): void {
+  // Triggers
+  LogicCubeRegistry.register('onClickTrigger', OnClickTrigger);
+  LogicCubeRegistry.register('onTimerTrigger', OnTimerTrigger);
+  LogicCubeRegistry.register('onGameStartTrigger', OnGameStartTrigger);
+  LogicCubeRegistry.register('onPlayerEnterTrigger', OnPlayerEnterTrigger);
+  LogicCubeRegistry.register('onPlayerLeaveTrigger', OnPlayerLeaveTrigger);
+
+  // Actions
+  LogicCubeRegistry.register('sendMessageAction', SendMessageAction);
+  LogicCubeRegistry.register('setVariableAction', SetVariableAction);
+  LogicCubeRegistry.register('spawnEntityAction', SpawnEntityAction);
+  LogicCubeRegistry.register('destroyEntityAction', DestroyEntityAction);
+  LogicCubeRegistry.register('logAction', LogAction);
+
+  // Conditions
+  LogicCubeRegistry.register('compareVariableCondition', CompareVariableCondition);
+  LogicCubeRegistry.register('isPlayerNearCondition', IsPlayerNearCondition);
+  LogicCubeRegistry.register('checkDistanceCondition', CheckDistanceCondition);
+
+  // Data
+  LogicCubeRegistry.register('variableData', VariableData);
+  LogicCubeRegistry.register('counterData', CounterData);
+  LogicCubeRegistry.register('timerData', TimerData);
+
+  // Logic Gates
+  LogicCubeRegistry.register('andGate', ANDGate);
+  LogicCubeRegistry.register('orGate', ORGate);
+  LogicCubeRegistry.register('notGate', NOTGate);
+  LogicCubeRegistry.register('delayGate', DelayGate);
+}

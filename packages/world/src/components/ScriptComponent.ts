@@ -1,8 +1,8 @@
 import { Component } from './Component';
 import { registerComponent } from './registry';
 import type { Scene } from '../core';
-import type { BehaviorConstructor, BehaviorInstance, BehaviorContext } from '@engine/script/Behavior';
-import { BehaviorRegistry } from '@engine/script/BehaviorRegistry';
+import type { BehaviorConstructor, BehaviorInstance, BehaviorContext } from '@engine/script';
+import { BehaviorRegistry } from '@engine/script';
 
 export interface ScriptDefinition {
   /** Registry name for behavior constructor */

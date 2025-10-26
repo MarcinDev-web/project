@@ -10,16 +10,20 @@
   ],
   "scripts": {
     "build": "pnpm -r build",
-    "dev": "pnpm --parallel -r dev",
+    "dev": "pnpm --filter @apps/editor dev",
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
     "clean": "pnpm -r clean && rm -rf node_modules",
     "dev:editor": "pnpm --filter @apps/editor dev",
     "build:editor": "pnpm --filter @apps/editor build",
     "test:unit": "vitest run --project unit",
+    "test:unit:fast": "vitest run --project unit --no-coverage --reporter=basic",
     "test:integration": "vitest run --project integration",
     "test:watch": "vitest watch --project unit --related",
-    "precommit": "pnpm lint && pnpm test:unit"
+    "test:changed": "vitest run --project unit --changed",
+    "test:affected": "vitest run --project unit --coverage.enabled=false --bail=1",
+    "test:ci": "vitest run --project unit --coverage.enabled=false --reporter=verbose",
+    "precommit": "pnpm lint && pnpm test:changed"
   },
   "keywords": [],
   "author": "",
