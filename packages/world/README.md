@@ -37,7 +37,16 @@ world.update(dt);          // Frame update
 
 ## Status
 
-🚧 **W budowie** - Placeholder dla przyszłej migracji
+✅ **Zmigrowany** - Faza 2 zakończona (26.10.2025)
+
+## Features
+
+- 36 plików źródłowych
+- ~5,500 linii kodu
+- 144 dist files
+- Entity-Component-System runtime
+- Physics engine (AABB, raycasting, Octree)
+- 11 komponentów (Transform, Camera, Light, Physics, Mesh, Material, Animation, etc.)
 
 Zobacz: [MIGRATION_PLAN.md](../../docs/MIGRATION_PLAN.md)
 

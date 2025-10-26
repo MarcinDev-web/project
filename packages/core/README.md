@@ -34,7 +34,16 @@ events.on('test', () => console.log('Event fired'));
 
 ## Status
 
-🚧 **W budowie** - Placeholder dla przyszłej migracji
+✅ **Zmigrowany** - Faza 1 zakończona (26.10.2025)
+
+## Testy
+
+Pakiet posiada 17 przechodzących testów:
+- math.test.ts (17 testów - Vec3, Mat4, Quat, helpers)
+
+```bash
+pnpm test
+```
 
 Zobacz: [MIGRATION_PLAN.md](../../docs/MIGRATION_PLAN.md)
 

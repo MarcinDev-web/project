@@ -35,7 +35,17 @@ scriptSystem.registerCube(new BuiltInCubes.OpenDoor());
 
 ## Status
 
-🚧 **W budowie** - Placeholder dla przyszłej migracji
+✅ **Zmigrowany** - Faza 4 zakończona (26.10.2025)
+
+## Features
+
+- 30 plików źródłowych
+- ~2,200 linii kodu
+- 124 dist files
+- 9 built-in LogicCubes
+- Behavior system with coroutines
+- Connection management for visual scripting
+- Circular dependency resolved (components moved to @engine/script)
 
 Zobacz: [MIGRATION_PLAN.md](../../docs/MIGRATION_PLAN.md)
 
