@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { EnvironmentRenderer } from '../rendering/renderers/EnvironmentRenderer';
+import { EnvironmentRenderer } from '@engine/gfx-webgpu';
 import { EnvironmentComponent } from '@engine/world';
 import type { Mat4, Vec3 } from '@engine/core/math';
 

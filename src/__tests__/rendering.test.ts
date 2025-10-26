@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { initRenderer } from '../rendering/index';
+import { initRenderer } from '@engine/gfx-webgpu';
 
 function mockStatusElement(): HTMLElement {
   const el = document.createElement('div');

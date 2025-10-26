@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { computeCascades } from '../rendering/shadows/ShadowCascades';
+import { computeCascades } from '@engine/gfx-webgpu';
 import { mat4Identity, mat4Perspective, type Mat4, type Vec3 } from '@engine/core/math';
-import { ShadowPass } from '../rendering/shadows/ShadowPass';
-import type { GeometryData } from '../rendering/resources/resources';
-import { BrdfLutPass } from '../rendering/postprocess/BrdfLut';
-import { EnvironmentRenderer } from '../rendering/renderers/EnvironmentRenderer';
+import { ShadowPass } from '@engine/gfx-webgpu';
+import type { GeometryData } from '@engine/gfx-webgpu';
+import { BrdfLutPass } from '@engine/gfx-webgpu';
+import { EnvironmentRenderer } from '@engine/gfx-webgpu';
 import { EnvironmentComponent } from '@engine/world';
 
 function createBasicDeviceMock() {

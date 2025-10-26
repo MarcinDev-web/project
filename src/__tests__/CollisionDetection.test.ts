@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { CollisionDetection } from '../physics/CollisionDetection';
+import { CollisionDetection } from '@engine/world/physics';
 import type { BoxCollider, SphereCollider, CapsuleCollider } from '@engine/world';
 import { ColliderShape } from '@engine/world';
 

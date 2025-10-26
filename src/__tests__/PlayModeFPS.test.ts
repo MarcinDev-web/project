@@ -4,7 +4,7 @@ import { Scene } from '@engine/world';
 import { Entity } from '@engine/world';
 import { EditorState } from '../editor/core/state';
 import { SelectionManager } from '@engine/world';
-import { PhysicsWorld } from '../physics/PhysicsWorld';
+import { PhysicsWorld } from '@engine/world/physics';
 import { CharacterControllerSystem } from '../scene/CharacterControllerSystem';
 import { CharacterInputHandler } from '../input/CharacterInput';
 import { FPSCamera } from '../editor/camera/FPSCamera';

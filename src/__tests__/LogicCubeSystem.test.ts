@@ -5,9 +5,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Scene } from '@engine/world';
 import { Entity } from '@engine/world';
-import { LogicCubeSystem } from '../logic/LogicCubeSystem';
+import { LogicCubeSystem } from '@engine/script';
 import { LogicCubeComponent } from '@engine/world';
-import { registerBuiltInLogicCubes } from '../logic/cubes';
+import { registerBuiltInLogicCubes } from '@engine/script';
 
 describe('LogicCubeSystem', () => {
   let scene: Scene;

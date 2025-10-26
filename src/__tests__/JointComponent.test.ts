@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { JointComponent } from '@engine/world';
 import { Entity } from '@engine/world';
 import { PhysicsComponent, RigidbodyType } from '@engine/world';
-import { createJoint, JointType, type FixedJointConfig } from '../physics/Joint';
+import { createJoint, JointType, type FixedJointConfig } from '@engine/world/physics';
 
 describe('JointComponent', () => {
   let entityA: Entity;

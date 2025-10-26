@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { PhysicsRaycast, type PhysicsRay } from '../physics/PhysicsRaycast';
+import { PhysicsRaycast, type PhysicsRay } from '@engine/world/physics';
 import { Entity } from '@engine/world';
 import { PhysicsComponent, RigidbodyType } from '@engine/world';
 import { Scene } from '@engine/world';
-import { PhysicsWorld } from '../physics/PhysicsWorld';
+import { PhysicsWorld } from '@engine/world/physics';
 
 describe('PhysicsRaycast', () => {
   let scene: Scene;

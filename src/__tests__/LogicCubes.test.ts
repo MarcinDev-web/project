@@ -9,26 +9,26 @@ import {
   OnClickTrigger,
   OnTimerTrigger,
   OnGameStartTrigger,
-} from '../logic/cubes/TriggerCubes';
+} from '@engine/script';
 import {
   SendMessageAction,
   SetVariableAction,
   LogAction,
-} from '../logic/cubes/ActionCubes';
+} from '@engine/script';
 import {
   CompareVariableCondition,
-} from '../logic/cubes/ConditionCubes';
+} from '@engine/script';
 import {
   VariableData,
   CounterData,
   TimerData,
-} from '../logic/cubes/DataCubes';
+} from '@engine/script';
 import {
   ANDGate,
   ORGate,
   NOTGate,
   DelayGate,
-} from '../logic/cubes/LogicGateCubes';
+} from '@engine/script';
 
 describe('Logic Cubes', () => {
   let scene: Scene;

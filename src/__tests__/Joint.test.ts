@@ -14,7 +14,7 @@ import {
   type HingeJointConfig,
   type BallSocketJointConfig,
   type SliderJointConfig,
-} from '../physics/Joint';
+} from '@engine/world/physics';
 import { Entity } from '@engine/world';
 import { PhysicsComponent, RigidbodyType } from '@engine/world';
 

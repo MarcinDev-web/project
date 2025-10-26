@@ -4,7 +4,7 @@ import {
   getBlock,
   getBlocksByCategory,
   getAllCategories,
-} from '../rendering/blocks/BlockLibrary';
+} from '@engine/gfx-webgpu';
 
 describe('BlockLibrary', () => {
   describe('BLOCK_LIBRARY', () => {

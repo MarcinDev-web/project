@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { BoundingVolume, type AABB } from '../physics/BoundingVolume';
+import { BoundingVolume, type AABB } from '@engine/world/physics';
 import { Entity } from '@engine/world';
 import { PhysicsComponent } from '@engine/world';
 

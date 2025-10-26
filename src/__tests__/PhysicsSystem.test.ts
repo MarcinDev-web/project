@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { PhysicsSystem, DEFAULT_PHYSICS_CONFIG } from '../physics/PhysicsSystem';
+import { PhysicsSystem, DEFAULT_PHYSICS_CONFIG } from '@engine/world/physics';
 import { PhysicsComponent, RigidbodyType } from '@engine/world';
 import { Scene } from '@engine/world';
 import { Entity } from '@engine/world';

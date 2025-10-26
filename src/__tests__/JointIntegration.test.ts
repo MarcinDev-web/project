@@ -1,10 +1,10 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Scene } from '@engine/world';
 import { Entity } from '@engine/world';
-import { PhysicsWorld } from '../physics/PhysicsWorld';
+import { PhysicsWorld } from '@engine/world/physics';
 import { PhysicsComponent, RigidbodyType } from '@engine/world';
 import { JointComponent } from '@engine/world';
-import { JointType } from '../physics/Joint';
+import { JointType } from '@engine/world/physics';
 
 describe('Joint Integration Tests', () => {
   let scene: Scene;

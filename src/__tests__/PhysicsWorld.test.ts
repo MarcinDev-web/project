@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { PhysicsWorld } from '../physics/PhysicsWorld';
+import { PhysicsWorld } from '@engine/world/physics';
 import { Scene } from '@engine/world';
 import { Entity } from '@engine/world';
 import { PhysicsComponent, RigidbodyType } from '@engine/world';

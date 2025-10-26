@@ -2,9 +2,9 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { Scene } from '@engine/world';
 import { Entity } from '@engine/world';
 import { ScriptComponent } from '@engine/world';
-import { ScriptSystem } from '../logic/ScriptSystem';
-import { BehaviorInstance, type BehaviorConstructor } from '../logic/Behavior';
-import { BehaviorRegistry } from '../logic/BehaviorRegistry';
+import { ScriptSystem } from '@engine/script';
+import { BehaviorInstance, type BehaviorConstructor } from '@engine/script';
+import { BehaviorRegistry } from '@engine/script';
 
 class CounterBehavior extends BehaviorInstance {
   ticks = 0;

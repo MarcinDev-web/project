@@ -8,7 +8,7 @@ import type { OrbitControls } from '../input';
 import { CharacterInputHandler } from '../input/CharacterInput';
 import { FPSCamera } from '../editor/camera/FPSCamera';
 import { CharacterControllerSystem } from '../scene/CharacterControllerSystem';
-import { PhysicsWorld } from '../physics/PhysicsWorld';
+import { PhysicsWorld } from '@engine/world/physics';
 import { PlayModeStateType } from '../editor/core/PlayModeStateMachine';
 import { ReturnState } from '../editor/states/ReturnState';
 import type { ReturnStateDeps } from '../editor/states';

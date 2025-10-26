@@ -4,8 +4,8 @@ import { Entity } from '@engine/world';
 import { ScriptComponent } from '@engine/world';
 import { PreflightState } from '../editor/states/PreflightState';
 import { PlayModeStateType, type PlayModeContext } from '../editor/core/PlayModeStateMachine';
-import { BehaviorInstance, type BehaviorConstructor } from '../logic/Behavior';
-import { BehaviorRegistry } from '../logic/BehaviorRegistry';
+import { BehaviorInstance, type BehaviorConstructor } from '@engine/script';
+import { BehaviorRegistry } from '@engine/script';
 
 describe('PreflightState - Script Validation', () => {
   let scene: Scene;

@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { BehaviorRegistry } from '../logic/BehaviorRegistry';
-import { BehaviorInstance, type BehaviorConstructor } from '../logic/Behavior';
+import { BehaviorRegistry } from '@engine/script';
+import { BehaviorInstance, type BehaviorConstructor } from '@engine/script';
 
 class A extends BehaviorInstance {}
 class B extends BehaviorInstance {}

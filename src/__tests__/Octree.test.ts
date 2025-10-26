@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Octree, DEFAULT_OCTREE_CONFIG } from '../physics/Octree';
-import { BoundingVolume, type AABB } from '../physics/BoundingVolume';
+import { Octree, DEFAULT_OCTREE_CONFIG } from '@engine/world/physics';
+import { BoundingVolume, type AABB } from '@engine/world/physics';
 import { Entity } from '@engine/world';
 
 describe('Octree', () => {

@@ -10,7 +10,7 @@ import {
   type CTMNeighbors,
   type CTMConfig,
   CTM_PRESETS,
-} from '../rendering/textures/ConnectedTextures';
+} from '@engine/gfx-webgpu';
 
 describe('ConnectedTextureSystem', () => {
   describe('Horizontal Pattern', () => {
