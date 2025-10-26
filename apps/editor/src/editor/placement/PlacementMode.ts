@@ -7,9 +7,9 @@ import { Entity } from '@engine/world';
 import type { Scene } from '@engine/world';
 import type { Vec3, Quat } from '@engine/core/math';
 import { CollisionDetector } from './CollisionDetector';
-import type { SnapSystem } from '../snap/SnapSystem';
+import type { SnapSystem } from '@engine/editor-utils';
 import { MaterialComponent } from '@engine/world/components/MaterialComponent';
-import type { AssetPreset } from '../assets/AssetTypes';
+import type { AssetPreset } from '@engine/assets';
 import { initializeBaseColor } from '../visuals/SelectionVisuals';
 import { Logger } from '../../utils/logger';
 

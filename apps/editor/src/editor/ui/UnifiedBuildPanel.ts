@@ -17,7 +17,7 @@ import { HotbarComponent } from './HotbarComponent';
 import { CatalogPanel } from './CatalogPanel';
 import { PlacementCoordinator } from './PlacementCoordinator';
 import type { PlacementMode } from '../placement/PlacementMode';
-import { assetRegistry } from '../assets/AssetRegistry';
+import { assetRegistry } from '@engine/assets';
 import { Logger } from '../../utils/logger';
 
 export interface UnifiedBuildPanelConfig {

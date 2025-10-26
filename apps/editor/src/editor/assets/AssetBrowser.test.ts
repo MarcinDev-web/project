@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { AssetBrowserV2 as AssetBrowser } from './AssetBrowser';
 import { Scene } from '@engine/world';
-import { assetRegistry } from './AssetRegistry';
+import { assetRegistry } from '@engine/assets';
 
 function createContainer(): HTMLElement {
   const el = document.createElement('div');

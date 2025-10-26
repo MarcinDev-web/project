@@ -2,7 +2,7 @@ import type { OrbitControls } from '@engine/camera';
 import type { Scene } from '@engine/world';
 import type { SelectionManager } from '@engine/world';
 import type { EditorState } from '../core/state';
-import type { SnapSystem } from '../snap/SnapSystem';
+import type { SnapSystem } from '@engine/editor-utils';
 import type { PlacementMode } from '../placement/PlacementMode';
 import type { ProjectManager } from '../managers/ProjectManager';
 import type { Clipboard } from '../utils/Clipboard';

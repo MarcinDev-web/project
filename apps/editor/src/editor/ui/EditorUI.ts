@@ -34,9 +34,9 @@ import {
   hydrateScene,
   resolveEntityByPath,
   serializeScene,
-} from '../history/HistoryHelpers';
-import { snapshotsEqual, type SceneSnapshot } from '../history/HistoryManager';
-import { SnapSystem } from '../snap/SnapSystem';
+} from '@engine/editor-utils';
+import { snapshotsEqual, type SceneSnapshot } from '@engine/editor-utils';
+import { SnapSystem } from '@engine/editor-utils';
 import { CollisionDetector } from '../placement/CollisionDetector';
 import { PlacementMode } from '../placement/PlacementMode';
 import { ProjectManager } from '../managers/ProjectManager';
@@ -48,7 +48,7 @@ import { BlockDragController } from '../controllers/BlockDragController';
 import { EasyPlaceController } from '../controllers/EasyPlaceController';
 import { LightManager } from '@engine/gfx-webgpu/lighting/LightManager';
 import { KeyboardHandler } from '../controllers/KeyboardHandler';
-import { DisposableGroup } from '../core/DisposableGroup';
+import { DisposableGroup } from '@engine/core/utils';
 import { EditorPanelManager } from '../panels/EditorPanelManager';
 import { EditorVisualManager } from '../visuals/EditorVisualManager';
 import { EditorUILayout } from './EditorUILayout';
@@ -67,7 +67,7 @@ import { FeatureIntroduction } from './FeatureIntroduction';
 import type { PhysicsWorld } from '@engine/world/PhysicsWorld';
 import type { CharacterControllerSystem } from '@engine/stdlib/CharacterController';
 import { CharacterInputHandler } from '@engine/input';
-import { FPSCamera } from '../camera/FPSCamera';
+import { FPSCamera } from '@engine/camera';
 import { PauseMenu } from './PauseMenu';
 
 export interface EditorUIConfig {

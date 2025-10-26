@@ -44,8 +44,8 @@ export class EditorUILayout {
   private sceneMetricsEl: HTMLElement | null = null;
   private metricsUpdateInterval: number | null = null;
 
-  private sidebarCollapsed = false;  // Start open for better discoverability
-  private inspectorCollapsed = false; // Start open for better discoverability
+  private sidebarCollapsed = true;  // Start closed - cleaner canvas
+  private inspectorCollapsed = true; // Start closed - cleaner canvas
 
   constructor(private readonly config: EditorUILayoutConfig) {}
 

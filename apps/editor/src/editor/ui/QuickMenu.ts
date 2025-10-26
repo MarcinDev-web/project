@@ -31,7 +31,7 @@ export interface QuickMenuConfig {
 export class QuickMenu {
   private container: HTMLElement | null = null;
   private activeMenu: HTMLElement | null = null;
-  private searchInput: HTMLInputElement | null = null;
+  // private searchInput: HTMLInputElement | null = null; // REMOVED - searchbar disabled
   private btnUndo: HTMLButtonElement | null = null;
   private btnRedo: HTMLButtonElement | null = null;
   private saveStatusEl: HTMLSpanElement | null = null;
@@ -55,9 +55,9 @@ export class QuickMenu {
     const left = this.createLeftSection();
     root.appendChild(left);
 
-    // Center: search
-    const center = this.createCenterSection();
-    root.appendChild(center);
+    // Center: search - REMOVED for cleaner UI
+    // const center = this.createCenterSection();
+    // root.appendChild(center);
 
     // New: Transform tools section
     const transformTools = this.createTransformToolsSection();
@@ -78,11 +78,11 @@ export class QuickMenu {
     });
 
     document.addEventListener('keydown', (e) => {
-      // Ctrl+K focus search
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
-        e.preventDefault();
-        this.searchInput?.focus();
-      }
+      // Ctrl+K focus search - REMOVED (searchbar disabled)
+      // if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+      //   e.preventDefault();
+      //   this.searchInput?.focus();
+      // }
       // Escape closes dropdowns
       if (e.key === 'Escape') {
         this.closeAllMenus();
@@ -139,29 +139,30 @@ export class QuickMenu {
     return left;
   }
 
-  private createCenterSection(): HTMLElement {
-    const center = document.createElement('div');
-    center.className = 'top-bar-center';
+  // REMOVED - Searchbar disabled for cleaner UI
+  // private createCenterSection(): HTMLElement {
+  //   const center = document.createElement('div');
+  //   center.className = 'top-bar-center';
 
-    const search = document.createElement('div');
-    search.className = 'top-bar-search';
+  //   const search = document.createElement('div');
+  //   search.className = 'top-bar-search';
 
-    const searchIcon = createIcon('search', 14);
-    searchIcon.classList.add('top-bar-search-icon');
-    const input = document.createElement('input');
-    input.type = 'search';
-    input.className = 'top-bar-search-input';
-    input.placeholder = 'Search entities... (Ctrl+K)';
-    input.addEventListener('input', () => {
-      this.config.onSearch?.(input.value);
-    });
+  //   const searchIcon = createIcon('search', 14);
+  //   searchIcon.classList.add('top-bar-search-icon');
+  //   const input = document.createElement('input');
+  //   input.type = 'search';
+  //   input.className = 'top-bar-search-input';
+  //   input.placeholder = 'Search entities... (Ctrl+K)';
+  //   input.addEventListener('input', () => {
+  //     this.config.onSearch?.(input.value);
+  //   });
 
-    search.appendChild(searchIcon);
-    search.appendChild(input);
-    center.appendChild(search);
-    this.searchInput = input;
-    return center;
-  }
+  //   search.appendChild(searchIcon);
+  //   search.appendChild(input);
+  //   center.appendChild(search);
+  //   this.searchInput = input;
+  //   return center;
+  // }
 
   private createTransformToolsSection(): HTMLElement {
     const section = document.createElement('div');
@@ -220,73 +221,73 @@ export class QuickMenu {
     transformGroup.appendChild(rotateBtn);
     transformGroup.appendChild(scaleBtn);
 
-    // Rotation Snap Group
-    const rotationGroup = document.createElement('div');
-    rotationGroup.className = 'top-bar-transform-group';
+    // Rotation Snap Group - REMOVED for cleaner UI
+    // const rotationGroup = document.createElement('div');
+    // rotationGroup.className = 'top-bar-transform-group';
 
-    // Free rotation
-    const freeBtn = document.createElement('button');
-    freeBtn.className = 'top-bar-transform-button';
-    freeBtn.title = 'Free Rotation';
-    const freeLabel = document.createElement('span');
-    freeLabel.textContent = 'Free';
-    freeLabel.className = 'top-bar-transform-label';
-    freeBtn.appendChild(freeLabel);
-    freeBtn.addEventListener('click', () => this.config.onRotationSnapChange('free'));
-    effect(() => {
-      const active = this.config.state.rotationSnapMode.value === 'free';
-      freeBtn.classList.toggle('active', active);
-    });
+    // // Free rotation
+    // const freeBtn = document.createElement('button');
+    // freeBtn.className = 'top-bar-transform-button';
+    // freeBtn.title = 'Free Rotation';
+    // const freeLabel = document.createElement('span');
+    // freeLabel.textContent = 'Free';
+    // freeLabel.className = 'top-bar-transform-label';
+    // freeBtn.appendChild(freeLabel);
+    // freeBtn.addEventListener('click', () => this.config.onRotationSnapChange('free'));
+    // effect(() => {
+    //   const active = this.config.state.rotationSnapMode.value === 'free';
+    //   freeBtn.classList.toggle('active', active);
+    // });
 
-    // 15° snap
-    const snap15Btn = document.createElement('button');
-    snap15Btn.className = 'top-bar-transform-button';
-    snap15Btn.title = 'Snap to 15°';
-    const snap15Label = document.createElement('span');
-    snap15Label.textContent = '15°';
-    snap15Label.className = 'top-bar-transform-label';
-    snap15Btn.appendChild(snap15Label);
-    snap15Btn.addEventListener('click', () => this.config.onRotationSnapChange('15deg'));
-    effect(() => {
-      const active = this.config.state.rotationSnapMode.value === '15deg';
-      snap15Btn.classList.toggle('active', active);
-    });
+    // // 15° snap
+    // const snap15Btn = document.createElement('button');
+    // snap15Btn.className = 'top-bar-transform-button';
+    // snap15Btn.title = 'Snap to 15°';
+    // const snap15Label = document.createElement('span');
+    // snap15Label.textContent = '15°';
+    // snap15Label.className = 'top-bar-transform-label';
+    // snap15Btn.appendChild(snap15Label);
+    // snap15Btn.addEventListener('click', () => this.config.onRotationSnapChange('15deg'));
+    // effect(() => {
+    //   const active = this.config.state.rotationSnapMode.value === '15deg';
+    //   snap15Btn.classList.toggle('active', active);
+    // });
 
-    // 45° snap
-    const snap45Btn = document.createElement('button');
-    snap45Btn.className = 'top-bar-transform-button';
-    snap45Btn.title = 'Snap to 45°';
-    const snap45Label = document.createElement('span');
-    snap45Label.textContent = '45°';
-    snap45Label.className = 'top-bar-transform-label';
-    snap45Btn.appendChild(snap45Label);
-    snap45Btn.addEventListener('click', () => this.config.onRotationSnapChange('45deg'));
-    effect(() => {
-      const active = this.config.state.rotationSnapMode.value === '45deg';
-      snap45Btn.classList.toggle('active', active);
-    });
+    // // 45° snap
+    // const snap45Btn = document.createElement('button');
+    // snap45Btn.className = 'top-bar-transform-button';
+    // snap45Btn.title = 'Snap to 45°';
+    // const snap45Label = document.createElement('span');
+    // snap45Label.textContent = '45°';
+    // snap45Label.className = 'top-bar-transform-label';
+    // snap45Btn.appendChild(snap45Label);
+    // snap45Btn.addEventListener('click', () => this.config.onRotationSnapChange('45deg'));
+    // effect(() => {
+    //   const active = this.config.state.rotationSnapMode.value === '45deg';
+    //   snap45Btn.classList.toggle('active', active);
+    // });
 
-    // 90° snap
-    const snap90Btn = document.createElement('button');
-    snap90Btn.className = 'top-bar-transform-button';
-    snap90Btn.title = 'Snap to 90°';
-    const snap90Label = document.createElement('span');
-    snap90Label.textContent = '90°';
-    snap90Label.className = 'top-bar-transform-label';
-    snap90Btn.appendChild(snap90Label);
-    snap90Btn.addEventListener('click', () => this.config.onRotationSnapChange('90deg'));
-    effect(() => {
-      const active = this.config.state.rotationSnapMode.value === '90deg';
-      snap90Btn.classList.toggle('active', active);
-    });
+    // // 90° snap
+    // const snap90Btn = document.createElement('button');
+    // snap90Btn.className = 'top-bar-transform-button';
+    // snap90Btn.title = 'Snap to 90°';
+    // const snap90Label = document.createElement('span');
+    // snap90Label.textContent = '90°';
+    // snap90Label.className = 'top-bar-transform-label';
+    // snap90Btn.appendChild(snap90Label);
+    // snap90Btn.addEventListener('click', () => this.config.onRotationSnapChange('90deg'));
+    // effect(() => {
+    //   const active = this.config.state.rotationSnapMode.value === '90deg';
+    //   snap90Btn.classList.toggle('active', active);
+    // });
 
-    rotationGroup.appendChild(freeBtn);
-    rotationGroup.appendChild(snap15Btn);
-    rotationGroup.appendChild(snap45Btn);
-    rotationGroup.appendChild(snap90Btn);
+    // rotationGroup.appendChild(freeBtn);
+    // rotationGroup.appendChild(snap15Btn);
+    // rotationGroup.appendChild(snap45Btn);
+    // rotationGroup.appendChild(snap90Btn);
 
     section.appendChild(transformGroup);
-    section.appendChild(rotationGroup);
+    // section.appendChild(rotationGroup); // REMOVED
 
     return section;
   }
@@ -341,16 +342,16 @@ export class QuickMenu {
       gridBtn.classList.toggle('active', show);
     });
 
-    // Assets Library
-    const assetsBtn = document.createElement('button');
-    assetsBtn.className = 'top-bar-icon-button';
-    assetsBtn.title = 'Asset Library';
-    assetsBtn.appendChild(createIcon('package', 14));
-    assetsBtn.addEventListener('click', () => {
-      if (this.config.onOpenAssets) {
-        this.config.onOpenAssets();
-      }
-    });
+    // Assets Library - REMOVED for cleaner UI
+    // const assetsBtn = document.createElement('button');
+    // assetsBtn.className = 'top-bar-icon-button';
+    // assetsBtn.title = 'Asset Library';
+    // assetsBtn.appendChild(createIcon('package', 14));
+    // assetsBtn.addEventListener('click', () => {
+    //   if (this.config.onOpenAssets) {
+    //     this.config.onOpenAssets();
+    //   }
+    // });
 
     // Custom Block Editor
     const blockEditorBtn = document.createElement('button');
@@ -387,7 +388,7 @@ export class QuickMenu {
     right.appendChild(modeBtn);
     right.appendChild(snapBtn);
     right.appendChild(gridBtn);
-    right.appendChild(assetsBtn);
+    // right.appendChild(assetsBtn); // REMOVED - Asset Library button
     right.appendChild(blockEditorBtn);
     right.appendChild(scriptBtn);
     right.appendChild(settingsBtn);
@@ -539,7 +540,7 @@ export class QuickMenu {
     }
     this.container = null;
     this.activeMenu = null;
-    this.searchInput = null;
+    // this.searchInput = null; // REMOVED - searchbar disabled
     this.btnUndo = null;
     this.btnRedo = null;
     this.saveStatusEl = null;

@@ -1,10 +1,10 @@
 import { signal, computed, type Signal } from '@preact/signals-core';
 import type { Scene, Entity } from '@engine/world';
-import { HistoryManager } from '../history/HistoryManager';
+import { HistoryManager } from '@engine/editor-utils';
 import type { GridConfig } from '../grid/GridConfig';
-import type { SnapConfig } from '../snap/SnapConfig';
+import type { SnapConfig } from '@engine/editor-utils';
+import { DEFAULT_SNAP_CONFIG } from '@engine/editor-utils';
 import { DEFAULT_GRID_CONFIG } from '../grid/GridConfig';
-import { DEFAULT_SNAP_CONFIG } from '../snap/SnapConfig';
 import type { RendererCapabilities } from '@engine/gfx-webgpu/config';
 
 const DEFAULT_HISTORY_LIMIT = 100;

@@ -17,7 +17,7 @@
 import type { Scene } from '@engine/world';
 import type { EditorState } from '../core/state';
 import type { Asset, AssetMainCategory, AssetVariant, AssetSortBy } from '@engine/assets';
-import { assetRegistry } from '../assets/AssetRegistry';
+import { assetRegistry } from '@engine/assets';
 import { createIcon, iconHTML } from '../utils/icons';
 import type { IconName } from '../utils/icons';
 import type { InventoryManager } from '../managers/InventoryManager';
