@@ -7,7 +7,7 @@ import { EditorUI } from './editor/ui/EditorUI';
 import { Logger } from './logger';
 import { CameraComponent } from '@engine/world';
 import { PhysicsWorld } from './physics/PhysicsWorld';
-import { CharacterControllerSystem } from './scene/CharacterControllerSystem'; // TODO: Move to @engine/stdlib in Phase 5
+import { CharacterControllerSystem } from '@engine/stdlib/CharacterController';
 
 export interface EditorAppOptions {
   canvas: HTMLCanvasElement;

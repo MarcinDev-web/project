@@ -1,5 +1,5 @@
 export * from './Component';
-// export * from './AnimationComponent'; // TODO: Uncomment in Phase 5 (@engine/stdlib)
+export * from './AnimationComponent';
 export * from './CameraComponent';
 export * from './CharacterController';
 export * from './EnvironmentComponent';

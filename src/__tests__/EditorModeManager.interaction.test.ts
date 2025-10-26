@@ -7,7 +7,7 @@ import { SelectionManager } from '@engine/world';
 import type { OrbitControls } from '@engine/camera';
 import { CharacterInputHandler } from '@engine/input';
 import { FPSCamera } from '../editor/camera/FPSCamera';
-import { CharacterControllerSystem } from '../scene/CharacterControllerSystem';
+import { CharacterControllerSystem } from '@engine/stdlib/CharacterController';
 import { PhysicsWorld } from '@engine/world/physics';
 import { PlayModeStateType } from '../editor/core/PlayModeStateMachine';
 import { ReturnState } from '../editor/states/ReturnState';

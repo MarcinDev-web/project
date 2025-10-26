@@ -9,7 +9,7 @@ import { Entity } from '@engine/world';
 import { Scene } from '@engine/world';
 import { PhysicsComponent, RigidbodyType } from '@engine/world';
 import { PhysicsWorld } from '@engine/world/physics';
-import { CharacterControllerSystem } from '../scene/CharacterControllerSystem';
+import { CharacterControllerSystem } from '@engine/stdlib/CharacterController';
 
 describe('CharacterController', () => {
   let entity: Entity;

@@ -1,3 +1,4 @@
+export type Vec2 = [number, number];
 export type Vec3 = [number, number, number];
 export type Mat4 = Float32Array;
 export type Mat3 = [

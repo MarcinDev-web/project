@@ -65,7 +65,7 @@ import { EnvironmentComponent } from '../../scene/components/EnvironmentComponen
 import { AdaptiveUIManager } from './AdaptiveUIManager';
 import { FeatureIntroduction } from './FeatureIntroduction';
 import type { PhysicsWorld } from '../../physics/PhysicsWorld';
-import type { CharacterControllerSystem } from '../../scene/CharacterControllerSystem';
+import type { CharacterControllerSystem } from '@engine/stdlib/CharacterController';
 import { CharacterInputHandler } from '@engine/input';
 import { FPSCamera } from '../camera/FPSCamera';
 import { PauseMenu } from './PauseMenu';

@@ -5,7 +5,7 @@ import { Entity } from '@engine/world';
 import { EditorState } from '../editor/core/state';
 import { SelectionManager } from '@engine/world';
 import { PhysicsWorld } from '@engine/world/physics';
-import { CharacterControllerSystem } from '../scene/CharacterControllerSystem';
+import { CharacterControllerSystem } from '@engine/stdlib/CharacterController';
 import { CharacterInputHandler } from '@engine/input';
 import { FPSCamera } from '../editor/camera/FPSCamera';
 import { CharacterController } from '@engine/world';

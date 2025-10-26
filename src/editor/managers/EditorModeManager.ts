@@ -21,7 +21,7 @@ import type { PhysicsWorld } from '../../physics/PhysicsWorld';
 import { CharacterController } from '../../scene/components/CharacterController';
 import { PhysicsComponent, RigidbodyType } from '../../scene/components/PhysicsComponent';
 import type { OrbitControls } from '@engine/camera';
-import type { CharacterControllerSystem } from '../../scene/CharacterControllerSystem';
+import type { CharacterControllerSystem } from '@engine/stdlib/CharacterController';
 import type { CharacterInputHandler } from '@engine/input';
 import type { FPSCamera } from '../camera/FPSCamera';
 import { PlayModeStateMachine, PlayModeStateType } from '../core/PlayModeStateMachine';
