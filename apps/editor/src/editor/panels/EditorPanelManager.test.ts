@@ -42,7 +42,6 @@ describe('EditorPanelManager', () => {
     });
 
     it('should not have panels before mounting', () => {
-      expect(manager.getOutliner()).toBeNull();
       expect(manager.getProperties()).toBeNull();
       expect(manager.getAssetBrowser()).toBeNull();
     });
@@ -53,7 +52,6 @@ describe('EditorPanelManager', () => {
       manager.mount(sidebarContainer, inspectorContainer);
 
       expect(manager.isMounted()).toBe(true);
-      expect(manager.getOutliner()).not.toBeNull();
       expect(manager.getProperties()).not.toBeNull();
       expect(manager.getAssetBrowser()).not.toBeNull();
     });
@@ -72,12 +70,13 @@ describe('EditorPanelManager', () => {
       const consoleError = vi.spyOn(console, 'error').mockImplementation(() => {});
 
       manager.mount(sidebarContainer, inspectorContainer);
-      const outliner1 = manager.getOutliner();
+      const mounted1 = manager.isMounted();
 
       manager.mount(sidebarContainer, inspectorContainer);
-      const outliner2 = manager.getOutliner();
+      const mounted2 = manager.isMounted();
 
-      expect(outliner1).toBe(outliner2); // Same instance
+      expect(mounted1).toBe(true);
+      expect(mounted2).toBe(true);
       expect(consoleError).toHaveBeenCalledWith('EditorPanelManager: Already mounted');
 
       consoleError.mockRestore();
@@ -87,15 +86,6 @@ describe('EditorPanelManager', () => {
   describe('panel refreshing', () => {
     beforeEach(() => {
       manager.mount(sidebarContainer, inspectorContainer);
-    });
-
-    it('should refresh outliner panel', () => {
-      const outliner = manager.getOutliner();
-      const refreshSpy = vi.spyOn(outliner!, 'refresh');
-
-      manager.refreshOutliner();
-
-      expect(refreshSpy).toHaveBeenCalledOnce();
     });
 
     it('should refresh properties panel', () => {
@@ -117,17 +107,14 @@ describe('EditorPanelManager', () => {
     });
 
     it('should refresh all panels', () => {
-      const outliner = manager.getOutliner();
       const properties = manager.getProperties();
       const assetBrowser = manager.getAssetBrowser();
 
-      const outlinerSpy = vi.spyOn(outliner!, 'refresh');
       const propertiesSpy = vi.spyOn(properties!, 'refresh');
       const assetBrowserSpy = vi.spyOn(assetBrowser!, 'refresh');
 
       manager.refreshAll();
 
-      expect(outlinerSpy).toHaveBeenCalledOnce();
       expect(propertiesSpy).toHaveBeenCalledOnce();
       expect(assetBrowserSpy).toHaveBeenCalledOnce();
     });
@@ -146,7 +133,6 @@ describe('EditorPanelManager', () => {
       });
 
       // Should not throw
-      expect(() => unmountedManager.refreshOutliner()).not.toThrow();
       expect(() => unmountedManager.refreshProperties()).not.toThrow();
       expect(() => unmountedManager.refreshAssetBrowser()).not.toThrow();
       expect(() => unmountedManager.refreshAll()).not.toThrow();
@@ -154,12 +140,12 @@ describe('EditorPanelManager', () => {
   });
 
   describe('callbacks', () => {
-    it('should call onEntitySelected when entity is selected in outliner', () => {
+    it('should handle entity selection', () => {
       manager.mount(sidebarContainer, inspectorContainer);
 
       const entity = scene.createEntity('TestEntity');
 
-      // Simulate selecting entity through outliner
+      // Simulate selecting entity through UI
       // (This would normally happen through UI interaction)
       selection.select(entity);
 
@@ -193,13 +179,11 @@ describe('EditorPanelManager', () => {
     it('should dispose and clear references', () => {
       manager.mount(sidebarContainer, inspectorContainer);
 
-      expect(manager.getOutliner()).not.toBeNull();
       expect(manager.getProperties()).not.toBeNull();
       expect(manager.getAssetBrowser()).not.toBeNull();
 
       manager.dispose();
 
-      expect(manager.getOutliner()).toBeNull();
       expect(manager.getProperties()).toBeNull();
       expect(manager.getAssetBrowser()).toBeNull();
       expect(manager.isMounted()).toBe(false);
@@ -232,7 +216,6 @@ describe('EditorPanelManager', () => {
       manager.refreshAll();
 
       // Verify panels are in sync (implicit through no errors)
-      expect(manager.getOutliner()).not.toBeNull();
       expect(manager.getProperties()).not.toBeNull();
     });
 
@@ -251,7 +234,6 @@ describe('EditorPanelManager', () => {
 
   describe('getters', () => {
     it('should return null getters before mounting', () => {
-      expect(manager.getOutliner()).toBeNull();
       expect(manager.getProperties()).toBeNull();
       expect(manager.getAssetBrowser()).toBeNull();
     });
@@ -259,16 +241,13 @@ describe('EditorPanelManager', () => {
     it('should return valid instances after mounting', () => {
       manager.mount(sidebarContainer, inspectorContainer);
 
-      const outliner = manager.getOutliner();
       const properties = manager.getProperties();
       const assetBrowser = manager.getAssetBrowser();
 
-      expect(outliner).toBeDefined();
       expect(properties).toBeDefined();
       expect(assetBrowser).toBeDefined();
 
       // Verify they have expected methods
-      expect(typeof outliner?.refresh).toBe('function');
       expect(typeof properties?.refresh).toBe('function');
       expect(typeof assetBrowser?.refresh).toBe('function');
     });

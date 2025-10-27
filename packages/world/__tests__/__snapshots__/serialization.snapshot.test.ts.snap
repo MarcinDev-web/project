@@ -1,0 +1,56 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Scene Serialization Snapshots > serializes empty scene 1`] = `
+{
+  "entities": [],
+  "name": "EmptyScene",
+}
+`;
+
+exports[`Scene Serialization Snapshots > serializes scene hierarchy 1`] = `
+{
+  "entities": [
+    {
+      "id": 1,
+      "name": "Root",
+      "parentId": null,
+    },
+    {
+      "id": 2,
+      "name": "Child1",
+      "parentId": 1,
+    },
+    {
+      "id": 3,
+      "name": "Child2",
+      "parentId": 1,
+    },
+    {
+      "id": 4,
+      "name": "Grandchild",
+      "parentId": 2,
+    },
+  ],
+  "name": "HierarchyScene",
+}
+`;
+
+exports[`Scene Serialization Snapshots > serializes scene with entities 1`] = `
+{
+  "entities": [
+    {
+      "id": 1,
+      "name": "Entity1",
+    },
+    {
+      "id": 2,
+      "name": "Entity2",
+    },
+    {
+      "id": 3,
+      "name": "Entity3",
+    },
+  ],
+  "name": "TestScene",
+}
+`;

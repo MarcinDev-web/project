@@ -30,7 +30,16 @@ export function initBrowserPolyfills() {
 
   // HTMLCanvasElement polyfills for jsdom
   if (typeof HTMLCanvasElement !== 'undefined') {
-    HTMLCanvasElement.prototype.getContext ??= function () {
+    // Override getContext to support any context type (including 'webgpu')
+    const originalGetContext = HTMLCanvasElement.prototype.getContext;
+    HTMLCanvasElement.prototype.getContext = function (contextType: string, ...args: any[]) {
+      // Try original implementation first (for standard contexts like '2d')
+      if (originalGetContext) {
+        const ctx = originalGetContext.call(this, contextType, ...args);
+        if (ctx) return ctx;
+      }
+      
+      // Fallback mock for WebGPU and other contexts
       return {
         canvas: this,
         configure: () => {},
@@ -41,18 +50,31 @@ export function initBrowserPolyfills() {
         }),
       };
     };
-    HTMLCanvasElement.prototype.getBoundingClientRect ??= function () {
+    
+    // Override getBoundingClientRect to use canvas dimensions
+    const originalGetBoundingClientRect = HTMLCanvasElement.prototype.getBoundingClientRect;
+    HTMLCanvasElement.prototype.getBoundingClientRect = function () {
+      // Try original if available
+      if (originalGetBoundingClientRect) {
+        const rect = originalGetBoundingClientRect.call(this);
+        // If rect has valid dimensions, use it
+        if (rect.width > 0 || rect.height > 0) {
+          return rect;
+        }
+      }
+      
+      // Fallback to canvas dimensions
       return {
         left: 0,
         top: 0,
-        right: this.width ?? 0,
-        bottom: this.height ?? 0,
-        width: this.width ?? 0,
-        height: this.height ?? 0,
+        right: this.width || 0,
+        bottom: this.height || 0,
+        width: this.width || 0,
+        height: this.height || 0,
         x: 0,
         y: 0,
         toJSON: () => ({}),
-      };
+      } as DOMRect;
     };
     Object.defineProperty(HTMLCanvasElement.prototype, 'clientWidth', {
       get() {

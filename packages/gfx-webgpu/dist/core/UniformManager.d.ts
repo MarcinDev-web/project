@@ -10,7 +10,7 @@
  * - 80-96: atlasInsetAndPad (vec4<f32>)
  * - 96-112: shadingParams0 (vec4<f32>)
  * - 112-128: atlasParams (vec4<f32>)
- * - 144-464: lighting data (managed by LightingUniformWriter)
+ * - 128-448: lighting data (managed by LightingUniformWriter)
  */
 import type { Mat4, Vec3 } from '@engine/core/math';
 import type { LightingData } from '../lighting/LightManager';
@@ -40,7 +40,7 @@ export declare class UniformManager {
     updateDynamicUniforms(viewProjectionMatrix: Mat4, eyePosition: Vec3, lightingData?: LightingData): void;
     /**
      * Updates shadow-related uniforms appended after the lighting block.
-     * Layout (offsets from 464 bytes):
+     * Layout (offsets from 448 bytes):
      *  - 0..64: viewMatrix
      *  - 64..320: lightViewProj[4]
      *  - 320..336: cascadeSplits (vec4)

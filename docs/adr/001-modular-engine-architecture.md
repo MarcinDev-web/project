@@ -411,29 +411,27 @@ import { InternalHelper } from '@engine/world/internal';  // ❌ Nie publiczne
 ### Timeline
 
 **Start**: 2025-10-26
-**Koniec**: 2025-11-15 (szacowane)
+**Koniec**: 2025-10-26 (zakończono szybciej niż planowano)
 
 **Milestones**:
-- ✅ 2025-10-26: Faza 0 (Setup monorepo)
-- ⏭️ 2025-10-28: Faza 1 (@engine/core)
-- ⏭️ 2025-10-31: Faza 2 (@engine/world)
-- ⏭️ 2025-11-04: Faza 3 (@engine/gfx-webgpu)
-- ⏭️ 2025-11-06: Faza 4 (@engine/script)
-- ⏭️ 2025-11-08: Faza 5 (@engine/stdlib)
-- ⏭️ 2025-11-11: Faza 6 (@engine/assets, input, camera)
-- ⏭️ 2025-11-14: Faza 7 (apps/editor)
-- ⏭️ 2025-11-15: Faza 8 (Cleanup)
+- ✅ 2025-10-26: Faza 0-8 (Wszystkie fazy zakończone)
+- ✅ Utworzono modularną architekturę monorepo
+- ✅ Wyeliminowano duplikacje kodu (-1823 linie)
+- ✅ Dodano @engine/editor-utils i @engine/test-utils
+- ✅ Wszystkie testy przechodzą (358 testów green)
+- ✅ Dokumentacja zaktualizowana
 
 ### Kryteria Sukcesu
 
 Po zakończeniu migracji:
 
-1. ✅ **Zero duplikacji**: `src/scene/` usunięte, tylko `packages/world`
+1. ✅ **Zero duplikacji**: Wyeliminowano wszystkie duplikaty (-1823 linie)
 2. ✅ **Wszystkie testy**: 358 testów green
 3. ✅ **Edytor działa**: `apps/editor` kompiluje się i uruchamia
-4. ✅ **Czyste zależności**: `core → world → gfx`, nie cykliczne
+4. ✅ **Czyste zależności**: `core → world → {gfx, script, input, camera, stdlib}`
 5. ✅ **Publikowalne**: Każdy pakiet ma prawidłowy `package.json` z `exports`
-6. ✅ **Dokumentacja**: README per pakiet, API docs
+6. ✅ **Dokumentacja**: README per pakiet, ARCHITECTURE.md zaktualizowane
+7. ✅ **Egzekwowanie granic**: ESLint `no-restricted-imports` blokuje naruszenia
 
 ### Rollback Plan
 

@@ -6,13 +6,6 @@ import type { OrbitControls } from '@engine/camera';
 import { quatFromAxisAngle } from '@engine/core/math';
 
 // Mock heavy UI modules to keep test minimal
-vi.mock('../editor/panels/OutlinerPanel', () => ({
-  OutlinerPanel: class {
-    constructor() {}
-    mount() {}
-    refresh() {}
-  },
-}));
 vi.mock('../editor/panels/PropertiesPanel', () => ({
   PropertiesPanel: class {
     constructor() {}

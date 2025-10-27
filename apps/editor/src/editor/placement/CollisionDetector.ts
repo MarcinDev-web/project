@@ -6,6 +6,8 @@
 import type { Entity } from '@engine/world';
 import type { Scene } from '@engine/world';
 import { normalizeVec3Out, quatNormalize, dotVec3, type Quat, type Vec3 } from '@engine/core/math';
+import { ensureWasmCollisionInit, getWasmCollisionSync } from '../../wasm/collision';
+import type { Trs, TrsArray } from '@engine/wasm-collision';
 
 /**
  * Axis-Aligned Bounding Box
@@ -388,9 +390,93 @@ export class CollisionDetector {
     scale?: Vec3,
     excludeEntities?: Set<Entity>
   ): CollisionResult {
+    // Kick off WASM init in background (no-op if already initialized)
+    ensureWasmCollisionInit();
+
     const obb = this.getOBB(entity, position, rotation, scale);
     // Broad-phase: use AABB enclosing the OBB of the tested entity
     const entityAabb = CollisionDetector.obbToAABB(obb);
+    const wasm = getWasmCollisionSync();
+    const debug = (globalThis as any).__COLLISION_DEBUG__ === true;
+    const t0 = debug && typeof performance !== 'undefined' ? performance.now() : 0;
+    if (wasm) {
+      // Collect candidates passing broad-phase and build TRS SoA for batch check
+      const candidates: Entity[] = [];
+      const positions: number[] = [];
+      const rotations: number[] = [];
+      const scales: number[] = [];
+
+      const entities = this.scene.getActiveEntities();
+      for (const other of entities) {
+        if (other === entity) continue;
+        if (excludeEntities?.has(other)) continue;
+        const otherPos = other.transform.getWorldPosition();
+        const otherScale = other.transform.scale;
+        const ohx = Math.max(Math.abs(otherScale[0]) / 2, CollisionDetector.MIN_BOX_SIZE);
+        const ohy = Math.max(Math.abs(otherScale[1]) / 2, CollisionDetector.MIN_BOX_SIZE);
+        const ohz = Math.max(Math.abs(otherScale[2]) / 2, CollisionDetector.MIN_BOX_SIZE);
+        const orad = Math.hypot(ohx, ohy, ohz);
+        const otherAabb = {
+          min: [otherPos[0] - orad, otherPos[1] - orad, otherPos[2] - orad] as Vec3,
+          max: [otherPos[0] + orad, otherPos[1] + orad, otherPos[2] + orad] as Vec3,
+        } satisfies BoundingBox;
+        if (!CollisionDetector.boxesIntersect(entityAabb, otherAabb)) continue;
+
+        candidates.push(other);
+        positions.push(otherPos[0], otherPos[1], otherPos[2]);
+        const orot = other.transform.rotation;
+        rotations.push(orot[0], orot[1], orot[2], orot[3]);
+        scales.push(otherScale[0], otherScale[1], otherScale[2]);
+      }
+
+      if (candidates.length === 0) {
+        return { hasCollision: false, collidingEntities: [] };
+      }
+
+      const previewTrs: Trs = {
+        pos: new Float32Array(position ?? entity.transform.getWorldPosition()),
+        rot: new Float32Array((rotation ?? entity.transform.rotation) as unknown as number[]),
+        scl: new Float32Array(scale ?? entity.transform.scale),
+      };
+      // Dynamic threshold: small candidate sets are faster in TS path due to overheads
+      const useWasm = candidates.length >= 64;
+      if (!useWasm) {
+        const collidingEntities: Entity[] = [];
+        for (let i = 0; i < candidates.length; i++) {
+          const other = candidates[i]!;
+          const otherObb = this.getOBB(other);
+          if (CollisionDetector.obbIntersect(obb, otherObb)) {
+            collidingEntities.push(other);
+          }
+        }
+        if (debug && typeof performance !== 'undefined') {
+          const t1 = performance.now();
+          // eslint-disable-next-line no-console
+          console.log('[collision][ts] candidates:', candidates.length, 'ms:', (t1 - (t0 as number)).toFixed(2));
+        }
+        return { hasCollision: collidingEntities.length > 0, collidingEntities };
+      }
+
+      const idx = wasm.batchCheckTrs(previewTrs, {
+        positions: new Float32Array(positions),
+        rotations: new Float32Array(rotations),
+        scales: new Float32Array(scales),
+      } satisfies TrsArray);
+
+      const collidingEntities: Entity[] = [];
+      for (let i = 0; i < idx.length; i++) {
+        const j = idx[i]!;
+        const ent = candidates[j];
+        if (ent) collidingEntities.push(ent);
+      }
+      if (debug && typeof performance !== 'undefined') {
+        const t1 = performance.now();
+        // eslint-disable-next-line no-console
+        console.log('[collision][wasm] candidates:', candidates.length, 'ms:', (t1 - (t0 as number)).toFixed(2));
+      }
+      return { hasCollision: collidingEntities.length > 0, collidingEntities };
+    } else {
+      // Fallback: original TypeScript path
     const collidingEntities: Entity[] = [];
     for (const other of this.scene.getActiveEntities()) {
       if (other === entity) continue;
@@ -415,7 +501,13 @@ export class CollisionDetector {
         collidingEntities.push(other);
       }
     }
+    if (debug && typeof performance !== 'undefined') {
+      const t1 = performance.now();
+      // eslint-disable-next-line no-console
+      console.log('[collision][fallback-ts] ms:', (t1 - (t0 as number)).toFixed(2));
+    }
     return { hasCollision: collidingEntities.length > 0, collidingEntities };
+    }
   }
 
   /**

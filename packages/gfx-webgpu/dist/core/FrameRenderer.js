@@ -84,7 +84,28 @@ export class FrameRenderer {
             this.depthTextureSize = { width: canvas.width, height: canvas.height };
         }
         const encoder = device.createCommandEncoder({ label: 'frame-encoder' });
-        // Shadow map pre-pass before main render pass
+        // Per-frame frustum culling and dynamic instance buffer updates (before shadow pass to avoid destroy-use hazards)
+        if (scene) {
+            try {
+                const frustum = this.frustumCuller.extractFrustumFromVP(viewProjectionMatrix);
+                const allEntities = scene.getActiveEntities();
+                this.frustumCuller.cullEntitiesToArray(allEntities, frustum, this.visibleEntitiesCache);
+                const sceneData = this.instanceBuilder.build(this.visibleEntitiesCache);
+                if (geometry.instanceCount === sceneData.instanceCount) {
+                    // Same count: update in place
+                    this.updateInstanceBuffers(device, frameResources, sceneData);
+                }
+                else {
+                    // Different count: reallocate
+                    this.reallocateInstanceBuffers(device, frameResources, sceneData);
+                }
+                geometry = { ...geometry, ...sceneData };
+            }
+            catch (err) {
+                Logger.warn('Frustum culling/update failed:', err);
+            }
+        }
+        // Shadow map pre-pass before main render pass (after buffers updated)
         try {
             // Lazy initialize shadow pass
             if (!this.shadowPass) {
@@ -154,27 +175,7 @@ export class FrameRenderer {
                 ? { maxDrawCount: passDescriptor.maxDrawCount }
                 : {}),
         };
-        // Per-frame frustum culling and dynamic instance buffer updates
-        if (scene) {
-            try {
-                const frustum = this.frustumCuller.extractFrustumFromVP(viewProjectionMatrix);
-                const allEntities = scene.getActiveEntities();
-                this.frustumCuller.cullEntitiesToArray(allEntities, frustum, this.visibleEntitiesCache);
-                const sceneData = this.instanceBuilder.build(this.visibleEntitiesCache);
-                if (geometry.instanceCount === sceneData.instanceCount) {
-                    // Same count: update in place
-                    this.updateInstanceBuffers(device, frameResources, sceneData);
-                }
-                else {
-                    // Different count: reallocate
-                    this.reallocateInstanceBuffers(device, frameResources, sceneData);
-                }
-                geometry = { ...geometry, ...sceneData };
-            }
-            catch (err) {
-                Logger.warn('Frustum culling/update failed:', err);
-            }
-        }
+        // (moved culling and instance buffer updates above the shadow pass)
         // Optional: write a timestamp before starting the render pass for tests
         if (frameResources.timestampQuerySet) {
             try {

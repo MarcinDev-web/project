@@ -8,7 +8,7 @@
  * - Persistence
  */
 
-import type { Asset } from '@engine/assets';
+import type { Asset } from '../types/BlockAssetTypes';
 import { storageLoad, storageSave } from '../../utils/storage';
 import { Logger } from '../../utils/logger';
 
@@ -197,12 +197,12 @@ export class InventoryManager {
 
     const slot = this.hotbarSlots[index]!;
     slot.asset = asset;
-    slot.count = asset ? this.getCount(asset.metadata.id) : 0;
-    this.hotbarAssetIds[index] = asset ? asset.metadata.id : null;
+    slot.count = asset ? this.getCount(asset.id) : 0;
+    this.hotbarAssetIds[index] = asset ? asset.id : null;
     
     this.saveToStorage();
     this.notifyListeners();
-    Logger.debug(`Hotbar slot ${index + 1} set to: ${asset?.metadata.name || 'empty'}`);
+    Logger.debug(`Hotbar slot ${index + 1} set to: ${asset?.name || 'empty'}`);
   }
 
   /**
@@ -242,7 +242,7 @@ export class InventoryManager {
     const count = this.getCount(assetId);
     
     for (const slot of this.hotbarSlots) {
-      if (slot.asset && slot.asset.metadata.id === assetId) {
+      if (slot.asset && slot.asset.id === assetId) {
         slot.count = count;
       }
     }
@@ -332,18 +332,18 @@ export class InventoryManager {
 
       const slot = this.hotbarSlots[i]!;
       const asset = assetId ? assetLookup(assetId) : null;
-      const previousId = slot.asset?.metadata.id ?? null;
+      const previousId = slot.asset?.id ?? null;
 
-      if (asset && asset.metadata.id !== previousId) {
+      if (asset && asset.id !== previousId) {
         slot.asset = asset;
-        slot.count = this.getCount(asset.metadata.id);
+        slot.count = this.getCount(asset.id);
         changed = true;
       } else if (!asset && previousId !== null) {
         slot.asset = null;
         slot.count = 0;
         changed = true;
-      } else if (asset && slot.count !== this.getCount(asset.metadata.id)) {
-        slot.count = this.getCount(asset.metadata.id);
+      } else if (asset && slot.count !== this.getCount(asset.id)) {
+        slot.count = this.getCount(asset.id);
         changed = true;
       }
     }
@@ -389,7 +389,7 @@ export class InventoryManager {
   private normalizeHotbarData(data: (string | null)[]): (string | null)[] {
     const normalized = Array(9).fill(null) as (string | null)[];
     for (let i = 0; i < Math.min(data.length, normalized.length); i++) {
-      normalized[i] = data[i];
+      normalized[i] = data[i] ?? null;
     }
     return normalized;
   }

@@ -8,6 +8,7 @@ import { Logger } from './utils/logger';
 import { CameraComponent } from '@engine/world';
 import { PhysicsWorld } from '@engine/world';
 import { CharacterControllerSystem } from '@engine/stdlib/CharacterController';
+import { registerTemplates, createEmptyTemplate, createBasicLightingTemplate, createCornellBoxSeed } from '@engine/world-templates';
 
 export interface EditorAppOptions {
   canvas: HTMLCanvasElement;
@@ -51,6 +52,15 @@ export class EditorApp {
         this.config.statusEl.textContent = 'Loading renderer…';
       }, 150);
 
+      // Register built-in world templates/seeds once at boot
+      try {
+        registerTemplates([
+          createEmptyTemplate(),
+          createBasicLightingTemplate(),
+          createCornellBoxSeed(),
+        ]);
+      } catch {}
+
       this.renderer = await initRenderer({
         canvas: this.config.canvas,
         statusEl: this.config.statusEl,
@@ -64,6 +74,18 @@ export class EditorApp {
               this.editor.getModeManager()?.updatePlayMode(deltaTime);
             } catch (err) {
               Logger.warn('Play mode update failed:', err as Error);
+            }
+          } else {
+            // Update edit mode systems (camera director, FPS camera for free-fly)
+            try {
+              const modeManager = this.editor?.getModeManager();
+              if (modeManager) {
+                modeManager.getCameraDirector().update(deltaTime);
+              }
+              // Update FPS camera for pointer lock handling
+              this.editor?.getFPSCamera()?.update();
+            } catch (err) {
+              // Ignore edit mode update errors
             }
           }
         },
@@ -194,6 +216,11 @@ export class EditorApp {
         this.projectionMatrix as Mat4,
         this.viewMatrix as Mat4
       );
+      
+      // Debug: log occasionally
+      if (Math.random() < 0.01) {
+        console.log('[EditorApp] updateCameraMatrices using CameraDirector, mode:', cameraDirector.getMode());
+      }
       return;
     }
 

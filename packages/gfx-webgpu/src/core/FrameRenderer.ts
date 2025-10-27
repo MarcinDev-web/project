@@ -25,7 +25,7 @@ import type { EnvironmentRenderer } from '../renderers/EnvironmentRenderer';
 import { mat4Invert } from '@engine/core/math';
 import type { Mat4, Vec3 } from '@engine/core/math';
 import { Logger } from '@engine/core/utils';
-import { CLEAR_COLOR, MSAA_SAMPLE_COUNT, TIMESTAMP_QUERY_COUNT, TIMESTAMP_BUFFER_SIZE, GPU_TIMESTAMP_PAIRS } from '../config';
+import { CLEAR_COLOR, MSAA_SAMPLE_COUNT, TIMESTAMP_QUERY_COUNT, TIMESTAMP_BUFFER_SIZE, GPU_TIMESTAMP_PAIRS, TIMESTAMP_INDICES } from '../config';
 import { TonemapLutPass } from '../postprocess/TonemapLut';
 import { BloomPass } from '../postprocess/Bloom';
 import { UniformManager } from './UniformManager';
@@ -46,6 +46,16 @@ export interface FrameRenderContext {
   onGpuTimings?: (timings: { label: string; timeMs: number }[]) => void;
   uniformManager: UniformManager;
   lightingData?: import('../lighting/LightManager').LightingData;
+  onShadowMetrics?: (counts: readonly [number, number, number, number]) => void;
+  // Performance/quality flags
+  featureFlags?: {
+    enableComputePrepass?: boolean;
+    enableShadows?: boolean;
+    enableBloom?: boolean;
+    enableHDR?: boolean; // reserved for HDR toggle path (later todo)
+  };
+  shadowQuality?: 'low' | 'med' | 'high' | 'ultra';
+  msaaSampleCount?: number;
 }
 
 /**
@@ -69,6 +79,8 @@ export class FrameRenderer {
   // Postprocess resources
   private hdrColorTexture: GPUTexture | null = null;
   private bloomTexture: GPUTexture | null = null;
+  private hdrColorView: GPUTextureView | null = null;
+  private bloomTextureView: GPUTextureView | null = null;
   private tonemapPass: TonemapLutPass | null = null;
   private bloomPass: BloomPass | null = null;
   private shadowPass: ShadowPass | null = null;
@@ -99,7 +111,10 @@ export class FrameRenderer {
       frameResources.msaaColorTexture.destroy();
       this.hdrColorTexture?.destroy();
       this.bloomTexture?.destroy();
-      frameResources.depthTexture = createDepthTexture(device, canvas, MSAA_SAMPLE_COUNT);
+      this.hdrColorView = null;
+      this.bloomTextureView = null;
+      const sampleCount = ctx.msaaSampleCount ?? MSAA_SAMPLE_COUNT;
+      frameResources.depthTexture = createDepthTexture(device, canvas, sampleCount);
       frameResources.depthTextureView = frameResources.depthTexture.createView({
         label: 'frame-depth-view',
       });
@@ -107,68 +122,135 @@ export class FrameRenderer {
         device,
         canvas,
         'rgba16float',
-        MSAA_SAMPLE_COUNT
+        sampleCount
       );
       frameResources.msaaColorView = frameResources.msaaColorTexture.createView({
         label: 'frame-msaa-color-view',
       });
-      this.hdrColorTexture = createHdrColorTarget(device, canvas);
-      this.bloomTexture = device.createTexture({
-        label: 'frame-bloom-texture',
-        size: { width: canvas.width, height: canvas.height, depthOrArrayLayers: 1 },
-        format: 'rgba16float',
-        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-      });
+      const enableHDR = ctx.featureFlags?.enableHDR !== false;
+      const enableBloom = ctx.featureFlags?.enableBloom !== false;
+      if (enableHDR) {
+        this.hdrColorTexture = createHdrColorTarget(device, canvas);
+        this.hdrColorView = this.hdrColorTexture.createView();
+        if (enableBloom) {
+          // Half-resolution bloom target
+          const halfW = Math.max(1, Math.floor(canvas.width / 2));
+          const halfH = Math.max(1, Math.floor(canvas.height / 2));
+          this.bloomTexture = device.createTexture({
+            label: 'frame-bloom-texture',
+            size: { width: halfW, height: halfH, depthOrArrayLayers: 1 },
+            format: 'rgba16float',
+            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+          });
+          this.bloomTextureView = this.bloomTexture.createView();
+        }
+      }
       this.depthTextureSize = { width: canvas.width, height: canvas.height };
     }
 
     const encoder = device.createCommandEncoder({ label: 'frame-encoder' });
+    // Frame begin timestamp (surround entire frame)
+    if (frameResources.timestampQuerySet) {
+      try {
+        (encoder as any).writeTimestamp?.(frameResources.timestampQuerySet, TIMESTAMP_INDICES.FRAME_BEGIN);
+      } catch {
+        // ignore when not supported by mock
+      }
+    }
 
-    // Shadow map pre-pass before main render pass
-    try {
-      // Lazy initialize shadow pass
-      if (!this.shadowPass) {
-        this.shadowPass = new ShadowPass(device);
+    // Per-frame frustum culling and dynamic instance buffer updates (before shadow pass to avoid destroy-use hazards)
+    if (scene) {
+      try {
+        const frustum = this.frustumCuller.extractFrustumFromVP(viewProjectionMatrix);
+        const allEntities = scene.getActiveEntities();
+        this.frustumCuller.cullEntitiesToArray(allEntities, frustum, this.visibleEntitiesCache);
+        const sceneData = this.instanceBuilder.build(this.visibleEntitiesCache);
+
+        if (geometry.instanceCount === sceneData.instanceCount) {
+          // Same count: update in place
+          this.updateInstanceBuffers(device, frameResources, sceneData);
+        } else {
+          // Different count: reallocate
+          this.reallocateInstanceBuffers(device, frameResources, sceneData);
+        }
+        geometry = { ...geometry, ...sceneData };
+      } catch (err) {
+        Logger.warn('Frustum culling/update failed:', err);
       }
-      if (viewMatrix && projectionMatrix) {
-        this.shadowPass.render({
-          encoder,
-          frameResources,
-          geometry,
-          viewMatrix,
-          projectionMatrix,
-          uniformManager: ctx.uniformManager,
-          lightingData: ctx.lightingData,
-          ibl: {
-            brdfLut: ctx.environmentRenderer && (ctx.environmentRenderer as any).getBrdfLutTexture?.(),
-            envCube: ctx.environmentRenderer && (ctx.environmentRenderer as any).getEnvCubeTexture?.(),
-          },
-        });
+    }
+
+    // Shadow map pre-pass before main render pass (after buffers updated)
+    if (ctx.featureFlags?.enableShadows !== false) {
+      try {
+        // Lazy initialize shadow pass
+        if (!this.shadowPass) {
+          this.shadowPass = new ShadowPass(device);
+        }
+        // Apply quality preset each frame (cheap)
+        try {
+          const q = ctx.shadowQuality ?? 'med';
+          this.shadowPass.setQualityPreset(q);
+        } catch {}
+        if (viewMatrix && projectionMatrix) {
+          this.shadowPass.render({
+            encoder,
+            frameResources,
+            geometry,
+            viewMatrix,
+            projectionMatrix,
+            uniformManager: ctx.uniformManager,
+            lightingData: ctx.lightingData,
+            ibl: {
+              brdfLut: ctx.environmentRenderer && (ctx.environmentRenderer as any).getBrdfLutTexture?.(),
+              envCube: ctx.environmentRenderer && (ctx.environmentRenderer as any).getEnvCubeTexture?.(),
+            },
+          });
+          if (typeof ctx.onShadowMetrics === 'function') {
+            try {
+              ctx.onShadowMetrics(this.shadowPass.getLastCascadeInstanceCounts());
+            } catch {}
+          }
+        }
+      } catch (err) {
+        Logger.warn('Shadow pass failed:', err);
       }
-    } catch (err) {
-      Logger.warn('Shadow pass failed:', err);
     }
 
     // Compute prepass (runs before render pass)
     try {
-      if (!this.computePrepass) {
-        if (typeof (encoder as GPUCommandEncoder).beginComputePass === 'function') {
-          this.computePrepass = new ComputePrepass(device);
+      if (ctx.featureFlags?.enableComputePrepass !== false) {
+        if (!this.computePrepass) {
+          if (typeof (encoder as GPUCommandEncoder).beginComputePass === 'function') {
+            this.computePrepass = new ComputePrepass(device);
+          }
+        }
+        if (frameResources.timestampQuerySet) {
+          try {
+            (encoder as any).writeTimestamp?.(frameResources.timestampQuerySet, TIMESTAMP_INDICES.COMPUTE_BEGIN);
+          } catch {}
+        }
+        this.computePrepass?.run(encoder);
+        if (frameResources.timestampQuerySet) {
+          try {
+            (encoder as any).writeTimestamp?.(frameResources.timestampQuerySet, TIMESTAMP_INDICES.COMPUTE_END);
+          } catch {}
         }
       }
-      this.computePrepass?.run(encoder);
     } catch (err) {
       Logger.warn('Compute prepass failed:', err);
     }
     const swapChainView = context.getCurrentTexture().createView({ label: 'frame-color-resolve-view' });
 
     // Base pass descriptor with required attachments
+    const enableHDR = ctx.featureFlags?.enableHDR !== false;
     const basePassDesc: GPURenderPassDescriptor = {
       label: 'frame-render-pass',
       colorAttachments: [
         {
           view: frameResources.msaaColorView,
-          resolveTarget: (this.hdrColorTexture ??= createHdrColorTarget(device, canvas)).createView({ label: 'frame-hdr-view' }),
+          resolveTarget: enableHDR
+            ? (this.hdrColorView ?? (this.hdrColorTexture ??= createHdrColorTarget(device, canvas)).createView({ label: 'frame-hdr-view' }))
+            : swapChainView,
           clearValue: CLEAR_COLOR,
           loadOp: 'clear',
           storeOp: 'store',
@@ -195,35 +277,7 @@ export class FrameRenderer {
         : {}),
     };
 
-    // Per-frame frustum culling and dynamic instance buffer updates
-    if (scene) {
-      try {
-        const frustum = this.frustumCuller.extractFrustumFromVP(viewProjectionMatrix);
-        const allEntities = scene.getActiveEntities();
-        this.frustumCuller.cullEntitiesToArray(allEntities, frustum, this.visibleEntitiesCache);
-        const sceneData = this.instanceBuilder.build(this.visibleEntitiesCache);
-
-        if (geometry.instanceCount === sceneData.instanceCount) {
-          // Same count: update in place
-          this.updateInstanceBuffers(device, frameResources, sceneData);
-        } else {
-          // Different count: reallocate
-          this.reallocateInstanceBuffers(device, frameResources, sceneData);
-        }
-        geometry = { ...geometry, ...sceneData };
-      } catch (err) {
-        Logger.warn('Frustum culling/update failed:', err);
-      }
-    }
-
-    // Optional: write a timestamp before starting the render pass for tests
-    if (frameResources.timestampQuerySet) {
-      try {
-        (encoder as any).writeTimestamp?.(frameResources.timestampQuerySet, 0);
-      } catch {
-        // ignore when not supported by mock
-      }
-    }
+    // (moved culling and instance buffer updates above the shadow pass)
 
     const passEncoder = encoder.beginRenderPass(finalPassDesc);
 
@@ -265,7 +319,8 @@ export class FrameRenderer {
           device,
           frameResources,
           ctx.presentationFormat,
-          geometry
+          geometry,
+          ctx.msaaSampleCount ?? MSAA_SAMPLE_COUNT
         );
         this.bundleDirty = false;
         this.bundleInstanceCount = geometry.instanceCount;
@@ -311,14 +366,65 @@ export class FrameRenderer {
     // }
 
     passEncoder.end();
-    // Optional: write a timestamp after the render pass for tests
+    // Postprocess: Bloom then Tonemap+LUT to the swap chain
+    // Initialize passes lazily
+    if (enableHDR) {
+      if (!this.bloomPass) { this.bloomPass = new BloomPass(device); this.bloomPass.initialize('rgba16float'); }
+      if (!this.tonemapPass) { this.tonemapPass = new TonemapLutPass(device); this.tonemapPass.initialize(ctx.presentationFormat); }
+    }
+    // Ensure views exist (created on resize)
+    if (!this.hdrColorTexture) {
+      this.hdrColorTexture = createHdrColorTarget(device, canvas);
+      this.hdrColorView = this.hdrColorTexture.createView();
+    }
+    if (!this.hdrColorView) this.hdrColorView = this.hdrColorTexture.createView();
+    if (enableHDR && !this.bloomTexture) {
+      const halfW = Math.max(1, Math.floor(canvas.width / 2));
+      const halfH = Math.max(1, Math.floor(canvas.height / 2));
+      this.bloomTexture = device.createTexture({
+        label: 'frame-bloom-texture',
+        size: { width: halfW, height: halfH, depthOrArrayLayers: 1 },
+        format: 'rgba16float',
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+      });
+      this.bloomTextureView = this.bloomTexture.createView();
+    }
+    if (enableHDR && !this.bloomTextureView) this.bloomTextureView = this.bloomTexture.createView();
+
+    const hdrView = this.hdrColorView;
+    const bloomView = this.bloomTextureView;
+    // Bloom pass with timestamps (optional flag)
+    if (enableHDR && ctx.featureFlags?.enableBloom !== false) {
+      this.bloomPass.render(
+      encoder,
+      hdrView,
+      bloomView,
+      frameResources.timestampQuerySet
+        ? { querySet: frameResources.timestampQuerySet, begin: TIMESTAMP_INDICES.BLOOM_BEGIN, end: TIMESTAMP_INDICES.BLOOM_END }
+        : undefined
+      );
+    }
+    // Tonemap pass with timestamps (only when HDR path is enabled)
+    if (enableHDR) {
+      this.tonemapPass.render(
+        encoder,
+        hdrView,
+        bloomView,
+        swapChainView,
+        frameResources.timestampQuerySet
+          ? { querySet: frameResources.timestampQuerySet, begin: TIMESTAMP_INDICES.TONEMAP_BEGIN, end: TIMESTAMP_INDICES.TONEMAP_END }
+          : undefined
+      );
+    }
+
+    // Frame end timestamp (after all passes; before resolve/copy)
     if (frameResources.timestampQuerySet) {
       try {
-        (encoder as any).writeTimestamp?.(frameResources.timestampQuerySet, 1);
-      } catch {
-        // ignore when not supported by mock
-      }
+        (encoder as any).writeTimestamp?.(frameResources.timestampQuerySet, TIMESTAMP_INDICES.FRAME_END);
+      } catch {}
     }
+
+    // Resolve and copy timestamps after all writes are recorded
     if (frameResources.timestampQuerySet && frameResources.timestampResolveBuffer && frameResources.timestampReadBuffer) {
       encoder.resolveQuerySet(
         frameResources.timestampQuerySet,
@@ -335,19 +441,6 @@ export class FrameRenderer {
         TIMESTAMP_BUFFER_SIZE
       );
     }
-    // Postprocess: Bloom then Tonemap+LUT to the swap chain
-    // Initialize passes lazily
-    if (!this.bloomPass) { this.bloomPass = new BloomPass(device); this.bloomPass.initialize('rgba16float'); }
-    if (!this.tonemapPass) { this.tonemapPass = new TonemapLutPass(device); this.tonemapPass.initialize(ctx.presentationFormat); }
-    const hdrView = (this.hdrColorTexture ?? createHdrColorTarget(device, canvas)).createView();
-    const bloomView = (this.bloomTexture ?? device.createTexture({
-      label: 'frame-bloom-texture',
-      size: { width: canvas.width, height: canvas.height, depthOrArrayLayers: 1 },
-      format: 'rgba16float',
-      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-    })).createView();
-    this.bloomPass.render(encoder, hdrView, bloomView);
-    this.tonemapPass.render(encoder, hdrView, bloomView, swapChainView);
 
     device.queue.submit([encoder.finish()]);
 
@@ -628,7 +721,8 @@ export class FrameRenderer {
     device: GPUDevice,
     frameResources: FrameResources,
     presentationFormat: GPUTextureFormat,
-    geometry: GeometryData
+    geometry: GeometryData,
+    sampleCount: number
   ): GPURenderBundle {
     if (typeof (device as any).createRenderBundleEncoder !== 'function') {
       // Fallback path when mock device lacks bundle encoder support
@@ -638,7 +732,7 @@ export class FrameRenderer {
       label: 'frame-static-bundle',
       colorFormats: ['rgba16float'],
       depthStencilFormat: 'depth24plus',
-      sampleCount: MSAA_SAMPLE_COUNT,
+      sampleCount,
     });
 
     this.drawStaticGeometry(bundleEncoder, frameResources, geometry);

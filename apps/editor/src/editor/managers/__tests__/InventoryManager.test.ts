@@ -1,23 +1,19 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { InventoryManager } from '../InventoryManager';
-import type { Asset } from '@engine/assets';
+import type { Asset } from '../../types/BlockAssetTypes';
+import { BLOCK_LIBRARY } from '@engine/gfx-webgpu/blocks/BlockLibrary';
+import { blockToAsset } from '../../types/BlockAssetTypes';
 
 // Mock asset
-const createMockAsset = (id: string, name: string): Asset => ({
-  type: 'primitive',
-  category: 'Building',
-  metadata: {
+const createMockAsset = (id: string, name: string): Asset => {
+  const block = Object.values(BLOCK_LIBRARY)[0];
+  const asset = blockToAsset(block);
+  return {
+    ...asset,
     id,
     name,
-    description: 'Test asset',
-  },
-  transform: {
-    position: [0, 0, 0],
-    rotation: [0, 0, 0, 1],
-    scale: [1, 1, 1],
-  },
-  colors: [[1, 1, 1, 1]],
-});
+  };
+};
 
 describe('InventoryManager', () => {
   let manager: InventoryManager;

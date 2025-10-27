@@ -35,7 +35,6 @@ export class EditorUILayout {
   private inspector: HTMLElement | null = null;
   private toolbar: HTMLElement | null = null;
   private canvasContainer: HTMLElement | null = null;
-  private sidebarToggle: HTMLElement | null = null;
   private inspectorToggle: HTMLElement | null = null;
   private keyboardCleanup: (() => void) | null = null;
   private breadcrumbs: HTMLElement | null = null;
@@ -108,7 +107,7 @@ export class EditorUILayout {
       this.sceneMetricsEl = document.createElement('div');
       this.sceneMetricsEl.className = 'status-bar-item';
       this.sceneMetricsEl.innerHTML = `
-        <span id="scene-metrics">0 entities</span>
+        <span id="scene-metrics"></span>
       `;
       statusBar.appendChild(this.sceneMetricsEl);
 
@@ -150,8 +149,7 @@ export class EditorUILayout {
       </div>
     `;
 
-    // Create toggle buttons for panels (improved with labels)
-    this.sidebarToggle = this.createToggleButton('left', () => this.toggleSidebar());
+    // Create toggle button for inspector panel
     this.inspectorToggle = this.createToggleButton('right', () => this.toggleInspector());
 
     // Create keyboard shortcuts overlay
@@ -173,7 +171,6 @@ export class EditorUILayout {
     this.layoutRoot.appendChild(this.sidebar);
     this.layoutRoot.appendChild(this.inspector);
     this.layoutRoot.appendChild(statusBar);
-    this.layoutRoot.appendChild(this.sidebarToggle);
     this.layoutRoot.appendChild(this.inspectorToggle);
     this.layoutRoot.appendChild(this.shortcutsOverlay);
     this.statusBar = statusBar;
@@ -207,7 +204,6 @@ export class EditorUILayout {
     const toggleElements: Array<HTMLElement | null> = [
       this.sidebar,
       this.inspector,
-      this.sidebarToggle,
       this.inspectorToggle,
       this.toolbar,
       this.breadcrumbs,
@@ -296,10 +292,19 @@ export class EditorUILayout {
     button.setAttribute('aria-expanded', String(!isCollapsed));
     button.setAttribute('title', `Toggle ${label} Panel (${shortcut})`);
     
-    // Simple, compact icon only
-    const icon = position === 'left' 
-      ? '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4L6 8l4 4"/></svg>'
-      : '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l4 4-4 4"/></svg>';
+    // Icon direction based on collapsed state and position
+    let icon: string;
+    if (position === 'left') {
+      // Left toggle: points right when collapsed, left when open
+      icon = isCollapsed
+        ? '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l4 4-4 4"/></svg>'
+        : '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4L6 8l4 4"/></svg>';
+    } else {
+      // Right toggle: points left when collapsed, right when open
+      icon = isCollapsed
+        ? '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4L6 8l4 4"/></svg>'
+        : '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l4 4-4 4"/></svg>';
+    }
     
     button.innerHTML = `
       ${icon}
@@ -323,7 +328,7 @@ export class EditorUILayout {
 
   /**
    * Updates scene metrics display in status bar.
-   * Compact format: shows entity count and FPS as primary metrics.
+   * Compact format: shows FPS and triangle count.
    */
   private updateSceneMetrics(): void {
     // In headless/test environments, window/document may be unavailable
@@ -335,10 +340,7 @@ export class EditorUILayout {
     const metrics = this.config.sceneMetricsProvider();
     const parts: string[] = [];
 
-    // Primary metric: entity count (compact)
-    parts.push(`${metrics.entityCount}e`);
-    
-    // Secondary metric: FPS (always show if available - most important for performance)
+    // Primary metric: FPS (always show if available - most important for performance)
     if (metrics.fps !== undefined) {
       parts.push(`${Math.round(metrics.fps)} fps`);
     }
@@ -473,21 +475,13 @@ export class EditorUILayout {
    * Toggles sidebar visibility.
    */
   toggleSidebar(): void {
-    if (!this.sidebar || !this.sidebarToggle) return;
+    if (!this.sidebar) return;
 
     this.sidebarCollapsed = !this.sidebarCollapsed;
     this.sidebar.classList.toggle('collapsed', this.sidebarCollapsed);
     
     // Update ARIA attributes
-    this.sidebarToggle.setAttribute('aria-expanded', String(!this.sidebarCollapsed));
     this.sidebar.setAttribute('aria-hidden', String(this.sidebarCollapsed));
-    
-    // Update toggle button icon direction
-    const icon = this.sidebarCollapsed
-      ? '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l4 4-4 4"/></svg>'
-      : '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4L6 8l4 4"/></svg>';
-    
-    this.sidebarToggle.innerHTML = icon;
   }
 
   /**
@@ -508,7 +502,10 @@ export class EditorUILayout {
       ? '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4L6 8l4 4"/></svg>'
       : '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l4 4-4 4"/></svg>';
     
-    this.inspectorToggle.innerHTML = icon;
+    this.inspectorToggle.innerHTML = `
+      ${icon}
+      <span class="panel-toggle-label">Inspector</span>
+    `;
   }
 
   /**
@@ -551,7 +548,6 @@ export class EditorUILayout {
     this.sidebar = null;
     this.inspector = null;
     this.canvasContainer = null;
-    this.sidebarToggle = null;
     this.inspectorToggle = null;
     this.breadcrumbs = null;
     this.shortcutsOverlay = null;

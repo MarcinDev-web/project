@@ -4,9 +4,10 @@ import { Logger } from '../../utils/logger';
 import type { CameraDirector } from '@engine/camera';
 import type { InputContextManager } from '@engine/input';
 import { GameplayInputContext } from '@engine/input';
-import type { Entity } from '@engine/world';
+import type { Entity, Scene, PhysicsWorld } from '@engine/world';
 import type { Vec3 } from '@engine/core/math';
 import type { PlayManifest } from '../core/PlayManifest';
+import { SpawnPointSystem } from '../systems/SpawnPointSystem';
 
 /**
  * Dependencies for PLAY_INTRO state
@@ -16,6 +17,10 @@ export interface PlayIntroStateDeps {
   cameraDirector: CameraDirector;
   /** Input context manager */
   inputContext: InputContextManager;
+  /** Scene for spawn point detection */
+  getScene: () => Scene;
+  /** Physics world for raycast fallback */
+  getPhysicsWorld?: () => PhysicsWorld | null;
   /** Track whether gameplay context has been pushed */
   markGameplayContextActive: (active: boolean) => void;
   /** Check if gameplay context is active */
@@ -93,12 +98,25 @@ export class PlayIntroState implements IPlayModeState {
         this.deps.configureController(manifest);
       }
 
-      // Step 2: Spawn player
-      const playerPos = manifest?.playerStart?.position ?? [0, 2, 0];
-      const playerRot = manifest?.playerStart?.rotation ?? 0;
+      // Step 2: Find spawn point
+      const scene = this.deps.getScene();
+      const physicsWorld = this.deps.getPhysicsWorld?.() ?? null;
+      
+      // Use camera position as fallback reference for raycast
+      const cameraPosition = this.deps.cameraDirector.getViewMatrix ? 
+        this.extractCameraPosition(this.deps.cameraDirector.getViewMatrix()) :
+        [0, 10, 0] as Vec3;
+      
+      const spawnResult = SpawnPointSystem.findSpawnPoint(
+        scene,
+        physicsWorld,
+        cameraPosition
+      );
 
-      Logger.debug('Spawning player at', playerPos);
-      const player = this.deps.spawnPlayer(playerPos as Vec3, playerRot);
+      Logger.debug('Spawn point found:', spawnResult.source, 'at', spawnResult.position);
+
+      // Step 3: Spawn player
+      const player = this.deps.spawnPlayer(spawnResult.position, spawnResult.rotation);
       context.data.set('playerEntity', player);
       this.deps.cameraDirector.setPlayerPosition(player.transform.position);
       
@@ -183,6 +201,25 @@ export class PlayIntroState implements IPlayModeState {
   canTransitionTo(target: PlayModeStateType): boolean {
     // Can transition to PLAYING (success) or RETURN (failure)
     return target === StateType.PLAYING || target === StateType.RETURN;
+  }
+
+  /**
+   * Extract camera position from view matrix
+   * View matrix is the inverse of the camera's world transform
+   */
+  private extractCameraPosition(viewMatrix: Float32Array): Vec3 {
+    // Invert view matrix to get camera world transform
+    // For a simple extraction, we can use the fact that:
+    // viewMatrix = inverse(cameraWorldMatrix)
+    // The camera position is at the translation component of the inverted view
+    
+    // Simplified extraction (assumes orthonormal matrix):
+    const m = viewMatrix;
+    const x = -(m[0] * m[12] + m[1] * m[13] + m[2] * m[14]);
+    const y = -(m[4] * m[12] + m[5] * m[13] + m[6] * m[14]);
+    const z = -(m[8] * m[12] + m[9] * m[13] + m[10] * m[14]);
+    
+    return [x, y, z];
   }
 }
 

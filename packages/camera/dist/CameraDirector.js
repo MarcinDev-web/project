@@ -17,6 +17,7 @@ export class CameraDirector {
     blend = null;
     orbitControls;
     fpsCamera;
+    editorCamera;
     canvas;
     scene;
     physicsWorld;
@@ -28,16 +29,25 @@ export class CameraDirector {
     projectionMatrix;
     // Player position for FPS mode (injected from outside)
     playerPosition = null;
+    // Logger for debugging
+    logger;
     constructor(config) {
         this.orbitControls = config.orbitControls;
         this.fpsCamera = config.fpsCamera;
+        this.editorCamera = config.editorCamera;
         this.canvas = config.canvas;
         this.scene = config.scene ?? null;
         this.physicsWorld = config.physicsWorld ?? null;
+        this.logger = config.logger ?? {
+            debug: console.debug,
+            warn: console.warn,
+        };
         this.viewMatrix = new Float32Array(16);
         this.projectionMatrix = new Float32Array(16);
         // Initialize matrices so callers can query immediately after construction
         this.updateCameraState();
+        // Enable the default camera mode (orbit)
+        this.enableCameraForMode(this.currentMode);
     }
     /**
      * Set the current camera mode (instant switch, no blend)
@@ -46,9 +56,14 @@ export class CameraDirector {
         if (this.currentMode === mode) {
             return;
         }
-        console.debug(`Camera mode: ${this.currentMode} → ${mode}`);
+        console.log(`[CameraDirector] Camera mode: ${this.currentMode} → ${mode}`);
+        // Disable previous mode's camera
+        this.disableCameraForMode(this.currentMode);
         this.currentMode = mode;
         this.blend = null;
+        // Enable new mode's camera
+        this.enableCameraForMode(this.currentMode);
+        console.log(`[CameraDirector] Mode switched to: ${mode}, editorCamera enabled: ${this.editorCamera?.isEnabled()}`);
         this.updateCameraState();
     }
     /**
@@ -60,13 +75,13 @@ export class CameraDirector {
         }
         // Treat non-positive durations as an instant switch (no blend)
         if (duration <= 0) {
-            console.debug(`Camera instant switch: ${this.currentMode} → ${toMode}`);
+            this.logger?.debug(`Camera instant switch: ${this.currentMode} → ${toMode}`);
             this.currentMode = toMode;
             this.blend = null;
             this.updateCameraState();
             return;
         }
-        console.debug(`Camera blend: ${this.currentMode} → ${toMode} (${duration}s)`);
+        this.logger?.debug(`Camera blend: ${this.currentMode} → ${toMode} (${duration}s)`);
         // Capture current matrices for blending
         const fromView = new Float32Array(16);
         const fromProjection = new Float32Array(16);
@@ -99,6 +114,15 @@ export class CameraDirector {
             if (this.blend.elapsed >= this.blend.duration) {
                 // Blend complete
                 this.blend = null;
+            }
+        }
+        // Update free-fly camera if active
+        if (this.currentMode === 'free-fly') {
+            if (this.editorCamera) {
+                this.editorCamera.update(deltaTime);
+            }
+            else {
+                console.warn('[CameraDirector] free-fly mode but editorCamera is null!');
             }
         }
         this.updateCameraState();
@@ -186,6 +210,64 @@ export class CameraDirector {
     dispose() {
         this.blend = null;
         this.playerPosition = null;
+        // Cleanup cameras
+        if (this.editorCamera) {
+            this.editorCamera.dispose();
+        }
+    }
+    /**
+     * Enable camera for a specific mode
+     */
+    enableCameraForMode(mode) {
+        console.log(`[CameraDirector] Enabling camera for mode: ${mode}`);
+        switch (mode) {
+            case 'orbit':
+                this.orbitControls.setEnabled(true);
+                console.log('[CameraDirector] ✓ Orbit controls enabled');
+                break;
+            case 'fps':
+                // FPS camera is enabled by play mode
+                if (this.fpsCamera) {
+                    this.fpsCamera.enable();
+                    console.log('[CameraDirector] ✓ FPS camera enabled');
+                }
+                break;
+            case 'free-fly':
+                if (this.editorCamera) {
+                    this.editorCamera.enable();
+                    console.log('[CameraDirector] ✓ EditorCamera enabled');
+                }
+                else {
+                    console.warn('[CameraDirector] ⚠️ EditorCamera is null!');
+                }
+                this.orbitControls.setEnabled(false);
+                console.log('[CameraDirector] ✓ Orbit controls disabled');
+                break;
+            case 'follow':
+                // Not implemented yet
+                break;
+        }
+    }
+    /**
+     * Disable camera for a specific mode
+     */
+    disableCameraForMode(mode) {
+        switch (mode) {
+            case 'orbit':
+                this.orbitControls.setEnabled(false);
+                break;
+            case 'fps':
+                // FPS camera is disabled by play mode
+                break;
+            case 'free-fly':
+                if (this.editorCamera) {
+                    this.editorCamera.disable();
+                }
+                break;
+            case 'follow':
+                // Not implemented yet
+                break;
+        }
     }
     /**
      * Update internal camera state based on current mode
@@ -215,12 +297,25 @@ export class CameraDirector {
                 break;
             }
             case 'fps': {
-                if (this.fpsCamera && this.playerPosition) {
-                    const basePosition = [
-                        this.playerPosition[0] + this.cameraOffset[0],
-                        this.playerPosition[1] + this.cameraOffset[1],
-                        this.playerPosition[2] + this.cameraOffset[2],
-                    ];
+                if (this.fpsCamera) {
+                    let basePosition;
+                    // In play mode: use player position
+                    // In edit mode: use orbit camera position for free-fly FPS
+                    if (this.playerPosition) {
+                        basePosition = [
+                            this.playerPosition[0] + this.cameraOffset[0],
+                            this.playerPosition[1] + this.cameraOffset[1],
+                            this.playerPosition[2] + this.cameraOffset[2],
+                        ];
+                    }
+                    else {
+                        // Edit mode: calculate position from orbit controls
+                        const { yaw, pitch, distance } = this.orbitControls.getState();
+                        const eyeX = Math.cos(pitch) * Math.sin(yaw) * distance;
+                        const eyeY = Math.sin(pitch) * distance;
+                        const eyeZ = Math.cos(pitch) * Math.cos(yaw) * distance;
+                        basePosition = [eyeX, eyeY, eyeZ];
+                    }
                     const cameraPosition = this.resolveCameraCollision(basePosition);
                     const fpsView = this.fpsCamera.getViewMatrix(cameraPosition);
                     outMatrix.set(fpsView);
@@ -237,8 +332,23 @@ export class CameraDirector {
                 this.computeViewMatrix('orbit', outMatrix);
                 break;
             }
+            case 'free-fly': {
+                if (this.editorCamera) {
+                    const view = this.editorCamera.getViewMatrix();
+                    outMatrix.set(view);
+                    // Debug: log first time to confirm it's being called
+                    if (Math.random() < 0.01) { // Log only 1% of frames to avoid spam
+                        console.log('[CameraDirector] Using free-fly view matrix, position:', this.editorCamera.getPosition());
+                    }
+                }
+                else {
+                    // Fallback to orbit if editor camera not available
+                    this.computeViewMatrix('orbit', outMatrix);
+                }
+                break;
+            }
             default: {
-                console.warn(`Unknown camera mode: ${mode}`);
+                this.logger?.warn(`Unknown camera mode: ${mode}`);
                 this.computeViewMatrix('orbit', outMatrix);
             }
         }

@@ -4,7 +4,7 @@ import { createDefaultManifest, validateManifest, type PlayManifest } from '../c
 import { Logger } from '../../utils/logger';
 import { quatToEuler } from '@engine/core/math';
 import type { Scene } from '@engine/world';
-import { ScriptComponent } from '@engine/world/components/ScriptComponent';
+import { ScriptComponent } from '@engine/script';
 import { BehaviorRegistry } from '@engine/script';
 
 /**

@@ -240,7 +240,7 @@ export class KeyboardHandler {
 
     this.registerCommand('w', {
       shortcut: 'w',
-      canExecute: () => !placementMode?.isActive(),
+      canExecute: () => !placementMode?.isActive() && state.cameraMode.value !== 'free-fly',
       execute: () => {
         state.gizmoMode.value = 'translate';
       },
@@ -248,7 +248,7 @@ export class KeyboardHandler {
 
     this.registerCommand('e', {
       shortcut: 'e',
-      canExecute: () => true,
+      canExecute: () => state.cameraMode.value !== 'free-fly',
       execute: () => {
         if (placementMode?.isActive()) {
           placementMode.rotatePreview(1);
@@ -262,9 +262,20 @@ export class KeyboardHandler {
 
     this.registerCommand('r', {
       shortcut: 'r',
-      canExecute: () => !placementMode?.isActive(),
+      canExecute: () => !placementMode?.isActive() && state.cameraMode.value !== 'free-fly',
       execute: () => {
         state.gizmoMode.value = 'scale';
+      },
+    });
+
+    this.registerCommand('shift+r', {
+      shortcut: 'shift+r',
+      preventDefault: true,
+      canExecute: () => !placementMode?.isActive(),
+      execute: () => {
+        state.gizmoMode.value = 'uniform';
+        this.options.statusEl.textContent = 'Gizmo: Uniform Scale';
+        setTimeout(() => (this.options.statusEl.textContent = ''), 1000);
       },
     });
 
@@ -339,7 +350,7 @@ export class KeyboardHandler {
     this.registerCommand('q', {
       shortcut: 'q',
       preventDefault: true,
-      canExecute: () => !!placementMode?.isActive(),
+      canExecute: () => !!placementMode?.isActive() && state.cameraMode.value !== 'free-fly',
       execute: () => {
         placementMode?.rotatePreview(-1);
         this.options.statusEl.textContent = 'Rotated CCW';
@@ -396,6 +407,8 @@ export class KeyboardHandler {
         setTimeout(() => (this.options.statusEl.textContent = ''), 1000);
       },
     });
+
+    // Camera: V key removed - free-fly is now the default editor camera
 
     // Easy Place: Switch to line pattern
     this.registerCommand('l', {

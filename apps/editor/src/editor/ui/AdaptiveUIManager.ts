@@ -6,11 +6,11 @@
  */
 
 import type { Entity } from '@engine/world';
-import type { EditorState, WorkflowPreset } from '../core/state';
-import { ScriptComponent } from '@engine/world/components/ScriptComponent';
+import type { EditorState } from '../core/state';
+import { ScriptComponent } from '@engine/script';
 import { Logger } from '../../utils/logger';
 
-export type SuggestionChannel = 'workflow' | 'panel' | 'feature';
+export type SuggestionChannel = 'panel' | 'feature';
 
 export interface AdaptiveSuggestion {
   id: string;
@@ -25,7 +25,6 @@ export interface AdaptiveContextMetrics {
   selectionCount: number;
   scriptEditCount: number;
   logicUsageCount: number;
-  workflowSwitchHistory: Array<{ preset: WorkflowPreset; timestamp: number }>;
   lastSuggestionDismissals: Record<string, number>;
 }
 
@@ -47,36 +46,8 @@ export class AdaptiveUIManager {
       return;
     }
     
-    const suggestions: AdaptiveSuggestion[] = [];
-    
     this.trackSelection();
-
-    // User selected entity with scripts? Suggest code editor
-    if (entity.hasComponent(ScriptComponent)) {
-      const suggestedKey = `codeEditor:${entity.id}`;
-      if (!this.suggestedPanels.has(suggestedKey) && !state.uiPreferences.value.showCodeEditor) {
-        suggestions.push({
-          id: `codeEditor:${entity.id}`,
-          channel: 'panel',
-          priority: 'medium',
-          reason: 'This entity has scripts. Show code editor?',
-          // Keep panel on payload and also as top-level hint for tests expecting it
-          payload: {
-            panel: 'showCodeEditor',
-          },
-        } as AdaptiveSuggestion & { panel?: string });
-        // Also mirror the panel key at top-level for simple property checks in tests
-        (suggestions[suggestions.length - 1] as any).panel = 'showCodeEditor';
-        this.suggestedPanels.add(suggestedKey);
-      }
-    }
-    
     this.persistMetrics();
-    
-    // Emit suggestions to listeners
-    suggestions.forEach(suggestion => {
-      this.suggestionCallbacks.forEach(cb => cb(suggestion));
-    });
   }
   
   /**
@@ -157,7 +128,6 @@ export class AdaptiveUIManager {
       selectionCount: 0,
       scriptEditCount: 0,
       logicUsageCount: 0,
-      workflowSwitchHistory: [],
       lastSuggestionDismissals: {},
     };
   }

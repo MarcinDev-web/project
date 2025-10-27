@@ -9,7 +9,7 @@ import type { Vec3, Quat } from '@engine/core/math';
 import { CollisionDetector } from './CollisionDetector';
 import type { SnapSystem } from '@engine/editor-utils';
 import { MaterialComponent } from '@engine/world/components/MaterialComponent';
-import type { AssetPreset } from '@engine/assets';
+import type { AssetPreset } from '../types/BlockAssetTypes';
 import { initializeBaseColor } from '../visuals/SelectionVisuals';
 import { Logger } from '../../utils/logger';
 

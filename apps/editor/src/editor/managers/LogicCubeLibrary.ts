@@ -5,8 +5,8 @@
 
 import { Entity } from '@engine/world';
 import { Scene } from '@engine/world';
-import { LogicCubeComponent } from '@engine/world/components/LogicCubeComponent';
-import type { LogicCubeMetadata, LogicCubeCategory } from '@engine/script/cubes/types';
+import { LogicCubeComponent } from '@engine/script';
+import type { LogicCubeMetadata, LogicCubeCategory } from '@engine/script';
 import { LogicCubeRegistry } from '@engine/script';
 
 /**

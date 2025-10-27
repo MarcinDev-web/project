@@ -1,0 +1,11 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Run full test suite before push
+echo "🧪 Running tests before push..."
+pnpm test:unit:fast || {
+  echo "❌ Tests failed. Push aborted."
+  exit 1
+}
+echo "✅ All tests passed!"
+

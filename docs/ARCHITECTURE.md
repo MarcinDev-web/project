@@ -14,12 +14,12 @@ ugc-3d-platform/
 │   ├── core/          # Fundament (math, ECS types, event, job, utils)
 │   ├── world/         # ECS runtime + fizyka
 │   ├── gfx-webgpu/    # Renderer WebGPU
-│   ├── assets/        # Zarządzanie assetami
 │   ├── script/        # Skryptowanie UGC (LogicCubes)
 │   ├── input/         # Input management
 │   ├── camera/        # Systemy kamer
 │   ├── stdlib/        # Biblioteka standardowa
-│   └── editor-utils/  # Narzędzia edytorskie (NEW)
+│   ├── editor-utils/  # Narzędzia edytorskie (NEW)
+│   └── test-utils/    # Narzędzia testowe (mocks, fixtures, assertions)
 ├── apps/              # Aplikacje
 │   └── editor/        # Edytor scen 3D
 └── docs/              # Dokumentacja
@@ -76,18 +76,22 @@ ugc-3d-platform/
 - Texture atlas (100x redukcja bind calls)
 - Post-processing (bloom, tone mapping)
 
-### @engine/assets
-**Asset management** - ładowanie i cache'owanie
+### @engine/test-utils
+**Test utilities** - reużywalne narzędzia testowe
 
 **Eksportuje:**
-- AssetRegistry - zarządzanie assetami i bloków
-- GltfLoader, TextureLoader - loadery
-- StreamingManager - streaming assetów
-- RecentAssetsTracker - historia
+- createMockCanvas, createMockGPU - WebGPU/Canvas mocks
+- entityFixtures - entity test fixtures
+- expectVec3ToBeCloseTo - custom assertions
+- waitFor - async test utilities
 
-**Zależności:** `@engine/core`, `@gltf-transform/*`
+**Zależności:** `@engine/core`, `@engine/world`
 
-**Uwaga:** System koncentruje się na blokach z BlockLibrary (@engine/gfx-webgpu). AssetRegistry może rejestrować bloki jako assety.
+**Przeznaczenie:**
+- Reużywalne mocks i fixtures
+- Custom matchers i assertions
+- Helpers dla testów async
+- Snapshot testing utilities
 
 ### @engine/script
 **UGC Scripting** - wizualne skryptowanie LogicCubes
@@ -203,8 +207,16 @@ core → world → {gfx-webgpu, assets, script, input, camera, stdlib}
 ### Module Boundaries
 - Każdy pakiet ma jasno zdefiniowany export przez `index.ts`
 - Importy tylko z głównego indexu pakietu: `from '@engine/world'`
+- Lub dokumentowane subpaths: `from '@engine/core/math'`, `from '@engine/core/utils'`
 - Brak importów submodułów: ~~`from '@engine/world/Entity'`~~
+- Brak importów wewnętrznych: ~~`from '../packages/core/src/...'`~~
 - Pakiety są niezależnie kompilowalne
+
+**Egzekwowanie:**
+- ESLint rule `no-restricted-imports` blokuje importy do `packages/*/src/**`
+- TypeScript `paths` aliasy kierują na `@engine/*` abstrakcje
+- Code review checklist wymaga compliance z granicami modułów
+- Pre-commit hooks uruchamiają linter przed każdym commitem
 
 ### Performance First
 - Question every allocation w hot paths

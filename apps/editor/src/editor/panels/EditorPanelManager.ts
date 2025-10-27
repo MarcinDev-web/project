@@ -3,17 +3,16 @@
  * Extracted from EditorUI to reduce complexity and improve maintainability.
  * 
  * Features:
- * - Tabbed sidebar (Scene/Layers/Settings)
- * - Outliner with enhanced hierarchy
+ * - Tabbed sidebar (Layers/Bookmarks/History/Logic/Settings)
  * - Properties panel
- * - Asset browser
+ * - Asset palette
  */
 
 import type { Scene, Entity } from '@engine/world';
 import type { SelectionManager } from '@engine/world';
 import type { EditorState } from '../core/state';
-import type { AssetPreset, AssetMainCategory, AssetCategory, Asset, AssetVariant, RgbaColor } from '@engine/assets';
-import { OutlinerPanel } from './OutlinerPanel';
+import type { AssetPreset, AssetMainCategory, AssetCategory, Asset, AssetVariant } from '../types/BlockAssetTypes';
+import type { RgbaColor } from '../../utils/colors';
 import { PropertiesPanel } from './PropertiesPanel';
 import { LogicPanel } from './LogicPanel';
 import { LayersPanel } from './LayersPanel';
@@ -24,6 +23,7 @@ import { DisposableGroup } from '@engine/core/utils';
 import { initializeBaseColor } from '../visuals/SelectionVisuals';
 import { ResizableSidebar } from '../ui/ResizableSidebar';
 import { SidebarTabs } from '../ui/SidebarTabs';
+import { TemplateGalleryPanel } from './TemplateGalleryPanel';
 
 export interface PanelVisibility {
   sidebar?: boolean;
@@ -61,12 +61,12 @@ export class EditorPanelManager {
   private sidebarTabs: SidebarTabs | null = null;
   private sidebarContainer: HTMLElement | null = null;
   private inspectorContainer: HTMLElement | null = null;
-  private outlinerPanel: OutlinerPanel | null = null;
   private layersPanel: LayersPanel | null = null;
   private bookmarksPanel: BookmarksPanel | null = null;
   private historyPanel: HistoryPanel | null = null;
   private propertiesPanel: PropertiesPanel | null = null;
   private logicPanel: LogicPanel | null = null;
+  private templateGallery: TemplateGalleryPanel | null = null;
   private assetPalette: AssetPalette | null = null;
   private assetBrowserWrapper: { refresh: () => void } | null = null;
   private resizableSidebar: ResizableSidebar | null = null;
@@ -79,7 +79,7 @@ export class EditorPanelManager {
    * @param inspectorContainer - Container for properties and asset browser (right)
    */
   mount(sidebarContainer: HTMLElement, inspectorContainer: HTMLElement): void {
-    if (this.outlinerPanel) {
+    if (this.layersPanel) {
       console.error('EditorPanelManager: Already mounted');
       return;
     }
@@ -92,27 +92,11 @@ export class EditorPanelManager {
     // Initialize Tabbed Sidebar
     this.sidebarTabs = new SidebarTabs();
 
-    // Initialize Outliner Panel
-    this.outlinerPanel = new OutlinerPanel({
-      scene: this.config.scene,
-      selection: this.config.selection,
-      state: this.config.state,
-      onEntitySelected: (entity) => {
-        this.config.selection.select(entity);
-        this.refreshProperties();
-        // Apply selection visuals immediately
-        this.config.onSelectionVisualsNeeded?.();
-      },
-    });
-
-    // Get outliner element via typed getter
-    const outlinerElement = this.outlinerPanel.element ?? document.createElement('div');
-
     // Initialize Layers Panel
     this.layersPanel = new LayersPanel({
       scene: this.config.scene,
       onLayerChanged: () => {
-        this.refreshOutliner();
+        // Layer changed
       },
     });
 
@@ -155,18 +139,16 @@ export class EditorPanelManager {
       },
     });
 
+    // Create templates panel
+    this.templateGallery = new TemplateGalleryPanel({
+      scene: this.config.scene,
+      updateSceneBuffers: this.config.updateSceneBuffers,
+    });
+
     // Create settings panel (placeholder for now)
     const settingsPanel = this.createSettingsPanel();
 
     // Add tabs to sidebar
-    this.sidebarTabs.addTab({
-      id: 'scene',
-      label: 'Scene',
-      icon: 'cube',
-      content: outlinerElement,
-      badge: () => this.config.scene.entityCount ?? 0,
-    });
-
     this.sidebarTabs.addTab({
       id: 'layers',
       label: 'Layers',
@@ -193,6 +175,13 @@ export class EditorPanelManager {
       label: 'Logic',
       icon: 'sparkle',
       content: this.logicPanel.element,
+    });
+
+    this.sidebarTabs.addTab({
+      id: 'templates',
+      label: 'Templates',
+      icon: 'gallery-horizontal',
+      content: this.templateGallery.element,
     });
 
     this.sidebarTabs.addTab({
@@ -286,13 +275,6 @@ export class EditorPanelManager {
   }
 
   /**
-   * Refreshes the outliner panel (rebuilds scene hierarchy UI).
-   */
-  refreshOutliner(): void {
-    this.outlinerPanel?.refresh();
-  }
-
-  /**
    * Refreshes the properties panel (updates displayed entity properties).
    */
   refreshProperties(): void {
@@ -304,7 +286,6 @@ export class EditorPanelManager {
    * Refreshes all panels.
    */
   refreshAll(): void {
-    this.refreshOutliner();
     this.refreshProperties();
     this.refreshAssetBrowser();
   }
@@ -376,42 +357,15 @@ export class EditorPanelManager {
    */
   private assetToPreset(asset: Asset, variant?: AssetVariant): AssetPreset {
     const finalColor = variant?.color || asset.color;
-    const finalScale = variant?.scale || asset.scale;
+    // Default scale for blocks is 1x1x1
+    const finalScale: [number, number, number] = variant?.scale || [1, 1, 1];
     
     return {
-      name: asset.metadata.name,
-      description: asset.metadata.description,
+      name: asset.name,
       scale: finalScale,
       color: finalColor,
-      category: this.convertMainCategoryToCategory(asset.category),
       ...(asset.blockData?.id && { blockId: asset.blockData.id }),
     };
-  }
-
-  /**
-   * Converts AssetMainCategory to AssetCategory format.
-   */
-  private convertMainCategoryToCategory(mainCategory: AssetMainCategory): AssetCategory {
-    // Map new categories to asset category format (legacy)
-    // AssetCategory = 'Blocks' | 'Primitives' | 'Architecture' | 'Furniture' | 'Nature' | 'Decoration' | 'Gameplay'
-    const categoryMap: Partial<Record<AssetMainCategory, AssetCategory>> = {
-      'Building': 'Blocks',
-      'Architecture': 'Architecture',
-      'Furniture': 'Furniture',
-      'Decoration': 'Decoration',
-      'Nature': 'Nature',
-      'Lighting': 'Decoration',
-      'Gameplay': 'Gameplay',
-      'Vehicles': 'Primitives',
-      'Characters': 'Primitives',
-      'Electronics': 'Furniture',
-      'Plumbing': 'Furniture',
-      'Landscaping': 'Nature',
-      'Effects': 'Decoration',
-      'Materials': 'Primitives',
-      'Custom': 'Primitives',
-    };
-    return categoryMap[mainCategory] || 'Blocks';
   }
 
   /**
@@ -419,16 +373,17 @@ export class EditorPanelManager {
    */
   private handleAssetSelection(asset: Asset, variant?: AssetVariant): void {
     const finalColor = variant?.color || asset.color;
-    const finalScale = variant?.scale || asset.scale;
+    // Default scale for blocks is 1x1x1
+    const finalScale: [number, number, number] = variant?.scale || [1, 1, 1];
     const preset = this.assetToPreset(asset, variant);
 
-    // Check if we should start placement mode
-    if (this.config.onStartPlacement && asset.isPlaceable) {
+    // All blocks are placeable in the simplified system
+    if (this.config.onStartPlacement) {
       this.config.onStartPlacement(preset);
     } else {
       // Direct spawn without placement mode
-      const entity = this.config.scene.createEntity(`${asset.metadata.name} ${this.config.scene.entityCount + 1}`);
-      entity.userData.asset = asset.metadata.name;
+      const entity = this.config.scene.createEntity(`${asset.name} ${this.config.scene.entityCount + 1}`);
+      entity.userData.asset = asset.name;
       
       // Place at world origin for predictable behavior
       const position: [number, number, number] = [0, finalScale[1] / 2, 0];
@@ -439,13 +394,6 @@ export class EditorPanelManager {
       this.config.selection.select(entity);
       this.config.onAssetSpawn(entity, preset);
     }
-  }
-
-  /**
-   * Gets the outliner panel instance.
-   */
-  getOutliner(): OutlinerPanel | null {
-    return this.outlinerPanel;
   }
 
   /**
@@ -466,7 +414,7 @@ export class EditorPanelManager {
    * Checks if panels are mounted.
    */
   isMounted(): boolean {
-    return this.outlinerPanel !== null;
+    return this.layersPanel !== null;
   }
 
   /**
@@ -495,7 +443,6 @@ export class EditorPanelManager {
 
     // Clear references to panels without dispose methods
     // (Their DOM elements will be removed when parent is cleared)
-    this.outlinerPanel = null;
     this.layersPanel = null;
     this.bookmarksPanel = null;
     this.historyPanel = null;

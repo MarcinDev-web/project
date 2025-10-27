@@ -37,23 +37,19 @@
 @import './components/tooltips-enhanced.css';
 @import './components/notifications.css';
 @import './components/tabs.css';
-@import './components/workflow-selector.css';
 
 /* ============================================
    EDITOR - SPECIFIC
    ============================================ */
 @import './editor/toolbar.css';
-@import './editor/outliner.css';
 @import './editor/inspector.css';
 @import './editor/inspector-animations.css';
 @import './editor/inspector-responsive.css';
 @import './editor/logic-panel.css';
-@import './editor/asset-browser.css';
 @import './editor/asset-palette.css';
-@import './editor/assets-dropdown.css';
+@import './editor/asset-palette-simple.css';
 @import './editor/unified-build-panel.css';
 @import './editor/hotbar-component.css';
-@import './editor/catalog-panel.css';
 @import './editor/color-picker.css';
 @import './editor/context-menu.css';
 @import './editor/status-bar.css';

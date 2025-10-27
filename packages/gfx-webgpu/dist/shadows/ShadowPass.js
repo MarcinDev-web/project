@@ -57,8 +57,8 @@ export class ShadowPass {
             const shader = this.device.createShaderModule({
                 label: 'shadow-pass-shader',
                 code: /* wgsl */ `
-struct VSOut { @builtin(position) position: vec4<f32>; };
-struct ShadowUniform { lightVP: mat4x4<f32>; };
+struct VSOut { @builtin(position) position: vec4<f32> }
+struct ShadowUniform { lightVP: mat4x4<f32> }
 @group(0) @binding(0) var<uniform> sh: ShadowUniform;
 
 fn quat_rotate(q : vec4<f32>, v : vec3<f32>) -> vec3<f32> {
@@ -163,14 +163,16 @@ fn vs_main(
         const viewports = [
             [0, 0], [half, 0], [0, half], [half, half],
         ];
-        for (let c = 0; c < 4; c++) {
-            // Upload current cascade lightVP
-            const m = cascades.lightViewProj[c];
-            this.device.queue.writeBuffer(this.uniformBuffer, 0, m.buffer, m.byteOffset ?? 0, 64);
-            const [vx, vy] = viewports[c];
-            pass.setViewport(vx, vy, half, half, 0, 1);
-            pass.setScissorRect(vx, vy, half, half);
-            pass.drawIndexed(params.geometry.indices.length, params.geometry.instanceCount, 0, 0, 0);
+        if (params.geometry.instanceCount > 0) {
+            for (let c = 0; c < 4; c++) {
+                // Upload current cascade lightVP
+                const m = cascades.lightViewProj[c];
+                this.device.queue.writeBuffer(this.uniformBuffer, 0, m.buffer, m.byteOffset ?? 0, 64);
+                const [vx, vy] = viewports[c];
+                pass.setViewport(vx, vy, half, half, 0, 1);
+                pass.setScissorRect(vx, vy, half, half);
+                pass.drawIndexed(params.geometry.indices.length, params.geometry.instanceCount, 0, 0, 0);
+            }
         }
         pass.end();
         // Recreate material bind group to swap in the real shadow atlas + comparison sampler

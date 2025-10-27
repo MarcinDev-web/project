@@ -5,11 +5,7 @@ export type Vec2 = [number, number];
 export type Vec3 = [number, number, number];
 export type Mat4 = Float32Array;
 // 3x3 matrix in column-major order to match gl-matrix conventions
-export type Mat3 = [
-  number, number, number,
-  number, number, number,
-  number, number, number
-];
+export type Mat3 = [number, number, number, number, number, number, number, number, number];
 export type Quat = [number, number, number, number];
 
 export type Vec3Like = [number, number, number] | { 0: number; 1: number; 2: number };
@@ -312,7 +308,7 @@ export function mat4GetTranslation(a: Mat4): Vec3 {
  * Writes translation component of matrix `a` into `out`.
  */
 export function mat4GetTranslationOut(out: Vec3, a: Mat4): Vec3 {
-  assertVec3('out', out as Vec3);
+  assertVec3('out', out);
   assertMat4('a', a);
   (out as unknown as v3)[0] = a[12]!;
   (out as unknown as v3)[1] = a[13]!;
@@ -338,7 +334,7 @@ export function mat4GetScale(a: Mat4): Vec3 {
  * Writes scale components of matrix `a` into `out`.
  */
 export function mat4GetScaleOut(out: Vec3, a: Mat4): Vec3 {
-  assertVec3('out', out as Vec3);
+  assertVec3('out', out);
   assertMat4('a', a);
   (out as unknown as v3)[0] = Math.hypot(a[0]!, a[1]!, a[2]!);
   (out as unknown as v3)[1] = Math.hypot(a[4]!, a[5]!, a[6]!);
@@ -364,9 +360,15 @@ export function mat4GetRotation(a: Mat4): Quat {
   }
 
   // Build a normalized 3x3 rotation (column-major basis vectors normalized)
-  const r00 = a[0]! / sx, r01 = a[4]! / sy, r02 = a[8]! / sz;
-  const r10 = a[1]! / sx, r11 = a[5]! / sy, r12 = a[9]! / sz;
-  const r20 = a[2]! / sx, r21 = a[6]! / sy, r22 = a[10]! / sz;
+  const r00 = a[0]! / sx,
+    r01 = a[4]! / sy,
+    r02 = a[8]! / sz;
+  const r10 = a[1]! / sx,
+    r11 = a[5]! / sy,
+    r12 = a[9]! / sz;
+  const r20 = a[2]! / sx,
+    r21 = a[6]! / sy,
+    r22 = a[10]! / sz;
 
   // Convert 3x3 rotation to quaternion (right-handed, column-major)
   const trace = r00 + r11 + r22;
@@ -414,9 +416,15 @@ export function mat4GetRotationOut(out: Quat, a: Mat4): Quat {
   if (!(sx > eps && sy > eps && sz > eps)) {
     throw new RangeError('mat4GetRotationOut: matrix has zero scale component');
   }
-  const r00 = a[0]! / sx, r01 = a[4]! / sy, r02 = a[8]! / sz;
-  const r10 = a[1]! / sx, r11 = a[5]! / sy, r12 = a[9]! / sz;
-  const r20 = a[2]! / sx, r21 = a[6]! / sy, r22 = a[10]! / sz;
+  const r00 = a[0]! / sx,
+    r01 = a[4]! / sy,
+    r02 = a[8]! / sz;
+  const r10 = a[1]! / sx,
+    r11 = a[5]! / sy,
+    r12 = a[9]! / sz;
+  const r20 = a[2]! / sx,
+    r21 = a[6]! / sy,
+    r22 = a[10]! / sz;
   const trace = r00 + r11 + r22;
   if (trace > 0) {
     const S = Math.sqrt(trace + 1.0) * 2;
@@ -459,12 +467,12 @@ export function mat4Lerp(out: Mat4, a: Mat4, b: Mat4, t: number): Mat4 {
   assertMat4('a', a);
   assertMat4('b', b);
   assertFinite('t', t);
-  
+
   const t1 = 1 - t;
   for (let i = 0; i < 16; i++) {
     out[i] = a[i]! * t1 + b[i]! * t;
   }
-  
+
   return out;
 }
 
@@ -489,7 +497,7 @@ export function normalizeVec3(vec: Vec3): Vec3 {
  */
 export function normalizeVec3Out(out: Vec3, vec: Vec3): Vec3 {
   assertVec3('vec', vec);
-  assertVec3('out', out as Vec3);
+  assertVec3('out', out);
   const len = Math.hypot(vec[0], vec[1], vec[2]);
   if (!(len > 0)) {
     throw new RangeError('normalizeVec3: zero-length vector');
@@ -522,7 +530,7 @@ function assertQuat(name: string, q: Quat): void {
  */
 export function quatNormalize(q: Quat): Quat {
   // Backward-compatible wrapper returning a new quaternion
-  quatNormalizeOut(TMP_Q4A as Quat, q);
+  quatNormalizeOut(TMP_Q4A, q);
   return [TMP_Q4A[0], TMP_Q4A[1], TMP_Q4A[2], TMP_Q4A[3]];
 }
 
@@ -553,7 +561,7 @@ export function quatNormalizeOut(out: Quat, q: Quat): Quat {
  * @throws {TypeError} If either argument is not a valid `Quat`.
  */
 export function quatMultiply(a: Quat, b: Quat): Quat {
-  quatMultiplyOut(TMP_Q4A as Quat, a, b);
+  quatMultiplyOut(TMP_Q4A, a, b);
   return [TMP_Q4A[0], TMP_Q4A[1], TMP_Q4A[2], TMP_Q4A[3]];
 }
 
@@ -574,7 +582,7 @@ export function quatMultiplyOut(out: Quat, a: Quat, b: Quat): Quat {
  * @throws {TypeError} If `axis` is not a valid `Vec3`.
  */
 export function quatFromAxisAngle(axis: Vec3, angle: number): Quat {
-  quatFromAxisAngleOut(TMP_Q4A as Quat, axis, angle);
+  quatFromAxisAngleOut(TMP_Q4A, axis, angle);
   return [TMP_Q4A[0], TMP_Q4A[1], TMP_Q4A[2], TMP_Q4A[3]];
 }
 
@@ -626,7 +634,7 @@ export function quatToEuler(q: Quat): Vec3 {
  * @throws {TypeError} If `euler` is not a valid `Vec3`.
  */
 export function quatFromEuler(euler: Vec3): Quat {
-  quatFromEulerOut(TMP_Q4A as Quat, euler);
+  quatFromEulerOut(TMP_Q4A, euler);
   return [TMP_Q4A[0], TMP_Q4A[1], TMP_Q4A[2], TMP_Q4A[3]];
 }
 
@@ -689,7 +697,7 @@ export function transformVec3ByQuat(vec: Vec3, quat: Quat): Vec3 {
 }
 
 export function transformVec3ByQuatOut(out: Vec3, vec: Vec3, quat: Quat): Vec3 {
-  assertVec3('out', out as Vec3);
+  assertVec3('out', out);
   assertVec3('vec', vec);
   assertQuat('quat', quat);
 
@@ -721,7 +729,7 @@ export function addVec3(a: Vec3, b: Vec3): Vec3 {
 }
 
 export function addVec3Out(out: Vec3, a: Vec3, b: Vec3): Vec3 {
-  assertVec3('out', out as Vec3);
+  assertVec3('out', out);
   assertVec3('a', a);
   assertVec3('b', b);
   (out as unknown as v3)[0] = a[0] + b[0];
@@ -742,7 +750,7 @@ export function subVec3(a: Vec3, b: Vec3): Vec3 {
 }
 
 export function subVec3Out(out: Vec3, a: Vec3, b: Vec3): Vec3 {
-  assertVec3('out', out as Vec3);
+  assertVec3('out', out);
   assertVec3('a', a);
   assertVec3('b', b);
   (out as unknown as v3)[0] = a[0] - b[0];
@@ -763,7 +771,7 @@ export function scaleVec3(vec: Vec3, scalar: number): Vec3 {
 }
 
 export function scaleVec3Out(out: Vec3, vec: Vec3, scalar: number): Vec3 {
-  assertVec3('out', out as Vec3);
+  assertVec3('out', out);
   assertVec3('vec', vec);
   assertFinite('scalar', scalar);
   (out as unknown as v3)[0] = vec[0] * scalar;
@@ -796,7 +804,7 @@ export function crossVec3(a: Vec3, b: Vec3): Vec3 {
 }
 
 export function crossVec3Out(out: Vec3, a: Vec3, b: Vec3): Vec3 {
-  assertVec3('out', out as Vec3);
+  assertVec3('out', out);
   assertVec3('a', a);
   assertVec3('b', b);
   (out as unknown as v3)[0] = a[1] * b[2] - a[2] * b[1];
@@ -844,11 +852,7 @@ export function clampVec3(vec: Vec3, minVal: number, maxVal: number): Vec3 {
 export function minVec3(a: Vec3, b: Vec3): Vec3 {
   assertVec3('a', a);
   assertVec3('b', b);
-  return [
-    Math.min(a[0], b[0]),
-    Math.min(a[1], b[1]),
-    Math.min(a[2], b[2]),
-  ];
+  return [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.min(a[2], b[2])];
 }
 
 /**
@@ -860,11 +864,7 @@ export function minVec3(a: Vec3, b: Vec3): Vec3 {
 export function maxVec3(a: Vec3, b: Vec3): Vec3 {
   assertVec3('a', a);
   assertVec3('b', b);
-  return [
-    Math.max(a[0], b[0]),
-    Math.max(a[1], b[1]),
-    Math.max(a[2], b[2]),
-  ];
+  return [Math.max(a[0], b[0]), Math.max(a[1], b[1]), Math.max(a[2], b[2])];
 }
 
 /**
@@ -935,7 +935,7 @@ export function lerpVec3(a: Vec3, b: Vec3, t: number): Vec3 {
 }
 
 export function lerpVec3Out(out: Vec3, a: Vec3, b: Vec3, t: number): Vec3 {
-  assertVec3('out', out as Vec3);
+  assertVec3('out', out);
   assertVec3('a', a);
   assertVec3('b', b);
   assertFinite('t', t);
@@ -951,7 +951,7 @@ export function lerpVec3Out(out: Vec3, a: Vec3, b: Vec3, t: number): Vec3 {
  * @returns The inverse quaternion
  */
 export function quatInverse(q: Quat): Quat {
-  quatInverseOut(TMP_Q4A as Quat, q);
+  quatInverseOut(TMP_Q4A, q);
   return [TMP_Q4A[0], TMP_Q4A[1], TMP_Q4A[2], TMP_Q4A[3]];
 }
 
@@ -970,7 +970,7 @@ export function quatInverseOut(out: Quat, q: Quat): Quat {
  * @returns The interpolated quaternion
  */
 export function quatSlerp(a: Quat, b: Quat, t: number): Quat {
-  quatSlerpOut(TMP_Q4A as Quat, a, b, t);
+  quatSlerpOut(TMP_Q4A, a, b, t);
   return [TMP_Q4A[0], TMP_Q4A[1], TMP_Q4A[2], TMP_Q4A[3]];
 }
 

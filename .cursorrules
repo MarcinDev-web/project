@@ -1,0 +1,160 @@
+# Cursor AI Rules - UGC 3D Platform
+
+## Context Files (Read First)
+
+**CRITICAL:** Before generating any code, read these files:
+
+1. **AI_CONTEXT.md** - Complete context guide (architectural rules, conventions, patterns)
+2. **CODEBASE_PATTERNS.md** - Design patterns and idioms used in the project
+3. **docs/guidelines/PACKAGE_GUIDELINES.md** - Where code belongs (decision tree)
+
+## Project Type
+
+- **TypeScript** monorepo (pnpm workspaces)
+- **WebGPU** 3D game engine
+- **Modular architecture** with strict boundaries
+- **Testing:** Vitest with comprehensive automation
+
+## Critical Rules (NEVER VIOLATE)
+
+### 1. Import Policy
+
+```typescript
+// ✅ ALWAYS use @engine/* aliases
+import { Vec3 } from '@engine/core';
+import { Scene } from '@engine/world';
+
+// ❌ NEVER use relative paths for packages
+import { Vec3 } from '../../../packages/core/src/math/Vec3';
+```
+
+### 2. Package Boundaries
+
+```
+✅ ALLOWED:
+- packages → packages (one direction)
+- apps → packages
+- Lower-level → Higher-level (core → world → gfx-webgpu)
+
+❌ FORBIDDEN:
+- packages → apps
+- Higher-level → Lower-level (circular deps)
+- Duplicating package code in apps/
+```
+
+### 3. Code Style
+
+- **TypeScript strict mode** - No `any` without comment
+- **Functional patterns** - Prefer composition over inheritance
+- **async/await** over raw Promises
+- **Destructuring** for readability
+- **Small functions** (<50 lines ideally)
+
+### 4. Performance
+
+- **Question every allocation** in hot paths (render loops, physics)
+- **Reuse objects** (use temp variables, object pools)
+- **Batch operations** where possible
+- **Lazy load** non-critical resources
+
+### 5. Testing
+
+- **Test behavior** (not implementation details)
+- **Mock external deps** (WebGPU, network, file system)
+- **Always cleanup** (dispose, clearAllMocks, clearAllTimers)
+- Use **@engine/test-utils** for common mocks/fixtures
+
+### 6. Resource Management
+
+- **Every resource needs dispose()** method
+- **Cleanup in afterEach** for tests
+- Use **DisposableGroup** for collections
+- **Remove event listeners** and clear timers
+
+## Language & Communication
+
+- **Code:** English (classes, functions, variables)
+- **Comments:** Polish or English
+- **Documentation (.md):** 
+  - Polish for `docs/adr/` and roadmap
+  - English for technical documentation
+
+## Package Hierarchy
+
+```
+Level 0: @engine/core (foundation)
+Level 1: @engine/world, @engine/input, @engine/editor-utils
+Level 2: @engine/gfx-webgpu, @engine/camera, @engine/script
+Level 3: @engine/stdlib, @apps/editor
+```
+
+**Never import from higher to lower level (creates cycles).**
+
+## Common Patterns
+
+- **ECS:** Components = data, Systems = logic
+- **Disposable:** Every resource has dispose()
+- **Event Bus:** Typed events, unsubscribe in dispose()
+- **Command:** For undo/redo (see HistoryManager)
+- **Factory:** For complex object construction
+
+## Before Generating Code
+
+Always ask yourself:
+
+1. **Where does this belong?** (Check PACKAGE_GUIDELINES.md)
+2. **Does this already exist?** (Search codebase first)
+3. **Does this create circular deps?** (Check import graph)
+4. **Did I add tests?** (Behavior tests)
+5. **Did I add cleanup?** (dispose, removeListener, clearTimeout)
+6. **Is this performant?** (No allocations in hot paths)
+
+## Code Checklist
+
+- [ ] Uses `@engine/*` imports (not relative paths)
+- [ ] No circular dependencies
+- [ ] Tests added/updated
+- [ ] Cleanup in `dispose()` methods
+- [ ] TypeScript strict mode compliant
+- [ ] No `any` without justification comment
+- [ ] Performance considered (if hot path)
+- [ ] Documentation comments for public APIs
+
+## Testing Commands
+
+```bash
+pnpm test:watch       # Watch mode (recommended)
+pnpm test:changed     # Only changed files (fast)
+pnpm test:unit:fast   # Quick run (~8s)
+pnpm test             # Full test suite
+```
+
+## Recent Changes (Oct 2025)
+
+- ✅ Created `@engine/editor-utils` package
+- ✅ Eliminated 6 code duplications (-1823 lines)
+- ✅ 100% import consistency
+- ❌ Removed: workflow, asset library features
+
+## When Helping Users
+
+1. **Check context files first** (AI_CONTEXT.md, CODEBASE_PATTERNS.md)
+2. **Search for existing code** before creating new
+3. **Follow established patterns** in similar code
+4. **Verify package boundaries** before suggesting changes
+5. **Add tests immediately** (don't defer)
+6. **Think about disposal** for every resource
+
+## References
+
+- Full context: `AI_CONTEXT.md`
+- Patterns: `CODEBASE_PATTERNS.md`
+- Guidelines: `docs/guidelines/PACKAGE_GUIDELINES.md`
+- Architecture: `docs/ARCHITECTURE.md`
+- Testing: `docs/TESTING.md`
+- Commands: `TEST_COMMANDS_CHEATSHEET.md`
+
+---
+
+**Quality, consistency, and maintainability are paramount. When in doubt, ask or reference documentation.**
+

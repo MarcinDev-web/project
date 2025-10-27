@@ -4,9 +4,9 @@
 
 import type { Entity } from '@engine/world';
 import type { SelectionManager } from '@engine/world';
-import { LogicCubeComponent } from '@engine/world/components/LogicCubeComponent';
+import { LogicCubeComponent } from '@engine/script';
 import { LogicCubeLibrary } from '../managers/LogicCubeLibrary';
-import type { LogicCubeCategory, LogicConnection } from '@engine/script/cubes/types';
+import type { LogicCubeCategory, LogicConnection } from '@engine/script';
 import { getLogicConnectionManager } from '@engine/script';
 
 export interface LogicPanelConfig {

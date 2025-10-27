@@ -1,5 +1,5 @@
 import type { Entity } from '@engine/world';
-import type { AnimationComponent } from '@engine/world/components/AnimationComponent';
+import type { AnimationComponent } from '@engine/stdlib/Animation';
 import type {
   AnimationParameter,
   AnimationParameters,

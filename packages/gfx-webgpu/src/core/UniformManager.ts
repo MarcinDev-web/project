@@ -10,7 +10,7 @@
  * - 80-96: atlasInsetAndPad (vec4<f32>)
  * - 96-112: shadingParams0 (vec4<f32>)
  * - 112-128: atlasParams (vec4<f32>)
- * - 144-464: lighting data (managed by LightingUniformWriter)
+ * - 128-448: lighting data (managed by LightingUniformWriter)
  */
 
 import type { Mat4, Vec3 } from '@engine/core/math';
@@ -138,7 +138,7 @@ export class UniformManager {
 
   /**
    * Updates shadow-related uniforms appended after the lighting block.
-   * Layout (offsets from 464 bytes):
+   * Layout (offsets from 448 bytes):
    *  - 0..64: viewMatrix
    *  - 64..320: lightViewProj[4]
    *  - 320..336: cascadeSplits (vec4)
@@ -153,9 +153,10 @@ export class UniformManager {
     atlasRects: readonly [number, number, number, number][]; // uvMin.xy, uvMax.zw per cascade
     filterParams: readonly [number, number, number, number];
     biasParams: readonly [number, number, number, number];
+    extraParams?: readonly [number, number, number, number];
   }): void {
     // Base offset right after lighting block
-    const baseOffset = 464;
+    const baseOffset = 448;
     // viewMatrix
     this.device.queue.writeBuffer(
       this.uniformBuffer,
@@ -200,6 +201,11 @@ export class UniformManager {
     // biasParams
     const biasF32 = new Float32Array(params.biasParams);
     this.device.queue.writeBuffer(this.uniformBuffer, baseOffset + 64 + 256 + 16 + 64 + 16, biasF32.buffer, 0, 16);
+
+    // extra shadow params (e.g., cascadeOverlap)
+    const extra = params.extraParams ?? [0, 0, 0, 0];
+    const extraF32 = new Float32Array(extra);
+    this.device.queue.writeBuffer(this.uniformBuffer, baseOffset + 64 + 256 + 16 + 64 + 16 + 16, extraF32.buffer, 0, 16);
   }
 
   /**

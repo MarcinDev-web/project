@@ -4,7 +4,7 @@ import { Scene } from '@engine/world';
 import { Entity } from '@engine/world';
 import { SnapSystem } from '@engine/editor-utils';
 import { CollisionDetector } from './CollisionDetector';
-import type { AssetPreset } from '@engine/assets';
+import type { AssetPreset } from '../types/BlockAssetTypes';
 import type { Vec3 } from '@engine/world';
 import { MaterialComponent } from '@engine/world/components/MaterialComponent';
 
@@ -16,10 +16,9 @@ describe('PlacementMode', () => {
 
   const testAsset: AssetPreset = {
     name: 'TestCube',
-    description: 'Test cube',
     scale: [1, 1, 1],
     color: [0.5, 0.5, 0.5, 1],
-    category: 'Primitives',
+    blockId: 'plastic_red',
   };
 
   beforeEach(() => {

@@ -477,8 +477,8 @@ fn atmosphericScattering(viewDir: vec3f, sunDir: vec3f) -> vec3f {
             fragment: { module: shader, entryPoint: 'fs', targets: [{ format: 'rgba16float' }] },
             primitive: { topology: 'triangle-list', cullMode: 'none' },
         });
-        // Face uniform buffer
-        const faceBuffer = this.device.createBuffer({ label: 'ibl-face-ubo', size: 16, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
+        // Face uniform buffer (32 bytes to satisfy uniform binding padding requirements)
+        const faceBuffer = this.device.createBuffer({ label: 'ibl-face-ubo', size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
         const faceLayout = (pipeline.getBindGroupLayout(1));
         for (let face = 0; face < 6; face++) {
             const view = this.envCube.createView({ baseArrayLayer: face, arrayLayerCount: 1 });
@@ -488,7 +488,9 @@ fn atmosphericScattering(viewDir: vec3f, sunDir: vec3f) -> vec3f {
             });
             pass.setPipeline(pipeline);
             pass.setBindGroup(0, this.paramsBindGroups.get('procedural-sky') ?? this.paramsBindGroups.values().next().value);
-            this.device.queue.writeBuffer(faceBuffer, 0, new Uint32Array([face, 0, 0, 0]));
+            const faceData = new Uint32Array(8);
+            faceData[0] = face;
+            this.device.queue.writeBuffer(faceBuffer, 0, faceData);
             const faceBg = this.device.createBindGroup({ label: `ibl-face-bg-${face}`, layout: faceLayout, entries: [{ binding: 0, resource: { buffer: faceBuffer } }] });
             pass.setBindGroup(1, faceBg);
             pass.draw(3, 1, 0, 0);

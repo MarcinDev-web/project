@@ -16,12 +16,14 @@ import type { SelectionManager } from '@engine/world';
 import type { EditorState } from '../core/state';
 import { Logger } from '../../utils/logger';
 import { Entity } from '@engine/world';
-import type { Vec3 } from '@engine/core/math';
-import type { PhysicsWorld } from '@engine/world/PhysicsWorld';
+import type { Vec3, Mat4 } from '@engine/core/math';
+import { mat4Invert, mat4GetTranslationOut, mat4GetRotationOut } from '@engine/core/math';
+import type { PhysicsWorld } from '@engine/world';
 import { CharacterController } from '@engine/world/components/CharacterController';
 import { PhysicsComponent, RigidbodyType } from '@engine/world/components/PhysicsComponent';
+import { CameraComponent } from '@engine/world/components/CameraComponent';
 import { CameraDirector } from '@engine/camera';
-import type { OrbitControls, FPSCamera } from '@engine/camera';
+import type { OrbitControls, FPSCamera, EditorCameraController, ThirdPersonCamera } from '@engine/camera';
 import type { CharacterControllerSystem } from '@engine/stdlib/CharacterController';
 import type { CharacterInputHandler } from '@engine/input';
 import { PlayModeStateMachine, PlayModeStateType } from '../core/PlayModeStateMachine';
@@ -37,6 +39,9 @@ import { ReturnState } from '../states/ReturnState';
 import { computeEntityPath, resolveEntityByPath } from '@engine/editor-utils';
 import { DefaultControllerFactory, PlayerSession } from '@engine/stdlib/CharacterController';
 import type { PlayManifest } from '../core/PlayManifest';
+import { LoadingOverlay } from '../ui/LoadingOverlay';
+import { CancellationToken } from '../core/cancellation/CancellationToken';
+import type { LoadingStepsRegistry } from '../core/LoadingStepsRegistry';
 
 export interface EditorModeManagerConfig {
   scene: Scene;
@@ -50,7 +55,11 @@ export interface EditorModeManagerConfig {
   characterSystem?: CharacterControllerSystem | null;
   characterInput?: CharacterInputHandler | null;
   fpsCamera?: FPSCamera | null;
+  editorCamera?: EditorCameraController | null;
+  thirdPersonCamera?: ThirdPersonCamera | null;
   getRendererReady?: () => boolean;
+  /** Optional registry to extend play mode loading steps */
+  loadingStepsRegistry?: LoadingStepsRegistry;
 }
 
 export class EditorModeManager {
@@ -69,6 +78,9 @@ export class EditorModeManager {
   private playerEntity: Entity | null = null;
   private playerSession: PlayerSession | null = null;
   
+  // Temporary camera entity for edit mode (bridges CameraDirector to renderer)
+  private editorCameraEntity: Entity | null = null;
+  
   // Systems
   private readonly physicsWorld: PhysicsWorld | null;
   private readonly characterSystem: CharacterControllerSystem | null;
@@ -77,6 +89,8 @@ export class EditorModeManager {
   private readonly controls: OrbitControls;
   private orbitSnapshot: { yaw: number; pitch: number; distance: number } | null = null;
   private selectionSnapshotPath: number[] | null = null;
+  private loadingOverlay: LoadingOverlay | null = null;
+  private loadingCancelToken: CancellationToken | null = null;
  
   // Time scaling
   private timeScale = 1.0;
@@ -84,6 +98,11 @@ export class EditorModeManager {
   
   // Track if we're returning from play mode to avoid duplicate cleanup
   private returningFromPlay = false;
+
+  // Scratch buffers to avoid allocations in camera sync
+  private readonly _cameraWorldScratch: Mat4 = new Float32Array(16) as Mat4;
+  private readonly _cameraPosScratch: Vec3 = [0, 0, 0] as Vec3;
+  private readonly _cameraRotScratch: [number, number, number, number] = [0, 0, 0, 1];
 
   constructor(private readonly config: EditorModeManagerConfig) {
     this.physicsWorld = config.physicsWorld ?? null;
@@ -97,18 +116,23 @@ export class EditorModeManager {
     this.cameraDirector = new CameraDirector({
       orbitControls: config.controls,
       fpsCamera: config.fpsCamera ?? null,
+      editorCamera: config.editorCamera ?? null,
+      thirdPersonCamera: config.thirdPersonCamera ?? null,
       canvas: config.canvas,
       scene: config.scene,
       physicsWorld: this.physicsWorld,
       logger: {
-        debug: Logger.debug.bind(Logger),
-        warn: Logger.warn.bind(Logger),
+        debug: (...args: unknown[]) => Logger.debug(args[0] as string, ...args.slice(1)),
+        warn: (...args: unknown[]) => Logger.warn(args[0] as string, ...args.slice(1)),
       },
     });
     this.inputContext = new InputContextManager(config.canvas);
     
     // Initialize state machine
     this.stateMachine = new PlayModeStateMachine();
+    
+    // Create temporary camera entity for edit mode
+    this.setupEditorCamera();
     
     // Create state instances
     this.editState = new EditState({
@@ -150,11 +174,29 @@ export class EditorModeManager {
         // Physics will be setup when player spawns
       },
       updateSceneBuffers: config.updateSceneBuffers,
+      onStarted: () => {
+        const token = this.ensureLoadingCancelToken();
+        this.getLoadingOverlay().show('Preparing play mode...', () => token.cancel());
+      },
+      onProgress: (progress) => {
+        this.getLoadingOverlay().updateProgress(progress);
+      },
+      onStepError: (error, stepName) => {
+        this.getLoadingOverlay().showError(`${stepName}: ${error}`, true);
+      },
+      onCompleted: () => {
+        this.getLoadingOverlay().hide();
+        this.loadingCancelToken = null;
+      },
+      getCancellationToken: () => this.ensureLoadingCancelToken(),
+      ...(config.loadingStepsRegistry ? { stepsRegistry: config.loadingStepsRegistry } : {}),
     });
     
     const playIntroState = new PlayIntroState({
       cameraDirector: this.cameraDirector,
       inputContext: this.inputContext,
+      getScene: () => config.scene,
+      getPhysicsWorld: () => this.physicsWorld,
       markGameplayContextActive: (active) => {
         this.stateMachine.getMutableContext().data.set('gameplayContextActive', active);
       },
@@ -173,6 +215,10 @@ export class EditorModeManager {
           this.controls.setState(this.orbitSnapshot);
         }
         this.config.state.enableHistory();
+        this.fpsCamera?.disable();
+        this.characterInput?.disable();
+        this.config.onModeChanged?.('edit');
+        this.config.state.editorMode.value = 'edit';
         this.restoreSelectionSnapshot();
         this.cleanupPlayer();
       },
@@ -405,6 +451,50 @@ export class EditorModeManager {
   getCameraDirector(): CameraDirector {
     return this.cameraDirector;
   }
+  
+  /**
+   * Setup temporary camera entity for edit mode
+   * This bridges CameraDirector to the renderer's CameraSystem
+   */
+  private setupEditorCamera(): void {
+    // Create a temporary camera entity
+    this.editorCameraEntity = new Entity('EditorCamera');
+    const cameraComponent = new CameraComponent();
+    this.editorCameraEntity.addComponent(cameraComponent);
+    
+    // Attach to scene so the camera is registered and selectable as primary
+    this.config.scene.addEntity(this.editorCameraEntity);
+    
+    // Override getViewMatrix to use CameraDirector
+    cameraComponent.getViewMatrix = (_entity: Entity, outMatrix: Mat4) => {
+      const view = this.cameraDirector.getViewMatrix();
+      outMatrix.set(view);
+
+      // Sync editor camera entity transform so world-space eyePosition/forward/up are correct
+      // world = inverse(view)
+      mat4Invert(this._cameraWorldScratch, view);
+      mat4GetTranslationOut(this._cameraPosScratch, this._cameraWorldScratch);
+      mat4GetRotationOut(this._cameraRotScratch, this._cameraWorldScratch);
+      if (this.editorCameraEntity) {
+        this.editorCameraEntity.transform.position = this._cameraPosScratch;
+        this.editorCameraEntity.transform.rotation = this._cameraRotScratch;
+      }
+
+      return outMatrix;
+    };
+    
+    // Override getProjectionMatrix to use CameraDirector
+    cameraComponent.getProjectionMatrix = (outMatrix: Mat4, _aspect: number) => {
+      const proj = this.cameraDirector.getProjectionMatrix();
+      outMatrix.set(proj);
+      return outMatrix;
+    };
+    
+    // Set as primary camera in edit mode
+    this.config.scene.setPrimaryCamera(this.editorCameraEntity);
+    
+    Logger.debug('[EditorModeManager] Setup editor camera entity');
+  }
 
   getWorldManager(): WorldManager {
     return this.worldManager;
@@ -412,6 +502,20 @@ export class EditorModeManager {
 
   getActiveScene(): Scene {
     return this.worldManager.getRuntimeWorld() ?? this.config.scene;
+  }
+
+  private getLoadingOverlay(): LoadingOverlay {
+    if (!this.loadingOverlay) {
+      this.loadingOverlay = new LoadingOverlay(this.config.canvas.ownerDocument ?? document);
+    }
+    return this.loadingOverlay;
+  }
+
+  private ensureLoadingCancelToken(): CancellationToken {
+    if (!this.loadingCancelToken) {
+      this.loadingCancelToken = new CancellationToken();
+    }
+    return this.loadingCancelToken;
   }
 
   async updatePlayMode(deltaTime: number): Promise<void> {
@@ -445,6 +549,19 @@ export class EditorModeManager {
   }
 
   dispose(): void {
+    // Cleanup temporary editor camera entity and primary camera assignment
+    if (this.editorCameraEntity) {
+      try {
+        if (this.config.scene.primaryCamera === this.editorCameraEntity) {
+          this.config.scene.setPrimaryCamera(null);
+        }
+        this.config.scene.removeEntity(this.editorCameraEntity);
+      } catch (error) {
+        Logger.warn('Error removing editor camera entity:', error as Error);
+      }
+      this.editorCameraEntity = null;
+    }
+
     this.stateMachine.dispose();
     this.worldManager.dispose();
     this.cameraDirector.dispose();

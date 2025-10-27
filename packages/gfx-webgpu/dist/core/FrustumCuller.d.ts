@@ -19,9 +19,13 @@ export interface Frustum {
 }
 /**
  * FrustumCuller manages frustum extraction and entity culling operations.
+ * Enhanced with octree spatial partitioning for efficient broad-phase culling.
  */
 export declare class FrustumCuller {
     private reusableVisibleArray;
+    private octree;
+    private octreeDirty;
+    private lastEntityCount;
     /**
      * Extracts a world-space frustum from a combined view-projection matrix.
      * Uses standard OpenGL/WebGPU frustum extraction.
@@ -30,13 +34,31 @@ export declare class FrustumCuller {
     /**
      * Culls entities outside frustum.
      * Reuses internal array to avoid allocations.
+     * Uses octree for broad-phase culling when available.
      * @returns Array of visible entities (reused, do not store reference)
      */
     cullEntities(entities: Entity[], frustum: Frustum): Entity[];
     /**
      * Culls entities and writes results to provided output array (avoids internal state).
+     * Uses octree for broad-phase culling when available.
      */
     cullEntitiesToArray(entities: Entity[], frustum: Frustum, outVisible: Entity[]): Entity[];
+    /**
+     * Marks the octree as dirty, forcing rebuild on next cull.
+     */
+    markDirty(): void;
+    /**
+     * Rebuilds the octree from entity list.
+     */
+    private rebuildOctree;
+    /**
+     * Calculates world bounds from entity list.
+     */
+    private calculateWorldBounds;
+    /**
+     * Gets approximate AABB bounds for frustum (for broad-phase query).
+     */
+    private getFrustumBounds;
     /**
      * Computes axis-aligned bounding box for entity in world space.
      * Handles rotation by transforming all 8 corners of the local box.

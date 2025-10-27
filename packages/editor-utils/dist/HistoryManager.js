@@ -69,6 +69,9 @@ export class HistoryManager {
     unfreeze() {
         this.frozen = false;
     }
+    isFrozen() {
+        return this.frozen;
+    }
     replace(snapshots) {
         this.entries = snapshots.map(HistoryManager.cloneSnapshot).slice(-this.maxSize);
         this.index = this.entries.length - 1;

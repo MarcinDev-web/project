@@ -1,5 +1,5 @@
-import { AnimationComponent } from '@engine/world';
 import { Transform } from '@engine/world';
+import { AnimationComponent } from './AnimationComponent';
 import { interpolate } from './interpolation';
 const DEFAULT_WEIGHT = 1;
 export class AnimationSystem {

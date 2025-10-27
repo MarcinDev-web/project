@@ -19,7 +19,6 @@ export class BrdfLutPass {
             const shader = this.device.createShaderModule({
                 label: 'brdf-lut-compute',
                 code: /* wgsl */ `
-struct Push { size: vec2<u32>; };
 @group(0) @binding(0) var destTex : texture_storage_2d<rgba16float, write>;
 
 fn hammersley(i: u32, n: u32) -> vec2<f32> {

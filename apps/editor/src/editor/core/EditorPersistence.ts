@@ -59,17 +59,18 @@ export function restoreUIPreferences(state: EditorState): void {
   } catch {}
 }
 
-export function persistWorkflowPreset(state: EditorState): void {
+export function persistCameraType(state: EditorState): void {
   try {
-    storageSave('workflowPreset', state.workflowPreset.value);
+    storageSave('cameraType', state.cameraType.value);
   } catch {}
 }
 
-export function restoreWorkflowPreset(state: EditorState): void {
+export function restoreCameraType(state: EditorState): void {
   try {
-    const restored = storageLoad<typeof state.workflowPreset.value>('workflowPreset');
-    if (restored) {
-      state.workflowPreset.value = restored;
+    const restored = storageLoad<'orbit' | 'fps'>('cameraType');
+    if (restored && (restored === 'orbit' || restored === 'fps')) {
+      state.cameraType.value = restored;
     }
   } catch {}
 }
+

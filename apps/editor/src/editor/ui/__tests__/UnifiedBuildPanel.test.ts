@@ -9,7 +9,9 @@ import { EditorState } from '../../core/state';
 import { PlacementMode } from '../../placement/PlacementMode';
 import { SnapSystem } from '../../snap/SnapSystem';
 import { CollisionDetector } from '../../placement/CollisionDetector';
-import { assetRegistry, type Asset } from '@engine/assets';
+import type { Asset } from '../../types/BlockAssetTypes';
+import { BLOCK_LIBRARY } from '@engine/gfx-webgpu/blocks/BlockLibrary';
+import { blockToAsset } from '../../types/BlockAssetTypes';
 
 describe('UnifiedBuildPanel', () => {
   let scene: Scene;
@@ -80,14 +82,14 @@ describe('UnifiedBuildPanel', () => {
     });
 
     it('should add asset to hotbar', () => {
-      // Get a test asset
-      const assets = assetRegistry.getAll();
-      if (assets.length === 0) {
-        // Skip if no assets available
+      // Get a test asset from BlockLibrary
+      const blocks = Object.values(BLOCK_LIBRARY);
+      if (blocks.length === 0) {
+        // Skip if no blocks available
         return;
       }
 
-      const testAsset = assets[0] as Asset;
+      const testAsset = blockToAsset(blocks[0]);
       const success = panel.addToHotbar(testAsset);
       
       expect(success).toBe(true);

@@ -15,6 +15,7 @@ import {
 import type { FrameResources, GeometryData } from '../resources/resources';
 import { GPUBufferPool } from './bufferPool';
 import type { Scene, Entity } from '@engine/world';
+import { EnvironmentComponent } from '@engine/world';
 import { LightManager } from '../lighting/LightManager';
 // TODO: Uncomment in Phase 4 when @engine/script exists
 // import { ScriptSystem } from '@engine/script';
@@ -34,6 +35,7 @@ import {
   UNIFORM_DATA_LENGTH,
   TIMESTAMP_BUFFER_SIZE,
 } from '../config';
+import { TIMESTAMP_INDICES } from '../config';
 import type { RendererCapabilities } from '../config';
 
 function hasPreferredCanvasFormat(
@@ -119,6 +121,13 @@ interface RendererOptions {
    * Use this for play mode updates, physics, character controllers, etc.
    */
   onFrameUpdate?: (deltaTime: number) => void;
+  // Performance/quality flags
+  enableHDR?: boolean;
+  enableBloom?: boolean;
+  enableShadows?: boolean;
+  shadowQuality?: 'low' | 'med' | 'high' | 'ultra';
+  enableComputePrepass?: boolean;
+  msaaSampleCount?: 1 | 2 | 4;
 }
 
 export async function initRenderer(options: RendererOptions): Promise<Renderer> {
@@ -127,6 +136,16 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
   const onFrameUpdateFn = options.onFrameUpdate;
   const currentScene = options.scene ?? null;
   let currentCameraEntity = options.cameraEntity ?? null;
+
+  // Resolve render settings with defaults
+  const renderSettings = {
+    enableHDR: options.enableHDR !== false,
+    enableBloom: options.enableBloom !== false,
+    enableShadows: options.enableShadows !== false,
+    shadowQuality: (options.shadowQuality ?? 'med') as 'low' | 'med' | 'high' | 'ultra',
+    enableComputePrepass: options.enableComputePrepass !== false,
+    msaaSampleCount: (options.msaaSampleCount ?? MSAA_SAMPLE_COUNT) as 1 | 2 | 4,
+  } as const;
 
   // Initialize light manager for the scene
   const lightManager = currentScene ? new LightManager(currentScene) : null;
@@ -320,7 +339,7 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       uniformResources.uniformBindGroupLayout,
       textureBindGroupLayout,
       vertexBuffers,
-      { sampleCount: MSAA_SAMPLE_COUNT, statusEl }
+      { sampleCount: renderSettings.msaaSampleCount, statusEl }
     );
 
     const uniformBindGroup = device.createBindGroup({
@@ -338,13 +357,13 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       ],
     });
 
-    const depthTexture = createDepthTexture(device, canvas, MSAA_SAMPLE_COUNT);
+    const depthTexture = createDepthTexture(device, canvas, renderSettings.msaaSampleCount);
     const depthTextureView = depthTexture.createView({ label: 'frame-depth-view' });
     const msaaColorTexture = createMsaaColorTarget(
       device,
       canvas,
       presentationFormat,
-      MSAA_SAMPLE_COUNT
+      renderSettings.msaaSampleCount
     );
     const msaaColorView = msaaColorTexture.createView({ label: 'frame-msaa-color-view' });
 
@@ -396,12 +415,12 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       ...({ bufferPool, atlas } as any),
     } as FrameResources;
 
-    // Initialize environment renderer
+    // Initialize environment renderer (match frame pass color format: rgba16float)
     environmentRenderer = new EnvironmentRenderer();
     await environmentRenderer.initialize({
       device,
-      presentationFormat,
-      sampleCount: MSAA_SAMPLE_COUNT,
+      presentationFormat: 'rgba16float',
+      sampleCount: renderSettings.msaaSampleCount,
     });
     // Precompute IBL textures (best-effort)
     try {
@@ -418,6 +437,11 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
         magFilter: 'linear',
         minFilter: 'linear',
       });
+      // Ensure environment params exist for IBL capture (procedural-sky defaults)
+      // Needed so the env-capture pipeline has a valid group(0) bind group
+      const defaultEnv = new EnvironmentComponent();
+      environmentRenderer.updateParams(defaultEnv);
+
       const { brdfLut, envCube } = await environmentRenderer.prepareIBLResources(128);
       const newBg = device.createBindGroup({
         label: 'material-atlas-bg+ibl',
@@ -550,8 +574,8 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
         passDesc = {
           timestampWrites: {
             querySet: frameResources.timestampQuerySet,
-            beginningOfPassWriteIndex: 0,
-            endOfPassWriteIndex: 1,
+            beginningOfPassWriteIndex: TIMESTAMP_INDICES.MAIN_PASS_BEGIN,
+            endOfPassWriteIndex: TIMESTAMP_INDICES.MAIN_PASS_END,
           },
         } as GPURenderPassDescriptor;
       }
@@ -571,6 +595,14 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
         // logicConnectionRenderer: null, // TODO: Phase 4
         uniformManager,
         lightingData,
+        featureFlags: {
+          enableComputePrepass: renderSettings.enableComputePrepass,
+          enableShadows: renderSettings.enableShadows,
+          enableBloom: renderSettings.enableBloom,
+          enableHDR: renderSettings.enableHDR,
+        },
+        shadowQuality: renderSettings.shadowQuality,
+        msaaSampleCount: renderSettings.msaaSampleCount,
         ...(gpuTimingListeners.length
           ? {
               onGpuTimings: (timings) => {
@@ -719,7 +751,8 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       if (!renderer || typeof renderer.initialize !== 'function') {
         throw new Error('Invalid grid renderer');
       }
-      await renderer.initialize(device, presentationFormat, 'depth24plus');
+      // Match frame pass color format to avoid attachment state mismatches
+      await renderer.initialize(device, 'rgba16float', 'depth24plus');
       gridRenderer = renderer;
     },
     getDevice: () => device,

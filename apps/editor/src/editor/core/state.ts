@@ -11,19 +11,17 @@ const DEFAULT_HISTORY_LIMIT = 100;
 
 export type EditorMode = 'edit' | 'play';
 export type BuildMode = 'free' | 'limited';
-export type WorkflowPreset = 'creative' | 'build' | 'logic' | 'developer' | 'custom';
 export type EasyPlacePattern = 'single' | 'line' | 'grid' | 'circle';
 export type RotationSnapMode = 'free' | '15deg' | '45deg' | '90deg';
+export type CameraType = 'orbit' | 'fps' | 'third-person';
+export type CameraMode = 'orbit' | 'free-fly';
+export type PlayModeCameraType = 'fps' | 'third-person'; // Camera types available in Play mode
+export type GizmoMode = 'translate' | 'rotate' | 'scale' | 'uniform';
+export type TransformSpace = 'world' | 'local';
 
 export interface UIPreferences {
   showHotbar: boolean;
-  showAssetCatalog: boolean;
-  showLogicPanel: boolean;
   showInspector: boolean;
-  showCodeEditor: boolean;
-  hotbarPosition: 'bottom' | 'side';
-  catalogStyle: 'compact' | 'detailed';
-  catalogPosition: 'left' | 'right';
 }
 
 export interface EasyPlaceSettings {
@@ -41,6 +39,14 @@ export interface PrecisionSettings {
   coarseStep: number; // Ctrl+Arrow coarse step
   rotationStep: number; // Bracket key rotation step
   fineRotationStep: number; // Shift+Bracket fine rotation
+}
+
+export interface CameraPreferences {
+  playModeCamera: PlayModeCameraType; // Default camera for Play mode
+  thirdPersonDistance: number; // Third person camera distance
+  thirdPersonHeight: number; // Third person camera height
+  sensitivity: number; // Mouse sensitivity
+  invertY: boolean; // Invert Y axis
 }
 
 export interface InspectorLayoutPreferences {
@@ -63,13 +69,14 @@ export class EditorState {
   scene: Signal<Scene>;
   selection: Signal<Entity[]>;
   selectedEntity: Signal<Entity | null>;
-  gizmoMode: Signal<'translate' | 'rotate' | 'scale'>;
+  gizmoMode: Signal<GizmoMode>;
+  transformSpace: Signal<TransformSpace>;
   snap: Signal<number>; // Legacy snap value (kept for backward compatibility)
   history: HistoryManager;
   historyLimit: Signal<number>;
   editorUI?: {
     setPauseMenuVisible?: (visible: boolean) => void;
-  };
+  } | undefined;
 
   // Reactive event ticks (increment to emit)
   transformRev: Signal<number>;
@@ -84,8 +91,7 @@ export class EditorState {
   editorMode: Signal<EditorMode>;
   buildMode: Signal<BuildMode>;
   
-  // Unified Building System
-  workflowPreset: Signal<WorkflowPreset>;
+  // UI Preferences
   uiPreferences: Signal<UIPreferences>;
 
   // Last selected preset to place (persisted between sessions)
@@ -114,6 +120,11 @@ export class EditorState {
   showPrecisionControls: Signal<boolean>;
   inspectorLayout: Signal<InspectorLayoutPreferences>;
 
+  // Camera selection
+  cameraType: Signal<CameraType>;
+  cameraMode: Signal<CameraMode>;
+  cameraPreferences: Signal<CameraPreferences>;
+
   // Optional Adaptive UI integration point (set by UI layer)
   adaptiveUI?: {
     trackPlacement?: () => void;
@@ -123,7 +134,8 @@ export class EditorState {
     this.scene = signal<Scene>(initialScene);
     this.selection = signal<Entity[]>([]);
     this.selectedEntity = computed(() => this.selection.value[0] ?? null);
-    this.gizmoMode = signal<'translate' | 'rotate' | 'scale'>('translate');
+    this.gizmoMode = signal<GizmoMode>('translate');
+    this.transformSpace = signal<TransformSpace>('world');
     this.snap = signal<number>(0.5);
     this.history = new HistoryManager(historyLimit);
     this.historyLimit = signal<number>(historyLimit);
@@ -141,26 +153,11 @@ export class EditorState {
     this.editorMode = signal<EditorMode>('edit');
     this.buildMode = signal<BuildMode>('free');
     
-    // Unified Building System - smart defaults
-    this.workflowPreset = signal<WorkflowPreset>('custom');
-    const defaultUIPreferences: Omit<UIPreferences, 'catalogPosition'> & Partial<Pick<UIPreferences, 'catalogPosition'>> = {
+    // UI Preferences - simplified to Minecraft creative style
+    this.uiPreferences = signal<UIPreferences>({
       showHotbar: true,
-      showAssetCatalog: true,
-      showLogicPanel: false,  // Hidden until user adds logic
       showInspector: true,
-      showCodeEditor: false,  // Hidden until user opens scripts
-      hotbarPosition: 'bottom',
-      catalogStyle: 'compact',
-    };
-    // Define catalogPosition as a non-enumerable property so deep-equal tests that
-    // check only enumerable fields pass, while property-based checks still see it.
-    Object.defineProperty(defaultUIPreferences, 'catalogPosition', {
-      value: 'left',
-      enumerable: false,
-      writable: true,
-      configurable: true,
     });
-    this.uiPreferences = signal<UIPreferences>(defaultUIPreferences as UIPreferences);
 
     // Last placement preset (initially none)
     this.lastPlacementPreset = signal(null);
@@ -198,6 +195,17 @@ export class EditorState {
       order: [...DEFAULT_INSPECTOR_SECTION_ORDER],
       collapsed: {},
       activeSection: 'transform',
+    });
+
+    // Camera selection defaults
+    this.cameraType = signal<CameraType>('orbit');
+    this.cameraMode = signal<CameraMode>('free-fly'); // Free-fly is now the default editor camera
+    this.cameraPreferences = signal<CameraPreferences>({
+      playModeCamera: 'fps', // Default to first person in Play mode
+      thirdPersonDistance: 3.5,
+      thirdPersonHeight: 1.2,
+      sensitivity: 0.0025,
+      invertY: false,
     });
   }
 

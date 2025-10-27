@@ -5,6 +5,7 @@
 ## Zawartość
 
 - **OrbitCamera** - Orbit-style mouse controls (class-based)
+- **ECS Orbit** - `OrbitCameraComponent` + `OrbitCameraSystem` (desktop, smooth, DPI-aware)
 - **FPSCamera** - First-person camera with pointer lock
 - **CameraDirector** - Manages camera modes and smooth transitions
 - **createOrbitControls** - Factory function (backward compatibility)
@@ -44,6 +45,47 @@ orbitCamera.cleanup(); // Cleanup
 
 // Or use factory function (backward compatibility)
 const controls = createOrbitControls(canvas);
+```
+
+### ECS Orbit (desktop)
+
+```typescript
+import { Scene, CameraComponent } from '@engine/world';
+import { OrbitCameraComponent, OrbitCameraSystem, type IOrbitCameraInput } from '@engine/camera';
+
+// 1) Scene and entity with camera
+const scene = new Scene('demo');
+const entity = scene.createEntity('camera');
+entity.addComponent(new CameraComponent());
+
+// 2) Orbit component with optional config
+const orbit = new OrbitCameraComponent({
+  fov: (55 * Math.PI) / 180,
+});
+entity.addComponent(orbit);
+
+// 3) Provide input adapter (decoupled from @engine/input)
+class EditorOrbitInput implements IOrbitCameraInput {
+  /* ... implement pointer/wheel reading bound to your app ... */
+  readPointerDelta() { return { dx: this.dx, dy: this.dy }; }
+  readWheelDelta() { return this.wheel; }
+  isOrbitActive() { return this.rmbDown; }
+  isPanActive() { return this.mmbDown; }
+  getModifiers() { return { shift: this.shift, alt: this.alt, ctrl: this.ctrl }; }
+  getDpiScale() { return window.devicePixelRatio ?? 1; }
+  getViewportSize() { return { width: canvas.clientWidth, height: canvas.clientHeight }; }
+  dispose() {/* remove listeners */}
+}
+orbit.input = new EditorOrbitInput();
+
+// 4) System
+const orbitSystem = new OrbitCameraSystem(scene);
+
+// 5) Game loop
+function frame(dt: number) {
+  orbitSystem.update(dt);
+  // Renderer will use CameraComponent on the same entity
+}
 ```
 
 ### FPS Camera

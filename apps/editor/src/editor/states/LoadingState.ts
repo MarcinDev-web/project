@@ -3,8 +3,17 @@ import { PlayModeStateType as StateType } from '../core/PlayModeStateMachine';
 import { Logger } from '../../utils/logger';
 import type { WorldManager } from '../core/WorldManager';
 import type { PlayManifest } from '../core/PlayManifest';
-import { LightManager } from '@engine/gfx-webgpu/lighting/LightManager';
-import { LightComponent } from '@engine/world/components/LightComponent';
+import type { LoadingProgress, ProgressCallback } from '../core/LoadingProgress';
+import type { RetryPolicy } from '../core/ErrorRecovery';
+import { DefaultRetryPolicy, LoadingErrorRecovery } from '../core/ErrorRecovery';
+import { SnapshotStep } from '../core/steps/SnapshotStep';
+import { BuildWorldStep } from '../core/steps/BuildWorldStep';
+import { LightSetupStep } from '../core/steps/LightSetupStep';
+import { PhysicsSetupStep } from '../core/steps/PhysicsSetupStep';
+import { BufferUpdateStep } from '../core/steps/BufferUpdateStep';
+import { PipelineWarmupStep } from '../core/steps/PipelineWarmupStep';
+import type { CancellationToken } from '../core/cancellation/CancellationToken';
+import { LoadingStepsRegistry, DefaultLoadingStepIds } from '../core/LoadingStepsRegistry';
 
 /**
  * Dependencies for LOADING state
@@ -18,6 +27,22 @@ export interface LoadingStateDeps {
   setupPhysics: () => void;
   /** Update scene buffers */
   updateSceneBuffers: () => void;
+  /** Called when loading starts (for UI) */
+  onStarted?: () => void;
+  /** Progress callback for UI */
+  onProgress?: ProgressCallback;
+  /** Called on step error */
+  onStepError?: (error: string, stepName: string, canRetry: boolean, attempt: number, maxAttempts: number) => void;
+  /** Called when loading completes */
+  onCompleted?: (success: boolean) => void;
+  /** Default retry policy */
+  retryPolicy?: RetryPolicy;
+  /** Per-step retry overrides */
+  perStepPolicies?: Record<string, RetryPolicy>;
+  /** Provide a cancellation token to allow early abort */
+  getCancellationToken?: () => CancellationToken;
+  /** Optional pluggable steps registry to extend/override loading pipeline order */
+  stepsRegistry?: LoadingStepsRegistry;
 }
 
 /**
@@ -36,6 +61,9 @@ export class LoadingState implements IPlayModeState {
   private deps: LoadingStateDeps;
   private loadingComplete = false;
   private loadingSuccess = false;
+  private started = false;
+  private readonly errorRecovery = new LoadingErrorRecovery();
+  private cancelToken: CancellationToken | null = null;
 
   constructor(deps: LoadingStateDeps) {
     this.deps = deps;
@@ -43,88 +71,138 @@ export class LoadingState implements IPlayModeState {
 
   onEnter(context: PlayModeContext): void {
     Logger.debug('Entering LOADING state');
-    
     this.loadingComplete = false;
     this.loadingSuccess = false;
-    
-    try {
-      // Step 1: Snapshot authoring world
-      Logger.debug('Creating authoring snapshot');
-      const snapshot = this.deps.worldManager.snapshotAuthoring();
-      context.authoringSnapshot = snapshot;
-      
-      // Step 2: Build runtime world from manifest
-      Logger.debug('Building runtime world');
-      const manifest = context.manifest as PlayManifest;
-      if (!manifest) {
-        throw new Error('No manifest available');
-      }
-      
-      const runtimeScene = this.deps.worldManager.buildRuntimeWorld(manifest);
-
-      // Ensure PBR has lighting: if scene has no lights, inject defaults (Sun + Ambient)
-      try {
-        const scene = runtimeScene ?? this.deps.worldManager.getRuntimeWorld();
-        if (scene) {
-          const lights = scene.queryEntities(LightComponent);
-          const hasAnyLight = lights.length > 0 && lights.some((e) => {
-            const lc = e.getComponent(LightComponent);
-            return !!lc && lc.enabled && e.active;
-          });
-          if (!hasAnyLight) {
-            LightManager.createDefaultLights(scene);
-            Logger.info('Injected default lights into runtime scene');
-          }
-        }
-      } catch (err) {
-        Logger.warn('Default light injection failed:', err as Error);
-      }
-      
-      // Step 3: Setup physics for runtime
-      Logger.debug('Setting up physics systems');
-      this.deps.setupPhysics();
-      
-      // Step 4: Update scene buffers for runtime world
-      Logger.debug('Updating scene buffers');
-      this.deps.updateSceneBuffers();
-      
-      // Step 5: Pre-warm WebGPU pipelines (optional)
-      if (this.deps.prewarmPipelines) {
-        Logger.debug('Pre-warming GPU pipelines');
-        // Run prewarm synchronously if provided
-        void this.deps.prewarmPipelines();
-      }
-      
-      this.loadingSuccess = true;
-      Logger.info('Runtime world loaded successfully');
-    } catch (error) {
-      Logger.error('Failed to load runtime world:', error as Error);
-      context.errors.push(`Loading failed: ${error instanceof Error ? error.message : String(error)}`);
-      this.loadingSuccess = false;
-    } finally {
-      this.loadingComplete = true;
-    }
+    this.started = false;
+    // UI hook
+    try { this.deps.onStarted?.(); } catch { /* ignore */ }
   }
 
   onExit(_context: PlayModeContext): void {
     Logger.debug('Exiting LOADING state');
   }
 
-  onUpdate(_deltaTime: number, _context: PlayModeContext): PlayModeStateType | null {
+  onUpdate(_deltaTime: number, context: PlayModeContext): PlayModeStateType | null {
+    if (!this.started) {
+      this.started = true;
+      void this.startAsyncLoading(context);
+    }
+
     if (!this.loadingComplete) {
       return null; // Still loading
     }
-    
+
     if (this.loadingSuccess) {
       return StateType.PLAY_INTRO; // Proceed to intro/handoff
-    } else {
-      return StateType.RETURN; // Failed, return to edit
     }
+    return StateType.RETURN; // Failed, return to edit
   }
 
   canTransitionTo(target: PlayModeStateType): boolean {
     // Can transition to PLAY_INTRO (success) or RETURN (failure)
     return target === StateType.PLAY_INTRO || target === StateType.RETURN;
+  }
+
+  private async startAsyncLoading(context: PlayModeContext): Promise<void> {
+    const manifest = context.manifest as PlayManifest | null;
+    if (!manifest) {
+      context.errors.push('Loading failed: No manifest available');
+      this.finish(false, context);
+      return;
+    }
+
+    this.cancelToken = this.deps.getCancellationToken?.() ?? null;
+
+    const defaultRegs = [
+      { id: DefaultLoadingStepIds.snapshot, create: () => new SnapshotStep() },
+      { id: DefaultLoadingStepIds.buildWorld, create: () => new BuildWorldStep() },
+      { id: DefaultLoadingStepIds.lightSetup, create: () => new LightSetupStep() },
+      { id: DefaultLoadingStepIds.physicsSetup, create: () => new PhysicsSetupStep() },
+      { id: DefaultLoadingStepIds.bufferUpdate, create: () => new BufferUpdateStep() },
+      { id: DefaultLoadingStepIds.pipelineWarmup, create: () => new PipelineWarmupStep() },
+    ] as const;
+
+    const steps = this.deps.stepsRegistry
+      ? this.deps.stepsRegistry.getSteps(defaultRegs as unknown as Array<{ id: string; create: () => any }>)
+      : defaultRegs.map((r) => r.create());
+
+    const totalWeight = steps.reduce((acc, s) => acc + s.weight, 0);
+    let completedWeight = 0;
+
+    for (let i = 0; i < steps.length; i++) {
+      const step = steps[i];
+      const stepBase = completedWeight;
+      const stepMax = stepBase + step.weight;
+      const onProgress: ProgressCallback = (p: LoadingProgress) => {
+        const localRatio = p.total > 0 ? p.current / p.total : 1;
+        const aggregate = ((stepBase + step.weight * localRatio) / totalWeight) * 100;
+        this.reportProgress(step.name, p.current, p.total, aggregate, p.message);
+      };
+
+      const policy = this.deps.perStepPolicies?.[step.name] ?? this.deps.retryPolicy ?? DefaultRetryPolicy;
+      let attempts = 0;
+      try {
+        await this.errorRecovery.executeWithRetry(
+          step as any,
+          {
+            worldManager: this.deps.worldManager,
+            manifest,
+            data: context.data,
+            cancelToken: this.cancelToken ?? undefined,
+            deps: {
+              setupPhysics: this.deps.setupPhysics,
+              updateSceneBuffers: this.deps.updateSceneBuffers,
+              prewarmPipelines: this.deps.prewarmPipelines,
+            },
+            emitProgress: (p) => onProgress(p),
+          },
+          policy,
+          (attempt, err) => {
+            attempts = attempt;
+            try { this.deps.onStepError?.(this.stringifyError(err), step.name, step.canRetry, attempt, policy.maxAttempts); } catch { /* ignore */ }
+          },
+          onProgress,
+        );
+      } catch (err) {
+        const errMsg = this.stringifyError(err);
+        Logger.error(`Step failed: ${step.name}:`, err as Error);
+        context.errors.push(`${step.name} failed: ${errMsg}`);
+        if (step.critical) {
+          this.finish(false, context);
+          return;
+        }
+      }
+
+      // Mark step as fully complete
+      completedWeight = stepMax;
+      this.reportProgress(step.name, 1, 1, (completedWeight / totalWeight) * 100);
+    }
+
+    this.finish(true, context);
+  }
+
+  private reportProgress(step: string, current: number, total: number, percentage: number, message = ''): void {
+    try {
+      this.deps.onProgress?.({ step, current, total, percentage: Math.round(Math.max(0, Math.min(100, percentage))), message });
+    } catch { /* ignore */ }
+  }
+
+  private finish(success: boolean, context: PlayModeContext): void {
+    this.loadingSuccess = success;
+    this.loadingComplete = true;
+    try { this.deps.onCompleted?.(success); } catch { /* ignore */ }
+    if (success) {
+      Logger.info('Runtime world loaded successfully');
+    } else {
+      if (context.errors.length === 0) {
+        context.errors.push('Loading failed');
+      }
+    }
+  }
+
+  private stringifyError(err: unknown): string {
+    if (err instanceof Error) return err.message;
+    return String(err);
   }
 }
 

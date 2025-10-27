@@ -23,4 +23,3 @@ export class Logger {
     console.debug(`[DEBUG] ${message}`, ...args);
   }
 }
-

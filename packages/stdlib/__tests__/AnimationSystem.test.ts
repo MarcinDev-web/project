@@ -1,10 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Scene } from '@engine/world';
-import { Entity } from '@engine/world';
-import { AnimationComponent } from '@engine/world';
-import { AnimationClip } from '@engine/stdlib/Animation';
-import { AnimationSystem } from '@engine/stdlib/Animation';
-import { Skeleton } from '@engine/stdlib/Animation';
+import { Scene, Entity } from '@engine/world';
+import { AnimationComponent, AnimationClip, AnimationSystem, Skeleton } from '@engine/stdlib/Animation';
 import { createTestClip } from './helpers/animationTestUtils';
 
 const IDENTITY_QUAT: [number, number, number, number] = [0, 0, 0, 1];

@@ -2,7 +2,6 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src",
     "baseUrl": ".",
     "paths": {
       "@engine/core": ["../../packages/core/src"],
@@ -20,7 +19,9 @@
       "@engine/camera": ["../../packages/camera/src"],
       "@engine/camera/*": ["../../packages/camera/src/*"],
       "@engine/stdlib": ["../../packages/stdlib/src"],
-      "@engine/stdlib/*": ["../../packages/stdlib/src/*"]
+      "@engine/stdlib/*": ["../../packages/stdlib/src/*"],
+      "@engine/wasm-collision": ["../../packages/wasm-collision/src"],
+      "@engine/wasm-collision/*": ["../../packages/wasm-collision/src/*"]
     }
   },
   "include": ["src/**/*", "index.html"],

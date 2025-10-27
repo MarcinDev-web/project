@@ -3,11 +3,11 @@ import {
   initializeBaseColor,
   applySelectionVisuals,
   HIGHLIGHT_COLOR_BOOST,
-} from '../src/editor/visuals/SelectionVisuals';
+} from '../SelectionVisuals';
 import { SelectionManager } from '@engine/world';
 import { Scene } from '@engine/world';
 import { Entity } from '@engine/world';
-import type { RgbaColor } from '../src/utils/colors';
+import type { RgbaColor } from '../../../utils/colors';
 
 describe('SelectionVisuals', () => {
   let scene: Scene;
@@ -407,6 +407,71 @@ describe('SelectionVisuals', () => {
       expect(entity.color[0]).toBeLessThan(0.5);
       expect(entity.color[1]).toBeLessThan(0.5);
       expect(entity.color[2]).toBeLessThan(0.5);
+    });
+
+    it('skips highlighting when skipHighlight is true', () => {
+      const baseColor: RgbaColor = [0.5, 0.5, 0.5, 1.0];
+      initializeBaseColor(entity, baseColor);
+
+      selection.select(entity);
+      applySelectionVisuals(scene, selection, HIGHLIGHT_COLOR_BOOST, true);
+
+      // Color should remain at base value even though entity is selected
+      expect(entity.color[0]).toBe(0.5);
+      expect(entity.color[1]).toBe(0.5);
+      expect(entity.color[2]).toBe(0.5);
+      expect(entity.color[3]).toBe(1.0);
+    });
+
+    it('applies highlighting when skipHighlight is false', () => {
+      const baseColor: RgbaColor = [0.5, 0.5, 0.5, 1.0];
+      initializeBaseColor(entity, baseColor);
+
+      selection.select(entity);
+      applySelectionVisuals(scene, selection, HIGHLIGHT_COLOR_BOOST, false);
+
+      // Color should be lightened
+      expect(entity.color[0]).toBeGreaterThan(0.5);
+      expect(entity.color[1]).toBeGreaterThan(0.5);
+      expect(entity.color[2]).toBeGreaterThan(0.5);
+    });
+
+    it('restores base color when skipHighlight is true after highlighting', () => {
+      const baseColor: RgbaColor = [0.4, 0.5, 0.6, 1.0];
+      initializeBaseColor(entity, baseColor);
+
+      selection.select(entity);
+      
+      // First apply with highlighting
+      applySelectionVisuals(scene, selection, HIGHLIGHT_COLOR_BOOST, false);
+      expect(entity.color[0]).toBeGreaterThan(0.4);
+
+      // Then apply with skipHighlight - should restore base color
+      applySelectionVisuals(scene, selection, HIGHLIGHT_COLOR_BOOST, true);
+      expect(entity.color[0]).toBe(0.4);
+      expect(entity.color[1]).toBe(0.5);
+      expect(entity.color[2]).toBe(0.6);
+    });
+
+    it('handles skipHighlight with multiple selected entities', () => {
+      const baseColor: RgbaColor = [0.3, 0.4, 0.5, 1.0];
+      initializeBaseColor(entity, baseColor);
+
+      const entity2 = new Entity('TestEntity2');
+      scene.addEntity(entity2);
+      initializeBaseColor(entity2, [0.6, 0.7, 0.8, 1.0]);
+
+      selection.selectMultiple([entity, entity2], 'set');
+      applySelectionVisuals(scene, selection, HIGHLIGHT_COLOR_BOOST, true);
+
+      // Both entities should keep their base colors
+      expect(entity.color[0]).toBe(0.3);
+      expect(entity.color[1]).toBe(0.4);
+      expect(entity.color[2]).toBe(0.5);
+      
+      expect(entity2.color[0]).toBe(0.6);
+      expect(entity2.color[1]).toBe(0.7);
+      expect(entity2.color[2]).toBe(0.8);
     });
   });
 });

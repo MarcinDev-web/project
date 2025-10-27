@@ -4,6 +4,8 @@ import type { Scene } from '@engine/world';
 import type { PhysicsWorld } from '@engine/world';
 import type { OrbitControls } from './OrbitCamera';
 import type { FPSCamera } from './FPSCamera';
+import type { EditorCameraController } from './EditorCameraController';
+import type { ThirdPersonCamera } from './ThirdPersonCamera';
 
 // Default rendering config constants
 const FOV_RADIANS = (2 * Math.PI) / 5;
@@ -13,7 +15,7 @@ const Z_FAR = 100;
 /**
  * Camera mode types
  */
-export type CameraMode = 'orbit' | 'fps' | 'follow';
+export type CameraMode = 'orbit' | 'fps' | 'third-person' | 'free-fly';
 
 /**
  * Camera blend state
@@ -34,6 +36,8 @@ interface CameraBlend {
 export interface CameraDirectorConfig {
   orbitControls: OrbitControls;
   fpsCamera: FPSCamera | null;
+  editorCamera: EditorCameraController | null;
+  thirdPersonCamera?: ThirdPersonCamera | null;
   canvas: HTMLCanvasElement;
   scene?: Scene;
   physicsWorld?: PhysicsWorld | null;
@@ -53,11 +57,13 @@ export interface CameraDirectorConfig {
  * - Centralized camera state management
  */
 export class CameraDirector {
-  private currentMode: CameraMode = 'orbit';
+  private currentMode: CameraMode = 'free-fly'; // Free-fly is the default editor camera
   private blend: CameraBlend | null = null;
   
   private readonly orbitControls: OrbitControls;
   private readonly fpsCamera: FPSCamera | null;
+  private readonly editorCamera: EditorCameraController | null;
+  private readonly thirdPersonCamera: ThirdPersonCamera | null;
   private readonly canvas: HTMLCanvasElement;
   private readonly scene: Scene | null;
   private readonly physicsWorld: PhysicsWorld | null;
@@ -79,6 +85,8 @@ export class CameraDirector {
   constructor(config: CameraDirectorConfig) {
     this.orbitControls = config.orbitControls;
     this.fpsCamera = config.fpsCamera;
+    this.editorCamera = config.editorCamera;
+    this.thirdPersonCamera = config.thirdPersonCamera ?? null;
     this.canvas = config.canvas;
     this.scene = config.scene ?? null;
     this.physicsWorld = config.physicsWorld ?? null;
@@ -93,6 +101,9 @@ export class CameraDirector {
 
     // Initialize matrices so callers can query immediately after construction
     this.updateCameraState();
+    
+    // Enable the default camera mode (free-fly for editor)
+    this.enableCameraForMode(this.currentMode);
   }
 
   /**
@@ -103,9 +114,18 @@ export class CameraDirector {
       return;
     }
 
-    this.logger?.debug(`Camera mode: ${this.currentMode} → ${mode}`);
+    console.log(`[CameraDirector] Camera mode: ${this.currentMode} → ${mode}`);
+    
+    // Disable previous mode's camera
+    this.disableCameraForMode(this.currentMode);
+    
     this.currentMode = mode;
     this.blend = null;
+    
+    // Enable new mode's camera
+    this.enableCameraForMode(this.currentMode);
+    
+    console.log(`[CameraDirector] Mode switched to: ${mode}, editorCamera enabled: ${this.editorCamera?.isEnabled()}`);
     
     this.updateCameraState();
   }
@@ -166,6 +186,24 @@ export class CameraDirector {
       if (this.blend.elapsed >= this.blend.duration) {
         // Blend complete
         this.blend = null;
+      }
+    }
+    
+    // Update free-fly camera if active
+    if (this.currentMode === 'free-fly') {
+      if (this.editorCamera) {
+        this.editorCamera.update(deltaTime);
+      } else {
+        console.warn('[CameraDirector] free-fly mode but editorCamera is null!');
+      }
+    }
+    
+    // Update third-person camera if active
+    if (this.currentMode === 'third-person') {
+      if (this.thirdPersonCamera && this.playerPosition) {
+        // Get player forward direction (simplified: use yaw from player rotation)
+        const playerForward: Vec3 = [0, 0, -1]; // Default forward, could be enhanced
+        this.thirdPersonCamera.update(this.playerPosition, playerForward, deltaTime);
       }
     }
     
@@ -269,6 +307,71 @@ export class CameraDirector {
   dispose(): void {
     this.blend = null;
     this.playerPosition = null;
+    
+    // Cleanup cameras
+    if (this.editorCamera) {
+      this.editorCamera.dispose();
+    }
+  }
+  
+  /**
+   * Enable camera for a specific mode
+   */
+  private enableCameraForMode(mode: CameraMode): void {
+    console.log(`[CameraDirector] Enabling camera for mode: ${mode}`);
+    switch (mode) {
+      case 'orbit':
+        this.orbitControls.setEnabled(true);
+        console.log('[CameraDirector] ✓ Orbit controls enabled');
+        break;
+      case 'fps':
+        // FPS camera is enabled by play mode
+        if (this.fpsCamera) {
+          this.fpsCamera.enable();
+          console.log('[CameraDirector] ✓ FPS camera enabled');
+        }
+        break;
+      case 'third-person':
+        if (this.thirdPersonCamera) {
+          this.thirdPersonCamera.enable();
+          console.log('[CameraDirector] ✓ Third person camera enabled');
+        }
+        break;
+      case 'free-fly':
+        if (this.editorCamera) {
+          this.editorCamera.enable();
+          console.log('[CameraDirector] ✓ EditorCamera enabled');
+        } else {
+          console.warn('[CameraDirector] ⚠️ EditorCamera is null!');
+        }
+        this.orbitControls.setEnabled(false);
+        console.log('[CameraDirector] ✓ Orbit controls disabled');
+        break;
+    }
+  }
+  
+  /**
+   * Disable camera for a specific mode
+   */
+  private disableCameraForMode(mode: CameraMode): void {
+    switch (mode) {
+      case 'orbit':
+        this.orbitControls.setEnabled(false);
+        break;
+      case 'fps':
+        // FPS camera is disabled by play mode
+        break;
+      case 'third-person':
+        if (this.thirdPersonCamera) {
+          this.thirdPersonCamera.disable();
+        }
+        break;
+      case 'free-fly':
+        if (this.editorCamera) {
+          this.editorCamera.disable();
+        }
+        break;
+    }
   }
 
   /**
@@ -303,12 +406,26 @@ export class CameraDirector {
       }
       
       case 'fps': {
-        if (this.fpsCamera && this.playerPosition) {
-          const basePosition: Vec3 = [
-            this.playerPosition[0] + this.cameraOffset[0],
-            this.playerPosition[1] + this.cameraOffset[1],
-            this.playerPosition[2] + this.cameraOffset[2],
-          ];
+        if (this.fpsCamera) {
+          let basePosition: Vec3;
+          
+          // In play mode: use player position
+          // In edit mode: use orbit camera position for free-fly FPS
+          if (this.playerPosition) {
+            basePosition = [
+              this.playerPosition[0] + this.cameraOffset[0],
+              this.playerPosition[1] + this.cameraOffset[1],
+              this.playerPosition[2] + this.cameraOffset[2],
+            ];
+          } else {
+            // Edit mode: calculate position from orbit controls
+            const { yaw, pitch, distance } = this.orbitControls.getState();
+            const eyeX = Math.cos(pitch) * Math.sin(yaw) * distance;
+            const eyeY = Math.sin(pitch) * distance;
+            const eyeZ = Math.cos(pitch) * Math.cos(yaw) * distance;
+            basePosition = [eyeX, eyeY, eyeZ];
+          }
+          
           const cameraPosition = this.resolveCameraCollision(basePosition);
           const fpsView = this.fpsCamera.getViewMatrix(cameraPosition);
           outMatrix.set(fpsView);
@@ -319,10 +436,29 @@ export class CameraDirector {
         break;
       }
       
-      case 'follow': {
-        // TODO: Implement third-person follow camera
-        // For now, fallback to orbit
-        this.computeViewMatrix('orbit', outMatrix);
+      case 'third-person': {
+        if (this.thirdPersonCamera && this.playerPosition) {
+          const view = this.thirdPersonCamera.getViewMatrix(this.playerPosition);
+          outMatrix.set(view);
+        } else {
+          // Fallback to orbit if third person camera not available
+          this.computeViewMatrix('orbit', outMatrix);
+        }
+        break;
+      }
+      
+      case 'free-fly': {
+        if (this.editorCamera) {
+          const view = this.editorCamera.getViewMatrix();
+          outMatrix.set(view);
+          // Debug: log first time to confirm it's being called
+          if (Math.random() < 0.01) { // Log only 1% of frames to avoid spam
+            console.log('[CameraDirector] Using free-fly view matrix, position:', this.editorCamera.getPosition());
+          }
+        } else {
+          // Fallback to orbit if editor camera not available
+          this.computeViewMatrix('orbit', outMatrix);
+        }
         break;
       }
       

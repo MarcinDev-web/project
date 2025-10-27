@@ -12,7 +12,7 @@
  * Extracted from EditorUI to reduce complexity and improve maintainability.
  */
 
-import type { OrbitControls } from '@engine/camera';
+import type { OrbitControls, CameraDirector } from '@engine/camera';
 import type { Scene, Entity } from '@engine/world';
 import type { SelectionManager } from '@engine/world';
 import type { EditorState } from '../core/state';
@@ -26,6 +26,8 @@ import { Logger } from '../../utils/logger';
 export interface EditorPlacementControllerConfig {
   canvas: HTMLCanvasElement;
   controls: OrbitControls;
+  /** Active camera director (preferred for view/projection) */
+  cameraDirector?: CameraDirector;
   scene: Scene;
   selection: SelectionManager;
   state: EditorState;
@@ -164,9 +166,25 @@ export class EditorPlacementController {
     const mouseX = (event.clientX - rect.left) * (this.config.canvas.width / rect.width);
     const mouseY = (event.clientY - rect.top) * (this.config.canvas.height / rect.height);
 
+    // Prefer CameraDirector matrices (supports free-fly/FPS/third-person)
+    const director = this.config.cameraDirector;
+    if (director) {
+      const viewMatrix = director.getViewMatrix();
+      const projectionMatrix = director.getProjectionMatrix();
+      return this.raycaster.createRayFromScreen(
+        mouseX,
+        mouseY,
+        this.config.canvas.width,
+        this.config.canvas.height,
+        viewMatrix,
+        projectionMatrix
+      );
+    }
+
+    // Fallback to legacy orbit-controls derived matrices
     const { yaw, pitch, distance } = this.config.controls.getState();
     const aspect = this.config.canvas.width / this.config.canvas.height;
-    
+
     const projectionMatrix = new Float32Array(16) as Mat4;
     const viewMatrix = new Float32Array(16) as Mat4;
 

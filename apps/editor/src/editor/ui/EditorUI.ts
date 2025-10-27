@@ -10,7 +10,7 @@
  * - Event coordination between managers
  *
  * Extracted components:
- * - EditorPanelManager - UI panels (outliner, properties, assets)
+ * - EditorPanelManager - UI panels (properties, assets, layers)
  * - EditorToolbar - Modern Toolbar UI with menus, search, breadcrumbs
  * - EditorVisualManager - Gizmo, grid, selection visuals
  * - DisposableGroup - Resource cleanup
@@ -18,13 +18,13 @@
 
 import type { OrbitControls } from '@engine/camera';
 import type { Renderer } from '@engine/gfx-webgpu/index';
-import { Entity, Scene } from '@engine/world';
+import { Entity, Scene, LightComponent } from '@engine/world';
 import type { SelectionManager } from '@engine/world';
 import { MaterialComponent } from '@engine/world/components/MaterialComponent';
 import type { Vec3 } from '@engine/core/math';
-import type { AssetPreset } from '@engine/assets';
+import type { AssetPreset } from '../types/BlockAssetTypes';
 import { initializeBaseColor } from '../visuals/SelectionVisuals';
-import { persistCamera, restoreCamera, persistLastPlacementPreset, restoreLastPlacementPreset, persistUIPreferences, restoreUIPreferences, persistWorkflowPreset, restoreWorkflowPreset } from '../core/EditorPersistence';
+import { persistCamera, restoreCamera, persistLastPlacementPreset, restoreLastPlacementPreset, persistUIPreferences, restoreUIPreferences, persistCameraType, restoreCameraType } from '../core/EditorPersistence';
 import { storageLoad, storageSave } from '../../utils/storage';
 import type { RgbaColor } from '../../utils/colors';
 import { effect } from '@preact/signals-core';
@@ -58,16 +58,15 @@ import { WelcomeOverlay } from './WelcomeOverlay';
 import { BuildStats } from './BuildStats';
 import { FloatingHints } from './FloatingHints';
 import { ScriptWorkbench } from './ScriptWorkbench';
-import { AssetsDropdown } from './AssetsDropdown';
 import { BlockEditorUI } from './BlockEditorUI';
-import { AudioManager } from '@engine/stdlib/Audio/AudioManager';
+import { Audio } from '@engine/stdlib';
 import { EnvironmentComponent } from '@engine/world/components/EnvironmentComponent';
 import { AdaptiveUIManager } from './AdaptiveUIManager';
 import { FeatureIntroduction } from './FeatureIntroduction';
-import type { PhysicsWorld } from '@engine/world/PhysicsWorld';
+import type { PhysicsWorld } from '@engine/world';
 import type { CharacterControllerSystem } from '@engine/stdlib/CharacterController';
 import { CharacterInputHandler } from '@engine/input';
-import { FPSCamera } from '@engine/camera';
+import { FPSCamera, EditorCameraController, ThirdPersonCamera } from '@engine/camera';
 import { PauseMenu } from './PauseMenu';
 
 export interface EditorUIConfig {
@@ -87,7 +86,8 @@ export class EditorUI {
   private readonly disposables = new DisposableGroup();
 
   private layout: EditorUILayout | null = null;
-  private panelHover = false;
+  private inspectorHover = false;
+  private sidebarHover = false;
   private lastSnapshot?: SceneSnapshot;
   private statusTimeout: number | null = null;
 
@@ -95,14 +95,12 @@ export class EditorUI {
   private panelManager: EditorPanelManager | null = null;
   private visualManager: EditorVisualManager | null = null;
   private quickMenu: QuickMenu | null = null;
-  private assetsDropdown: AssetsDropdown | null = null;
   private blockEditor: BlockEditorUI | null = null;
-  private unifiedBuildPanel: import('./UnifiedBuildPanel').UnifiedBuildPanel | null = null;
   private welcomeOverlay: WelcomeOverlay | null = null;
   private buildStats: BuildStats | null = null;
   private floatingHints: FloatingHints | null = null;
   private scriptWorkbench: ScriptWorkbench | null = null;
-  private audio: AudioManager | null = null;
+  private audio: Audio.AudioManager | null = null;
   private adaptiveUI: AdaptiveUIManager | null = null;
   private featureIntro: FeatureIntroduction | null = null;
   private pauseMenu: PauseMenu | null = null;
@@ -125,6 +123,8 @@ export class EditorUI {
   private easyPlaceController: EasyPlaceController | null = null;
   private characterInput: CharacterInputHandler | null = null;
   private fpsCamera: FPSCamera | null = null;
+  private editorCamera: EditorCameraController | null = null;
+  private thirdPersonCamera: ThirdPersonCamera | null = null;
 
   constructor(private readonly config: EditorUIConfig) {}
 
@@ -151,6 +151,19 @@ export class EditorUI {
 
     // 6. Restore persisted state
     this.restorePersistedState();
+
+    // Ensure scene isn't completely dark when loading persisted scenes without lights
+    // If there are no light entities, create a default ambient + directional setup
+    try {
+      const hasAnyLights = this.config.scene.queryEntities(LightComponent).length > 0;
+      if (!hasAnyLights) {
+        LightManager.createDefaultLights(this.config.scene);
+        // Scene buffers will pick this up automatically next frame, but prompt an update now
+        this.config.updateSceneBuffers();
+      }
+    } catch {
+      // ignore – lighting system may be unavailable in certain minimal test environments
+    }
 
     // 8. Setup placement tracking
     const placementCleanup = this.placementController?.initialize();
@@ -189,14 +202,11 @@ export class EditorUI {
       this.blockEditor = new BlockEditorUI();
     }
     this.blockEditor.show(undefined, async (block) => {
-      try {
-        // Lazy import to avoid circular deps in some test environments
-        const mod = await import('../assets/AssetRegistry');
-        mod.assetRegistry.registerBlockAsset(block, { origin: 'custom' });
-      } catch {}
+      // Removed: AssetRegistry no longer exists
+      // Block is created but not registered to any system
+      
       // Refresh palette/browser where present
       try { this.panelManager?.getAssetPalette()?.refresh(); } catch {}
-      try { this.assetsDropdown?.refresh(); } catch {}
       this.setStatusMessage(`Saved custom block: ${block.name}` as string, 1200);
     });
   }
@@ -225,6 +235,20 @@ export class EditorUI {
       this.fpsCamera = new FPSCamera(this.config.canvas);
       this.disposables.add(() => this.fpsCamera?.dispose());
     }
+    if (!this.editorCamera) {
+      this.editorCamera = new EditorCameraController(this.config.canvas, {
+        moveSpeed: 5.0,
+        initialPosition: [0, 2, 5],
+      });
+      this.disposables.add(() => this.editorCamera?.dispose());
+    }
+    if (!this.thirdPersonCamera) {
+      this.thirdPersonCamera = new ThirdPersonCamera(this.config.canvas, this.config.physicsWorld ?? null, {
+        distance: this.state.cameraPreferences.value.thirdPersonDistance,
+        height: this.state.cameraPreferences.value.thirdPersonHeight,
+      });
+      this.disposables.add(() => this.thirdPersonCamera?.dispose());
+    }
 
     this.modeManager = new EditorModeManager({
       scene: this.config.scene,
@@ -236,7 +260,6 @@ export class EditorUI {
             this.setStatusMessage(isPlay ? 'Play Mode' : 'Edit Mode', 800);
             this.layout?.setPlayMode(isPlay);
             this.quickMenu?.setPlayMode(isPlay);
-            this.panelManager?.refreshOutliner();
             this.panelManager?.refreshProperties();
             this.visualManager?.applySelectionVisuals();
           },
@@ -246,6 +269,8 @@ export class EditorUI {
       characterSystem,
       characterInput: this.characterInput,
       fpsCamera: this.fpsCamera,
+      editorCamera: this.editorCamera,
+      thirdPersonCamera: this.thirdPersonCamera,
       getRendererReady: () => this.config.getRenderer() !== null,
     });
 
@@ -262,8 +287,7 @@ export class EditorUI {
       scene: this.config.scene,
       selection: this.config.selection,
       onSearchResults: () => {
-        // Refresh outliner to show search results
-        this.panelManager?.refreshOutliner();
+        // Search results updated
       },
       onStatusMessage: (msg, dur) => this.setStatusMessage(msg, dur),
     });
@@ -271,6 +295,7 @@ export class EditorUI {
     this.placementController = new EditorPlacementController({
       canvas: this.config.canvas,
       controls: this.config.controls,
+      cameraDirector: this.modeManager.getCameraDirector(),
       scene: this.config.scene,
       selection: this.config.selection,
       state: this.state,
@@ -283,6 +308,7 @@ export class EditorUI {
     this.dragController = new BlockDragController({
       canvas: this.config.canvas,
       controls: this.config.controls,
+      cameraDirector: this.modeManager.getCameraDirector(),
       scene: this.config.scene,
       selection: this.config.selection,
       state: this.state,
@@ -350,20 +376,20 @@ export class EditorUI {
 
     // Setup hover detection for inspector panel
     containers.inspector?.addEventListener('pointerenter', () => {
-      this.panelHover = true;
+      this.inspectorHover = true;
       this.updateControlEnabledState();
     });
     containers.inspector?.addEventListener('pointerleave', () => {
-      this.panelHover = false;
+      this.inspectorHover = false;
       this.updateControlEnabledState();
     });
 
     containers.sidebar?.addEventListener('pointerenter', () => {
-      this.panelHover = true;
+      this.sidebarHover = true;
       this.updateControlEnabledState();
     });
     containers.sidebar?.addEventListener('pointerleave', () => {
-      this.panelHover = false;
+      this.sidebarHover = false;
       this.updateControlEnabledState();
     });
 
@@ -390,7 +416,6 @@ export class EditorUI {
       scene: this.config.scene,
       state: this.state,
       updateSceneBuffers: this.config.updateSceneBuffers,
-      refreshOutliner: () => this.panelManager?.refreshOutliner(),
       showStatusMessage: (message, duration) => this.setStatusMessage(message, duration),
       onSaveStatusChange: (status) => this.quickMenu?.setSaveStatus(status),
     });
@@ -428,7 +453,7 @@ export class EditorUI {
           new KeyboardShortcutsModal().show();
         } catch {}
       },
-      onOpenAssets: () => this.assetsDropdown?.toggle(),
+      onOpenAssets: () => {}, // Removed: assetsDropdown no longer exists
       onOpenScriptWorkbench: () => this.openScriptWorkbench(),
       onOpenBlockEditor: () => this.openBlockEditor(),
       onGizmoModeChange: (mode) => {
@@ -440,6 +465,44 @@ export class EditorUI {
         if (!this.state) return;
         this.state.rotationSnapMode.value = mode;
         this.setStatusMessage(`Rotation snap: ${mode}`, 1000);
+      },
+      onCameraChange: (type) => {
+        if (!this.state || !this.modeManager) return;
+        const cameraDirector = this.modeManager.getCameraDirector();
+        
+        // Synchronize orientation when switching to FPS
+        if (type === 'fps' && this.fpsCamera) {
+          const orbitState = this.config.controls.getState();
+          // Set FPS camera orientation to match orbit camera
+          this.fpsCamera.setYawPitch(orbitState.yaw, orbitState.pitch);
+        }
+        
+        cameraDirector.setMode(type);
+        this.state.cameraType.value = type;
+        
+        // Update camera preference if in play mode
+        if (this.state.editorMode.value === 'play' && (type === 'fps' || type === 'third-person')) {
+          this.state.cameraPreferences.value = {
+            ...this.state.cameraPreferences.value,
+            playModeCamera: type,
+          };
+        }
+        
+        // Enable/disable camera controls based on mode
+        if (type === 'fps') {
+          this.fpsCamera?.enable();
+          this.config.controls.setEnabled(false);
+        } else if (type === 'third-person') {
+          // Third person camera is managed by CameraDirector
+          this.fpsCamera?.disable();
+          this.config.controls.setEnabled(false);
+        } else {
+          this.fpsCamera?.disable();
+          this.config.controls.setEnabled(true);
+        }
+        
+        const cameraName = type === 'fps' ? 'First Person' : type === 'third-person' ? 'Third Person' : 'Orbit';
+        this.setStatusMessage(`Camera: ${cameraName}`, 1000);
       },
     });
     this.quickMenu.mount();
@@ -489,7 +552,6 @@ export class EditorUI {
       },
       onAssetSpawn: (_entity, _preset) => {
         this.config.updateSceneBuffers();
-        this.panelManager?.refreshOutliner();
         this.recordSnapshot('Add asset');
       },
       onStartPlacement: (preset: AssetPreset) => {
@@ -523,7 +585,7 @@ export class EditorUI {
         }
       },
       onSelectionVisualsNeeded: () => {
-        // Apply selection visuals when entity is selected from outliner
+        // Apply selection visuals when entity is selected
         this.visualManager?.applySelectionVisuals();
       },
       onOpenScriptWorkbench: () => {
@@ -605,98 +667,9 @@ export class EditorUI {
     });
     this.disposables.add(() => this.scriptWorkbench?.dispose());
 
-    // Initialize Assets Dropdown (dropdown panel for Asset Browser)
-    this.assetsDropdown = new AssetsDropdown({
-      scene: this.config.scene,
-      state: this.state,
-      onAssetSelect: (asset, variant) => {
-        // Handle asset selection from dropdown
-        const finalColor = variant?.color || asset.color;
-        const finalScale = variant?.scale || asset.scale;
-        
-        // Convert Asset to AssetPreset for placement
-        const preset: AssetPreset = {
-          name: asset.metadata.name,
-          description: asset.metadata.description,
-          category: asset.category as AssetPreset['category'],
-          scale: finalScale,
-          color: finalColor,
-          ...(asset.blockData?.id && { blockId: asset.blockData.id }),
-        };
-        
-        // Start placement mode
-        if (this.placementMode && this.state) {
-          this.placementMode.startPlacement(preset);
-          this.state.placementMode.value = true;
-          this.config.statusEl.textContent = `Placing ${preset.name} (Q/E rotate, Double-click or Enter confirm, Esc cancel)`;
-          try {
-            this.floatingHints?.dismissAll();
-            this.floatingHints?.showPlacementHint(preset.name);
-          } catch {}
-        }
-      },
-    });
-    this.assetsDropdown.mount();
-    this.disposables.add(() => this.assetsDropdown?.dispose());
+    // Removed: AssetsDropdown and UnifiedBuildPanel (replaced by simplified AssetPalette)
 
-    // Initialize Unified Build Panel (combines hotbar + catalog for Build Mode)
-    const { UnifiedBuildPanel } = await import('./UnifiedBuildPanel');
-    this.unifiedBuildPanel = new UnifiedBuildPanel({
-      scene: this.config.scene,
-      state: this.state,
-      placementMode: this.placementMode!,
-      // inventoryManager is optional, not provided here
-      onAssetSelect: (asset, _variant, source) => {
-        // Track selection source
-        this.setStatusMessage(`Selected ${asset.metadata.name} from ${source}`, 1000);
-      },
-      onPlacementStart: (asset, variant) => {
-        const finalColor = variant?.color || asset.color;
-        const finalScale = variant?.scale || asset.scale;
-        
-        // Convert Asset to AssetPreset for placement
-        const preset: AssetPreset = {
-          name: asset.metadata.name,
-          description: asset.metadata.description || '',
-          category: asset.category as AssetPreset['category'],
-          scale: finalScale,
-          color: finalColor,
-          ...(asset.blockData?.id && { blockId: asset.blockData.id }),
-        };
-
-        // Persist last placement
-        try {
-          const last = {
-            name: preset.name,
-            scale: [...preset.scale] as [number, number, number],
-            color: [...preset.color] as [number, number, number, number],
-            ...(preset.blockId ? { blockId: preset.blockId } : {}),
-          };
-          this.state!.lastPlacementPreset.value = last;
-          persistLastPlacementPreset(this.state!);
-        } catch {}
-
-        this.state!.placementMode.value = true;
-        this.floatingHints?.dismissAll();
-        this.floatingHints?.showPlacementHint(preset.name);
-      },
-      onPlacementEnd: (confirmed) => {
-        if (confirmed) {
-          this.config.updateSceneBuffers();
-          this.panelManager?.refreshOutliner();
-          this.recordSnapshot('Place asset');
-          this.setStatusMessage('Asset placed', 1000);
-        }
-        this.state!.placementMode.value = false;
-      },
-      onStatusUpdate: (message) => {
-        this.config.statusEl.textContent = message;
-      },
-    });
-    this.unifiedBuildPanel.mount();
-    this.disposables.add(() => this.unifiedBuildPanel?.dispose());
-
-    this.audio = new AudioManager({ scene: this.config.scene, orbitControls: this.config.controls });
+    this.audio = new Audio.AudioManager({ scene: this.config.scene, orbitControls: this.config.controls });
     this.disposables.add(() => this.audio?.dispose());
     
     // Initialize Adaptive UI Manager
@@ -718,7 +691,6 @@ export class EditorUI {
     effect(() => {
       const selectedId = this.state!.selectedEntity.value?.id ?? 'none';
       void selectedId;
-      this.panelManager?.refreshOutliner();
       this.panelManager?.refreshProperties();
       this.visualManager?.applySelectionVisuals();
       
@@ -741,7 +713,6 @@ export class EditorUI {
     });
     effect(() => {
       void this.state!.renameRev.value;
-      this.panelManager?.refreshOutliner();
       this.panelManager?.refreshProperties();
     });
 
@@ -752,7 +723,6 @@ export class EditorUI {
         this.state.selection.value = selected ? [selected] : [];
       }
       this.persistSelection();
-      this.panelManager?.refreshOutliner();
       this.panelManager?.refreshProperties();
       this.visualManager?.applySelectionVisuals();
     });
@@ -778,35 +748,53 @@ export class EditorUI {
     // React to UI preferences changes
     const uiPrefsEffect = effect(() => {
       const prefs = this.state!.uiPreferences.value;
-      const preset = this.state!.workflowPreset.value;
 
       this.panelManager?.setVisibility({
         sidebar: true,
         inspector: prefs.showInspector,
       });
 
-      // Show/hide unified build panel based on workflow and preferences
-      // Unified build panel is shown when in 'build' mode with both hotbar and catalog enabled
-      const shouldShowUnifiedBuild = preset === 'build' && prefs.showHotbar && prefs.showAssetCatalog;
-      this.unifiedBuildPanel?.setVisibility(shouldShowUnifiedBuild);
+      // Removed: unifiedBuildPanel no longer exists
 
       if (this.state) {
         persistUIPreferences(this.state);
       }
     });
     this.disposables.add(() => uiPrefsEffect());
-    
-    // React to workflow preset changes
-    const workflowEffect = effect(() => {
-      const preset = this.state!.workflowPreset.value;
-      void preset; // Mark as used
-      
-      // Persist workflow preset
+
+    // React to camera type changes
+    const cameraTypeEffect = effect(() => {
+      const cameraType = this.state!.cameraType.value;
+      if (this.modeManager) {
+        const cameraDirector = this.modeManager.getCameraDirector();
+        
+        // Synchronize orientation when switching to FPS
+        if (cameraType === 'fps' && this.fpsCamera) {
+          const orbitState = this.config.controls.getState();
+          this.fpsCamera.setYawPitch(orbitState.yaw, orbitState.pitch);
+        }
+        
+        cameraDirector.setMode(cameraType);
+        
+        // Enable/disable camera controls based on type
+        if (cameraType === 'fps') {
+          this.fpsCamera?.enable();
+          this.config.controls.setEnabled(false);
+        } else {
+          this.fpsCamera?.disable();
+          this.config.controls.setEnabled(true);
+        }
+      }
       if (this.state) {
-        persistWorkflowPreset(this.state);
+        persistCameraType(this.state);
       }
     });
-    this.disposables.add(() => workflowEffect());
+    this.disposables.add(() => cameraTypeEffect());
+
+    // Camera mode is now always free-fly in edit mode
+    // No need for camera mode switching in editor
+    // (Camera switching between FPS/Third Person happens in Play mode only)
+    
   }
 
   /**
@@ -871,13 +859,15 @@ export class EditorUI {
     if (this.state) {
       restoreLastPlacementPreset(this.state);
       restoreUIPreferences(this.state);
-      restoreWorkflowPreset(this.state);
+      restoreCameraType(this.state);
     }
   }
 
 
   /**
    * Seeds demo scene if empty.
+   * Creates an advanced arena with architectural features: spiral stairs, bridges, 
+   * parkour paths, alcoves, balconies, and multi-level structures.
    */
   private seedDemoScene(): void {
     if (this.config.scene.entityCount > 0) return;
@@ -886,7 +876,6 @@ export class EditorUI {
     try {
       const envEntity = new Entity('Environment');
       envEntity.addComponent(new EnvironmentComponent());
-      // Ensure environment has a non-white base color so selection highlight is visible in tests
       try {
         initializeBaseColor(envEntity, [0.6, 0.7, 0.9, 1]);
       } catch {}
@@ -895,39 +884,430 @@ export class EditorUI {
       // Ignore if component not available in certain test environments
     }
 
-    const gridSize = 5;
-    const spacing = 1.5;
-
-    for (let x = 0; x < gridSize; x++) {
-      for (let z = 0; z < gridSize; z++) {
-        const entity = new Entity(`Cube_${x}_${z}`);
-        entity.transform.position = [(x - gridSize / 2) * spacing, 0, (z - gridSize / 2) * spacing];
-        const color: RgbaColor = [0.3 + (x / gridSize) * 0.5, 0.35 + (z / gridSize) * 0.5, 0.55, 1];
+    // ========== HELPER FUNCTIONS ==========
+    
+    const createBlock = (
+      name: string,
+      pos: Vec3,
+      scale: Vec3,
+      matId: number,
+      color?: RgbaColor
+    ): Entity => {
+      const entity = new Entity(name);
+      entity.transform.position = pos;
+      entity.transform.scale = scale;
+      if (color) {
         initializeBaseColor(entity, color);
-        // Assign varied material IDs across the grid so textures are not all identical
-        try {
-          const mat = entity.getComponent(MaterialComponent) ?? entity.addComponent(new MaterialComponent());
-          mat.materialId = ((x + z * gridSize) % (MaterialComponent.MAX_MATERIAL_ID + 1));
-        } catch {
-          // ignore
+      }
+      try {
+        const mat = entity.getComponent(MaterialComponent) ?? entity.addComponent(new MaterialComponent());
+        mat.materialId = matId;
+      } catch {
+        // ignore
+      }
+      this.config.scene.addEntity(entity);
+      return entity;
+    };
+
+    // Spiral staircase helper
+    const createSpiralStairs = (
+      centerX: number,
+      centerZ: number,
+      radius: number,
+      height: number,
+      startAngle: number,
+      matId: number
+    ): void => {
+      const steps = height * 6; // 6 steps per level
+      for (let i = 0; i < steps; i++) {
+        const angle = startAngle + (i / steps) * Math.PI * 3; // 1.5 rotations
+        const x = centerX + Math.cos(angle) * radius;
+        const z = centerZ + Math.sin(angle) * radius;
+        const y = (i / steps) * height;
+        createBlock(`Spiral_${centerX}_${centerZ}_${i}`, [x, y, z], [1, 1, 1], matId);
+      }
+    };
+
+    // Bridge helper
+    const createBridge = (
+      startPos: Vec3,
+      endPos: Vec3,
+      width: number,
+      matId: number,
+      name: string
+    ): void => {
+      const dx = endPos[0] - startPos[0];
+      const dz = endPos[2] - startPos[2];
+      const length = Math.sqrt(dx * dx + dz * dz);
+      const steps = Math.ceil(length);
+      const stepX = dx / steps;
+      const stepZ = dz / steps;
+      
+      for (let i = 0; i <= steps; i++) {
+        for (let w = -Math.floor(width / 2); w <= Math.floor(width / 2); w++) {
+          const perpX = (-stepZ / length) * w;
+          const perpZ = (stepX / length) * w;
+          const x = startPos[0] + stepX * i + perpX;
+          const z = startPos[2] + stepZ * i + perpZ;
+          const y = startPos[1];
+          createBlock(`${name}_${i}_${w}`, [x, y, z], [1, 1, 1], matId);
+          
+          // Glass railings on edges
+          if (Math.abs(w) === Math.floor(width / 2) && i % 2 === 0) {
+            createBlock(`${name}_Rail_${i}_${w}`, [x, y + 1, z], [1, 1, 1], 7); // glass
+          }
         }
-        this.config.scene.addEntity(entity);
+      }
+    };
+
+    const arenaSize = 35;
+    const halfSize = Math.floor(arenaSize / 2);
+
+    // ========== 1. CHECKERBOARD FLOOR with CONCENTRIC CIRCLES ==========
+    for (let x = -halfSize; x <= halfSize; x++) {
+      for (let z = -halfSize; z <= halfSize; z++) {
+        const distFromCenter = Math.sqrt(x * x + z * z);
+        let matId: number;
+        let color: RgbaColor | undefined;
+        
+        // Concentric circles in center
+        if (distFromCenter < 3) {
+          matId = 13; // yellow plastic
+          color = [0.95, 0.85, 0.15, 1];
+        } else if (distFromCenter < 6) {
+          matId = 10; // red plastic
+          color = [0.9, 0.15, 0.15, 1];
+        } else if (distFromCenter < 9) {
+          matId = 11; // blue plastic
+          color = [0.15, 0.45, 0.95, 1];
+        } else {
+          // Checkerboard pattern for outer area
+          const isEven = (x + z) % 2 === 0;
+          matId = isEven ? 4 : 1; // grass : stone
+        }
+        
+        createBlock(`Floor_${x}_${z}`, [x, -0.5, z], [1, 1, 1], matId, color);
       }
     }
 
-    const centerpiece = new Entity('Center');
-    centerpiece.transform.position = [0, 1, 0];
-    centerpiece.transform.scale = [1, 2, 1];
-    initializeBaseColor(centerpiece, [1, 0.7, 0.2, 1]);
-    this.config.scene.addEntity(centerpiece);
+    // ========== 2. ENHANCED WALLS (2 blocks thick) with CRENELLATIONS ==========
+    const wallHeight = 5;
+    
+    // North wall (double thickness)
+    for (let i = -halfSize; i <= halfSize; i++) {
+      const matId = i % 5 === 0 ? 14 : 1; // buttresses every 5 blocks (concrete : stone)
+      for (let h = 0; h < wallHeight; h++) {
+        createBlock(`Wall_North_Outer_${i}_${h}`, [i, h, halfSize], [1, 1, 1], matId);
+        createBlock(`Wall_North_Inner_${i}_${h}`, [i, h, halfSize - 1], [1, 1, 1], matId);
+      }
+      // Crenellations (pattern: block-gap-block)
+      if (i % 2 === 0) {
+        createBlock(`Wall_North_Cren_${i}`, [i, wallHeight, halfSize], [1, 1, 1], matId);
+      }
+    }
+    
+    // South wall
+    for (let i = -halfSize; i <= halfSize; i++) {
+      const matId = i % 5 === 0 ? 14 : 1;
+      for (let h = 0; h < wallHeight; h++) {
+        createBlock(`Wall_South_Outer_${i}_${h}`, [i, h, -halfSize], [1, 1, 1], matId);
+        createBlock(`Wall_South_Inner_${i}_${h}`, [i, h, -halfSize + 1], [1, 1, 1], matId);
+      }
+      if (i % 2 === 0) {
+        createBlock(`Wall_South_Cren_${i}`, [i, wallHeight, -halfSize], [1, 1, 1], matId);
+      }
+    }
+    
+    // East wall
+    for (let i = -halfSize; i <= halfSize; i++) {
+      const matId = i % 5 === 0 ? 14 : 1;
+      for (let h = 0; h < wallHeight; h++) {
+        createBlock(`Wall_East_Outer_${i}_${h}`, [halfSize, h, i], [1, 1, 1], matId);
+        createBlock(`Wall_East_Inner_${i}_${h}`, [halfSize - 1, h, i], [1, 1, 1], matId);
+      }
+      if (i % 2 === 0) {
+        createBlock(`Wall_East_Cren_${i}`, [halfSize, wallHeight, i], [1, 1, 1], matId);
+      }
+    }
+    
+    // West wall
+    for (let i = -halfSize; i <= halfSize; i++) {
+      const matId = i % 5 === 0 ? 14 : 1;
+      for (let h = 0; h < wallHeight; h++) {
+        createBlock(`Wall_West_Outer_${i}_${h}`, [-halfSize, h, i], [1, 1, 1], matId);
+        createBlock(`Wall_West_Inner_${i}_${h}`, [-halfSize + 1, h, i], [1, 1, 1], matId);
+      }
+      if (i % 2 === 0) {
+        createBlock(`Wall_West_Cren_${i}`, [-halfSize, wallHeight, i], [1, 1, 1], matId);
+      }
+    }
 
-    // Add default lighting after initial entities so first root entity is non-white for selection tests
+    // ========== 3. HIDDEN ALCOVES in walls ==========
+    const alcoves = [
+      { x: 0, z: halfSize - 2, dir: 'north', wallNormal: [0, 0, -1] },
+      { x: 0, z: -halfSize + 2, dir: 'south', wallNormal: [0, 0, 1] },
+      { x: halfSize - 2, z: 0, dir: 'east', wallNormal: [-1, 0, 0] },
+      { x: -halfSize + 2, z: 0, dir: 'west', wallNormal: [1, 0, 0] },
+    ];
+    
+    for (const alcove of alcoves) {
+      // Create 3x3x2 room
+      for (let dx = -1; dx <= 1; dx++) {
+        for (let dz = -1; dz <= 1; dz++) {
+          for (let h = 0; h < 2; h++) {
+            const normalX = alcove.wallNormal[0] ?? 0;
+            const normalZ = alcove.wallNormal[2] ?? 0;
+            const x = normalX === 0 ? alcove.x + dx : alcove.x + dz * normalX;
+            const z = normalZ === 0 ? alcove.z + dz : alcove.z + dx * normalZ;
+            createBlock(`Alcove_${alcove.dir}_${dx}_${dz}_${h}`, [x, h + 1, z], [1, 1, 1], 14); // concrete
+          }
+        }
+      }
+      // Treasure light in center
+      const normalX = alcove.wallNormal[0] ?? 0;
+      const normalZ = alcove.wallNormal[2] ?? 0;
+      const centerX = normalX === 0 ? alcove.x : alcove.x + normalX;
+      const centerZ = normalZ === 0 ? alcove.z : alcove.z + normalZ;
+      createBlock(`Alcove_Light_${alcove.dir}`, [centerX, 1.5, centerZ], [0.5, 0.5, 0.5], 8, [1, 1, 0.8, 1]);
+    }
+
+    // ========== 4. CORNER TOWERS (height 8) with SPIRAL STAIRS ==========
+    const towerPositions: [Vec3, number, string][] = [
+      [[halfSize - 3, 0, halfSize - 3], 10, 'Red'],
+      [[-halfSize + 3, 0, halfSize - 3], 11, 'Blue'],
+      [[halfSize - 3, 0, -halfSize + 3], 12, 'Green'],
+      [[-halfSize + 3, 0, -halfSize + 3], 13, 'Yellow'],
+    ];
+
+    for (const [basePos, matId, colorName] of towerPositions) {
+      // Tower core (3x3)
+      for (let x = -1; x <= 1; x++) {
+        for (let z = -1; z <= 1; z++) {
+          for (let y = 0; y < 8; y++) {
+            // Hollow center for stairs
+            if (x === 0 && z === 0 && y > 0) continue;
+            createBlock(
+              `Tower_${colorName}_${x}_${y}_${z}`,
+              [basePos[0] + x, basePos[1] + y, basePos[2] + z],
+              [1, 1, 1],
+              matId
+            );
+          }
+        }
+      }
+      
+      // Spiral staircase around tower
+      createSpiralStairs(basePos[0], basePos[2], 2.2, 8, 0, 5); // dirt stairs
+      
+      // Balconies at y=5 and y=7
+      for (const balconyY of [5, 7]) {
+        for (let dx = -2; dx <= 2; dx++) {
+          createBlock(
+            `Tower_${colorName}_Balcony_${balconyY}_${dx}`,
+            [basePos[0] + dx, balconyY, basePos[2] + (dx < 0 ? -3 : 3)],
+            [1, 1, 1],
+            14 // concrete
+          );
+          // Glass railing
+          if (Math.abs(dx) === 2) {
+            createBlock(
+              `Tower_${colorName}_Balcony_Rail_${balconyY}_${dx}`,
+              [basePos[0] + dx, balconyY + 1, basePos[2] + (dx < 0 ? -3 : 3)],
+              [1, 1, 1],
+              7 // glass
+            );
+          }
+        }
+      }
+    }
+
+    // ========== 5. BRIDGES connecting towers ==========
+    createBridge(
+      [halfSize - 3, 3, halfSize - 3],
+      [-halfSize + 3, 3, halfSize - 3],
+      3,
+      5,
+      'Bridge_North'
+    ); // North bridge
+    
+    createBridge(
+      [halfSize - 3, 3, -halfSize + 3],
+      [-halfSize + 3, 3, -halfSize + 3],
+      3,
+      5,
+      'Bridge_South'
+    ); // South bridge
+    
+    createBridge(
+      [halfSize - 3, 3, halfSize - 3],
+      [halfSize - 3, 3, -halfSize + 3],
+      3,
+      5,
+      'Bridge_East'
+    ); // East bridge
+    
+    createBridge(
+      [-halfSize + 3, 3, halfSize - 3],
+      [-halfSize + 3, 3, -halfSize + 3],
+      3,
+      5,
+      'Bridge_West'
+    ); // West bridge
+
+    // ========== 6. PARKOUR PATH - floating platforms ==========
+    const parkourPath: [Vec3, Vec3][] = [
+      [[10, 0.5, 10], [1, 1, 1]],
+      [[12, 1, 12], [0.8, 0.8, 0.8]],
+      [[13, 1.8, 14], [0.6, 0.6, 0.6]],
+      [[14, 2.5, 15], [1, 1, 1]],
+      [[13, 3.2, 13], [0.7, 0.7, 0.7]],
+      [[11, 4, 12], [0.9, 0.9, 0.9]],
+      [[9, 4.8, 13], [0.6, 0.6, 0.6]],
+      [[7, 5.5, 14], [0.8, 0.8, 0.8]],
+      [[5, 6.2, 13], [1, 1, 1]],
+      [[3, 7, 12], [0.7, 0.7, 0.7]],
+      [[1, 7.8, 11], [0.9, 0.9, 0.9]],
+      [[-1, 8.5, 10], [0.6, 0.6, 0.6]],
+      [[-3, 9.2, 9], [1, 1, 1]],
+      [[-5, 10, 8], [0.8, 0.8, 0.8]],
+    ];
+    
+    for (let i = 0; i < parkourPath.length; i++) {
+      const [pos, scale] = parkourPath[i]!;
+      const colors = [
+        [0.9, 0.15, 0.15, 1],
+        [0.15, 0.45, 0.95, 1],
+        [0.15, 0.85, 0.25, 1],
+        [0.95, 0.85, 0.15, 1],
+      ] as RgbaColor[];
+      const color = colors[i % 4]!;
+      const matId = 10 + (i % 4); // rotating plastic colors
+      createBlock(`Parkour_${i}`, pos, scale, matId, color);
+    }
+
+    // ========== 7. DIAGONAL RAMPS in corners ==========
+    const ramps = [
+      { start: [12, 0, 12], dir: [-1, 0.3, -1], length: 8, name: 'NE' },
+      { start: [-12, 0, 12], dir: [1, 0.3, -1], length: 8, name: 'NW' },
+      { start: [12, 0, -12], dir: [-1, 0.3, 1], length: 8, name: 'SE' },
+      { start: [-12, 0, -12], dir: [1, 0.3, 1], length: 8, name: 'SW' },
+    ];
+    
+    for (const ramp of ramps) {
+      for (let i = 0; i < ramp.length; i++) {
+        const startX = ramp.start[0] ?? 0;
+        const startY = ramp.start[1] ?? 0;
+        const startZ = ramp.start[2] ?? 0;
+        const dirX = ramp.dir[0] ?? 0;
+        const dirY = ramp.dir[1] ?? 0;
+        const dirZ = ramp.dir[2] ?? 0;
+        const x = startX + dirX * i;
+        const y = startY + dirY * i;
+        const z = startZ + dirZ * i;
+        createBlock(`Ramp_${ramp.name}_${i}`, [x, y, z], [1, 1, 1], 5); // dirt
+      }
+    }
+
+    // ========== 8. CENTRAL PIT with elevated column ==========
+    // Pit (depression)
+    for (let x = -4; x <= 4; x++) {
+      for (let z = -4; z <= 4; z++) {
+        const dist = Math.sqrt(x * x + z * z);
+        if (dist < 4) {
+          createBlock(`Pit_${x}_${z}`, [x, -1.5, z], [1, 1, 1], 5); // dirt pit
+        }
+      }
+    }
+    
+    // Tall central column
+    for (let y = 0; y < 12; y++) {
+      createBlock(`Central_Column_${y}`, [0, y, 0], [1, 1, 1], 13, [0.95, 0.85, 0.15, 1]);
+    }
+
+    // ========== 9. ENHANCED TUNNELS (5x5 with lighting) ==========
+    for (let z = -5; z <= 5; z++) {
+      for (let y = 0; y < 4; y++) {
+        for (let w = -1; w <= 1; w++) {
+          // East tunnel
+          if (y === 0 || y === 3 || Math.abs(w) === 1) {
+            createBlock(`Tunnel_East_${z}_${y}_${w}`, [halfSize - 6 + w, y, z], [1, 1, 1], 14);
+          }
+          // West tunnel
+          if (y === 0 || y === 3 || Math.abs(w) === 1) {
+            createBlock(`Tunnel_West_${z}_${y}_${w}`, [-halfSize + 6 + w, y, z], [1, 1, 1], 14);
+          }
+        }
+      }
+      // Tunnel lighting every 3 blocks
+      if (z % 3 === 0) {
+        createBlock(`Tunnel_East_Light_${z}`, [halfSize - 6, 2.5, z], [0.5, 0.5, 0.5], 8, [1, 1, 1, 1]);
+        createBlock(`Tunnel_West_Light_${z}`, [-halfSize + 6, 2.5, z], [0.5, 0.5, 0.5], 8, [1, 1, 1, 1]);
+      }
+    }
+
+    // ========== 10. PARTIAL ROOF with SKYLIGHTS ==========
+    const roofY = 7;
+    for (let x = -halfSize + 5; x <= halfSize - 5; x += 3) {
+      for (let z = -halfSize + 5; z <= halfSize - 5; z += 3) {
+        // Roof panels (concrete)
+        for (let dx = 0; dx < 2; dx++) {
+          for (let dz = 0; dz < 2; dz++) {
+            createBlock(`Roof_${x}_${z}_${dx}_${dz}`, [x + dx, roofY, z + dz], [1, 1, 1], 14);
+          }
+        }
+        // Skylight (glass) in center of some panels
+        if ((x + z) % 6 === 0) {
+          createBlock(`Skylight_${x}_${z}`, [x + 1, roofY + 0.5, z + 1], [1, 1, 1], 7);
+        }
+      }
+    }
+
+    // ========== 11. VIEWING BALCONIES on walls ==========
+    const balconies = [
+      { x: 0, z: halfSize - 3, y: 5, dir: 'north', extend: [0, -1] },
+      { x: 0, z: -halfSize + 3, y: 5, dir: 'south', extend: [0, 1] },
+      { x: halfSize - 3, z: 0, y: 5, dir: 'east', extend: [-1, 0] },
+      { x: -halfSize + 3, z: 0, y: 5, dir: 'west', extend: [1, 0] },
+    ];
+    
+    for (const balcony of balconies) {
+      for (let i = -2; i <= 2; i++) {
+        for (let d = 0; d < 2; d++) {
+          const extendX = balcony.extend[0] ?? 0;
+          const extendZ = balcony.extend[1] ?? 0;
+          const x = balcony.x + (extendX === 0 ? i : extendX * d);
+          const z = balcony.z + (extendZ === 0 ? i : extendZ * d);
+          createBlock(`Balcony_${balcony.dir}_${i}_${d}`, [x, balcony.y, z], [1, 1, 1], 14);
+          
+          // Glass railings
+          if (d === 1 && Math.abs(i) === 2) {
+            createBlock(`Balcony_Rail_${balcony.dir}_${i}`, [x, balcony.y + 1, z], [1, 1, 1], 7);
+          }
+        }
+      }
+    }
+
+    // ========== 12. DECORATIVE LIGHTS in strategic positions ==========
+    const lightPositions: Vec3[] = [
+      [halfSize - 4, 6, halfSize - 4],
+      [-halfSize + 4, 6, halfSize - 4],
+      [halfSize - 4, 6, -halfSize + 4],
+      [-halfSize + 4, 6, -halfSize + 4],
+      [0, 10, 10],
+      [0, 10, -10],
+      [10, 10, 0],
+      [-10, 10, 0],
+    ];
+    
+    for (let i = 0; i < lightPositions.length; i++) {
+      const pos = lightPositions[i]!;
+      createBlock(`Light_${i}`, pos, [0.8, 0.8, 0.8], 8, [1.0, 1.0, 0.9, 1]);
+    }
+
+    // Add default scene lighting
     LightManager.createDefaultLights(this.config.scene);
 
     this.recordSnapshot('Seed scene', { force: true });
-
-    // Ensure UI reflects new entities immediately
-    this.panelManager?.refreshOutliner();
     this.panelManager?.refreshProperties();
   }
 
@@ -935,7 +1315,8 @@ export class EditorUI {
    * Updates control enabled state based on UI hover.
    */
   private updateControlEnabledState(): void {
-    const shouldEnable = !this.panelHover;
+    const isHoveringAnyPanel = this.inspectorHover || this.sidebarHover;
+    const shouldEnable = !isHoveringAnyPanel;
     this.config.controls.setEnabled(shouldEnable);
   }
 
@@ -1059,7 +1440,6 @@ export class EditorUI {
       } else {
         this.config.selection.clearSelection();
       }
-      this.panelManager?.refreshOutliner();
       this.panelManager?.refreshProperties();
       this.visualManager?.applySelectionVisuals();
       this.lastSnapshot = snapshot;
@@ -1129,7 +1509,6 @@ export class EditorUI {
 
     if (!query || query.trim().length === 0) {
       this.searchManager.clearSearch();
-      this.panelManager?.refreshOutliner();
       return;
     }
 
@@ -1189,7 +1568,7 @@ export class EditorUI {
   }
 
   private resumePlayMode(): void {
-    if (!this.modeManager || this.state.editorMode.value !== 'play') return;
+    if (!this.modeManager || !this.state || this.state.editorMode.value !== 'play') return;
     this.pauseMenuOpen = false;
     this.pauseMenu?.hide();
     this.modeManager.resumePlayMode();

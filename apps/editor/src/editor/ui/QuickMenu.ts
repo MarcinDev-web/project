@@ -4,11 +4,10 @@
  */
 
 import { effect } from '@preact/signals-core';
-import type { EditorState } from '../core/state';
+import type { EditorState, CameraType } from '../core/state';
 import type { ProjectManager } from '../managers/ProjectManager';
 import { createIcon } from '../utils/icons';
 import { KeyboardShortcutsModal } from './KeyboardShortcutsModal';
-import { WorkflowSelector } from './WorkflowSelector';
 
 export interface QuickMenuConfig {
   state: EditorState;
@@ -26,6 +25,7 @@ export interface QuickMenuConfig {
   onOpenBlockEditor?: () => void;
   onGizmoModeChange: (mode: 'translate' | 'rotate' | 'scale') => void;
   onRotationSnapChange: (mode: 'free' | '15deg' | '45deg' | '90deg') => void;
+  onCameraChange?: (type: CameraType) => void;
 }
 
 export class QuickMenu {
@@ -35,7 +35,6 @@ export class QuickMenu {
   private btnUndo: HTMLButtonElement | null = null;
   private btnRedo: HTMLButtonElement | null = null;
   private saveStatusEl: HTMLSpanElement | null = null;
-  private workflowSelector: WorkflowSelector | null = null;
   private modeBtn: HTMLButtonElement | null = null;
   private isPlayMode = false;
 
@@ -122,19 +121,9 @@ export class QuickMenu {
     menuBar.appendChild(this.createDropdownMenu('File', this.buildFileMenu()));
     menuBar.appendChild(this.createDropdownMenu('Edit', this.buildEditMenu()));
     menuBar.appendChild(this.createDropdownMenu('View', this.buildViewMenu()));
+    menuBar.appendChild(this.createDropdownMenu('Camera', this.buildCameraMenu()));
     menuBar.appendChild(this.createDropdownMenu('Help', this.buildHelpMenu()));
     left.appendChild(menuBar);
-
-    // Workflow selector
-    this.workflowSelector = new WorkflowSelector({
-      state: this.config.state,
-      onWorkflowChange: (preset) => {
-        this.config.projectManager?.showStatusMessage?.(`Switched to ${preset} workflow`, 1500);
-      },
-    });
-    const selectorElement = this.workflowSelector.render();
-    selectorElement.classList.add('top-bar-workflow-selector');
-    left.appendChild(selectorElement);
 
     return left;
   }
@@ -471,6 +460,19 @@ export class QuickMenu {
     const items: Array<HTMLElement | 'divider'> = [];
     items.push(this.menuItem('Toggle Grid', 'grid', 'G', () => this.config.toggleGrid()));
     items.push(this.menuItem('Toggle Snap', 'snap', 'X', () => this.config.toggleSnap()));
+    return items;
+  }
+
+  private buildCameraMenu(): Array<HTMLElement | 'divider'> {
+    const items: Array<HTMLElement | 'divider'> = [];
+    // Editor mode: free-fly camera (always active, no menu option needed)
+    // Play mode: FPS and Third Person options
+    items.push(this.menuItem('First Person', 'user', undefined, () => {
+      this.config.onCameraChange?.('fps');
+    }));
+    items.push(this.menuItem('Third Person', 'eye', undefined, () => {
+      this.config.onCameraChange?.('third-person');
+    }));
     return items;
   }
 

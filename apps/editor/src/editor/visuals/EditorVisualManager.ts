@@ -28,6 +28,8 @@ export interface EditorVisualManagerConfig {
   snapSystem: SnapSystem | null;
   getRenderer: () => Renderer | null;
   projectWorldToScreen: (world: Vec3) => { x: number; y: number } | null;
+  getCameraPosition?: () => Vec3;
+  getCameraRotation?: () => import('@engine/core/math').Quat;
   updateSceneBuffers: () => void;
   setControlsEnabled: (enabled: boolean) => void;
 }
@@ -115,6 +117,8 @@ export class EditorVisualManager {
       selection: this.config.selection,
       canvas: this.config.canvas,
       projectWorldToScreen: this.config.projectWorldToScreen,
+      getCameraPosition: this.config.getCameraPosition,
+      getCameraRotation: this.config.getCameraRotation,
       snapSystem: this.config.snapSystem,
       updateSceneBuffers: this.config.updateSceneBuffers,
       setControlsEnabled: this.config.setControlsEnabled,
@@ -167,6 +171,14 @@ export class EditorVisualManager {
       }
     });
     this.disposables.add(() => selectionEffect());
+
+    // Sync transform space with gizmo controller
+    const transformSpaceEffect = effect(() => {
+      if (this.gizmoController && this.config.state) {
+        this.gizmoController.setTransformSpace(this.config.state.transformSpace.value);
+      }
+    });
+    this.disposables.add(() => transformSpaceEffect());
   }
 
   /**
@@ -211,7 +223,8 @@ export class EditorVisualManager {
    * Applies selection visual effects to entities.
    */
   applySelectionVisuals(): void {
-    applySelectionVisuals(this.config.scene, this.config.selection);
+    const isDragging = this.gizmoController?.isDragging() ?? false;
+    applySelectionVisuals(this.config.scene, this.config.selection, undefined, isDragging);
     this.config.updateSceneBuffers();
     const raf = typeof requestAnimationFrame === 'function'
       ? requestAnimationFrame

@@ -36,4 +36,3 @@ let nextEntityId = 0;
 export function generateEntityId(): EntityId {
   return `entity_${nextEntityId++}`;
 }
-

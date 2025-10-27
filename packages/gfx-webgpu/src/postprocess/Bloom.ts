@@ -3,6 +3,9 @@ export class BloomPass {
   private pipeline: GPURenderPipeline | null = null;
   private bindGroupLayout: GPUBindGroupLayout | null = null;
   private sampler: GPUSampler | null = null;
+  private cachedBindGroup: GPUBindGroup | null = null;
+  private cachedSrcView: GPUTextureView | null = null;
+  private cachedDstView: GPUTextureView | null = null;
 
   constructor(device: GPUDevice) {
     this.device = device;
@@ -38,7 +41,7 @@ struct VSOut { @builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32> };
         },
         fragment: {
           module: this.device.createShaderModule({ code: `
-@group(0) @binding(0) var hdrTex : texture_2d<f16>;
+@group(0) @binding(0) var hdrTex : texture_2d<f32>;
 @group(0) @binding(1) var smp : sampler;
 @fragment fn fs_main(@location(0) v_uv:vec2<f32>) -> @location(0) vec4<f32> {
   // Bright-pass filter
@@ -77,23 +80,39 @@ struct VSOut { @builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32> };
   render(
     encoder: GPUCommandEncoder,
     srcView: GPUTextureView,
-    dstView: GPUTextureView
+    dstView: GPUTextureView,
+    opts?: { querySet?: GPUQuerySet; begin?: number; end?: number }
   ): void {
     if (!this.pipeline || !this.bindGroupLayout || !this.sampler) return;
-    const bindGroup = this.device.createBindGroup({
-      label: 'bloom-bg',
-      layout: this.bindGroupLayout,
-      entries: [
-        { binding: 0, resource: srcView },
-        { binding: 1, resource: this.sampler },
-      ],
-    });
-    const pass = encoder.beginRenderPass({
+    // Cache bind group across frames; recreate when views change (resize)
+    if (!this.cachedBindGroup || this.cachedSrcView !== srcView || this.cachedDstView !== dstView) {
+      this.cachedBindGroup = this.device.createBindGroup({
+        label: 'bloom-bg',
+        layout: this.bindGroupLayout,
+        entries: [
+          { binding: 0, resource: srcView },
+          { binding: 1, resource: this.sampler },
+        ],
+      });
+      this.cachedSrcView = srcView;
+      this.cachedDstView = dstView;
+    }
+    const passDesc: GPURenderPassDescriptor = {
       label: 'bloom-pass',
       colorAttachments: [{ view: dstView, loadOp: 'clear', storeOp: 'store' }],
-    });
+      ...(opts?.querySet && typeof opts.begin === 'number' && typeof opts.end === 'number'
+        ? {
+            timestampWrites: {
+              querySet: opts.querySet,
+              beginningOfPassWriteIndex: opts.begin!,
+              endOfPassWriteIndex: opts.end!,
+            },
+          }
+        : {}),
+    } as GPURenderPassDescriptor;
+    const pass = encoder.beginRenderPass(passDesc);
     pass.setPipeline(this.pipeline);
-    pass.setBindGroup(0, bindGroup);
+    pass.setBindGroup(0, this.cachedBindGroup!);
     pass.draw(3, 1, 0, 0);
     pass.end();
   }

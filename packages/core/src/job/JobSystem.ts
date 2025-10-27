@@ -4,9 +4,9 @@
  */
 
 export enum TaskPriority {
-  RenderCritical = 0,   // Main thread, executed immediately
-  Background = 1,       // Worker thread, heavy computation
-  Idle = 2,            // Idle time, low priority
+  RenderCritical = 0, // Main thread, executed immediately
+  Background = 1, // Worker thread, heavy computation
+  Idle = 2, // Idle time, low priority
 }
 
 export interface Task {
@@ -78,4 +78,3 @@ export class JobSystem {
     }
   }
 }
-

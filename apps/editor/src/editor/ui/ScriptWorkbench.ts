@@ -1,6 +1,6 @@
 import { createIcon } from '../utils/icons';
 import type { Entity } from '@engine/world';
-import { ScriptComponent, type ScriptComponentState } from '@engine/world/components/ScriptComponent';
+import { ScriptComponent, type ScriptComponentState } from '@engine/script';
 import { BehaviorRegistry } from '@engine/script';
 
 interface ScriptWorkbenchConfig {

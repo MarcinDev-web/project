@@ -1,3 +1,3 @@
-export * from '../behavior/Behavior';
-export * from '../behavior/BehaviorRegistry';
+export * from './Behavior';
+export * from './BehaviorRegistry';
 //# sourceMappingURL=index.d.ts.map

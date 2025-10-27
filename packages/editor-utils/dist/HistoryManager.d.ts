@@ -32,6 +32,7 @@ export declare class HistoryManager {
     size(): number;
     freeze(): void;
     unfreeze(): void;
+    isFrozen(): boolean;
     replace(snapshots: SceneSnapshot[]): void;
     setLimit(limit: number): void;
     /** Temporarily toggles recording. */

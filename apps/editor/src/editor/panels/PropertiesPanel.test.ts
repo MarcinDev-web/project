@@ -4,9 +4,9 @@ import { SelectionManager } from '@engine/world';
 import { Scene } from '@engine/world';
 import { Entity } from '@engine/world';
 import { EditorState } from '../core/state';
-import { AnimationComponent } from '@engine/world/components/AnimationComponent';
+import { AnimationComponent } from '@engine/stdlib/Animation';
 import { AnimationClip } from '@engine/stdlib/Animation/AnimationClip';
-import { ScriptComponent } from '@engine/world/components/ScriptComponent';
+import { ScriptComponent } from '@engine/script';
 import { BehaviorRegistry } from '@engine/script';
 import { BehaviorInstance } from '@engine/script/Behavior';
 

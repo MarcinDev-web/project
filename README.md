@@ -2,6 +2,8 @@
 
 **Modular WebGPU/TypeScript game engine** for UGC platforms with professional scene editor.
 
+> **🤖 For AI Assistants (Claude 4.5 Sonnet, GPT-5):** Start with **[AI_CONTEXT.md](AI_CONTEXT.md)** for comprehensive context, patterns, and conventions. Also see **[CODEBASE_PATTERNS.md](CODEBASE_PATTERNS.md)** for design patterns used throughout the project.
+
 ## 🎯 Overview
 
 A production-grade 3D engine built from the ground up with modern web technologies, featuring a complete modular architecture, comprehensive testing, and a professional editor.
@@ -16,12 +18,12 @@ ugc-3d-platform/
 │   ├── core/          # Foundation (math, ECS, event, job, utils)
 │   ├── world/         # ECS runtime (entities, components, systems)
 │   ├── gfx-webgpu/    # WebGPU renderer
-│   ├── assets/        # Asset loading & streaming
 │   ├── script/        # UGC scripting (LogicCubes)
 │   ├── input/         # Input management
 │   ├── camera/        # Camera systems
 │   ├── stdlib/        # Standard library (animation, audio, character)
-│   └── editor-utils/  # Editor tools (history, snap) [NEW]
+│   ├── editor-utils/  # Editor tools (history, snap) [NEW Oct 2025]
+│   └── test-utils/    # Test utilities (mocks, fixtures, assertions)
 ├── apps/              # Applications
 │   ├── editor/        # Professional 3D scene editor
 │   └── playground/    # Demo/sandbox (future)
@@ -52,12 +54,13 @@ ugc-3d-platform/
 - Post-processing effects (bloom, tone mapping)
 - Texture atlas system (100x bind call reduction)
 
-### @engine/assets
-**Asset management** - Loading, caching, and streaming
-- GLTF/GLB model loading
-- Texture management
-- Asset registry and library system
-- Recent assets tracking
+### @engine/test-utils
+**Test utilities** - Reusable testing tools
+- Mock implementations (Canvas, WebGPU, etc.)
+- Entity fixtures for tests
+- Custom assertions (Vec3, AABB, etc.)
+- Async test helpers (waitFor, etc.)
+- Snapshot testing utilities
 
 ### @engine/script
 **UGC scripting** - Visual scripting with LogicCubes
@@ -257,15 +260,29 @@ test('example', async () => {
 
 ## 📖 Documentation
 
+### 🤖 For AI Assistants
+
+📖 **[AI_FILES_INDEX.md](AI_FILES_INDEX.md)** - **Which file should I read? Start here!**
+
+- **[AI_CONTEXT.md](AI_CONTEXT.md)** - **START HERE** - Comprehensive guide for AI coding assistants (Claude, GPT)
+- **[CODEBASE_PATTERNS.md](CODEBASE_PATTERNS.md)** - Design patterns, idioms, and conventions
+- **[AI_PROMPTS.md](AI_PROMPTS.md)** - Example prompts and workflows for AI-assisted development
+- **[QUICK_START_AI.md](QUICK_START_AI.md)** - ⚡ 2-minute quick reference
+- **[.cursorrules](.cursorrules)** - Cursor IDE rules (auto-loaded)
+- **[AI_DOCUMENTATION_CHANGELOG.md](AI_DOCUMENTATION_CHANGELOG.md)** - Documentation changes and improvements
+
+### For Developers
+
 Detailed documentation available in the `docs/` directory:
 
-- [ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture
-- [**PACKAGE_GUIDELINES.md**](docs/PACKAGE_GUIDELINES.md) - **Where code belongs (Must Read)**
-- [CODE_REVIEW_CHECKLIST.md](docs/CODE_REVIEW_CHECKLIST.md) - PR review checklist
-- [TEAM_ONBOARDING.md](docs/TEAM_ONBOARDING.md) - New developer guide
-- [TESTING.md](docs/TESTING.md) - Testing philosophy and guidelines
-- [PERFORMANCE_PHILOSOPHY.md](docs/PERFORMANCE_PHILOSOPHY.md) - Performance guidelines
-- [REFACTORING_COMPLETE.md](docs/REFACTORING_COMPLETE.md) - Recent refactoring (Oct 2025)
+- [**docs/guidelines/TEAM_ONBOARDING.md**](docs/guidelines/TEAM_ONBOARDING.md) - **New developers start here**
+- [**docs/guidelines/PACKAGE_GUIDELINES.md**](docs/guidelines/PACKAGE_GUIDELINES.md) - **Where code belongs (Must Read)**
+- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture
+- [docs/guidelines/CODE_REVIEW_CHECKLIST.md](docs/guidelines/CODE_REVIEW_CHECKLIST.md) - PR review checklist
+- [docs/TESTING.md](docs/TESTING.md) - Testing philosophy and guidelines
+- [docs/PERFORMANCE.md](docs/PERFORMANCE.md) - Performance guidelines
+- [docs/refactoring/REFACTORING_COMPLETE.md](docs/refactoring/REFACTORING_COMPLETE.md) - Recent refactoring (Oct 2025)
+- [TEST_COMMANDS_CHEATSHEET.md](TEST_COMMANDS_CHEATSHEET.md) - Testing commands reference
 
 ## Quick Start
 

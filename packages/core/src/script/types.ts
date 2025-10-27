@@ -14,4 +14,3 @@ export interface ScriptRuntime {
   renderer?: unknown;
   [key: string]: unknown;
 }
-

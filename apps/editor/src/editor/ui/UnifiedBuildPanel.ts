@@ -9,7 +9,7 @@
  * - Keyboard shortcuts (1-9, Ctrl+K for search)
  */
 
-import type { Asset, AssetVariant } from '@engine/assets';
+import type { Asset, AssetVariant } from '../types/BlockAssetTypes';
 import type { Scene } from '@engine/world';
 import type { EditorState } from '../core/state';
 import type { InventoryManager } from '../managers/InventoryManager';
@@ -17,7 +17,7 @@ import { HotbarComponent } from './HotbarComponent';
 import { CatalogPanel } from './CatalogPanel';
 import { PlacementCoordinator } from './PlacementCoordinator';
 import type { PlacementMode } from '../placement/PlacementMode';
-import { assetRegistry } from '@engine/assets';
+// Removed: assetRegistry no longer exists
 import { Logger } from '../../utils/logger';
 
 export interface UnifiedBuildPanelConfig {

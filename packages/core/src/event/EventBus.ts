@@ -25,7 +25,7 @@ export class EventBus {
       this.subscribers.set(event, set);
     }
     set.add(callback as EventCallback);
-    
+
     return () => {
       set?.delete(callback as EventCallback);
       if (set && set.size === 0) {
@@ -64,7 +64,7 @@ export class EventBus {
   emit(event: string, data?: unknown): void {
     const set = this.subscribers.get(event);
     if (!set || set.size === 0) return;
-    
+
     for (const callback of set) {
       try {
         callback(data);
@@ -97,4 +97,3 @@ export class EventBus {
     this.emit(event.type, event);
   }
 }
-

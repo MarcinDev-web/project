@@ -3,7 +3,6 @@ import { EditorUI } from '../EditorUI';
 import { SelectionManager } from '@engine/world';
 import { Scene } from '@engine/world';
 import type { OrbitControls } from '@engine/camera';
-import { assetRegistry } from '@engine/assets';
 
 function createMockControls(): OrbitControls {
   let state = { yaw: 0, pitch: 0, distance: 3 };
@@ -68,9 +67,8 @@ describe('EditorUI integration', () => {
     try {
       localStorage.clear();
     } catch {}
-
-    assetRegistry.clear();
-    await assetRegistry.initialize();
+    
+    // Removed: assetRegistry no longer exists
   });
 
   it('reacts to EditorState signal changes (snap toggle updates button)', () => {
@@ -92,17 +90,18 @@ describe('EditorUI integration', () => {
   });
 
   it('updates history toolbar enabled/disabled after push, undo and redo', async () => {
-    setup();
+    const { scene, selection } = setup();
     const undoButton = document.querySelector(
       'button[title="Undo (Ctrl+Z)"]'
     ) as HTMLButtonElement;
     const redoButton = document.querySelector(
       'button[title="Redo (Ctrl+Y)"]'
     ) as HTMLButtonElement;
-    // Ensure a selection so Properties panel is visible
-    const outlinerSelectables = document.querySelectorAll('#outliner-list .outliner-item-selectable');
-    expect(outlinerSelectables.length).toBeGreaterThan(0);
-    (outlinerSelectables[0] as HTMLButtonElement).click();
+    // Select an entity so Properties panel is visible
+    const firstEntity = scene.rootEntities[0];
+    expect(firstEntity).toBeTruthy();
+    selection.select(firstEntity!);
+    await Promise.resolve(); // Let UI update
     const nameInput = document.querySelector<HTMLInputElement>('section[data-tab="Properties"] .entity-card-name-input');
 
     // After seed snapshot: undo/redo should be disabled
@@ -128,15 +127,13 @@ describe('EditorUI integration', () => {
     expect(redoButton.disabled).toBe(true);
   });
 
-  it('clicking Outliner updates Properties and selection highlight without manual refresh', () => {
-    const { scene } = setup();
-    const outlinerSelectables = document.querySelectorAll('#outliner-list .outliner-item-selectable');
-    expect(outlinerSelectables.length).toBeGreaterThan(0);
-    const firstSelectable = outlinerSelectables[0] as HTMLButtonElement;
-    // Determine the entity we expect: first root entity
+  it('selecting entity programmatically updates Properties and selection highlight', async () => {
+    const { scene, selection } = setup();
     const expected = scene.rootEntities[0]!;
+    expect(expected).toBeTruthy();
 
-    firstSelectable.click();
+    selection.select(expected);
+    await Promise.resolve(); // Let UI update
 
     // Properties panel shows selected entity name
     const nameInput = document.querySelector<HTMLInputElement>('section[data-tab="Properties"] .entity-card-name-input');

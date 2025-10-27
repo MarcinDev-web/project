@@ -58,4 +58,3 @@ export class BitFlags {
     this._value = 0;
   }
 }
-

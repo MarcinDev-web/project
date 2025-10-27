@@ -30,10 +30,10 @@ Implikacje
 ==========
 - Struktura katalogów:
   - `src/shaders/` – źródła WGSL.
-  - `tests/webgpu/helpers/` – harness WebGPU do testów.
-  - `tests/webgpu/compute/` – testy obliczeń.
-  - `tests/webgpu/render/` – testy renderingu z odczytem pikseli.
-  - `tests/webgpu/visual/` – testy wizualne ze screenshotami i goldenami.
+  - `packages/gfx-webgpu/tests/helpers/` – harness WebGPU do testów.
+  - `packages/gfx-webgpu/tests/compute/` – testy obliczeń.
+  - `packages/gfx-webgpu/tests/render/` – testy renderingu z odczytem pikseli.
+  - `packages/gfx-webgpu/tests/visual/` – testy wizualne ze screenshotami i goldenami.
 - CI (GitHub Actions) uruchamia tylko Chromium; artefakty: raport Playwright i wyniki testów.
 
 Ryzyka i mitigacje

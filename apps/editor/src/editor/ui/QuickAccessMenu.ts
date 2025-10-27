@@ -9,7 +9,7 @@
  * - Release to activate
  */
 
-import type { Asset } from '@engine/assets';
+import type { Asset } from '../types/BlockAssetTypes';
 import { createIcon } from '../utils/icons';
 import { Logger } from '../../utils/logger';
 

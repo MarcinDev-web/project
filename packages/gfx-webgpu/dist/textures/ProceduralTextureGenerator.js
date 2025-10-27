@@ -17,7 +17,7 @@ export class ProceduralTextureGenerator {
         this.canvas = document.createElement('canvas');
         this.canvas.width = textureSize;
         this.canvas.height = textureSize;
-        const ctx = this.canvas.getContext('2d');
+        const ctx = this.canvas.getContext('2d', { willReadFrequently: true });
         if (!ctx) {
             throw new Error('Failed to get 2D context');
         }

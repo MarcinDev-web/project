@@ -10,6 +10,7 @@ import { JointComponent } from '../components/JointComponent';
 import type { Vec3 } from '@engine/core/math';
 import { CollisionDetection, type ColliderTransform } from './CollisionDetection';
 import { quatMultiply, quatFromAxisAngle, quatNormalize } from '@engine/core/math';
+import { ObjectPool } from '@engine/core/utils';
 import { Octree, type OctreeConfig, DEFAULT_OCTREE_CONFIG } from './Octree';
 import { BoundingVolume } from './BoundingVolume';
 import type { Joint } from './Joint';
@@ -100,12 +101,59 @@ export class PhysicsSystem {
 
   /** Track previous frame's overlapping triggers */
   private previousTriggers: Set<string> = new Set();
+  /** Scratch set reused each frame for current triggers */
+  private currentTriggersScratch: Set<string> = new Set();
 
   /** Octree for spatial partitioning (broad phase) */
   private octree: Octree | null = null;
 
   /** Flag to rebuild octree next frame */
   private needsOctreeRebuild = false;
+
+  /** Scratch arrays reused across frames to avoid allocations */
+  private pairsScratch: Array<[Entity, Entity]> = [];
+  private collisionsScratch: CollisionEvent[] = [];
+
+  /** Scratch transforms reused for collision checks to avoid object churn */
+  private readonly transformAPosition: Vec3 = [0, 0, 0];
+  private readonly transformARotation: [number, number, number, number] = [0, 0, 0, 1];
+  private readonly transformAScale: Vec3 = [1, 1, 1];
+  private readonly transformBPosition: Vec3 = [0, 0, 0];
+  private readonly transformBRotation: [number, number, number, number] = [0, 0, 0, 1];
+  private readonly transformBScale: Vec3 = [1, 1, 1];
+
+  private readonly colliderTransformA: ColliderTransform = {
+    position: this.transformAPosition,
+    rotation: this.transformARotation,
+    scale: this.transformAScale,
+  };
+  private readonly colliderTransformB: ColliderTransform = {
+    position: this.transformBPosition,
+    rotation: this.transformBRotation,
+    scale: this.transformBScale,
+  };
+
+  /** Scratch temporaries for quaternion/axis math */
+  private readonly tmpAxis: Vec3 = [0, 0, 0];
+  private readonly tmpQuatA: [number, number, number, number] = [0, 0, 0, 1];
+  private readonly tmpQuatB: [number, number, number, number] = [0, 0, 0, 1];
+
+  /** Pool of CollisionEvent wrappers to reduce per-frame allocations */
+  private readonly collisionEventPool = new ObjectPool<CollisionEvent>(
+    () => ({
+      entityA: null as unknown as Entity,
+      entityB: null as unknown as Entity,
+      physicsA: null as unknown as PhysicsComponent,
+      physicsB: null as unknown as PhysicsComponent,
+      normal: [0, 0, 0],
+      depth: 0,
+      contactPoint: [0, 0, 0],
+    }),
+    (e) => {
+      e.depth = 0;
+    },
+    2048
+  );
 
   constructor(scene: Scene, config: Partial<PhysicsConfig> = {}) {
     this.scene = scene;
@@ -185,6 +233,10 @@ export class PhysicsSystem {
     // Step 5: Fire collision events
     for (const collision of collisions) {
       this.fireCollisionEvent(collision);
+    }
+    // Release pooled events
+    for (let i = 0; i < collisions.length; i++) {
+      this.collisionEventPool.release(collisions[i]!);
     }
 
     // Step 6: Handle trigger events
@@ -283,11 +335,10 @@ export class PhysicsSystem {
     );
 
     if (angularSpeed > 0.0001) {
-      const axis: Vec3 = [
-        physics.angularVelocity[0] / angularSpeed,
-        physics.angularVelocity[1] / angularSpeed,
-        physics.angularVelocity[2] / angularSpeed,
-      ];
+      const axis = this.tmpAxis;
+      axis[0] = physics.angularVelocity[0] / angularSpeed;
+      axis[1] = physics.angularVelocity[1] / angularSpeed;
+      axis[2] = physics.angularVelocity[2] / angularSpeed;
       const angle = angularSpeed * dt;
 
       // Apply constraints
@@ -295,8 +346,12 @@ export class PhysicsSystem {
       if (physics.freezeRotationY) axis[1] = 0;
       if (physics.freezeRotationZ) axis[2] = 0;
 
-      const deltaQuat = quatFromAxisAngle(axis, angle);
-      transform.rotation = quatNormalize(quatMultiply(transform.rotation, deltaQuat));
+      const deltaQuat = this.tmpQuatA;
+      quatFromAxisAngleOut(deltaQuat, axis, angle);
+      const multiplied = this.tmpQuatB;
+      quatMultiplyOut(multiplied, transform.rotation, deltaQuat);
+      quatNormalizeOut(multiplied, multiplied);
+      transform.rotation = multiplied;
     }
   }
 
@@ -304,7 +359,7 @@ export class PhysicsSystem {
    * Detects all collisions between physics entities
    */
   private detectCollisions(entities: Entity[]): CollisionEvent[] {
-    const collisions: CollisionEvent[] = [];
+    this.collisionsScratch.length = 0;
 
     // Update octree if enabled
     if (this.octree) {
@@ -312,12 +367,23 @@ export class PhysicsSystem {
     }
 
     // Broad phase: get potential collision pairs
-    const pairs = this.octree
-      ? this.getBroadPhasePairsOctree()
-      : this.getBroadPhasePairsBruteForce(entities);
+    this.pairsScratch.length = 0;
+    if (this.octree) {
+      const pairsFromTree = this.octree.queryPairs();
+      // copy into scratch to allow downstream reuse and centralized clearing
+      for (let i = 0; i < pairsFromTree.length; i++) {
+        const p = pairsFromTree[i]!;
+        this.pairsScratch.push(p);
+      }
+    } else {
+      this.getBroadPhasePairsBruteForceInto(entities, this.pairsScratch);
+    }
 
     // Narrow phase: check each pair for actual collision
-    for (const [entityA, entityB] of pairs) {
+    for (let k = 0; k < this.pairsScratch.length; k++) {
+      const pair = this.pairsScratch[k]!;
+      const entityA = pair[0]!;
+      const entityB = pair[1]!;
       const physicsA = entityA.getComponent(PhysicsComponent);
       const physicsB = entityB.getComponent(PhysicsComponent);
 
@@ -335,22 +401,19 @@ export class PhysicsSystem {
       // Check each collider pair
       for (const colliderA of physicsA.colliders) {
         for (const colliderB of physicsB.colliders) {
-          const transformA: ColliderTransform = {
-            position: entityA.transform.getWorldPosition(),
-            rotation: entityA.transform.rotation,
-            scale: entityA.transform.scale,
-          };
-          const transformB: ColliderTransform = {
-            position: entityB.transform.getWorldPosition(),
-            rotation: entityB.transform.rotation,
-            scale: entityB.transform.scale,
-          };
+          // Fill scratch transforms (avoid per-pair object/array allocations)
+          entityA.transform.getWorldPositionInto(this.transformAPosition);
+          entityA.transform.getRotationInto(this.transformARotation);
+          entityA.transform.getScaleInto(this.transformAScale);
+          entityB.transform.getWorldPositionInto(this.transformBPosition);
+          entityB.transform.getRotationInto(this.transformBRotation);
+          entityB.transform.getScaleInto(this.transformBScale);
 
           const result = CollisionDetection.detectCollision(
             colliderA,
-            transformA,
+            this.colliderTransformA,
             colliderB,
-            transformB
+            this.colliderTransformB
           );
 
           if (result.hasCollision && result.contacts.length > 0) {
@@ -361,21 +424,21 @@ export class PhysicsSystem {
               continue;
             }
 
-            collisions.push({
-              entityA,
-              entityB,
-              physicsA,
-              physicsB,
-              normal: contact.normal,
-              depth: contact.depth,
-              contactPoint: contact.position,
-            });
+            const evt = this.collisionEventPool.acquire();
+            evt.entityA = entityA;
+            evt.entityB = entityB;
+            evt.physicsA = physicsA;
+            evt.physicsB = physicsB;
+            evt.normal = contact.normal;
+            evt.depth = contact.depth;
+            evt.contactPoint = contact.position;
+            this.collisionsScratch.push(evt);
           }
         }
       }
     }
 
-    return collisions;
+    return this.collisionsScratch;
   }
 
   /**
@@ -390,21 +453,24 @@ export class PhysicsSystem {
    * Broad phase using brute force O(n²) check (fallback)
    */
   private getBroadPhasePairsBruteForce(entities: Entity[]): Array<[Entity, Entity]> {
-    const pairs: Array<[Entity, Entity]> = [];
+    const out: Array<[Entity, Entity]> = [];
+    this.getBroadPhasePairsBruteForceInto(entities, out);
+    return out;
+  }
 
+  private getBroadPhasePairsBruteForceInto(
+    entities: Entity[],
+    out: Array<[Entity, Entity]>
+  ): void {
     for (let i = 0; i < entities.length; i++) {
       const entityA = entities[i];
       if (!entityA) continue;
-
       for (let j = i + 1; j < entities.length; j++) {
         const entityB = entities[j];
         if (!entityB) continue;
-
-        pairs.push([entityA, entityB]);
+        out.push([entityA, entityB]);
       }
     }
-
-    return pairs;
   }
 
   /**
@@ -583,7 +649,8 @@ export class PhysicsSystem {
    * Handles trigger collider enter/exit events
    */
   private handleTriggers(entities: Entity[]): void {
-    const currentTriggers = new Set<string>();
+    const currentTriggers = this.currentTriggersScratch;
+    currentTriggers.clear();
 
     // Check all pairs for trigger overlaps
     for (let i = 0; i < entities.length; i++) {
@@ -671,7 +738,10 @@ export class PhysicsSystem {
       }
     }
 
+    // Swap sets to reuse allocations next frame
+    const tmp = this.previousTriggers;
     this.previousTriggers = currentTriggers;
+    this.currentTriggersScratch = tmp;
   }
 
   /**

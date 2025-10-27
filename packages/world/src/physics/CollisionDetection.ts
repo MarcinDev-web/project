@@ -93,10 +93,12 @@ export class CollisionDetection {
         transformA.scale
       );
       // Flip normal direction
-      result.contacts = result.contacts.map((c) => ({
-        ...c,
-        normal: [-c.normal[0], -c.normal[1], -c.normal[2]] as Vec3,
-      }));
+      for (let i = 0; i < result.contacts.length; i++) {
+        const c = result.contacts[i]!;
+        c.normal[0] = -c.normal[0];
+        c.normal[1] = -c.normal[1];
+        c.normal[2] = -c.normal[2];
+      }
       return result;
     } else if (colliderA.shape === 'capsule' || colliderB.shape === 'capsule') {
       // Capsule collisions

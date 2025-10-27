@@ -16,8 +16,7 @@
   ],
   "references": [
     { "path": "../core" },
-    { "path": "../stdlib" },
-    { "path": "../script" }
+    { "path": "../stdlib" }
   ]
 }
 

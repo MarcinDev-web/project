@@ -7,7 +7,7 @@
  * - Event system for UI updates
  */
 
-import type { Asset } from '@engine/assets';
+import type { Asset } from '../types/BlockAssetTypes';
 import { Logger } from '../../utils/logger';
 
 export type FavoritesChangeListener = (favorites: Set<string>) => void;

@@ -3,19 +3,25 @@ import type { Scene } from '@engine/world';
 import type { PhysicsWorld } from '@engine/world';
 import type { OrbitControls } from './OrbitCamera';
 import type { FPSCamera } from './FPSCamera';
+import type { EditorCameraController } from './EditorCameraController';
 /**
  * Camera mode types
  */
-export type CameraMode = 'orbit' | 'fps' | 'follow';
+export type CameraMode = 'orbit' | 'fps' | 'follow' | 'free-fly';
 /**
  * Camera configuration for each mode
  */
 export interface CameraDirectorConfig {
     orbitControls: OrbitControls;
     fpsCamera: FPSCamera | null;
+    editorCamera: EditorCameraController | null;
     canvas: HTMLCanvasElement;
     scene?: Scene;
     physicsWorld?: PhysicsWorld | null;
+    logger?: {
+        debug: (...args: unknown[]) => void;
+        warn: (...args: unknown[]) => void;
+    };
 }
 /**
  * CameraDirector manages camera modes and smooth transitions
@@ -31,6 +37,7 @@ export declare class CameraDirector {
     private blend;
     private readonly orbitControls;
     private readonly fpsCamera;
+    private readonly editorCamera;
     private readonly canvas;
     private readonly scene;
     private readonly physicsWorld;
@@ -40,6 +47,7 @@ export declare class CameraDirector {
     private readonly viewMatrix;
     private readonly projectionMatrix;
     private playerPosition;
+    private logger;
     constructor(config: CameraDirectorConfig);
     /**
      * Set the current camera mode (instant switch, no blend)
@@ -84,6 +92,14 @@ export declare class CameraDirector {
      * Dispose of resources
      */
     dispose(): void;
+    /**
+     * Enable camera for a specific mode
+     */
+    private enableCameraForMode;
+    /**
+     * Disable camera for a specific mode
+     */
+    private disableCameraForMode;
     /**
      * Update internal camera state based on current mode
      */

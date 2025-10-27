@@ -196,6 +196,17 @@ export class Transform extends Component {
   }
 
   /**
+   * Writes world position into provided array to avoid allocations.
+   */
+  getWorldPositionInto(out: Vec3): Vec3 {
+    const world = this.getWorldMatrix();
+    out[0] = world[12] ?? 0;
+    out[1] = world[13] ?? 0;
+    out[2] = world[14] ?? 0;
+    return out;
+  }
+
+  /**
    * Gets the forward direction vector in world space.
    */
   getForward(out: Vec3 = [0, 0, -1]): Vec3 {
@@ -222,6 +233,27 @@ export class Transform extends Component {
     out[0] = x / length;
     out[1] = y / length;
     out[2] = z / length;
+    return out;
+  }
+
+  /**
+   * Writes the current local rotation into provided quaternion.
+   */
+  getRotationInto(out: Quat): Quat {
+    out[0] = this._rotation[0];
+    out[1] = this._rotation[1];
+    out[2] = this._rotation[2];
+    out[3] = this._rotation[3];
+    return out;
+  }
+
+  /**
+   * Writes the current local scale into provided vector.
+   */
+  getScaleInto(out: Vec3): Vec3 {
+    out[0] = this._scale[0];
+    out[1] = this._scale[1];
+    out[2] = this._scale[2];
     return out;
   }
 

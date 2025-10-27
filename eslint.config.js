@@ -26,6 +26,18 @@ export default tseslint.config(
       '@typescript-eslint/explicit-function-return-type': 'off',
       '@typescript-eslint/no-explicit-any': 'warn',
       'no-console': ['warn', { allow: ['warn', 'error'] }],
+      // Enforce module boundaries - only import from package root (index.ts) or documented subpaths
+      'no-restricted-imports': [
+        'error',
+        {
+          patterns: [
+            {
+              group: ['**/packages/*/src/**', '../packages/*/src/**', '../../packages/*/src/**'],
+              message: 'Import from @engine/* package name only, not internal src/ paths. Use @engine/package-name or documented subpaths like @engine/core/math.',
+            },
+          ],
+        },
+      ],
     },
   },
   // Relaksacja reguł dla testów

@@ -1,0 +1,25 @@
+{
+  "name": "@engine/compute-wasm",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "scripts": {
+    "clean": "rimraf pkg target",
+    "build:wasm": "wasm-pack build --target web --out-dir ./pkg",
+    "build": "pnpm run build:wasm"
+  },
+  "files": [
+    "pkg"
+  ],
+  "exports": {
+    ".": {
+      "types": "./pkg/compute_wasm.d.ts",
+      "import": "./pkg/compute_wasm.js"
+    }
+  },
+  "devDependencies": {
+    "rimraf": "^6.0.1"
+  }
+}
+
+

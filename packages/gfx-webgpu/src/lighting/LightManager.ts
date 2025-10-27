@@ -166,6 +166,28 @@ export class LightManager {
       ambientIntensity = 1.0;
     }
 
+    // Safety fallback: if scene has no lights at all, provide a non-black baseline
+    // without mutating the scene graph. This ensures new/empty scenes are visible
+    // immediately even before UI injects default lights.
+    if (packedLights.length === 0 && ambientIntensity <= 0) {
+      // Mild sky-like ambient
+      ambientColor[0] = 0.6;
+      ambientColor[1] = 0.65;
+      ambientColor[2] = 0.75;
+      ambientIntensity = 0.6;
+
+      // Soft directional sun (color already treated as color*intensity in PackedLight)
+      packedLights.push({
+        type: 0,
+        position: [0, 0, 0] as Vec3,
+        direction: [0.3, -0.7, -0.5] as Vec3,
+        color: [1.0, 0.98, 0.95] as Vec3,
+        range: 0,
+        spotInnerCos: 0,
+        spotOuterCos: 0,
+      });
+    }
+
     this.cachedLightingData = {
       lightCount: packedLights.length,
       lights: packedLights,

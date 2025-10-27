@@ -1,10 +1,11 @@
 /**
  * Tests for FavoritesManager
+ * @vitest-environment jsdom
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { FavoritesManager } from '../FavoritesManager';
-import type { Asset } from '@engine/assets';
+import type { Asset } from '../../types/BlockAssetTypes';
 
 describe('FavoritesManager', () => {
   let manager: FavoritesManager;

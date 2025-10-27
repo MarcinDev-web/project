@@ -1,21 +1,15 @@
 import { EditorApp } from './app';
 import { requireEditorDom } from './utils/dom';
-import { assetRegistry } from '@engine/assets';
 import { Logger } from './utils/logger';
 import { registerBuiltInLogicCubes } from '@engine/script';
 import { LogicCubeLibrary } from './editor/managers/LogicCubeLibrary';
+import { ensureWasmCollisionInit } from './wasm/collision';
+import { warmupCollisionWorker } from './wasm/collisionWorkerClient';
 
 export async function bootstrap(): Promise<void> {
   const { canvas, statusEl } = requireEditorDom();
 
-  // Initialize Asset Registry
-  try {
-    statusEl.textContent = 'Loading assets...';
-    await assetRegistry.initialize();
-    Logger.info('Asset Registry initialized successfully');
-  } catch (error) {
-    Logger.error('Failed to initialize Asset Registry:', error as Error);
-  }
+  // Removed: Asset Registry initialization (no longer needed)
 
   // Initialize Logic Cube System
   try {
@@ -27,6 +21,12 @@ export async function bootstrap(): Promise<void> {
   }
 
   const app = new EditorApp({ canvas, statusEl });
+
+  // Background warm-up: init WASM (in-thread) and Worker to avoid first-use jank
+  try {
+    ensureWasmCollisionInit();
+    warmupCollisionWorker();
+  } catch {}
 
   window.addEventListener(
     'beforeunload',

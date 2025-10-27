@@ -5,7 +5,6 @@
  * - Search entities by name
  * - Search by component type
  * - Search by tag/metadata
- * - Filter outliner results
  * - Highlight search results
  * 
  * Extracted from EditorUI to reduce complexity and improve maintainability.

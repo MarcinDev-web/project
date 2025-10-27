@@ -10,7 +10,7 @@
  * - 80-96: atlasInsetAndPad (vec4<f32>)
  * - 96-112: shadingParams0 (vec4<f32>)
  * - 112-128: atlasParams (vec4<f32>)
- * - 144-464: lighting data (managed by LightingUniformWriter)
+ * - 128-448: lighting data (managed by LightingUniformWriter)
  */
 import { writeLightingUniforms } from './LightingUniforms';
 import { TEXTURE_SIZE, SHADING_AMBIENT, SHADING_TOON_BANDS, SHADING_SPECULAR_POWER } from '../config';
@@ -79,7 +79,7 @@ export class UniformManager {
     }
     /**
      * Updates shadow-related uniforms appended after the lighting block.
-     * Layout (offsets from 464 bytes):
+     * Layout (offsets from 448 bytes):
      *  - 0..64: viewMatrix
      *  - 64..320: lightViewProj[4]
      *  - 320..336: cascadeSplits (vec4)
@@ -89,7 +89,7 @@ export class UniformManager {
      */
     updateShadowUniforms(params) {
         // Base offset right after lighting block
-        const baseOffset = 464;
+        const baseOffset = 448;
         // viewMatrix
         this.device.queue.writeBuffer(this.uniformBuffer, baseOffset, params.viewMatrix.buffer, params.viewMatrix.byteOffset ?? 0, 64);
         // lightViewProj[4]

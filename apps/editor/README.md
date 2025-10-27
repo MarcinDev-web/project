@@ -16,11 +16,11 @@
 
 ## Technologie
 
-- **React** - UI framework
-- **Tailwind CSS** - Styling
+- **Vanilla TypeScript** - Pure TS bez frameworku UI
+- **@preact/signals-core** - Reactive state management
+- **Custom CSS** - Modern glassmorphic styling
 - **WebGPU** - 3D rendering
-- **TypeScript** - Type safety
-- **Vite** - Build tool
+- **Vite** - Build tool i dev server
 
 ## Dependencies
 

@@ -1,0 +1,271 @@
+/**
+ * Asset Palette Simple - Minecraft-style hotbar and build menu
+ * Used by AssetPalette.ts component
+ */
+
+/* ============================================
+   CONTAINER - Fixed at bottom center
+   ============================================ */
+
+.asset-palette-container {
+  position: fixed;
+  left: 50%;
+  bottom: 20px;
+  transform: translateX(-50%);
+  z-index: 100;
+  display: flex;
+  flex-direction: column-reverse; /* Reverse order: hotbar at bottom, menu above */
+  align-items: center;
+  gap: 1rem;
+  pointer-events: none;
+}
+
+.asset-palette-container > * {
+  pointer-events: auto;
+}
+
+/* ============================================
+   HOTBAR - Horizontal bar with 9 slots
+   ============================================ */
+
+.hotbar {
+  display: flex;
+  flex-direction: row; /* IMPORTANT: Horizontal layout */
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: rgba(30, 35, 42, 1); /* Solid, opaque background */
+  border: 3px solid rgba(60, 70, 85, 1);
+  border-radius: var(--radius-md);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.6), 0 4px 12px rgba(0, 0, 0, 0.4);
+  align-items: center;
+}
+
+/* More specific selector to override other hotbar-slot styles */
+.hotbar .hotbar-slot {
+  position: relative;
+  width: 60px;
+  height: 60px;
+  background: rgba(45, 52, 62, 1); /* Solid background */
+  border: 3px solid rgba(70, 80, 95, 1);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  box-shadow: 0 4px 0 rgba(20, 25, 30, 1), 0 6px 8px rgba(0, 0, 0, 0.4);
+}
+
+.hotbar .hotbar-slot:hover {
+  border-color: rgba(100, 110, 130, 1);
+  background: rgba(55, 62, 72, 1);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 rgba(20, 25, 30, 1), 0 8px 12px rgba(0, 0, 0, 0.5);
+}
+
+.hotbar .hotbar-slot-number {
+  position: absolute;
+  top: 2px;
+  left: 4px;
+  font-size: 0.65rem;
+  font-weight: 600;
+  color: var(--color-text-2);
+  background: var(--color-bg-1);
+  padding: 1px 4px;
+  border-radius: 2px;
+  line-height: 1;
+  z-index: 1;
+}
+
+.hotbar .hotbar-slot-preview {
+  width: 80%;
+  height: 80%;
+  border-radius: var(--radius-xs);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.2);
+}
+
+/* Expand button (hammer icon) */
+.hotbar-expand-button {
+  width: 60px;
+  height: 60px;
+  background: rgba(34, 197, 94, 1); /* Solid green */
+  border: 3px solid rgba(22, 163, 74, 1);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  font-size: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: all 0.2s ease;
+  color: white;
+  margin-left: 0.25rem;
+  box-shadow: 0 4px 0 rgba(20, 83, 45, 1), 0 6px 8px rgba(0, 0, 0, 0.4);
+}
+
+.hotbar-expand-button:hover {
+  background: rgba(46, 204, 113, 1);
+  transform: translateY(-2px);
+  box-shadow: 0 6px 0 rgba(20, 83, 45, 1), 0 8px 12px rgba(0, 0, 0, 0.5);
+}
+
+.hotbar-expand-button:active {
+  transform: translateY(0);
+}
+
+/* ============================================
+   BUILD MENU - Expandable grid above hotbar
+   ============================================ */
+
+.build-menu {
+  background: rgba(30, 35, 42, 1); /* Solid, opaque background */
+  border: 3px solid rgba(60, 70, 85, 1);
+  border-radius: var(--radius-md);
+  box-shadow: 0 12px 48px rgba(0, 0, 0, 0.7), 0 6px 24px rgba(0, 0, 0, 0.5);
+  min-width: 500px;
+  max-width: 800px;
+  max-height: 400px;
+  overflow-y: auto;
+  animation: slideUpFade 0.2s ease-out;
+}
+
+@keyframes slideUpFade {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.build-menu-header {
+  padding: 0.75rem 1rem;
+  font-weight: 600;
+  font-size: 0.9rem;
+  color: rgba(255, 255, 255, 0.95);
+  background: rgba(45, 52, 62, 1); /* Solid background */
+  border-bottom: 2px solid rgba(70, 80, 95, 1);
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
+  text-align: center;
+}
+
+.build-menu-grid {
+  display: grid !important; /* Force grid layout */
+  grid-template-columns: repeat(5, 1fr); /* 5 columns fixed */
+  gap: 0.75rem;
+  padding: 1rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Alternative: responsive grid */
+@media (min-width: 600px) {
+  .build-menu-grid {
+    grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
+  }
+}
+
+.build-menu-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.75rem;
+  background: rgba(45, 52, 62, 1); /* Solid background */
+  border: 2px solid rgba(70, 80, 95, 1);
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.build-menu-item:hover {
+  border-color: rgba(100, 110, 130, 1);
+  background: rgba(55, 62, 72, 1);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.5);
+}
+
+.build-menu-item:active {
+  transform: translateY(0);
+}
+
+.build-menu-item-preview {
+  width: 60px;
+  height: 60px;
+  border-radius: var(--radius-sm);
+  box-shadow: 
+    inset 0 2px 4px rgba(0, 0, 0, 0.2),
+    0 2px 4px rgba(0, 0, 0, 0.1);
+}
+
+.build-menu-item-name {
+  font-size: 0.75rem;
+  color: rgba(200, 210, 220, 1);
+  text-align: center;
+  line-height: 1.2;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+
+@media (max-width: 768px) {
+  .hotbar {
+    gap: 0.25rem;
+    padding: 0.5rem;
+  }
+  
+  .hotbar .hotbar-slot,
+  .hotbar .hotbar-expand-button {
+    width: 48px;
+    height: 48px;
+  }
+  
+  .build-menu {
+    max-width: calc(100vw - 40px);
+  }
+  
+  .build-menu-grid {
+    grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+    gap: 0.5rem;
+    padding: 0.75rem;
+  }
+  
+  .build-menu-item {
+    padding: 0.5rem;
+  }
+  
+  .build-menu-item-preview {
+    width: 48px;
+    height: 48px;
+  }
+}
+
+/* ============================================
+   SCROLLBAR
+   ============================================ */
+
+.build-menu::-webkit-scrollbar {
+  width: 8px;
+}
+
+.build-menu::-webkit-scrollbar-track {
+  background: var(--color-bg-3);
+  border-radius: 0 var(--radius-md) var(--radius-md) 0;
+}
+
+.build-menu::-webkit-scrollbar-thumb {
+  background: var(--color-border-2);
+  border-radius: 4px;
+}
+
+.build-menu::-webkit-scrollbar-thumb:hover {
+  background: var(--color-border-3, #555);
+}
+

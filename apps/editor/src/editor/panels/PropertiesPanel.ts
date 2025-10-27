@@ -26,11 +26,11 @@ import { CameraComponent } from '@engine/world/components/CameraComponent';
 import { EnvironmentComponent } from '@engine/world/components/EnvironmentComponent';
 import { createVectorInput } from '../ui/VectorInput';
 import { createColorPicker } from '../ui/ColorPicker';
-import { ScriptComponent, type ScriptComponentState, type ScriptDefinition } from '@engine/world/components/ScriptComponent';
+import { ScriptComponent, type ScriptComponentState, type ScriptDefinition } from '@engine/script';
 import { CoordinateManager } from '../utils/CoordinateManager';
 import { QuaternionHelper } from '../utils/QuaternionHelper';
 import { BehaviorRegistry } from '@engine/script';
-import { AnimationComponent } from '@engine/world/components/AnimationComponent';
+import { AnimationComponent } from '@engine/stdlib/Animation';
 import { createAnimationSection } from '../ui/animation/AnimationSection';
 import { MaterialComponent } from '@engine/world/components/MaterialComponent';
 

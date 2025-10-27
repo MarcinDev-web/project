@@ -86,10 +86,10 @@ struct VSOut { @builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32> };
                 fragment: {
                     module: this.device.createShaderModule({
                         code: `
-@group(0) @binding(0) var srcTex : texture_2d<f16>;
+@group(0) @binding(0) var srcTex : texture_2d<f32>;
 @group(0) @binding(1) var srcSmp : sampler;
 @group(0) @binding(2) var lut3d : texture_3d<f32>;
-@group(0) @binding(3) var bloomTex : texture_2d<f16>;
+@group(0) @binding(3) var bloomTex : texture_2d<f32>;
 @fragment fn fs_main(@location(0) v_uv:vec2<f32>) -> @location(0) vec4<f32> {
   var hdr = vec3<f32>(textureSample(srcTex, srcSmp, v_uv).xyz);
   let bloom = vec3<f32>(textureSample(bloomTex, srcSmp, v_uv).xyz);

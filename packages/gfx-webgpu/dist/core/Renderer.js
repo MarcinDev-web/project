@@ -2,6 +2,7 @@ import { updateCanvasSize, getTimestampPeriod } from './helpers';
 import { DEFAULT_GEOMETRY, createGeometryBuffers, createTimestampResources, createUniformResources, createTextureAtlas, // NEW: Texture atlas system
 createPipelines, createDepthTexture, createMsaaColorTarget, } from '../resources/resources';
 import { GPUBufferPool } from './bufferPool';
+import { EnvironmentComponent } from '@engine/world';
 import { LightManager } from '../lighting/LightManager';
 // TODO: Uncomment in Phase 4 when @engine/script exists
 // import { ScriptSystem } from '@engine/script';
@@ -277,11 +278,11 @@ export async function initRenderer(options) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             ...{ bufferPool, atlas },
         };
-        // Initialize environment renderer
+        // Initialize environment renderer (match frame pass color format: rgba16float)
         environmentRenderer = new EnvironmentRenderer();
         await environmentRenderer.initialize({
             device,
-            presentationFormat,
+            presentationFormat: 'rgba16float',
             sampleCount: MSAA_SAMPLE_COUNT,
         });
         // Precompute IBL textures (best-effort)
@@ -299,6 +300,10 @@ export async function initRenderer(options) {
                 magFilter: 'linear',
                 minFilter: 'linear',
             });
+            // Ensure environment params exist for IBL capture (procedural-sky defaults)
+            // Needed so the env-capture pipeline has a valid group(0) bind group
+            const defaultEnv = new EnvironmentComponent();
+            environmentRenderer.updateParams(defaultEnv);
             const { brdfLut, envCube } = await environmentRenderer.prepareIBLResources(128);
             const newBg = device.createBindGroup({
                 label: 'material-atlas-bg+ibl',
@@ -577,7 +582,8 @@ export async function initRenderer(options) {
             if (!renderer || typeof renderer.initialize !== 'function') {
                 throw new Error('Invalid grid renderer');
             }
-            await renderer.initialize(device, presentationFormat, 'depth24plus');
+            // Match frame pass color format to avoid attachment state mismatches
+            await renderer.initialize(device, 'rgba16float', 'depth24plus');
             gridRenderer = renderer;
         },
         getDevice: () => device,

@@ -37,6 +37,7 @@ export default defineWorkspace([
       environment: 'node',
       environmentMatchGlobs: [
         // Use jsdom only for tests that need DOM/Browser APIs
+        ['**/apps/editor/**/*.test.ts', 'jsdom'],
         ['**/editor/**/*.test.ts', 'jsdom'],
         ['**/*UI*.test.ts', 'jsdom'],
         ['**/*Dom*.test.ts', 'jsdom'],

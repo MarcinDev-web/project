@@ -94,6 +94,10 @@ export class HistoryManager {
     this.frozen = false;
   }
 
+  isFrozen(): boolean {
+    return this.frozen;
+  }
+
   replace(snapshots: SceneSnapshot[]): void {
     this.entries = snapshots.map(HistoryManager.cloneSnapshot).slice(-this.maxSize);
     this.index = this.entries.length - 1;

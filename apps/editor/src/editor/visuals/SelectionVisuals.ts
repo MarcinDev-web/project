@@ -19,7 +19,8 @@ export function initializeBaseColor(entity: Entity, baseColor: RgbaColor): void 
 export function applySelectionVisuals(
   scene: Scene,
   selection: SelectionManager,
-  highlightBoost = HIGHLIGHT_COLOR_BOOST
+  highlightBoost = HIGHLIGHT_COLOR_BOOST,
+  skipHighlight = false
 ): void {
   scene.traverse((entity) => {
     const hasStored = (entity.userData.baseColor as RgbaColor | undefined) !== undefined;
@@ -40,7 +41,7 @@ export function applySelectionVisuals(
 
     // Update color in place, only when necessary
     const isSelected = selection.isSelected(entity);
-    if (isSelected) {
+    if (isSelected && !skipHighlight) {
       copyRgba(entity.color, storedBase);
       lightenColorInPlace(entity.color, highlightBoost);
     } else {

@@ -1,7 +1,6 @@
-import type { Scene } from '@engine/world';
-import type { Entity } from '@engine/world';
-import { AnimationComponent } from '@engine/world';
+import type { Scene, Entity } from '@engine/world';
 import { Transform } from '@engine/world';
+import { AnimationComponent } from './AnimationComponent';
 import type { Vec3, Quat } from '@engine/core/math';
 import { interpolate } from './interpolation';
 import type { AnimationSample } from './types';

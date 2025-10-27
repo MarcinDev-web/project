@@ -17,8 +17,22 @@ export interface GpuTimestampPair {
     beginIndex: number;
     endIndex: number;
 }
+export declare const TIMESTAMP_INDICES: {
+    readonly FRAME_BEGIN: 0;
+    readonly FRAME_END: 1;
+    readonly COMPUTE_BEGIN: 2;
+    readonly COMPUTE_END: 3;
+    readonly SHADOW_BEGIN: 4;
+    readonly SHADOW_END: 5;
+    readonly MAIN_PASS_BEGIN: 6;
+    readonly MAIN_PASS_END: 7;
+    readonly BLOOM_BEGIN: 8;
+    readonly BLOOM_END: 9;
+    readonly TONEMAP_BEGIN: 10;
+    readonly TONEMAP_END: 11;
+};
 export declare const GPU_TIMESTAMP_PAIRS: GpuTimestampPair[];
-export declare const TIMESTAMP_QUERY_COUNT: number;
+export declare const TIMESTAMP_QUERY_COUNT = 16;
 export declare const TIMESTAMP_BUFFER_SIZE: number;
 export declare const TEXTURE_SIZE = 128;
 export declare const SHADING_AMBIENT = 0.3;

@@ -94,6 +94,49 @@ export class WorldManager {
   }
 
   /**
+   * Build runtime world asynchronously in chunks to keep UI responsive.
+   */
+  async buildRuntimeWorldChunked(
+    manifest: PlayManifest,
+    onProgress: (progress: number) => void,
+  ): Promise<Scene> {
+    if (this.runtimeWorld) {
+      Logger.warn('Runtime world already exists, clearing it first');
+      this.clearRuntimeWorld();
+    }
+
+    Logger.debug('Building runtime world (chunked) from authoring world');
+
+    const includeComponent = this.createRuntimeComponentPredicate(manifest);
+    this.runtimeWorld = new Scene(`${this.authoringWorld.name} (Runtime)`);
+
+    const authoringData = this.authoringWorld.toJSON();
+    const entities = authoringData.entities as any[];
+    const total = entities.length || 1;
+    const chunkSize = 200;
+
+    for (let i = 0; i < entities.length; i += chunkSize) {
+      const chunk = entities.slice(i, i + chunkSize);
+      for (let j = 0; j < chunk.length; j++) {
+        try {
+          const clonedEntity = this.cloneEntityForRuntime(chunk[j], manifest, includeComponent);
+          if (clonedEntity) {
+            this.runtimeWorld.addEntity(clonedEntity);
+          }
+        } catch (error) {
+          Logger.warn(`Failed to clone entity during chunked build:`, error as Error);
+        }
+      }
+      const progress = Math.min(1, (i + chunk.length) / total);
+      try { onProgress(progress); } catch { /* ignore */ }
+      await new Promise((resolve) => setTimeout(resolve, 0)); // yield to UI thread
+    }
+
+    Logger.debug(`Runtime world (chunked) built with ${this.runtimeWorld.entityCount} entities`);
+    return this.runtimeWorld;
+  }
+
+  /**
    * Restore authoring world from snapshot
    */
   restoreAuthoring(): void {

@@ -1,0 +1,27 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`Test Utils Examples > Snapshots > handles dynamic values 1`] = `
+{
+  "data": [
+    1,
+    2,
+    3,
+  ],
+  "id": "<uuid>",
+  "name": "Test",
+}
+`;
+
+exports[`Test Utils Examples > Snapshots > takes snapshot of scene 1`] = `
+{
+  "entities": [
+    {
+      "name": "Entity1",
+    },
+    {
+      "name": "Entity2",
+    },
+  ],
+  "name": "TestScene",
+}
+`;

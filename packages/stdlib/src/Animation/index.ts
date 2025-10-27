@@ -1,3 +1,4 @@
+export * from './AnimationComponent';
 export * from './AnimationSystem';
 export * from './AnimationClip';
 export * from './AnimationController';

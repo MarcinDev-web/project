@@ -98,17 +98,18 @@ fn sampleShadowPCF(uv: vec2<f32>, zRef: f32, kernel: i32, texelSize: vec2<f32>) 
   var count = 0.0;
   let k = max(kernel, 1);
   let r = k / 2;
-  // Use fixed loop bounds for uniform control flow
+  // Use fixed loop bounds for uniform control flow - required by WebGPU
   const MAX_KERNEL = 9;
   let halfMax = MAX_KERNEL / 2;
   for (var y = -halfMax; y <= halfMax; y++) {
     for (var x = -halfMax; x <= halfMax; x++) {
-      // Only sample within the actual kernel radius
-      if (x >= -r && x < k - r && y >= -r && y < k - r) {
-        let off = vec2<f32>(f32(x), f32(y)) * texelSize;
-        sum += textureSampleCompare(shadowAtlas, shadowSamplerCmp, uv + off, zRef);
-        count += 1.0;
-      }
+      let off = vec2<f32>(f32(x), f32(y)) * texelSize;
+      // Always sample to maintain uniform control flow
+      let shadowValue = textureSampleCompare(shadowAtlas, shadowSamplerCmp, uv + off, zRef);
+      // Use weight to include/exclude samples based on kernel radius
+      let inKernel = f32(x >= -r && x < k - r && y >= -r && y < k - r);
+      sum += shadowValue * inKernel;
+      count += inKernel;
     }
   }
   return sum / max(count, 1.0);
@@ -199,11 +200,11 @@ fn fs_main(
   @location(5) materialId : f32,
   @location(6) vAO : f32
 ) -> @location(0) vec4<f32> {
-  // Base inputs
+  // Flat/voxel-friendly shading: no normal mapping, no specular
   let Ngeom = normalize(vNormal);
   let V = normalize(uniforms.cameraPosition - worldPos);
 
-  // Atlas sampling via metadata
+  // Atlas sampling via metadata (base color only)
   let materialsPerRowF = max(uniforms.atlasParams.x, 1.0);
   let maxMatIdF = max(0.0, floor(materialsPerRowF * materialsPerRowF * 0.5 - 1.0));
   let matId = u32(clamp(materialId, 0.0, maxMatIdF));
@@ -213,97 +214,46 @@ fn fs_main(
   let atlasUV = rect.xy + vUV * rect.zw;
   var baseColor = textureSample(atlasTex, texSampler, atlasUV).rgb * vColor;
 
-  // Normal mapping
-  let normalSample = textureSample(normalAtlasTex, texSampler, atlasUV).rgb;
-  let nTangent = normalize(normalSample * 2.0 - vec3<f32>(1.0));
-  let dp1 = dpdx(worldPos);
-  let dp2 = dpdy(worldPos);
-  let duv1 = dpdx(vUV);
-  let duv2 = dpdy(vUV);
-  let det = duv1.x * duv2.y - duv1.y * duv2.x;
-  let invDet = select(0.0, 1.0 / det, abs(det) > 1e-5);
-  var T = (dp1 * duv2.y - dp2 * duv1.y) * invDet;
-  var B = (dp2 * duv1.x - dp1 * duv2.x) * invDet;
-  T = normalize(T - Ngeom * dot(Ngeom, T));
-  B = normalize(cross(Ngeom, T));
-  let N = normalize(mat3x3<f32>(T, B, Ngeom) * nTangent);
-
-  // Material params from metadata
-  let metallic = clamp(matMeta.metallic, 0.0, 1.0);
-  let roughness = clamp(matMeta.roughness, 0.04, 1.0);
-
-  // Fresnel base reflectance (F0)
-  let dielectricF0 = vec3<f32>(0.04, 0.04, 0.04);
-  let F0 = mix(dielectricF0, baseColor, metallic);
-
-  // Saturation boost in YUV
+  // Optional mild saturation boost for colorful blocks
   let Y = dot(baseColor, vec3<f32>(0.299, 0.587, 0.114));
   let U = baseColor.b - Y;
   let Vc = baseColor.r - Y;
   baseColor = clamp(vec3<f32>(Y + Vc * matMeta.saturation, Y + (baseColor.g - Y) * matMeta.saturation, Y + U * matMeta.saturation), vec3<f32>(0.0), vec3<f32>(1.0));
 
+  // Flat normal (no normal mapping)
+  let N = Ngeom;
+
   // Ambient term
   let ambient = uniforms.ambientColor * uniforms.ambientIntensity * baseColor;
 
-  // Directional light
-  let Ld = normalize(-uniforms.directionalLightDir);
-  let H = normalize(V + Ld);
-  let NdotL_dir = max(dot(N, Ld), 0.0);
-  let NDF_dir = distribution_ggx(N, H, roughness);
-  let G_dir = geometry_smith(N, V, Ld, roughness);
-  let F_dir = fresnel_schlick(max(dot(H, V), 0.0), F0);
-  let kSpec_dir = (NDF_dir * G_dir) / max(4.0 * max(dot(N, V), 0.0) * NdotL_dir, 1e-4);
-  let spec_dir = F_dir * kSpec_dir;
-  let kd_dir = (vec3<f32>(1.0) - F_dir) * (1.0 - metallic);
-  let diff_dir = kd_dir * lambert(baseColor);
-  var direct = (diff_dir + spec_dir) * uniforms.directionalLightColor * NdotL_dir;
-  // Shadowing (CSM + PCSS)
-  let viewPos = (uniforms.viewMatrix * vec4<f32>(worldPos, 1.0)).xyz;
-  let linearDepth = -viewPos.z;
-  let cIdx = selectCascade(linearDepth, uniforms.cascadeSplits);
-  let visibility = sampleShadowPCSS(worldPos, N, cIdx);
-  direct *= visibility;
-  // Rim lighting
-  let rim = pow(1.0 - clamp(dot(N, V), 0.0, 1.0), 3.5);
-  direct += rim * 0.2 * (vec3<f32>(1.0) - kd_dir);
+  // Simple voxel tri-tone based on face orientation (top/side/bottom)
+  let topMask = step(0.5, N.y);
+  let bottomMask = step(0.5, -N.y);
+  let sideMask = clamp(1.0 - topMask - bottomMask, 0.0, 1.0);
+  let tone = topMask * 1.15 + sideMask * 0.95 + bottomMask * 0.80;
 
-  // Point lights
+  // Directional light - subtle Lambert only (keeps sense of sun without glare)
+  let Ld = normalize(-uniforms.directionalLightDir);
+  let NdotL_dir = max(dot(N, Ld), 0.0);
+  var direct = lambert(baseColor) * uniforms.directionalLightColor * (NdotL_dir * 0.25);
+
+  // Point lights - Lambert only (also subtle)
   for (var i = 0u; i < uniforms.pointLightCount && i < MAX_POINT_LIGHTS; i++) {
     let Lpos = uniforms.pointLights[i].positionOrDirection;
     let toL = Lpos - worldPos;
     let dist = length(toL);
     if (dist <= uniforms.pointLights[i].range) {
       let L = toL / max(dist, 1e-4);
-      let H2 = normalize(V + L);
       let attenuation = 1.0 / (1.0 + (dist * dist) / (uniforms.pointLights[i].range * uniforms.pointLights[i].range));
       let NdotL = max(dot(N, L), 0.0);
-      let NDF = distribution_ggx(N, H2, roughness);
-      let Gv = geometry_smith(N, V, L, roughness);
-      let Fv = fresnel_schlick(max(dot(H2, V), 0.0), F0);
-      let kSpec = (NDF * Gv) / max(4.0 * max(dot(N, V), 0.0) * NdotL, 1e-4);
-      let spec = Fv * kSpec;
-      let kd = (vec3<f32>(1.0) - Fv) * (1.0 - metallic);
-      let diff = kd * lambert(baseColor);
-      direct += (diff + spec) * uniforms.pointLights[i].color * NdotL * attenuation;
+      direct += lambert(baseColor) * uniforms.pointLights[i].color * (NdotL * 0.25) * attenuation;
     }
   }
 
-  // Apply vertex AO with 0.4 strength
+  // Apply vertex AO with moderate strength
   let ao = mix(1.0, clamp(vAO, 0.0, 1.0), 0.4);
-  // Image-Based Lighting (split-sum approximation)
-  let NdotV = max(dot(N, V), 0.0);
-  let R = reflect(-V, N);
-  let brdf = textureSample(brdfLutTex, texSampler, vec2<f32>(NdotV, roughness)).rg;
-  // Select mip level based on roughness (fallback to 0 if no mips)
-  let prefiltered = textureSampleLevel(prefilteredEnvTex, texSampler, R, roughness * 4.0).rgb;
-  let specIBL = prefiltered * (F0 * brdf.x + brdf.y);
-  var color = (ambient + direct + specIBL) * ao;
-  // Fog (disabled by default)
-  let dist = length(uniforms.cameraPosition - worldPos);
-  let fogDensity = 0.0;
-  let fogFactor = clamp(exp(-fogDensity * dist), 0.0, 1.0);
-  let fogColor = uniforms.ambientColor * uniforms.ambientIntensity;
-  color = mix(fogColor, color, fogFactor);
+
+  var color = (ambient + direct) * tone * ao;
   color = clamp(color, vec3<f32>(0.0), vec3<f32>(1.0));
   return vec4<f32>(color, 1.0);
 }

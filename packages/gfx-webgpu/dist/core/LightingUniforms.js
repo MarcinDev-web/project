@@ -4,15 +4,15 @@
  * Manages writing lighting data to GPU uniform buffers.
  * Handles directional lights, point lights, and ambient lighting.
  *
- * Buffer Layout (starting at offset 144):
- * - 144-160: pointLightCount (u32 + 3 padding)
- * - 160-176: directionalLightDir (vec3 + padding)
- * - 176-192: directionalLightColor (vec3 + padding)
- * - 192-208: ambientColor (vec3) + ambientIntensity (f32)
- * - 208-464: pointLights array (4 * 64 bytes)
+ * Buffer Layout (starting at offset 128):
+ * - 128-144: pointLightCount (u32 + 3 padding)
+ * - 144-160: directionalLightDir (vec3 + padding)
+ * - 160-176: directionalLightColor (vec3 + padding)
+ * - 176-192: ambientColor (vec3) + ambientIntensity (f32)
+ * - 192-448: pointLights array (4 * 64 bytes)
  */
 /** Byte offset where lighting uniforms start in the uniform buffer */
-export const LIGHTING_UNIFORMS_OFFSET = 144;
+export const LIGHTING_UNIFORMS_OFFSET = 128;
 /** Total byte size of lighting uniforms section */
 export const LIGHTING_UNIFORMS_SIZE = 320;
 /**
@@ -99,12 +99,12 @@ export class LightingUniformWriter {
  * Writes lighting uniforms to the GPU buffer.
  * Legacy function for backward compatibility.
  *
- * Buffer layout (starting at offset 144 after atlasParams):
- * - 144-160: pointLightCount (u32 + 3 padding as f32/unused)
- * - 160-176: directionalLightDir (vec3 + padding)
- * - 176-192: directionalLightColor (vec3 + padding)
- * - 192-208: ambientColor (vec3) + ambientIntensity (f32)
- * - 208-464: pointLights array (4 * 64 bytes)
+ * Buffer layout (starting at offset 128 after atlasParams):
+ * - 128-144: pointLightCount (u32 + 3 padding as f32/unused)
+ * - 144-160: directionalLightDir (vec3 + padding)
+ * - 160-176: directionalLightColor (vec3 + padding)
+ * - 176-192: ambientColor (vec3) + ambientIntensity (f32)
+ * - 192-448: pointLights array (4 * 64 bytes)
  */
 export function writeLightingUniforms(device, uniformBuffer, lightingData) {
     const writer = new LightingUniformWriter();

@@ -5,8 +5,8 @@
 import type { Scene } from '@engine/world';
 import type { Entity } from '@engine/world';
 import type { LogicConnectionManager } from '@engine/script';
-import type { LogicPort } from '@engine/script/cubes/types';
-import { LogicCubeComponent } from '@engine/world/components/LogicCubeComponent';
+import type { LogicPort } from '@engine/script';
+import { LogicCubeComponent } from '@engine/script';
 import { LogicCubeLibrary } from '../managers/LogicCubeLibrary';
 import { Logger } from '../../utils/logger';
 

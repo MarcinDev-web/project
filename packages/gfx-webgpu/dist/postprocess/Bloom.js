@@ -36,7 +36,7 @@ struct VSOut { @builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32> };
                 },
                 fragment: {
                     module: this.device.createShaderModule({ code: `
-@group(0) @binding(0) var hdrTex : texture_2d<f16>;
+@group(0) @binding(0) var hdrTex : texture_2d<f32>;
 @group(0) @binding(1) var smp : sampler;
 @fragment fn fs_main(@location(0) v_uv:vec2<f32>) -> @location(0) vec4<f32> {
   // Bright-pass filter

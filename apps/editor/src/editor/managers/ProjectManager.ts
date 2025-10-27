@@ -11,7 +11,6 @@ export interface ProjectManagerOptions {
   scene: Scene;
   state: EditorState;
   updateSceneBuffers: () => void;
-  refreshOutliner: () => void;
   showStatusMessage: (message: string, duration?: number) => void;
   onSaveStatusChange: (status: ProjectSaveStatus) => void;
 }
@@ -75,7 +74,6 @@ export class ProjectManager {
       // Ignore if unavailable in test environment
     }
     this.options.updateSceneBuffers();
-    this.options.refreshOutliner();
     this.options.showStatusMessage('New project created', 1500);
   }
 
@@ -344,7 +342,6 @@ export class ProjectManager {
       this.unsavedChanges = false;
       this.options.onSaveStatusChange('Saved');
       this.options.updateSceneBuffers();
-      this.options.refreshOutliner();
       this.options.showStatusMessage(`Loaded: ${project.metadata.name}`, 1500);
     } catch (error) {
       Logger.error('Load failed:', error);
@@ -353,7 +350,6 @@ export class ProjectManager {
         const restored = Scene.fromJSON(backup);
         this.resetSceneRootEntities(restored.rootEntities);
         this.options.updateSceneBuffers();
-        this.options.refreshOutliner();
       } catch (rollbackError) {
         Logger.error('Rollback failed:', rollbackError);
       }

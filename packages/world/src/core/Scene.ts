@@ -26,6 +26,12 @@ export class Scene {
   readonly events: EventBus;
   /** Optional scripting runtime context injected when ScriptSystem is active */
   scriptRuntime: ScriptRuntime | null = null;
+  
+  // Query cache for performance optimization
+  private _queryCache = new Map<string, Entity[]>();
+  private _activeEntitiesCache: Entity[] | null = null;
+  private _allEntitiesCache: Entity[] | null = null;
+  private _queryCacheDirty = true;
 
   constructor(name = 'Scene') {
     this.name = name;
@@ -166,27 +172,48 @@ export class Scene {
 
   /**
    * Gets all entities in the scene (flat list).
+   * Uses cache to avoid allocation on every call.
    */
   getAllEntities(): Entity[] {
-    return Array.from(this._entityMap.values());
+    if (!this._allEntitiesCache || this._queryCacheDirty) {
+      this._allEntitiesCache = Array.from(this._entityMap.values());
+    }
+    return this._allEntitiesCache;
   }
 
   /**
    * Gets all active entities (flat list).
+   * Uses cache to avoid allocation and filtering on every call.
    */
   getActiveEntities(): Entity[] {
-    return Array.from(this._entityMap.values()).filter((e) => e.active);
+    if (!this._activeEntitiesCache || this._queryCacheDirty) {
+      this._activeEntitiesCache = Array.from(this._entityMap.values()).filter((e) => e.active);
+    }
+    return this._activeEntitiesCache;
   }
 
   /**
    * Queries entities that have all specified component types.
    * Returns all entities when no component classes are provided.
+   * Uses cache to avoid recomputation on every call.
    */
   queryEntities(...componentClasses: ComponentClass[]): Entity[] {
     if (componentClasses.length === 0) return this.getAllEntities();
 
+    // Generate cache key from component class names
+    const cacheKey = componentClasses.map((cls) => cls.name).sort().join(',');
+
+    // Return cached result if valid
+    if (!this._queryCacheDirty && this._queryCache.has(cacheKey)) {
+      return this._queryCache.get(cacheKey)!;
+    }
+
     const sets = componentClasses.map((cls) => this._componentIndex.get(cls));
-    if (sets.some((s) => !s || s.size === 0)) return [];
+    if (sets.some((s) => !s || s.size === 0)) {
+      const emptyResult: Entity[] = [];
+      this._queryCache.set(cacheKey, emptyResult);
+      return emptyResult;
+    }
 
     const sorted = (sets as Array<Set<Entity>>).slice().sort((a, b) => a.size - b.size);
     const smallest = sorted[0]!;
@@ -199,6 +226,10 @@ export class Scene {
       }
       result.push(entity);
     }
+
+    // Cache the result
+    this._queryCache.set(cacheKey, result);
+    
     return result;
   }
 
@@ -225,6 +256,7 @@ export class Scene {
     this._primaryCameraId = null;
     this.events.clear();
     this.scriptRuntime = null;
+    this.invalidateQueryCache();
   }
 
   /**
@@ -248,6 +280,7 @@ export class Scene {
       this.attachSubtree(child);
     }
     this._ensurePrimaryCamera();
+    this.invalidateQueryCache();
   }
 
   /**
@@ -273,6 +306,7 @@ export class Scene {
       this.detachSubtree(child);
     }
     this._ensurePrimaryCamera();
+    this.invalidateQueryCache();
   }
 
   /** @internal */
@@ -285,6 +319,7 @@ export class Scene {
         this._ensurePrimaryCamera();
       }
     }
+    this.invalidateQueryCache();
   }
 
   /** @internal */
@@ -294,6 +329,26 @@ export class Scene {
       this._unregisterCamera(entity);
       this._ensurePrimaryCamera();
     }
+    this.invalidateQueryCache();
+  }
+  
+  /**
+   * Invalidates the query cache, forcing queries to recompute.
+   * Called when entities or components are added/removed.
+   */
+  private invalidateQueryCache(): void {
+    this._queryCacheDirty = true;
+    this._queryCache.clear();
+    this._activeEntitiesCache = null;
+    this._allEntitiesCache = null;
+  }
+  
+  /**
+   * Validates the query cache after batch updates.
+   * Can be called to mark cache as valid after known safe state.
+   */
+  validateQueryCache(): void {
+    this._queryCacheDirty = false;
   }
 
   private _indexComponent(entity: Entity, componentType: ComponentClass): void {

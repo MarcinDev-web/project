@@ -9,6 +9,7 @@
 
 import type { Mat4, Vec3 } from '@engine/core/math';
 import type { Entity, AABB } from '@engine/world';
+import { Octree } from '@engine/world';
 
 export interface FrustumPlane {
   nx: number;
@@ -23,9 +24,13 @@ export interface Frustum {
 
 /**
  * FrustumCuller manages frustum extraction and entity culling operations.
+ * Enhanced with octree spatial partitioning for efficient broad-phase culling.
  */
 export class FrustumCuller {
   private reusableVisibleArray: Entity[] = [];
+  private octree: Octree | null = null;
+  private octreeDirty = true;
+  private lastEntityCount = 0;
 
   /**
    * Extracts a world-space frustum from a combined view-projection matrix.
@@ -105,31 +110,191 @@ export class FrustumCuller {
   /**
    * Culls entities outside frustum.
    * Reuses internal array to avoid allocations.
+   * Uses octree for broad-phase culling when available.
    * @returns Array of visible entities (reused, do not store reference)
    */
   cullEntities(entities: Entity[], frustum: Frustum): Entity[] {
     this.reusableVisibleArray.length = 0; // Clear without deallocating
-    for (const e of entities) {
+
+    // Rebuild octree if needed (entity count changed or marked dirty)
+    if (
+      this.octreeDirty ||
+      !this.octree ||
+      entities.length !== this.lastEntityCount
+    ) {
+      this.rebuildOctree(entities);
+    }
+
+    // Broad-phase: Get potentially visible entities from octree
+    const frustumBounds = this.getFrustumBounds(frustum);
+    const candidates = this.octree
+      ? this.octree.query(frustumBounds)
+      : entities;
+
+    // Fine-phase: Test each candidate against frustum planes
+    for (const e of candidates) {
       const aabb = this.getEntityAABB(e);
       if (this.frustumIntersectsAABB(aabb, frustum)) {
         this.reusableVisibleArray.push(e);
       }
     }
+
     return this.reusableVisibleArray;
   }
 
   /**
    * Culls entities and writes results to provided output array (avoids internal state).
+   * Uses octree for broad-phase culling when available.
    */
   cullEntitiesToArray(entities: Entity[], frustum: Frustum, outVisible: Entity[]): Entity[] {
     outVisible.length = 0; // Clear without deallocating
-    for (const e of entities) {
+
+    // Rebuild octree if needed
+    if (
+      this.octreeDirty ||
+      !this.octree ||
+      entities.length !== this.lastEntityCount
+    ) {
+      this.rebuildOctree(entities);
+    }
+
+    // Broad-phase: Get potentially visible entities from octree
+    const frustumBounds = this.getFrustumBounds(frustum);
+    const candidates = this.octree
+      ? this.octree.query(frustumBounds)
+      : entities;
+
+    // Fine-phase: Test each candidate against frustum planes
+    for (const e of candidates) {
       const aabb = this.getEntityAABB(e);
       if (this.frustumIntersectsAABB(aabb, frustum)) {
         outVisible.push(e);
       }
     }
+
     return outVisible;
+  }
+
+  /**
+   * Marks the octree as dirty, forcing rebuild on next cull.
+   */
+  markDirty(): void {
+    this.octreeDirty = true;
+  }
+
+  /**
+   * Rebuilds the octree from entity list.
+   */
+  private rebuildOctree(entities: Entity[]): void {
+    // Calculate world bounds from entities
+    const worldBounds = this.calculateWorldBounds(entities);
+
+    // Create new octree
+    this.octree = new Octree(worldBounds, {
+      maxDepth: 6,
+      maxEntitiesPerNode: 8,
+      minNodeSize: 1.0,
+    });
+
+    // Insert entities into octree
+    for (const entity of entities) {
+      if (entity && entity.active) {
+        const aabb = this.getEntityAABB(entity);
+        this.octree.insert(entity, aabb);
+      }
+    }
+
+    this.octreeDirty = false;
+    this.lastEntityCount = entities.length;
+  }
+
+  /**
+   * Calculates world bounds from entity list.
+   */
+  private calculateWorldBounds(entities: Entity[]): AABB {
+    if (entities.length === 0) {
+      return {
+        min: [-100, -100, -100],
+        max: [100, 100, 100],
+      };
+    }
+
+    let minX = Infinity,
+      minY = Infinity,
+      minZ = Infinity;
+    let maxX = -Infinity,
+      maxY = -Infinity,
+      maxZ = -Infinity;
+
+    for (const e of entities) {
+      const aabb = this.getEntityAABB(e);
+      minX = Math.min(minX, aabb.min[0]);
+      minY = Math.min(minY, aabb.min[1]);
+      minZ = Math.min(minZ, aabb.min[2]);
+      maxX = Math.max(maxX, aabb.max[0]);
+      maxY = Math.max(maxY, aabb.max[1]);
+      maxZ = Math.max(maxZ, aabb.max[2]);
+    }
+
+    // Add some padding
+    const padding = 10;
+    return {
+      min: [minX - padding, minY - padding, minZ - padding],
+      max: [maxX + padding, maxY + padding, maxZ + padding],
+    };
+  }
+
+  /**
+   * Gets approximate AABB bounds for frustum (for broad-phase query).
+   */
+  private getFrustumBounds(frustum: Frustum): AABB {
+    // Calculate bounds from frustum planes intersection
+    // This is a conservative estimate - could be tighter
+    let minX = -Infinity,
+      minY = -Infinity,
+      minZ = -Infinity;
+    let maxX = Infinity,
+      maxY = Infinity,
+      maxZ = Infinity;
+
+    // For each plane, constrain the bounds
+    for (const plane of frustum.planes) {
+      const absNx = Math.abs(plane.nx);
+      const absNy = Math.abs(plane.ny);
+      const absNz = Math.abs(plane.nz);
+
+      // Estimate constraint based on dominant axis
+      if (absNx > absNy && absNx > absNz) {
+        // X-dominant plane
+        const x = -plane.d / plane.nx;
+        if (plane.nx > 0) minX = Math.max(minX, x);
+        else maxX = Math.min(maxX, x);
+      } else if (absNy > absNz) {
+        // Y-dominant plane
+        const y = -plane.d / plane.ny;
+        if (plane.ny > 0) minY = Math.max(minY, y);
+        else maxY = Math.min(maxY, y);
+      } else {
+        // Z-dominant plane
+        const z = -plane.d / plane.nz;
+        if (plane.nz > 0) minZ = Math.max(minZ, z);
+        else maxZ = Math.min(maxZ, z);
+      }
+    }
+
+    // Clamp to reasonable bounds if infinite
+    const maxBound = 1000;
+    if (!Number.isFinite(minX)) minX = -maxBound;
+    if (!Number.isFinite(minY)) minY = -maxBound;
+    if (!Number.isFinite(minZ)) minZ = -maxBound;
+    if (!Number.isFinite(maxX)) maxX = maxBound;
+    if (!Number.isFinite(maxY)) maxY = maxBound;
+    if (!Number.isFinite(maxZ)) maxZ = maxBound;
+
+    return {
+      min: [minX, minY, minZ],
+      max: [maxX, maxY, maxZ],
+    };
   }
 
   /**

@@ -1,3 +1,6 @@
+/**
+ * @vitest-environment jsdom
+ */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { EditorUILayout, type EditorUILayoutConfig, type SceneMetrics } from '../EditorUILayout';
 
@@ -49,15 +52,15 @@ describe('EditorUILayout', () => {
       expect(() => layout.mount()).toThrow('EditorUILayout: Already mounted');
     });
 
-    it('should start with panels open by default', () => {
+    it('should start with panels closed by default (cleaner canvas)', () => {
       layout = new EditorUILayout(config);
       layout.mount();
 
       const sidebar = document.querySelector('.editor-sidebar');
       const inspector = document.querySelector('.editor-inspector');
 
-      expect(sidebar?.classList.contains('collapsed')).toBe(false);
-      expect(inspector?.classList.contains('collapsed')).toBe(false);
+      expect(sidebar?.classList.contains('collapsed')).toBe(true);
+      expect(inspector?.classList.contains('collapsed')).toBe(true);
     });
 
     it('should create breadcrumbs bar', () => {
@@ -87,16 +90,15 @@ describe('EditorUILayout', () => {
       expect(button?.textContent).toBe('?');
     });
 
-    it('should create panel toggle buttons with labels', () => {
+    it('should create inspector toggle button with label', () => {
       layout = new EditorUILayout(config);
       layout.mount();
 
       const leftToggle = document.querySelector('.panel-toggle.left');
       const rightToggle = document.querySelector('.panel-toggle.right');
 
-      expect(leftToggle).toBeTruthy();
+      expect(leftToggle).toBeFalsy(); // Left toggle removed
       expect(rightToggle).toBeTruthy();
-      expect(leftToggle?.querySelector('.panel-toggle-label')?.textContent?.trim()).toBe('Scene');
       expect(rightToggle?.querySelector('.panel-toggle-label')?.textContent?.trim()).toBe('Inspector');
     });
   });
@@ -143,33 +145,35 @@ describe('EditorUILayout', () => {
 
     it('should toggle sidebar visibility', () => {
       const sidebar = document.querySelector('.editor-sidebar');
-      expect(sidebar?.classList.contains('collapsed')).toBe(false);
-
-      layout.toggleSidebar();
       expect(sidebar?.classList.contains('collapsed')).toBe(true);
 
       layout.toggleSidebar();
       expect(sidebar?.classList.contains('collapsed')).toBe(false);
+
+      layout.toggleSidebar();
+      expect(sidebar?.classList.contains('collapsed')).toBe(true);
     });
 
     it('should toggle inspector visibility', () => {
       const inspector = document.querySelector('.editor-inspector');
-      expect(inspector?.classList.contains('collapsed')).toBe(false);
-
-      layout.toggleInspector();
       expect(inspector?.classList.contains('collapsed')).toBe(true);
 
       layout.toggleInspector();
       expect(inspector?.classList.contains('collapsed')).toBe(false);
+
+      layout.toggleInspector();
+      expect(inspector?.classList.contains('collapsed')).toBe(true);
     });
 
-    it('should update toggle button on sidebar toggle', () => {
+    it('should toggle sidebar without toggle button', () => {
       const toggle = document.querySelector('.panel-toggle.left');
-      const getIcon = () => toggle?.querySelector('svg')?.innerHTML;
+      const sidebar = document.querySelector('.editor-sidebar');
       
-      const initialIcon = getIcon();
+      expect(toggle).toBeFalsy(); // No left toggle button
+      expect(sidebar?.classList.contains('collapsed')).toBe(true);
+      
       layout.toggleSidebar();
-      expect(getIcon()).not.toBe(initialIcon);
+      expect(sidebar?.classList.contains('collapsed')).toBe(false);
     });
   });
 
@@ -224,7 +228,7 @@ describe('EditorUILayout', () => {
       const sidebar = document.querySelector('.editor-sidebar');
       const inspector = document.querySelector('.editor-inspector');
 
-      // Start with both open, should close both
+      // Start with both closed, should open both
       const event = new KeyboardEvent('keydown', {
         key: '\\',
         ctrlKey: true,
@@ -232,13 +236,13 @@ describe('EditorUILayout', () => {
       });
       window.dispatchEvent(event);
 
-      expect(sidebar?.classList.contains('collapsed')).toBe(true);
-      expect(inspector?.classList.contains('collapsed')).toBe(true);
-
-      // Both closed, should open both
-      window.dispatchEvent(event);
       expect(sidebar?.classList.contains('collapsed')).toBe(false);
       expect(inspector?.classList.contains('collapsed')).toBe(false);
+
+      // Both open, should close both
+      window.dispatchEvent(event);
+      expect(sidebar?.classList.contains('collapsed')).toBe(true);
+      expect(inspector?.classList.contains('collapsed')).toBe(true);
     });
   });
 
@@ -350,7 +354,7 @@ describe('EditorUILayout', () => {
       layout.mount();
       
       const sidebar = document.querySelector('.editor-sidebar');
-      expect(sidebar?.classList.contains('collapsed')).toBe(false);
+      expect(sidebar?.classList.contains('collapsed')).toBe(true);
 
       layout.dispose();
 

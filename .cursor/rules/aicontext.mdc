@@ -1,0 +1,581 @@
+---
+alwaysApply: false
+---
+# AI Context Guide - UGC 3D Platform
+
+> **For: Claude 4.5 Sonnet, GPT-5, and other AI coding assistants**  
+> **Last Updated:** 2025-10-26
+
+## 🎯 Quick Context
+
+**You are working on:** A production-grade WebGPU-based 3D game engine with modular monorepo architecture.
+
+**Tech Stack:** TypeScript, WebGPU, Vite, Vitest, pnpm workspaces  
+**Architecture:** Modular monorepo with strict package boundaries  
+**Testing:** Vitest with comprehensive automation (CI/CD, pre-commit hooks)
+
+---
+
+## 📁 Project Structure (Mental Model)
+
+```
+ugc-3d-platform/
+├── packages/          # @engine/* - Reusable engine modules (NEVER duplicate here)
+│   ├── core/          # Foundation: math, ECS types, event system, job scheduler
+│   ├── world/         # ECS runtime: entities, components, systems, physics
+│   ├── gfx-webgpu/    # WebGPU renderer: pipelines, materials, shadows, textures
+│   ├── script/        # Visual scripting: LogicCubes, behaviors, coroutines
+│   ├── input/         # Input management: keyboard, mouse, gamepad
+│   ├── camera/        # Camera systems: Orbit, FPS, CameraDirector
+│   ├── stdlib/        # Standard library: animation, audio, character controller
+│   └── editor-utils/  # Editor utilities: history, snap, entity paths [NEW Oct 2025]
+│
+├── apps/              # Applications (UI/UX specific, consumes packages)
+│   └── editor/        # 3D scene editor with modern glassmorphic UI
+│
+└── docs/              # Documentation (Polish for ADRs/roadmap, English for technical)
+```
+
+---
+
+## 🧠 Critical Architectural Rules
+
+### Import Policy (STRICTLY ENFORCED)
+
+```typescript
+// ✅ CORRECT - Always use @engine/* aliases
+import { Vec3 } from '@engine/core';
+import { Scene, Entity } from '@engine/world';
+import { Renderer } from '@engine/gfx-webgpu';
+
+// ❌ NEVER use relative paths for packages
+import { Vec3 } from '../../packages/core/src/math/Vec3';
+```
+
+### Package Boundaries (NO VIOLATIONS)
+
+```
+✅ ALLOWED:
+- packages → packages (one direction, avoid cycles)
+- apps → packages
+- Lower-level → Higher-level (core → world → gfx-webgpu)
+
+❌ FORBIDDEN:
+- packages → apps
+- Higher-level → Lower-level (creates dependency cycles)
+- Duplicating package code in apps/
+```
+
+### Dependency Hierarchy
+
+```
+Level 0: @engine/core (foundation, no deps)
+Level 1: @engine/world, @engine/input, @engine/editor-utils
+Level 2: @engine/gfx-webgpu, @engine/camera, @engine/script
+Level 3: @engine/stdlib, @apps/editor
+```
+
+---
+
+## 🎨 Code Style & Conventions
+
+### TypeScript Rules
+
+```typescript
+// ✅ Strict mode ALWAYS enabled
+// ✅ Prefer type inference for locals, explicit for public APIs
+export function createEntity(name: string): Entity { // Explicit return
+  const id = generateId(); // Inferred
+  return new Entity(id, name);
+}
+
+// ✅ Use unknown over any when type is truly unknown
+function parse(data: unknown): Result {
+  if (typeof data === 'string') { /* ... */ }
+}
+
+// ❌ NO any without comment explaining why
+function legacy(data: any) { // BAD
+  return data.something;
+}
+
+// ✅ any with justification
+function legacy(data: any /* legacy API, no types available */) {
+  return data.something;
+}
+```
+
+### Functional Patterns
+
+```typescript
+// ✅ Prefer functional components and composition
+export function createSystem(scene: Scene) {
+  const entities: Entity[] = [];
+  
+  return {
+    update: (dt: number) => { /* ... */ },
+    dispose: () => entities.forEach(e => e.dispose()),
+  };
+}
+
+// ✅ Keep functions small (<50 lines ideally)
+// ✅ Use async/await over raw Promises
+async function loadAsset(url: string): Promise<Asset> {
+  const response = await fetch(url);
+  return await response.json();
+}
+
+// ✅ Destructure for readability
+function render({ camera, scene, viewport }: RenderContext) {
+  // clearer than render(context)
+}
+```
+
+### Performance Mindset
+
+```typescript
+// ✅ Question every allocation in hot paths (render loops, physics updates)
+class System {
+  private tempVec = new Vec3(); // Reuse, don't allocate per frame
+  
+  update(entities: Entity[]) {
+    for (const entity of entities) {
+      this.tempVec.set(entity.x, entity.y, entity.z); // Reuse
+      // NOT: const temp = new Vec3(entity.x, entity.y, entity.z); ❌
+    }
+  }
+}
+
+// ✅ Consider cache locality for data structures
+// Store transform components contiguously for better iteration
+
+// ✅ Batch operations where possible
+renderer.batch(() => {
+  for (const mesh of meshes) {
+    renderer.drawMesh(mesh);
+  }
+});
+
+// ✅ Lazy load non-critical resources
+class AssetManager {
+  private cache = new Map<string, Promise<Asset>>();
+  
+  async load(url: string): Promise<Asset> {
+    if (!this.cache.has(url)) {
+      this.cache.set(url, this.fetchAsset(url));
+    }
+    return this.cache.get(url)!;
+  }
+}
+```
+
+---
+
+## 🧪 Testing Philosophy
+
+### Test Behavior, Not Implementation
+
+```typescript
+// ✅ GOOD - Tests observable behavior
+test('entity position updates correctly', () => {
+  const entity = new Entity();
+  entity.setPosition(1, 2, 3);
+  expect(entity.getPosition()).toEqual([1, 2, 3]);
+});
+
+// ❌ BAD - Tests internal implementation
+test('entity stores position in _position field', () => {
+  const entity = new Entity();
+  entity._position = [1, 2, 3]; // Testing private details
+  expect(entity._position).toBeDefined();
+});
+```
+
+### Mock External Dependencies
+
+```typescript
+// ✅ Mock WebGPU, file system, network
+vi.mock('@engine/gfx-webgpu', () => ({
+  Renderer: vi.fn().mockImplementation(() => ({
+    render: vi.fn(),
+    dispose: vi.fn(),
+  })),
+}));
+
+// ✅ Use @engine/test-utils for common mocks
+import { createMockCanvas, entityFixtures } from '@engine/test-utils';
+
+test('renderer initializes with canvas', () => {
+  const canvas = createMockCanvas(800, 600);
+  const renderer = new Renderer(canvas);
+  expect(renderer.isReady()).toBe(true);
+});
+```
+
+### Test Organization
+
+```typescript
+// ✅ Use concurrent for independent tests (faster)
+describe.concurrent('Math utilities', () => {
+  test('vec3 addition', () => { /* ... */ });
+  test('vec3 subtraction', () => { /* ... */ });
+});
+
+// ✅ Always cleanup in afterEach
+describe('System lifecycle', () => {
+  let system: System;
+  
+  beforeEach(() => {
+    system = new System();
+  });
+  
+  afterEach(() => {
+    system.dispose(); // CRITICAL: prevent leaks
+    vi.clearAllMocks();
+    vi.clearAllTimers();
+  });
+  
+  test('updates correctly', () => { /* ... */ });
+});
+```
+
+---
+
+## 🚀 Common Tasks & Patterns
+
+### Creating a New Package
+
+```bash
+# 1. Create directory structure
+mkdir -p packages/my-package/src
+cd packages/my-package
+
+# 2. Create package.json
+{
+  "name": "@engine/my-package",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  }
+}
+
+# 3. Create tsconfig.json (extend from root)
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src"
+  }
+}
+
+# 4. Export from src/index.ts
+export * from './MyModule';
+```
+
+### Adding a New Component
+
+```typescript
+// packages/world/src/components/MyComponent.ts
+import { Component } from './Component';
+
+export interface MyComponentData {
+  property: number;
+}
+
+export class MyComponent extends Component {
+  public property: number;
+  
+  constructor(data: MyComponentData) {
+    super('MyComponent');
+    this.property = data.property;
+  }
+  
+  serialize(): MyComponentData {
+    return { property: this.property };
+  }
+  
+  dispose(): void {
+    // Cleanup resources
+  }
+}
+
+// Don't forget to export from packages/world/src/index.ts
+export { MyComponent } from './components/MyComponent';
+```
+
+### Writing Tests
+
+```typescript
+// packages/world/__tests__/MyComponent.test.ts
+import { describe, test, expect, beforeEach, afterEach } from 'vitest';
+import { MyComponent } from '../src/components/MyComponent';
+
+describe('MyComponent', () => {
+  let component: MyComponent;
+  
+  beforeEach(() => {
+    component = new MyComponent({ property: 42 });
+  });
+  
+  afterEach(() => {
+    component.dispose();
+  });
+  
+  test('initializes with correct value', () => {
+    expect(component.property).toBe(42);
+  });
+  
+  test('serializes correctly', () => {
+    const data = component.serialize();
+    expect(data).toEqual({ property: 42 });
+  });
+});
+```
+
+---
+
+## 🔥 Common Pitfalls & Anti-Patterns
+
+### ❌ DON'T: Duplicate Package Code in Apps
+
+```typescript
+// ❌ BAD: apps/editor/src/utils/history.ts
+export class HistoryManager { /* ... */ }
+
+// This belongs in packages/editor-utils!
+```
+
+### ❌ DON'T: Import with Relative Paths Between Packages
+
+```typescript
+// ❌ BAD
+import { Vec3 } from '../../../packages/core/src/math/Vec3';
+
+// ✅ GOOD
+import { Vec3 } from '@engine/core';
+```
+
+### ❌ DON'T: Create Circular Dependencies
+
+```typescript
+// ❌ BAD
+// packages/world/src/Scene.ts imports from gfx-webgpu
+// packages/gfx-webgpu/src/Renderer.ts imports from world
+```
+
+### ❌ DON'T: Allocate in Hot Paths
+
+```typescript
+// ❌ BAD (called 60 times per second)
+update(dt: number) {
+  const velocity = new Vec3(); // Allocates every frame!
+  velocity.set(this.vx, this.vy, this.vz);
+}
+
+// ✅ GOOD
+private tempVelocity = new Vec3(); // Reuse
+
+update(dt: number) {
+  this.tempVelocity.set(this.vx, this.vy, this.vz);
+}
+```
+
+### ❌ DON'T: Forget Cleanup
+
+```typescript
+// ❌ BAD
+test('animation plays', () => {
+  const interval = setInterval(() => { /* ... */ }, 100);
+  // Test finishes, interval keeps running!
+});
+
+// ✅ GOOD
+test('animation plays', () => {
+  const interval = setInterval(() => { /* ... */ }, 100);
+  
+  // Cleanup
+  afterEach(() => {
+    clearInterval(interval);
+  });
+});
+```
+
+---
+
+## 📊 Key Systems Overview
+
+### ECS (Entity-Component-System)
+
+```typescript
+// Entity: Container for components
+const entity = new Entity('player');
+
+// Components: Data holders
+entity.addComponent(new TransformComponent({ position: [0, 0, 0] }));
+entity.addComponent(new MeshComponent({ geometry, material }));
+
+// Systems: Process entities with specific components
+class RenderSystem {
+  update(entities: Entity[]) {
+    for (const entity of entities) {
+      if (entity.has(TransformComponent) && entity.has(MeshComponent)) {
+        this.renderer.draw(entity);
+      }
+    }
+  }
+}
+```
+
+### LogicCubes (Visual Scripting)
+
+```typescript
+// LogicCubes: Visual programming system
+// Types: Trigger, Action, Condition, Data, Gate
+
+// Example: OnPlayerEnter → PlaySound
+const trigger = new OnPlayerEnterCube({ zone: 'area1' });
+const action = new PlaySoundCube({ sound: 'doorOpen.wav' });
+
+trigger.connect(action); // Visual connection
+```
+
+### WebGPU Rendering Pipeline
+
+```typescript
+// 1. Create renderer
+const renderer = new Renderer(canvas);
+
+// 2. Setup scene
+const scene = new Scene();
+scene.add(entity);
+
+// 3. Render loop
+function render() {
+  renderer.render(scene, camera);
+  requestAnimationFrame(render);
+}
+```
+
+---
+
+## 🛠️ Development Commands
+
+```bash
+# Development
+pnpm dev                 # Start editor in dev mode
+pnpm build               # Build all packages
+pnpm lint                # Run linter
+
+# Testing (Fast Feedback)
+pnpm test:watch          # Watch mode (1-3s per test)
+pnpm test:changed        # Only changed files (2-5s)
+pnpm test:unit:fast      # Quick run without coverage (~8s)
+
+# Testing (Comprehensive)
+pnpm test:unit           # All unit tests (~10s)
+pnpm test:integration    # Integration tests (~15s)
+pnpm test                # All tests
+
+# Testing (CI/CD)
+pnpm test:ci             # Optimized for CI
+pnpm test:coverage       # With coverage report
+```
+
+---
+
+## 📖 Documentation Hierarchy
+
+**When helping users, reference these docs in order:**
+
+1. **[AI_CONTEXT.md]** ← You are here (Quick context for AI)
+2. **[docs/guidelines/PACKAGE_GUIDELINES.md]** ← Where does code belong?
+3. **[docs/guidelines/CODE_REVIEW_CHECKLIST.md]** ← Quality checklist
+4. **[docs/ARCHITECTURE.md]** ← Detailed system architecture
+5. **[docs/TESTING.md]** ← Testing philosophy
+6. **[TEST_COMMANDS_CHEATSHEET.md]** ← Test commands reference
+
+---
+
+## 🎯 When Making Changes
+
+### Always Ask:
+
+1. **Where does this code belong?** (Check PACKAGE_GUIDELINES.md)
+2. **Am I duplicating existing functionality?** (Search codebase first)
+3. **Does this create a circular dependency?** (Check import graph)
+4. **Did I add tests?** (Behavior tests, not implementation tests)
+5. **Did I cleanup resources?** (dispose, removeEventListener, clearTimeout)
+6. **Is this performant?** (Avoid allocations in hot paths)
+
+### Code Checklist:
+
+- [ ] Uses `@engine/*` imports (not relative paths)
+- [ ] No circular dependencies
+- [ ] Tests added/updated
+- [ ] Cleanup in `dispose()` methods
+- [ ] TypeScript strict mode compliant
+- [ ] No `any` without justification comment
+- [ ] Performance considered (if hot path)
+- [ ] Documentation comments for public APIs
+
+---
+
+## 🔮 Recent Changes (Oct 2025)
+
+- ✅ Created `@engine/editor-utils` package
+- ✅ Eliminated 6 major code duplications (-1823 lines)
+- ✅ Achieved 100% import consistency
+- ✅ Test automation with CI/CD, pre-commit hooks
+- ✅ Comprehensive test utilities (`@engine/test-utils`)
+
+**Note:** Workflow and asset library features were removed and are no longer part of the codebase.
+
+---
+
+## 💡 Pro Tips for AI Assistants
+
+### When Generating Code:
+
+1. **Start with the package decision:** "This should go in `@engine/X` because..."
+2. **Check for existing code:** Search before creating new modules
+3. **Follow the patterns:** Look at similar code in the same package
+4. **Add tests immediately:** Don't defer testing
+5. **Think about disposal:** Every resource needs cleanup
+
+### When Debugging:
+
+1. **Check import paths first:** 90% of issues are import-related
+2. **Verify package boundaries:** Is the dependency allowed?
+3. **Look at test files:** They show correct usage patterns
+4. **Check vitest.workspace.ts:** Environment configuration affects tests
+
+### When Refactoring:
+
+1. **Check PACKAGE_GUIDELINES.md:** Ensure new location is correct
+2. **Update all imports:** Use search-and-replace carefully
+3. **Run tests:** `pnpm test:changed` after each step
+4. **Update docs:** Especially if public APIs changed
+
+---
+
+## 📞 Quick Reference Links
+
+- Main README: [README.md](README.md)
+- Architecture: [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- Package Guidelines: [docs/guidelines/PACKAGE_GUIDELINES.md](docs/guidelines/PACKAGE_GUIDELINES.md)
+- Testing Guide: [docs/TESTING_AUTOMATION.md](docs/TESTING_AUTOMATION.md)
+- Test Commands: [TEST_COMMANDS_CHEATSHEET.md](TEST_COMMANDS_CHEATSHEET.md)
+
+---
+
+**Remember:** This is a production-grade codebase. Quality, consistency, and maintainability are paramount. When in doubt, ask or reference the documentation.
+
+**Generated for AI assistants to provide better context and code generation.**
+
+

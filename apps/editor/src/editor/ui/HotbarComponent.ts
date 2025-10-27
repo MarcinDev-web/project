@@ -9,7 +9,7 @@
  * - Persistent across sessions
  */
 
-import type { Asset } from '@engine/assets';
+import type { Asset } from '../types/BlockAssetTypes';
 import type { InventoryManager } from '../managers/InventoryManager';
 import { createIcon } from '../utils/icons';
 import { Logger } from '../../utils/logger';

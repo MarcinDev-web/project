@@ -1,0 +1,1 @@
+{"version":3,"file":"JsonTemplate.d.ts","sourceRoot":"","sources":["../../src/loaders/JsonTemplate.ts"],"names":[],"mappings":"AAAA,OAAO,EAAS,KAAK,SAAS,EAAE,MAAM,eAAe,CAAC;AACtD,OAAO,KAAK,EAAE,gBAAgB,EAAE,gBAAgB,EAAE,MAAM,UAAU,CAAC;AAEnE,wBAAgB,kBAAkB,CAChC,IAAI,EAAE,gBAAgB,EACtB,IAAI,EAAE,SAAS,GAAG,CAAC,MAAM,OAAO,CAAC,SAAS,CAAC,CAAC,GAC3C,gBAAgB,CAQlB"}
