@@ -191,7 +191,7 @@ export class QuickAccessMenu {
           this.items.push({
             asset,
             angle,
-            label: asset.metadata.name,
+            label: asset.name,
           });
         });
         break;
@@ -203,7 +203,7 @@ export class QuickAccessMenu {
           this.items.push({
             asset,
             angle,
-            label: asset.metadata.name,
+            label: asset.name,
           });
         });
         break;
@@ -215,7 +215,7 @@ export class QuickAccessMenu {
           this.items.push({
             asset,
             angle,
-            label: asset ? asset.metadata.name : `Slot ${index + 1}`,
+            label: asset ? asset.name : `Slot ${index + 1}`,
             index,
           });
         });
@@ -269,12 +269,7 @@ export class QuickAccessMenu {
     const icon = document.createElement('div');
     icon.className = 'quick-access-item-icon';
     
-    if (item.asset?.thumbnail) {
-      const img = document.createElement('img');
-      img.src = item.asset.thumbnail;
-      img.alt = item.label;
-      icon.appendChild(img);
-    } else if (item.asset) {
+    if (item.asset) {
       icon.appendChild(createIcon('cube', 24));
     } else {
       icon.appendChild(createIcon('plus', 24));
@@ -392,7 +387,7 @@ export class QuickAccessMenu {
 
     this.config.onAssetSelect(item.asset, this.currentMode, item.index);
     
-    Logger.debug(`QuickAccessMenu: Activated ${item.asset.metadata.name} in ${this.currentMode} mode`);
+    Logger.debug(`QuickAccessMenu: Activated ${item.asset.name} in ${this.currentMode} mode`);
   }
 
   /**

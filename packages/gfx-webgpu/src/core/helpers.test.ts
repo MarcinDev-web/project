@@ -1,14 +1,13 @@
+/**
+ * @vitest-environment jsdom
+ */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-
-vi.mock('../../logger', () => {
-  const warn = vi.fn();
-  const error = vi.fn();
-  const info = vi.fn();
-  return { logger: { warn, error, info } };
-});
-
 import { Logger } from '@engine/core/utils';
 import { asBytes, getTimestampPeriod, updateCanvasSize } from './helpers';
+
+const mockWarn = vi.spyOn(Logger, 'warn');
+const mockError = vi.spyOn(Logger, 'error');
+const mockInfo = vi.spyOn(Logger, 'info');
 
 const flushMicrotasks = async () => {
   await Promise.resolve();
@@ -32,7 +31,7 @@ describe('getTimestampPeriod', () => {
 
     expect(result).toBe(2.5);
     expect(queue.getTimestampPeriod).toHaveBeenCalledTimes(1);
-    expect(Logger.warn).not.toHaveBeenCalled();
+    expect(mockWarn).not.toHaveBeenCalled();
   });
 
   it('falls back to queue.timestampPeriod when getter returns invalid value', async () => {

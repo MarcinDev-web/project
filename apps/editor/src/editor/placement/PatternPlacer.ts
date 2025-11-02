@@ -10,8 +10,9 @@
 
 import type { Vec3 } from '@engine/core/math';
 import type { Scene, Entity } from '@engine/world';
-import type { CollisionDetector } from './CollisionDetector';
 import { Entity as EntityClass } from '@engine/world';
+import { initializeBaseColor } from '../visuals/SelectionVisuals';
+import type { CollisionDetector } from './CollisionDetector';
 
 export interface PatternPosition {
   position: Vec3;
@@ -138,13 +139,13 @@ export class PatternPlacer {
   /**
    * Validates positions for collisions
    */
-  validatePositions(
+  async validatePositions(
     positions: PatternPosition[],
     previewEntity: Entity,
     excludeEntities?: Set<Entity>
-  ): void {
+  ): Promise<void> {
     for (const pos of positions) {
-      const collisionResult = this.collisionDetector.checkCollisionOBB(
+      const collisionResult = await this.collisionDetector.checkCollisionOBB(
         previewEntity,
         pos.position,
         previewEntity.transform.rotation,
@@ -177,8 +178,9 @@ export class PatternPlacer {
       preview.userData.isPatternPreview = true;
 
       // Copy base color
-      if (templateEntity.userData.baseColor) {
-        preview.userData.baseColor = pos.valid ? [...validColor] : [...invalidColor];
+      const templateBase = templateEntity.userData.baseColor as [number, number, number, number] | undefined;
+      if (templateBase) {
+        preview.userData.baseColor = [...templateBase];
       }
 
       this.scene.addEntity(preview);
@@ -214,11 +216,13 @@ export class PatternPlacer {
       entity.transform.position = pos.position;
       entity.transform.rotation = [...templateEntity.transform.rotation];
       entity.transform.scale = [...templateEntity.transform.scale];
-      entity.color = [...templateEntity.color];
 
       // Copy userData
-      if (templateEntity.userData.baseColor) {
-        entity.userData.baseColor = [...(templateEntity.userData.baseColor as [number, number, number, number])];
+      const templateBase = templateEntity.userData.baseColor as [number, number, number, number] | undefined;
+      if (templateBase) {
+        initializeBaseColor(entity, templateBase);
+      } else if (templateEntity.color) {
+        initializeBaseColor(entity, templateEntity.color as [number, number, number, number]);
       }
       if (templateEntity.userData.asset) {
         entity.userData.asset = templateEntity.userData.asset;
@@ -245,4 +249,3 @@ export class PatternPlacer {
     return [...this.previewEntities];
   }
 }
-

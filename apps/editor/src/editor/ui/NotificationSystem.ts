@@ -38,7 +38,6 @@ interface PromptOptions {
 
 class NotificationSystemClass {
   private toastContainer: HTMLElement | null = null;
-  private modalContainer: HTMLElement | null = null;
   private activeToasts: Set<HTMLElement> = new Set();
 
   /**
@@ -74,7 +73,7 @@ class NotificationSystemClass {
     if (icon || type) {
       const iconName = icon || this.getDefaultIcon(type);
       const iconEl = createIcon(iconName as any, 20);
-      iconEl.className = 'notification-toast-icon';
+      iconEl.setAttribute('class', 'notification-toast-icon');
       toast.appendChild(iconEl);
     }
 
@@ -113,28 +112,28 @@ class NotificationSystemClass {
    * Shows an info toast
    */
   info(message: string, duration?: number): void {
-    this.toast(message, { type: 'info', duration });
+    this.toast(message, duration !== undefined ? { type: 'info', duration } : { type: 'info' });
   }
 
   /**
    * Shows a success toast
    */
   success(message: string, duration?: number): void {
-    this.toast(message, { type: 'success', duration });
+    this.toast(message, duration !== undefined ? { type: 'success', duration } : { type: 'success' });
   }
 
   /**
    * Shows a warning toast
    */
   warning(message: string, duration?: number): void {
-    this.toast(message, { type: 'warning', duration });
+    this.toast(message, duration !== undefined ? { type: 'warning', duration } : { type: 'warning' });
   }
 
   /**
    * Shows an error toast
    */
   error(message: string, duration?: number): void {
-    this.toast(message, { type: 'error', duration });
+    this.toast(message, duration !== undefined ? { type: 'error', duration } : { type: 'error' });
   }
 
   /**

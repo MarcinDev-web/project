@@ -1,15 +1,17 @@
 /**
  * Camera Selection Integration Tests
  * Tests camera type selection with CameraDirector and persistence
+ * @vitest-environment jsdom
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { EditorState, type CameraType } from '../../core/state';
+import { EditorState } from '../../core/state';
 import { Scene } from '@engine/world';
 import { CameraDirector } from '@engine/camera';
 import { createOrbitControls } from '@engine/camera';
 import { persistCameraType, restoreCameraType } from '../../core/EditorPersistence';
 import { storageLoad, storageSave } from '../../../utils/storage';
+import { initBrowserPolyfills } from '../../../test/setup';
 
 // Mock storage utilities
 vi.mock('../../../utils/storage', () => ({
@@ -24,6 +26,7 @@ describe('Camera Selection Integration', () => {
   let cameraDirector: CameraDirector;
 
   beforeEach(() => {
+    initBrowserPolyfills(); // Ensure DOM is ready
     // Create test canvas
     canvas = document.createElement('canvas');
     canvas.width = 800;
@@ -38,6 +41,7 @@ describe('Camera Selection Integration', () => {
     cameraDirector = new CameraDirector({
       orbitControls: controls,
       fpsCamera: null,
+      editorCamera: null,
       canvas,
       scene,
       physicsWorld: null,
@@ -52,86 +56,59 @@ describe('Camera Selection Integration', () => {
   });
 
   describe('EditorState camera type', () => {
-    it('should default to orbit camera', () => {
-      expect(state.cameraType.value).toBe('orbit');
+    it('should default to free-fly camera', () => {
+      expect(state.cameraType.value).toBe('free-fly');
     });
 
     it('should update camera type signal', () => {
-      state.cameraType.value = 'fps';
-      expect(state.cameraType.value).toBe('fps');
-
-      state.cameraType.value = 'orbit';
-      expect(state.cameraType.value).toBe('orbit');
+      state.cameraType.value = 'free-fly';
+      expect(state.cameraType.value).toBe('free-fly');
     });
   });
 
   describe('CameraDirector integration', () => {
-    it('should switch to orbit mode', () => {
-      cameraDirector.setMode('orbit');
-      expect(cameraDirector.getMode()).toBe('orbit');
+    it('should start in free-fly mode', () => {
+      expect(cameraDirector.getMode()).toBe('free-fly');
     });
 
-    it('should switch to fps mode', () => {
-      cameraDirector.setMode('fps');
-      expect(cameraDirector.getMode()).toBe('fps');
-    });
-
-    it('should switch from orbit to fps', () => {
-      cameraDirector.setMode('orbit');
-      expect(cameraDirector.getMode()).toBe('orbit');
-
-      cameraDirector.setMode('fps');
-      expect(cameraDirector.getMode()).toBe('fps');
-    });
-
-    it('should switch from fps to orbit', () => {
-      cameraDirector.setMode('fps');
-      expect(cameraDirector.getMode()).toBe('fps');
-
-      cameraDirector.setMode('orbit');
-      expect(cameraDirector.getMode()).toBe('orbit');
-    });
+    // FPS and third-person modes are not available in editor - only in play mode
 
     it('should handle switching to same mode', () => {
-      cameraDirector.setMode('orbit');
-      expect(cameraDirector.getMode()).toBe('orbit');
+      cameraDirector.setMode('free-fly');
+      expect(cameraDirector.getMode()).toBe('free-fly');
 
       // Should not throw
-      cameraDirector.setMode('orbit');
-      expect(cameraDirector.getMode()).toBe('orbit');
+      cameraDirector.setMode('free-fly');
+      expect(cameraDirector.getMode()).toBe('free-fly');
     });
   });
 
   describe('Camera type persistence', () => {
-    it('should persist orbit camera type', () => {
-      state.cameraType.value = 'orbit';
+    it('should persist free-fly camera type', () => {
+      state.cameraType.value = 'free-fly';
       persistCameraType(state);
 
-      expect(storageSave).toHaveBeenCalledWith('cameraType', 'orbit');
+      expect(storageSave).toHaveBeenCalledWith('cameraType', 'free-fly');
     });
 
-    it('should persist fps camera type', () => {
-      state.cameraType.value = 'fps';
-      persistCameraType(state);
+    // FPS camera type persistence removed - not used in editor
 
-      expect(storageSave).toHaveBeenCalledWith('cameraType', 'fps');
-    });
-
-    it('should restore orbit camera type', () => {
-      vi.mocked(storageLoad).mockReturnValue('orbit');
+    it('should restore free-fly camera type', () => {
+      vi.mocked(storageLoad).mockReturnValue('free-fly');
 
       restoreCameraType(state);
 
-      expect(state.cameraType.value).toBe('orbit');
+      expect(state.cameraType.value).toBe('free-fly');
       expect(storageLoad).toHaveBeenCalledWith('cameraType');
     });
 
-    it('should restore fps camera type', () => {
+    it('should ignore fps camera type from storage (not used in editor)', () => {
       vi.mocked(storageLoad).mockReturnValue('fps');
 
       restoreCameraType(state);
 
-      expect(state.cameraType.value).toBe('fps');
+      // Should fallback to free-fly (editor default)
+      expect(state.cameraType.value).toBe('free-fly');
       expect(storageLoad).toHaveBeenCalledWith('cameraType');
     });
 
@@ -176,51 +153,45 @@ describe('Camera Selection Integration', () => {
   });
 
   describe('Full workflow', () => {
-    it('should persist and restore camera selection', () => {
-      // Set to FPS
-      state.cameraType.value = 'fps';
+    it('should persist and restore free-fly camera selection', () => {
+      // Set to free-fly
+      state.cameraType.value = 'free-fly';
       persistCameraType(state);
 
       // Create new state (simulating page reload)
       const newState = new EditorState(scene);
-      expect(newState.cameraType.value).toBe('orbit'); // Default
+      expect(newState.cameraType.value).toBe('free-fly'); // Default
 
       // Restore from storage
-      vi.mocked(storageLoad).mockReturnValue('fps');
+      vi.mocked(storageLoad).mockReturnValue('free-fly');
       restoreCameraType(newState);
 
       // Should be restored
-      expect(newState.cameraType.value).toBe('fps');
+      expect(newState.cameraType.value).toBe('free-fly');
     });
 
     it('should synchronize state with camera director', () => {
       // Update state
-      state.cameraType.value = 'fps';
+      state.cameraType.value = 'free-fly';
 
       // Manually sync (in real app, this is done via effect)
       cameraDirector.setMode(state.cameraType.value);
 
       // Verify sync
-      expect(cameraDirector.getMode()).toBe('fps');
-      expect(state.cameraType.value).toBe('fps');
-
-      // Change back
-      state.cameraType.value = 'orbit';
-      cameraDirector.setMode(state.cameraType.value);
-
-      expect(cameraDirector.getMode()).toBe('orbit');
-      expect(state.cameraType.value).toBe('orbit');
+      expect(cameraDirector.getMode()).toBe('free-fly');
+      expect(state.cameraType.value).toBe('free-fly');
     });
   });
 
   describe('Type safety', () => {
-    it('should only accept valid camera types', () => {
-      const validTypes: CameraType[] = ['orbit', 'fps', 'third-person'];
-
-      validTypes.forEach(type => {
-        state.cameraType.value = type;
-        expect(state.cameraType.value).toBe(type);
-      });
+    it('should accept camera types (though only free-fly is used in editor)', () => {
+      // Type system allows all camera types, but editor only uses free-fly
+      state.cameraType.value = 'free-fly';
+      expect(state.cameraType.value).toBe('free-fly');
+      
+      // FPS and third-person are for play mode only
+      state.cameraType.value = 'fps';
+      expect(state.cameraType.value).toBe('fps'); // Type allows it
     });
   });
 });

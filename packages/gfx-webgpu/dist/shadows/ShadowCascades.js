@@ -79,9 +79,11 @@ export function computeCascades(params) {
         const eye = [cx - lightDirection[0] * cameraFar, cy - lightDirection[1] * cameraFar, cz - lightDirection[2] * cameraFar];
         const lightView = new Float32Array(16);
         mat4LookAt(lightView, eye, center, up);
-        // Transform corners to light space to compute ortho bounds
+        // Transform corners to light space and compute bounds
         let minX = Number.POSITIVE_INFINITY, minY = Number.POSITIVE_INFINITY, minZ = Number.POSITIVE_INFINITY;
         let maxX = Number.NEGATIVE_INFINITY, maxY = Number.NEGATIVE_INFINITY, maxZ = Number.NEGATIVE_INFINITY;
+        // Also accumulate center in light space for stable sphere fitting
+        let sumLX = 0, sumLY = 0, sumLZ = 0;
         for (let i = 0; i < 8; i++) {
             const p = corners[i];
             const lx = p[0] * lightView[0] + p[1] * lightView[4] + p[2] * lightView[8] + lightView[12];
@@ -99,14 +101,31 @@ export function computeCascades(params) {
                 minZ = lz;
             if (lz > maxZ)
                 maxZ = lz;
+            sumLX += lx;
+            sumLY += ly;
+            sumLZ += lz;
         }
-        // Stabilize by snapping center to texel grid
-        const width = maxX - minX;
-        const height = maxY - minY;
-        const texelSizeX = width / (atlasSize * 0.5); // quadrant resolution (2048/2)
+        // Stable cascade extents: fit to sphere in light space to keep constant size under rotation
+        let cxL = sumLX / 8;
+        let cyL = sumLY / 8;
+        let maxRadius = 0.0;
+        for (let i = 0; i < 8; i++) {
+            const p = corners[i];
+            const lx = p[0] * lightView[0] + p[1] * lightView[4] + p[2] * lightView[8] + lightView[12];
+            const ly = p[0] * lightView[1] + p[1] * lightView[5] + p[2] * lightView[9] + lightView[13];
+            const dx = lx - cxL;
+            const dy = ly - cyL;
+            const r = Math.hypot(dx, dy);
+            if (r > maxRadius)
+                maxRadius = r;
+        }
+        // Make extents square to reduce shimmering when rotating camera
+        const width = maxRadius * 2.0;
+        const height = width;
+        // Texel size in light-space units for the quadrant (atlas split into 2x2)
+        const texelSizeX = width / (atlasSize * 0.5);
         const texelSizeY = height / (atlasSize * 0.5);
-        let cxL = (minX + maxX) * 0.5;
-        let cyL = (minY + maxY) * 0.5;
+        // Snap center to texel grid
         cxL = Math.floor(cxL / texelSizeX) * texelSizeX;
         cyL = Math.floor(cyL / texelSizeY) * texelSizeY;
         minX = cxL - width * 0.5;

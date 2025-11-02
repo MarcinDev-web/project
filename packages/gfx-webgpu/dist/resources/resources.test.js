@@ -1,12 +1,21 @@
+/**
+ * @vitest-environment jsdom
+ */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-vi.mock('../../logger', () => {
+import { createPipelines, createTimestampResources, validateGeometryData } from './resources';
+import { Logger } from '@engine/core/utils';
+vi.mock('@engine/core/utils', () => {
     const warn = vi.fn();
     const error = vi.fn();
     const info = vi.fn();
-    return { logger: { warn, error, info } };
+    return {
+        Logger: {
+            warn,
+            error,
+            info,
+        },
+    };
 });
-import { createPipelines, createTimestampResources, validateGeometryData } from './resources';
-import { Logger } from '@engine/core/utils';
 const makeVertex = (position, normal = [0, 0, 1], ao = 1.0) => {
     const out = new Uint8Array(24);
     const view = new DataView(out.buffer);
@@ -34,16 +43,27 @@ const baseGeometry = {
     vertices: combineVertices([makeVertex([0, 0, 0]), makeVertex([1, 0, 0]), makeVertex([0, 1, 0])]),
     indices: new Uint16Array([0, 1, 2]),
     instanceCount: 1,
+    opaqueCount: 1,
     instanceOffsetData: new Float32Array([0, 0, 0]),
     instanceColorScaleData: new Float32Array([1, 1, 1, 1]),
+    instanceSecondaryColorData: new Float32Array([1, 1, 1, 1]),
+    instanceEmissiveColorData: new Float32Array([0, 0, 0, 0]),
+    instanceMaterialParamsData: new Float32Array([1, 0, 1, 0]),
     instanceRotationData: new Float32Array([0, 0, 0, 1]),
 };
 const cloneGeometry = (overrides) => ({
     vertices: overrides.vertices ?? new Uint8Array(baseGeometry.vertices),
     indices: overrides.indices ?? new Uint16Array(baseGeometry.indices),
     instanceCount: overrides.instanceCount ?? baseGeometry.instanceCount,
+    opaqueCount: overrides.opaqueCount ?? baseGeometry.opaqueCount,
     instanceOffsetData: overrides.instanceOffsetData ?? new Float32Array(baseGeometry.instanceOffsetData),
     instanceColorScaleData: overrides.instanceColorScaleData ?? new Float32Array(baseGeometry.instanceColorScaleData),
+    instanceSecondaryColorData: overrides.instanceSecondaryColorData ??
+        new Float32Array(baseGeometry.instanceSecondaryColorData),
+    instanceEmissiveColorData: overrides.instanceEmissiveColorData ??
+        new Float32Array(baseGeometry.instanceEmissiveColorData),
+    instanceMaterialParamsData: overrides.instanceMaterialParamsData ??
+        new Float32Array(baseGeometry.instanceMaterialParamsData),
     instanceRotationData: overrides.instanceRotationData ?? new Float32Array(baseGeometry.instanceRotationData),
 });
 describe('validateGeometryData', () => {
@@ -187,13 +207,15 @@ describe('createPipelines error handling', () => {
             createPipelineLayout: vi.fn(() => layoutStub),
             createRenderPipeline: vi
                 .fn()
-                .mockReturnValueOnce({})
-                .mockReturnValueOnce({}),
+                .mockReturnValueOnce({}) // render pipeline
+                .mockReturnValueOnce({}) // transparent pipeline
+                .mockReturnValueOnce({}), // overlay pipeline
             pushErrorScope: vi.fn(),
             popErrorScope: vi
                 .fn()
-                .mockResolvedValueOnce(null)
-                .mockResolvedValueOnce({ message: 'overlay invalid' }),
+                .mockResolvedValueOnce(null) // render pipeline OK
+                .mockResolvedValueOnce(null) // transparent pipeline OK
+                .mockResolvedValueOnce({ message: 'overlay invalid' }), // overlay pipeline error
         };
         await expect(createPipelines(device, 'rgba8unorm', sharedArgs[1], sharedArgs[2], [], {
             sampleCount: 1,
@@ -203,7 +225,7 @@ describe('createPipelines error handling', () => {
             message: 'overlay invalid',
         });
         expect(statusEl.textContent).toBe('Overlay pipeline error. See console for details.');
-        expect(device.createRenderPipeline).toHaveBeenCalledTimes(2);
+        expect(device.createRenderPipeline).toHaveBeenCalledTimes(3);
     });
 });
 //# sourceMappingURL=resources.test.js.map

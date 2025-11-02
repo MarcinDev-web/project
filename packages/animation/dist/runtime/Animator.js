@@ -68,6 +68,14 @@ export class Animator {
             if (!tr.condition || tr.condition(this.params)) {
                 if (tr.duration > 0) {
                     this.crossfadeTo(tr.to, tr.duration);
+                    // Apply initial progress within this frame so sampling reflects mid-fade
+                    const from = this.controller.getState(this.fadeFromStateName);
+                    const to = this.controller.getState(this.fadeToStateName);
+                    this.fadeTime = Math.min(this.fadeDuration, dtClamped);
+                    if (from.clip.duration > 0)
+                        this.fadeFromTime = (this.fadeFromTime + dtClamped * from.speed) % from.clip.duration;
+                    if (to.clip.duration > 0)
+                        this.fadeToTime = (this.fadeToTime + dtClamped * to.speed) % to.clip.duration;
                 }
                 else {
                     this.setState(tr.to);

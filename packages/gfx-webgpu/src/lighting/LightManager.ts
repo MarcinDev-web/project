@@ -3,7 +3,7 @@
  */
 
 import type { Scene, Entity } from '@engine/world';
-import { LightComponent } from '@engine/world';
+import { LightComponent, type LightType } from '@engine/world';
 import type { Vec3 } from '@engine/core/math';
 
 /**
@@ -63,7 +63,7 @@ export class LightManager {
    */
   private gatherLights(): Entity[] {
     const lights: Entity[] = [];
-    this.scene.traverse((entity) => {
+    this.scene.traverse((entity: Entity) => {
       const lightComp = entity.getComponent(LightComponent);
       if (lightComp && lightComp.enabled && entity.active) {
         lights.push(entity);
@@ -93,8 +93,8 @@ export class LightManager {
     ];
 
     // Map light type to numeric value
-    const typeMap = { directional: 0, point: 1, spot: 2, ambient: 3 };
-    const type = typeMap[lightComp.lightType];
+    const typeMap: Record<LightType, number> = { directional: 0, point: 1, spot: 2, ambient: 3 };
+    const type = typeMap[lightComp.lightType] ?? 0;
 
     return {
       type,

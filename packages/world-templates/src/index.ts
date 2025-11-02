@@ -8,9 +8,7 @@ export { registerTemplates, listTemplates, getTemplate, instantiate, applyTo } f
 export { createJsonTemplate } from './loaders/JsonTemplate';
 export { createProceduralTemplate } from './loaders/ProceduralTemplate';
 
-// Built-in templates/seeds
-export { createEmptyTemplate } from './builtins/templates/Empty';
-export { createBasicLightingTemplate } from './builtins/templates/BasicLighting';
-export { createCornellBoxSeed } from './builtins/seeds/CornellBox';
+// Built-in templates (reduced set)
+export { createFlatPlatformTemplate } from './builtins/templates/FlatPlatform';
 
 

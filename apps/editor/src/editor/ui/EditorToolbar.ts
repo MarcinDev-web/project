@@ -30,6 +30,7 @@ export interface EditorToolbarConfig {
   state: EditorState;
   selection: SelectionManager;
   projectManager: ProjectManager | null;
+  onNewProject?: () => void;
   onUndo: () => void;
   onRedo: () => void;
   canUndo: () => boolean;
@@ -44,6 +45,10 @@ export interface EditorToolbarConfig {
   onDuplicate?: () => void;
   onSelectAll?: () => void;
   onFocusPanel?: (panel: 'assets' | 'entities' | 'components' | 'settings') => void;
+  onToggleCollaboration?: () => void;
+  isCollaborating?: () => boolean;
+  onEntityCreated?: (entity: Entity) => void;
+  onEntityDeleted?: (entityId: string) => void;
 }
 
 interface DropdownMenuItem {
@@ -209,6 +214,8 @@ export class EditorToolbar {
   }
 
   private buildMenuConfig(): Record<string, DropdownMenuItem[]> {
+    const isSharedView = this.config.state.isSharedView.value;
+
     const toggleSnap = (): void => {
       this.config.state.snapConfig.value = {
         ...this.config.state.snapConfig.value,
@@ -220,51 +227,67 @@ export class EditorToolbar {
       this.config.state.showGrid.value = !this.config.state.showGrid.value;
     };
 
+    // No-op action for disabled items in shared view
+    const disabledAction = (): void => {
+      // Silent - item is disabled
+    };
+
     return {
       File: [
         {
           label: 'New Project',
           icon: 'new',
           shortcut: 'Ctrl+N',
-          action: () => this.config.projectManager?.newProject(),
+          action: isSharedView ? disabledAction : (() => {
+            if (this.config.onNewProject) {
+              this.config.onNewProject();
+            } else {
+              void this.config.projectManager?.newProject();
+            }
+          }),
         },
         {
           label: 'Add Environment',
           icon: 'sun',
-          action: () => this.addEnvironmentIfMissing(),
+          action: isSharedView ? disabledAction : (() => this.addEnvironmentIfMissing()),
         },
         {
           label: 'Open...',
           icon: 'load',
           shortcut: 'Ctrl+O',
-          action: () => this.config.projectManager?.showLoadDialog(),
+          action: isSharedView ? disabledAction : (() => this.config.projectManager?.showLoadDialog()),
         },
         {
           label: 'Save',
           icon: 'save',
           shortcut: 'Ctrl+S',
-          action: () => this.config.projectManager?.saveProject(),
+          action: isSharedView ? disabledAction : (() => this.config.projectManager?.saveProject()),
         },
         {
           label: 'Save As...',
           icon: 'save',
           shortcut: 'Ctrl+Shift+S',
-          action: () => this.config.projectManager?.saveProjectAs(),
+          action: isSharedView ? disabledAction : (() => this.config.projectManager?.saveProjectAs()),
+        },
+        {
+          label: 'Share Project',
+          icon: 'share',
+          action: isSharedView ? disabledAction : (() => this.config.projectManager?.shareProject()),
         },
         { divider: true },
-        { label: 'Export...', icon: 'load', action: () => {} },
-        { label: 'Import...', icon: 'load', action: () => {} },
+        { label: 'Export...', icon: 'load', action: isSharedView ? disabledAction : (() => {}) },
+        { label: 'Import...', icon: 'load', action: isSharedView ? disabledAction : (() => {}) },
       ],
       Edit: [
-        { label: 'Undo', icon: 'undo', shortcut: 'Ctrl+Z', action: () => this.config.onUndo() },
-        { label: 'Redo', icon: 'redo', shortcut: 'Ctrl+Y', action: () => this.config.onRedo() },
+        { label: 'Undo', icon: 'undo', shortcut: 'Ctrl+Z', action: isSharedView ? disabledAction : (() => this.config.onUndo()) },
+        { label: 'Redo', icon: 'redo', shortcut: 'Ctrl+Y', action: isSharedView ? disabledAction : (() => this.config.onRedo()) },
         { divider: true },
-        { label: 'Cut', icon: 'trash', shortcut: 'Ctrl+X', action: () => this.config.onCut?.() },
-        { label: 'Copy', icon: 'copy', shortcut: 'Ctrl+C', action: () => this.config.onCopy?.() },
-        { label: 'Paste', icon: 'paste', shortcut: 'Ctrl+V', action: () => this.config.onPaste?.() },
-        { label: 'Duplicate', icon: 'copy', shortcut: 'Ctrl+D', action: () => this.config.onDuplicate?.() },
+        { label: 'Cut', icon: 'trash', shortcut: 'Ctrl+X', action: isSharedView ? disabledAction : (() => this.config.onCut?.()) },
+        { label: 'Copy', icon: 'copy', shortcut: 'Ctrl+C', action: () => this.config.onCopy?.() }, // Copy is allowed
+        { label: 'Paste', icon: 'paste', shortcut: 'Ctrl+V', action: isSharedView ? disabledAction : (() => this.config.onPaste?.()) },
+        { label: 'Duplicate', icon: 'copy', shortcut: 'Ctrl+D', action: isSharedView ? disabledAction : (() => this.config.onDuplicate?.()) },
         { divider: true },
-        { label: 'Select All', shortcut: 'Ctrl+A', action: () => this.config.onSelectAll?.() },
+        { label: 'Select All', shortcut: 'Ctrl+A', action: () => this.config.onSelectAll?.() }, // Selection is allowed
       ],
       View: [
         { label: 'Toggle Grid', icon: 'grid', shortcut: 'G', action: toggleGrid },
@@ -449,14 +472,27 @@ export class EditorToolbar {
     
     effect(() => {
       const mode = this.config.state.editorMode.value;
+      const isSharedView = this.config.state.isSharedView.value;
       modeBtn.innerHTML = '';
       modeBtn.appendChild(createIcon(mode === 'edit' ? 'edit' : 'play', 16));
       const text = document.createElement('span');
-      text.textContent = mode === 'edit' ? 'Edit Mode' : 'Play Mode';
+      if (isSharedView) {
+        text.textContent = 'View Only';
+        modeBtn.style.opacity = '0.6';
+        modeBtn.style.cursor = 'not-allowed';
+      } else {
+        text.textContent = mode === 'edit' ? 'Edit Mode' : 'Play Mode';
+        modeBtn.style.opacity = '1';
+        modeBtn.style.cursor = 'pointer';
+      }
       modeBtn.appendChild(text);
     });
 
     modeBtn.addEventListener('click', () => {
+      // Block mode switching in shared view
+      if (this.config.state.isSharedView.value) {
+        return;
+      }
       const current = this.config.state.editorMode.value;
       this.config.state.editorMode.value = current === 'edit' ? 'play' : 'edit';
     });
@@ -479,6 +515,24 @@ export class EditorToolbar {
 
     const cameraMenu = this.createCameraMenu();
 
+    // Collaboration button
+    const collaborationBtn = createIconButton('users', {
+      title: 'Collaboration',
+      className: 'toolbar-v2-icon-btn',
+    });
+    
+    if (this.config.isCollaborating) {
+      effect(() => {
+        const isActive = this.config.isCollaborating?.() ?? false;
+        collaborationBtn.classList.toggle('active', isActive);
+        collaborationBtn.style.opacity = isActive ? '1' : '0.7';
+      });
+    }
+    
+    collaborationBtn.addEventListener('click', () => {
+      this.config.onToggleCollaboration?.();
+    });
+
     // Settings button
     const settingsBtn = createIconButton('settings', {
       title: 'Settings',
@@ -488,6 +542,7 @@ export class EditorToolbar {
     section.appendChild(modeBtn);
     section.appendChild(buildBtn);
     section.appendChild(cameraMenu);
+    section.appendChild(collaborationBtn);
     section.appendChild(settingsBtn);
 
     return section;
@@ -617,11 +672,14 @@ export class EditorToolbar {
     deleteBtn.title = 'Delete camera';
     deleteBtn.appendChild(createIcon('trash', 14));
     deleteBtn.addEventListener('click', () => {
+      const entityId = entity.id;
       if (entity.parent) {
         entity.removeFromParent();
       } else {
         this.config.state.scene.value.removeEntity(entity);
       }
+      // Replicate entity deletion
+      this.config.onEntityDeleted?.(entityId);
       this.populateCameraDropdown(row.parentElement as HTMLElement);
       this.config.projectManager?.markUnsaved();
       this.config.selection.clearSelection();
@@ -643,6 +701,8 @@ export class EditorToolbar {
     cameraEntity.transform.position = [0, 3, 6];
     this.config.projectManager?.markUnsaved();
     scene.setPrimaryCamera(cameraEntity);
+    // Replicate entity creation
+    this.config.onEntityCreated?.(cameraEntity);
     return cameraEntity;
   }
 

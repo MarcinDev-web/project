@@ -257,7 +257,7 @@ export class EasyPlaceController {
     }
 
     // Validate positions
-    this.patternPlacer.validatePositions(positions, preview);
+    void this.patternPlacer.validatePositions(positions, preview);
 
     // Place entities
     const placed = this.patternPlacer.placeEntities(positions, preview);
@@ -313,6 +313,10 @@ export class EasyPlaceController {
         scale[1] * delta,
         scale[2] * delta,
       ];
+      const previewState = this.config.placementMode.getPreview();
+      if (previewState.position) {
+        void this.config.placementMode.updatePreviewPosition(previewState.position);
+      }
       this.config.onStatusMessage?.(
         `Scale: ${scale[0].toFixed(2)}`,
         500
@@ -320,7 +324,7 @@ export class EasyPlaceController {
     } else {
       // Wheel: Rotate
       const direction = event.deltaY > 0 ? 1 : -1;
-      this.config.placementMode.rotatePreview(direction);
+      void this.config.placementMode.rotatePreview(direction);
       this.config.onStatusMessage?.('Rotated', 500);
     }
 
@@ -439,7 +443,7 @@ export class EasyPlaceController {
     }
 
     // Validate and create preview entities
-    this.patternPlacer.validatePositions(positions, preview);
+    void this.patternPlacer.validatePositions(positions, preview);
     this.patternPlacer.createPreviewEntities(positions, preview, validColor, invalidColor);
 
     const validCount = this.patternPlacer.getValidCount(positions);
@@ -500,4 +504,3 @@ export class EasyPlaceController {
     this.config.controls.setEnabled(true);
   }
 }
-

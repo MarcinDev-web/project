@@ -1,4 +1,5 @@
-import { Component, registerComponent } from './Component';
+import { Component } from './Component';
+import { registerComponent } from './registry';
 import type { Animator, AnimatorController, Pose, Skeleton, MorphTargetClip } from '@engine/animation';
 import { createPose } from '@engine/animation';
 
@@ -24,6 +25,17 @@ export class AnimatorComponent extends Component {
       // Lazy: animator is created by the system when controller is present
       // This component only holds data
     }
+  }
+
+  override clone(): AnimatorComponent {
+    const clone = new AnimatorComponent();
+    clone.skeleton = this.skeleton;
+    clone.pose = this.pose;
+    clone.animator = this.animator;
+    clone.controller = this.controller;
+    clone.morphClip = this.morphClip;
+    clone.morphWeights = this.morphWeights;
+    return clone;
   }
 }
 

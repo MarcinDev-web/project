@@ -1,3 +1,6 @@
+/**
+ * @vitest-environment jsdom
+ */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { BlockDragController } from '../BlockDragController';
 import { Scene } from '@engine/world';
@@ -5,22 +8,20 @@ import { Entity } from '@engine/world';
 import { SelectionManager } from '@engine/world';
 import { PlacementMode } from '../../placement/PlacementMode';
 import { CollisionDetector } from '../../placement/CollisionDetector';
-import { SnapSystem } from '../../snap/SnapSystem';
+import { SnapSystem } from '@engine/editor-utils';
 import { EditorState } from '../../core/state';
 import type { OrbitControls } from '@engine/camera';
 import { mat4Invert, mat4GetRotation, mat4GetScale } from '@engine/core/math';
 
 function createMockControls(): OrbitControls {
-  let enabled = true;
+  const setEnabledSpy = vi.fn();
   return {
-    getState: () => ({ yaw: 0, pitch: 0, distance: 5, enabled }),
+    getState: () => ({ yaw: 0, pitch: 0, distance: 5 }),
     cleanup: () => {},
-    setEnabled: (e: boolean) => {
-      enabled = e;
-    },
+    setEnabled: setEnabledSpy,
     setState: vi.fn(),
     setPreset: vi.fn(),
-  } as OrbitControls;
+  } as OrbitControls & { setEnabled: ReturnType<typeof vi.fn> };
 }
 
 function createMockCanvas(): HTMLCanvasElement {
@@ -64,7 +65,7 @@ describe('BlockDragController', () => {
   let placementMode: PlacementMode;
   let collisionDetector: CollisionDetector;
   let snapSystem: SnapSystem;
-  let controls: OrbitControls;
+  let controls: OrbitControls & { setEnabled: ReturnType<typeof vi.fn> };
   let canvas: HTMLCanvasElement;
   let updateSceneBuffers: ReturnType<typeof vi.fn>;
   let recordSnapshot: ReturnType<typeof vi.fn>;
@@ -170,7 +171,7 @@ describe('BlockDragController', () => {
 
     // Should now be dragging
     expect(controller.isDraggingBlock()).toBe(true);
-    expect(controls.getState().enabled).toBe(false); // Controls should be disabled during drag
+    expect(controls.setEnabled).toHaveBeenCalledWith(false); // Controls should be disabled during drag
   });
 
   it('should cancel drag on Escape key', () => {
@@ -208,7 +209,7 @@ describe('BlockDragController', () => {
 
     expect(controller.isDraggingBlock()).toBe(false);
     expect(entity.transform.position).toEqual(originalPosition);
-    expect(controls.getState().enabled).toBe(true); // Controls should be re-enabled
+    expect(controls.setEnabled).toHaveBeenCalledWith(true); // Controls should be re-enabled
   });
 
   it('should complete drag on pointer up with valid placement', () => {
@@ -251,7 +252,7 @@ describe('BlockDragController', () => {
 
     expect(controller.isDraggingBlock()).toBe(false);
     expect(recordSnapshot).toHaveBeenCalledWith('Move block');
-    expect(controls.getState().enabled).toBe(true);
+    expect(controls.setEnabled).toHaveBeenCalledWith(true);
   });
 
   it('should not start drag in play mode', () => {
@@ -447,7 +448,7 @@ describe('BlockDragController', () => {
 
     const collisionSpy = vi
       .spyOn(collisionDetector, 'checkCollisionOBB')
-      .mockImplementation(() => ({ hasCollision: false, collidingEntities: [] }));
+      .mockResolvedValue({ hasCollision: false, collidingEntities: [] });
 
     (controller as any).dragState = {
       entity: child,
@@ -528,7 +529,7 @@ describe('BlockDragController', () => {
     window.dispatchEvent(pointerMoveEvent);
 
     expect(controller.isDraggingBlock()).toBe(true);
-    expect(controls.getState().enabled).toBe(false);
+    expect(controls.setEnabled).toHaveBeenCalledWith(false);
 
     (canvas as any).releasePointerCapture.mockClear();
 
@@ -544,7 +545,7 @@ describe('BlockDragController', () => {
     expect(entity.userData.isPreview).toBe(false);
     expect(entity.transform.position).toEqual([0, 0.5, 0]);
     expect(entity.color).toEqual([0.4, 0.3, 0.2, 1]);
-    expect(controls.getState().enabled).toBe(true);
+    expect(controls.setEnabled).toHaveBeenCalledWith(true);
     expect(onStatusMessage).toHaveBeenCalledWith('Drag cancelled', 1000);
 
     cleanup();

@@ -65,6 +65,15 @@ export interface BlockDefinition {
     };
     /** Connected textures configuration (optional) */
     ctm?: CTMConfig;
+    /** Behavior properties (gameplay effects) */
+    behavior?: {
+        /** Friction multiplier applied to PhysicsComponent.material.friction (ice: 0.1, slime: 2.0) */
+        frictionMultiplier?: number;
+        /** Movement speed multiplier applied to CharacterController.config.moveSpeed (ice: 1.5, slime: 0.5) */
+        movementSpeedMultiplier?: number;
+        /** Damage per second applied to HealthComponent (lava: 20, poison: 5) */
+        damagePerSecond?: number;
+    };
 }
 /**
  * Built-in block library with Kogama/Roblox/Minecraft inspired blocks

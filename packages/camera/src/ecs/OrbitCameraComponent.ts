@@ -109,7 +109,7 @@ export class OrbitCameraComponent extends Component {
     return OrbitCameraComponent.type;
   }
 
-  override clone(): OrbitCameraComponent {
+  clone(): OrbitCameraComponent {
     const clone = new OrbitCameraComponent();
     clone.yaw = this.yaw;
     clone.pitch = this.pitch;
@@ -129,7 +129,7 @@ export class OrbitCameraComponent extends Component {
     return clone;
   }
 
-  override toJSON(): Record<string, unknown> {
+  toJSON(): Record<string, unknown> {
     return {
       yaw: this.yaw,
       pitch: this.pitch,
@@ -188,14 +188,14 @@ export class OrbitCameraComponent extends Component {
     this.targetFov = clamp(this.targetFov, this.clamp.fovMin, this.clamp.fovMax);
   }
 
-  protected override onDetach(): void {
+  protected onDetach(): void {
     // Allow input adapter to clean up any listeners/resources
     try {
       this.input?.dispose?.();
     } catch {
       // ignore adapter disposal errors
     }
-    this.input = undefined;
+    delete this.input;
   }
 }
 

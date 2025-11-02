@@ -101,11 +101,7 @@ export const performanceFixtures = {
     largeEntitySet: (count = 10000) => Array.from({ length: count }, (_, i) => ({
         id: i,
         name: `Entity${i}`,
-        position: [
-            Math.random() * 100 - 50,
-            Math.random() * 100 - 50,
-            Math.random() * 100 - 50,
-        ],
+        position: [Math.random() * 100 - 50, Math.random() * 100 - 50, Math.random() * 100 - 50],
     })),
     /**
      * Generate stress test mesh data

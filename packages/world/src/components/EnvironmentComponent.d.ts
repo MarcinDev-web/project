@@ -1,5 +1,9 @@
 import { Component } from './Component';
 import type { Vec3 } from '@engine/core/math';
+declare global {
+    interface GPUTexture {
+    }
+}
 /**
  * Types of skybox rendering supported
  */
@@ -40,11 +44,11 @@ export declare class EnvironmentComponent extends Component {
     /** Ground color (bottom) for gradient mode */
     groundColor: Vec3;
     /** Sun direction (normalized) for procedural sky */
-    sunDirection: Vec3;
+    private _sunDirection;
     /** Sun color for procedural sky */
     sunColor: Vec3;
     /** Sun intensity multiplier */
-    sunIntensity: number;
+    private _sunIntensity;
     /** Fog rendering mode */
     fogMode: FogMode;
     /** Fog color */
@@ -56,12 +60,58 @@ export declare class EnvironmentComponent extends Component {
     /** Fog density (for exponential fog) */
     fogDensity: number;
     /** Ambient light intensity from environment */
-    ambientIntensity: number;
+    private _ambientIntensity;
     /** Exposure adjustment for HDR environments */
-    exposure: number;
+    private _exposure;
     /** Whether environment rendering is enabled */
     enabled: boolean;
+    /** Cubemap texture resource (set by renderer, not serialized) */
+    cubemapTexture?: GPUTexture;
+    /** Path to cubemap file (for serialization/loading) */
+    cubemapPath?: string;
     getType(): string;
+    /**
+     * Gets the sun direction (always normalized)
+     */
+    get sunDirection(): Vec3;
+    /**
+     * Sets the sun direction and auto-normalizes it
+     */
+    set sunDirection(value: Vec3);
+    /**
+     * Gets the sun intensity (always >= 0)
+     */
+    get sunIntensity(): number;
+    /**
+     * Sets the sun intensity with clamping (>= 0, allows HDR > 1.0)
+     */
+    set sunIntensity(value: number);
+    /**
+     * Gets the ambient intensity (always >= 0)
+     */
+    get ambientIntensity(): number;
+    /**
+     * Sets the ambient intensity with clamping (>= 0, <= 10)
+     */
+    set ambientIntensity(value: number);
+    /**
+     * Gets the exposure value (always > 0)
+     */
+    get exposure(): number;
+    /**
+     * Sets the exposure with clamping (> 0, <= 10)
+     */
+    set exposure(value: number);
+    /**
+     * Sets the cubemap texture and path
+     * @param texture The GPU texture (will be managed by renderer lifecycle)
+     * @param path Optional path/identifier for the cubemap
+     */
+    setCubemap(texture: GPUTexture | undefined, path?: string): void;
+    /**
+     * Clears the cubemap and resets to procedural sky
+     */
+    clearCubemap(): void;
     /**
      * Normalizes the sun direction vector
      */

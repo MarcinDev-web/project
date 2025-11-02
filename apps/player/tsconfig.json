@@ -1,0 +1,26 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "baseUrl": ".",
+    "paths": {
+      "@engine/core": ["../../packages/core/src"],
+      "@engine/core/*": ["../../packages/core/src/*"],
+      "@engine/world": ["../../packages/world/src"],
+      "@engine/world/*": ["../../packages/world/src/*"],
+      "@engine/gfx-webgpu": ["../../packages/gfx-webgpu/src"],
+      "@engine/gfx-webgpu/*": ["../../packages/gfx-webgpu/src/*"],
+      "@engine/input": ["../../packages/input/src"],
+      "@engine/input/*": ["../../packages/input/src/*"],
+      "@engine/camera": ["../../packages/camera/src"],
+      "@engine/camera/*": ["../../packages/camera/src/*"],
+      "@engine/stdlib": ["../../packages/stdlib/src"],
+      "@engine/stdlib/*": ["../../packages/stdlib/src/*"],
+      "@engine/editor-utils": ["../../packages/editor-utils/src"],
+      "@engine/editor-utils/*": ["../../packages/editor-utils/src/*"]
+    }
+  },
+  "include": ["src/**/*", "index.html"],
+  "exclude": ["node_modules", "dist"]
+}
+

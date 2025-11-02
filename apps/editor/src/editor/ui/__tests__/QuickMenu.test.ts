@@ -1,11 +1,13 @@
 /**
  * QuickMenu tests - Camera selection functionality
+ * @vitest-environment jsdom
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { QuickMenu } from '../QuickMenu';
 import { EditorState } from '../../core/state';
 import { Scene } from '@engine/world';
+import { initBrowserPolyfills } from '../../../test/setup';
 
 describe('QuickMenu', () => {
   let state: EditorState;
@@ -14,6 +16,7 @@ describe('QuickMenu', () => {
   let quickMenu: QuickMenu;
 
   beforeEach(() => {
+    initBrowserPolyfills(); // Ensure DOM polyfills are initialized
     // Create test scene and state
     const scene = new Scene('Test Scene');
     state = new EditorState(scene);
@@ -76,7 +79,7 @@ describe('QuickMenu', () => {
       expect(activeMenu).toBeTruthy();
     });
 
-    it('should have Third Person Camera option', () => {
+    it('should have only Free-Fly Camera option (FPS and Third Person are for play mode)', () => {
       quickMenu.mount();
       
       // Open Camera menu
@@ -84,13 +87,19 @@ describe('QuickMenu', () => {
       const cameraButton = menuButtons.find(btn => btn.textContent === 'Camera') as HTMLElement;
       cameraButton.click();
       
-      // Find Third Person option
+      // Find Free-Fly option
       const dropdownItems = Array.from(document.querySelectorAll('.top-bar-dropdown-item'));
+      const freeFlyItem = dropdownItems.find(item => item.textContent?.includes('Free-Fly'));
+      expect(freeFlyItem).toBeTruthy();
+      
+      // First Person and Third Person should NOT be present in editor menu
+      const fpsItem = dropdownItems.find(item => item.textContent?.includes('First Person'));
       const thirdPersonItem = dropdownItems.find(item => item.textContent?.includes('Third Person'));
-      expect(thirdPersonItem).toBeTruthy();
+      expect(fpsItem).toBeFalsy();
+      expect(thirdPersonItem).toBeFalsy();
     });
 
-    it('should have First Person option', () => {
+    it('should call onCameraChange with "free-fly" when Free-Fly is clicked', () => {
       quickMenu.mount();
       
       // Open Camera menu
@@ -98,43 +107,12 @@ describe('QuickMenu', () => {
       const cameraButton = menuButtons.find(btn => btn.textContent === 'Camera') as HTMLElement;
       cameraButton.click();
       
-      // Find First Person option
+      // Click Free-Fly
       const dropdownItems = Array.from(document.querySelectorAll('.top-bar-dropdown-item'));
-      const fpsItem = dropdownItems.find(item => item.textContent?.includes('First Person'));
-      expect(fpsItem).toBeTruthy();
-    });
-
-    it('should call onCameraChange with "third-person" when Third Person is clicked', () => {
-      quickMenu.mount();
+      const freeFlyItem = dropdownItems.find(item => item.textContent?.includes('Free-Fly')) as HTMLElement;
+      freeFlyItem.click();
       
-      // Open Camera menu
-      const menuButtons = Array.from(document.querySelectorAll('.top-bar-menu-button'));
-      const cameraButton = menuButtons.find(btn => btn.textContent === 'Camera') as HTMLElement;
-      cameraButton.click();
-      
-      // Click Third Person
-      const dropdownItems = Array.from(document.querySelectorAll('.top-bar-dropdown-item'));
-      const thirdPersonItem = dropdownItems.find(item => item.textContent?.includes('Third Person')) as HTMLElement;
-      thirdPersonItem.click();
-      
-      expect(mockCallbacks.onCameraChange).toHaveBeenCalledWith('third-person');
-    });
-
-    it('should call onCameraChange with "fps" when First Person is clicked', () => {
-      quickMenu.mount();
-      
-      // Open Camera menu
-      const menuButtons = Array.from(document.querySelectorAll('.top-bar-menu-button'));
-      const cameraButton = menuButtons.find(btn => btn.textContent === 'Camera') as HTMLElement;
-      cameraButton.click();
-      
-      // Click First Person
-      const dropdownItems = Array.from(document.querySelectorAll('.top-bar-dropdown-item'));
-      const fpsItem = dropdownItems.find(item => item.textContent?.includes('First Person'));
-      expect(fpsItem).toBeTruthy();
-      fpsItem.click();
-      
-      expect(mockCallbacks.onCameraChange).toHaveBeenCalledWith('fps');
+      expect(mockCallbacks.onCameraChange).toHaveBeenCalledWith('free-fly');
     });
 
     it('should close menu after selecting camera option', () => {
@@ -149,10 +127,10 @@ describe('QuickMenu', () => {
       let activeMenu = document.querySelector('.top-bar-menu-item.active');
       expect(activeMenu).toBeTruthy();
       
-      // Click First Person
+      // Click Free-Fly
       const dropdownItems = Array.from(document.querySelectorAll('.top-bar-dropdown-item'));
-      const fpsItem = dropdownItems.find(item => item.textContent?.includes('First Person')) as HTMLElement;
-      fpsItem.click();
+      const freeFlyItem = dropdownItems.find(item => item.textContent?.includes('Free-Fly')) as HTMLElement;
+      freeFlyItem.click();
       
       // Verify menu is closed
       activeMenu = document.querySelector('.top-bar-menu-item.active');
@@ -181,11 +159,11 @@ describe('QuickMenu', () => {
       const cameraButton = menuButtons.find(btn => btn.textContent === 'Camera') as HTMLElement;
       cameraButton.click();
       
-      // Click First Person - should not throw
+      // Click Free-Fly - should not throw
       const dropdownItems = Array.from(document.querySelectorAll('.top-bar-dropdown-item'));
-      const fpsItem = dropdownItems.find(item => item.textContent?.includes('First Person')) as HTMLElement;
+      const freeFlyItem = dropdownItems.find(item => item.textContent?.includes('Free-Fly')) as HTMLElement;
       
-      expect(() => fpsItem.click()).not.toThrow();
+      expect(() => freeFlyItem.click()).not.toThrow();
       
       menuWithoutCallback.dispose();
     });

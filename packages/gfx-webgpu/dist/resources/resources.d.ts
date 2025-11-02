@@ -3,8 +3,12 @@ export interface GeometryData {
     vertices: Uint8Array;
     indices: Uint16Array;
     instanceCount: number;
+    opaqueCount: number;
     instanceOffsetData: Float32Array;
     instanceColorScaleData: Float32Array;
+    instanceSecondaryColorData: Float32Array;
+    instanceEmissiveColorData: Float32Array;
+    instanceMaterialParamsData: Float32Array;
     instanceRotationData: Float32Array;
     instanceMaterialIdData?: Float32Array;
 }
@@ -13,6 +17,9 @@ export interface FrameResources {
     indexBuffer: GPUBuffer;
     instanceOffsetBuffer: GPUBuffer;
     instanceColorScaleBuffer: GPUBuffer;
+    instanceSecondaryColorBuffer: GPUBuffer;
+    instanceEmissiveColorBuffer: GPUBuffer;
+    instanceMaterialParamsBuffer: GPUBuffer;
     instanceRotationBuffer: GPUBuffer;
     instanceMaterialIdBuffer: GPUBuffer;
     uniformBuffer: GPUBuffer;
@@ -20,6 +27,7 @@ export interface FrameResources {
     textureBindGroupLayout: GPUBindGroupLayout;
     uniformData: Float32Array;
     renderPipeline: GPURenderPipeline;
+    transparentPipeline: GPURenderPipeline;
     overlayPipeline: GPURenderPipeline;
     uniformBindGroup: GPUBindGroup;
     textureBindGroup: GPUBindGroup;
@@ -44,6 +52,12 @@ export interface FrameResources {
  * @param geometry - Packed vertex and index data alongside instancing buffers to verify.
  */
 export declare function validateGeometryData(geometry: GeometryData): void;
+/**
+ * Packs an interleaved float32 vertex buffer into the compact 24-byte-per-vertex layout:
+ * position float32x3 (12B), normal snorm8x4 (4B), uv float16x2 (4B), AO unorm8x4 (4B).
+ * AO is stored in the X channel; YZW are zero.
+ */
+export declare function packVerticesFloat32ToPacked24(source: Float32Array, defaultAO?: number): Uint8Array;
 export declare const DEFAULT_GEOMETRY: GeometryData;
 export interface TimestampResources {
     querySet: GPUQuerySet | null;
@@ -74,6 +88,9 @@ export declare function createGeometryBuffers(device: GPUDevice, geometry: Geome
     indexBuffer: GPUBuffer;
     instanceOffsetBuffer: GPUBuffer;
     instanceColorScaleBuffer: GPUBuffer;
+    instanceSecondaryColorBuffer: GPUBuffer;
+    instanceEmissiveColorBuffer: GPUBuffer;
+    instanceMaterialParamsBuffer: GPUBuffer;
     instanceRotationBuffer: GPUBuffer;
     instanceMaterialIdBuffer: GPUBuffer;
 };
@@ -146,6 +163,7 @@ export declare function createPipelines(device: GPUDevice, colorFormat: GPUTextu
     statusEl: HTMLElement;
 }): Promise<{
     renderPipeline: GPURenderPipeline;
+    transparentPipeline: GPURenderPipeline;
     overlayPipeline: GPURenderPipeline;
 }>;
 /**
@@ -182,13 +200,13 @@ export declare function createHdrColorTarget(device: GPUDevice, canvasElement: H
  * @returns A GPU texture configured for render attachment usage.
  */
 export declare function createRenderAttachmentTexture(device: GPUDevice, canvasElement: HTMLCanvasElement, format: GPUTextureFormat, sampleCount: number, label: string): GPUTexture;
-export type TexturePattern = 'stripes' | 'grid';
+export type TexturePattern = 'stripes' | 'grid' | 'solid';
 /**
  * Generates pixel data for a procedural debug texture.
  *
  * @param width - Texture width in pixels.
  * @param height - Texture height in pixels.
- * @param pattern - Procedural pattern to render (`stripes` or `grid`).
+ * @param pattern - Procedural pattern to render (`stripes`, `grid`, or `solid`).
  * @returns A `Uint8Array` containing RGBA texel data.
  */
 export declare function makeTextureData(width: number, height: number, pattern: TexturePattern): Uint8Array;

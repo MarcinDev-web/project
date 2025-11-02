@@ -3,18 +3,23 @@
   "version": "0.1.0",
   "type": "module",
   "private": true,
-  "main": "dist/index.js",
-  "module": "dist/index.js",
-  "types": "dist/index.d.ts",
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
   "files": [
     "dist",
-    "pkg"
+    "pkg",
+    "src"
   ],
   "scripts": {
-    "build:wasm": "wasm-pack build ../../crates/collision --target bundler --out-dir ./pkg",
+    "build:wasm": "wasm-pack build ../../crates/collision --target web --out-dir ../../packages/wasm-collision/pkg",
     "build:ts": "tsc -p tsconfig.json",
     "build": "pnpm run build:wasm && pnpm run build:ts",
-    "clean": "rimraf dist pkg"
+    "clean": "rimraf dist pkg",
+    "lint": "eslint src --max-warnings=0"
   },
   "devDependencies": {
     "@types/node": "^24.7.2",
@@ -22,5 +27,3 @@
     "typescript": "^5.9.3"
   }
 }
-
-

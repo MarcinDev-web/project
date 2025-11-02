@@ -117,6 +117,10 @@ export class UniformManager {
         // biasParams
         const biasF32 = new Float32Array(params.biasParams);
         this.device.queue.writeBuffer(this.uniformBuffer, baseOffset + 64 + 256 + 16 + 64 + 16, biasF32.buffer, 0, 16);
+        // extra shadow params (e.g., cascadeOverlap)
+        const extra = params.extraParams ?? [0, 0, 0, 0];
+        const extraF32 = new Float32Array(extra);
+        this.device.queue.writeBuffer(this.uniformBuffer, baseOffset + 64 + 256 + 16 + 64 + 16 + 16, extraF32.buffer, 0, 16);
     }
     /**
      * Gets the uniform buffer.

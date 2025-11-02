@@ -1,6 +1,8 @@
 import { Component } from './Component';
 import type { Vec3 } from '@engine/core/math';
+import { quatFromAxisAngle, quatToEuler } from '@engine/core/math';
 import { PhysicsComponent, RigidbodyType } from './PhysicsComponent';
+import type { MovementController, MovementInput } from '../movement/MovementInterface';
 
 /**
  * Character controller state
@@ -38,6 +40,8 @@ export interface CharacterControllerConfig {
   rotationSpeed: number;
   /** Whether to auto-rotate to movement direction */
   autoRotate: boolean;
+  /** Velocity smoothing time constant in seconds (default: 0.1). Lower = more responsive, higher = smoother. */
+  velocitySmoothing?: number;
 }
 
 /**
@@ -54,6 +58,7 @@ export const DEFAULT_CHARACTER_CONFIG: CharacterControllerConfig = {
   airControlMultiplier: 0.3,
   rotationSpeed: 10,
   autoRotate: true,
+  velocitySmoothing: 0.1,
 };
 
 /**
@@ -81,8 +86,10 @@ export interface CharacterInput {
  * - Slope handling
  * - Stair climbing
  * - Camera-relative movement
+ * 
+ * Implements MovementController interface for unified movement API.
  */
-export class CharacterController extends Component {
+export class CharacterController extends Component implements MovementController {
   /** Configuration */
   public config: CharacterControllerConfig;
 
@@ -121,6 +128,12 @@ export class CharacterController extends Component {
 
   /** Reference to physics component */
   private physics: PhysicsComponent | null = null;
+
+  /** Current movement profile */
+  private currentProfile: any = null; // MovementProfile from @engine/stdlib (using any to avoid circular dependency)
+
+  /** Current rotation angle for smooth interpolation (radians) */
+  private currentRotationY: number = 0;
 
   constructor(config: Partial<CharacterControllerConfig> = {}) {
     super();
@@ -180,9 +193,42 @@ export class CharacterController extends Component {
   }
 
   /**
-   * Set movement input
+   * Set movement input (MovementController interface)
+   * Accepts MovementInput and converts to CharacterInput internally
    */
-  setInput(input: CharacterInput): void {
+  setInput(input: MovementInput | CharacterInput): void {
+    // Handle MovementInput (unified interface)
+    if ('cameraForward' in input && input.cameraForward !== undefined) {
+      // CharacterInput with camera directions
+      this.setCharacterInput(input as CharacterInput);
+    } else {
+      // MovementInput - convert to CharacterInput
+      this.setMovementInput(input as MovementInput);
+    }
+  }
+
+  /**
+   * Set movement input using MovementInput (unified interface)
+   */
+  private setMovementInput(input: MovementInput): void {
+    // Store movement direction (normalize)
+    this.normalizeInto(this.moveInput, input.moveDirection);
+
+    // No camera-relative movement for basic MovementInput
+    // Movement direction is already in world space
+
+    this.isSprinting = input.sprint ?? false;
+
+    if (input.jump) {
+      this.jumpRequested = true;
+      this.timeSinceJumpPressed = 0;
+    }
+  }
+
+  /**
+   * Set movement input using CharacterInput (original interface)
+   */
+  private setCharacterInput(input: CharacterInput): void {
     // Store movement direction
     this.normalizeInto(this.moveInput, input.moveDirection);
 
@@ -246,7 +292,7 @@ export class CharacterController extends Component {
 
     // Auto-rotate to movement direction if enabled
     if (this.config.autoRotate) {
-      this.autoRotateToMovement();
+      this.autoRotateToMovement(deltaTime);
     }
 
     // Reset jump request
@@ -280,7 +326,17 @@ export class CharacterController extends Component {
   }
 
   /**
-   * Apply movement forces/velocity
+   * Sync velocity to physics component
+   */
+  private syncVelocityToPhysics(): void {
+    if (!this.physics) return;
+    this.physics.velocity[0] = this.velocity[0];
+    this.physics.velocity[1] = this.velocity[1];
+    this.physics.velocity[2] = this.velocity[2];
+  }
+
+  /**
+   * Apply movement forces/velocity with smooth interpolation
    */
   private applyMovement(deltaTime: number): void {
     if (!this.physics) return;
@@ -299,25 +355,31 @@ export class CharacterController extends Component {
     // Apply air control multiplier when not grounded
     const controlMultiplier = this.isGrounded ? 1.0 : this.config.airControlMultiplier;
 
-    // Smoothly interpolate to target velocity
-    const acceleration = controlMultiplier * 20; // Adjust for responsiveness
-    this.velocity[0] += (targetVelocity[0] - this.velocity[0]) * Math.min(1, acceleration * deltaTime);
-    this.velocity[2] += (targetVelocity[2] - this.velocity[2]) * Math.min(1, acceleration * deltaTime);
+    // Smoothly interpolate to target velocity using exponential damping
+    // Adjust smoothing time constant based on air control
+    const smoothingTau = (this.config.velocitySmoothing ?? 0.1) / controlMultiplier;
+    const alpha = this.expDecayAlpha(smoothingTau, deltaTime);
+    
+    this.velocity[0] += (targetVelocity[0] - this.velocity[0]) * alpha;
+    this.velocity[2] += (targetVelocity[2] - this.velocity[2]) * alpha;
 
     // Update physics velocity
-    this.physics.velocity[0] = this.velocity[0];
-    this.physics.velocity[1] = this.velocity[1];
-    this.physics.velocity[2] = this.velocity[2];
+    // Note: Position integration is handled automatically by PhysicsSystem.integrateVelocities()
+    // in fixedUpdate(). Manual integration here would cause double integration.
+    this.syncVelocityToPhysics();
+  }
 
-    // Integrate horizontal position from velocity to reflect movement in tests
-    const entity = this.entity;
-    if (entity) {
-      // Get current position (returns a copy), modify it, then set it back
-      const pos = entity.transform.position;
-      pos[0] += this.velocity[0] * deltaTime;
-      pos[2] += this.velocity[2] * deltaTime;
-      entity.transform.position = pos;
-    }
+  /**
+   * Frame-rate independent exponential damping factor
+   * Computes alpha for exponential smoothing: 1 - e^(-dt/tau)
+   */
+  private expDecayAlpha(tau: number, dt: number): number {
+    const MIN_TAU = 1e-5;
+    const safeTau = Math.max(MIN_TAU, Number.isFinite(tau) ? tau : MIN_TAU);
+    const safeDt = Math.max(0, Number.isFinite(dt) ? dt : 0);
+    const alpha = 1 - Math.exp(-safeDt / safeTau);
+    // Numerical guard
+    return alpha > 1 ? 1 : alpha < 0 ? 0 : alpha;
   }
 
   /**
@@ -328,7 +390,7 @@ export class CharacterController extends Component {
 
     const gravity = -9.81 * this.config.gravityMultiplier;
     this.velocity[1] += gravity * deltaTime;
-    this.physics.velocity[1] = this.velocity[1];
+    this.syncVelocityToPhysics();
   }
 
   /**
@@ -344,7 +406,7 @@ export class CharacterController extends Component {
     if (this.jumpRequested && canJump) {
       // Apply jump force
       this.velocity[1] = this.config.jumpForce;
-      this.physics.velocity[1] = this.velocity[1];
+      this.syncVelocityToPhysics();
       
       this.isGrounded = false;
       this.timeSinceGrounded = this.coyoteTime; // Prevent double jump
@@ -358,9 +420,9 @@ export class CharacterController extends Component {
   }
 
   /**
-   * Auto-rotate character to face movement direction
+   * Auto-rotate character to face movement direction with smooth interpolation
    */
-  private autoRotateToMovement(): void {
+  private autoRotateToMovement(deltaTime?: number): void {
     const entity = this.entity;
     if (!entity) return;
 
@@ -370,12 +432,21 @@ export class CharacterController extends Component {
     // Calculate target rotation
     const targetAngle = Math.atan2(this.moveInput[0], this.moveInput[2]);
 
-    // Get current rotation (assuming Y-axis rotation)
-    // This is simplified - proper quaternion interpolation would be better
-    // Smoothly interpolate rotation
-    // For now, just set the rotation directly
-    entity.transform.setEulerAngles(0, targetAngle, 0);
-    // TODO: Implement smooth rotation interpolation
+    // Get current rotation from transform
+    const currentEuler = quatToEuler(entity.transform.rotation);
+    this.currentRotationY = currentEuler[1]; // Y-axis rotation (yaw)
+
+    // Use deltaTime from update() if available, otherwise estimate
+    const dt = deltaTime ?? (1 / 60); // Default to 60 FPS if not provided
+
+    // Smoothly interpolate rotation angle using exponential damping
+    const rotationTau = 1.0 / this.config.rotationSpeed; // Convert speed to time constant
+    const alpha = this.expDecayAlpha(rotationTau, dt);
+    this.currentRotationY += (targetAngle - this.currentRotationY) * alpha;
+
+    // Apply smooth rotation directly from smoothed angle (Y-axis only)
+    const smoothedQuat = quatFromAxisAngle([0, 1, 0], this.currentRotationY);
+    entity.transform.rotation = smoothedQuat;
   }
 
   /**
@@ -420,6 +491,25 @@ export class CharacterController extends Component {
   }
 
   /**
+   * Get current velocity (MovementController interface)
+   */
+  getVelocity(): Vec3 {
+    return [...this.velocity] as Vec3;
+  }
+
+  /**
+   * Get current position (MovementController interface)
+   */
+  getPosition(): Vec3 {
+    const entity = this.entity;
+    if (entity) {
+      const pos = entity.transform.position;
+      return [pos[0], pos[1], pos[2]] as Vec3;
+    }
+    return [0, 0, 0] as Vec3;
+  }
+
+  /**
    * Teleport character to a position
    */
   teleport(position: Vec3): void {
@@ -444,11 +534,46 @@ export class CharacterController extends Component {
     this.velocity[1] += velocity[1];
     this.velocity[2] += velocity[2];
     
-    if (this.physics) {
-      this.physics.velocity[0] = this.velocity[0];
-      this.physics.velocity[1] = this.velocity[1];
-      this.physics.velocity[2] = this.velocity[2];
+    this.syncVelocityToPhysics();
+  }
+
+  /**
+   * Apply a movement profile to this controller
+   * 
+   * @param profile - Movement profile to apply
+   */
+  applyProfile(profile: any): void { // MovementProfile from @engine/stdlib (using any to avoid circular dependency)
+    // Apply config from profile
+    this.config = { ...profile.config };
+
+    // Apply extensions
+    if (profile.extensions) {
+      for (const ext of profile.extensions) {
+        if (ext.onApply) {
+          ext.onApply(this);
+        }
+        if (ext.modifyConfig) {
+          this.config = ext.modifyConfig(this.config);
+        }
+      }
     }
+
+    this.currentProfile = profile;
+
+    // Update physics gravity if needed
+    this.ensurePhysicsComponent();
+    if (this.physics && this.config.gravityMultiplier !== 1.0) {
+      this.physics.useGravity = false; // We'll apply custom gravity
+    }
+  }
+
+  /**
+   * Get the current movement profile
+   * 
+   * @returns Current profile or null if none applied
+   */
+  getCurrentProfile(): any | null { // MovementProfile from @engine/stdlib (using any to avoid circular dependency)
+    return this.currentProfile;
   }
 
   /**
@@ -457,6 +582,9 @@ export class CharacterController extends Component {
   clone(): CharacterController {
     const clone = new CharacterController(this.config);
     clone.state = this.state;
+    if (this.currentProfile) {
+      clone.currentProfile = this.currentProfile;
+    }
     return clone;
   }
 
@@ -464,13 +592,20 @@ export class CharacterController extends Component {
    * Serialize the component
    */
   serialize(): any {
-    return {
+    const result: any = {
       type: this.getType(),
       config: this.config,
       state: this.state,
       isGrounded: this.isGrounded,
       velocity: this.velocity,
     };
+
+    // Include profile ID if profile is applied
+    if (this.currentProfile?.id) {
+      result.profileId = this.currentProfile.id;
+    }
+
+    return result;
   }
 
   /**
@@ -481,6 +616,18 @@ export class CharacterController extends Component {
     controller.state = data.state;
     controller.isGrounded = data.isGrounded;
     controller.velocity = data.velocity;
+
+    // Load profile if profileId is provided
+    // Note: This requires @engine/stdlib to be available at runtime
+    // Profile loading is deferred to runtime to avoid circular dependency
+    if (data.profileId) {
+      // Profile will be loaded by CharacterControllerSystem.update()
+      // This is a placeholder - actual loading happens in CharacterControllerSystem
+      // or similar higher-level system that has access to MovementProfileRegistry
+      // Store placeholder that will be recognized by ensureProfileLoaded()
+      controller.currentProfile = { id: data.profileId, name: '' } as any;
+    }
+
     return controller;
   }
 }

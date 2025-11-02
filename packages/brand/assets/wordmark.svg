@@ -1,0 +1,19 @@
+<svg width="400" height="80" viewBox="0 0 400 80" xmlns="http://www.w3.org/2000/svg">
+  <!-- FORGE Worlds Wordmark -->
+  
+  <!-- FORGE text -->
+  <text x="20" y="50" font-family="Inter, Roboto, sans-serif" font-size="48" font-weight="700" fill="#ffffff" letter-spacing="-1">
+    FORGE
+  </text>
+  
+  <!-- WORLDS text (smaller, lighter) -->
+  <text x="180" y="50" font-family="Inter, Roboto, sans-serif" font-size="32" font-weight="500" fill="#8a8a8a" letter-spacing="0">
+    WORLDS
+  </text>
+  
+  <!-- Accent line (hot orange) -->
+  <line x1="20" y1="58" x2="370" y2="58" stroke="#ff3b00" stroke-width="3" opacity="0.8"/>
+  
+  <!-- Community badge indicator (small circle) -->
+  <circle cx="365" cy="40" r="4" fill="#00c853" opacity="0.8"/>
+</svg>

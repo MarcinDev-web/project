@@ -7,6 +7,7 @@ export class TonemapLutPass {
   private cachedBindGroup: GPUBindGroup | null = null;
   private cachedSrcView: GPUTextureView | null = null;
   private cachedBloomView: GPUTextureView | null = null;
+  private cachedSSAOView: GPUTextureView | null = null;
 
   constructor(device: GPUDevice) {
     this.device = device;
@@ -69,18 +70,13 @@ export class TonemapLutPass {
           { binding: 0, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
           { binding: 1, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
           { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float', viewDimension: '3d' } },
-          { binding: 3, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
+          { binding: 3, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } }, // bloom
+          { binding: 4, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } }, // ssao (optional)
         ],
       });
     }
 
     if (!this.pipeline) {
-      const shader = this.device.createShaderModule({
-        label: 'tonemap-lut-shader',
-        code: (/* wgsl */ `
-${''}
-` as unknown) as string,
-      });
       // Load code from file path in build systems; here we inline compile by importing via bundler
       // In this environment, we expect bundler to resolve shader code from file system.
       const layout = this.device.createPipelineLayout({
@@ -104,10 +100,14 @@ struct VSOut { @builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32> };
 @group(0) @binding(1) var srcSmp : sampler;
 @group(0) @binding(2) var lut3d : texture_3d<f32>;
 @group(0) @binding(3) var bloomTex : texture_2d<f32>;
+@group(0) @binding(4) var ssaoTex : texture_2d<f32>;
 @fragment fn fs_main(@location(0) v_uv:vec2<f32>) -> @location(0) vec4<f32> {
   var hdr = vec3<f32>(textureSample(srcTex, srcSmp, v_uv).xyz);
   let bloom = vec3<f32>(textureSample(bloomTex, srcSmp, v_uv).xyz);
   hdr += bloom;
+  // Apply SSAO (multiply ambient occlusion)
+  let ssao = textureSample(ssaoTex, srcSmp, v_uv).r;
+  hdr *= mix(1.0, ssao, 0.5); // Blend between no occlusion and full occlusion
   let lutc = textureSampleLevel(lut3d, srcSmp, clamp(hdr, vec3(0.0), vec3(1.0)), 0.0).xyz;
   let a=2.51; let b=0.03; let c=2.43; let d=0.59; let e=0.14;
   let aces = clamp((lutc*(a*lutc+b))/(lutc*(c*lutc+d)+e), vec3(0.0), vec3(1.0));
@@ -128,10 +128,33 @@ struct VSOut { @builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32> };
     srcView: GPUTextureView,
     bloomView: GPUTextureView,
     dstView: GPUTextureView,
+    ssaoView?: GPUTextureView | null,
     opts?: { querySet?: GPUQuerySet; begin?: number; end?: number }
   ): void {
     if (!this.pipeline || !this.bindGroupLayout || !this.sampler || !this.lutTexture) return;
-    if (!this.cachedBindGroup || this.cachedSrcView !== srcView || this.cachedBloomView !== bloomView) {
+    
+    // Create placeholder white texture for SSAO if not provided (no occlusion = white)
+    let placeholderSSAO: GPUTexture | null = null;
+    if (!ssaoView) {
+      placeholderSSAO = this.device.createTexture({
+        label: 'tonemap-ssao-placeholder',
+        size: [1, 1, 1],
+        format: 'rgba16float',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      });
+      // Write white (no occlusion = 1.0) in float16
+      const whiteData = new Float32Array([1.0, 1.0, 1.0, 1.0]);
+      this.device.queue.writeTexture(
+        { texture: placeholderSSAO },
+        whiteData.buffer as ArrayBuffer,
+        { bytesPerRow: 16, rowsPerImage: 1 },
+        [1, 1, 1]
+      );
+    }
+    
+    const ssaoToUse = ssaoView ?? placeholderSSAO!.createView();
+    
+    if (!this.cachedBindGroup || this.cachedSrcView !== srcView || this.cachedBloomView !== bloomView || this.cachedSSAOView !== ssaoView) {
       this.cachedBindGroup = this.device.createBindGroup({
         label: 'tonemap-lut-bg',
         layout: this.bindGroupLayout,
@@ -140,10 +163,14 @@ struct VSOut { @builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32> };
           { binding: 1, resource: this.sampler },
           { binding: 2, resource: this.lutTexture.createView({ dimension: '3d' }) },
           { binding: 3, resource: bloomView },
+          { binding: 4, resource: ssaoToUse },
         ],
       });
       this.cachedSrcView = srcView;
       this.cachedBloomView = bloomView;
+      this.cachedSSAOView = ssaoView ?? null;
+      // Note: placeholderSSAO will be reused across frames if ssaoView is null
+      // It's acceptable to keep it alive for the lifetime of TonemapLutPass
     }
     const passDesc: GPURenderPassDescriptor = {
       label: 'tonemap-pass',

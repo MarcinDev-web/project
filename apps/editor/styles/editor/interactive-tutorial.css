@@ -1,0 +1,297 @@
+/**
+ * Interactive Tutorial - Step-by-step guide UI
+ * 
+ * Features:
+ * - Spotlight effect on highlighted elements
+ * - Smooth step transitions
+ * - Progress indicators
+ * - Responsive positioning
+ */
+
+/* ============================================
+   TUTORIAL OVERLAY
+   ============================================ */
+
+.tutorial-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
+  -webkit-backdrop-filter: blur(4px);
+  z-index: 9997;
+  pointer-events: none;
+}
+
+.tutorial-container {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+}
+
+/* ============================================
+   TUTORIAL STEP
+   ============================================ */
+
+.tutorial-step {
+  position: relative;
+  max-width: 480px;
+  width: 90%;
+  background: var(--color-surface-glass, rgba(20, 25, 35, 0.95));
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-xl, 16px);
+  padding: 1.5rem;
+  box-shadow: 
+    0 24px 64px rgba(0, 0, 0, 0.5),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+  opacity: 0;
+  transform: translateY(20px) scale(0.95);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  pointer-events: all;
+}
+
+.tutorial-step.visible {
+  opacity: 1;
+  transform: translateY(0) scale(1);
+}
+
+/* Positioning variants */
+.tutorial-step-center {
+  margin: auto;
+}
+
+.tutorial-step-top,
+.tutorial-step-bottom,
+.tutorial-step-left,
+.tutorial-step-right {
+  position: fixed;
+}
+
+/* ============================================
+   PROGRESS INDICATOR
+   ============================================ */
+
+.tutorial-progress {
+  margin-bottom: 1.25rem;
+}
+
+.tutorial-progress-bar {
+  width: 100%;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+  margin-bottom: 0.5rem;
+}
+
+.tutorial-progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #667eea 0%, #764ba2 100%);
+  border-radius: 2px;
+  transition: width 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.tutorial-progress-text {
+  font-size: 0.75rem;
+  color: var(--color-base-400, rgba(255, 255, 255, 0.5));
+  text-align: right;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ============================================
+   STEP CONTENT
+   ============================================ */
+
+.tutorial-step-content {
+  margin-bottom: 1.5rem;
+}
+
+.tutorial-step-title {
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--color-base-50, #fafafa);
+  margin: 0 0 0.75rem 0;
+  line-height: 1.3;
+}
+
+.tutorial-step-description {
+  font-size: 0.9375rem;
+  color: var(--color-base-300, rgba(255, 255, 255, 0.7));
+  line-height: 1.6;
+  margin: 0;
+}
+
+/* ============================================
+   STEP ACTIONS
+   ============================================ */
+
+.tutorial-step-actions {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+}
+
+.tutorial-btn {
+  flex: 1;
+  padding: 0.75rem 1.25rem;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  border: none;
+  border-radius: var(--radius-lg, 12px);
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+  white-space: nowrap;
+}
+
+.tutorial-btn-primary {
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  color: white;
+  box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+}
+
+.tutorial-btn-primary:hover {
+  box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
+  transform: translateY(-2px);
+}
+
+.tutorial-btn-primary:active {
+  transform: translateY(0);
+}
+
+.tutorial-btn-secondary {
+  flex: 0 0 auto;
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: var(--color-base-200, rgba(255, 255, 255, 0.8));
+}
+
+.tutorial-btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.12);
+  border-color: rgba(255, 255, 255, 0.25);
+}
+
+.tutorial-btn-text {
+  flex: 0 0 auto;
+  background: none;
+  border: none;
+  color: var(--color-base-400, rgba(255, 255, 255, 0.5));
+  padding: 0.75rem 0.5rem;
+  font-size: 0.875rem;
+}
+
+.tutorial-btn-text:hover {
+  color: var(--color-base-300, rgba(255, 255, 255, 0.7));
+  text-decoration: underline;
+}
+
+/* ============================================
+   HIGHLIGHT EFFECT
+   ============================================ */
+
+.tutorial-highlight {
+  border: 3px solid #667eea;
+  border-radius: var(--radius-lg, 12px);
+  box-shadow: 
+    0 0 0 4px rgba(102, 126, 234, 0.2),
+    0 0 32px rgba(102, 126, 234, 0.4);
+  animation: tutorial-highlight-pulse 2s ease-in-out infinite;
+  pointer-events: none;
+}
+
+@keyframes tutorial-highlight-pulse {
+  0%, 100% {
+    box-shadow: 
+      0 0 0 4px rgba(102, 126, 234, 0.2),
+      0 0 32px rgba(102, 126, 234, 0.4);
+  }
+  50% {
+    box-shadow: 
+      0 0 0 8px rgba(102, 126, 234, 0.3),
+      0 0 48px rgba(102, 126, 234, 0.6);
+  }
+}
+
+/* ============================================
+   ARROW POINTER (for positioned steps)
+   ============================================ */
+
+.tutorial-step-top::after,
+.tutorial-step-bottom::before,
+.tutorial-step-left::after,
+.tutorial-step-right::before {
+  content: '';
+  position: absolute;
+  width: 0;
+  height: 0;
+  border-style: solid;
+}
+
+.tutorial-step-top::after {
+  bottom: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 12px 12px 0 12px;
+  border-color: rgba(20, 25, 35, 0.95) transparent transparent transparent;
+}
+
+.tutorial-step-bottom::before {
+  top: -12px;
+  left: 50%;
+  transform: translateX(-50%);
+  border-width: 0 12px 12px 12px;
+  border-color: transparent transparent rgba(20, 25, 35, 0.95) transparent;
+}
+
+.tutorial-step-left::after {
+  right: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-width: 12px 0 12px 12px;
+  border-color: transparent transparent transparent rgba(20, 25, 35, 0.95);
+}
+
+.tutorial-step-right::before {
+  left: -12px;
+  top: 50%;
+  transform: translateY(-50%);
+  border-width: 12px 12px 12px 0;
+  border-color: transparent rgba(20, 25, 35, 0.95) transparent transparent;
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+
+@media (max-width: 640px) {
+  .tutorial-step {
+    max-width: 90%;
+    padding: 1.25rem;
+  }
+
+  .tutorial-step-title {
+    font-size: 1.125rem;
+  }
+
+  .tutorial-step-description {
+    font-size: 0.875rem;
+  }
+
+  .tutorial-step-actions {
+    flex-direction: column;
+  }
+
+  .tutorial-btn {
+    width: 100%;
+  }
+
+  .tutorial-btn-text {
+    order: 3;
+  }
+}
+

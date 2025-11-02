@@ -21,6 +21,7 @@ export declare class FPSCamera {
     private invertY;
     private pointerLockActive;
     private pendingPointerLock;
+    private pointerDownHandler;
     constructor(canvas: HTMLCanvasElement, options?: {
         eyeHeight?: number;
         sensitivity?: number;
@@ -28,6 +29,7 @@ export declare class FPSCamera {
     });
     setSensitivity(value: number): void;
     setEyeHeight(value: number): void;
+    getEyeHeight(): number;
     setPitchLimit(value: number): void;
     setInvertY(value: boolean): void;
     dispose(): void;
@@ -46,6 +48,7 @@ export declare class FPSCamera {
     update(): void;
     private handlePointerLockChange;
     private handlePointerLockError;
+    private handlePointerDown;
     private handleMouseMove;
     private updateDirectionVectors;
 }

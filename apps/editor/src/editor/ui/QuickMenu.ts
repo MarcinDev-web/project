@@ -12,6 +12,8 @@ import { KeyboardShortcutsModal } from './KeyboardShortcutsModal';
 export interface QuickMenuConfig {
   state: EditorState;
   projectManager?: ProjectManager | null;
+  onNewProject?: () => void;
+  onLoadTemplate?: () => void;
   onUndo: () => void;
   onRedo: () => void;
   canUndo: () => boolean;
@@ -23,6 +25,9 @@ export interface QuickMenuConfig {
   onOpenAssets?: () => void;
   onOpenScriptWorkbench?: () => void;
   onOpenBlockEditor?: () => void;
+  onOpenUIEditor?: () => void;
+  onToggleCollaboration?: () => void;
+  isCollaborating?: () => boolean;
   onGizmoModeChange: (mode: 'translate' | 'rotate' | 'scale') => void;
   onRotationSnapChange: (mode: 'free' | '15deg' | '45deg' | '90deg') => void;
   onCameraChange?: (type: CameraType) => void;
@@ -36,7 +41,7 @@ export class QuickMenu {
   private btnRedo: HTMLButtonElement | null = null;
   private saveStatusEl: HTMLSpanElement | null = null;
   private modeBtn: HTMLButtonElement | null = null;
-  private isPlayMode = false;
+  private cameraButtons: Partial<Record<CameraType, HTMLButtonElement>> = {};
 
   constructor(private readonly config: QuickMenuConfig) {}
 
@@ -91,10 +96,15 @@ export class QuickMenu {
     // Initial state sync
     this.updateHistoryButtons();
     effect(() => this.updateModeButton());
+    effect(() => {
+      const activeCamera = this.config.state.cameraType.value;
+      this.updateCameraSelection(activeCamera);
+    });
   }
 
-  public setPlayMode(active: boolean): void {
-    this.isPlayMode = active;
+  public setPlayMode(_active: boolean): void {
+    // Mode is tracked in config.state.editorMode.value and updated reactively
+    // This method exists for API compatibility
     this.updateModeButton();
   }
 
@@ -362,6 +372,33 @@ export class QuickMenu {
       }
     });
 
+    // Collaboration button
+    const collaborationBtn = document.createElement('button');
+    collaborationBtn.className = 'top-bar-icon-button';
+    collaborationBtn.title = 'Toggle Collaboration';
+    collaborationBtn.appendChild(createIcon('users', 14));
+    collaborationBtn.addEventListener('click', () => {
+      this.config.onToggleCollaboration?.();
+    });
+    
+    if (this.config.isCollaborating) {
+      effect(() => {
+        const isActive = this.config.isCollaborating?.() ?? false;
+        collaborationBtn.classList.toggle('active', isActive);
+      });
+    }
+
+    // Template selector button
+    const templateBtn = document.createElement('button');
+    templateBtn.className = 'top-bar-icon-button';
+    templateBtn.title = 'Load Template';
+    templateBtn.appendChild(createIcon('box', 14));
+    templateBtn.addEventListener('click', () => {
+      if (this.config.onLoadTemplate) {
+        this.config.onLoadTemplate();
+      }
+    });
+
     // Settings
     const settingsBtn = document.createElement('button');
     settingsBtn.className = 'top-bar-icon-button';
@@ -378,8 +415,10 @@ export class QuickMenu {
     right.appendChild(snapBtn);
     right.appendChild(gridBtn);
     // right.appendChild(assetsBtn); // REMOVED - Asset Library button
+    right.appendChild(templateBtn);
     right.appendChild(blockEditorBtn);
     right.appendChild(scriptBtn);
+    right.appendChild(collaborationBtn);
     right.appendChild(settingsBtn);
     right.appendChild(this.saveStatusEl);
 
@@ -433,7 +472,16 @@ export class QuickMenu {
     const pm = this.config.projectManager;
     const items: Array<HTMLElement | 'divider'> = [];
 
-    items.push(this.menuItem('New Project', 'new', undefined, () => pm?.newProject()));
+    const newProjectAction =
+      this.config.onNewProject !== undefined
+        ? () => this.config.onNewProject?.()
+        : () => pm?.newProject?.();
+    items.push(this.menuItem('New Project', 'new', 'Ctrl+N', newProjectAction));
+    items.push(this.menuItem('Load Template', 'load', undefined, () => {
+      if (this.config.onLoadTemplate) {
+        this.config.onLoadTemplate();
+      }
+    }));
     items.push(this.menuItem('Open...', 'load', 'Ctrl+O', () => pm?.showLoadDialog()));
     items.push(this.menuItem('Save', 'save', 'Ctrl+S', () => pm?.saveProject()));
     items.push(this.menuItem('Save As...', 'save', 'Ctrl+Shift+S', () => pm?.saveProjectAs?.()));
@@ -460,19 +508,20 @@ export class QuickMenu {
     const items: Array<HTMLElement | 'divider'> = [];
     items.push(this.menuItem('Toggle Grid', 'grid', 'G', () => this.config.toggleGrid()));
     items.push(this.menuItem('Toggle Snap', 'snap', 'X', () => this.config.toggleSnap()));
+    items.push('divider');
+    items.push(this.menuItem('Script Workbench', 'code', 'Ctrl+Shift+S', () => this.config.onOpenScriptWorkbench?.()));
+    if (this.config.onOpenUIEditor) {
+      items.push(this.menuItem('UI Editor', 'layout', 'Ctrl+Shift+U', () => this.config.onOpenUIEditor?.()));
+    }
     return items;
   }
 
   private buildCameraMenu(): Array<HTMLElement | 'divider'> {
+    this.cameraButtons = {};
     const items: Array<HTMLElement | 'divider'> = [];
-    // Editor mode: free-fly camera (always active, no menu option needed)
-    // Play mode: FPS and Third Person options
-    items.push(this.menuItem('First Person', 'user', undefined, () => {
-      this.config.onCameraChange?.('fps');
-    }));
-    items.push(this.menuItem('Third Person', 'eye', undefined, () => {
-      this.config.onCameraChange?.('third-person');
-    }));
+    // In editor, only free-fly camera is available
+    // FPS and Third Person cameras are only available in Play mode
+    items.push(this.createCameraMenuItem('Editor Free-Fly', 'move', 'free-fly'));
     return items;
   }
 
@@ -490,8 +539,9 @@ export class QuickMenu {
     return items;
   }
 
-  private menuItem(label: string, iconName: string, shortcut: string | undefined, action: () => void): HTMLElement {
+  private menuItem(label: string, iconName: string, shortcut: string | undefined, action: () => void): HTMLButtonElement {
     const el = document.createElement('button');
+    el.type = 'button';
     el.className = 'top-bar-dropdown-item';
     el.appendChild(createIcon(iconName as any, 14));
     const span = document.createElement('span');
@@ -508,6 +558,28 @@ export class QuickMenu {
       this.closeAllMenus();
     });
     return el;
+  }
+
+  private createCameraMenuItem(label: string, iconName: string, type: CameraType): HTMLButtonElement {
+    const button = this.menuItem(label, iconName, undefined, () => {
+      this.config.onCameraChange?.(type);
+    });
+    button.dataset.cameraType = type;
+    button.classList.add('top-bar-dropdown-camera-item');
+    button.setAttribute('role', 'menuitemradio');
+    button.setAttribute('aria-checked', 'false');
+
+    this.cameraButtons[type] = button;
+    return button;
+  }
+
+  private updateCameraSelection(active: CameraType): void {
+    (Object.entries(this.cameraButtons) as Array<[CameraType, HTMLButtonElement | undefined]>).forEach(([type, button]) => {
+      if (!button) return;
+      const isActive = type === active;
+      button.classList.toggle('is-active', isActive);
+      button.setAttribute('aria-checked', String(isActive));
+    });
   }
 
   private closeAllMenus(): void {

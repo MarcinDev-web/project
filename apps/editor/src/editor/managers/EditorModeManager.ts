@@ -13,6 +13,7 @@
 
 import type { Scene } from '@engine/world';
 import type { SelectionManager } from '@engine/world';
+import type { CharacterInput } from '@engine/world';
 import type { EditorState } from '../core/state';
 import { Logger } from '../../utils/logger';
 import { Entity } from '@engine/world';
@@ -21,15 +22,18 @@ import { mat4Invert, mat4GetTranslationOut, mat4GetRotationOut } from '@engine/c
 import type { PhysicsWorld } from '@engine/world';
 import { CharacterController } from '@engine/world/components/CharacterController';
 import { PhysicsComponent, RigidbodyType } from '@engine/world/components/PhysicsComponent';
+import { HealthComponent } from '@engine/world/components/HealthComponent';
 import { CameraComponent } from '@engine/world/components/CameraComponent';
 import { CameraDirector } from '@engine/camera';
-import type { OrbitControls, FPSCamera, EditorCameraController, ThirdPersonCamera } from '@engine/camera';
+import type { OrbitControls, EditorCameraController } from '@engine/camera';
+import type { FPSCamera } from '@engine/camera';
+// Note: FPSCamera and ThirdPersonCamera are not used in editor, only in play mode
 import type { CharacterControllerSystem } from '@engine/stdlib/CharacterController';
 import type { CharacterInputHandler } from '@engine/input';
 import { PlayModeStateMachine, PlayModeStateType } from '../core/PlayModeStateMachine';
 import { WorldManager } from '../core/WorldManager';
 import { InputContextManager, EditorInputContext } from '@engine/input';
-import { EditState } from '../states/EditState';
+import { EditState, type EditorCameraState } from '../states/EditState';
 import { PreflightState } from '../states/PreflightState';
 import { LoadingState } from '../states/LoadingState';
 import { PlayIntroState } from '../states/PlayIntroState';
@@ -42,6 +46,8 @@ import type { PlayManifest } from '../core/PlayManifest';
 import { LoadingOverlay } from '../ui/LoadingOverlay';
 import { CancellationToken } from '../core/cancellation/CancellationToken';
 import type { LoadingStepsRegistry } from '../core/LoadingStepsRegistry';
+import { CheckpointSystem } from '../systems/CheckpointSystem';
+import type { BlockBehaviorSystem } from '@engine/world/systems';
 
 export interface EditorModeManagerConfig {
   scene: Scene;
@@ -53,13 +59,16 @@ export interface EditorModeManagerConfig {
   controls: OrbitControls;
   physicsWorld?: PhysicsWorld | null;
   characterSystem?: CharacterControllerSystem | null;
+  blockBehaviorSystem?: BlockBehaviorSystem | null;
   characterInput?: CharacterInputHandler | null;
-  fpsCamera?: FPSCamera | null;
+  fpsCamera?: any | null; // FPSCamera - not used in editor, only in play mode
   editorCamera?: EditorCameraController | null;
-  thirdPersonCamera?: ThirdPersonCamera | null;
+  thirdPersonCamera?: any | null; // ThirdPersonCamera - not used in editor, only in play mode
   getRendererReady?: () => boolean;
   /** Optional registry to extend play mode loading steps */
   loadingStepsRegistry?: LoadingStepsRegistry;
+  /** Collaboration manager for multiplayer gameplay */
+  collaborationManager?: any; // CollaborationManager type
 }
 
 export class EditorModeManager {
@@ -84,10 +93,12 @@ export class EditorModeManager {
   // Systems
   private readonly physicsWorld: PhysicsWorld | null;
   private readonly characterSystem: CharacterControllerSystem | null;
+  private readonly blockBehaviorSystem: BlockBehaviorSystem | null;
   private readonly characterInput: CharacterInputHandler | null;
-  private readonly fpsCamera: FPSCamera | null;
+  private readonly editorCamera: EditorCameraController | null;
   private readonly controls: OrbitControls;
-  private orbitSnapshot: { yaw: number; pitch: number; distance: number } | null = null;
+  private readonly checkpointSystem: CheckpointSystem;
+  private editorCameraSnapshot: EditorCameraState | null = null;
   private selectionSnapshotPath: number[] | null = null;
   private loadingOverlay: LoadingOverlay | null = null;
   private loadingCancelToken: CancellationToken | null = null;
@@ -107,17 +118,18 @@ export class EditorModeManager {
   constructor(private readonly config: EditorModeManagerConfig) {
     this.physicsWorld = config.physicsWorld ?? null;
     this.characterSystem = config.characterSystem ?? null;
+    this.blockBehaviorSystem = config.blockBehaviorSystem ?? null;
     this.characterInput = config.characterInput ?? null;
-    this.fpsCamera = config.fpsCamera ?? null;
+    this.editorCamera = config.editorCamera ?? null;
     this.controls = config.controls;
     
     // Initialize managers
     this.worldManager = new WorldManager(config.scene);
     this.cameraDirector = new CameraDirector({
       orbitControls: config.controls,
-      fpsCamera: config.fpsCamera ?? null,
+      fpsCamera: null, // Not used in editor - only in play mode
       editorCamera: config.editorCamera ?? null,
-      thirdPersonCamera: config.thirdPersonCamera ?? null,
+      thirdPersonCamera: null, // Not used in editor - only in play mode
       canvas: config.canvas,
       scene: config.scene,
       physicsWorld: this.physicsWorld,
@@ -127,12 +139,15 @@ export class EditorModeManager {
       },
     });
     this.inputContext = new InputContextManager(config.canvas);
+    this.checkpointSystem = new CheckpointSystem();
+    this.checkpointSystem.initialize(config.scene);
     
     // Initialize state machine
     this.stateMachine = new PlayModeStateMachine();
     
     // Create temporary camera entity for edit mode
     this.setupEditorCamera();
+    // Avatar is not used in editor
     
     // Create state instances
     this.editState = new EditState({
@@ -142,15 +157,42 @@ export class EditorModeManager {
           config.state.disableHistory();
         }
       },
-      setOrbitEnabled: (enabled) => this.controls.setEnabled(enabled),
-      getOrbitState: () => this.controls.getState(),
-      saveOrbitState: (state) => {
-        this.orbitSnapshot = { ...state };
+      enableEditorCamera: () => {
+        this.cameraDirector.setMode('free-fly');
       },
-      restoreOrbitState: (state) => {
-        if (state) {
-          this.controls.setState(state);
+      disableEditorCamera: () => {
+        this.editorCamera?.disable();
+        this.controls.setEnabled(false);
+      },
+      getEditorCameraState: () => {
+        if (this.editorCamera) {
+          const position = this.editorCamera.getPosition();
+          const { yaw, pitch } = this.editorCamera.getOrientation();
+          return {
+            position: [...position] as Vec3,
+            yaw,
+            pitch,
+          };
         }
+        return {
+          position: [0, 2, 5] as Vec3,
+          yaw: 0,
+          pitch: 0,
+        };
+      },
+      saveEditorCameraState: (state) => {
+        this.editorCameraSnapshot = {
+          position: [...state.position] as Vec3,
+          yaw: state.yaw,
+          pitch: state.pitch,
+        };
+      },
+      restoreEditorCameraState: (state) => {
+        if (!this.editorCamera || !state) {
+          return;
+        }
+        this.editorCamera.setPosition(state.position);
+        this.editorCamera.setOrientation(state.yaw, state.pitch);
       },
       stopPhysics: () => this.physicsWorld?.stop(),
       disableScripts: () => {
@@ -160,7 +202,7 @@ export class EditorModeManager {
       disableHistory: () => config.state.disableHistory(),
       isReturningFromPlay: () => this.returningFromPlay,
       disableCharacterInput: () => this.characterInput?.disable(),
-      disableFPSCamera: () => this.fpsCamera?.disable(),
+      disableFPSCamera: () => this.getFPSCamera()?.disable(),
     });
     
     const preflightState = new PreflightState({
@@ -208,14 +250,19 @@ export class EditorModeManager {
       enableCharacterInput: () => this.characterInput?.enable(),
       disableOrbitControls: () => this.controls.setEnabled(false),
       freezeHistory: () => this.config.state.disableHistory(),
-      hasFpsCamera: () => this.fpsCamera !== null,
+      hasFpsCamera: () => this.getFPSCamera() !== null,
+      initializeCheckpoints: (scene) => {
+        this.checkpointSystem.initialize(scene);
+      },
       onFailure: () => {
-        this.controls.setEnabled(true);
-        if (this.orbitSnapshot) {
-          this.controls.setState(this.orbitSnapshot);
+        this.controls.setEnabled(false);
+        if (this.editorCameraSnapshot && this.editorCamera) {
+          this.editorCamera.setPosition(this.editorCameraSnapshot.position);
+          this.editorCamera.setOrientation(this.editorCameraSnapshot.yaw, this.editorCameraSnapshot.pitch);
         }
+        this.cameraDirector.setMode('free-fly');
         this.config.state.enableHistory();
-        this.fpsCamera?.disable();
+        this.getFPSCamera()?.disable();
         this.characterInput?.disable();
         this.config.onModeChanged?.('edit');
         this.config.state.editorMode.value = 'edit';
@@ -225,18 +272,32 @@ export class EditorModeManager {
     });
     
     this.playingState = new PlayingState({
-      updateFPSCamera: () => this.fpsCamera?.update(),
+      updateFPSCamera: () => this.getFPSCamera()?.update(),
       cameraDirector: this.cameraDirector,
-      enableOrbitControls: () => this.controls.setEnabled(true),
-      restoreOrbitState: () => {
-        if (this.orbitSnapshot) {
-          this.controls.setState(this.orbitSnapshot);
+      enableEditorCamera: () => {
+        this.cameraDirector.setMode('free-fly');
+        this.getFPSCamera()?.disable();
+        this.controls.setEnabled(false);
+      },
+      restoreEditorCameraState: () => {
+        if (this.editorCameraSnapshot && this.editorCamera) {
+          this.editorCamera.setPosition(this.editorCameraSnapshot.position);
+          this.editorCamera.setOrientation(this.editorCameraSnapshot.yaw, this.editorCameraSnapshot.pitch);
         }
       },
       updateCharacterInput: (forward, right) => this.characterInput?.setCameraDirections(forward, right),
-      getCameraForward: () => this.fpsCamera?.getForwardDirection() ?? [0, 0, -1],
-      getCameraRight: () => this.fpsCamera?.getRightDirection() ?? [1, 0, 0],
+      getCameraForward: () => this.getFPSCamera()?.getForwardDirection() ?? [0, 0, -1],
+      getCameraRight: () => this.getFPSCamera()?.getRightDirection() ?? [1, 0, 0],
+      updateCheckpoints: (playerPosition) => this.checkpointSystem.update(playerPosition),
       resumeHistory: () => this.config.state.enableHistory(),
+      updateMultiplayer: (deltaTime) => {
+        // Update multiplayer gameplay systems
+        this.config.collaborationManager?.updateMultiplayerGameplay(deltaTime);
+      },
+      processMultiplayerInput: (input) => {
+        // Process input for multiplayer replication
+        this.config.collaborationManager?.processMultiplayerInput(input);
+      },
     });
     
     this.pausedState = new PausedState({
@@ -263,7 +324,7 @@ export class EditorModeManager {
         // TODO: Disable scripts when script system is ready
       },
       disableCharacterInput: () => this.characterInput?.disable(),
-      disableFPSCamera: () => this.fpsCamera?.disable(),
+      disableFPSCamera: () => this.getFPSCamera()?.disable(),
       unbindPlayerController: () => this.playerSession?.unbindController(),
       cleanupPlayer: () => {
         this.cleanupPlayer();
@@ -274,7 +335,20 @@ export class EditorModeManager {
       showEditorUI: () => {
         this.config.state.editorMode.value = 'edit';
       },
-      enableOrbitControls: () => this.controls.setEnabled(true),
+      restoreEditorCamera: () => {
+        this.cameraDirector.setMode('free-fly');
+        this.getFPSCamera()?.disable();
+        this.controls.setEnabled(false);
+      },
+      clearCheckpoints: () => {
+        this.checkpointSystem.clear();
+        // Reinitialize with authoring scene when returning to edit
+        this.checkpointSystem.initialize(this.config.scene);
+        if (this.editorCameraSnapshot && this.editorCamera) {
+          this.editorCamera.setPosition(this.editorCameraSnapshot.position);
+          this.editorCamera.setOrientation(this.editorCameraSnapshot.yaw, this.editorCameraSnapshot.pitch);
+        }
+      },
     });
     
     // Register states
@@ -345,6 +419,32 @@ export class EditorModeManager {
       return;
     }
 
+    // If collaboration is active, request Play Mode from other users
+    if (this.config.collaborationManager?.isCollaborating()) {
+      const requestId = this.config.collaborationManager.requestPlayMode();
+      if (requestId) {
+        Logger.debug('Play Mode request sent, waiting for responses...');
+        // The actual Play Mode entry will be triggered by onPlayModeStarted callback
+        return;
+      }
+    }
+
+    // No collaboration or request failed, enter Play Mode directly
+    this.enterPlayModeSync();
+  }
+
+  /**
+   * Enter Play Mode synchronously (without collaboration request).
+   * Called by CollaborationManager when all users accepted the request,
+   * or when collaboration is not active.
+   */
+  enterPlayModeSync(): void {
+    const currentState = this.stateMachine.getCurrentStateType();
+    if (currentState !== PlayModeStateType.EDIT) {
+      Logger.warn('Can only enter play mode from EDIT state');
+      return;
+    }
+
     this.selectionSnapshotPath = computeEntityPath(
       this.config.scene,
       this.config.selection.primarySelection
@@ -368,7 +468,7 @@ export class EditorModeManager {
     } else if (currentState === PlayModeStateType.PAUSED) {
       this.pausedState.stop();
     } else if (currentState === PlayModeStateType.EDIT) {
-      Logger.warn('Already in edit mode');
+      Logger.debug('Already in edit mode');
       return;
     } else {
       if (!this.stateMachine.transitionTo(PlayModeStateType.RETURN)) {
@@ -379,11 +479,19 @@ export class EditorModeManager {
     this.settleStateMachine();
 
     if (!this.isPlayMode()) {
+      // Send Play Mode end notification if collaboration is active
+      if (this.config.collaborationManager?.isCollaborating()) {
+        this.config.collaborationManager.sendPlayModeEnd();
+      }
+
       this.restoreSelectionSnapshot();
       this.returningFromPlay = false; // Clear flag after returning to edit mode
       this.config.onModeChanged?.('edit');
       this.config.state.editorMode.value = 'edit';
       this.config.state.enableHistory();
+      // Restore avatar visibility based on current camera type (free-fly hides avatar)
+      const cameraType = this.config.state.cameraType.value;
+      this.setEditCameraInputMode(cameraType);
     }
   }
 
@@ -444,12 +552,17 @@ export class EditorModeManager {
     return this.playerSession;
   }
 
-  getFPSCamera(): FPSCamera | null {
-    return this.fpsCamera ?? null;
-  }
 
   getCameraDirector(): CameraDirector {
     return this.cameraDirector;
+  }
+
+  /**
+   * Get FPS camera instance (available in play mode)
+   * Returns null if FPS camera is not configured (editor-only mode)
+   */
+  getFPSCamera(): FPSCamera | null {
+    return this.config.fpsCamera ?? null;
   }
   
   /**
@@ -496,6 +609,18 @@ export class EditorModeManager {
     Logger.debug('[EditorModeManager] Setup editor camera entity');
   }
 
+  setEditCameraInputMode(cameraType: 'free-fly' | 'fps' | 'third-person'): void {
+    // In editor, only free-fly camera is allowed
+    // FPS and third-person are for play mode only
+    if (cameraType !== 'free-fly') {
+      return;
+    }
+    
+    // Character input is disabled in editor (only used in play mode)
+    this.characterInput?.disable();
+    this.characterInput?.clear();
+  }
+
   getWorldManager(): WorldManager {
     return this.worldManager;
   }
@@ -518,6 +643,17 @@ export class EditorModeManager {
     return this.loadingCancelToken;
   }
 
+  updateEditPreview(_deltaTime: number): void {
+    if (this.isPlayMode()) {
+      return;
+    }
+
+    // In editor, no avatar preview is used
+    // This method is kept for API compatibility but does nothing
+    // Avatar is only used in play mode
+  }
+
+
   async updatePlayMode(deltaTime: number): Promise<void> {
     if (!this.isPlayMode()) {
       return;
@@ -536,6 +672,7 @@ export class EditorModeManager {
     while (this.playAccumulator >= fixedDeltaTime && steps < maxSubsteps) {
       this.physicsWorld?.update(fixedDeltaTime);
       this.characterSystem?.update(fixedDeltaTime);
+      this.blockBehaviorSystem?.update(fixedDeltaTime);
       this.playerSession?.update(fixedDeltaTime);
       this.stateMachine.update(fixedDeltaTime);
       this.playAccumulator -= fixedDeltaTime;
@@ -566,7 +703,9 @@ export class EditorModeManager {
     this.worldManager.dispose();
     this.cameraDirector.dispose();
     this.inputContext.dispose();
+    this.checkpointSystem.dispose();
     this.playerEntity = null;
+    // Avatar is not used in editor, no cleanup needed
   }
 
   private configureController(manifest: PlayManifest): void {
@@ -578,10 +717,11 @@ export class EditorModeManager {
     this.cameraDirector.setCameraOffset(pawnConfig.cameraTarget.offset);
     this.cameraDirector.setCollisionRadius(pawnConfig.cameraTarget.collisionRadius);
 
-    if (this.fpsCamera) {
-      this.fpsCamera.setEyeHeight(pawnConfig.cameraTarget.offset[1]);
-      this.fpsCamera.setSensitivity(controllerConfig.preferences.sensitivity);
-      this.fpsCamera.setInvertY(controllerConfig.preferences.invertY);
+    const fpsCamera = this.getFPSCamera();
+    if (fpsCamera) {
+      fpsCamera.setEyeHeight(pawnConfig.cameraTarget.offset[1]);
+      fpsCamera.setSensitivity(controllerConfig.preferences.sensitivity);
+      fpsCamera.setInvertY(controllerConfig.preferences.invertY);
     }
 
     if (this.characterInput) {
@@ -590,7 +730,58 @@ export class EditorModeManager {
     Logger.debug('Controller configured from manifest');
   }
 
-  private spawnPlayer(position: Vec3, rotation: number): Entity {
+  /**
+   * Respawn player at the last activated checkpoint or default spawn point.
+   * Can be called during gameplay to respawn the player.
+   * 
+   * @public
+   */
+  async respawnPlayer(): Promise<void> {
+    const player = this.playerEntity;
+    if (!player) {
+      Logger.warn('[EditorModeManager] Cannot respawn: no player entity');
+      return;
+    }
+
+    const contextManifest = this.stateMachine.getMutableContext().manifest as PlayManifest | null;
+    const defaultSpawn = {
+      position: (contextManifest?.playerStart.position ?? [0, 2, 0]) as Vec3,
+      rotation: contextManifest?.playerStart.rotation ?? 0,
+    };
+
+    // Get respawn data from checkpoint system (falls back to default if no checkpoint)
+    const respawnData = this.checkpointSystem.getRespawnData(defaultSpawn);
+
+    // Update player position and rotation
+    player.transform.position = respawnData.position;
+    player.transform.setEulerAngles(0, respawnData.rotation, 0);
+
+    // Reset physics (velocity, etc.)
+    const physics = player.getComponent(PhysicsComponent);
+    if (physics && this.physicsWorld) {
+      // Reset velocity
+      physics.velocity[0] = 0;
+      physics.velocity[1] = 0;
+      physics.velocity[2] = 0;
+      physics.angularVelocity[0] = 0;
+      physics.angularVelocity[1] = 0;
+      physics.angularVelocity[2] = 0;
+    }
+
+    // Update camera to player position
+    const forward = player.transform.getForward();
+    this.cameraDirector.setPlayerPose(respawnData.position, forward);
+
+    // Reset FPS camera yaw/pitch
+    const fpsCamera = this.getFPSCamera();
+    if (fpsCamera) {
+      fpsCamera.setYawPitch(respawnData.rotation, 0);
+    }
+
+    Logger.debug('[EditorModeManager] Player respawned at checkpoint/default spawn:', respawnData.position);
+  }
+
+  private async spawnPlayer(position: Vec3, rotation: number): Promise<Entity> {
     const player = new Entity('__playmode_player');
     
     player.transform.position = [...position] as Vec3;
@@ -634,6 +825,12 @@ export class EditorModeManager {
     const controller = new CharacterController(controllerConfig ?? {});
     player.addComponent(controller);
 
+    // Add health component for gameplay blocks (lava, poison)
+    const health = new HealthComponent();
+    health.maxHealth = 100;
+    health.currentHealth = 100;
+    player.addComponent(health);
+
     if (manifest && this.characterInput) {
       const factory = new DefaultControllerFactory();
       const localController = factory.createLocalController({
@@ -641,9 +838,16 @@ export class EditorModeManager {
         bindings: manifest.controller,
         inputHandler: this.characterInput,
         cameraDirector: this.cameraDirector,
-        fpsCamera: this.fpsCamera,
+        fpsCamera: this.getFPSCamera(),
         characterSystem: this.characterSystem,
       });
+
+      // Set multiplayer input callback if collaboration is active
+      if (this.config.collaborationManager?.isCollaborating()) {
+        (localController as any).onMultiplayerInput = (input: CharacterInput) => {
+          this.config.collaborationManager?.processMultiplayerInput(input);
+        };
+      }
 
       const session = new PlayerSession({
         id: 'player1',
@@ -664,16 +868,26 @@ export class EditorModeManager {
     
     this.playerEntity = player;
 
+    // Start multiplayer gameplay if collaboration is active
+    if (this.config.collaborationManager?.isCollaborating()) {
+      try {
+        await this.config.collaborationManager.startMultiplayerGameplay(player);
+      } catch (error) {
+        Logger.warn('Failed to start multiplayer gameplay:', error as Error);
+      }
+    }
+
     // Start physics
     if (this.physicsWorld) {
       this.physicsWorld.start();
     }
 
     // Initialize FPS camera orientation from orbit
-    if (this.fpsCamera) {
+    const fpsCamera = this.getFPSCamera();
+    if (fpsCamera) {
       const orbitState = this.controls.getState();
-      this.fpsCamera.setYawPitch(rotation, orbitState.pitch);
-      this.fpsCamera.enable();
+      fpsCamera.setYawPitch(rotation, orbitState.pitch);
+      fpsCamera.enable();
     }
 
     Logger.debug('Player spawned at position:', player.transform.position);
@@ -681,6 +895,15 @@ export class EditorModeManager {
   }
 
   private cleanupPlayer(): void {
+    // Stop multiplayer gameplay if active
+    if (this.config.collaborationManager?.isCollaborating()) {
+      try {
+        void this.config.collaborationManager.stopMultiplayerGameplay();
+      } catch (error) {
+        Logger.warn('Failed to stop multiplayer gameplay:', error as Error);
+      }
+    }
+
     if (this.playerEntity) {
       try {
         const runtimeWorld = this.worldManager.getRuntimeWorld();

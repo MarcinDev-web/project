@@ -7,7 +7,6 @@
 
 import type { Entity } from '@engine/world';
 import type { EditorState } from '../core/state';
-import { ScriptComponent } from '@engine/script';
 import { Logger } from '../../utils/logger';
 
 export type SuggestionChannel = 'panel' | 'feature';
@@ -41,7 +40,7 @@ export class AdaptiveUIManager {
   /**
    * Analyzes context and suggests UI adaptations
    */
-  adaptToContext(entity: Entity | null, state: EditorState): void {
+  adaptToContext(entity: Entity | null, _state: EditorState): void {
     if (!entity) {
       return;
     }
@@ -142,7 +141,6 @@ export class AdaptiveUIManager {
       return {
         ...this.createDefaultMetrics(),
         ...parsed,
-        workflowSwitchHistory: parsed.workflowSwitchHistory ?? [],
         lastSuggestionDismissals: parsed.lastSuggestionDismissals ?? {},
       };
     } catch (error) {

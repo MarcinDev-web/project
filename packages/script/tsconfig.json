@@ -2,17 +2,28 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src",
-    "composite": true,
+    "composite": false,
+    "skipLibCheck": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "paths": {
+      "@engine/core": ["../core/dist"],
+      "@engine/core/*": ["../core/dist/*"],
+      "@engine/world": ["../world/dist"],
+      "@engine/world/*": ["../world/dist/*"],
+      "@engine/stdlib": ["../stdlib/dist"],
+      "@engine/stdlib/*": ["../stdlib/dist/*"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": [
     "__tests__",
     "dist",
-    "node_modules"
+    "node_modules",
+    "../core/src",
+    "../world/src",
+    "../stdlib/src"
   ],
   "references": [
     { "path": "../core" },

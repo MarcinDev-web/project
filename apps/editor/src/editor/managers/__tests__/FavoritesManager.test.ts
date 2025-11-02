@@ -6,6 +6,8 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { FavoritesManager } from '../FavoritesManager';
 import type { Asset } from '../../types/BlockAssetTypes';
+import { BLOCK_LIBRARY } from '@engine/blocks';
+import { blockToAsset } from '../../types/BlockAssetTypes';
 
 describe('FavoritesManager', () => {
   let manager: FavoritesManager;
@@ -132,10 +134,24 @@ describe('FavoritesManager', () => {
   });
 
   describe('getFavoriteAssets', () => {
+    // Helper to create mock assets
+    const createMockAsset = (id: string, name: string): Asset => {
+      const block = Object.values(BLOCK_LIBRARY)[0];
+      if (!block) {
+        throw new Error('BLOCK_LIBRARY is empty - cannot create mock asset');
+      }
+      const asset = blockToAsset(block);
+      return {
+        ...asset,
+        id,
+        name,
+      };
+    };
+
     it('should get favorite assets', () => {
       const mockAssets: Record<string, Asset> = {
-        'asset-1': { metadata: { id: 'asset-1', name: 'Asset 1' } } as Asset,
-        'asset-2': { metadata: { id: 'asset-2', name: 'Asset 2' } } as Asset,
+        'asset-1': createMockAsset('asset-1', 'Asset 1'),
+        'asset-2': createMockAsset('asset-2', 'Asset 2'),
       };
 
       manager.addFavorite('asset-1');
@@ -143,13 +159,13 @@ describe('FavoritesManager', () => {
 
       const assets = manager.getFavoriteAssets((id) => mockAssets[id]);
       expect(assets).toHaveLength(2);
-      expect(assets[0]?.metadata.id).toBe('asset-1');
-      expect(assets[1]?.metadata.id).toBe('asset-2');
+      expect(assets[0]?.id).toBe('asset-1');
+      expect(assets[1]?.id).toBe('asset-2');
     });
 
     it('should filter out missing assets', () => {
       const mockAssets: Record<string, Asset> = {
-        'asset-1': { metadata: { id: 'asset-1', name: 'Asset 1' } } as Asset,
+        'asset-1': createMockAsset('asset-1', 'Asset 1'),
       };
 
       manager.addFavorite('asset-1');
@@ -157,7 +173,7 @@ describe('FavoritesManager', () => {
 
       const assets = manager.getFavoriteAssets((id) => mockAssets[id]);
       expect(assets).toHaveLength(1);
-      expect(assets[0]?.metadata.id).toBe('asset-1');
+      expect(assets[0]?.id).toBe('asset-1');
     });
   });
 });

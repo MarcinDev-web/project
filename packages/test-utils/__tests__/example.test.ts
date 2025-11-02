@@ -1,6 +1,7 @@
 /**
  * Example test demonstrating all test-utils features
  * This serves as a reference for writing tests across the project
+ * @vitest-environment jsdom
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';

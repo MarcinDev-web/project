@@ -153,6 +153,21 @@
   cursor: not-allowed;
 }
 
+.top-bar-dropdown-camera-item {
+  display: flex;
+  gap: var(--spacing-2);
+}
+
+.top-bar-dropdown-camera-item.is-active {
+  background: rgba(37, 99, 235, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(59, 130, 246, 0.35);
+  color: rgba(239, 246, 255, 1);
+}
+
+.top-bar-dropdown-camera-item.is-active svg {
+  color: rgb(147, 197, 253);
+}
+
 .top-bar-dropdown-divider {
   height: 2px;
   background: rgba(60, 70, 85, 0.5);

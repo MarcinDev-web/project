@@ -27,7 +27,8 @@ export interface EditorCameraConfig {
  * - WASD movement (with Shift to sprint, Alt to slow down)
  * - Right mouse button + drag for look
  * - Q/E for vertical movement (up/down)
- * - Mouse wheel to adjust movement speed
+ * - Mouse wheel to zoom (move forward/backward)
+ * - Ctrl+Mouse wheel to adjust movement speed
  * - No collision, can fly through anything
  *
  * This is NOT for gameplay - it's for editor navigation.
@@ -121,6 +122,7 @@ export declare class EditorCameraController {
     private handleMouseMove;
     private handleWheel;
     private handleBlur;
+    private handleFocus;
     private updateDirectionVectors;
 }
 //# sourceMappingURL=EditorCameraController.d.ts.map

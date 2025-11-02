@@ -8,19 +8,22 @@
                     ".":  "./dist/index.js",
                     "./core":  "./dist/core/index.js",
                     "./components":  "./dist/components/index.js",
+                    "./components/*":  "./dist/components/*.js",
                     "./systems":  "./dist/systems/index.js",
                     "./physics":  "./dist/physics/index.js"
                 },
     "scripts":  {
-                    "build":  "tsc",
+                    "build":  "tsc -b && node ../../scripts/verify-world-build.js",
                     "dev":  "tsc --watch",
                     "test":  "vitest run",
                     "test:watch":  "vitest",
-                    "clean":  "rm -rf dist",
+                    "clean":  "rimraf dist",
                     "lint":  "eslint src --max-warnings=0"
                 },
     "dependencies":  {
                          "@engine/core":  "workspace:*",
+                         "@engine/animation":  "workspace:*",
+                         "@engine/blocks":  "workspace:*",
                          "gl-matrix":  "^3.4.4"
                      },
     "devDependencies":  {

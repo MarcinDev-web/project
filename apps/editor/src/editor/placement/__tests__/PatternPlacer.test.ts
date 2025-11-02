@@ -16,7 +16,7 @@ describe('PatternPlacer', () => {
   beforeEach(() => {
     scene = new Scene();
     mockCollisionDetector = {
-      checkCollisionOBB: vi.fn().mockReturnValue({ hasCollision: false, collidingEntities: [] }),
+      checkCollisionOBB: vi.fn().mockResolvedValue({ hasCollision: false, collidingEntities: [] }),
     } as any;
     patternPlacer = new PatternPlacer(scene, mockCollisionDetector);
   });
@@ -159,11 +159,11 @@ describe('PatternPlacer', () => {
   });
 
   describe('validatePositions', () => {
-    it('should mark positions as invalid when collision detected', () => {
+    it('should mark positions as invalid when collision detected', async () => {
       const entity = new Entity('test');
       entity.transform.scale = [1, 1, 1];
 
-      mockCollisionDetector.checkCollisionOBB = vi.fn().mockReturnValue({
+      mockCollisionDetector.checkCollisionOBB = vi.fn().mockResolvedValue({
         hasCollision: true,
         collidingEntities: [],
       });
@@ -173,17 +173,17 @@ describe('PatternPlacer', () => {
         { position: [1, 0, 0] as [number, number, number], valid: true },
       ];
 
-      patternPlacer.validatePositions(positions, entity);
+      await patternPlacer.validatePositions(positions, entity);
 
       expect(positions[0]?.valid).toBe(false);
       expect(positions[1]?.valid).toBe(false);
     });
 
-    it('should mark positions as valid when no collision', () => {
+    it('should mark positions as valid when no collision', async () => {
       const entity = new Entity('test');
       entity.transform.scale = [1, 1, 1];
 
-      mockCollisionDetector.checkCollisionOBB = vi.fn().mockReturnValue({
+      mockCollisionDetector.checkCollisionOBB = vi.fn().mockResolvedValue({
         hasCollision: false,
         collidingEntities: [],
       });
@@ -193,7 +193,7 @@ describe('PatternPlacer', () => {
         { position: [1, 0, 0] as [number, number, number], valid: false },
       ];
 
-      patternPlacer.validatePositions(positions, entity);
+      await patternPlacer.validatePositions(positions, entity);
 
       expect(positions[0]?.valid).toBe(true);
       expect(positions[1]?.valid).toBe(true);

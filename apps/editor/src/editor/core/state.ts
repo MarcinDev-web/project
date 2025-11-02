@@ -13,7 +13,7 @@ export type EditorMode = 'edit' | 'play';
 export type BuildMode = 'free' | 'limited';
 export type EasyPlacePattern = 'single' | 'line' | 'grid' | 'circle';
 export type RotationSnapMode = 'free' | '15deg' | '45deg' | '90deg';
-export type CameraType = 'orbit' | 'fps' | 'third-person';
+export type CameraType = 'free-fly' | 'fps' | 'third-person';
 export type CameraMode = 'orbit' | 'free-fly';
 export type PlayModeCameraType = 'fps' | 'third-person'; // Camera types available in Play mode
 export type GizmoMode = 'translate' | 'rotate' | 'scale' | 'uniform';
@@ -62,6 +62,8 @@ export const DEFAULT_INSPECTOR_SECTION_ORDER: string[] = [
   'camera',
   'environment',
   'animation',
+  'character-controller',
+  'ui',
   'scripts',
 ];
 
@@ -124,6 +126,9 @@ export class EditorState {
   cameraType: Signal<CameraType>;
   cameraMode: Signal<CameraMode>;
   cameraPreferences: Signal<CameraPreferences>;
+
+  // Share/view-only mode
+  isSharedView: Signal<boolean>;
 
   // Optional Adaptive UI integration point (set by UI layer)
   adaptiveUI?: {
@@ -198,7 +203,7 @@ export class EditorState {
     });
 
     // Camera selection defaults
-    this.cameraType = signal<CameraType>('orbit');
+    this.cameraType = signal<CameraType>('free-fly');
     this.cameraMode = signal<CameraMode>('free-fly'); // Free-fly is now the default editor camera
     this.cameraPreferences = signal<CameraPreferences>({
       playModeCamera: 'fps', // Default to first person in Play mode
@@ -207,6 +212,9 @@ export class EditorState {
       sensitivity: 0.0025,
       invertY: false,
     });
+
+    // Share/view-only mode - disabled by default
+    this.isSharedView = signal<boolean>(false);
   }
 
   /** Temporarily disables history recording (used during undo/redo). */

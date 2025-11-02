@@ -2,21 +2,39 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src",
     "composite": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "skipLibCheck": true,
+    "paths": {
+      "@engine/economy": ["../economy/dist"],
+      "@engine/economy/*": ["../economy/dist/*"],
+      "@engine/world-server": ["../world-server/dist"],
+      "@engine/world-server/*": ["../world-server/dist/*"],
+      "@engine/script": ["../script/dist"],
+      "@engine/script/*": ["../script/dist/*"],
+      "@engine/stdlib": ["../stdlib/dist"],
+      "@engine/stdlib/*": ["../stdlib/dist/*"],
+      "@engine/voxel": ["../voxel/dist"],
+      "@engine/voxel/*": ["../voxel/dist/*"]
+    }
   },
   "include": ["src/**/*"],
   "exclude": [
     "__tests__",
     "dist",
-    "node_modules"
+    "node_modules",
+    "../economy/src",
+    "../world-server/src",
+    "../script/src",
+    "../stdlib/src",
+    "../voxel/src"
   ],
   "references": [
     { "path": "../core" },
-    { "path": "../stdlib" }
+    { "path": "../animation" },
+    { "path": "../blocks" }
   ]
 }
 

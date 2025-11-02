@@ -1,3 +1,6 @@
+/**
+ * @vitest-environment jsdom
+ */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { initRenderer } from '@engine/gfx-webgpu';
 

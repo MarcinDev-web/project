@@ -41,7 +41,7 @@ export class ScriptComponent extends Component {
     return this.instances.slice();
   }
 
-  override clone(): ScriptComponent {
+  clone(): ScriptComponent {
     const copy = new ScriptComponent();
     // Deep-copy script definitions; instances are not cloned
     copy.scripts = this.getScriptDefinitions();
@@ -73,14 +73,14 @@ export class ScriptComponent extends Component {
     return removed;
   }
 
-  override onAttach(): void {
+  onAttach(): void {
     // Instantiate all scripts
     for (const def of this.scripts) {
       this.tryInstantiate(def);
     }
   }
 
-  override onDetach(): void {
+  onDetach(): void {
     // Destroy instances
     const scene = this.entity?.scene ?? null;
     for (const inst of this.instances) {

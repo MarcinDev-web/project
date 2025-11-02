@@ -8,10 +8,8 @@ import {
   type WaitForPredicate,
   type WaitForSeconds,
 } from '../coroutine/CoroutineScheduler';
-import type { PhysicsWorld } from '@engine/world/physics';
-// TODO: Uncomment in Phase 5
-// import type { AnimationSystem } from '@engine/stdlib/Animation';
-type AnimationSystem = any; // Temp
+import type { PhysicsWorld } from '@engine/world';
+import type { AnimationSystem } from '@engine/stdlib/Animation';
 type Renderer = any; // Temp
 
 export interface BehaviorContext {

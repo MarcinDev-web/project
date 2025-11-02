@@ -1,12 +1,18 @@
+/**
+ * @vitest-environment jsdom
+ */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { InventoryManager } from '../InventoryManager';
 import type { Asset } from '../../types/BlockAssetTypes';
-import { BLOCK_LIBRARY } from '@engine/gfx-webgpu/blocks/BlockLibrary';
+import { BLOCK_LIBRARY } from '@engine/blocks';
 import { blockToAsset } from '../../types/BlockAssetTypes';
 
 // Mock asset
 const createMockAsset = (id: string, name: string): Asset => {
   const block = Object.values(BLOCK_LIBRARY)[0];
+  if (!block) {
+    throw new Error('BLOCK_LIBRARY is empty - cannot create mock asset');
+  }
   const asset = blockToAsset(block);
   return {
     ...asset,
@@ -200,9 +206,9 @@ describe('InventoryManager', () => {
       
       manager.restoreHotbar(data, assetLookup);
       
-      expect(manager.getHotbarSlot(0)?.asset?.metadata.id).toBe('asset1');
+      expect(manager.getHotbarSlot(0)?.asset?.id).toBe('asset1');
       expect(manager.getHotbarSlot(1)?.asset).toBeNull();
-      expect(manager.getHotbarSlot(2)?.asset?.metadata.id).toBe('asset2');
+      expect(manager.getHotbarSlot(2)?.asset?.id).toBe('asset2');
     });
   });
 
@@ -323,7 +329,7 @@ describe('InventoryManager', () => {
       newManager.restoreHotbar(savedData, lookup);
 
       expect(newManager.getHotbarSlot(0)?.asset).toBe(resolvedAsset);
-      expect(newManager.getHotbarSlot(0)?.asset?.metadata.id).toBe('asset1');
+      expect(newManager.getHotbarSlot(0)?.asset?.id).toBe('asset1');
       expect(newManager.getHotbarData()[0]).toBe('asset1');
       expect(lookup).toHaveBeenCalledWith('asset1');
     });

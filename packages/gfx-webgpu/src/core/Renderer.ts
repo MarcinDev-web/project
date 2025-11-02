@@ -1,6 +1,4 @@
-// TODO: Uncomment in Phase 6 when @engine/input exists
-// import type { OrbitControlsState } from '@engine/input';
-export type OrbitControlsState = { distance: number; azimuth: number; elevation: number; target: [number,number,number] }; // Temp
+import type { OrbitControlsState } from '@engine/camera';
 import { updateCanvasSize, getTimestampPeriod } from './helpers';
 import {
   DEFAULT_GEOMETRY,
@@ -17,11 +15,11 @@ import { GPUBufferPool } from './bufferPool';
 import type { Scene, Entity } from '@engine/world';
 import { EnvironmentComponent } from '@engine/world';
 import { LightManager } from '../lighting/LightManager';
-// TODO: Uncomment in Phase 4 when @engine/script exists
-// import { ScriptSystem } from '@engine/script';
-// import { LogicCubeSystem } from '@engine/script';
-// import { LogicConnectionRenderer } from '../LogicConnectionRenderer'; // TODO: Phase 4
+import { ScriptSystem } from '@engine/script';
+import { LogicCubeSystem } from '@engine/script';
+import { LogicConnectionRenderer } from '../LogicConnectionRenderer';
 import { EnvironmentRenderer } from '../renderers/EnvironmentRenderer';
+import { WaterRenderer } from '../renderers/WaterRenderer';
 import { Logger } from '@engine/core/utils';
 import { CameraSystem } from './CameraSystem';
 import { UniformManager } from './UniformManager';
@@ -59,15 +57,46 @@ function createVertexBufferLayouts(): GPUVertexBufferLayout[] {
       stepMode: 'vertex',
       attributes: [
         { shaderLocation: 0, offset: 0, format: 'float32x3' }, // position
-        { shaderLocation: 2, offset: 12, format: 'snorm8x4' }, // normal
-        { shaderLocation: 3, offset: 16, format: 'float16x2' }, // uv
-        { shaderLocation: 7, offset: 20, format: 'unorm8x4' }, // AO (x), rest unused
+        { shaderLocation: 1, offset: 12, format: 'snorm8x4' }, // normal
+        { shaderLocation: 2, offset: 16, format: 'float16x2' }, // uv
+        { shaderLocation: 3, offset: 20, format: 'unorm8x4' }, // AO (x), rest unused
       ],
     },
-    { arrayStride: INSTANCE_OFFSET_STRIDE, stepMode: 'instance', attributes: [{ shaderLocation: 1, offset: 0, format: 'float32x3' }] },
-    { arrayStride: 16, stepMode: 'instance', attributes: [{ shaderLocation: 4, offset: 0, format: 'float32x4' }] },
-    { arrayStride: 16, stepMode: 'instance', attributes: [{ shaderLocation: 5, offset: 0, format: 'float32x4' }] },
-    { arrayStride: 4, stepMode: 'instance', attributes: [{ shaderLocation: 6, offset: 0, format: 'float32' }] },
+    {
+      arrayStride: INSTANCE_OFFSET_STRIDE,
+      stepMode: 'instance',
+      attributes: [{ shaderLocation: 4, offset: 0, format: 'float32x3' }],
+    },
+    {
+      arrayStride: 16,
+      stepMode: 'instance',
+      attributes: [{ shaderLocation: 5, offset: 0, format: 'float32x4' }],
+    },
+    {
+      arrayStride: 16,
+      stepMode: 'instance',
+      attributes: [{ shaderLocation: 6, offset: 0, format: 'float32x4' }],
+    },
+    {
+      arrayStride: 16,
+      stepMode: 'instance',
+      attributes: [{ shaderLocation: 7, offset: 0, format: 'float32x4' }],
+    },
+    {
+      arrayStride: 16,
+      stepMode: 'instance',
+      attributes: [{ shaderLocation: 8, offset: 0, format: 'float32x4' }],
+    },
+    {
+      arrayStride: 16,
+      stepMode: 'instance',
+      attributes: [{ shaderLocation: 9, offset: 0, format: 'float32x4' }],
+    },
+    {
+      arrayStride: 4,
+      stepMode: 'instance',
+      attributes: [{ shaderLocation: 10, offset: 0, format: 'float32' }],
+    },
   ];
 }
 
@@ -125,6 +154,7 @@ interface RendererOptions {
   enableHDR?: boolean;
   enableBloom?: boolean;
   enableShadows?: boolean;
+  enableSSAO?: boolean; // Screen Space Ambient Occlusion
   shadowQuality?: 'low' | 'med' | 'high' | 'ultra';
   enableComputePrepass?: boolean;
   msaaSampleCount?: 1 | 2 | 4;
@@ -142,6 +172,7 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
     enableHDR: options.enableHDR !== false,
     enableBloom: options.enableBloom !== false,
     enableShadows: options.enableShadows !== false,
+    enableSSAO: options.enableSSAO !== false,
     shadowQuality: (options.shadowQuality ?? 'med') as 'low' | 'med' | 'high' | 'ultra',
     enableComputePrepass: options.enableComputePrepass !== false,
     msaaSampleCount: (options.msaaSampleCount ?? MSAA_SAMPLE_COUNT) as 1 | 2 | 4,
@@ -285,16 +316,17 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
   let frame: () => void;
   let frameResources: FrameResources;
   let frameRenderer: FrameRenderer;
-  // TODO: Uncomment in Phase 4
-  // let scriptSystem: ScriptSystem | null = null;
-  // let logicCubeSystem: LogicCubeSystem | null = null;
-  // let logicConnectionRenderer: LogicConnectionRenderer | null = null;
+  let scriptSystem: ScriptSystem | null = null;
+  let logicCubeSystem: LogicCubeSystem | null = null;
+  let logicConnectionRenderer: LogicConnectionRenderer | null = null;
   let lastFrameTimeMs: number | null = null;
 
   // Prepare geometry from scene or use default
   let geometry = options.geometry ?? DEFAULT_GEOMETRY;
+  geometry = { ...geometry, opaqueCount: geometry.opaqueCount ?? geometry.instanceCount };
   let gridRenderer: GridRenderer | null = null;
   let environmentRenderer: EnvironmentRenderer | null = null;
+  let waterRenderer: WaterRenderer | null = null;
 
   try {
     resizeObserver = new ResizeObserver(() => {
@@ -312,16 +344,15 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       if (!currentCameraEntity) {
         currentCameraEntity = currentScene.primaryCamera;
       }
-      // TODO: Uncomment in Phase 4 when @engine/script exists
       // Initialize scripting runtime for scene
-      // scriptSystem = new ScriptSystem(currentScene);
+      scriptSystem = new ScriptSystem(currentScene);
       // Initialize logic cube system for scene
-      // logicCubeSystem = new LogicCubeSystem(currentScene);
+      logicCubeSystem = new LogicCubeSystem(currentScene);
       // Initialize logic connection renderer
-      // logicConnectionRenderer = new LogicConnectionRenderer(
-      //   currentScene,
-      //   logicCubeSystem.getConnectionManager()
-      // );
+      logicConnectionRenderer = new LogicConnectionRenderer(
+        currentScene,
+        logicCubeSystem.getConnectionManager()
+      );
     }
     const geometryBuffers = createGeometryBuffers(device, geometry);
 
@@ -333,7 +364,7 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
     const { textureBindGroupLayout, textureBindGroup, atlasTexture, normalAtlasTexture, sampler, atlas, atlasMetaBuffer } =
       createTextureAtlas(device, undefined, 2048, 128);
 
-    const { renderPipeline, overlayPipeline } = await createPipelines(
+    const { renderPipeline, transparentPipeline, overlayPipeline } = await createPipelines(
       device,
       'rgba16float',
       uniformResources.uniformBindGroupLayout,
@@ -393,6 +424,7 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       uniformBindGroupLayout: uniformResources.uniformBindGroupLayout,
       textureBindGroupLayout,
       renderPipeline,
+      transparentPipeline,
       overlayPipeline,
       uniformBindGroup,
       uniformData: uniformResources.uniformData,
@@ -422,6 +454,14 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       presentationFormat: 'rgba16float',
       sampleCount: renderSettings.msaaSampleCount,
     });
+
+    // Initialize water renderer
+    waterRenderer = new WaterRenderer();
+    await waterRenderer.initialize({
+      device,
+      presentationFormat: 'rgba16float',
+      sampleCount: renderSettings.msaaSampleCount,
+    });
     // Precompute IBL textures (best-effort)
     try {
       // Shadow placeholders for bindings 4 & 5
@@ -442,7 +482,7 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       const defaultEnv = new EnvironmentComponent();
       environmentRenderer.updateParams(defaultEnv);
 
-      const { brdfLut, envCube } = await environmentRenderer.prepareIBLResources(128);
+      const { brdfLut, envCube } = await environmentRenderer.prepareIBLResources(defaultEnv, 128);
       const newBg = device.createBindGroup({
         label: 'material-atlas-bg+ibl',
         layout: textureBindGroupLayout,
@@ -463,17 +503,16 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       // ignore if IBL generation fails in minimal environments
     }
 
-    // TODO: Uncomment in Phase 4 when @engine/script exists
     // Initialize logic connection renderer
-    // if (logicConnectionRenderer) {
-    //   try {
-    //     await logicConnectionRenderer.initialize(device, presentationFormat);
-    //     Logger.info('Logic connection renderer initialized');
-    //   } catch (err) {
-    //     Logger.warn('Failed to initialize logic connection renderer:', err);
-    //     logicConnectionRenderer = null;
-    //   }
-    // }
+    if (logicConnectionRenderer) {
+      try {
+        await logicConnectionRenderer.initialize(device, presentationFormat);
+        Logger.info('Logic connection renderer initialized');
+      } catch (err) {
+        Logger.warn('Failed to initialize logic connection renderer:', err);
+        logicConnectionRenderer = null;
+      }
+    }
 
     frame = () => {
       if (animationFrameHandle !== null) {
@@ -533,35 +572,33 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
         }
       }
 
-      // TODO: Uncomment in Phase 4 when @engine/script exists
       // Per-frame system updates (runtime simulation)
-      // if (scriptSystem && dtSec > 0 && shouldSimulateFn()) {
-      //   try {
-      //     scriptSystem.update(dtSec);
-      //     scriptSystem.lateUpdate(dtSec);
-      //   } catch (err) {
-      //     Logger.warn('ScriptSystem update failed:', err);
-      //   }
-      // }
+      if (scriptSystem && dtSec > 0 && shouldSimulateFn()) {
+        try {
+          scriptSystem.update(dtSec);
+          scriptSystem.lateUpdate(dtSec);
+        } catch (err) {
+          Logger.warn('ScriptSystem update failed:', err);
+        }
+      }
 
       // Update logic cube system
-      // if (logicCubeSystem && dtSec > 0 && shouldSimulateFn()) {
-      //   try {
-      //     logicCubeSystem.update(dtSec);
-      //   } catch (err) {
-      //     Logger.warn('LogicCubeSystem update failed:', err);
-      //   }
-      // }
+      if (logicCubeSystem && dtSec > 0 && shouldSimulateFn()) {
+        try {
+          logicCubeSystem.update(dtSec);
+        } catch (err) {
+          Logger.warn('LogicCubeSystem update failed:', err);
+        }
+      }
 
-      // TODO: Uncomment in Phase 4
       // Update logic connection renderer animations
-      // if (logicConnectionRenderer && dtSec > 0) {
-      //   try {
-      //     logicConnectionRenderer.update(dtSec);
-      //   } catch (err) {
-      //     Logger.warn('Logic connection renderer update failed:', err);
-      //   }
-      // }
+      if (logicConnectionRenderer && dtSec > 0) {
+        try {
+          logicConnectionRenderer.update(dtSec);
+        } catch (err) {
+          Logger.warn('Logic connection renderer update failed:', err);
+        }
+      }
 
       // Update all dynamic uniforms (matrices, camera, lighting)
       const lightingData = lightManager ? lightManager.getLightingData(frameId) : undefined;
@@ -581,6 +618,11 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       }
 
     // Render frame (handles all rendering operations)
+    // Calculate time for animations
+    const currentTime = typeof performance !== 'undefined' && typeof performance.now === 'function'
+      ? performance.now() / 1000.0 // Convert to seconds
+      : Date.now() / 1000.0;
+
     geometry = frameRenderer.renderFrame(
       {
         device,
@@ -591,8 +633,9 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
         scene: currentScene,
         geometry,
         environmentRenderer,
+        waterRenderer,
         gridRenderer,
-        // logicConnectionRenderer: null, // TODO: Phase 4
+        logicConnectionRenderer,
         uniformManager,
         lightingData,
         featureFlags: {
@@ -600,9 +643,11 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
           enableShadows: renderSettings.enableShadows,
           enableBloom: renderSettings.enableBloom,
           enableHDR: renderSettings.enableHDR,
+          enableSSAO: renderSettings.enableSSAO,
         },
         shadowQuality: renderSettings.shadowQuality,
         msaaSampleCount: renderSettings.msaaSampleCount,
+        time: currentTime,
         ...(gpuTimingListeners.length
           ? {
               onGpuTimings: (timings) => {
@@ -680,6 +725,9 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
     safeDestroy(frameResources.indexBuffer);
     safeDestroy(frameResources.instanceOffsetBuffer);
     safeDestroy(frameResources.instanceColorScaleBuffer);
+    safeDestroy(frameResources.instanceSecondaryColorBuffer);
+    safeDestroy(frameResources.instanceEmissiveColorBuffer);
+    safeDestroy(frameResources.instanceMaterialParamsBuffer);
     safeDestroy(frameResources.instanceRotationBuffer);
     safeDestroy(frameResources.instanceMaterialIdBuffer);
     safeDestroy(frameResources.sideTexture);
@@ -692,6 +740,8 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
     try {
       environmentRenderer?.cleanup();
       environmentRenderer = null;
+      waterRenderer?.dispose();
+      waterRenderer = null;
       // TODO: Phase 4
       // logicConnectionRenderer?.dispose();
       // logicConnectionRenderer = null;

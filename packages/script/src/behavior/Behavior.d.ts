@@ -2,8 +2,8 @@ import type { Entity } from '@engine/world';
 import type { Scene } from '@engine/world';
 import type { EventBus } from '@engine/core/event';
 import { type CoroutineGenerator, type WaitForFrames, type WaitForPredicate, type WaitForSeconds } from '../coroutine/CoroutineScheduler';
-import type { PhysicsWorld } from '@engine/world/physics';
-type AnimationSystem = any;
+import type { PhysicsWorld } from '@engine/world';
+import type { AnimationSystem } from '@engine/stdlib/Animation';
 type Renderer = any;
 export interface BehaviorContext {
     entity: Entity;

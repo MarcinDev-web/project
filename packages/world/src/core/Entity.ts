@@ -344,7 +344,8 @@ export class Entity {
     if (data.name === undefined || data.name === null || typeof data.name !== 'string') {
       throw new Error('Invalid entity data: name is required and must be a string');
     }
-    if (typeof data.active !== 'boolean') {
+    // active is optional, default to true if not provided
+    if (data.active !== undefined && typeof data.active !== 'boolean') {
       throw new Error('Invalid entity data: active must be a boolean');
     }
 
@@ -391,7 +392,7 @@ export class Entity {
     // Create entity with validated data, passing the original ID to preserve it
     const entity = new Entity(data.name, Transform.fromJSON(data.transform), data.id);
 
-    entity._active = data.active;
+    entity._active = data.active !== undefined ? data.active : true;
 
     // Restore components first when provided
     entity.deserializeComponents(data.components ?? []);
@@ -509,7 +510,7 @@ export class Entity {
 export interface EntityData {
   id: EntityId;
   name: string;
-  active: boolean;
+  active?: boolean;
   // Optional ECS components payload (new format)
   components?: Array<{
     type: string;

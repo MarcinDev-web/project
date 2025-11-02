@@ -51,7 +51,7 @@ export class SendMessageAction extends LogicCube {
             color: [0.8, 0.4, 1], // Purple
         };
     }
-    onSignalReceived(portId, signal) {
+    onSignalReceived(portId, signal, _context) {
         if (portId !== 'trigger')
             return null;
         const message = this.getConfig('message', 'CustomEvent');
@@ -143,7 +143,7 @@ export class SetVariableAction extends LogicCube {
             color: [0.2, 0.8, 1], // Cyan
         };
     }
-    onSignalReceived(portId, signal) {
+    onSignalReceived(portId, signal, _context) {
         if (portId !== 'trigger')
             return null;
         // Get variable storage from scene (we'll need to access it through the system)
@@ -242,7 +242,7 @@ export class SpawnEntityAction extends LogicCube {
             color: [0.2, 1, 0.5], // Green-cyan
         };
     }
-    onSignalReceived(portId, signal) {
+    onSignalReceived(portId, signal, _context) {
         if (portId !== 'trigger')
             return null;
         const prefabName = this.getConfig('prefabName', 'Cube');
@@ -352,7 +352,7 @@ export class LogAction extends LogicCube {
             color: [0.5, 0.5, 0.5], // Gray
         };
     }
-    onSignalReceived(portId, signal) {
+    onSignalReceived(portId, signal, _context) {
         if (portId !== 'trigger')
             return null;
         const message = this.getConfig('message', 'Hello World');

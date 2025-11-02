@@ -3,6 +3,9 @@ export class BloomPass {
     pipeline = null;
     bindGroupLayout = null;
     sampler = null;
+    cachedBindGroup = null;
+    cachedSrcView = null;
+    cachedDstView = null;
     constructor(device) {
         this.device = device;
     }
@@ -71,23 +74,38 @@ struct VSOut { @builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32> };
             });
         }
     }
-    render(encoder, srcView, dstView) {
+    render(encoder, srcView, dstView, opts) {
         if (!this.pipeline || !this.bindGroupLayout || !this.sampler)
             return;
-        const bindGroup = this.device.createBindGroup({
-            label: 'bloom-bg',
-            layout: this.bindGroupLayout,
-            entries: [
-                { binding: 0, resource: srcView },
-                { binding: 1, resource: this.sampler },
-            ],
-        });
-        const pass = encoder.beginRenderPass({
+        // Cache bind group across frames; recreate when views change (resize)
+        if (!this.cachedBindGroup || this.cachedSrcView !== srcView || this.cachedDstView !== dstView) {
+            this.cachedBindGroup = this.device.createBindGroup({
+                label: 'bloom-bg',
+                layout: this.bindGroupLayout,
+                entries: [
+                    { binding: 0, resource: srcView },
+                    { binding: 1, resource: this.sampler },
+                ],
+            });
+            this.cachedSrcView = srcView;
+            this.cachedDstView = dstView;
+        }
+        const passDesc = {
             label: 'bloom-pass',
             colorAttachments: [{ view: dstView, loadOp: 'clear', storeOp: 'store' }],
-        });
+            ...(opts?.querySet && typeof opts.begin === 'number' && typeof opts.end === 'number'
+                ? {
+                    timestampWrites: {
+                        querySet: opts.querySet,
+                        beginningOfPassWriteIndex: opts.begin,
+                        endOfPassWriteIndex: opts.end,
+                    },
+                }
+                : {}),
+        };
+        const pass = encoder.beginRenderPass(passDesc);
         pass.setPipeline(this.pipeline);
-        pass.setBindGroup(0, bindGroup);
+        pass.setBindGroup(0, this.cachedBindGroup);
         pass.draw(3, 1, 0, 0);
         pass.end();
     }

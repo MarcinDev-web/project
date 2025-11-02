@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { Scene } from '@engine/world';
+import { Scene, Entity } from '@engine/world';
 import { LogicCubeLibrary } from '../LogicCubeLibrary';
-import { LogicCubeRegistry } from '@engine/script';
-import type { LogicCube, LogicCubeConstructor } from '@engine/script';
+import { LogicCubeRegistry, LogicCube } from '@engine/script';
+import type { LogicCubeConstructor } from '@engine/script';
 
 describe('LogicCubeLibrary', () => {
   beforeEach(() => {
@@ -16,10 +16,12 @@ describe('LogicCubeLibrary', () => {
   it('getCategories returns dynamic categories with stable ordering', () => {
     // Register two fake cube types with categories including a custom one
     const makeCtor = (meta: { type: string; displayName: string; category: string }): LogicCubeConstructor => {
-      class DummyCube implements LogicCube {
+      class DummyCube extends LogicCube {
         static type = meta.type;
-        enabled = true;
-        constructor(): void {}
+        constructor(entity: Entity, scene: Scene, config?: Record<string, unknown>) {
+          super(entity, scene, config);
+          // Parameters are required by base class constructor but unused in test mocks
+        }
         getMetadata() {
           return {
             type: meta.type,
@@ -37,7 +39,13 @@ describe('LogicCubeLibrary', () => {
         onUpdate() {}
         canReceiveSignal() { return true; }
         onSignalReceived() { return null; }
-        toJSON() { return {}; }
+        toJSON() {
+          return {
+            config: {},
+            state: {},
+            cooldown: 0,
+          };
+        }
         fromJSON() {}
       }
       return DummyCube as unknown as LogicCubeConstructor;
@@ -63,10 +71,12 @@ describe('LogicCubeLibrary', () => {
   it('createEntity attaches created entity to provided scene', () => {
     // Minimal cube to be registered
     const makeCtor = (meta: { type: string; displayName: string; category: string }): LogicCubeConstructor => {
-      class DummyCube implements LogicCube {
+      class DummyCube extends LogicCube {
         static type = meta.type;
-        enabled = true;
-        constructor(): void {}
+        constructor(entity: Entity, scene: Scene, config?: Record<string, unknown>) {
+          super(entity, scene, config);
+          // Parameters are required by base class constructor but unused in test mocks
+        }
         getMetadata() {
           return {
             type: meta.type,
@@ -83,7 +93,13 @@ describe('LogicCubeLibrary', () => {
         onUpdate() {}
         canReceiveSignal() { return true; }
         onSignalReceived() { return null; }
-        toJSON() { return {}; }
+        toJSON() {
+          return {
+            config: {},
+            state: {},
+            cooldown: 0,
+          };
+        }
         fromJSON() {}
       }
       return DummyCube as unknown as LogicCubeConstructor;

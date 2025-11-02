@@ -67,10 +67,13 @@ export function persistCameraType(state: EditorState): void {
 
 export function restoreCameraType(state: EditorState): void {
   try {
-    const restored = storageLoad<'orbit' | 'fps'>('cameraType');
-    if (restored && (restored === 'orbit' || restored === 'fps')) {
+    const restored = storageLoad<'free-fly' | 'fps' | 'third-person'>('cameraType');
+    // Only restore valid editor camera types (free-fly)
+    // Ignore fps and third-person (not available in editor)
+    if (restored === 'free-fly') {
       state.cameraType.value = restored;
     }
+    // If stored value is fps or third-person, ignore it (default to free-fly)
   } catch {}
 }
 

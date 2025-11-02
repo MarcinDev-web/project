@@ -1,0 +1,37 @@
+/**
+ * Platform Main CSS Entry Point
+ * 
+ * Reuses design system from editor for consistency
+ */
+
+/* Design System - Reference editor styles */
+@import '../../../../apps/editor/styles/design-tokens.css';
+
+/* Base */
+@import '../../../../apps/editor/styles/base/reset.css';
+@import '../../../../apps/editor/styles/base/typography.css';
+
+/* Layout - We'll create platform-specific layouts */
+@import './layout.css';
+
+/* Components - Reuse from editor */
+@import '../../../../apps/editor/styles/components/buttons.css';
+@import '../../../../apps/editor/styles/components/inputs.css';
+@import '../../../../apps/editor/styles/components/forms.css';
+@import '../../../../apps/editor/styles/components/cards.css';
+@import '../../../../apps/editor/styles/components/lists.css';
+@import '../../../../apps/editor/styles/components/modals.css';
+@import '../../../../apps/editor/styles/components/notifications.css';
+@import '../../../../apps/editor/styles/components/badges.css';
+@import '../../../../apps/editor/styles/components/tabs.css';
+
+/* Utilities */
+@import '../../../../apps/editor/styles/utilities/animations.css';
+@import '../../../../apps/editor/styles/utilities/responsive.css';
+@import '../../../../apps/editor/styles/utilities/scrollbars.css';
+@import '../../../../apps/editor/styles/utilities/spacing.css';
+
+/* Platform-specific styles */
+@import './platform.css';
+@import './blocks-models-studio.css';
+

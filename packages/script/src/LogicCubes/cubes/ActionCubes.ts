@@ -3,7 +3,7 @@
  */
 
 import { LogicCube } from './LogicCube';
-import type { LogicCubeMetadata, LogicSignal } from './types';
+import type { LogicCubeMetadata, LogicSignal, LogicExecutionContext } from './types';
 import { Logger } from '@engine/core/utils';
 
 /**
@@ -55,7 +55,7 @@ export class SendMessageAction extends LogicCube {
     };
   }
 
-  onSignalReceived(portId: string, signal: LogicSignal): Map<string, LogicSignal> | null {
+  onSignalReceived(portId: string, signal: LogicSignal, _context: LogicExecutionContext): Map<string, LogicSignal> | null {
     if (portId !== 'trigger') return null;
 
     const message = this.getConfig<string>('message', 'CustomEvent');
@@ -150,7 +150,7 @@ export class SetVariableAction extends LogicCube {
     };
   }
 
-  onSignalReceived(portId: string, signal: LogicSignal): Map<string, LogicSignal> | null {
+  onSignalReceived(portId: string, signal: LogicSignal, _context: LogicExecutionContext): Map<string, LogicSignal> | null {
     if (portId !== 'trigger') return null;
 
     // Get variable storage from scene (we'll need to access it through the system)
@@ -251,7 +251,7 @@ export class SpawnEntityAction extends LogicCube {
     };
   }
 
-  onSignalReceived(portId: string, signal: LogicSignal): Map<string, LogicSignal> | null {
+  onSignalReceived(portId: string, signal: LogicSignal, _context: LogicExecutionContext): Map<string, LogicSignal> | null {
     if (portId !== 'trigger') return null;
 
     const prefabName = this.getConfig<string>('prefabName', 'Cube');
@@ -372,7 +372,7 @@ export class LogAction extends LogicCube {
     };
   }
 
-  onSignalReceived(portId: string, signal: LogicSignal): Map<string, LogicSignal> | null {
+  onSignalReceived(portId: string, signal: LogicSignal, _context: LogicExecutionContext): Map<string, LogicSignal> | null {
     if (portId !== 'trigger') return null;
 
     const message = this.getConfig<string>('message', 'Hello World');

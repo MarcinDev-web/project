@@ -10,6 +10,7 @@
     "lint": "eslint src --max-warnings=0"
   },
   "dependencies": {
+    "@engine/brand": "workspace:*",
     "@engine/core": "workspace:*",
     "@engine/world": "workspace:*",
     "@engine/gfx-webgpu": "workspace:*",
@@ -17,7 +18,11 @@
     "@engine/input": "workspace:*",
     "@engine/camera": "workspace:*",
     "@engine/stdlib": "workspace:*",
+    "@engine/avatar": "workspace:*",
     "@engine/editor-utils": "workspace:*",
+    "@engine/net": "workspace:*",
+    "@engine/wasm-collision": "workspace:*",
+    "@engine/blocks": "workspace:*",
     "@webgpu/types": "^0.1.65",
     "@gltf-transform/core": "^3.10.1",
     "@gltf-transform/extensions": "^3.10.1",

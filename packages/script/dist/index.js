@@ -11,4 +11,5 @@ export * from './coroutine';
 export * from './connection';
 export { VariableStorage } from './storage/VariableStorage'; // Named to avoid VariableData conflict
 export * from './services';
+export * from './signals';
 //# sourceMappingURL=index.js.map

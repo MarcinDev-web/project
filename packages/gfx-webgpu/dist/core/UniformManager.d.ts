@@ -55,6 +55,7 @@ export declare class UniformManager {
         atlasRects: readonly [number, number, number, number][];
         filterParams: readonly [number, number, number, number];
         biasParams: readonly [number, number, number, number];
+        extraParams?: readonly [number, number, number, number];
     }): void;
     /**
      * Gets the uniform buffer.

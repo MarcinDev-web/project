@@ -1,8 +1,8 @@
 import type { BehaviorInstance } from '../behavior/Behavior';
 import type { CoroutineScheduler } from '../coroutine/CoroutineScheduler';
 import type { SceneScriptContextBuilder } from '../services/SceneScriptContextBuilder';
-import type { PhysicsWorld } from '@engine/world/physics';
-type AnimationSystem = any;
+import type { PhysicsWorld } from '@engine/world';
+import type { AnimationSystem } from '@engine/stdlib/Animation';
 type Renderer = any;
 export interface ScriptRuntime {
     scheduler: CoroutineScheduler;

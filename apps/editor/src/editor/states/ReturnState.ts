@@ -37,8 +37,10 @@ export interface ReturnStateDeps {
   disposeRuntimeGPUResources?: () => void;
   /** Restore editor UI visibility */
   showEditorUI: () => void;
-  /** Re-enable orbit controls */
-  enableOrbitControls: () => void;
+  /** Restore editor camera */
+  restoreEditorCamera: () => void;
+  /** Clear checkpoint system */
+  clearCheckpoints?: () => void;
 }
 
 /**
@@ -78,6 +80,7 @@ export class ReturnState implements IPlayModeState {
       this.deps.disableFPSCamera();
       this.deps.unbindPlayerController();
       this.deps.cleanupPlayer();
+      this.deps.clearCheckpoints?.();
       
       // Step 2: Pop gameplay input context and release pointer lock
       Logger.debug('Releasing pointer lock and input context');
@@ -87,9 +90,9 @@ export class ReturnState implements IPlayModeState {
       }
       this.deps.inputContext.releasePointerLock();
       
-      // Step 3: Switch camera back to orbit
-      Logger.debug('Switching camera to orbit mode');
-      this.deps.cameraDirector.setMode('orbit');
+      // Step 3: Switch camera back to free-fly
+      Logger.debug('Switching camera to free-fly mode');
+      this.deps.cameraDirector.setMode('free-fly');
       
       // Step 4: Dispose runtime GPU resources
       if (this.deps.disposeRuntimeGPUResources) {
@@ -115,7 +118,7 @@ export class ReturnState implements IPlayModeState {
       context.manifest = null;
       context.data.clear();
       this.deps.showEditorUI();
-      this.deps.enableOrbitControls();
+      this.deps.restoreEditorCamera();
       
       Logger.info('Returned to edit mode');
     } catch (error) {

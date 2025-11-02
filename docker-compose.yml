@@ -1,0 +1,46 @@
+version: "3.9"
+
+services:
+  db:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-collab}
+      POSTGRES_USER: ${POSTGRES_USER:-collab}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-collab}
+    volumes:
+      - db_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-collab} -d ${POSTGRES_DB:-collab}"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+    networks:
+      - backend
+
+  collab-server:
+    build:
+      context: .
+      dockerfile: apps/collab-server/Dockerfile
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PORT: ${PORT:-4000}
+      DATABASE_URL: ${DATABASE_URL:-postgres://${POSTGRES_USER:-collab}:${POSTGRES_PASSWORD:-collab}@db:5432/${POSTGRES_DB:-collab}}
+      JWT_SECRET: ${JWT_SECRET:-change-me-in-dev}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-}
+      ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173}
+      NODE_ENV: ${NODE_ENV:-development}
+    ports:
+      - "${PORT:-4000}:${PORT:-4000}"
+    networks:
+      - backend
+
+networks:
+  backend:
+    driver: bridge
+
+volumes:
+  db_data:
+
+

@@ -1,0 +1,28 @@
+{
+  "name": "@engine/world-server",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src --max-warnings=0",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "@engine/world": "workspace:*",
+    "@engine/net-protocol": "workspace:*"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.3"
+  }
+}
+
+

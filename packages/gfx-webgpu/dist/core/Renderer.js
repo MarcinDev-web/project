@@ -15,6 +15,7 @@ import { UniformManager } from './UniformManager';
 import { FrameRenderer } from './FrameRenderer';
 import { createInstanceDataFromScene } from './InstanceManager';
 import { DEFAULT_STATUS_MESSAGE, MSAA_SAMPLE_COUNT, TIMESTAMP_QUERY_COUNT, UNIFORM_BUFFER_SIZE, UNIFORM_DATA_LENGTH, TIMESTAMP_BUFFER_SIZE, } from '../config';
+import { TIMESTAMP_INDICES } from '../config';
 function hasPreferredCanvasFormat(gpu) {
     return (typeof gpu === 'object' &&
         gpu !== null &&
@@ -30,15 +31,46 @@ function createVertexBufferLayouts() {
             stepMode: 'vertex',
             attributes: [
                 { shaderLocation: 0, offset: 0, format: 'float32x3' }, // position
-                { shaderLocation: 2, offset: 12, format: 'snorm8x4' }, // normal
-                { shaderLocation: 3, offset: 16, format: 'float16x2' }, // uv
-                { shaderLocation: 7, offset: 20, format: 'unorm8x4' }, // AO (x), rest unused
+                { shaderLocation: 1, offset: 12, format: 'snorm8x4' }, // normal
+                { shaderLocation: 2, offset: 16, format: 'float16x2' }, // uv
+                { shaderLocation: 3, offset: 20, format: 'unorm8x4' }, // AO (x), rest unused
             ],
         },
-        { arrayStride: INSTANCE_OFFSET_STRIDE, stepMode: 'instance', attributes: [{ shaderLocation: 1, offset: 0, format: 'float32x3' }] },
-        { arrayStride: 16, stepMode: 'instance', attributes: [{ shaderLocation: 4, offset: 0, format: 'float32x4' }] },
-        { arrayStride: 16, stepMode: 'instance', attributes: [{ shaderLocation: 5, offset: 0, format: 'float32x4' }] },
-        { arrayStride: 4, stepMode: 'instance', attributes: [{ shaderLocation: 6, offset: 0, format: 'float32' }] },
+        {
+            arrayStride: INSTANCE_OFFSET_STRIDE,
+            stepMode: 'instance',
+            attributes: [{ shaderLocation: 4, offset: 0, format: 'float32x3' }],
+        },
+        {
+            arrayStride: 16,
+            stepMode: 'instance',
+            attributes: [{ shaderLocation: 5, offset: 0, format: 'float32x4' }],
+        },
+        {
+            arrayStride: 16,
+            stepMode: 'instance',
+            attributes: [{ shaderLocation: 6, offset: 0, format: 'float32x4' }],
+        },
+        {
+            arrayStride: 16,
+            stepMode: 'instance',
+            attributes: [{ shaderLocation: 7, offset: 0, format: 'float32x4' }],
+        },
+        {
+            arrayStride: 16,
+            stepMode: 'instance',
+            attributes: [{ shaderLocation: 8, offset: 0, format: 'float32x4' }],
+        },
+        {
+            arrayStride: 16,
+            stepMode: 'instance',
+            attributes: [{ shaderLocation: 9, offset: 0, format: 'float32x4' }],
+        },
+        {
+            arrayStride: 4,
+            stepMode: 'instance',
+            attributes: [{ shaderLocation: 10, offset: 0, format: 'float32' }],
+        },
     ];
 }
 export async function initRenderer(options) {
@@ -47,6 +79,15 @@ export async function initRenderer(options) {
     const onFrameUpdateFn = options.onFrameUpdate;
     const currentScene = options.scene ?? null;
     let currentCameraEntity = options.cameraEntity ?? null;
+    // Resolve render settings with defaults
+    const renderSettings = {
+        enableHDR: options.enableHDR !== false,
+        enableBloom: options.enableBloom !== false,
+        enableShadows: options.enableShadows !== false,
+        shadowQuality: (options.shadowQuality ?? 'med'),
+        enableComputePrepass: options.enableComputePrepass !== false,
+        msaaSampleCount: (options.msaaSampleCount ?? MSAA_SAMPLE_COUNT),
+    };
     // Initialize light manager for the scene
     const lightManager = currentScene ? new LightManager(currentScene) : null;
     if (!('gpu' in navigator) || !navigator.gpu) {
@@ -181,6 +222,7 @@ export async function initRenderer(options) {
     let lastFrameTimeMs = null;
     // Prepare geometry from scene or use default
     let geometry = options.geometry ?? DEFAULT_GEOMETRY;
+    geometry = { ...geometry, opaqueCount: geometry.opaqueCount ?? geometry.instanceCount };
     let gridRenderer = null;
     let environmentRenderer = null;
     try {
@@ -216,7 +258,7 @@ export async function initRenderer(options) {
         });
         const vertexBuffers = createVertexBufferLayouts();
         const { textureBindGroupLayout, textureBindGroup, atlasTexture, normalAtlasTexture, sampler, atlas, atlasMetaBuffer } = createTextureAtlas(device, undefined, 2048, 128);
-        const { renderPipeline, overlayPipeline } = await createPipelines(device, 'rgba16float', uniformResources.uniformBindGroupLayout, textureBindGroupLayout, vertexBuffers, { sampleCount: MSAA_SAMPLE_COUNT, statusEl });
+        const { renderPipeline, transparentPipeline, overlayPipeline } = await createPipelines(device, 'rgba16float', uniformResources.uniformBindGroupLayout, textureBindGroupLayout, vertexBuffers, { sampleCount: renderSettings.msaaSampleCount, statusEl });
         const uniformBindGroup = device.createBindGroup({
             label: 'frame-uniform-bg',
             layout: uniformResources.uniformBindGroupLayout,
@@ -231,9 +273,9 @@ export async function initRenderer(options) {
                 },
             ],
         });
-        const depthTexture = createDepthTexture(device, canvas, MSAA_SAMPLE_COUNT);
+        const depthTexture = createDepthTexture(device, canvas, renderSettings.msaaSampleCount);
         const depthTextureView = depthTexture.createView({ label: 'frame-depth-view' });
-        const msaaColorTexture = createMsaaColorTarget(device, canvas, presentationFormat, MSAA_SAMPLE_COUNT);
+        const msaaColorTexture = createMsaaColorTarget(device, canvas, presentationFormat, renderSettings.msaaSampleCount);
         const msaaColorView = msaaColorTexture.createView({ label: 'frame-msaa-color-view' });
         // Initialize rendering systems
         const uniformManager = new UniformManager(device, uniformResources.uniformBuffer);
@@ -257,6 +299,7 @@ export async function initRenderer(options) {
             uniformBindGroupLayout: uniformResources.uniformBindGroupLayout,
             textureBindGroupLayout,
             renderPipeline,
+            transparentPipeline,
             overlayPipeline,
             uniformBindGroup,
             uniformData: uniformResources.uniformData,
@@ -283,7 +326,7 @@ export async function initRenderer(options) {
         await environmentRenderer.initialize({
             device,
             presentationFormat: 'rgba16float',
-            sampleCount: MSAA_SAMPLE_COUNT,
+            sampleCount: renderSettings.msaaSampleCount,
         });
         // Precompute IBL textures (best-effort)
         try {
@@ -304,7 +347,7 @@ export async function initRenderer(options) {
             // Needed so the env-capture pipeline has a valid group(0) bind group
             const defaultEnv = new EnvironmentComponent();
             environmentRenderer.updateParams(defaultEnv);
-            const { brdfLut, envCube } = await environmentRenderer.prepareIBLResources(128);
+            const { brdfLut, envCube } = await environmentRenderer.prepareIBLResources(defaultEnv, 128);
             const newBg = device.createBindGroup({
                 label: 'material-atlas-bg+ibl',
                 layout: textureBindGroupLayout,
@@ -424,8 +467,8 @@ export async function initRenderer(options) {
                 passDesc = {
                     timestampWrites: {
                         querySet: frameResources.timestampQuerySet,
-                        beginningOfPassWriteIndex: 0,
-                        endOfPassWriteIndex: 1,
+                        beginningOfPassWriteIndex: TIMESTAMP_INDICES.MAIN_PASS_BEGIN,
+                        endOfPassWriteIndex: TIMESTAMP_INDICES.MAIN_PASS_END,
                     },
                 };
             }
@@ -443,6 +486,14 @@ export async function initRenderer(options) {
                 // logicConnectionRenderer: null, // TODO: Phase 4
                 uniformManager,
                 lightingData,
+                featureFlags: {
+                    enableComputePrepass: renderSettings.enableComputePrepass,
+                    enableShadows: renderSettings.enableShadows,
+                    enableBloom: renderSettings.enableBloom,
+                    enableHDR: renderSettings.enableHDR,
+                },
+                shadowQuality: renderSettings.shadowQuality,
+                msaaSampleCount: renderSettings.msaaSampleCount,
                 ...(gpuTimingListeners.length
                     ? {
                         onGpuTimings: (timings) => {
@@ -517,6 +568,9 @@ export async function initRenderer(options) {
         safeDestroy(frameResources.indexBuffer);
         safeDestroy(frameResources.instanceOffsetBuffer);
         safeDestroy(frameResources.instanceColorScaleBuffer);
+        safeDestroy(frameResources.instanceSecondaryColorBuffer);
+        safeDestroy(frameResources.instanceEmissiveColorBuffer);
+        safeDestroy(frameResources.instanceMaterialParamsBuffer);
         safeDestroy(frameResources.instanceRotationBuffer);
         safeDestroy(frameResources.instanceMaterialIdBuffer);
         safeDestroy(frameResources.sideTexture);

@@ -1,15 +1,26 @@
 import type { PlayerController, ControllerPreferences, ControllerContext } from './Controller';
 import { CharacterController } from '@engine/world';
-import type { CharacterInput } from '@engine/world';
+import type { CharacterInput, MovementController } from '@engine/world';
 import type { Entity } from '@engine/world';
 import type { Vec3 } from '@engine/core/math';
 import { EMPTY_INTENT, cloneIntent } from './Intent';
+import { ProfileSwitcher } from '../MovementProfiles/ProfileSwitcher';
+import { PRESET_PROFILES } from '../MovementProfiles/presets';
 
 // Note: This file has dependencies on editor components that need to be resolved
 // These types are imported but will need to be adapted for the stdlib package
 
 export interface CharacterInputHandler {
   getInput(): CharacterInput;
+}
+
+/**
+ * Optional interface for checking special keys (F1-F4, Tab, etc.)
+ * If not provided, profile switching will be disabled
+ */
+export interface KeyInputProvider {
+  isKeyPressed(key: string): boolean;
+  wasKeyJustPressed?(key: string): boolean; // Optional: for one-time key press detection
 }
 
 export interface CameraDirector {
@@ -38,6 +49,8 @@ export interface LocalPlayerControllerOptions {
   cameraDirector: CameraDirector;
   fpsCamera: FPSCamera | null;
   characterSystem: CharacterControllerSystem | null;
+  keyInputProvider?: KeyInputProvider; // Optional: for profile switching
+  enableProfileSwitching?: boolean; // Enable profile switching (default: true if keyInputProvider provided)
 }
 
 export class LocalPlayerController implements PlayerController {
@@ -49,11 +62,15 @@ export class LocalPlayerController implements PlayerController {
   private readonly _cameraDirector: CameraDirector;
   private readonly fpsCamera: FPSCamera | null;
   private readonly characterSystem: CharacterControllerSystem | null;
+  private readonly keyInputProvider: KeyInputProvider | null;
+  private readonly enableProfileSwitching: boolean;
 
-  private pawnController: CharacterController | null = null;
+  private pawnController: MovementController | null = null;
   private context: ControllerContext;
   private lastYaw = 0;
   private lastPitch = 0;
+  private profileSwitcher: ProfileSwitcher | null = null;
+  private lastProfileSwitchKeys: Set<string> = new Set();
 
   constructor(options: LocalPlayerControllerOptions) {
     this.id = options.id;
@@ -62,6 +79,18 @@ export class LocalPlayerController implements PlayerController {
     this._cameraDirector = options.cameraDirector;
     this.fpsCamera = options.fpsCamera ?? null;
     this.characterSystem = options.characterSystem ?? null;
+    this.keyInputProvider = options.keyInputProvider ?? null;
+    this.enableProfileSwitching = options.enableProfileSwitching ?? (options.keyInputProvider !== undefined);
+
+    // Initialize profile switcher with default profiles
+    if (this.enableProfileSwitching && this.keyInputProvider) {
+      this.profileSwitcher = new ProfileSwitcher([
+        PRESET_PROFILES.HUMAN,
+        PRESET_PROFILES.FAST_HUMAN,
+        PRESET_PROFILES.FLYING_HUMAN,
+        PRESET_PROFILES.SPEED_BOOST_HUMAN,
+      ]);
+    }
 
     const intent = cloneIntent(EMPTY_INTENT);
     this.context = {
@@ -71,7 +100,9 @@ export class LocalPlayerController implements PlayerController {
   }
 
   possess(pawn: Entity): void {
-    const controller = pawn.getComponent(CharacterController);
+    // Use MovementController interface - works with CharacterController now,
+    // and will work with future movement types (VehicleController, FlyingController, etc.)
+    const controller = pawn.getComponent(CharacterController) as MovementController;
     if (!controller) {
       console.warn('LocalPlayerController: pawn missing CharacterController component');
       this.context.pawn = pawn;
@@ -97,6 +128,11 @@ export class LocalPlayerController implements PlayerController {
   update(_deltaTime: number): void {
     if (!this.context.pawn || !this.pawnController) {
       return;
+    }
+
+    // Handle profile switching
+    if (this.enableProfileSwitching && this.keyInputProvider && this.profileSwitcher && this.pawnController instanceof CharacterController) {
+      this.handleProfileSwitching();
     }
 
     const input = this.inputHandler.getInput();
@@ -126,27 +162,113 @@ export class LocalPlayerController implements PlayerController {
     const forwardVec: Vec3 = this.fpsCamera?.getForwardDirection() ?? [0, 0, -1];
     const rightVec: Vec3 = this.fpsCamera?.getRightDirection() ?? [1, 0, 0];
 
-    if (this.characterSystem) {
-      this.characterSystem.applyIntent(
-        this.pawnController,
-        {
-          move: [intent.move[0], intent.move[1]],
-          jump: intent.jump,
-          sprint: intent.sprint,
-        },
-        forwardVec,
-        rightVec
-      );
-    } else {
-      const directInput: CharacterInput = {
-        moveDirection: [intent.move[0], 0, intent.move[1]],
-        sprint: intent.sprint,
-        jump: intent.jump,
-        cameraForward: forwardVec,
-        cameraRight: rightVec,
-      };
-      this.pawnController.setInput(directInput);
+    // Create CharacterInput for multiplayer replication
+    const characterInput: CharacterInput = {
+      moveDirection: [intent.move[0], 0, intent.move[1]],
+      sprint: intent.sprint,
+      jump: intent.jump,
+      cameraForward: forwardVec,
+      cameraRight: rightVec,
+    };
+
+    // Process multiplayer input replication (if callback is set)
+    if ((this as any).onMultiplayerInput) {
+      (this as any).onMultiplayerInput(characterInput);
     }
+
+    if (this.characterSystem) {
+      // Use system applyIntent for multiplayer replication
+      // System expects CharacterController specifically for camera-relative movement
+      if (this.pawnController instanceof CharacterController) {
+        this.characterSystem.applyIntent(
+          this.pawnController,
+          {
+            move: [intent.move[0], intent.move[1]],
+            jump: intent.jump,
+            sprint: intent.sprint,
+          },
+          forwardVec,
+          rightVec
+        );
+      }
+    } else {
+      // Direct input - can use MovementInput or CharacterInput
+      // CharacterInput needed for camera-relative movement in multiplayer
+      this.pawnController.setInput(characterInput);
+    }
+  }
+
+  /**
+   * Handle profile switching based on key input
+   */
+  private handleProfileSwitching(): void {
+    if (!this.keyInputProvider || !this.profileSwitcher || !(this.pawnController instanceof CharacterController)) {
+      return;
+    }
+
+    const keys = new Set<string>();
+    const checkKey = (key: string): boolean => {
+      const pressed = this.keyInputProvider!.isKeyPressed(key);
+      const wasPressed = this.lastProfileSwitchKeys.has(key);
+      
+      if (pressed) {
+        keys.add(key);
+      }
+
+      // Detect key press (was not pressed, now is pressed)
+      return pressed && !wasPressed;
+    };
+
+    // F1 - Normal (HUMAN)
+    if (checkKey('F1')) {
+      const profile = this.profileSwitcher.switchTo('human');
+      if (profile) {
+        this.pawnController.applyProfile(profile);
+      }
+    }
+    // F2 - Fast (FAST_HUMAN)
+    else if (checkKey('F2')) {
+      const profile = this.profileSwitcher.switchTo('fast-human');
+      if (profile) {
+        this.pawnController.applyProfile(profile);
+      }
+    }
+    // F3 - Flying (FLYING_HUMAN)
+    else if (checkKey('F3')) {
+      const profile = this.profileSwitcher.switchTo('flying-human');
+      if (profile) {
+        this.pawnController.applyProfile(profile);
+      }
+    }
+    // F4 - Speed Boost (SPEED_BOOST_HUMAN)
+    else if (checkKey('F4')) {
+      const profile = this.profileSwitcher.switchTo('speed-boost-human');
+      if (profile) {
+        this.pawnController.applyProfile(profile);
+      }
+    }
+    // Tab - Switch to next profile (cycle)
+    else if (checkKey('Tab')) {
+      const profile = this.profileSwitcher.switchToNext();
+      this.pawnController.applyProfile(profile);
+    }
+
+    // Update last keys state
+    this.lastProfileSwitchKeys = keys;
+  }
+
+  /**
+   * Set custom profile switcher
+   */
+  setProfileSwitcher(switcher: ProfileSwitcher): void {
+    this.profileSwitcher = switcher;
+  }
+
+  /**
+   * Get current profile switcher
+   */
+  getProfileSwitcher(): ProfileSwitcher | null {
+    return this.profileSwitcher;
   }
 
   getContext(): ControllerContext {

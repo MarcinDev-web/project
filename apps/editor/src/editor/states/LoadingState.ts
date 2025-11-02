@@ -69,7 +69,7 @@ export class LoadingState implements IPlayModeState {
     this.deps = deps;
   }
 
-  onEnter(context: PlayModeContext): void {
+  onEnter(_context: PlayModeContext): void {
     Logger.debug('Entering LOADING state');
     this.loadingComplete = false;
     this.loadingSuccess = false;
@@ -131,6 +131,11 @@ export class LoadingState implements IPlayModeState {
 
     for (let i = 0; i < steps.length; i++) {
       const step = steps[i];
+      if (!step) {
+        Logger.warn(`Step at index ${i} is undefined, skipping`);
+        continue;
+      }
+
       const stepBase = completedWeight;
       const stepMax = stepBase + step.weight;
       const onProgress: ProgressCallback = (p: LoadingProgress) => {
@@ -140,7 +145,6 @@ export class LoadingState implements IPlayModeState {
       };
 
       const policy = this.deps.perStepPolicies?.[step.name] ?? this.deps.retryPolicy ?? DefaultRetryPolicy;
-      let attempts = 0;
       try {
         await this.errorRecovery.executeWithRetry(
           step as any,
@@ -148,17 +152,16 @@ export class LoadingState implements IPlayModeState {
             worldManager: this.deps.worldManager,
             manifest,
             data: context.data,
-            cancelToken: this.cancelToken ?? undefined,
+            ...(this.cancelToken && { cancelToken: this.cancelToken }),
             deps: {
               setupPhysics: this.deps.setupPhysics,
               updateSceneBuffers: this.deps.updateSceneBuffers,
-              prewarmPipelines: this.deps.prewarmPipelines,
+              ...(this.deps.prewarmPipelines && { prewarmPipelines: this.deps.prewarmPipelines }),
             },
             emitProgress: (p) => onProgress(p),
           },
           policy,
           (attempt, err) => {
-            attempts = attempt;
             try { this.deps.onStepError?.(this.stringifyError(err), step.name, step.canRetry, attempt, policy.maxAttempts); } catch { /* ignore */ }
           },
           onProgress,

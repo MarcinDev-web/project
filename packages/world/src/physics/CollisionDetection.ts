@@ -100,8 +100,32 @@ export class CollisionDetection {
         c.normal[2] = -c.normal[2];
       }
       return result;
+    } else if (colliderA.shape === 'capsule' && colliderB.shape === 'box') {
+      // Precise capsule-box collision
+      return this.capsuleBox(
+        colliderA as CapsuleCollider,
+        transformA,
+        colliderB as BoxCollider,
+        transformB
+      );
+    } else if (colliderA.shape === 'box' && colliderB.shape === 'capsule') {
+      // Precise box-capsule collision (swap order)
+      const result = this.capsuleBox(
+        colliderB as CapsuleCollider,
+        transformB,
+        colliderA as BoxCollider,
+        transformA
+      );
+      // Flip normal direction
+      for (let i = 0; i < result.contacts.length; i++) {
+        const c = result.contacts[i]!;
+        c.normal[0] = -c.normal[0];
+        c.normal[1] = -c.normal[1];
+        c.normal[2] = -c.normal[2];
+      }
+      return result;
     } else if (colliderA.shape === 'capsule' || colliderB.shape === 'capsule') {
-      // Capsule collisions
+      // Other capsule collisions (capsule-sphere, capsule-capsule)
       return this.capsuleCollision(colliderA, transformA, colliderB, transformB);
     }
 
@@ -306,6 +330,225 @@ export class CollisionDetection {
       hasCollision: true,
       contacts: [contact],
     };
+  }
+
+  /**
+   * Precise Capsule vs Box collision detection
+   * Computes closest point on box to capsule segment, similar to boxSphere but for capsule segment
+   */
+  private static capsuleBox(
+    capsule: CapsuleCollider,
+    capsuleTransform: ColliderTransform,
+    box: BoxCollider,
+    boxTransform: ColliderTransform
+  ): CollisionInfo {
+    const boxPos = this.getWorldPosition(box.center, boxTransform);
+    const capsulePos = this.getWorldPosition(capsule.center, capsuleTransform);
+
+    // Get capsule segment endpoints in world space
+    const scaledRadius = capsule.radius * Math.max(capsuleTransform.scale[0], capsuleTransform.scale[2]);
+    const half = Math.max(0, (capsule.height * capsuleTransform.scale[1] - 2 * scaledRadius) / 2);
+    const localA: Vec3 = [0, -half, 0];
+    const localB: Vec3 = [0, half, 0];
+    const capsuleSegA = this.addVec(
+      this.rotateVector(localA, capsuleTransform.rotation),
+      capsulePos
+    );
+    const capsuleSegB = this.addVec(
+      this.rotateVector(localB, capsuleTransform.rotation),
+      capsulePos
+    );
+
+    // Transform capsule segment to box's local space
+    const relA: Vec3 = [
+      capsuleSegA[0] - boxPos[0],
+      capsuleSegA[1] - boxPos[1],
+      capsuleSegA[2] - boxPos[2],
+    ];
+    const relB: Vec3 = [
+      capsuleSegB[0] - boxPos[0],
+      capsuleSegB[1] - boxPos[1],
+      capsuleSegB[2] - boxPos[2],
+    ];
+    const localSegA = this.inverseRotateVector(relA, boxTransform.rotation);
+    const localSegB = this.inverseRotateVector(relB, boxTransform.rotation);
+
+    // Box half extents in local space
+    const halfX = (box.size[0] * boxTransform.scale[0]) / 2;
+    const halfY = (box.size[1] * boxTransform.scale[1]) / 2;
+    const halfZ = (box.size[2] * boxTransform.scale[2]) / 2;
+
+    // Find closest point on capsule segment to box
+    // For each point on the segment, clamp to box bounds and find minimum distance
+    const boxMin: Vec3 = [-halfX, -halfY, -halfZ];
+    const boxMax: Vec3 = [halfX, halfY, halfZ];
+
+    // Find closest point on capsule segment to box
+    // Use iterative approach: sample points along segment or use closest point algorithm
+    const closestOnSegment = this.closestPointOnSegmentToBox(
+      localSegA,
+      localSegB,
+      boxMin,
+      boxMax
+    );
+
+    // Clamp closest point to box surface
+    const closestOnBox: Vec3 = [
+      Math.max(boxMin[0], Math.min(boxMax[0], closestOnSegment[0])),
+      Math.max(boxMin[1], Math.min(boxMax[1], closestOnSegment[1])),
+      Math.max(boxMin[2], Math.min(boxMax[2], closestOnSegment[2])),
+    ];
+
+    // Distance from closest point on capsule to closest point on box
+    const dx = closestOnSegment[0] - closestOnBox[0];
+    const dy = closestOnSegment[1] - closestOnBox[1];
+    const dz = closestOnSegment[2] - closestOnBox[2];
+    const distanceSq = dx * dx + dy * dy + dz * dz;
+
+    // Check collision with capsule radius
+    if (distanceSq >= scaledRadius * scaledRadius) {
+      return { hasCollision: false, contacts: [] };
+    }
+
+    const distance = Math.sqrt(distanceSq);
+    const depth = scaledRadius - distance;
+
+    // Normal in local space (from box to capsule)
+    let localNormal: Vec3;
+    if (distance > this.EPSILON) {
+      localNormal = [dx / distance, dy / distance, dz / distance];
+    } else {
+      // Capsule is inside or touching box, find exit direction
+      // Find which box face is closest
+      const distToMinX = closestOnBox[0] - boxMin[0];
+      const distToMaxX = boxMax[0] - closestOnBox[0];
+      const distToMinY = closestOnBox[1] - boxMin[1];
+      const distToMaxY = boxMax[1] - closestOnBox[1];
+      const distToMinZ = closestOnBox[2] - boxMin[2];
+      const distToMaxZ = boxMax[2] - closestOnBox[2];
+
+      const minDist = Math.min(distToMinX, distToMaxX, distToMinY, distToMaxY, distToMinZ, distToMaxZ);
+      if (minDist === distToMinX) localNormal = [-1, 0, 0];
+      else if (minDist === distToMaxX) localNormal = [1, 0, 0];
+      else if (minDist === distToMinY) localNormal = [0, -1, 0];
+      else if (minDist === distToMaxY) localNormal = [0, 1, 0];
+      else if (minDist === distToMinZ) localNormal = [0, 0, -1];
+      else localNormal = [0, 0, 1];
+    }
+
+    // Transform back to world space
+    const worldNormal = this.rotateVector(localNormal, boxTransform.rotation);
+    const worldClosestOnBox = this.addVec(
+      this.rotateVector(closestOnBox, boxTransform.rotation),
+      boxPos
+    );
+
+    // Contact point on box surface
+    const contact: ContactPoint = {
+      position: worldClosestOnBox,
+      normal: worldNormal,
+      depth,
+    };
+
+    return {
+      hasCollision: true,
+      contacts: [contact],
+    };
+  }
+
+  /**
+   * Find closest point on segment AB to an axis-aligned box
+   * Uses iterative refinement for accuracy
+   */
+  private static closestPointOnSegmentToBox(
+    segA: Vec3,
+    segB: Vec3,
+    boxMin: Vec3,
+    boxMax: Vec3
+  ): Vec3 {
+    // Vector along segment
+    const segDir: Vec3 = [
+      segB[0] - segA[0],
+      segB[1] - segA[1],
+      segB[2] - segA[2],
+    ];
+    const segLenSq = segDir[0] ** 2 + segDir[1] ** 2 + segDir[2] ** 2;
+
+    // If segment is degenerate (point), return the point
+    if (segLenSq < this.EPSILON * this.EPSILON) {
+      return [segA[0], segA[1], segA[2]];
+    }
+
+    // Project box center onto segment line
+    const boxCenter: Vec3 = [
+      (boxMin[0] + boxMax[0]) / 2,
+      (boxMin[1] + boxMax[1]) / 2,
+      (boxMin[2] + boxMax[2]) / 2,
+    ];
+
+    const toCenter: Vec3 = [
+      boxCenter[0] - segA[0],
+      boxCenter[1] - segA[1],
+      boxCenter[2] - segA[2],
+    ];
+
+    const segDirNorm: Vec3 = [
+      segDir[0] / Math.sqrt(segLenSq),
+      segDir[1] / Math.sqrt(segLenSq),
+      segDir[2] / Math.sqrt(segLenSq),
+    ];
+
+    const t = this.dot(toCenter, segDirNorm);
+    const tClamped = Math.max(0, Math.min(1, t)); // Clamp to segment range
+
+    // Point on segment
+    const pointOnSeg: Vec3 = [
+      segA[0] + tClamped * segDir[0],
+      segA[1] + tClamped * segDir[1],
+      segA[2] + tClamped * segDir[2],
+    ];
+
+    // Refine: check if any box corner is closer
+    // For simplicity, use iterative approach checking segment endpoints and midpoint
+    let bestPoint = pointOnSeg;
+    let bestDistSq = Infinity;
+
+    const samples = [
+      [segA[0], segA[1], segA[2]],
+      [segB[0], segB[1], segB[2]],
+      pointOnSeg,
+      // Midpoints
+      [
+        (segA[0] + pointOnSeg[0]) / 2,
+        (segA[1] + pointOnSeg[1]) / 2,
+        (segA[2] + pointOnSeg[2]) / 2,
+      ],
+      [
+        (pointOnSeg[0] + segB[0]) / 2,
+        (pointOnSeg[1] + segB[1]) / 2,
+        (pointOnSeg[2] + segB[2]) / 2,
+      ],
+    ];
+
+    for (const sample of samples) {
+      // Clamp to box and compute distance
+      const clamped: Vec3 = [
+        Math.max(boxMin[0], Math.min(boxMax[0], sample[0]!)),
+        Math.max(boxMin[1], Math.min(boxMax[1], sample[1]!)),
+        Math.max(boxMin[2], Math.min(boxMax[2], sample[2]!)),
+      ];
+      const dx = sample[0]! - clamped[0];
+      const dy = sample[1]! - clamped[1];
+      const dz = sample[2]! - clamped[2];
+      const distSq = dx * dx + dy * dy + dz * dz;
+
+      if (distSq < bestDistSq) {
+        bestDistSq = distSq;
+        bestPoint = [sample[0]!, sample[1]!, sample[2]!];
+      }
+    }
+
+    return bestPoint;
   }
 
   /**

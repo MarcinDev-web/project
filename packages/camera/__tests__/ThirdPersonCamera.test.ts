@@ -1,3 +1,6 @@
+/**
+ * @vitest-environment jsdom
+ */
 import { describe, it, expect, beforeEach, vi, afterEach } from 'vitest';
 import { ThirdPersonCamera } from '../src/ThirdPersonCamera';
 import type { PhysicsWorld, RaycastHit } from '@engine/world';
@@ -180,6 +183,7 @@ describe('ThirdPersonCamera', () => {
     it('should rotate toward player forward direction', () => {
       const camera = new ThirdPersonCamera(canvas, null, {
         rotationSpeed: 10.0, // Fast rotation for testing
+        rotationSmoothing: 0.01, // Fast smoothing for testing
       });
       camera.enable();
 
@@ -191,8 +195,11 @@ describe('ThirdPersonCamera', () => {
 
       const initialYaw = camera.getOrientation().yaw;
 
-      // Update camera (should rotate toward player forward)
-      camera.update(playerPosition, playerForward, 0.1);
+      // Update camera multiple times to allow smoothing to take effect
+      // (auto-rotation updates targetYaw, smoothing interpolates yaw toward targetYaw)
+      for (let i = 0; i < 10; i++) {
+        camera.update(playerPosition, playerForward, 0.1);
+      }
 
       const newYaw = camera.getOrientation().yaw;
 

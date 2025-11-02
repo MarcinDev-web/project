@@ -1,4 +1,4 @@
-export * from './Entity.js';
-export * from './Scene.js';
-export * from './Transform.js';
+export * from './Entity';
+export * from './Scene';
+export * from './Transform';
 

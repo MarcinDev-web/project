@@ -1,3 +1,6 @@
+/**
+ * @vitest-environment jsdom
+ */
 import { describe, it, expect, vi } from 'vitest';
 import { DisposableGroup, isDisposable, toDisposable } from '../src/utils/DisposableGroup';
 

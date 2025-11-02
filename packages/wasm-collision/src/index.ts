@@ -43,6 +43,11 @@ async function ensureInit(): Promise<void> {
       if (typeof maybeInit === 'function') {
         await maybeInit();
       }
+      // Optional: when the crate is built with the `panic-hook` feature,
+      // install console_error_panic_hook for clearer stack traces.
+      if (typeof mod.init_panic_hook === 'function') {
+        mod.init_panic_hook();
+      }
       isReady = true;
     })();
   }
@@ -58,6 +63,9 @@ export async function init(): Promise<WasmCollision> {
   // Re-import after init to get bound functions
   // any: wasm-pack JS has no TypeScript types, require loose import
   const mod: any = await import('../pkg/collision.js');
+  if (typeof mod.init_panic_hook === 'function') {
+    mod.init_panic_hook();
+  }
 
   const obb_intersect = mod.obb_intersect as (
     a_center: Float32Array,
@@ -87,11 +95,32 @@ export async function init(): Promise<WasmCollision> {
   ) => Uint32Array;
 
   const api: WasmCollision = {
-    obbIntersect: (a, b) => obb_intersect(a.center, a.axes, a.half, b.center, b.axes, b.half),
-    batchCheck: (preview, others) =>
-      batch_check(preview.center, preview.axes, preview.half, others.centers, others.axes, others.halves),
-    batchCheckTrs: (preview, others) =>
-      batch_check_trs(preview.pos, preview.rot, preview.scl, others.positions, others.rotations, others.scales),
+    obbIntersect: (a, b) => {
+      try {
+        return obb_intersect(a.center, a.axes, a.half, b.center, b.axes, b.half);
+      } catch (error) {
+        // Log error for debugging
+        console.error('[wasm-collision] obbIntersect error:', error);
+        // Re-throw to allow caller to fallback to TypeScript implementation
+        throw error;
+      }
+    },
+    batchCheck: (preview, others) => {
+      try {
+        return batch_check(preview.center, preview.axes, preview.half, others.centers, others.axes, others.halves);
+      } catch (error) {
+        console.error('[wasm-collision] batchCheck error:', error);
+        throw error;
+      }
+    },
+    batchCheckTrs: (preview, others) => {
+      try {
+        return batch_check_trs(preview.pos, preview.rot, preview.scl, others.positions, others.rotations, others.scales);
+      } catch (error) {
+        console.error('[wasm-collision] batchCheckTrs error:', error);
+        throw error;
+      }
+    },
     dispose: () => {
       // No explicit deinit required; allow GC to reclaim module when unused.
       isReady = false;

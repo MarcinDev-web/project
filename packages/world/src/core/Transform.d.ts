@@ -94,6 +94,10 @@ export declare class Transform extends Component {
      */
     getWorldPosition(): Vec3;
     /**
+     * Writes world position into provided array to avoid allocations.
+     */
+    getWorldPositionInto(out: Vec3): Vec3;
+    /**
      * Gets the forward direction vector in world space.
      */
     getForward(out?: Vec3): Vec3;
@@ -101,6 +105,14 @@ export declare class Transform extends Component {
      * Gets the up direction vector in world space.
      */
     getUp(out?: Vec3): Vec3;
+    /**
+     * Writes the current local rotation into provided quaternion.
+     */
+    getRotationInto(out: Quat): Quat;
+    /**
+     * Writes the current local scale into provided vector.
+     */
+    getScaleInto(out: Vec3): Vec3;
     /**
      * Marks the local and world matrices as dirty.
      * Should be called after any transformation change.

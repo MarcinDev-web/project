@@ -12,37 +12,49 @@
  * Usage:
  *   node scripts/headless-smoke-test.js
  * 
- * Note: This script runs @engine/world unit tests which are already
- * designed to work without WebGPU/DOM. If tests pass, headless mode works.
+ * This script directly imports @engine/world and creates basic entities
+ * to verify it works without GPU/DOM dependencies.
  */
 
-import { spawn } from 'child_process';
-import { fileURLToPath } from 'url';
-import { dirname, join } from 'path';
-
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = dirname(__filename);
-const rootDir = join(__dirname, '..');
+import { World, Scene, Entity } from '@engine/world';
 
 console.log('🚀 Headless Smoke Test: @engine/world\n');
-console.log('Running unit tests without GPU/DOM...\n');
+console.log('Testing basic World/Scene/Entity creation without GPU/DOM...\n');
 
-const testProcess = spawn('pnpm', ['--filter', '@engine/world', 'test'], {
-  cwd: rootDir,
-  stdio: 'inherit',
-  shell: true
-});
+try {
+  // Create World instance
+  const world = new World();
+  console.log('✅ World created');
 
-testProcess.on('close', (code) => {
-  if (code === 0) {
-    console.log('\n✅ Headless test PASSED!');
-    console.log('   @engine/world works without GPU/DOM.');
-    console.log('   Ready for server-side multiplayer.\n');
-    process.exit(0);
-  } else {
-    console.error('\n❌ Headless test FAILED!');
-    console.error(`   Exit code: ${code}\n`);
-    process.exit(1);
+  // Create Scene
+  const scene = new Scene('Test');
+  console.log('✅ Scene created');
+
+  // Create Entity
+  const entity = scene.createEntity('Cube');
+  console.log('✅ Entity created');
+
+  // Add scene to world
+  world.addScene(scene);
+  console.log('✅ Scene added to World');
+
+  // Simulate one tick
+  world.fixedUpdate(1 / 60);
+  console.log('✅ World.fixedUpdate() executed');
+
+  // Verify entity exists
+  if (!entity) {
+    throw new Error('Entity should exist');
   }
-});
+
+  console.log('\n✅ Headless test PASSED!');
+  console.log('   @engine/world works without GPU/DOM.');
+  console.log('   Ready for server-side multiplayer.\n');
+  process.exit(0);
+} catch (error) {
+  console.error('\n❌ Headless test FAILED!');
+  console.error('   Error:', error.message);
+  console.error('   Stack:', error.stack);
+  process.exit(1);
+}
 

@@ -80,9 +80,12 @@ struct VertexOutput {
   @location(1) localPos : vec3<f32>,
   @location(2) worldPos : vec3<f32>,
   @location(3) vUV : vec2<f32>,
-  @location(4) vColor : vec3<f32>,
-  @location(5) materialId : f32,
-  @location(6) vAO : f32,
+  @location(4) primaryColor : vec4<f32>,
+  @location(5) secondaryColor : vec4<f32>,
+  @location(6) emissiveColor : vec4<f32>,
+  @location(7) materialParams : vec4<f32>,
+  @location(8) materialId : f32,
+  @location(9) vAO : f32,
 };
 
 ${WGSL_COMMON_HELPERS}
@@ -103,8 +106,18 @@ fn computeCascadeBlend(linearDepth: f32, splits: vec4<f32>, overlapFrac: f32) ->
 
   // Lower boundary blend (with previous cascade)
   if (baseIndex > 0u) {
-    let lowerSplit = select(baseIndex == 1u, splits.x, select(baseIndex == 2u, splits.y, splits.z));
-    let prevSplit = select(baseIndex == 1u, 0.0, select(baseIndex == 2u, splits.x, splits.y));
+    var lowerSplit = splits.z;
+    if (baseIndex == 1u) {
+      lowerSplit = splits.x;
+    } else if (baseIndex == 2u) {
+      lowerSplit = splits.y;
+    }
+    var prevSplit = splits.y;
+    if (baseIndex == 1u) {
+      prevSplit = 0.0;
+    } else if (baseIndex == 2u) {
+      prevSplit = splits.x;
+    }
     let range = max(1e-6, lowerSplit - prevSplit);
     let overlap = overlapFrac * range;
     if (linearDepth < lowerSplit + overlap) {
@@ -116,10 +129,24 @@ fn computeCascadeBlend(linearDepth: f32, splits: vec4<f32>, overlapFrac: f32) ->
   }
   // Upper boundary blend (with next cascade)
   if (neighbor == 4u && baseIndex < 3u) {
-    let upperSplit = select(baseIndex == 0u, splits.x, select(baseIndex == 1u, splits.y, splits.z));
+    var upperSplit = splits.z;
+    if (baseIndex == 0u) {
+      upperSplit = splits.x;
+    } else if (baseIndex == 1u) {
+      upperSplit = splits.y;
+    }
     // Next split (for range estimate)
-    let nextSplit = select(baseIndex == 0u, splits.y, select(baseIndex == 1u, splits.z, 0.0));
-    let range = max(1e-6, select(baseIndex < 2u, nextSplit - upperSplit, upperSplit));
+    var nextSplit = 0.0;
+    if (baseIndex == 0u) {
+      nextSplit = splits.y;
+    } else if (baseIndex == 1u) {
+      nextSplit = splits.z;
+    }
+    var rangeCandidate = upperSplit;
+    if (baseIndex < 2u) {
+      rangeCandidate = nextSplit - upperSplit;
+    }
+    let range = max(1e-6, rangeCandidate);
     let overlap = overlapFrac * range;
     if (linearDepth > upperSplit - overlap) {
       let t = clamp((linearDepth - (upperSplit - overlap)) / max(overlap, 1e-6), 0.0, 1.0);
@@ -200,13 +227,16 @@ fn sampleShadowPCSS(worldPos: vec3<f32>, normal: vec3<f32>, cascadeIndex: u32) -
 @vertex
 fn vs_main(
   @location(0) position : vec3<f32>,
-  @location(1) instanceOffset : vec3<f32>,
-  @location(2) normalPacked : vec4<f32>,
-  @location(3) uv : vec2<f32>,
-  @location(4) instanceColorScale : vec4<f32>,
-  @location(5) instanceRotation : vec4<f32>,
-  @location(6) instanceMaterialId : f32,
-  @location(7) aoPacked : vec4<f32>
+  @location(1) normalPacked : vec4<f32>,
+  @location(2) uv : vec2<f32>,
+  @location(3) aoPacked : vec4<f32>,
+  @location(4) instanceOffset : vec3<f32>,
+  @location(5) instanceColorScale : vec4<f32>,
+  @location(6) instanceSecondaryColor : vec4<f32>,
+  @location(7) instanceEmissive : vec4<f32>,
+  @location(8) instanceMaterialParams : vec4<f32>,
+  @location(9) instanceRotation : vec4<f32>,
+  @location(10) instanceMaterialId : f32
 ) -> VertexOutput {
   var output : VertexOutput;
   let scale = instanceColorScale.w;
@@ -221,7 +251,11 @@ fn vs_main(
   output.worldPos = worldPos;
   let atlasInset = uniforms.atlasInsetAndPad.xy;
   output.vUV = clamp(uv, atlasInset, vec2<f32>(1.0, 1.0) - atlasInset);
-  output.vColor = instanceColorScale.xyz;
+  let primaryAlpha = instanceMaterialParams.x;
+  output.primaryColor = vec4<f32>(instanceColorScale.xyz, primaryAlpha);
+  output.secondaryColor = instanceSecondaryColor;
+  output.emissiveColor = instanceEmissive;
+  output.materialParams = instanceMaterialParams;
   output.materialId = instanceMaterialId;
   output.vAO = clamp(aoPacked.x, 0.0, 1.0);
   return output;
@@ -235,9 +269,12 @@ fn fs_main(
   @location(1) localPos : vec3<f32>,
   @location(2) worldPos : vec3<f32>,
   @location(3) vUV : vec2<f32>,
-  @location(4) vColor : vec3<f32>,
-  @location(5) materialId : f32,
-  @location(6) vAO : f32
+  @location(4) primaryColor : vec4<f32>,
+  @location(5) secondaryColor : vec4<f32>,
+  @location(6) emissiveColor : vec4<f32>,
+  @location(7) materialParams : vec4<f32>,
+  @location(8) materialId : f32,
+  @location(9) vAO : f32
 ) -> @location(0) vec4<f32> {
   // Flat/voxel-friendly shading: no normal mapping, no specular
   let Ngeom = normalize(vNormal);
@@ -251,7 +288,8 @@ fn fs_main(
   let isTop = step(0.5, abs(Ngeom.y));
   let rect = mix(matMeta.sideRect, matMeta.topRect, vec4<f32>(isTop, isTop, isTop, isTop));
   let atlasUV = rect.xy + vUV * rect.zw;
-  var baseColor = textureSample(atlasTex, texSampler, atlasUV).rgb * vColor;
+  let tint = mix(primaryColor.rgb, secondaryColor.rgb, 0.2);
+  var baseColor = textureSample(atlasTex, texSampler, atlasUV).rgb * tint;
 
   // Optional mild saturation boost for colorful blocks
   let Y = dot(baseColor, vec3<f32>(0.299, 0.587, 0.114));
@@ -263,7 +301,9 @@ fn fs_main(
   let N = Ngeom;
 
   // Ambient term
-  let ambient = uniforms.ambientColor * uniforms.ambientIntensity * baseColor;
+  let metallic = clamp(materialParams.y, 0.0, 1.0);
+  let roughness = clamp(materialParams.z, 0.0, 1.0);
+  let ambient = uniforms.ambientColor * uniforms.ambientIntensity * baseColor * (1.0 - metallic * 0.35);
 
   // Simple voxel tri-tone based on face orientation (top/side/bottom)
   let topMask = step(0.5, N.y);
@@ -281,12 +321,13 @@ fn fs_main(
   let baseIdx = blendInfo.x;
   let neighborIdx = blendInfo.y;
   let blendWeight = bitcast<f32>(blendInfo.z);
-  var shadowBase = sampleShadowPCSS(worldPos, N, baseIdx);
-  var shadowVal = shadowBase;
-  if (neighborIdx < 4u) {
-    let s1 = sampleShadowPCSS(worldPos, N, neighborIdx);
-    shadowVal = mix(shadowBase, s1, clamp(blendWeight, 0.0, 1.0));
-  }
+  let shadowBase = sampleShadowPCSS(worldPos, N, baseIdx);
+  let neighborValid = neighborIdx < 4u;
+  let neighborSampleIdx = select(baseIdx, neighborIdx, neighborValid);
+  let neighborShadow = sampleShadowPCSS(worldPos, N, neighborSampleIdx);
+  let blendFactor = clamp(blendWeight, 0.0, 1.0);
+  let neighborBlend = select(0.0, blendFactor, neighborValid);
+  let shadowVal = mix(shadowBase, neighborShadow, neighborBlend);
   var direct = lambert(baseColor) * uniforms.directionalLightColor * (NdotL_dir * 0.25) * shadowVal;
 
   // Point lights - Lambert only (also subtle)
@@ -298,7 +339,7 @@ fn fs_main(
       let L = toL / max(dist, 1e-4);
       let attenuation = 1.0 / (1.0 + (dist * dist) / (uniforms.pointLights[i].range * uniforms.pointLights[i].range));
       let NdotL = max(dot(N, L), 0.0);
-      direct += lambert(baseColor) * uniforms.pointLights[i].color * (NdotL * 0.25) * attenuation;
+      direct += lambert(baseColor) * uniforms.pointLights[i].color * (NdotL * mix(0.3, 0.5, metallic)) * attenuation;
     }
   }
 
@@ -306,25 +347,27 @@ fn fs_main(
   let ao = mix(1.0, clamp(vAO, 0.0, 1.0), 0.4);
 
   var color = (ambient + direct) * tone * ao;
+  color += emissiveColor.rgb * emissiveColor.w;
   color = clamp(color, vec3<f32>(0.0), vec3<f32>(1.0));
-  return vec4<f32>(color, 1.0);
+  let alpha = clamp(primaryColor.a, 0.0, 1.0);
+  return vec4<f32>(color, alpha);
 }
 
 @fragment
 fn fs_overlay(
   @location(0) vNormal : vec3<f32>,
   @location(2) worldPos : vec3<f32>,
-  @location(4) vColor : vec3<f32>
+  @location(4) primaryColor : vec4<f32>,
+  @location(5) secondaryColor : vec4<f32>
 ) -> @location(0) vec4<f32> {
   let n = normalize(vNormal);
   let l = normalize(-uniforms.directionalLightDir);
   let intensity = 0.35 + 0.65 * max(dot(n, l), 0.0);
-  let highlight = mix(vec3<f32>(1.0), vColor, 0.4);
+  let highlightBase = mix(primaryColor.rgb, secondaryColor.rgb, 0.3);
+  let highlight = mix(vec3<f32>(1.0), highlightBase, 0.4);
   let rim = smoothstep(0.0, 1.0, 1.0 - clamp(dot(n, normalize(uniforms.cameraPosition - worldPos)), 0.0, 1.0));
   let color = clamp(highlight * (intensity + 0.3 * rim), vec3<f32>(0.0), vec3<f32>(1.0));
   return vec4<f32>(color, 0.75);
 }
 `;
 }
-
-

@@ -10,8 +10,26 @@ export declare class ShadowPass {
     private uniformBindGroup;
     private comparisonSampler;
     private readonly atlasSize;
+    private cascadeOverlap;
+    private filterParamsRef;
+    private biasParamsRef;
+    private lastCascadeCounts;
+    private culledCapacity;
+    private culledOffsetBuffer;
+    private culledColorScaleBuffer;
+    private culledRotationBuffer;
+    private culledMaterialIdBuffer;
+    private culledOffsetF32;
+    private culledColorScaleF32;
+    private culledRotationF32;
+    private culledMaterialIdF32;
     constructor(device: GPUDevice);
+    setQualityPreset(preset: 'low' | 'med' | 'high' | 'ultra'): void;
+    getLastCascadeInstanceCounts(): readonly [number, number, number, number];
     private ensureResources;
+    private ensureCulledBuffers;
+    private rowNorm;
+    private cullInstancesForCascade;
     render(params: {
         encoder: GPUCommandEncoder;
         frameResources: {

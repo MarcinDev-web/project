@@ -76,8 +76,25 @@ export class CameraDirector {
   private readonly viewMatrix: Mat4;
   private readonly projectionMatrix: Mat4;
   
-  // Player position for FPS mode (injected from outside)
+  // Scratch buffers for blend operations (to avoid allocations in hot path)
+  private readonly blendScratch = {
+    fromView: new Float32Array(16) as Mat4,
+    fromProjection: new Float32Array(16) as Mat4,
+    targetView: new Float32Array(16) as Mat4,
+    fromWorld: new Float32Array(16) as Mat4,
+    toWorld: new Float32Array(16) as Mat4,
+    blendedWorld: new Float32Array(16) as Mat4,
+    fromPos: new Float32Array(3) as unknown as Vec3,
+    toPos: new Float32Array(3) as unknown as Vec3,
+    blendedPos: new Float32Array(3) as unknown as Vec3,
+    fromRot: new Float32Array(4) as unknown as [number, number, number, number],
+    toRot: new Float32Array(4) as unknown as [number, number, number, number],
+    blendedRot: new Float32Array(4) as unknown as [number, number, number, number],
+  };
+  
+  // Player pose for FPS/third-person modes (injected from outside)
   private playerPosition: Vec3 | null = null;
+  private playerForward: Vec3 | null = null;
   
   // Logger for debugging
   private logger: CameraDirectorConfig['logger'];
@@ -114,10 +131,10 @@ export class CameraDirector {
       return;
     }
 
-    console.log(`[CameraDirector] Camera mode: ${this.currentMode} → ${mode}`);
+    this.logger?.debug(`Camera mode: ${this.currentMode} -> ${mode}`);
     
     // Disable previous mode's camera
-    this.disableCameraForMode(this.currentMode);
+    this.disableCameraForMode(this.currentMode, mode);
     
     this.currentMode = mode;
     this.blend = null;
@@ -125,7 +142,7 @@ export class CameraDirector {
     // Enable new mode's camera
     this.enableCameraForMode(this.currentMode);
     
-    console.log(`[CameraDirector] Mode switched to: ${mode}, editorCamera enabled: ${this.editorCamera?.isEnabled()}`);
+    this.logger?.debug(`Mode switched to: ${mode}, editorCamera enabled: ${this.editorCamera?.isEnabled()}`);
     
     this.updateCameraState();
   }
@@ -140,29 +157,28 @@ export class CameraDirector {
 
     // Treat non-positive durations as an instant switch (no blend)
     if (duration <= 0) {
-      this.logger?.debug(`Camera instant switch: ${this.currentMode} → ${toMode}`);
+      this.logger?.debug(`Camera instant switch: ${this.currentMode} -> ${toMode}`);
       this.currentMode = toMode;
       this.blend = null;
       this.updateCameraState();
       return;
     }
 
-    this.logger?.debug(`Camera blend: ${this.currentMode} → ${toMode} (${duration}s)`);
+    this.logger?.debug(`Camera blend: ${this.currentMode} -> ${toMode} (${duration}s)`);
     
-    // Capture current matrices for blending
-    const fromView = new Float32Array(16) as Mat4;
-    const fromProjection = new Float32Array(16) as Mat4;
-    fromView.set(this.viewMatrix);
-    fromProjection.set(this.projectionMatrix);
+    // Capture current matrices for blending (using scratch buffers to avoid allocations)
+    this.blendScratch.fromView.set(this.viewMatrix);
+    this.blendScratch.fromProjection.set(this.projectionMatrix);
     
+    // Create new blend state with copies of scratch buffers
     this.blend = {
       active: true,
       fromMode: this.currentMode,
       toMode: toMode,
       duration,
       elapsed: 0,
-      fromView,
-      fromProjection,
+      fromView: new Float32Array(this.blendScratch.fromView) as Mat4,
+      fromProjection: new Float32Array(this.blendScratch.fromProjection) as Mat4,
     };
     
     this.currentMode = toMode;
@@ -194,16 +210,22 @@ export class CameraDirector {
       if (this.editorCamera) {
         this.editorCamera.update(deltaTime);
       } else {
-        console.warn('[CameraDirector] free-fly mode but editorCamera is null!');
+        this.logger?.warn('free-fly mode but editorCamera is null!');
+      }
+    }
+    
+    // Update FPS camera if active
+    if (this.currentMode === 'fps') {
+      if (this.fpsCamera) {
+        this.fpsCamera.update(deltaTime);
       }
     }
     
     // Update third-person camera if active
     if (this.currentMode === 'third-person') {
       if (this.thirdPersonCamera && this.playerPosition) {
-        // Get player forward direction (simplified: use yaw from player rotation)
-        const playerForward: Vec3 = [0, 0, -1]; // Default forward, could be enhanced
-        this.thirdPersonCamera.update(this.playerPosition, playerForward, deltaTime);
+        const forward = this.playerForward ?? [0, 0, -1];
+        this.thirdPersonCamera.update(this.playerPosition, forward, deltaTime);
       }
     }
     
@@ -216,39 +238,40 @@ export class CameraDirector {
   getViewMatrix(): Mat4 {
     if (this.blend && this.blend.active) {
       // Return blended view matrix using position/rotation decomposition
+      // Using scratch buffers to avoid allocations in hot path
       const duration = this.blend.duration > 0 ? this.blend.duration : 1e-6;
       const t = Math.min(this.blend.elapsed / duration, 1.0);
       const smoothT = this.smoothstep(t);
 
-      // Compute target view matrix for the current mode
-      const targetView = new Float32Array(16) as Mat4;
-      this.computeViewMatrix(this.currentMode, targetView);
+      // Compute target view matrix for the current mode (into scratch buffer)
+      this.computeViewMatrix(this.currentMode, this.blendScratch.targetView);
 
-      // Convert both views to camera world transforms
-      const fromWorld = new Float32Array(16) as Mat4;
-      const toWorld = new Float32Array(16) as Mat4;
-      mat4Invert(fromWorld, this.blend.fromView);
-      mat4Invert(toWorld, targetView);
+      // Convert both views to camera world transforms (using scratch buffers)
+      mat4Invert(this.blendScratch.fromWorld, this.blend.fromView);
+      mat4Invert(this.blendScratch.toWorld, this.blendScratch.targetView);
 
-      // Extract positions and rotations
-      const fromPos: Vec3 = [0, 0, 0];
-      const toPos: Vec3 = [0, 0, 0];
-      const blendedPos: Vec3 = [0, 0, 0];
-      mat4GetTranslationOut(fromPos, fromWorld);
-      mat4GetTranslationOut(toPos, toWorld);
-      lerpVec3Out(blendedPos, fromPos, toPos, smoothT);
+      // Extract positions and rotations (into scratch buffers)
+      mat4GetTranslationOut(this.blendScratch.fromPos, this.blendScratch.fromWorld);
+      mat4GetTranslationOut(this.blendScratch.toPos, this.blendScratch.toWorld);
+      lerpVec3Out(this.blendScratch.blendedPos, this.blendScratch.fromPos, this.blendScratch.toPos, smoothT);
 
-      const fromRot: [number, number, number, number] = [0, 0, 0, 1];
-      const toRot: [number, number, number, number] = [0, 0, 0, 1];
-      const blendedRot: [number, number, number, number] = [0, 0, 0, 1];
-      mat4GetRotationOut(fromRot, fromWorld);
-      mat4GetRotationOut(toRot, toWorld);
-      quatSlerpOut(blendedRot, fromRot, toRot, smoothT);
+      // Initialize rotations (quaternions)
+      this.blendScratch.fromRot[0] = 0;
+      this.blendScratch.fromRot[1] = 0;
+      this.blendScratch.fromRot[2] = 0;
+      this.blendScratch.fromRot[3] = 1;
+      this.blendScratch.toRot[0] = 0;
+      this.blendScratch.toRot[1] = 0;
+      this.blendScratch.toRot[2] = 0;
+      this.blendScratch.toRot[3] = 1;
+      
+      mat4GetRotationOut(this.blendScratch.fromRot, this.blendScratch.fromWorld);
+      mat4GetRotationOut(this.blendScratch.toRot, this.blendScratch.toWorld);
+      quatSlerpOut(this.blendScratch.blendedRot, this.blendScratch.fromRot, this.blendScratch.toRot, smoothT);
 
-      // Recompose camera world transform, then invert to view
-      const blendedWorld = new Float32Array(16) as Mat4;
-      mat4FromQuatTranslation(blendedWorld, blendedRot, blendedPos);
-      mat4Invert(this.viewMatrix, blendedWorld);
+      // Recompose camera world transform, then invert to view (using scratch buffers)
+      mat4FromQuatTranslation(this.blendScratch.blendedWorld, this.blendScratch.blendedRot, this.blendScratch.blendedPos);
+      mat4Invert(this.viewMatrix, this.blendScratch.blendedWorld);
       return this.viewMatrix;
     }
     
@@ -281,17 +304,41 @@ export class CameraDirector {
   }
 
   /**
-   * Set player position for FPS camera mode
+   * Set player position for FPS/third-person camera modes (legacy helper)
    */
   setPlayerPosition(position: Vec3): void {
-    this.playerPosition = position;
+    this.setPlayerPose(position);
+  }
+
+  /**
+   * Set full player pose for camera modes
+   */
+  setPlayerPose(position: Vec3, forward?: Vec3): void {
+    this.playerPosition = [...position] as Vec3;
+    if (forward) {
+      this.playerForward = this.normalizeVector(forward);
+    }
+  }
+
+  /**
+   * Update player forward direction independently
+   */
+  setPlayerForward(forward: Vec3): void {
+    this.playerForward = this.normalizeVector(forward);
   }
 
   /**
    * Get player position
    */
   getPlayerPosition(): Vec3 | null {
-    return this.playerPosition;
+    return this.playerPosition ? [...this.playerPosition] as Vec3 : null;
+  }
+
+  /**
+   * Get player forward direction if available
+   */
+  getPlayerForward(): Vec3 | null {
+    return this.playerForward ? [...this.playerForward] as Vec3 : null;
   }
 
   /**
@@ -307,53 +354,68 @@ export class CameraDirector {
   dispose(): void {
     this.blend = null;
     this.playerPosition = null;
+    this.playerForward = null;
     
-    // Cleanup cameras
-    if (this.editorCamera) {
-      this.editorCamera.dispose();
-    }
+    // Cleanup ALL cameras consistently
+    this.orbitControls?.cleanup?.();
+    this.fpsCamera?.dispose?.();
+    this.editorCamera?.dispose?.();
+    this.thirdPersonCamera?.dispose?.();
+  }
+
+  private normalizeVector(vec: Vec3): Vec3 {
+    const length = Math.hypot(vec[0], vec[1], vec[2]) || 1;
+    return [vec[0] / length, vec[1] / length, vec[2] / length];
   }
   
   /**
    * Enable camera for a specific mode
    */
   private enableCameraForMode(mode: CameraMode): void {
-    console.log(`[CameraDirector] Enabling camera for mode: ${mode}`);
+    this.logger?.debug(`Enabling camera for mode: ${mode}`);
     switch (mode) {
-      case 'orbit':
+      case 'orbit': {
         this.orbitControls.setEnabled(true);
-        console.log('[CameraDirector] ✓ Orbit controls enabled');
+        if (this.editorCamera && !this.editorCamera.isEnabled()) {
+          this.editorCamera.enable();
+          this.logger?.debug('EditorCamera enabled for orbit mode');
+        }
+        this.logger?.debug('Orbit controls enabled');
         break;
-      case 'fps':
+      }
+      case 'fps': {
         // FPS camera is enabled by play mode
         if (this.fpsCamera) {
           this.fpsCamera.enable();
-          console.log('[CameraDirector] ✓ FPS camera enabled');
+          this.logger?.debug('FPS camera enabled');
         }
         break;
-      case 'third-person':
+      }
+      case 'third-person': {
         if (this.thirdPersonCamera) {
           this.thirdPersonCamera.enable();
-          console.log('[CameraDirector] ✓ Third person camera enabled');
+          this.logger?.debug('Third person camera enabled');
         }
         break;
-      case 'free-fly':
+      }
+      case 'free-fly': {
         if (this.editorCamera) {
           this.editorCamera.enable();
-          console.log('[CameraDirector] ✓ EditorCamera enabled');
+          this.logger?.debug('EditorCamera enabled');
         } else {
-          console.warn('[CameraDirector] ⚠️ EditorCamera is null!');
+          this.logger?.warn('EditorCamera is null!');
         }
         this.orbitControls.setEnabled(false);
-        console.log('[CameraDirector] ✓ Orbit controls disabled');
+        this.logger?.debug('Orbit controls disabled');
         break;
+      }
     }
   }
-  
+
   /**
    * Disable camera for a specific mode
    */
-  private disableCameraForMode(mode: CameraMode): void {
+  private disableCameraForMode(mode: CameraMode, nextMode?: CameraMode): void {
     switch (mode) {
       case 'orbit':
         this.orbitControls.setEnabled(false);
@@ -367,6 +429,9 @@ export class CameraDirector {
         }
         break;
       case 'free-fly':
+        if (nextMode === 'orbit') {
+          break;
+        }
         if (this.editorCamera) {
           this.editorCamera.disable();
         }
@@ -407,27 +472,32 @@ export class CameraDirector {
       
       case 'fps': {
         if (this.fpsCamera) {
-          let basePosition: Vec3;
-          
-          // In play mode: use player position
-          // In edit mode: use orbit camera position for free-fly FPS
+          let desiredCameraPosition: Vec3;
+
           if (this.playerPosition) {
-            basePosition = [
+            desiredCameraPosition = [
               this.playerPosition[0] + this.cameraOffset[0],
               this.playerPosition[1] + this.cameraOffset[1],
               this.playerPosition[2] + this.cameraOffset[2],
-            ];
+            ] as Vec3;
           } else {
             // Edit mode: calculate position from orbit controls
             const { yaw, pitch, distance } = this.orbitControls.getState();
             const eyeX = Math.cos(pitch) * Math.sin(yaw) * distance;
             const eyeY = Math.sin(pitch) * distance;
             const eyeZ = Math.cos(pitch) * Math.cos(yaw) * distance;
-            basePosition = [eyeX, eyeY, eyeZ];
+            desiredCameraPosition = [eyeX, eyeY, eyeZ] as Vec3;
           }
-          
-          const cameraPosition = this.resolveCameraCollision(basePosition);
-          const fpsView = this.fpsCamera.getViewMatrix(cameraPosition);
+
+          const resolvedCameraPosition = this.resolveCameraCollision(desiredCameraPosition);
+          const eyeHeight = this.fpsCamera.getEyeHeight();
+          const basePosition: Vec3 = [
+            resolvedCameraPosition[0],
+            resolvedCameraPosition[1] - eyeHeight,
+            resolvedCameraPosition[2],
+          ] as Vec3;
+
+          const fpsView = this.fpsCamera.getViewMatrix(basePosition);
           outMatrix.set(fpsView);
         } else {
           // Fallback to orbit if FPS camera not available
@@ -451,10 +521,6 @@ export class CameraDirector {
         if (this.editorCamera) {
           const view = this.editorCamera.getViewMatrix();
           outMatrix.set(view);
-          // Debug: log first time to confirm it's being called
-          if (Math.random() < 0.01) { // Log only 1% of frames to avoid spam
-            console.log('[CameraDirector] Using free-fly view matrix, position:', this.editorCamera.getPosition());
-          }
         } else {
           // Fallback to orbit if editor camera not available
           this.computeViewMatrix('orbit', outMatrix);

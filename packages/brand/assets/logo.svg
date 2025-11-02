@@ -1,0 +1,38 @@
+<svg width="200" height="200" viewBox="0 0 200 200" xmlns="http://www.w3.org/2000/svg">
+  <!-- FORGE Worlds Logo -->
+  <!-- Design: Industrial forge aesthetic with community/open-source elements -->
+  
+  <!-- Background circle (optional, can be removed for transparent) -->
+  <!-- <circle cx="100" cy="100" r="95" fill="#0f0f10" stroke="#2a2a2c" stroke-width="2"/> -->
+  
+  <!-- Main Forge Hammer/Anvil Icon -->
+  <!-- Hammer handle -->
+  <path d="M 60 140 L 90 80 L 85 75 L 55 135 Z" fill="#ff3b00" opacity="0.9"/>
+  <!-- Hammer head -->
+  <rect x="85" y="70" width="35" height="25" rx="3" fill="#ff3b00"/>
+  <rect x="90" y="65" width="25" height="10" rx="2" fill="#ff5722"/>
+  
+  <!-- Anvil base -->
+  <rect x="100" y="150" width="50" height="20" rx="2" fill="#1a1a1c"/>
+  <rect x="110" y="140" width="30" height="15" rx="2" fill="#2a2a2c"/>
+  
+  <!-- Community Circle (top) - represents community/open-source -->
+  <circle cx="100" cy="50" r="15" fill="none" stroke="#00c853" stroke-width="2" stroke-dasharray="2 2" opacity="0.8"/>
+  <circle cx="100" cy="50" r="8" fill="#00c853" opacity="0.6"/>
+  
+  <!-- Spark particles (top-left and top-right) - representing creativity/community contributions -->
+  <g opacity="0.8">
+    <!-- Top-left sparks -->
+    <circle cx="50" cy="50" r="2" fill="#ff3b00"/>
+    <circle cx="45" cy="55" r="1.5" fill="#ff5722"/>
+    <circle cx="55" cy="45" r="1.5" fill="#ff5722"/>
+    
+    <!-- Top-right sparks -->
+    <circle cx="150" cy="50" r="2" fill="#ff3b00"/>
+    <circle cx="145" cy="55" r="1.5" fill="#ff5722"/>
+    <circle cx="155" cy="45" r="1.5" fill="#ff5722"/>
+  </g>
+  
+  <!-- Text (optional, can be hidden if using as icon) -->
+  <!-- <text x="100" y="180" font-family="Inter, sans-serif" font-size="14" font-weight="600" fill="#ffffff" text-anchor="middle">FORGE</text> -->
+</svg>

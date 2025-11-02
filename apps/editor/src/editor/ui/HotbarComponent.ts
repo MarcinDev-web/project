@@ -107,7 +107,7 @@ export class HotbarComponent {
 
       if (e.dataTransfer) {
         e.dataTransfer.effectAllowed = 'move';
-        e.dataTransfer.setData('application/x-hotbar-asset', asset.metadata.id);
+        e.dataTransfer.setData('application/x-hotbar-asset', asset.id);
       }
 
       slot.classList.add('dragging');
@@ -167,7 +167,7 @@ export class HotbarComponent {
     // Notify parent
     this.config.onSlotActivated(asset, index);
 
-    Logger.debug(`HotbarComponent: Activated slot ${index + 1} - ${asset.metadata.name}`);
+    Logger.debug(`HotbarComponent: Activated slot ${index + 1} - ${asset.name}`);
   }
 
   /**
@@ -187,7 +187,8 @@ export class HotbarComponent {
     // Notify parent
     this.config.onSlotChanged?.(index, asset);
 
-    Logger.debug(`HotbarComponent: Set slot ${index + 1} to ${asset?.metadata.name || 'empty'}`);
+    const assetName = asset?.name || 'empty';
+    Logger.debug(`HotbarComponent: Set slot ${index + 1} to ${assetName}`);
   }
 
   /**
@@ -203,8 +204,8 @@ export class HotbarComponent {
   swapSlots(indexA: number, indexB: number): void {
     if (indexA < 0 || indexA >= 9 || indexB < 0 || indexB >= 9) return;
 
-    const temp = this.slots[indexA];
-    this.slots[indexA] = this.slots[indexB];
+    const temp = this.slots[indexA] ?? null;
+    this.slots[indexA] = this.slots[indexB] ?? null;
     this.slots[indexB] = temp;
 
     this.refreshSlot(indexA);
@@ -270,7 +271,7 @@ export class HotbarComponent {
     const asset = this.slots[index];
     if (!asset) return;
 
-    const count = this.config.inventoryManager.getCount(asset.metadata.id);
+    const count = this.config.inventoryManager.getCount(asset.id);
     const buildMode = this.config.inventoryManager.getBuildMode();
 
     // Update or create count badge
@@ -315,7 +316,7 @@ export class HotbarComponent {
    */
   getSlot(index: number): Asset | null {
     if (index < 0 || index >= 9) return null;
-    return this.slots[index];
+    return this.slots[index] ?? null;
   }
 
   /**
@@ -343,7 +344,7 @@ export class HotbarComponent {
    * Checks if an asset is already in the hotbar
    */
   hasAsset(asset: Asset): boolean {
-    return this.slots.some((slot) => slot?.metadata.id === asset.metadata.id);
+    return this.slots.some((slot) => slot?.id === asset.id);
   }
 
   /**

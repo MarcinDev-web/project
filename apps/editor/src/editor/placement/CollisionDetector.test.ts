@@ -1,8 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { CollisionDetector, type BoundingBox } from './CollisionDetector';
-import { Scene } from '@engine/world';
-import { Entity } from '@engine/world';
-import type { Vec3 } from '@engine/world';
+import { Scene, Entity, CameraComponent } from '@engine/world';
+import { type Vec3 } from '@engine/core';
 
 describe('CollisionDetector', () => {
   let scene: Scene;
@@ -704,19 +703,19 @@ describe('CollisionDetector', () => {
     });
 
     describe('checkCollisionOBB', () => {
-      it('should detect no collision for single entity', () => {
+      it('should detect no collision for single entity', async () => {
         const entity = new Entity('test');
         entity.transform.position = [0, 0, 0];
         entity.transform.scale = [1, 1, 1];
         scene.addEntity(entity);
 
-        const result = detector.checkCollisionOBB(entity);
+        const result = await detector.checkCollisionOBB(entity);
 
         expect(result.hasCollision).toBe(false);
         expect(result.collidingEntities).toEqual([]);
       });
 
-      it('should detect collision between two entities', () => {
+      it('should detect collision between two entities', async () => {
         const entity1 = new Entity('entity1');
         entity1.transform.position = [0, 0, 0];
         entity1.transform.scale = [2, 2, 2];
@@ -727,13 +726,13 @@ describe('CollisionDetector', () => {
         entity2.transform.scale = [2, 2, 2];
         scene.addEntity(entity2);
 
-        const result = detector.checkCollisionOBB(entity1);
+        const result = await detector.checkCollisionOBB(entity1);
 
         expect(result.hasCollision).toBe(true);
         expect(result.collidingEntities).toContain(entity2);
       });
 
-      it('should detect collision with rotation', () => {
+      it('should detect collision with rotation', async () => {
         const entity1 = new Entity('entity1');
         entity1.transform.position = [0, 0, 0];
         entity1.transform.rotation = [0, 0, 0, 1]; // No rotation
@@ -748,14 +747,14 @@ describe('CollisionDetector', () => {
         entity2.transform.scale = [4, 1, 1]; // Perpendicular long box
         scene.addEntity(entity2);
 
-        const result = detector.checkCollisionOBB(entity1);
+        const result = await detector.checkCollisionOBB(entity1);
 
         // Should detect collision (cross pattern)
         expect(result.hasCollision).toBe(true);
         expect(result.collidingEntities).toContain(entity2);
       });
 
-      it('should not detect collision when rotated boxes are separated', () => {
+      it('should not detect collision when rotated boxes are separated', async () => {
         const entity1 = new Entity('entity1');
         entity1.transform.position = [0, 0, 0];
         entity1.transform.scale = [1, 1, 1];
@@ -768,12 +767,12 @@ describe('CollisionDetector', () => {
         entity2.transform.scale = [1, 1, 1];
         scene.addEntity(entity2);
 
-        const result = detector.checkCollisionOBB(entity1);
+        const result = await detector.checkCollisionOBB(entity1);
 
         expect(result.hasCollision).toBe(false);
       });
 
-      it('should use position override', () => {
+      it('should use position override', async () => {
         const entity1 = new Entity('entity1');
         entity1.transform.position = [10, 0, 0]; // Far away
         entity1.transform.scale = [2, 2, 2];
@@ -785,13 +784,13 @@ describe('CollisionDetector', () => {
         scene.addEntity(entity2);
 
         // Check collision as if entity1 is at origin
-        const result = detector.checkCollisionOBB(entity1, [0, 0, 0]);
+        const result = await detector.checkCollisionOBB(entity1, [0, 0, 0]);
 
         expect(result.hasCollision).toBe(true);
         expect(result.collidingEntities).toContain(entity2);
       });
 
-      it('should use rotation override', () => {
+      it('should use rotation override', async () => {
         const entity1 = new Entity('entity1');
         entity1.transform.position = [0, 0, 0];
         entity1.transform.rotation = [0, 0, 0, 1]; // No rotation
@@ -804,7 +803,7 @@ describe('CollisionDetector', () => {
         scene.addEntity(entity2);
 
         // No collision initially
-        let result = detector.checkCollisionOBB(entity1);
+        let result = await detector.checkCollisionOBB(entity1);
         expect(result.hasCollision).toBe(false);
 
         // Use rotation override - should still not collide (just testing override works)
@@ -815,17 +814,17 @@ describe('CollisionDetector', () => {
           0,
           Math.cos(angle / 2),
         ];
-        result = detector.checkCollisionOBB(entity1, undefined, rot);
+        result = await detector.checkCollisionOBB(entity1, undefined, rot);
         expect(result.hasCollision).toBe(false);
 
         // Test that override actually affects OBB by moving entity2 closer
         entity2.transform.position = [1.5, 0, 0];
-        result = detector.checkCollisionOBB(entity1, undefined, rot);
+        result = await detector.checkCollisionOBB(entity1, undefined, rot);
         // Should detect collision since boxes are close
         expect(result.hasCollision).toBe(true);
       });
 
-      it('should exclude entities from check', () => {
+      it('should exclude entities from check', async () => {
         const entity1 = new Entity('entity1');
         entity1.transform.position = [0, 0, 0];
         entity1.transform.scale = [2, 2, 2];
@@ -837,7 +836,7 @@ describe('CollisionDetector', () => {
         scene.addEntity(entity2);
 
         const excludeSet = new Set([entity2]);
-        const result = detector.checkCollisionOBB(
+        const result = await detector.checkCollisionOBB(
           entity1,
           undefined,
           undefined,
@@ -848,7 +847,7 @@ describe('CollisionDetector', () => {
         expect(result.hasCollision).toBe(false);
       });
 
-      it('should detect collision with multiple entities', () => {
+      it('should detect collision with multiple entities', async () => {
         const entity1 = new Entity('entity1');
         entity1.transform.position = [0, 0, 0];
         entity1.transform.scale = [4, 4, 4]; // Large box
@@ -864,13 +863,136 @@ describe('CollisionDetector', () => {
         entity3.transform.scale = [1, 1, 1];
         scene.addEntity(entity3);
 
-        const result = detector.checkCollisionOBB(entity1);
+        const result = await detector.checkCollisionOBB(entity1);
 
         expect(result.hasCollision).toBe(true);
         expect(result.collidingEntities).toHaveLength(2);
         expect(result.collidingEntities).toContain(entity2);
         expect(result.collidingEntities).toContain(entity3);
       });
+    });
+  });
+
+  describe('camera exclusion', () => {
+    it('should not detect collision with cameras in checkCollision', () => {
+      // Create a camera entity at the same position as test entity
+      const cameraEntity = new Entity('Camera');
+      cameraEntity.addComponent(new CameraComponent());
+      cameraEntity.transform.position = [0, 0, 0];
+      cameraEntity.transform.scale = [1, 1, 1];
+      scene.addEntity(cameraEntity);
+
+      const testEntity = new Entity('Test');
+      testEntity.transform.position = [0, 0, 0];
+      testEntity.transform.scale = [1, 1, 1];
+      scene.addEntity(testEntity);
+
+      const result = detector.checkCollision(testEntity);
+
+      // Should not detect collision with camera
+      expect(result.hasCollision).toBe(false);
+      expect(result.collidingEntities).not.toContain(cameraEntity);
+    });
+
+    it('should not detect collision with cameras in checkCollisionOBB', async () => {
+      // Create a camera entity with larger scale
+      const cameraEntity = new Entity('Camera');
+      cameraEntity.addComponent(new CameraComponent());
+      cameraEntity.transform.position = [0, 0, 0];
+      cameraEntity.transform.scale = [2, 2, 2]; // Larger bounding box
+      scene.addEntity(cameraEntity);
+
+      const testEntity = new Entity('Test');
+      testEntity.transform.position = [0, 0, 0];
+      testEntity.transform.scale = [1, 1, 1];
+      scene.addEntity(testEntity);
+
+      const result = await detector.checkCollisionOBB(testEntity);
+
+      // Should not detect collision with camera
+      expect(result.hasCollision).toBe(false);
+      expect(result.collidingEntities).not.toContain(cameraEntity);
+    });
+
+    it('should still detect collision with regular entities when cameras are present', () => {
+      // Create a camera
+      const cameraEntity = new Entity('Camera');
+      cameraEntity.addComponent(new CameraComponent());
+      cameraEntity.transform.position = [5, 5, 5];
+      cameraEntity.transform.scale = [1, 1, 1];
+      scene.addEntity(cameraEntity);
+
+      // Create a regular entity that collides
+      const obstacle = new Entity('Obstacle');
+      obstacle.transform.position = [0, 0, 0];
+      obstacle.transform.scale = [2, 2, 2];
+      scene.addEntity(obstacle);
+
+      const testEntity = new Entity('Test');
+      testEntity.transform.position = [0, 0, 0];
+      testEntity.transform.scale = [1, 1, 1];
+      scene.addEntity(testEntity);
+
+      const result = detector.checkCollision(testEntity);
+
+      // Should detect collision with obstacle, not with camera
+      expect(result.hasCollision).toBe(true);
+      expect(result.collidingEntities).toContain(obstacle);
+      expect(result.collidingEntities).not.toContain(cameraEntity);
+    });
+
+    it('should exclude multiple cameras from collision detection', () => {
+      // Create multiple cameras
+      const cameras: Entity[] = [];
+      for (let i = 0; i < 3; i++) {
+        const cameraEntity = new Entity(`Camera${i}`);
+        cameraEntity.addComponent(new CameraComponent());
+        cameraEntity.transform.position = [i, 0, 0];
+        cameraEntity.transform.scale = [1, 1, 1];
+        scene.addEntity(cameraEntity);
+        cameras.push(cameraEntity);
+      }
+
+      const testEntity = new Entity('Test');
+      testEntity.transform.position = [1, 0, 0]; // Overlaps with Camera1
+      testEntity.transform.scale = [1, 1, 1];
+      scene.addEntity(testEntity);
+
+      const result = detector.checkCollision(testEntity);
+
+      // Should not detect collision with any camera
+      expect(result.hasCollision).toBe(false);
+      expect(result.collidingEntities).not.toContain(cameras[0]);
+      expect(result.collidingEntities).not.toContain(cameras[1]);
+      expect(result.collidingEntities).not.toContain(cameras[2]);
+    });
+
+    it('should exclude cameras even with excludeEntities parameter', () => {
+      // This test ensures cameras are excluded independently of excludeEntities
+      const cameraEntity = new Entity('Camera');
+      cameraEntity.addComponent(new CameraComponent());
+      cameraEntity.transform.position = [0, 0, 0];
+      cameraEntity.transform.scale = [1, 1, 1];
+      scene.addEntity(cameraEntity);
+
+      const otherEntity = new Entity('Other');
+      otherEntity.transform.position = [0, 0, 0];
+      otherEntity.transform.scale = [1, 1, 1];
+      scene.addEntity(otherEntity);
+
+      const testEntity = new Entity('Test');
+      testEntity.transform.position = [0, 0, 0];
+      testEntity.transform.scale = [1, 1, 1];
+      scene.addEntity(testEntity);
+
+      // Exclude otherEntity, but camera should still be excluded automatically
+      const excludeSet = new Set([otherEntity]);
+      const result = detector.checkCollision(testEntity, undefined, undefined, undefined, excludeSet);
+
+      // Should not detect collision (both camera and otherEntity excluded)
+      expect(result.hasCollision).toBe(false);
+      expect(result.collidingEntities).not.toContain(cameraEntity);
+      expect(result.collidingEntities).not.toContain(otherEntity);
     });
   });
 });

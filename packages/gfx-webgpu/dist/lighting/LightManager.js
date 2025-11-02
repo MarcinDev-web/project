@@ -51,7 +51,7 @@ export class LightManager {
         ];
         // Map light type to numeric value
         const typeMap = { directional: 0, point: 1, spot: 2, ambient: 3 };
-        const type = typeMap[lightComp.lightType];
+        const type = typeMap[lightComp.lightType] ?? 0;
         return {
             type,
             position: worldPos,

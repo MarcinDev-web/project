@@ -26,7 +26,7 @@ export interface PlayIntroStateDeps {
   /** Check if gameplay context is active */
   isGameplayContextActive: () => boolean;
   /** Spawn player entity */
-  spawnPlayer: (position: Vec3, rotation: number) => Entity;
+  spawnPlayer: (position: Vec3, rotation: number) => Promise<Entity>;
   /** Configure controller bindings */
   configureController: (manifest: PlayManifest) => void;
   /** Enable character input */
@@ -35,6 +35,8 @@ export interface PlayIntroStateDeps {
   disableOrbitControls: () => void;
   /** Freeze history recording */
   freezeHistory: () => void;
+  /** Initialize checkpoint system with runtime world */
+  initializeCheckpoints?: (scene: Scene) => void;
   /** Whether FPS camera mode is available */
   hasFpsCamera?: () => boolean;
   /** Called when play intro fails to transition */
@@ -67,7 +69,7 @@ export class PlayIntroState implements IPlayModeState {
     this.blendDuration = deps.blendDuration ?? 0;
   }
 
-  onEnter(context: PlayModeContext): void {
+  async onEnter(context: PlayModeContext): Promise<void> {
     Logger.debug('Entering PLAY_INTRO state');
     
     this.handoffComplete = false;
@@ -98,9 +100,12 @@ export class PlayIntroState implements IPlayModeState {
         this.deps.configureController(manifest);
       }
 
-      // Step 2: Find spawn point
+      // Step 2: Find spawn point and initialize checkpoints with runtime world
       const scene = this.deps.getScene();
       const physicsWorld = this.deps.getPhysicsWorld?.() ?? null;
+      
+      // Initialize checkpoint system with runtime scene
+      this.deps.initializeCheckpoints?.(scene);
       
       // Use camera position as fallback reference for raycast
       const cameraPosition = this.deps.cameraDirector.getViewMatrix ? 
@@ -116,19 +121,19 @@ export class PlayIntroState implements IPlayModeState {
       Logger.debug('Spawn point found:', spawnResult.source, 'at', spawnResult.position);
 
       // Step 3: Spawn player
-      const player = this.deps.spawnPlayer(spawnResult.position, spawnResult.rotation);
+      const player = await this.deps.spawnPlayer(spawnResult.position, spawnResult.rotation);
       context.data.set('playerEntity', player);
-      this.deps.cameraDirector.setPlayerPosition(player.transform.position);
+      this.deps.cameraDirector.setPlayerPose(player.transform.position, player.transform.getForward());
       
       // Step 3: Start camera blend from orbit to FPS
       const hasFpsCamera = this.deps.hasFpsCamera?.() ?? true;
       if (hasFpsCamera) {
-        Logger.debug('Starting camera blend: orbit → fps');
+        Logger.debug('Starting camera blend: free-fly -> fps');
         const blendDuration = this.blendDuration > 0 ? this.blendDuration : 0.33;
         this.deps.cameraDirector.startBlend('fps', blendDuration);
       } else {
         Logger.warn('FPS camera unavailable, skipping blend');
-        this.deps.cameraDirector.setMode('orbit');
+        this.deps.cameraDirector.setMode('free-fly');
       }
       
       // Step 4: Enable character input
@@ -174,7 +179,7 @@ export class PlayIntroState implements IPlayModeState {
     // Update player position for camera
     const player = context.data.get('playerEntity') as Entity | undefined;
     if (player) {
-      this.deps.cameraDirector.setPlayerPosition(player.transform.position);
+      this.deps.cameraDirector.setPlayerPose(player.transform.position, player.transform.getForward());
     }
     
     // Wait for blend to complete
@@ -214,10 +219,11 @@ export class PlayIntroState implements IPlayModeState {
     // The camera position is at the translation component of the inverted view
     
     // Simplified extraction (assumes orthonormal matrix):
+    // View matrix is always 4x4 (16 elements), so indices 0-15 are guaranteed to exist
     const m = viewMatrix;
-    const x = -(m[0] * m[12] + m[1] * m[13] + m[2] * m[14]);
-    const y = -(m[4] * m[12] + m[5] * m[13] + m[6] * m[14]);
-    const z = -(m[8] * m[12] + m[9] * m[13] + m[10] * m[14]);
+    const x = -(m[0]! * m[12]! + m[1]! * m[13]! + m[2]! * m[14]!);
+    const y = -(m[4]! * m[12]! + m[5]! * m[13]! + m[6]! * m[14]!);
+    const z = -(m[8]! * m[12]! + m[9]! * m[13]! + m[10]! * m[14]!);
     
     return [x, y, z];
   }

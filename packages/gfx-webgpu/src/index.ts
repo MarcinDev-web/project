@@ -26,7 +26,7 @@ export {
   type CTMTextureIndex,
 } from './textures/ConnectedTextures';
 
-// Block Library
+// Block Library (re-exported from @engine/blocks for backwards compatibility)
 export {
   getBlock,
   getBlocksByCategory,
@@ -34,7 +34,7 @@ export {
   BLOCK_LIBRARY,
   type BlockDefinition,
   type BlockCategory,
-} from './blocks/BlockLibrary';
+} from '@engine/blocks';
 
 // Shadow System
 export { computeCascades, type CascadeParams, type CascadeResult } from './shadows/ShadowCascades';
@@ -60,4 +60,7 @@ export type {
 // Post-Processing & Environment
 export { BrdfLutPass } from './postprocess/BrdfLut';
 export { EnvironmentRenderer } from './renderers/EnvironmentRenderer';
+export { WaterRenderer } from './renderers/WaterRenderer';
+export { VegetationRenderer } from './renderers/VegetationRenderer';
+export type { VegetationRendererConfig } from './renderers/VegetationRenderer';
 

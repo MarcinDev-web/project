@@ -13,7 +13,7 @@
 import type { Scene } from '@engine/world';
 import type { FrameResources, GeometryData } from '../resources/resources';
 import type { EnvironmentRenderer } from '../renderers/EnvironmentRenderer';
-import type { Mat4, Vec3 } from '@engine/core/math';
+import { type Mat4, type Vec3 } from '@engine/core/math';
 import { UniformManager } from './UniformManager';
 export interface FrameRenderContext {
     device: GPUDevice;
@@ -33,6 +33,15 @@ export interface FrameRenderContext {
     }[]) => void;
     uniformManager: UniformManager;
     lightingData?: import('../lighting/LightManager').LightingData;
+    onShadowMetrics?: (counts: readonly [number, number, number, number]) => void;
+    featureFlags?: {
+        enableComputePrepass?: boolean;
+        enableShadows?: boolean;
+        enableBloom?: boolean;
+        enableHDR?: boolean;
+    };
+    shadowQuality?: 'low' | 'med' | 'high' | 'ultra';
+    msaaSampleCount?: number;
 }
 /**
  * FrameRenderer manages the per-frame rendering operations.
@@ -40,7 +49,9 @@ export interface FrameRenderContext {
 export declare class FrameRenderer {
     private frustumCuller;
     private instanceBuilder;
+    private geometryCache;
     private visibleEntitiesCache;
+    private customGeometryEntitiesCache;
     private depthTextureSize;
     private computePrepass;
     private pendingTimestampRead;
@@ -48,12 +59,16 @@ export declare class FrameRenderer {
     private bundleDirty;
     private bundleInstanceCount;
     private bundleIndexCount;
+    private bundleOpaqueCount;
     private bundleRenderPipeline;
+    private bundleTransparentPipeline;
     private bundleOverlayPipeline;
     private bundleUniformBindGroup;
     private bundleTextureBindGroup;
     private hdrColorTexture;
     private bloomTexture;
+    private hdrColorView;
+    private bloomTextureView;
     private tonemapPass;
     private bloomPass;
     private shadowPass;
@@ -78,6 +93,10 @@ export declare class FrameRenderer {
     private scheduleTimestampRead;
     private invalidateBundle;
     private drawStaticGeometry;
+    /**
+     * Renders custom geometry entities (those with meshData)
+     */
+    private drawCustomGeometry;
     private recordStaticBundle;
 }
 //# sourceMappingURL=FrameRenderer.d.ts.map

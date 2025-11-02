@@ -44,6 +44,8 @@ import { EditorModeManager } from '../managers/EditorModeManager';
 import { EditorClipboardManager } from '../managers/EditorClipboardManager';
 import { EditorSearchManager } from '../managers/EditorSearchManager';
 import { EditorPlacementController } from '../controllers/EditorPlacementController';
+import { VegetationPaintController } from '../controllers/VegetationPaintController';
+import { TerrainBuilderStudio } from '../terrain/TerrainBuilderStudio';
 import { BlockDragController } from '../controllers/BlockDragController';
 import { EasyPlaceController } from '../controllers/EasyPlaceController';
 import { LightManager } from '@engine/gfx-webgpu/lighting/LightManager';
@@ -54,20 +56,29 @@ import { EditorVisualManager } from '../visuals/EditorVisualManager';
 import { EditorUILayout } from './EditorUILayout';
 import { QuickMenu } from './QuickMenu';
 import { KeyboardShortcutsModal } from './KeyboardShortcutsModal';
-import { WelcomeOverlay } from './WelcomeOverlay';
+import { WelcomeOverlay, type WelcomeOverlayConfig } from './WelcomeOverlay';
+import { InteractiveTutorial, createEditorTutorial } from './InteractiveTutorial';
+import { QuickStartGuide } from './QuickStartGuide';
 import { BuildStats } from './BuildStats';
 import { FloatingHints } from './FloatingHints';
 import { ScriptWorkbench } from './ScriptWorkbench';
-import { BlockEditorUI } from './BlockEditorUI';
+import { UIEditor } from './UIEditor';
 import { Audio } from '@engine/stdlib';
 import { EnvironmentComponent } from '@engine/world/components/EnvironmentComponent';
 import { AdaptiveUIManager } from './AdaptiveUIManager';
 import { FeatureIntroduction } from './FeatureIntroduction';
 import type { PhysicsWorld } from '@engine/world';
 import type { CharacterControllerSystem } from '@engine/stdlib/CharacterController';
+import type { BlockBehaviorSystem } from '@engine/world/systems';
 import { CharacterInputHandler } from '@engine/input';
-import { FPSCamera, EditorCameraController, ThirdPersonCamera } from '@engine/camera';
+import { EditorCameraController } from '@engine/camera';
 import { PauseMenu } from './PauseMenu';
+import { TemplatePickerModal } from './TemplatePickerModal';
+import { CollaborationManager } from '../managers/CollaborationManager';
+import { BrandWatermark } from './BrandWatermark';
+import { PlayModeInviteDialog } from './PlayModeInviteDialog';
+import { showCustomProfileEditor } from './CustomProfileEditor';
+import type { PublicUser } from '@engine/net';
 
 export interface EditorUIConfig {
   canvas: HTMLCanvasElement;
@@ -80,6 +91,7 @@ export interface EditorUIConfig {
   getRenderer: () => Renderer | null;
   physicsWorld?: PhysicsWorld | null;
   characterSystem?: CharacterControllerSystem | null;
+  blockBehaviorSystem?: BlockBehaviorSystem | null;
 }
 
 export class EditorUI {
@@ -95,16 +107,23 @@ export class EditorUI {
   private panelManager: EditorPanelManager | null = null;
   private visualManager: EditorVisualManager | null = null;
   private quickMenu: QuickMenu | null = null;
-  private blockEditor: BlockEditorUI | null = null;
+  private templatePicker: TemplatePickerModal | null = null;
   private welcomeOverlay: WelcomeOverlay | null = null;
+  private interactiveTutorial: InteractiveTutorial | null = null;
+  private quickStartGuide: QuickStartGuide | null = null;
   private buildStats: BuildStats | null = null;
   private floatingHints: FloatingHints | null = null;
   private scriptWorkbench: ScriptWorkbench | null = null;
+  private uiEditor: UIEditor | null = null;
   private audio: Audio.AudioManager | null = null;
   private adaptiveUI: AdaptiveUIManager | null = null;
   private featureIntro: FeatureIntroduction | null = null;
   private pauseMenu: PauseMenu | null = null;
   private pauseMenuOpen = false;
+  private brandWatermark: BrandWatermark | null = null;
+  private collaborationManager: CollaborationManager | null = null;
+  private collaborationPanelVisible = false;
+  private playModeInviteDialog: PlayModeInviteDialog | null = null;
 
   // Core systems
   private state: EditorState | null = null;
@@ -119,12 +138,12 @@ export class EditorUI {
   private clipboardManager: EditorClipboardManager | null = null;
   private searchManager: EditorSearchManager | null = null;
   private placementController: EditorPlacementController | null = null;
+  private vegetationPaintController: VegetationPaintController | null = null;
+  private terrainBuilderStudio: TerrainBuilderStudio | null = null;
   private dragController: BlockDragController | null = null;
   private easyPlaceController: EasyPlaceController | null = null;
   private characterInput: CharacterInputHandler | null = null;
-  private fpsCamera: FPSCamera | null = null;
   private editorCamera: EditorCameraController | null = null;
-  private thirdPersonCamera: ThirdPersonCamera | null = null;
 
   constructor(private readonly config: EditorUIConfig) {}
 
@@ -195,21 +214,36 @@ export class EditorUI {
   }
 
   /**
-   * Opens the Custom Block Editor modal. On save, registers the block and refreshes asset UIs.
+   * Launches the new project flow (template picker is now handled by ProjectManager).
    */
-  private openBlockEditor(): void {
-    if (!this.blockEditor) {
-      this.blockEditor = new BlockEditorUI();
-    }
-    this.blockEditor.show(undefined, async (block) => {
-      // Removed: AssetRegistry no longer exists
-      // Block is created but not registered to any system
-      
-      // Refresh palette/browser where present
-      try { this.panelManager?.getAssetPalette()?.refresh(); } catch {}
-      this.setStatusMessage(`Saved custom block: ${block.name}` as string, 1200);
-    });
+  private async startNewProjectFlow(): Promise<void> {
+    if (!this.projectManager) return;
+    await this.projectManager.newProject();
   }
+
+  /**
+   * Loads a template into the current scene (clears existing scene).
+   */
+  private async loadTemplate(): Promise<void> {
+    if (!this.projectManager) return;
+
+    if (typeof document === 'undefined') {
+      return;
+    }
+
+    this.templatePicker ??= new TemplatePickerModal();
+    const result = await this.templatePicker.pickTemplate({
+      title: 'Load Template',
+      subtitle: 'This will replace the current scene with the selected template.',
+      confirmLabel: 'Load Template',
+      includeSeeds: true,
+    });
+
+    if (!result) return;
+
+    await this.projectManager.newProjectFromTemplate(result.template);
+  }
+
 
   /**
    * Initializes core state and systems.
@@ -221,33 +255,33 @@ export class EditorUI {
     this.placementMode = new PlacementMode(
       this.config.scene,
       this.snapSystem,
-      this.collisionDetector
+      this.collisionDetector,
+      {
+        onEntityCreated: (entity) => {
+          // Replicate entity creation
+          // Note: collaborationManager may not be initialized yet, but will be checked at runtime
+          const manager = this.collaborationManager;
+          if (manager?.isCollaborating()) {
+            manager.replicateEntityCreate(entity);
+          }
+        },
+      }
     );
 
     const physicsWorld = this.config.physicsWorld ?? null;
     const characterSystem = this.config.characterSystem ?? null;
+    const blockBehaviorSystem = this.config.blockBehaviorSystem ?? null;
 
     if (!this.characterInput) {
       this.characterInput = new CharacterInputHandler();
       this.disposables.add(() => this.characterInput?.destroy());
     }
-    if (!this.fpsCamera) {
-      this.fpsCamera = new FPSCamera(this.config.canvas);
-      this.disposables.add(() => this.fpsCamera?.dispose());
-    }
     if (!this.editorCamera) {
       this.editorCamera = new EditorCameraController(this.config.canvas, {
         moveSpeed: 5.0,
-        initialPosition: [0, 2, 5],
+        initialPosition: [0, 2, 8], // Spawn further back to avoid avatar blocking view
       });
       this.disposables.add(() => this.editorCamera?.dispose());
-    }
-    if (!this.thirdPersonCamera) {
-      this.thirdPersonCamera = new ThirdPersonCamera(this.config.canvas, this.config.physicsWorld ?? null, {
-        distance: this.state.cameraPreferences.value.thirdPersonDistance,
-        height: this.state.cameraPreferences.value.thirdPersonHeight,
-      });
-      this.disposables.add(() => this.thirdPersonCamera?.dispose());
     }
 
     this.modeManager = new EditorModeManager({
@@ -267,11 +301,13 @@ export class EditorUI {
       controls: this.config.controls,
       physicsWorld,
       characterSystem,
+      blockBehaviorSystem,
       characterInput: this.characterInput,
-      fpsCamera: this.fpsCamera,
+      fpsCamera: null, // Not used in editor - only in play mode
       editorCamera: this.editorCamera,
-      thirdPersonCamera: this.thirdPersonCamera,
+      thirdPersonCamera: null, // Not used in editor - only in play mode
       getRendererReady: () => this.config.getRenderer() !== null,
+      collaborationManager: this.collaborationManager,
     });
 
     this.clipboardManager = new EditorClipboardManager({
@@ -331,6 +367,33 @@ export class EditorUI {
       recordSnapshot: (d) => this.recordSnapshot(d),
       onStatusMessage: (msg, dur) => this.setStatusMessage(msg, dur),
     });
+
+    // Initialize Vegetation Paint Controller
+    this.vegetationPaintController = new VegetationPaintController({
+      canvas: this.config.canvas,
+      scene: this.config.scene,
+      controls: this.config.controls,
+      cameraDirector: this.modeManager.getCameraDirector(),
+      state: this.state,
+      onStatusMessage: (msg, dur) => this.setStatusMessage(msg, dur),
+    });
+    const paintCleanup = this.vegetationPaintController.initialize();
+    this.disposables.add(paintCleanup);
+
+    // Initialize Terrain Builder Studio
+    this.terrainBuilderStudio = new TerrainBuilderStudio({
+      canvas: this.config.canvas,
+      scene: this.config.scene,
+      controls: this.config.controls,
+      state: this.state,
+      onStatusMessage: (msg, dur) => this.setStatusMessage(msg, dur),
+      onTerrainChanged: (_entity) => {
+        this.config.updateSceneBuffers();
+        this.recordSnapshot('Terrain changed');
+      },
+    });
+    this.terrainBuilderStudio.initialize();
+    this.disposables.add(() => this.terrainBuilderStudio?.dispose());
 
     // Sync SnapSystem when snap config changes
     effect(() => {
@@ -393,8 +456,16 @@ export class EditorUI {
       this.updateControlEnabledState();
     });
 
+    // Initialize brand watermark (FORGE ENGINE branding)
+    this.brandWatermark = new BrandWatermark({
+      container: document.body,
+      showFPS: true, // Show FPS counter in dev mode
+      position: 'top-left',
+    });
+
     // Cleanup on dispose
     this.disposables.add(() => this.layout?.dispose());
+    this.disposables.add(() => this.brandWatermark?.dispose());
   }
 
   /**
@@ -432,6 +503,8 @@ export class EditorUI {
     this.quickMenu = new QuickMenu({
       state: this.state,
       projectManager: this.projectManager,
+      onNewProject: () => this.startNewProjectFlow(),
+      onLoadTemplate: () => this.loadTemplate(),
       onUndo: () => this.undo(),
       onRedo: () => this.redo(),
       canUndo: () => this.state?.history.canUndo() ?? false,
@@ -454,8 +527,11 @@ export class EditorUI {
         } catch {}
       },
       onOpenAssets: () => {}, // Removed: assetsDropdown no longer exists
-      onOpenScriptWorkbench: () => this.openScriptWorkbench(),
       onOpenBlockEditor: () => this.openBlockEditor(),
+      onOpenScriptWorkbench: () => this.openScriptWorkbench(),
+      onOpenUIEditor: () => this.openUIEditor(),
+      onToggleCollaboration: () => this.toggleCollaborationPanel(),
+      isCollaborating: () => this.collaborationManager?.isCollaborating() ?? false,
       onGizmoModeChange: (mode) => {
         if (!this.state) return;
         this.state.gizmoMode.value = mode;
@@ -470,39 +546,17 @@ export class EditorUI {
         if (!this.state || !this.modeManager) return;
         const cameraDirector = this.modeManager.getCameraDirector();
         
-        // Synchronize orientation when switching to FPS
-        if (type === 'fps' && this.fpsCamera) {
-          const orbitState = this.config.controls.getState();
-          // Set FPS camera orientation to match orbit camera
-          this.fpsCamera.setYawPitch(orbitState.yaw, orbitState.pitch);
+        // In editor, only free-fly is allowed (fps and third-person are for play mode only)
+        if (type === 'fps' || type === 'third-person') {
+          // These camera types are not available in editor
+          this.setStatusMessage('FPS and Third Person cameras are only available in Play mode', 2000);
+          return;
         }
         
         cameraDirector.setMode(type);
         this.state.cameraType.value = type;
         
-        // Update camera preference if in play mode
-        if (this.state.editorMode.value === 'play' && (type === 'fps' || type === 'third-person')) {
-          this.state.cameraPreferences.value = {
-            ...this.state.cameraPreferences.value,
-            playModeCamera: type,
-          };
-        }
-        
-        // Enable/disable camera controls based on mode
-        if (type === 'fps') {
-          this.fpsCamera?.enable();
-          this.config.controls.setEnabled(false);
-        } else if (type === 'third-person') {
-          // Third person camera is managed by CameraDirector
-          this.fpsCamera?.disable();
-          this.config.controls.setEnabled(false);
-        } else {
-          this.fpsCamera?.disable();
-          this.config.controls.setEnabled(true);
-        }
-        
-        const cameraName = type === 'fps' ? 'First Person' : type === 'third-person' ? 'Third Person' : 'Orbit';
-        this.setStatusMessage(`Camera: ${cameraName}`, 1000);
+        this.setStatusMessage('Camera: Free Fly', 1000);
       },
     });
     this.quickMenu.mount();
@@ -535,6 +589,17 @@ export class EditorUI {
         this.config.updateSceneBuffers();
         this.state!.transformRev.value = this.state!.transformRev.value + 1;
         this.recordSnapshot('Transform change');
+        
+        // Replicate transform changes
+        if (this.collaborationManager?.isCollaborating()) {
+          this.collaborationManager.replicateTransformUpdate(
+            _entity.id,
+            _entity.transform.position,
+            _entity.transform.rotation,
+            _entity.transform.scale
+          );
+        }
+        
         requestAnimationFrame(() => this.visualManager?.updateGizmoOverlay());
       },
       onColorChanged: (entity, color) => {
@@ -545,6 +610,18 @@ export class EditorUI {
         }
         this.state!.colorRev.value = this.state!.colorRev.value + 1;
         this.recordSnapshot('Color change');
+        
+        // Replicate component property change (color)
+        if (this.collaborationManager?.isCollaborating()) {
+          // Color is stored in entity.userData.baseColor, but we can replicate it as component property
+          // For now, we'll replicate it as a transform update since color change doesn't have a dedicated operation type
+          this.collaborationManager.replicateTransformUpdate(
+            entity.id,
+            entity.transform.position,
+            entity.transform.rotation,
+            entity.transform.scale
+          );
+        }
       },
       onEntityRenamed: () => {
         this.state!.renameRev.value = this.state!.renameRev.value + 1;
@@ -563,6 +640,12 @@ export class EditorUI {
           return;
         }
         if (this.placementMode && this.state) {
+          // Block placement in shared view
+          if (this.state.isSharedView.value) {
+            this.config.statusEl.textContent = 'View-only mode: Editing is disabled';
+            return;
+          }
+
           // Persist last chosen preset for placement memory
           try {
             const last = {
@@ -591,6 +674,20 @@ export class EditorUI {
       onOpenScriptWorkbench: () => {
         this.openScriptWorkbench();
       },
+      getVegetationPaintController: () => {
+        const controller = this.getVegetationPaintController();
+        if (!controller) return null;
+        return {
+          activate: (preset: AssetPreset) => controller.activate(preset),
+          updateConfig: (config: { brushRadius?: number; density?: number; minSpacing?: number }) => {
+            controller.updatePaintConfig(config);
+          },
+          isActive: () => controller.isPaintModeActive(),
+        };
+      },
+      getTerrainBuilderStudio: () => {
+        return this.terrainBuilderStudio;
+      },
       getRendererDeviceAndFormat: () => {
         const renderer = this.config.getRenderer();
         if (!renderer) return null;
@@ -618,15 +715,32 @@ export class EditorUI {
       projectWorldToScreen: this.config.projectWorldToScreen,
       updateSceneBuffers: this.config.updateSceneBuffers,
       setControlsEnabled: (enabled) => this.config.controls.setEnabled(enabled),
+      onTransformChanged: (entity) => {
+        // Replicate transform changes
+        if (this.collaborationManager?.isCollaborating()) {
+          this.collaborationManager.replicateTransformUpdate(
+            entity.id,
+            entity.transform.position,
+            entity.transform.rotation,
+            entity.transform.scale
+          );
+        }
+      },
     });
     void this.visualManager.initialize();
     this.disposables.add(() => this.visualManager?.dispose());
 
     // (Old floating QuickMenu removed; replaced with top bar above)
 
-    // Initialize WelcomeOverlay (first-time tutorial)
-    this.welcomeOverlay = new WelcomeOverlay();
+    // Initialize Enhanced WelcomeOverlay (first-time experience)
+    const welcomeConfig: WelcomeOverlayConfig = {
+      onStartTutorial: () => this.startInteractiveTutorial(),
+      onQuickStart: () => this.showQuickStartGuide(),
+      onShowQuickGuide: () => this.showQuickStartGuide(),
+    };
+    this.welcomeOverlay = new WelcomeOverlay(welcomeConfig);
     this.welcomeOverlay.mount();
+    this.disposables.add(() => this.welcomeOverlay?.dispose());
 
     // Initialize BuildStats (performance overlay) - only if renderer available
     try {
@@ -679,6 +793,59 @@ export class EditorUI {
     // Initialize Feature Introduction
     this.featureIntro = new FeatureIntroduction();
     this.disposables.add(() => this.featureIntro?.dispose());
+
+    // Initialize Collaboration Manager (optional - requires auth token)
+    try {
+      // TODO: Get JWT token from auth system
+      const jwtToken = localStorage.getItem('auth_token') || 'temp_token';
+      this.collaborationManager = new CollaborationManager({
+        scene: this.config.scene,
+        physicsWorld: this.config.physicsWorld ?? null,
+        jwtToken,
+        wsUrl: 'ws://localhost:3001',
+        onStart: () => {
+          this.setStatusMessage('Collaboration started', 2000);
+        },
+        onStop: () => {
+          this.setStatusMessage('Collaboration stopped', 2000);
+        },
+      });
+      this.collaborationManager.initialize();
+      
+      // Mount collaboration panel (initially hidden)
+      if (this.collaborationManager) {
+        this.collaborationManager.mountPanel(document.body);
+        // Hide panel initially
+        const panel = this.collaborationManager.getPanel();
+        if (panel) {
+          const root = panel.getRoot();
+          if (root) {
+            root.style.display = 'none';
+          }
+        }
+
+        // Subscribe to Play Mode synchronization events
+        const unsubscribeRequested = this.collaborationManager.onPlayModeRequested((fromUser, requestId) => {
+          this.handlePlayModeRequest(fromUser, requestId);
+        });
+
+        const unsubscribeStarted = this.collaborationManager.onPlayModeStarted(() => {
+          this.handlePlayModeStart();
+        });
+
+        this.disposables.add(() => {
+          unsubscribeRequested();
+          unsubscribeStarted();
+        });
+      }
+      
+      this.disposables.add(() => {
+        this.playModeInviteDialog?.dispose();
+        this.collaborationManager?.dispose();
+      });
+    } catch (error) {
+      console.warn('Failed to initialize collaboration manager:', error);
+    }
   }
 
   /**
@@ -766,24 +933,14 @@ export class EditorUI {
     const cameraTypeEffect = effect(() => {
       const cameraType = this.state!.cameraType.value;
       if (this.modeManager) {
+        // In editor, only free-fly is allowed
+        const effectiveCameraType = cameraType === 'fps' || cameraType === 'third-person' ? 'free-fly' : cameraType;
+        this.modeManager.setEditCameraInputMode(effectiveCameraType);
         const cameraDirector = this.modeManager.getCameraDirector();
-        
-        // Synchronize orientation when switching to FPS
-        if (cameraType === 'fps' && this.fpsCamera) {
-          const orbitState = this.config.controls.getState();
-          this.fpsCamera.setYawPitch(orbitState.yaw, orbitState.pitch);
-        }
-        
-        cameraDirector.setMode(cameraType);
-        
-        // Enable/disable camera controls based on type
-        if (cameraType === 'fps') {
-          this.fpsCamera?.enable();
-          this.config.controls.setEnabled(false);
-        } else {
-          this.fpsCamera?.disable();
-          this.config.controls.setEnabled(true);
-        }
+
+        // Always use free-fly in editor
+        cameraDirector.setMode('free-fly');
+        this.config.controls.setEnabled(false);
       }
       if (this.state) {
         persistCameraType(this.state);
@@ -861,6 +1018,11 @@ export class EditorUI {
       restoreUIPreferences(this.state);
       restoreCameraType(this.state);
     }
+
+    // Safety: ensure no stale placement preview is active after startup
+    try {
+      this.cancelActivePlacement();
+    } catch {}
   }
 
 
@@ -1501,6 +1663,15 @@ export class EditorUI {
     this.scriptWorkbench.open(selected);
   }
 
+  public openUIEditor(): void {
+    if (!this.uiEditor) return;
+    this.uiEditor.open();
+  }
+
+  public openBlockEditor(): void {
+    showCustomProfileEditor();
+  }
+
   /**
    * Handles search query from toolbar
    */
@@ -1538,6 +1709,7 @@ export class EditorUI {
     this.clipboardManager?.dispose();
     this.searchManager?.dispose();
     this.placementController?.dispose();
+    this.vegetationPaintController?.dispose();
 
     this.layout = null;
     this.panelManager = null;
@@ -1552,6 +1724,7 @@ export class EditorUI {
     this.clipboardManager = null;
     this.searchManager = null;
     this.placementController = null;
+    this.vegetationPaintController = null;
   }
 
   /** Returns true when Play Mode is active. */
@@ -1559,13 +1732,24 @@ export class EditorUI {
     return this.modeManager?.isPlayMode() ?? false;
   }
 
+  /**
+   * Gets the vegetation paint controller instance.
+   */
+  public getVegetationPaintController(): VegetationPaintController | null {
+    return this.vegetationPaintController;
+  }
+
+  /**
+   * Update brand watermark FPS counter (call from render loop)
+   */
+  public updateBrandWatermark(): void {
+    this.brandWatermark?.updateFPS();
+  }
+
   public getModeManager(): EditorModeManager | null {
     return this.modeManager;
   }
 
-  public getFPSCamera(): FPSCamera | null {
-    return this.fpsCamera;
-  }
 
   private resumePlayMode(): void {
     if (!this.modeManager || !this.state || this.state.editorMode.value !== 'play') return;
@@ -1601,6 +1785,158 @@ export class EditorUI {
     } else {
       this.hidePauseMenu();
     }
+  }
+
+  /**
+   * Starts the interactive tutorial for new users.
+   */
+  private startInteractiveTutorial(): void {
+    if (this.interactiveTutorial) {
+      // If tutorial already exists, restart it
+      this.interactiveTutorial.dispose();
+    }
+
+    const tutorialConfig = createEditorTutorial();
+    tutorialConfig.onComplete = () => {
+      this.setStatusMessage('Tutorial completed! You\'re ready to create.', 3000);
+      this.showQuickStartGuide();
+    };
+    tutorialConfig.onSkip = () => {
+      this.setStatusMessage('Tutorial skipped', 2000);
+    };
+
+    this.interactiveTutorial = new InteractiveTutorial(tutorialConfig);
+    this.interactiveTutorial.start();
+  }
+
+  /**
+   * Shows the Quick Start Guide panel.
+   */
+  private showQuickStartGuide(): void {
+    if (this.quickStartGuide) {
+      this.quickStartGuide.show();
+      return;
+    }
+
+    this.quickStartGuide = new QuickStartGuide({
+      onAddObject: () => {
+        // Hint: User can browse assets in the right panel
+        this.setStatusMessage('Browse assets in the right panel to add objects', 3000);
+      },
+      onSaveProject: () => {
+        this.projectManager?.saveProject();
+      },
+      onPlayMode: () => {
+        this.modeManager?.enterPlayMode();
+      },
+      onOpenHelp: () => {
+        // Open keyboard shortcuts modal
+        const modal = new KeyboardShortcutsModal();
+        modal.show();
+      },
+    });
+    this.quickStartGuide.mount();
+    this.disposables.add(() => this.quickStartGuide?.dispose());
+  }
+
+  /**
+   * Toggle collaboration panel visibility.
+   */
+  private toggleCollaborationPanel(): void {
+    if (!this.collaborationManager) {
+      this.setStatusMessage('Collaboration not available. Please login first.', 3000);
+      return;
+    }
+
+    const panel = this.collaborationManager.getPanel();
+    if (!panel) {
+      return;
+    }
+
+    this.collaborationPanelVisible = !this.collaborationPanelVisible;
+
+    if (this.collaborationPanelVisible) {
+      // Panel is already mounted (mounted in initializeManagers)
+      // Just ensure it's visible
+      const root = panel.getRoot();
+      if (root) {
+        root.style.display = 'block';
+      }
+    } else {
+      // Hide panel
+      const root = panel.getRoot();
+      if (root) {
+        root.style.display = 'none';
+      }
+    }
+  }
+
+  /**
+   * Get collaboration manager (for external access).
+   */
+  public getCollaborationManager(): CollaborationManager | null {
+    return this.collaborationManager;
+  }
+
+  /**
+   * Handle Play Mode request from another user.
+   */
+  private handlePlayModeRequest(fromUser: PublicUser, requestId: string): void {
+    if (!this.collaborationManager) {
+      return;
+    }
+
+    // Hide any existing dialog
+    if (this.playModeInviteDialog) {
+      this.playModeInviteDialog.hide();
+    }
+
+    // Create and show new dialog
+    this.playModeInviteDialog = new PlayModeInviteDialog({
+      fromUser,
+      onAccept: () => {
+        this.collaborationManager?.respondToPlayModeRequest(requestId, true);
+        this.playModeInviteDialog = null;
+      },
+      onReject: () => {
+        this.collaborationManager?.respondToPlayModeRequest(requestId, false);
+        this.playModeInviteDialog = null;
+      },
+      timeout: 30000, // 30 seconds
+    });
+
+    this.playModeInviteDialog.show();
+  }
+
+  /**
+   * Handle Play Mode start notification.
+   * Called when all users accepted the request and Play Mode should start.
+   */
+  private handlePlayModeStart(): void {
+    // Hide dialog if shown
+    if (this.playModeInviteDialog) {
+      this.playModeInviteDialog.hide();
+      this.playModeInviteDialog = null;
+    }
+
+    // Enter Play Mode
+    if (this.modeManager) {
+      this.modeManager.enterPlayModeSync();
+    }
+  }
+
+  /**
+   * Public: Cancels any active placement preview (ghost cube) immediately.
+   */
+  public cancelActivePlacement(): void {
+    try {
+      this.placementMode?.cancelPlacement(true);
+    } catch {}
+    try {
+      if (this.state) {
+        this.state.placementMode.value = false;
+      }
+    } catch {}
   }
 }
 

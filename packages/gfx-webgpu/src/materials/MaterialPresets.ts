@@ -8,7 +8,8 @@ export type MaterialPresetName =
   | 'wood_oak'
   | 'stone_granite'
   | 'glass_clear'
-  | 'emissive_neon';
+  | 'emissive_neon'
+  | 'water_default';
 
 export function createPreset(name: MaterialPresetName): Material {
   const m = new Material();
@@ -57,6 +58,14 @@ export function createPreset(name: MaterialPresetName): Material {
       m.emissive = [0.1, 0.6, 1.0];
       m.emissiveIntensity = 3.0;
       m.color = [0.1, 0.2, 0.3, 1];
+      break;
+    case 'water_default':
+      m.metallic = 0;
+      m.roughness = 0.05;
+      m.color = [0.2, 0.5, 0.8, 0.7];
+      m.alphaMode = 'BLEND';
+      m.doubleSided = true;
+      m.opacity = 0.7;
       break;
   }
   return m;

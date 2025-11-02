@@ -88,10 +88,11 @@ describe('SpawnPointSystem', () => {
     it('should find spawn point via raycast', () => {
       const mockHit: RaycastHit = {
         entity: null as any,
+        physics: null as any,
+        colliderIndex: 0,
         distance: 5.0,
         point: [10, 0, 10],
         normal: [0, 1, 0],
-        collider: null as any,
       };
 
       vi.mocked(mockPhysicsWorld.raycast).mockReturnValue(mockHit);
@@ -176,10 +177,11 @@ describe('SpawnPointSystem', () => {
     it('should fall back to raycast when no spawn point exists', () => {
       const mockHit: RaycastHit = {
         entity: null as any,
+        physics: null as any,
+        colliderIndex: 0,
         distance: 5.0,
         point: [0, 0, 0],
         normal: [0, 1, 0],
-        collider: null as any,
       };
 
       vi.mocked(mockPhysicsWorld.raycast).mockReturnValue(mockHit);
@@ -227,10 +229,11 @@ describe('SpawnPointSystem', () => {
     it('should return true if ground exists beneath position', () => {
       const mockHit: RaycastHit = {
         entity: null as any,
+        physics: null as any,
+        colliderIndex: 0,
         distance: 1.0,
         point: [0, -1, 0],
         normal: [0, 1, 0],
-        collider: null as any,
       };
 
       vi.mocked(mockPhysicsWorld.raycast).mockReturnValue(mockHit);

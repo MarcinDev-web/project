@@ -742,11 +742,7 @@ export function clampVec3(vec, minVal, maxVal) {
 export function minVec3(a, b) {
     assertVec3('a', a);
     assertVec3('b', b);
-    return [
-        Math.min(a[0], b[0]),
-        Math.min(a[1], b[1]),
-        Math.min(a[2], b[2]),
-    ];
+    return [Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.min(a[2], b[2])];
 }
 /**
  * Component-wise maximum of two vectors
@@ -757,11 +753,7 @@ export function minVec3(a, b) {
 export function maxVec3(a, b) {
     assertVec3('a', a);
     assertVec3('b', b);
-    return [
-        Math.max(a[0], b[0]),
-        Math.max(a[1], b[1]),
-        Math.max(a[2], b[2]),
-    ];
+    return [Math.max(a[0], b[0]), Math.max(a[1], b[1]), Math.max(a[2], b[2])];
 }
 /**
  * Approximate equality test for two Vec3 using epsilon tolerance per component.

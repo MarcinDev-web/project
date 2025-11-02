@@ -1,6 +1,13 @@
 import type { IPlayModeState, PlayModeContext, PlayModeStateType } from '../core/PlayModeStateMachine';
 import { PlayModeStateType as StateType } from '../core/PlayModeStateMachine';
 import { Logger } from '../../utils/logger';
+import type { Vec3 } from '@engine/core/math';
+
+export interface EditorCameraState {
+  position: Vec3;
+  yaw: number;
+  pitch: number;
+}
 
 /**
  * Dependencies for EDIT state
@@ -8,14 +15,16 @@ import { Logger } from '../../utils/logger';
 export interface EditStateDeps {
   /** Show/hide editor UI */
   setEditorUIVisible: (visible: boolean) => void;
-  /** Enable/disable orbit controls */
-  setOrbitEnabled: (enabled: boolean) => void;
-  /** Get current orbit controls state */
-  getOrbitState: () => { yaw: number; pitch: number; distance: number };
-  /** Save orbit controls state for restoration */
-  saveOrbitState: (state: { yaw: number; pitch: number; distance: number }) => void;
-  /** Restore orbit controls state */
-  restoreOrbitState: (state: { yaw: number; pitch: number; distance: number } | null) => void;
+  /** Enable editor free-fly camera */
+  enableEditorCamera: () => void;
+  /** Disable editor free-fly camera */
+  disableEditorCamera: () => void;
+  /** Get current editor camera state */
+  getEditorCameraState: () => EditorCameraState;
+  /** Save editor camera state for restoration */
+  saveEditorCameraState: (state: EditorCameraState) => void;
+  /** Restore editor camera state */
+  restoreEditorCameraState: (state: EditorCameraState | null) => void;
   /** Stop physics simulation */
   stopPhysics: () => void;
   /** Disable script execution */
@@ -37,7 +46,7 @@ export interface EditStateDeps {
  * 
  * Active systems:
  * - Editor UI (toolbar, inspector, panels)
- * - Orbit camera
+ * - Free-fly editor camera
  * - Selection and gizmos
  * - History/undo system
  * - Editor tools
@@ -52,7 +61,7 @@ export class EditState implements IPlayModeState {
   
   private deps: EditStateDeps;
   private triggerPlayMode = false;
-  private lastOrbitState: { yaw: number; pitch: number; distance: number } | null = null;
+  private lastEditorCameraState: EditorCameraState | null = null;
 
   constructor(deps: EditStateDeps) {
     this.deps = deps;
@@ -64,10 +73,10 @@ export class EditState implements IPlayModeState {
     // Show editor UI
     this.deps.setEditorUIVisible(true);
     
-    // Enable orbit camera
-    this.deps.setOrbitEnabled(true);
-    this.deps.restoreOrbitState(this.lastOrbitState);
-    this.lastOrbitState = null;
+    // Enable free-fly camera
+    this.deps.enableEditorCamera();
+    this.deps.restoreEditorCameraState(this.lastEditorCameraState);
+    this.lastEditorCameraState = null;
     
     // Stop simulation systems (only if not coming from RETURN, which already stopped them)
     const fromReturn = this.deps.isReturningFromPlay?.() ?? false;
@@ -91,10 +100,10 @@ export class EditState implements IPlayModeState {
 
   onExit(context: PlayModeContext): void {
     Logger.debug('Exiting EDIT state');
-    const orbitState = this.deps.getOrbitState();
-    this.deps.saveOrbitState(orbitState);
-    this.lastOrbitState = orbitState;
-    this.deps.setOrbitEnabled(false);
+    const cameraState = this.deps.getEditorCameraState();
+    this.deps.saveEditorCameraState(cameraState);
+    this.lastEditorCameraState = cameraState;
+    this.deps.disableEditorCamera();
   }
 
   onUpdate(_deltaTime: number, _context: PlayModeContext): PlayModeStateType | null {

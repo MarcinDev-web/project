@@ -84,20 +84,21 @@ Complete documentation for the UGC 3D Platform project.
 
 ---
 
-## 🔧 Refactoring (October 2025)
+## 🔧 Refactoring (October 2025) - Archived
 
-**Location:** [refactoring/](./refactoring/)
+**Location:** [archive/](./archive/)
 
-### Summary
-**[REFACTORING_COMPLETE.md](./refactoring/REFACTORING_COMPLETE.md)** - Complete overview
+**Note:** Refactoring documentation has been moved to the archive as the refactoring work is complete.
 
-**Results:**
+**Summary:**
 - Eliminated 6 major duplicates (-1823 lines)
 - Created @engine/editor-utils package
 - 100% import consistency achieved
 - Comprehensive documentation (24+ files)
 
-**See:** [refactoring/README.md](./refactoring/README.md) for all refactoring docs
+**Key archived files:**
+- [REFACTORING_COMPLETE.md](./archive/REFACTORING_COMPLETE.md) - Complete overview
+- [MIGRATION_SUCCESS_METRICS.md](./archive/MIGRATION_SUCCESS_METRICS.md) - Metrics and results
 
 ---
 
@@ -111,10 +112,16 @@ Complete documentation for the UGC 3D Platform project.
 
 ## 📊 Analysis & Reports
 
+**Current analyses:**
 - **[GAMEPLAY_ANALYSIS.md](./GAMEPLAY_ANALYSIS.md)** - Gameplay systems analysis
 - **[TEST_OPTIMIZATION.md](./TEST_OPTIMIZATION.md)** - Test optimization report
 - **[TESTING_AUTOMATION.md](./TESTING_AUTOMATION.md)** - Test automation guide
-- **[WORKFLOW_SIMPLIFICATION.md](./WORKFLOW_SIMPLIFICATION.md)** - Workflow improvements
+- **[analysis/](./analysis/)** - Current analysis documents
+  - [HOTBAR_PLACEMENT_ANALYSIS.md](./analysis/HOTBAR_PLACEMENT_ANALYSIS.md) - Hotbar placement integration
+  - [PLACEMENT_ANALYSIS_PROBLEMS.md](./analysis/PLACEMENT_ANALYSIS_PROBLEMS.md) - Placement system issues
+
+**Archived analyses:**
+- See [archive/](./archive/) for historical analysis documents and completed refactoring documentation
 
 ---
 
@@ -164,12 +171,15 @@ ugc-3d-platform/
     │   ├── PACKAGE_GUIDELINES.md         # Where code belongs
     │   ├── CODE_REVIEW_CHECKLIST.md      # PR review checklist
     │   └── TEAM_ONBOARDING.md            # New dev guide
-    ├── refactoring/                 # Oct 2025 refactoring
-    │   ├── README.md
-    │   ├── REFACTORING_COMPLETE.md       # Complete summary
+    ├── archive/                    # Archived documentation
+    │   ├── REFACTORING_COMPLETE.md      # Oct 2025 refactoring summary
     │   ├── MIGRATION_SUCCESS_METRICS.md
-    │   ├── EDITOR_PACKAGES_ANALYSIS.md
-    │   └── [phase summaries]
+    │   ├── [completed refactoring docs]
+    │   └── [historical analyses]
+    ├── analysis/                   # Current analysis documents
+    │   ├── HOTBAR_PLACEMENT_ANALYSIS.md
+    │   ├── PLACEMENT_ANALYSIS_PROBLEMS.md
+    │   └── [other analyses]
     ├── technical/                   # Technical specs
     │   ├── FRAME_MODEL.md
     │   └── PLAY_MODE.md
@@ -182,5 +192,7 @@ ugc-3d-platform/
 
 ---
 
-**Last Updated:** 2025-10-26  
+**Last Updated:** 2025-11-02  
 **Maintainer:** Tech Lead
+
+**Note:** Documentation has been reorganized. Historical analyses and completed refactoring documentation are now in [archive/](./archive/).

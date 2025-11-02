@@ -46,6 +46,23 @@ export interface AtlasConfig {
     /** Anisotropic filtering level (1-16, only used if filterMode is 'anisotropic') */
     anisotropyLevel?: number;
 }
+/**
+ * TextureAtlas manages packing of multiple material textures into a single GPU texture.
+ *
+ * Layout:
+ * - Atlas divided into grid of cells
+ * - Each material occupies 2 cells (side + top texture)
+ * - Materials packed in row-major order
+ *
+ * Example (4 materials, 2048x2048 atlas, 128px textures):
+ * +-------+-------+-------+-------+-------+
+ * | Mat0  | Mat0  | Mat1  | Mat1  | Mat2  |
+ * | Side  | Top   | Side  | Top   | Side  |
+ * +-------+-------+-------+-------+-------+
+ * | Mat2  | Mat3  | Mat3  | Empty | Empty |
+ * | Top   | Side  | Top   |       |       |
+ * +-------+-------+-------+-------+-------+
+ */
 export declare class TextureAtlas {
     private readonly config;
     private materials;

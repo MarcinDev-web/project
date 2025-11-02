@@ -215,14 +215,14 @@ export class BlockDragController {
     // Try adjacent placement first (snapping to existing entities)
     const adjacent = this.getAdjacentPlacementFromRay(ray);
     if (adjacent) {
-      this.updateDragPosition(adjacent);
+      void this.updateDragPosition(adjacent);
       return;
     }
 
     // Fall back to ground plane intersection
     const groundIntersection = this.raycastToGroundPlane(ray);
     if (groundIntersection) {
-      this.updateDragPosition(groundIntersection);
+      void this.updateDragPosition(groundIntersection);
     }
 
     event.preventDefault();
@@ -253,7 +253,7 @@ export class BlockDragController {
   /**
    * Updates the position of the dragged block.
    */
-  private updateDragPosition(worldPosition: Vec3): void {
+  private async updateDragPosition(worldPosition: Vec3): Promise<void> {
     if (!this.dragState || !this.isDragging) return;
 
     const entity = this.dragState.entity;
@@ -277,7 +277,7 @@ export class BlockDragController {
     // Exclude the entity being dragged from collision check
     const excludeSet = new Set<Entity>([entity]);
 
-    const collisionResult = this.config.collisionDetector.checkCollisionOBB(
+    const collisionResult = await this.config.collisionDetector.checkCollisionOBB(
       entity,
       worldPosition,
       worldRotation,

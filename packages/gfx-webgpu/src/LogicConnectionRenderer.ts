@@ -7,8 +7,10 @@ import type { LogicConnectionManager } from '../logic/LogicConnectionManager';
 import type { LogicConnection } from '../logic/cubes/types';
 import type { Mat4, Vec3 } from '@engine/core/math';
 import { createLineShaderCode } from './shaders/lineShader';
-import { LogicCubeComponent } from '@engine/world';
-import { LogicCubeLibrary } from '../editor/managers/LogicCubeLibrary';
+import { LogicCubeComponent } from '@engine/script';
+// Note: LogicCubeLibrary is in apps/editor, which violates package boundaries
+// For now, using fallback colors when library is unavailable
+// TODO: Move LogicCubeLibrary to @engine/editor-utils or make this configurable
 
 interface LineVertex {
   position: Vec3;
@@ -208,22 +210,22 @@ export class LogicConnectionRenderer {
       const component = sourceEntity.getComponent(LogicCubeComponent);
       if (component) {
         const cubeType = component.getCubeType();
-        const entry = LogicCubeLibrary.get(cubeType);
-        if (entry) {
-          const category = entry.metadata.category;
-          // Color by category
-          switch (category) {
-            case 'trigger':
-              return [1, 0.8, 0.2]; // Yellow
-            case 'action':
-              return [0.8, 0.4, 1]; // Purple
-            case 'condition':
-              return [1, 1, 0.3]; // Yellow
-            case 'data':
-              return [0.3, 0.8, 1]; // Blue
-            case 'logic':
-              return [0.7, 0.7, 1]; // Light purple
-          }
+        // Fallback: Use simple color mapping based on cube type name
+        // In production, this should use LogicCubeLibrary from @engine/editor-utils
+        if (cubeType.includes('trigger') || cubeType.includes('Trigger')) {
+          return [1, 0.8, 0.2]; // Yellow
+        }
+        if (cubeType.includes('action') || cubeType.includes('Action')) {
+          return [0.8, 0.4, 1]; // Purple
+        }
+        if (cubeType.includes('condition') || cubeType.includes('Condition')) {
+          return [1, 1, 0.3]; // Yellow
+        }
+        if (cubeType.includes('data') || cubeType.includes('Data')) {
+          return [0.3, 0.8, 1]; // Blue
+        }
+        if (cubeType.includes('logic') || cubeType.includes('Logic')) {
+          return [0.7, 0.7, 1]; // Light purple
         }
       }
     }

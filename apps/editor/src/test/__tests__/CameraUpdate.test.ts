@@ -9,22 +9,17 @@ describe('Camera Update in Edit Mode', () => {
     it('should update camera director in edit mode', () => {
       // Mock editor with mode manager
       const mockCameraDirector = {
-        update: vi.fn(),
-        getMode: vi.fn(() => 'orbit'),
+        update: vi.fn((deltaTime: number) => {}),
+        getMode: vi.fn(() => 'free-fly'),
       };
 
       const mockModeManager = {
         getCameraDirector: vi.fn(() => mockCameraDirector),
       };
 
-      const mockFPSCamera = {
-        update: vi.fn(),
-      };
-
       const mockEditor = {
         isPlayMode: vi.fn(() => false),
         getModeManager: vi.fn(() => mockModeManager),
-        getFPSCamera: vi.fn(() => mockFPSCamera),
       };
 
       // Simulate onFrameUpdate callback from app.ts
@@ -35,17 +30,16 @@ describe('Camera Update in Edit Mode', () => {
         if (modeManager) {
           modeManager.getCameraDirector().update(deltaTime);
         }
-        mockEditor.getFPSCamera()?.update();
+        // FPS camera is not updated in editor - only in play mode
       }
 
       // Verify camera director was updated
       expect(mockCameraDirector.update).toHaveBeenCalledWith(deltaTime);
-      expect(mockFPSCamera.update).toHaveBeenCalled();
     });
 
     it('should not update camera in play mode (handled by updatePlayMode)', () => {
       const mockCameraDirector = {
-        update: vi.fn(),
+        update: vi.fn((deltaTime: number) => {}),
       };
 
       const mockModeManager = {
@@ -73,7 +67,7 @@ describe('Camera Update in Edit Mode', () => {
 
     it('should handle missing FPS camera gracefully', () => {
       const mockCameraDirector = {
-        update: vi.fn(),
+        update: vi.fn((deltaTime: number) => {}),
       };
 
       const mockModeManager = {
@@ -83,19 +77,18 @@ describe('Camera Update in Edit Mode', () => {
       const mockEditor = {
         isPlayMode: vi.fn(() => false),
         getModeManager: vi.fn(() => mockModeManager),
-        getFPSCamera: vi.fn(() => null), // No FPS camera
       };
 
       const deltaTime = 0.016;
 
-      // Should not throw even without FPS camera
+      // Should not throw
       expect(() => {
         if (!mockEditor.isPlayMode()) {
           const modeManager = mockEditor.getModeManager();
           if (modeManager) {
             modeManager.getCameraDirector().update(deltaTime);
           }
-          mockEditor.getFPSCamera()?.update();
+          // FPS camera is not used in editor
         }
       }).not.toThrow();
 
@@ -104,7 +97,7 @@ describe('Camera Update in Edit Mode', () => {
 
     it('should handle errors in camera update gracefully', () => {
       const mockCameraDirector = {
-        update: vi.fn(() => {
+        update: vi.fn((deltaTime: number) => {
           throw new Error('Camera update error');
         }),
       };
@@ -116,7 +109,6 @@ describe('Camera Update in Edit Mode', () => {
       const mockEditor = {
         isPlayMode: vi.fn(() => false),
         getModeManager: vi.fn(() => mockModeManager),
-        getFPSCamera: vi.fn(() => null),
       };
 
       const deltaTime = 0.016;
@@ -129,7 +121,7 @@ describe('Camera Update in Edit Mode', () => {
             if (modeManager) {
               modeManager.getCameraDirector().update(deltaTime);
             }
-            mockEditor.getFPSCamera()?.update();
+            // FPS camera is not used in editor
           }
         } catch (err) {
           // Ignore edit mode update errors
@@ -141,21 +133,16 @@ describe('Camera Update in Edit Mode', () => {
   describe('camera update timing', () => {
     it('should update camera every frame with correct delta time', () => {
       const mockCameraDirector = {
-        update: vi.fn(),
+        update: vi.fn((deltaTime: number) => {}),
       };
 
       const mockModeManager = {
         getCameraDirector: vi.fn(() => mockCameraDirector),
       };
 
-      const mockFPSCamera = {
-        update: vi.fn(),
-      };
-
       const mockEditor = {
         isPlayMode: vi.fn(() => false),
         getModeManager: vi.fn(() => mockModeManager),
-        getFPSCamera: vi.fn(() => mockFPSCamera),
       };
 
       // Simulate multiple frames
@@ -167,13 +154,12 @@ describe('Camera Update in Edit Mode', () => {
           if (modeManager) {
             modeManager.getCameraDirector().update(deltaTime);
           }
-          mockEditor.getFPSCamera()?.update();
+          // FPS camera is not used in editor
         }
       }
 
       // Should be called once per frame
       expect(mockCameraDirector.update).toHaveBeenCalledTimes(frames.length);
-      expect(mockFPSCamera.update).toHaveBeenCalledTimes(frames.length);
 
       // Verify correct delta times were passed
       frames.forEach((dt, index) => {
@@ -183,7 +169,7 @@ describe('Camera Update in Edit Mode', () => {
 
     it('should handle very large delta times', () => {
       const mockCameraDirector = {
-        update: vi.fn(),
+        update: vi.fn((deltaTime: number) => {}),
       };
 
       const mockModeManager = {
@@ -193,7 +179,6 @@ describe('Camera Update in Edit Mode', () => {
       const mockEditor = {
         isPlayMode: vi.fn(() => false),
         getModeManager: vi.fn(() => mockModeManager),
-        getFPSCamera: vi.fn(() => null),
       };
 
       const largeDeltaTime = 1.0; // 1 second frame time (lag spike)
@@ -212,7 +197,7 @@ describe('Camera Update in Edit Mode', () => {
   describe('mode transitions', () => {
     it('should switch update strategy when transitioning between edit and play', () => {
       const mockCameraDirector = {
-        update: vi.fn(),
+        update: vi.fn((deltaTime: number) => {}),
       };
 
       const mockModeManager = {
@@ -220,14 +205,9 @@ describe('Camera Update in Edit Mode', () => {
         updatePlayMode: vi.fn(),
       };
 
-      const mockFPSCamera = {
-        update: vi.fn(),
-      };
-
       const mockEditor = {
         isPlayMode: vi.fn(),
         getModeManager: vi.fn(() => mockModeManager),
-        getFPSCamera: vi.fn(() => mockFPSCamera),
       };
 
       const deltaTime = 0.016;
@@ -237,14 +217,12 @@ describe('Camera Update in Edit Mode', () => {
 
       if (!mockEditor.isPlayMode()) {
         mockEditor.getModeManager()?.getCameraDirector().update(deltaTime);
-        mockEditor.getFPSCamera()?.update();
+        // FPS camera is not used in editor
       }
 
       expect(mockCameraDirector.update).toHaveBeenCalledTimes(1);
-      expect(mockFPSCamera.update).toHaveBeenCalledTimes(1);
 
       mockCameraDirector.update.mockClear();
-      mockFPSCamera.update.mockClear();
 
       // Transition to play mode
       mockEditor.isPlayMode.mockReturnValue(true);
@@ -253,12 +231,11 @@ describe('Camera Update in Edit Mode', () => {
         mockEditor.getModeManager()?.updatePlayMode(deltaTime);
       } else {
         mockEditor.getModeManager()?.getCameraDirector().update(deltaTime);
-        mockEditor.getFPSCamera()?.update();
+        // FPS camera is not used in editor
       }
 
       expect(mockModeManager.updatePlayMode).toHaveBeenCalledTimes(1);
       expect(mockCameraDirector.update).not.toHaveBeenCalled();
-      expect(mockFPSCamera.update).not.toHaveBeenCalled();
     });
   });
 });

@@ -14,7 +14,14 @@ let browserPolyfillsInitialized = false;
  * Call this from tests that require DOM APIs
  */
 export function initBrowserPolyfills() {
-  if (browserPolyfillsInitialized || !isBrowserEnv) return;
+  // Check again at call time in case jsdom wasn't ready at module load
+  // In jsdom environment, document should be available, but check dynamically
+  const envReady = typeof window !== 'undefined' && typeof document !== 'undefined';
+  if (browserPolyfillsInitialized) return;
+  
+  // If environment not ready yet, skip initialization (will be retried if needed)
+  if (!envReady) return;
+  
   browserPolyfillsInitialized = true;
 
   // ResizeObserver polyfill
@@ -179,7 +186,8 @@ if (typeof (globalThis as any).devicePixelRatio === 'undefined') {
   });
 }
 
-// Auto-initialize browser polyfills only in jsdom environment
-if (isBrowserEnv) {
+// Auto-initialize browser polyfills in jsdom environment
+// Check dynamically since jsdom might initialize after module load
+if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   initBrowserPolyfills();
 }

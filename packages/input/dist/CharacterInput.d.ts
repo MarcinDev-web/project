@@ -17,37 +17,24 @@ export interface InputBindings {
  * Keyboard input handler for character controller
  *
  * Provides keyboard-based input for character movement.
- * Can be extended with gamepad, touch, or other input methods.
+ * Now uses Enhanced Input Abstraction internally but maintains backward compatibility.
+ *
+ * For new code, consider using UnifiedInputManager directly.
  */
 export declare class CharacterInputHandler {
-    /** Key states */
-    private keys;
-    /** Key bindings */
-    private bindings;
+    private inputManager;
+    private keyboardSource;
     /** Whether input is enabled */
-    private enabled;
+    private _enabled;
     /** Camera forward direction (for camera-relative movement) */
     private cameraForward;
     /** Camera right direction (for camera-relative movement) */
     private cameraRight;
     constructor();
+    /**
+     * Set key bindings (backward compatibility)
+     */
     setBindings(bindings: InputBindings): void;
-    /**
-     * Setup keyboard event listeners
-     */
-    private setupEventListeners;
-    /**
-     * Handle key down event
-     */
-    private handleKeyDown;
-    /**
-     * Handle key up event
-     */
-    private handleKeyUp;
-    /**
-     * Check if any key in a binding is pressed
-     */
-    private isKeyPressed;
     /**
      * Set camera directions for camera-relative movement
      */
@@ -74,38 +61,48 @@ export declare class CharacterInputHandler {
     clear(): void;
     /**
      * Cleanup event listeners
+     * @deprecated Use dispose() instead
      */
     destroy(): void;
+    /**
+     * Dispose of the input handler
+     */
+    dispose(): void;
 }
 /**
  * Gamepad input handler for character controller
+ *
+ * Now uses Enhanced Input Abstraction internally but maintains backward compatibility.
+ * For new code, consider using GamepadInputSource or UnifiedInputManager directly.
  */
 export declare class CharacterGamepadHandler {
-    /** Gamepad index */
-    private gamepadIndex;
+    private gamepadSource;
+    private inputManager;
+    constructor(gamepadIndex?: number);
     /** Dead zone for analog sticks */
-    deadZone: number;
+    get deadZone(): number;
+    set deadZone(value: number);
     /** Sprint threshold for trigger */
-    sprintThreshold: number;
+    get sprintThreshold(): number;
+    set sprintThreshold(value: number);
     /** Button mappings (standard gamepad layout) */
-    buttons: {
+    get buttons(): {
         jump: number;
         sprint: number;
     };
+    set buttons(value: {
+        jump: number;
+        sprint: number;
+    });
     /** Axis mappings */
-    axes: {
+    get axes(): {
         moveX: number;
         moveY: number;
     };
-    constructor(gamepadIndex?: number);
-    /**
-     * Get connected gamepad
-     */
-    private getGamepad;
-    /**
-     * Apply dead zone to axis value
-     */
-    private applyDeadZone;
+    set axes(value: {
+        moveX: number;
+        moveY: number;
+    });
     /**
      * Get current character input state from gamepad
      */
@@ -114,5 +111,9 @@ export declare class CharacterGamepadHandler {
      * Check if gamepad is connected
      */
     isConnected(): boolean;
+    /**
+     * Dispose of the gamepad handler
+     */
+    dispose(): void;
 }
 //# sourceMappingURL=CharacterInput.d.ts.map

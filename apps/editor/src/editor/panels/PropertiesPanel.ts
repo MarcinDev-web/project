@@ -33,6 +33,11 @@ import { BehaviorRegistry } from '@engine/script';
 import { AnimationComponent } from '@engine/stdlib/Animation';
 import { createAnimationSection } from '../ui/animation/AnimationSection';
 import { MaterialComponent } from '@engine/world/components/MaterialComponent';
+import { CharacterController } from '@engine/world';
+import { UIElementComponent } from '@engine/world/components/UIElementComponent';
+import { UIElementProperties } from '../ui/UIElementProperties';
+import { MovementProfileRegistry, PRESET_PROFILES, type MovementProfileExtension } from '@engine/stdlib/MovementProfiles';
+import { showCustomProfileEditor } from '../ui/CustomProfileEditor';
 
 const MIN_SCALE = 0.001;
 
@@ -60,6 +65,8 @@ const SECTION_METADATA: SectionMeta[] = [
   { id: 'camera', label: 'Camera', icon: 'camera' },
   { id: 'environment', label: 'Environment', icon: 'sun' },
   { id: 'animation', label: 'Animation', icon: 'play' },
+  { id: 'character-controller', label: 'Character Controller', icon: 'user' },
+  { id: 'ui', label: 'UI', icon: 'layers' },
   { id: 'scripts', label: 'Scripts', icon: 'list' },
 ];
 
@@ -1320,14 +1327,39 @@ export class PropertiesPanel {
         ctx.fillStyle = `rgba(${environment.sunColor[0] * 255}, ${environment.sunColor[1] * 255}, ${environment.sunColor[2] * 255}, ${environment.sunIntensity})`;
         ctx.fill();
       } else if (environment.skyboxType === 'cubemap') {
-        // Placeholder for cubemap
-        ctx.fillStyle = '#1a1a2e';
-        ctx.fillRect(0, 0, 320, 180);
-        ctx.fillStyle = 'rgba(14, 165, 233, 0.3)';
-        ctx.font = '14px monospace';
-        ctx.textAlign = 'center';
-        ctx.textBaseline = 'middle';
-        ctx.fillText('Cubemap', 160, 90);
+        // Cubemap preview
+        const cubemapPath = (environment as any).cubemapPath;
+        if (cubemapPath) {
+          // Show loaded cubemap info
+          ctx.fillStyle = '#1a1a2e';
+          ctx.fillRect(0, 0, 320, 180);
+          ctx.fillStyle = '#4ade80';
+          ctx.font = '12px monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('Cubemap Loaded', 160, 80);
+          ctx.fillStyle = 'rgba(148, 163, 184, 0.7)';
+          ctx.font = '10px monospace';
+          const lines = cubemapPath.split(', ');
+          let y = 100;
+          for (let i = 0; i < Math.min(lines.length, 4); i++) {
+            const text = lines[i]!.length > 30 ? lines[i]!.substring(0, 27) + '...' : lines[i]!;
+            ctx.fillText(text, 160, y);
+            y += 14;
+          }
+          if (lines.length > 4) {
+            ctx.fillText(`+${lines.length - 4} more`, 160, y);
+          }
+        } else {
+          // Placeholder for cubemap
+          ctx.fillStyle = '#1a1a2e';
+          ctx.fillRect(0, 0, 320, 180);
+          ctx.fillStyle = 'rgba(14, 165, 233, 0.3)';
+          ctx.font = '14px monospace';
+          ctx.textAlign = 'center';
+          ctx.textBaseline = 'middle';
+          ctx.fillText('Cubemap', 160, 90);
+        }
       }
     }
 
@@ -1516,6 +1548,132 @@ export class PropertiesPanel {
     skyboxTypeRow.appendChild(skyboxTypeLabel);
     skyboxTypeRow.appendChild(skyboxTypeSelect);
     container.appendChild(skyboxTypeRow);
+
+    // Cubemap file picker (only for cubemap type)
+    if (environment.skyboxType === 'cubemap') {
+      const cubemapRow = document.createElement('div');
+      cubemapRow.className = 'property-row';
+
+      const cubemapLabel = document.createElement('label');
+      cubemapLabel.className = 'property-label-v2';
+      cubemapLabel.textContent = 'Cubemap';
+
+      const cubemapContainer = document.createElement('div');
+      cubemapContainer.className = 'property-control-v2';
+
+      // HDR file picker
+      const hdrInput = document.createElement('input');
+      hdrInput.type = 'file';
+      hdrInput.accept = '.hdr';
+      hdrInput.style.display = 'none';
+      hdrInput.id = `hdr-input-${Date.now()}`;
+
+      const hdrButton = document.createElement('button');
+      hdrButton.type = 'button';
+      hdrButton.className = 'property-button-v2';
+      hdrButton.textContent = 'Load HDR';
+      hdrButton.style.marginLeft = '8px';
+      hdrButton.addEventListener('click', () => hdrInput.click(), { signal: this.refreshAbort!.signal });
+
+      // Cubemap 6 images file picker
+      const fileInput = document.createElement('input');
+      fileInput.type = 'file';
+      fileInput.accept = 'image/*';
+      fileInput.multiple = true;
+      fileInput.style.display = 'none';
+      fileInput.id = `cubemap-input-${Date.now()}`;
+
+      const fileButton = document.createElement('button');
+      fileButton.type = 'button';
+      fileButton.className = 'property-button-v2';
+      fileButton.textContent = 'Load Cubemap (6 images)';
+      fileButton.addEventListener('click', () => fileInput.click(), { signal: this.refreshAbort!.signal });
+
+      const infoText = document.createElement('div');
+      infoText.className = 'property-hint-v2';
+      infoText.style.marginTop = '4px';
+      if ((environment as any).cubemapPath) {
+        infoText.textContent = `Loaded: ${(environment as any).cubemapPath}`;
+        infoText.style.color = '#4ade80';
+      } else {
+        infoText.textContent = 'Select HDR file or 6 images (order: +X, -X, +Y, -Y, +Z, -Z)';
+        infoText.style.color = '#94a3b8';
+      }
+
+      // HDR file loader
+      hdrInput.addEventListener('change', async (e) => {
+        const file = (e.target as HTMLInputElement).files?.[0];
+        if (!file) return;
+
+        if (!file.name.toLowerCase().endsWith('.hdr')) {
+          this.announce('Please select an HDR file (.hdr)');
+          return;
+        }
+
+        try {
+          this.announce('Loading HDR file...');
+          // Note: Actual HDR loading requires EnvironmentRenderer
+          // This is a placeholder - integration will happen through editor's render system
+          (environment as any).cubemapPath = file.name;
+          (environment as any).hdrPath = file.name;
+          infoText.textContent = `Loaded HDR: ${file.name}`;
+          infoText.style.color = '#4ade80';
+          this.refresh();
+          this.announce(`HDR file selected: ${file.name} (requires renderer integration)`);
+        } catch (err) {
+          this.announce(`Failed to load HDR: ${err}`);
+        }
+      }, { signal: this.refreshAbort!.signal });
+
+      fileInput.addEventListener('change', async (e) => {
+        const files = (e.target as HTMLInputElement).files;
+        if (!files || files.length !== 6) {
+          this.announce('Cubemap requires exactly 6 images');
+          return;
+        }
+
+        try {
+          this.announce('Loading cubemap...');
+          // Note: Actual cubemap loading would need access to EnvironmentRenderer
+          // This is a placeholder for UI integration
+          const fileNames = Array.from(files).map(f => f.name).join(', ');
+          (environment as any).cubemapPath = fileNames;
+          infoText.textContent = `Loaded: ${fileNames}`;
+          infoText.style.color = '#4ade80';
+          this.refresh();
+          this.announce('Cubemap loaded (requires renderer integration)');
+        } catch (err) {
+          this.announce(`Failed to load cubemap: ${err}`);
+        }
+      }, { signal: this.refreshAbort!.signal });
+
+      const clearButton = document.createElement('button');
+      clearButton.type = 'button';
+      clearButton.className = 'property-button-v2';
+      clearButton.textContent = 'Clear';
+      clearButton.style.marginLeft = '8px';
+      clearButton.addEventListener('click', () => {
+        (environment as any).cubemapTexture = undefined;
+        (environment as any).cubemapPath = undefined;
+        environment.clearCubemap();
+        fileInput.value = '';
+        infoText.textContent = 'Select 6 images (order: +X, -X, +Y, -Y, +Z, -Z)';
+        infoText.style.color = '#94a3b8';
+        this.refresh();
+        this.announce('Cubemap cleared');
+      }, { signal: this.refreshAbort!.signal });
+
+      cubemapContainer.appendChild(hdrInput);
+      cubemapContainer.appendChild(hdrButton);
+      cubemapContainer.appendChild(fileInput);
+      cubemapContainer.appendChild(fileButton);
+      cubemapContainer.appendChild(clearButton);
+      cubemapContainer.appendChild(infoText);
+
+      cubemapRow.appendChild(cubemapLabel);
+      cubemapRow.appendChild(cubemapContainer);
+      container.appendChild(cubemapRow);
+    }
 
     // Sky Color
     container.appendChild(
@@ -2611,6 +2769,32 @@ export class PropertiesPanel {
           () => this.toggleSectionCollapse('material')
         );
       }
+      case 'character-controller': {
+        const characterController = entity.getComponent(CharacterController);
+        if (!characterController) return null;
+        return this.createCollapsibleSection(
+          'character-controller',
+          'Character Controller',
+          'user',
+          this.createCharacterControllerProperties(entity, characterController),
+          collapsed,
+          () => this.toggleSectionCollapse('character-controller')
+        );
+      }
+      case 'ui': {
+        const uiElementComponent = entity.getComponent(UIElementComponent);
+        const content = uiElementComponent
+          ? this.createUIProperties(entity, uiElementComponent)
+          : this.createUIEmptyState(entity);
+        return this.createCollapsibleSection(
+          'ui',
+          'UI',
+          'layout',
+          content,
+          collapsed,
+          () => this.toggleSectionCollapse('ui')
+        );
+      }
       case 'scripts': {
         const scriptComponent = entity.getComponent(ScriptComponent);
         const content = scriptComponent
@@ -2732,6 +2916,315 @@ export class PropertiesPanel {
       )
     );
 
+    return container;
+  }
+
+  /**
+   * Creates Character Controller properties content
+   */
+  private createCharacterControllerProperties(
+    _entity: Entity,
+    controller: CharacterController
+  ): HTMLElement {
+    const container = document.createElement('div');
+    container.className = 'property-content';
+
+    // Profile Selector
+    const profileRow = document.createElement('div');
+    profileRow.className = 'property-row-v2';
+    
+    const profileLabel = document.createElement('label');
+    profileLabel.className = 'property-label-v2';
+    profileLabel.textContent = 'Movement Profile';
+    
+    const profileSelect = document.createElement('select');
+    profileSelect.className = 'property-select';
+    
+    // Get current profile
+    const currentProfile = controller.getCurrentProfile();
+    const registry = MovementProfileRegistry.getInstance();
+    
+    // Add preset profiles
+    const presetOptions = [
+      { value: 'human', label: 'Human (Default)', profile: PRESET_PROFILES.HUMAN },
+      { value: 'fast-human', label: 'Fast Human', profile: PRESET_PROFILES.FAST_HUMAN },
+      { value: 'slow-human', label: 'Slow Human', profile: PRESET_PROFILES.SLOW_HUMAN },
+      { value: 'heavy-human', label: 'Heavy Human', profile: PRESET_PROFILES.HEAVY_HUMAN },
+      { value: 'agile-human', label: 'Agile Human', profile: PRESET_PROFILES.AGILE_HUMAN },
+      { value: 'flying-human', label: 'Flying Human', profile: PRESET_PROFILES.FLYING_HUMAN },
+      { value: 'speed-boost-human', label: 'Speed Boost Human', profile: PRESET_PROFILES.SPEED_BOOST_HUMAN },
+      { value: 'vehicle-mode', label: 'Vehicle Mode', profile: PRESET_PROFILES.VEHICLE_MODE },
+    ];
+
+    presetOptions.forEach(({ value, label, profile }) => {
+      const option = document.createElement('option');
+      option.value = value;
+      option.textContent = label;
+      if (currentProfile?.id === profile.id) {
+        option.selected = true;
+      }
+      profileSelect.appendChild(option);
+    });
+
+    // Add custom profiles from registry
+    const allProfiles = registry.getAll();
+    const customProfiles = allProfiles.filter(p => 
+      !presetOptions.some(po => po.profile.id === p.id)
+    );
+
+    if (customProfiles.length > 0) {
+      const separator = document.createElement('option');
+      separator.disabled = true;
+      separator.textContent = '── Custom Profiles ──';
+      profileSelect.appendChild(separator);
+
+      customProfiles.forEach(profile => {
+        const option = document.createElement('option');
+        option.value = profile.id;
+        option.textContent = profile.name;
+        if (currentProfile?.id === profile.id) {
+          option.selected = true;
+        }
+        profileSelect.appendChild(option);
+      });
+    }
+
+    profileSelect.addEventListener('change', () => {
+      const selectedId = profileSelect.value;
+      const profile = registry.get(selectedId) || presetOptions.find(po => po.value === selectedId)?.profile;
+      
+      if (profile) {
+        const prevProfile = currentProfile;
+        controller.applyProfile(profile);
+        this.registerUndo(() => {
+          if (prevProfile) {
+            controller.applyProfile(prevProfile);
+          }
+          this.refresh();
+        });
+        this.refresh();
+        this.announce(`Profile changed to ${profile.name}`);
+      }
+    }, { signal: this.refreshAbort!.signal });
+
+    profileRow.appendChild(profileLabel);
+    profileRow.appendChild(profileSelect);
+    container.appendChild(profileRow);
+
+    // Profile Description
+    if (currentProfile?.description) {
+      const descRow = document.createElement('div');
+      descRow.className = 'property-row-v2';
+      const descText = document.createElement('p');
+      descText.className = 'property-description';
+      descText.textContent = currentProfile.description;
+      descText.style.margin = '0';
+      descText.style.fontSize = '11px';
+      descText.style.color = 'rgba(148, 163, 184, 0.8)';
+      descRow.appendChild(descText);
+      container.appendChild(descRow);
+    }
+
+    // Config Preview
+    const configSection = document.createElement('div');
+    configSection.className = 'property-section';
+    
+    const configLabel = document.createElement('div');
+    configLabel.className = 'precision-label';
+    configLabel.textContent = 'Parameters';
+    configSection.appendChild(configLabel);
+
+    const configTable = document.createElement('div');
+    configTable.className = 'property-table';
+
+    const config = controller.config;
+    const params = [
+      { label: 'Move Speed', value: config.moveSpeed.toFixed(1), unit: 'u/s' },
+      { label: 'Sprint Multiplier', value: config.sprintMultiplier.toFixed(2), unit: 'x' },
+      { label: 'Jump Force', value: config.jumpForce.toFixed(1), unit: 'm/s²' },
+      { label: 'Gravity Multiplier', value: config.gravityMultiplier.toFixed(2), unit: 'x' },
+      { label: 'Air Control', value: (config.airControlMultiplier * 100).toFixed(0), unit: '%' },
+      { label: 'Rotation Speed', value: config.rotationSpeed.toFixed(1), unit: 'rad/s' },
+    ];
+
+    params.forEach(param => {
+      const row = document.createElement('div');
+      row.className = 'property-table-row';
+      
+      const label = document.createElement('span');
+      label.className = 'property-table-label';
+      label.textContent = param.label;
+      
+      const value = document.createElement('span');
+      value.className = 'property-table-value';
+      value.textContent = `${param.value} ${param.unit}`;
+      
+      row.appendChild(label);
+      row.appendChild(value);
+      configTable.appendChild(row);
+    });
+
+    configSection.appendChild(configTable);
+    container.appendChild(configSection);
+
+    // Extensions Badges
+    if (currentProfile?.extensions && currentProfile.extensions.length > 0) {
+      const extensionsSection = document.createElement('div');
+      extensionsSection.className = 'property-section';
+      
+      const extensionsLabel = document.createElement('div');
+      extensionsLabel.className = 'precision-label';
+      extensionsLabel.textContent = 'Active Extensions';
+      extensionsSection.appendChild(extensionsLabel);
+
+      const badgesContainer = document.createElement('div');
+      badgesContainer.className = 'extension-badges';
+      badgesContainer.style.display = 'flex';
+      badgesContainer.style.gap = '8px';
+      badgesContainer.style.flexWrap = 'wrap';
+
+      currentProfile.extensions.forEach((ext: MovementProfileExtension) => {
+        const badge = document.createElement('div');
+        badge.className = 'extension-badge';
+        badge.style.display = 'inline-flex';
+        badge.style.alignItems = 'center';
+        badge.style.gap = '6px';
+        badge.style.padding = '4px 10px';
+        badge.style.borderRadius = '12px';
+        badge.style.fontSize = '11px';
+        badge.style.fontWeight = '500';
+        
+        // Color coding based on extension type
+        if (ext.id === 'flying') {
+          badge.style.backgroundColor = 'rgba(59, 130, 246, 0.2)';
+          badge.style.color = '#60a5fa';
+          badge.textContent = '🚀 Flying';
+        } else if (ext.id === 'speed-boost') {
+          badge.style.backgroundColor = 'rgba(251, 146, 60, 0.2)';
+          badge.style.color = '#fb923c';
+          badge.textContent = '⚡ Speed Boost';
+        } else if (ext.id === 'vehicle') {
+          badge.style.backgroundColor = 'rgba(168, 85, 247, 0.2)';
+          badge.style.color = '#a855f7';
+          badge.textContent = '🚗 Vehicle';
+        } else {
+          badge.style.backgroundColor = 'rgba(148, 163, 184, 0.2)';
+          badge.style.color = '#94a3b8';
+          badge.textContent = ext.name;
+        }
+        
+        badge.title = ext.name;
+        badgesContainer.appendChild(badge);
+      });
+
+      extensionsSection.appendChild(badgesContainer);
+      container.appendChild(extensionsSection);
+    }
+
+    // Action buttons
+    const actionsRow = document.createElement('div');
+    actionsRow.className = 'property-row-v2';
+    actionsRow.style.marginTop = '12px';
+    actionsRow.style.display = 'flex';
+    actionsRow.style.gap = '8px';
+
+    // Create Custom Profile button
+    const createCustomBtn = document.createElement('button');
+    createCustomBtn.type = 'button';
+    createCustomBtn.className = 'property-btn';
+    createCustomBtn.textContent = 'Create Custom...';
+    createCustomBtn.style.flex = '1';
+    createCustomBtn.addEventListener('click', () => {
+      showCustomProfileEditor({
+        onSave: (profile) => {
+          const prevProfile = currentProfile;
+          controller.applyProfile(profile);
+          this.registerUndo(() => {
+            if (prevProfile) {
+              controller.applyProfile(prevProfile);
+            }
+            this.refresh();
+          });
+          this.refresh();
+          this.announce(`Custom profile "${profile.name}" created and applied`);
+        },
+      });
+    }, { signal: this.refreshAbort!.signal });
+
+    // Reset to Default button
+    const resetBtn = document.createElement('button');
+    resetBtn.type = 'button';
+    resetBtn.className = 'property-reset-btn';
+    resetBtn.textContent = 'Reset';
+    resetBtn.style.flex = '1';
+    resetBtn.addEventListener('click', () => {
+      const prevProfile = currentProfile;
+      controller.applyProfile(PRESET_PROFILES.HUMAN);
+      this.registerUndo(() => {
+        if (prevProfile) {
+          controller.applyProfile(prevProfile);
+        }
+        this.refresh();
+      });
+      this.refresh();
+      this.announce('Reset to default profile');
+    }, { signal: this.refreshAbort!.signal });
+
+    actionsRow.appendChild(createCustomBtn);
+    actionsRow.appendChild(resetBtn);
+    container.appendChild(actionsRow);
+
+    return container;
+  }
+
+  private createUIProperties(entity: Entity, component: UIElementComponent): HTMLElement {
+    const container = document.createElement('div');
+    container.className = 'property-content';
+
+    // Use UIElementProperties class for consistent editing
+    const uiProps = new UIElementProperties({
+      entity,
+      component,
+      onUpdate: (_updatedComponent) => {
+        this.config.onTransformChanged?.(entity);
+        this.refresh();
+      },
+    });
+
+    container.appendChild(uiProps.element);
+    return container;
+  }
+
+  private createUIEmptyState(entity: Entity): HTMLElement {
+    const container = document.createElement('div');
+    container.className = 'property-content ui-empty-state';
+
+    const text = document.createElement('p');
+    text.className = 'muted-text';
+    text.textContent = 'No UIElementComponent attached.';
+
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'script-add-component-btn';
+    addBtn.textContent = 'Add UIElementComponent';
+    addBtn.addEventListener('click', () => {
+      if (entity.getComponent(UIElementComponent)) {
+        this.renderedEntityId = null;
+        this.refresh();
+        return;
+      }
+      try {
+        const comp = new UIElementComponent(undefined, 'button');
+        entity.addComponent(comp);
+      } catch {
+        // Ignore add errors
+      }
+      this.renderedEntityId = null;
+      this.refresh();
+    }, { signal: this.refreshAbort!.signal });
+
+    container.appendChild(text);
+    container.appendChild(addBtn);
     return container;
   }
 }

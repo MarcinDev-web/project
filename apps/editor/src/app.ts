@@ -8,7 +8,10 @@ import { Logger } from './utils/logger';
 import { CameraComponent } from '@engine/world';
 import { PhysicsWorld } from '@engine/world';
 import { CharacterControllerSystem } from '@engine/stdlib/CharacterController';
-import { registerTemplates, createEmptyTemplate, createBasicLightingTemplate, createCornellBoxSeed } from '@engine/world-templates';
+import { BlockBehaviorSystem, UISystem } from '@engine/world/systems';
+import { registerTemplates, applyTo } from '@engine/world-templates';
+import { createFlatPlatformTemplate } from '@engine/world-templates';
+import { ShareClient } from '@engine/net';
 
 export interface EditorAppOptions {
   canvas: HTMLCanvasElement;
@@ -22,6 +25,8 @@ export class EditorApp {
   private readonly raycaster = new Raycaster();
   private physicsWorld: PhysicsWorld | null = null;
   private characterSystem: CharacterControllerSystem | null = null;
+  private blockBehaviorSystem: BlockBehaviorSystem | null = null;
+  private uiSystem: UISystem | null = null;
 
   private renderer: Renderer | null = null;
   private editor: EditorUI | null = null;
@@ -30,6 +35,7 @@ export class EditorApp {
   private cleanedUp = false;
   private loaderTimeout: number | null = null;
   private loaderVisible = false;
+  private isSharedView = false;
 
   private readonly projectionMatrix = new Float32Array(16);
   private readonly viewMatrix = new Float32Array(16);
@@ -52,13 +58,14 @@ export class EditorApp {
         this.config.statusEl.textContent = 'Loading renderer…';
       }, 150);
 
-      // Register built-in world templates/seeds once at boot
+      // Register a single built-in template once at boot
       try {
         registerTemplates([
-          createEmptyTemplate(),
-          createBasicLightingTemplate(),
-          createCornellBoxSeed(),
+          createFlatPlatformTemplate(),
         ]);
+        // Load default template immediately before initializing renderer/UI
+        this.config.statusEl.textContent = 'Loading default scene…';
+        await applyTo(this.scene, 'template:flat-platform', { clear: true });
       } catch {}
 
       this.renderer = await initRenderer({
@@ -68,22 +75,36 @@ export class EditorApp {
         scene: this.scene,
         shouldSimulate: () => this.editor?.isPlayMode() === true,
         onFrameUpdate: (deltaTime: number) => {
-          // Update play mode systems (physics, character controller, FPS camera)
+          // Update brand watermark (FORGE ENGINE branding with FPS)
+          this.editor?.updateBrandWatermark();
+
+          // Update play mode systems (physics, character controller, FPS camera, UI)
           if (this.editor?.isPlayMode()) {
             try {
+              // Initialize UI system if not already initialized
+              if (this.uiSystem && !(this.uiSystem as any).uiRoot) {
+                this.uiSystem.initialize();
+              }
               this.editor.getModeManager()?.updatePlayMode(deltaTime);
+              // Update UI system
+              if (this.uiSystem) {
+                this.uiSystem.update();
+              }
             } catch (err) {
               Logger.warn('Play mode update failed:', err as Error);
             }
           } else {
-            // Update edit mode systems (camera director, FPS camera for free-fly)
+            // Cleanup UI system when exiting play mode
+            if (this.uiSystem) {
+              this.uiSystem.cleanup();
+            }
+            // Update edit mode systems (camera director)
             try {
               const modeManager = this.editor?.getModeManager();
               if (modeManager) {
+                modeManager.updateEditPreview(deltaTime);
                 modeManager.getCameraDirector().update(deltaTime);
               }
-              // Update FPS camera for pointer lock handling
-              this.editor?.getFPSCamera()?.update();
             } catch (err) {
               // Ignore edit mode update errors
             }
@@ -93,6 +114,8 @@ export class EditorApp {
 
       this.physicsWorld = new PhysicsWorld(this.scene);
       this.characterSystem = new CharacterControllerSystem(this.scene, this.physicsWorld);
+      this.blockBehaviorSystem = new BlockBehaviorSystem(this.scene, this.physicsWorld.getSystem());
+      this.uiSystem = new UISystem(this.scene);
 
       // Expose abort helper for debugging
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -115,6 +138,7 @@ export class EditorApp {
         getRenderer: () => this.renderer,
         physicsWorld: this.physicsWorld,
         characterSystem: this.characterSystem,
+        blockBehaviorSystem: this.blockBehaviorSystem,
       });
       await this.editor.initialize();
 
@@ -129,6 +153,10 @@ export class EditorApp {
             enableTimestamps: !!caps.features.timestampQuery,
             enableOcclusion: !!caps.features.occlusionQuery,
           };
+          // Set shared view mode if in shared view
+          if (this.isSharedView) {
+            state.isSharedView.value = true;
+          }
         } catch {
           // ignore capability propagation errors
         }
@@ -176,6 +204,15 @@ export class EditorApp {
 
     this.physicsWorld = null;
     this.characterSystem = null;
+
+    if (this.uiSystem) {
+      try {
+        this.uiSystem.dispose();
+      } catch (error) {
+        Logger.warn('uiSystem dispose failed:', error as unknown as Error);
+      }
+      this.uiSystem = null;
+    }
 
     try {
       this.controls.cleanup();
@@ -254,6 +291,54 @@ export class EditorApp {
     );
   };
 
+  /**
+   * Load a shared project by token.
+   * Called from bootstrap if ?share=TOKEN is present in URL.
+   */
+  public async loadSharedProject(token: string): Promise<void> {
+    try {
+      this.config.statusEl.textContent = 'Loading shared project...';
+      
+      // Use empty baseURL for relative paths (Vite proxy handles /api/)
+      const shareClient = new ShareClient('');
+      const projectData = await shareClient.loadSharedProject(token);
+
+      // Load scene from shared project
+      const newScene = Scene.fromJSON(projectData.scene);
+      
+      // Replace current scene entities
+      this.scene.clear();
+      for (const entity of newScene.rootEntities) {
+        this.scene.addEntity(entity);
+      }
+      this.scene.name = projectData.scene.name;
+
+      // Update scene buffers if renderer is ready
+      if (this.renderer) {
+        this.renderer.updateScene();
+      }
+
+      // Mark as shared view and update state
+      this.isSharedView = true;
+      const state = (this.editor as any)?.state;
+      if (state) {
+        state.isSharedView.value = true;
+      }
+      
+      // Show view-only message
+      const message = `View-only mode: ${projectData.metadata.name} (Editing disabled)`;
+      this.config.statusEl.textContent = message;
+      setTimeout(() => {
+        this.config.statusEl.textContent = `Viewing: ${projectData.metadata.name}`;
+      }, 5000);
+      Logger.info(`Loaded shared project: ${projectData.metadata.name}`);
+    } catch (error) {
+      Logger.error('Failed to load shared project:', error as unknown as Error);
+      this.config.statusEl.textContent = 'Failed to load shared project.';
+      throw error;
+    }
+  }
+
   private readonly projectWorldToScreen = (world: Vec3): { x: number; y: number } | null => {
     this.updateCameraMatrices();
     const x = world[0] ?? 0;
@@ -301,9 +386,24 @@ export class EditorApp {
             this.selection.select(hit.entity);
           }
         }
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const sendSel = (window as any).__collabSendSelection as ((ids: string[]) => void) | undefined;
+          if (sendSel) {
+            const ids: string[] = [];
+            const primary = this.selection.primarySelection as unknown as { id?: string } | null;
+            if (primary && typeof primary.id === 'string') ids.push(primary.id);
+            sendSel(ids);
+          }
+        } catch {}
       } else {
         if (!isCtrl) {
           this.selection.clearSelection();
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const sendSel = (window as any).__collabSendSelection as ((ids: string[]) => void) | undefined;
+            if (sendSel) sendSel([]);
+          } catch {}
         }
       }
     };
@@ -314,6 +414,10 @@ export class EditorApp {
           this.editor?.getModeManager()?.exitPlayMode();
           return;
         }
+        // Failsafe: always cancel any active placement preview first
+        try {
+          (this.editor as unknown as { cancelActivePlacement?: () => void })?.cancelActivePlacement?.();
+        } catch {}
         this.selection.clearSelection();
       }
     };

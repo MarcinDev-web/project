@@ -11,7 +11,7 @@
 import type { Scene, Entity } from '@engine/world';
 import type { SelectionManager } from '@engine/world';
 import type { EditorState } from '../core/state';
-import type { AssetPreset, AssetMainCategory, AssetCategory, Asset, AssetVariant } from '../types/BlockAssetTypes';
+import type { AssetPreset, Asset } from '../types/BlockAssetTypes';
 import type { RgbaColor } from '../../utils/colors';
 import { PropertiesPanel } from './PropertiesPanel';
 import { LogicPanel } from './LogicPanel';
@@ -24,6 +24,13 @@ import { initializeBaseColor } from '../visuals/SelectionVisuals';
 import { ResizableSidebar } from '../ui/ResizableSidebar';
 import { SidebarTabs } from '../ui/SidebarTabs';
 import { TemplateGalleryPanel } from './TemplateGalleryPanel';
+import { VegetationPanel } from './VegetationPanel';
+import { EconomyPanel } from './EconomyPanel';
+import { UIPanel } from './UIPanel';
+import { UICanvasComponent } from '@engine/world/components/UICanvasComponent';
+import { UIElementComponent } from '@engine/world/components/UIElementComponent';
+import { TerrainPanel } from '../terrain/ui/TerrainPanel';
+import type { TerrainBuilderStudio } from '../terrain/TerrainBuilderStudio';
 
 export interface PanelVisibility {
   sidebar?: boolean;
@@ -50,6 +57,12 @@ export interface EditorPanelManagerConfig {
     device: GPUDevice;
     presentationFormat: GPUTextureFormat;
   } | null;
+  getVegetationPaintController?: () => {
+    activate: (preset: AssetPreset) => void;
+    updateConfig: (config: { brushRadius?: number; density?: number; minSpacing?: number }) => void;
+    isActive: () => boolean;
+  } | null;
+  getTerrainBuilderStudio?: () => TerrainBuilderStudio | null;
 }
 
 /**
@@ -67,6 +80,9 @@ export class EditorPanelManager {
   private propertiesPanel: PropertiesPanel | null = null;
   private logicPanel: LogicPanel | null = null;
   private templateGallery: TemplateGalleryPanel | null = null;
+  private vegetationPanel: VegetationPanel | null = null;
+  private uiPanel: UIPanel | null = null;
+  private terrainPanel: TerrainPanel | null = null;
   private assetPalette: AssetPalette | null = null;
   private assetBrowserWrapper: { refresh: () => void } | null = null;
   private resizableSidebar: ResizableSidebar | null = null;
@@ -148,6 +164,118 @@ export class EditorPanelManager {
     // Create settings panel (placeholder for now)
     const settingsPanel = this.createSettingsPanel();
 
+    // Initialize Vegetation Panel
+    this.vegetationPanel = new VegetationPanel({
+      assetPreset: null,
+      onConfigChanged: (config) => {
+        // Configuration changed - could update active preset
+        console.log('[VegetationPanel] Config changed:', config);
+      },
+      onCreatePreset: (config) => {
+        // Create new vegetation preset
+        console.log('[VegetationPanel] Create preset:', config);
+        // TODO: Integrate with asset system to create new vegetation presets
+      },
+      onActivatePaint: (preset) => {
+        const paintController = this.config.getVegetationPaintController?.();
+        if (paintController) {
+          paintController.activate(preset);
+        } else {
+          console.warn('[VegetationPanel] Paint controller not available');
+        }
+      },
+      onUpdatePaintConfig: (config) => {
+        const paintController = this.config.getVegetationPaintController?.();
+        if (paintController) {
+          paintController.updateConfig(config);
+        }
+      },
+    });
+
+    // Initialize Economy Panel
+    const economyPanel = new EconomyPanel();
+
+    // Initialize UI Panel
+    this.uiPanel = new UIPanel({
+      scene: this.config.scene,
+      onElementSelect: (entity) => {
+        this.config.selection.select(entity);
+        this.refreshProperties();
+      },
+      onElementAdd: (type) => {
+        // Create UI element entity with component
+        const canvases = this.config.scene.queryEntities(UICanvasComponent);
+        let canvasEntity;
+        if (canvases.length === 0) {
+          canvasEntity = this.config.scene.createEntity('UI Canvas');
+          canvasEntity.addComponent(new UICanvasComponent());
+        } else {
+          canvasEntity = canvases[0]!;
+        }
+
+        const elementEntity = this.config.scene.createEntity(`UI ${type}`);
+        canvasEntity.addChild(elementEntity);
+
+        const component = new UIElementComponent(undefined, type);
+        switch (type) {
+          case 'button':
+            component.buttonText = 'Button';
+            component.size = { width: 120, height: 40 };
+            break;
+          case 'text':
+            component.textContent = 'Text';
+            component.fontSize = 16;
+            component.color = '#ffffff';
+            component.size = { width: 200, height: 30 };
+            break;
+          case 'image':
+            component.size = { width: 100, height: 100 };
+            break;
+          case 'slider':
+            component.minValue = 0;
+            component.maxValue = 100;
+            component.value = 50;
+            component.step = 1;
+            component.size = { width: 200, height: 20 };
+            break;
+          case 'progress':
+            component.value = 0.5;
+            component.size = { width: 200, height: 30 };
+            break;
+          case 'input':
+            component.inputType = 'text';
+            component.placeholder = 'Enter text...';
+            component.size = { width: 200, height: 30 };
+            break;
+        }
+
+        elementEntity.addComponent(component);
+        this.config.selection.select(elementEntity);
+        this.refreshProperties();
+        this.config.updateSceneBuffers();
+      },
+    });
+
+    // Initialize Terrain Panel
+    const terrainStudio = this.config.getTerrainBuilderStudio?.();
+    if (terrainStudio) {
+      this.terrainPanel = new TerrainPanel({
+        terrainStudio,
+        onTerrainCreated: (entity) => {
+          this.config.updateSceneBuffers();
+          // Optionally select the new terrain entity
+          this.config.selection.select(entity);
+          this.refreshProperties();
+        },
+        onTerrainSelected: (entity) => {
+          if (entity) {
+            this.config.selection.select(entity);
+            this.refreshProperties();
+          }
+        },
+      });
+    }
+
     // Add tabs to sidebar
     this.sidebarTabs.addTab({
       id: 'layers',
@@ -183,6 +311,36 @@ export class EditorPanelManager {
       icon: 'gallery-horizontal',
       content: this.templateGallery.element,
     });
+
+    this.sidebarTabs.addTab({
+      id: 'vegetation',
+      label: 'Vegetation',
+      icon: 'leaf',
+      content: this.vegetationPanel.element,
+    });
+
+    this.sidebarTabs.addTab({
+      id: 'ui',
+      label: 'UI',
+      icon: 'layout',
+      content: this.uiPanel.element,
+    });
+
+    this.sidebarTabs.addTab({
+      id: 'economy',
+      label: 'Economy',
+      icon: 'banknote',
+      content: economyPanel.element,
+    });
+
+    if (this.terrainPanel) {
+      this.sidebarTabs.addTab({
+        id: 'terrain',
+        label: 'Terrain',
+        icon: 'grid',
+        content: this.terrainPanel.element,
+      });
+    }
 
     this.sidebarTabs.addTab({
       id: 'settings',
@@ -227,13 +385,13 @@ export class EditorPanelManager {
     this.assetPalette = new AssetPalette({
       scene: this.config.scene,
       state: this.config.state,
-      onAssetSelect: (asset: Asset, variant?: AssetVariant) => {
-        // Handle asset selection with variant support
-        this.handleAssetSelection(asset, variant);
+      onAssetSelect: (asset: Asset) => {
+        // Handle asset selection
+        this.handleAssetSelection(asset);
       },
-      onStartPlacement: (asset: Asset, variant?: AssetVariant) => {
+      onStartPlacement: (asset: Asset) => {
         // Convert asset to preset format for placement
-        const preset = this.assetToPreset(asset, variant);
+        const preset = this.assetToPreset(asset);
         this.config.onStartPlacement(preset);
       },
     });
@@ -355,27 +513,25 @@ export class EditorPanelManager {
   /**
    * Converts Asset to AssetPreset format for backward compatibility.
    */
-  private assetToPreset(asset: Asset, variant?: AssetVariant): AssetPreset {
-    const finalColor = variant?.color || asset.color;
+  private assetToPreset(asset: Asset): AssetPreset {
     // Default scale for blocks is 1x1x1
-    const finalScale: [number, number, number] = variant?.scale || [1, 1, 1];
+    const finalScale: [number, number, number] = [1, 1, 1];
     
     return {
       name: asset.name,
       scale: finalScale,
-      color: finalColor,
+      color: asset.color,
       ...(asset.blockData?.id && { blockId: asset.blockData.id }),
     };
   }
 
   /**
-   * Handles asset selection from AssetPalette with variant support
+   * Handles asset selection from AssetPalette
    */
-  private handleAssetSelection(asset: Asset, variant?: AssetVariant): void {
-    const finalColor = variant?.color || asset.color;
+  private handleAssetSelection(asset: Asset): void {
     // Default scale for blocks is 1x1x1
-    const finalScale: [number, number, number] = variant?.scale || [1, 1, 1];
-    const preset = this.assetToPreset(asset, variant);
+    const finalScale: [number, number, number] = [1, 1, 1];
+    const preset = this.assetToPreset(asset);
 
     // All blocks are placeable in the simplified system
     if (this.config.onStartPlacement) {
@@ -389,7 +545,7 @@ export class EditorPanelManager {
       const position: [number, number, number] = [0, finalScale[1] / 2, 0];
       entity.transform.position = position;
       entity.transform.scale = [...finalScale];
-      initializeBaseColor(entity, [...finalColor]);
+      initializeBaseColor(entity, asset.color);
       
       this.config.selection.select(entity);
       this.config.onAssetSpawn(entity, preset);
@@ -408,6 +564,20 @@ export class EditorPanelManager {
    */
   getAssetPalette(): AssetPalette | null {
     return this.assetPalette;
+  }
+
+  /**
+   * Gets the vegetation panel instance.
+   */
+  getVegetationPanel(): VegetationPanel | null {
+    return this.vegetationPanel;
+  }
+
+  /**
+   * Gets the terrain panel instance.
+   */
+  getTerrainPanel(): TerrainPanel | null {
+    return this.terrainPanel;
   }
 
   /**
@@ -440,6 +610,15 @@ export class EditorPanelManager {
 
     this.assetPalette?.dispose();
     this.assetPalette = null;
+
+    this.vegetationPanel?.dispose();
+    this.vegetationPanel = null;
+
+    this.uiPanel?.dispose();
+    this.uiPanel = null;
+
+    this.terrainPanel?.dispose();
+    this.terrainPanel = null;
 
     // Clear references to panels without dispose methods
     // (Their DOM elements will be removed when parent is cleared)

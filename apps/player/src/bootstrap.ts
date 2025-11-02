@@ -1,0 +1,178 @@
+/**
+ * Bootstrap player runtime - initializes all systems and starts game loop
+ */
+
+import { initRenderer } from '@engine/gfx-webgpu';
+import { Scene } from '@engine/world';
+import { PhysicsWorld } from '@engine/world';
+import { CharacterControllerSystem } from '@engine/stdlib/CharacterController';
+import { FPSCamera } from '@engine/camera';
+import { CharacterInputHandler } from '@engine/input';
+import { PlayerModeManager } from './PlayerModeManager';
+import { Logger } from './utils/logger';
+import { requirePlayerDom } from './utils/dom';
+
+export async function bootstrap(): Promise<void> {
+  const dom = requirePlayerDom();
+  
+  // Show loading
+  if (dom.loadingEl) {
+    dom.loadingEl.style.display = 'block';
+  }
+  
+  if (dom.statusEl) {
+    dom.statusEl.textContent = 'Initializing WebGPU...';
+  }
+  
+  try {
+    // Get buildId from URL query string
+    const urlParams = new URLSearchParams(window.location.search);
+    const buildId = urlParams.get('buildId');
+    
+    if (!buildId) {
+      throw new Error('Missing buildId parameter in URL');
+    }
+    
+    // Initialize renderer
+    if (dom.statusEl) {
+      dom.statusEl.textContent = 'Initializing renderer...';
+    }
+    
+    const scene = new Scene('Player Scene');
+    const renderer = await initRenderer({
+      canvas: dom.canvas,
+      statusEl: dom.statusEl ?? undefined,
+      getOrbitState: () => ({ position: [0, 0, 0], target: [0, 0, 0], pitch: 0, yaw: 0, zoom: 1 }),
+      scene,
+      shouldSimulate: () => true, // Always simulate in player mode
+      onFrameUpdate: () => {
+        // Game loop will be handled by PlayerModeManager
+      },
+    });
+    
+    // Initialize physics
+    if (dom.statusEl) {
+      dom.statusEl.textContent = 'Initializing physics...';
+    }
+    
+    const physicsWorld = new PhysicsWorld(scene);
+    
+    // Initialize character system
+    const characterSystem = new CharacterControllerSystem(scene, physicsWorld);
+    
+    // Initialize input
+    const characterInput = new CharacterInputHandler();
+    
+    // Initialize FPS camera
+    const fpsCamera = new FPSCamera(dom.canvas, {
+      eyeHeight: 1.6,
+      sensitivity: 0.0025,
+    });
+    
+    // Initialize PlayerModeManager
+    if (dom.statusEl) {
+      dom.statusEl.textContent = 'Loading game...';
+    }
+    
+    const playerManager = new PlayerModeManager({
+      canvas: dom.canvas,
+      scene,
+      renderer,
+      physicsWorld,
+      characterSystem,
+      characterInput,
+      fpsCamera,
+    });
+    
+    // Initialize player mode (loads build data, spawns player, etc.)
+    await playerManager.initialize(buildId);
+    
+    // Hide loading
+    if (dom.loadingEl) {
+      dom.loadingEl.style.display = 'none';
+    }
+    
+    if (dom.statusEl) {
+      dom.statusEl.textContent = 'Playing...';
+      dom.statusEl.style.display = 'none'; // Hide status after loading
+    }
+    
+    // Show exit button
+    if (dom.exitButton) {
+      dom.exitButton.style.display = 'block';
+      dom.exitButton.addEventListener('click', () => {
+        void playerManager.exit();
+      });
+    }
+    
+    // Setup exit on Escape key
+    document.addEventListener('keydown', (event) => {
+      if (event.key === 'Escape') {
+        void playerManager.exit();
+      }
+    });
+    
+    // Game loop
+    let lastTime = performance.now();
+    function gameLoop(currentTime: number): void {
+      const deltaTime = Math.min((currentTime - lastTime) / 1000, 0.1); // Cap at 100ms
+      lastTime = currentTime;
+      
+      try {
+        playerManager.update(deltaTime);
+      } catch (error) {
+        Logger.error('Game loop error:', error as Error);
+      }
+      
+      requestAnimationFrame(gameLoop);
+    }
+    
+    // Start game loop
+    requestAnimationFrame(gameLoop);
+    
+    // Cleanup on page unload
+    window.addEventListener('beforeunload', () => {
+      playerManager.dispose();
+    }, { once: true });
+    
+    Logger.info('Player runtime initialized successfully');
+  } catch (error) {
+    Logger.error('Bootstrap failed:', error as Error);
+    
+    // Hide loading
+    if (dom.loadingEl) {
+      dom.loadingEl.style.display = 'none';
+    }
+    
+    // Show error
+    if (dom.errorEl) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+      dom.errorEl.textContent = `Failed to start game: ${errorMessage}`;
+      dom.errorEl.style.display = 'block';
+      
+      // Add retry button
+      const retryButton = document.createElement('button');
+      retryButton.textContent = 'Retry';
+      retryButton.style.cssText = `
+        margin-top: 1rem;
+        padding: 0.5rem 1rem;
+        background: rgba(255, 255, 255, 0.1);
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        border-radius: 6px;
+        color: white;
+        cursor: pointer;
+      `;
+      retryButton.addEventListener('click', () => {
+        window.location.reload();
+      });
+      dom.errorEl.appendChild(retryButton);
+    }
+    
+    if (dom.statusEl) {
+      dom.statusEl.textContent = 'Failed to initialize';
+    }
+    
+    throw error;
+  }
+}
+

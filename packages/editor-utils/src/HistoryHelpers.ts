@@ -1,5 +1,6 @@
-import { Scene } from '@engine/world';
-import type { Entity } from '@engine/world';
+import { Scene, Entity, type EntityData, type SceneData } from '@engine/world';
+
+const TRANSIENT_ENTITY_IDS = new Set<string>(['__editor_preview_player']);
 
 /** Finds path to an entity within the scene's root hierarchy. */
 export function computeEntityPath(scene: Scene, entity: Entity | null): number[] | null {
@@ -33,7 +34,11 @@ export function resolveEntityByPath(scene: Scene, path: number[] | null): Entity
 }
 
 export function serializeScene(scene: Scene): string {
-  return JSON.stringify(scene.toJSON());
+  const sceneData = scene.toJSON() as SceneData;
+  return JSON.stringify({
+    ...sceneData,
+    entities: pruneTransientEntities(sceneData.entities),
+  });
 }
 
 export function hydrateScene(scene: Scene, json: string): void {
@@ -41,8 +46,31 @@ export function hydrateScene(scene: Scene, json: string): void {
   const restored = Scene.fromJSON(data);
 
   scene.clear();
-  restored.rootEntities.forEach((entity) => {
+  restored.rootEntities.forEach((entity: Entity) => {
     scene.addEntity(entity);
   });
+}
+
+function pruneTransientEntities(entities: EntityData[]): EntityData[] {
+  const pruned: EntityData[] = [];
+  for (const entity of entities) {
+    if (isTransientEntity(entity)) {
+      continue;
+    }
+    const children = entity.children?.length ? pruneTransientEntities(entity.children) : [];
+    pruned.push({
+      ...entity,
+      children,
+    });
+  }
+  return pruned;
+}
+
+function isTransientEntity(entity: EntityData): boolean {
+  if (TRANSIENT_ENTITY_IDS.has(entity.id)) {
+    return true;
+  }
+  const userData = entity.userData as Record<string, unknown> | undefined;
+  return userData?.isEditorPreviewPlayer === true;
 }
 

@@ -6,5 +6,6 @@ export { createProceduralTemplate } from './loaders/ProceduralTemplate';
 // Built-in templates/seeds
 export { createEmptyTemplate } from './builtins/templates/Empty';
 export { createBasicLightingTemplate } from './builtins/templates/BasicLighting';
+export { createBlockPlaygroundTemplate } from './builtins/templates/BlockPlayground';
 export { createCornellBoxSeed } from './builtins/seeds/CornellBox';
 //# sourceMappingURL=index.js.map

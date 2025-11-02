@@ -34,6 +34,8 @@ export interface GizmoControllerOptions {
   setControlsEnabled: (enabled: boolean) => void;
   getCameraPosition?: () => Vec3;
   getCameraRotation?: () => Quat;
+  /** Called when transform changes (for replication) */
+  onTransformChanged?: (entity: Entity) => void;
 }
 
 /**
@@ -367,11 +369,11 @@ export class GizmoController {
 
     // Apply transformation based on handle type
     if (handle === 'x' || handle === 'y' || handle === 'z') {
-      this.handleAxisDrag(handle, deltaX, deltaY, mode, selected);
+      this.handleAxisDrag(handle, deltaX, deltaY, mode, selected, event);
     } else if (handle === 'xy' || handle === 'xz' || handle === 'yz') {
-      this.handlePlaneDrag(handle, deltaX, deltaY, selected);
+      this.handlePlaneDrag(handle, deltaX, deltaY, selected, event);
     } else if (handle === 'center') {
-      this.handleUniformScale(deltaX, deltaY, selected);
+      this.handleUniformScale(deltaX, deltaY, selected, event);
     }
 
     this.options.updateSceneBuffers();
@@ -386,7 +388,8 @@ export class GizmoController {
     deltaX: number,
     deltaY: number,
     mode: GizmoMode,
-    selected: Entity[]
+    selected: Entity[],
+    pointerEvent: PointerEvent
   ): void {
     if (!this.gizmoState) return;
 
@@ -435,8 +438,8 @@ export class GizmoController {
       // Show value display
       this.renderer.showValueDisplay(
         `${axis.toUpperCase()}: ${finalPos[axisIndex].toFixed(2)}`,
-        event.clientX,
-        event.clientY
+        pointerEvent.clientX,
+        pointerEvent.clientY
       );
     } else if (mode === 'scale') {
       const nextScale = [...this.gizmoState.originalScale] as Vec3;
@@ -456,8 +459,8 @@ export class GizmoController {
 
       this.renderer.showValueDisplay(
         `Scale ${axis.toUpperCase()}: ${finalScale[axisIndex].toFixed(2)}`,
-        event.clientX,
-        event.clientY
+        pointerEvent.clientX,
+        pointerEvent.clientY
       );
     } else if (mode === 'rotate') {
       const angle = worldDelta * Math.PI;
@@ -480,8 +483,8 @@ export class GizmoController {
       const degrees = ((angle * 180) / Math.PI).toFixed(0);
       this.renderer.showValueDisplay(
         `Rotate ${axis.toUpperCase()}: ${degrees}°`,
-        event.clientX,
-        event.clientY
+        pointerEvent.clientX,
+        pointerEvent.clientY
       );
     }
   }
@@ -490,7 +493,8 @@ export class GizmoController {
     plane: PlaneKey,
     deltaX: number,
     deltaY: number,
-    selected: Entity[]
+    selected: Entity[],
+    pointerEvent: PointerEvent
   ): void {
     if (!this.gizmoState) return;
 
@@ -536,12 +540,17 @@ export class GizmoController {
 
     this.renderer.showValueDisplay(
       `${plane.toUpperCase()}: (${finalPos[axis1Index].toFixed(2)}, ${finalPos[axis2Index].toFixed(2)})`,
-      event.clientX,
-      event.clientY
+      pointerEvent.clientX,
+      pointerEvent.clientY
     );
   }
 
-  private handleUniformScale(deltaX: number, deltaY: number, selected: Entity[]): void {
+  private handleUniformScale(
+    deltaX: number,
+    deltaY: number,
+    selected: Entity[],
+    pointerEvent: PointerEvent
+  ): void {
     if (!this.gizmoState) return;
 
     const distance = Math.hypot(deltaX, deltaY);
@@ -561,8 +570,8 @@ export class GizmoController {
 
     this.renderer.showValueDisplay(
       `Uniform Scale: ${newScale[0].toFixed(2)}`,
-      event.clientX,
-      event.clientY
+      pointerEvent.clientX,
+      pointerEvent.clientY
     );
   }
 
@@ -570,6 +579,14 @@ export class GizmoController {
     if (!this.gizmoState) {
       this.options.setControlsEnabled(true);
       return;
+    }
+
+    // Replicate transform changes for all affected entities
+    const selected = this.getSelectedEntities();
+    if (this.options.onTransformChanged) {
+      selected.forEach((entity) => {
+        this.options.onTransformChanged?.(entity);
+      });
     }
 
     this.renderer.setActiveHandle(null);

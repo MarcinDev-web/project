@@ -18,6 +18,15 @@ import {
 } from './ActionCubes';
 
 import {
+  UIButtonClickTrigger,
+  UIShowElementAction,
+  UISetTextAction,
+  UISetImageAction,
+  UISetValueAction,
+  UIEnableElementAction,
+} from './UICubes';
+
+import {
   CompareVariableCondition,
   IsPlayerNearCondition,
   CheckDistanceCondition,
@@ -60,5 +69,13 @@ export function registerBuiltInLogicCubes(): void {
   LogicCubeRegistry.register('orGate', ORGate);
   LogicCubeRegistry.register('notGate', NOTGate);
   LogicCubeRegistry.register('delayGate', DelayGate);
+
+  // UI Cubes
+  LogicCubeRegistry.register('uiButtonClick', UIButtonClickTrigger);
+  LogicCubeRegistry.register('uiShowElement', UIShowElementAction);
+  LogicCubeRegistry.register('uiSetText', UISetTextAction);
+  LogicCubeRegistry.register('uiSetImage', UISetImageAction);
+  LogicCubeRegistry.register('uiSetValue', UISetValueAction);
+  LogicCubeRegistry.register('uiEnableElement', UIEnableElementAction);
 }
 

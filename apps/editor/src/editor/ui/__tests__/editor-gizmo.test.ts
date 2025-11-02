@@ -1,3 +1,6 @@
+/**
+ * @vitest-environment jsdom
+ */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EditorUI } from '../EditorUI';
 import { SelectionManager } from '@engine/world';
@@ -88,6 +91,7 @@ function setupEditor() {
 
   const undoButton = document.querySelector<HTMLButtonElement>('button[title="Undo (Ctrl+Z)"]');
   const redoButton = document.querySelector<HTMLButtonElement>('button[title="Redo (Ctrl+Y)"]');
+  const historyLimitInput = document.querySelector<HTMLInputElement>('input[title="History limit"]');
 
   expect(undoButton).toBeTruthy();
   expect(redoButton).toBeTruthy();
@@ -99,6 +103,7 @@ function setupEditor() {
     canvas,
     undoButton: undoButton!,
     redoButton: redoButton!,
+    historyLimitInput: historyLimitInput || null,
   };
 }
 

@@ -1,0 +1,28 @@
+{
+  "name": "@engine/economy",
+  "version": "0.1.0",
+  "description": "Currency and economy system for game players and marketplace transactions",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js",
+    "./examples": "./dist/examples/CurrencySystemExample.js"
+  },
+  "scripts": {
+    "build": "tsc -b",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src --max-warnings=0"
+  },
+  "dependencies": {
+    "@engine/core": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.2",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.3"
+  }
+}
+

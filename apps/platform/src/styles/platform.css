@@ -1,0 +1,101 @@
+/**
+ * Platform-specific component styles
+ */
+
+/* Animations */
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
+}
+
+@keyframes slideInRight {
+  from {
+    transform: translateX(100%);
+    opacity: 0;
+  }
+  to {
+    transform: translateX(0);
+    opacity: 1;
+  }
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Profile page specific styles */
+.profile-avatar {
+  width: 80px;
+  height: 80px;
+  border-radius: var(--radius-full);
+  object-fit: cover;
+  border: 2px solid var(--border-default);
+  transition: transform var(--transition-base);
+}
+
+.profile-avatar:hover {
+  transform: scale(1.05);
+}
+
+.profile-builds-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--spacing-4);
+  animation: fadeIn 0.3s ease-in;
+}
+
+/* Responsive adjustments */
+@media (max-width: 768px) {
+  .profile-builds-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Toast notification styles */
+.toast-container {
+  position: fixed;
+  top: var(--spacing-4);
+  right: var(--spacing-4);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  pointer-events: none;
+}
+
+.toast {
+  pointer-events: auto;
+  animation: slideInRight 0.3s ease-out;
+}
+
+/* Loading skeleton styles */
+.skeleton {
+  background: var(--bg-elevated);
+  border-radius: var(--radius-md);
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+/* Accessibility improvements */
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/* Focus styles for better keyboard navigation */
+button:focus-visible,
+a:focus-visible {
+  outline: 2px solid var(--color-primary, #007bff);
+  outline-offset: 2px;
+}

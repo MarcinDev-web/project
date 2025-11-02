@@ -1,5 +1,6 @@
 import { Component } from './Component';
 import type { Vec3 } from '@engine/core/math';
+import type { MovementController, MovementInput } from '../movement/MovementInterface';
 /**
  * Character controller state
  */
@@ -35,6 +36,8 @@ export interface CharacterControllerConfig {
     rotationSpeed: number;
     /** Whether to auto-rotate to movement direction */
     autoRotate: boolean;
+    /** Velocity smoothing time constant in seconds (default: 0.1). Lower = more responsive, higher = smoother. */
+    velocitySmoothing?: number;
 }
 /**
  * Default character controller configuration
@@ -64,8 +67,10 @@ export interface CharacterInput {
  * - Slope handling
  * - Stair climbing
  * - Camera-relative movement
+ *
+ * Implements MovementController interface for unified movement API.
  */
-export declare class CharacterController extends Component {
+export declare class CharacterController extends Component implements MovementController {
     /** Configuration */
     config: CharacterControllerConfig;
     /** Current character state */
@@ -92,6 +97,10 @@ export declare class CharacterController extends Component {
     private timeSinceJumpPressed;
     /** Reference to physics component */
     private physics;
+    /** Current movement profile */
+    private currentProfile;
+    /** Current rotation angle for smooth interpolation (radians) */
+    private currentRotationY;
     constructor(config?: Partial<CharacterControllerConfig>);
     /**
      * Get the type of this component
@@ -106,9 +115,18 @@ export declare class CharacterController extends Component {
      */
     private ensurePhysicsComponent;
     /**
-     * Set movement input
+     * Set movement input (MovementController interface)
+     * Accepts MovementInput and converts to CharacterInput internally
      */
-    setInput(input: CharacterInput): void;
+    setInput(input: MovementInput | CharacterInput): void;
+    /**
+     * Set movement input using MovementInput (unified interface)
+     */
+    private setMovementInput;
+    /**
+     * Set movement input using CharacterInput (original interface)
+     */
+    private setCharacterInput;
     /**
      * Update character controller (called each frame)
      */
@@ -118,9 +136,18 @@ export declare class CharacterController extends Component {
      */
     private updateState;
     /**
-     * Apply movement forces/velocity
+     * Sync velocity to physics component
+     */
+    private syncVelocityToPhysics;
+    /**
+     * Apply movement forces/velocity with smooth interpolation
      */
     private applyMovement;
+    /**
+     * Frame-rate independent exponential damping factor
+     * Computes alpha for exponential smoothing: 1 - e^(-dt/tau)
+     */
+    private expDecayAlpha;
     /**
      * Apply custom gravity
      */
@@ -130,7 +157,7 @@ export declare class CharacterController extends Component {
      */
     private handleJump;
     /**
-     * Auto-rotate character to face movement direction
+     * Auto-rotate character to face movement direction with smooth interpolation
      */
     private autoRotateToMovement;
     /**
@@ -142,6 +169,14 @@ export declare class CharacterController extends Component {
      */
     private normalizeInto;
     /**
+     * Get current velocity (MovementController interface)
+     */
+    getVelocity(): Vec3;
+    /**
+     * Get current position (MovementController interface)
+     */
+    getPosition(): Vec3;
+    /**
      * Teleport character to a position
      */
     teleport(position: Vec3): void;
@@ -149,6 +184,18 @@ export declare class CharacterController extends Component {
      * Add velocity to character (e.g., from external forces)
      */
     addVelocity(velocity: Vec3): void;
+    /**
+     * Apply a movement profile to this controller
+     *
+     * @param profile - Movement profile to apply
+     */
+    applyProfile(profile: any): void;
+    /**
+     * Get the current movement profile
+     *
+     * @returns Current profile or null if none applied
+     */
+    getCurrentProfile(): any | null;
     /**
      * Clone this component
      */

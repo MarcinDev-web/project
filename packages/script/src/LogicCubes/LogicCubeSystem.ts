@@ -71,6 +71,18 @@ export class LogicCubeSystem {
     this.variableStorage = new VariableStorage();
     this.playerDetection = new PlayerDetection(scene);
     registerLogicConnectionManager(scene, this.connectionManager);
+
+    // Listen for external logic signals (e.g., from UI events)
+    scene.events.on('logic:signal', (event: any) => {
+      const { targetEntityId, targetPort, signal } = event.payload || {};
+      if (targetEntityId && targetPort && signal) {
+        this.signalQueue.push({
+          targetEntityId,
+          targetPort,
+          signal,
+        });
+      }
+    });
   }
 
   /**

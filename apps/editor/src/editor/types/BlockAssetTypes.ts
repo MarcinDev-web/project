@@ -4,7 +4,7 @@
  * Only supports blocks from BlockLibrary (10 blocks total)
  */
 
-import type { BlockDefinition } from '@engine/gfx-webgpu/blocks/BlockLibrary';
+import type { BlockDefinition } from '@engine/blocks';
 import type { RgbaColor } from '../../utils/colors';
 
 /**
@@ -32,6 +32,16 @@ export interface AssetPreset {
   blockId?: string;
   scale: [number, number, number];
   color: [number, number, number, number];
+  /** Vegetation configuration (if this is a vegetation asset) */
+  vegetationConfig?: {
+    type: 'grass' | 'flower' | 'shrub' | 'tree' | 'custom';
+    billboardTexture?: string;
+    modelUrl?: string;
+    canBeHarvested?: boolean;
+    harvestTime?: number;
+    windStrength?: number;
+    windFrequency?: number;
+  };
 }
 
 /**

@@ -1,6 +1,6 @@
 import type { Scene } from '@engine/world';
 import { CameraComponent, Transform } from '@engine/world';
-import { addVec3Out, crossVec3Out, dotVec3, lengthVec3, normalizeVec3Out, scaleVec3Out, subVec3Out, type Vec3 } from '@engine/core';
+import { crossVec3Out, dotVec3, lengthVec3, normalizeVec3Out, scaleVec3Out, type Vec3 } from '@engine/core';
 import { damp, expDecayAlpha } from '../utils/Damper';
 import { OrbitCameraComponent } from './OrbitCameraComponent';
 

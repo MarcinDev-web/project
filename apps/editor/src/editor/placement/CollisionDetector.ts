@@ -5,9 +5,12 @@
 
 import type { Entity } from '@engine/world';
 import type { Scene } from '@engine/world';
+import { CameraComponent } from '@engine/world';
 import { normalizeVec3Out, quatNormalize, dotVec3, type Quat, type Vec3 } from '@engine/core/math';
 import { ensureWasmCollisionInit, getWasmCollisionSync } from '../../wasm/collision';
 import type { Trs, TrsArray } from '@engine/wasm-collision';
+import { getTrsBuffers, releaseTrsBuffers } from '@engine/wasm-collision';
+import { requestCheckTrs } from '../../wasm/collisionWorkerClient';
 
 /**
  * Axis-Aligned Bounding Box
@@ -89,6 +92,9 @@ export class CollisionDetector {
       if (other === entity) continue;
       if (excludeEntities?.has(other)) continue;
 
+      // Skip cameras (they are virtual, not physical objects)
+      if (other.getComponent(CameraComponent)) continue;
+
       const otherBox = this.getBoundingBox(other);
       if (CollisionDetector.boxesIntersect(entityBox, otherBox)) {
         collidingEntities.push(other);
@@ -122,6 +128,18 @@ export class CollisionDetector {
     // Use provided values or entity's transform
     const pos = position ?? entity.transform.getWorldPosition();
     const scl = scale ?? entity.transform.scale;
+
+    // Validate scale: check if all dimensions are zero or invalid
+    if (
+      (!scl[0] && !scl[1] && !scl[2]) ||
+      (!Number.isFinite(scl[0]) || !Number.isFinite(scl[1]) || !Number.isFinite(scl[2]))
+    ) {
+      // Return minimal box for invalid scale
+      return {
+        min: [pos[0] - CollisionDetector.MIN_BOX_SIZE, pos[1] - CollisionDetector.MIN_BOX_SIZE, pos[2] - CollisionDetector.MIN_BOX_SIZE],
+        max: [pos[0] + CollisionDetector.MIN_BOX_SIZE, pos[1] + CollisionDetector.MIN_BOX_SIZE, pos[2] + CollisionDetector.MIN_BOX_SIZE],
+      };
+    }
 
     // For AABB, we ignore rotation and use axis-aligned box
     // Base box is centered at origin with size 1x1x1
@@ -382,18 +400,23 @@ export class CollisionDetector {
 
   /**
    * High-precision collision check using OBB vs OBB (SAT).
+   * Uses worker for large scenes (>500 objects) to offload main thread.
    */
-  checkCollisionOBB(
+  async checkCollisionOBB(
     entity: Entity,
     position?: Vec3,
     rotation?: Quat,
     scale?: Vec3,
     excludeEntities?: Set<Entity>
-  ): CollisionResult {
+  ): Promise<CollisionResult> {
     // Kick off WASM init in background (no-op if already initialized)
     ensureWasmCollisionInit();
 
-    const obb = this.getOBB(entity, position, rotation, scale);
+    const previewPos = position ?? entity.transform.getWorldPosition();
+    const previewRot = (rotation ?? entity.transform.rotation) as Quat;
+    const previewScale = scale ?? entity.transform.scale;
+
+    const obb = this.getOBB(entity, previewPos, previewRot, previewScale);
     // Broad-phase: use AABB enclosing the OBB of the tested entity
     const entityAabb = CollisionDetector.obbToAABB(obb);
     const wasm = getWasmCollisionSync();
@@ -410,6 +433,10 @@ export class CollisionDetector {
       for (const other of entities) {
         if (other === entity) continue;
         if (excludeEntities?.has(other)) continue;
+        
+        // Skip cameras (they are virtual, not physical objects)
+        if (other.getComponent(CameraComponent)) continue;
+        
         const otherPos = other.transform.getWorldPosition();
         const otherScale = other.transform.scale;
         const ohx = Math.max(Math.abs(otherScale[0]) / 2, CollisionDetector.MIN_BOX_SIZE);
@@ -434,13 +461,20 @@ export class CollisionDetector {
       }
 
       const previewTrs: Trs = {
-        pos: new Float32Array(position ?? entity.transform.getWorldPosition()),
-        rot: new Float32Array((rotation ?? entity.transform.rotation) as unknown as number[]),
-        scl: new Float32Array(scale ?? entity.transform.scale),
+        pos: new Float32Array(previewPos),
+        rot: new Float32Array(previewRot),
+        scl: new Float32Array(previewScale),
       };
-      // Dynamic threshold: small candidate sets are faster in TS path due to overheads
+      
+      // Dynamic threshold strategy:
+      // - < 64: TypeScript (lower overhead for small batches)
+      // - 64-500: Direct WASM (good balance)
+      // - > 500: Worker (offload main thread for large scenes)
+      const useWorker = candidates.length > 500;
       const useWasm = candidates.length >= 64;
+      
       if (!useWasm) {
+        // TypeScript path for small batches
         const collidingEntities: Entity[] = [];
         for (let i = 0; i < candidates.length; i++) {
           const other = candidates[i]!;
@@ -457,22 +491,88 @@ export class CollisionDetector {
         return { hasCollision: collidingEntities.length > 0, collidingEntities };
       }
 
-      const idx = wasm.batchCheckTrs(previewTrs, {
-        positions: new Float32Array(positions),
-        rotations: new Float32Array(rotations),
-        scales: new Float32Array(scales),
-      } satisfies TrsArray);
+      if (useWorker) {
+        // Worker path for very large batches (>500 objects)
+        try {
+          const othersTrs: TrsArray = {
+            positions: new Float32Array(positions),
+            rotations: new Float32Array(rotations),
+            scales: new Float32Array(scales),
+          };
+          
+          const idx = await requestCheckTrs(previewTrs, othersTrs, 1000);
+          
+          const collidingEntities: Entity[] = [];
+          for (let i = 0; i < idx.length; i++) {
+            const j = idx[i]!;
+            const ent = candidates[j];
+            if (ent) collidingEntities.push(ent);
+          }
+          if (debug && typeof performance !== 'undefined') {
+            const t1 = performance.now();
+            // eslint-disable-next-line no-console
+            console.log('[collision][worker] candidates:', candidates.length, 'ms:', (t1 - (t0 as number)).toFixed(2));
+          }
+          return { hasCollision: collidingEntities.length > 0, collidingEntities };
+        } catch (error) {
+          // Fallback on worker error
+          if (debug) {
+            // eslint-disable-next-line no-console
+            console.warn('[collision] Worker error, falling back to direct WASM:', error);
+          }
+          // Fall through to direct WASM path below
+        }
+      }
 
+      // Direct WASM path (64-500 objects, or fallback from worker)
+      const buffers = getTrsBuffers(candidates.length);
+      try {
+        // Copy data into pooled buffers (positions is candidates.length * 3, etc.)
+        buffers.positions.set(positions, 0);
+        buffers.rotations.set(rotations, 0);
+        buffers.scales.set(scales, 0);
+
+        const idx = wasm.batchCheckTrs(previewTrs, {
+          positions: buffers.positions.subarray(0, positions.length),
+          rotations: buffers.rotations.subarray(0, rotations.length),
+          scales: buffers.scales.subarray(0, scales.length),
+        } satisfies TrsArray);
+
+        const collidingEntities: Entity[] = [];
+        for (let i = 0; i < idx.length; i++) {
+          const j = idx[i]!;
+          const ent = candidates[j];
+          if (ent) collidingEntities.push(ent);
+        }
+        if (debug && typeof performance !== 'undefined') {
+          const t1 = performance.now();
+          // eslint-disable-next-line no-console
+          console.log('[collision][wasm] candidates:', candidates.length, 'ms:', (t1 - (t0 as number)).toFixed(2));
+        }
+        return { hasCollision: collidingEntities.length > 0, collidingEntities };
+      } catch (error) {
+        // Fallback to TypeScript implementation on WASM error
+        if (debug) {
+          // eslint-disable-next-line no-console
+          console.warn('[collision] WASM error, falling back to TypeScript:', error);
+        }
+        // Fall through to TypeScript path below
+      } finally {
+        releaseTrsBuffers(buffers);
+      }
+      // Fallback: TypeScript path (also reached if WASM fails)
       const collidingEntities: Entity[] = [];
-      for (let i = 0; i < idx.length; i++) {
-        const j = idx[i]!;
-        const ent = candidates[j];
-        if (ent) collidingEntities.push(ent);
+      for (let i = 0; i < candidates.length; i++) {
+        const other = candidates[i]!;
+        const otherObb = this.getOBB(other);
+        if (CollisionDetector.obbIntersect(obb, otherObb)) {
+          collidingEntities.push(other);
+        }
       }
       if (debug && typeof performance !== 'undefined') {
         const t1 = performance.now();
         // eslint-disable-next-line no-console
-        console.log('[collision][wasm] candidates:', candidates.length, 'ms:', (t1 - (t0 as number)).toFixed(2));
+        console.log('[collision][fallback-ts] candidates:', candidates.length, 'ms:', (t1 - (t0 as number)).toFixed(2));
       }
       return { hasCollision: collidingEntities.length > 0, collidingEntities };
     } else {
@@ -481,6 +581,10 @@ export class CollisionDetector {
     for (const other of this.scene.getActiveEntities()) {
       if (other === entity) continue;
       if (excludeEntities?.has(other)) continue;
+      
+      // Skip cameras (they are virtual, not physical objects)
+      if (other.getComponent(CameraComponent)) continue;
+      
       // Broad-phase for other entity: use conservative bounding-sphere AABB (rotation-invariant)
       const otherPos = other.transform.getWorldPosition();
       const otherScale = other.transform.scale;
@@ -613,5 +717,14 @@ export class CollisionDetector {
    */
   getScene(): Scene {
     return this.scene;
+  }
+
+  /**
+   * Cleanup resources. Currently a no-op, but provided for consistency
+   * with disposable pattern and future cleanup needs.
+   */
+  dispose(): void {
+    // No resources to clean up currently, but method provided for consistency
+    // with disposable pattern used throughout the engine
   }
 }

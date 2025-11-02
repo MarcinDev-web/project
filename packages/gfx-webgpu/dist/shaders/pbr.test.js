@@ -14,10 +14,10 @@ describe('createPbrShaderCode', () => {
         expect(code).toContain('distribution_ggx');
         expect(code).toContain('geometry_smith');
     });
-    it('uses atlas sampling and normal mapping', () => {
+    it('uses atlas sampling', () => {
         const code = createPbrShaderCode();
         expect(code).toMatch(/let atlasUV = rect\.xy \+ vUV \* rect\.zw;/);
-        expect(code).toMatch(/textureSample\(normalAtlasTex, texSampler, atlasUV\)/);
+        expect(code).toMatch(/textureSample\(atlasTex, texSampler, atlasUV\)/);
     });
 });
 //# sourceMappingURL=pbr.test.js.map

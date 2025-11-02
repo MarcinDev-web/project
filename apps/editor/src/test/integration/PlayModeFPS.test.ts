@@ -13,6 +13,7 @@ import { PhysicsComponent } from '@engine/world';
 import type { OrbitControls } from '@engine/camera';
 import { createDefaultManifest } from '../../editor/core/PlayManifest';
 import { quatToEuler } from '@engine/core/math';
+import { PlayModeStateType } from '../../editor/core/PlayModeStateMachine';
 
 function createMockCanvas(): HTMLCanvasElement {
   const canvas = document.createElement('canvas');
@@ -107,12 +108,32 @@ describe('PlayModeFPS Integration Tests', () => {
     modeManager.initialize();
   });
 
+  /**
+   * Helper to wait for play mode to fully load and reach PLAYING state
+   * This handles async LoadingState operations
+   */
+  async function waitForPlayMode(maxWaitMs = 5000): Promise<void> {
+    const startTime = Date.now();
+    while (modeManager.getCurrentState() !== PlayModeStateType.PLAYING) {
+      if (Date.now() - startTime > maxWaitMs) {
+        throw new Error(
+          `Timeout waiting for PLAYING state. Current state: ${modeManager.getCurrentState()}`
+        );
+      }
+      // Update state machine to process async LoadingState transitions
+      (modeManager as any).settleStateMachine(0.016);
+      // Small delay to allow async operations in LoadingState to complete
+      await new Promise(resolve => setTimeout(resolve, 20));
+    }
+  }
+
   describe('Player Entity Spawning', () => {
-    it('should spawn player at default manifest position and yaw', () => {
+    it('should spawn player at default manifest position and yaw', async () => {
       const manifest = createDefaultManifest();
       (modeManager as any).stateMachine.getMutableContext().manifest = manifest;
 
       modeManager.enterPlayMode();
+      await waitForPlayMode();
 
       const activeScene = modeManager.getActiveScene();
       const playerEntity = activeScene.getAllEntities().find((e) => e.userData.isPlayModePlayer);
@@ -122,15 +143,16 @@ describe('PlayModeFPS Integration Tests', () => {
       expect(yaw).toBeCloseTo(manifest.playerStart.rotation, 1e-3);
     });
 
-    it('should mark player entity as hidden', () => {
+    it('should mark player entity as hidden', async () => {
       modeManager.enterPlayMode();
+      await waitForPlayMode();
 
       const activeScene = modeManager.getActiveScene();
       const playerEntity = activeScene.getAllEntities().find((e) => e.userData.isPlayModePlayer);
       expect(playerEntity?.userData.isHidden).toBe(true);
     });
 
-    it('should spawn player using PlayerStart yaw', () => {
+    it('should spawn player using PlayerStart yaw', async () => {
       // Create a PlayerStart with a specific yaw
       const playerStart = new Entity('PlayerStart');
       const yaw = Math.PI / 4; // 45 degrees
@@ -138,6 +160,7 @@ describe('PlayModeFPS Integration Tests', () => {
       scene.addEntity(playerStart);
 
       modeManager.enterPlayMode();
+      await waitForPlayMode();
 
       const activeScene = modeManager.getActiveScene();
       const playerEntity = activeScene.getAllEntities().find((e) => e.userData.isPlayModePlayer);
@@ -147,8 +170,9 @@ describe('PlayModeFPS Integration Tests', () => {
       expect(spawnedYaw).toBeCloseTo(yaw, 1e-3);
     });
 
-    it('should add CharacterController component to player', () => {
+    it('should add CharacterController component to player', async () => {
       modeManager.enterPlayMode();
+      await waitForPlayMode();
 
       const activeScene = modeManager.getActiveScene();
       const playerEntity = activeScene.getAllEntities().find((e) => e.userData.isPlayModePlayer);
@@ -158,8 +182,9 @@ describe('PlayModeFPS Integration Tests', () => {
       expect(controller).toBeInstanceOf(CharacterController);
     });
 
-    it('should add PhysicsComponent with capsule collider to player', () => {
+    it('should add PhysicsComponent with capsule collider to player', async () => {
       modeManager.enterPlayMode();
+      await waitForPlayMode();
 
       const activeScene = modeManager.getActiveScene();
       const playerEntity = activeScene.getAllEntities().find((e) => e.userData.isPlayModePlayer);
@@ -170,8 +195,9 @@ describe('PlayModeFPS Integration Tests', () => {
       expect(physics?.colliders[0]?.shape).toBe('capsule');
     });
 
-    it('should create a player session and controller when entering play mode', () => {
+    it('should create a player session and controller when entering play mode', async () => {
       modeManager.enterPlayMode();
+      await waitForPlayMode();
       const playerSession = (modeManager as any).playerSession;
       expect(playerSession).toBeDefined();
       const controller = playerSession.getController?.();
@@ -179,8 +205,9 @@ describe('PlayModeFPS Integration Tests', () => {
       expect(controller?.getContext().pawn).toBeDefined();
     });
 
-    it('should remove player entity when exiting play mode', () => {
+    it('should remove player entity when exiting play mode', async () => {
       modeManager.enterPlayMode();
+      await waitForPlayMode();
       const activeScene = modeManager.getActiveScene();
       expect(activeScene.getAllEntities().some((e) => e.userData.isPlayModePlayer)).toBe(true);
 
@@ -200,20 +227,22 @@ describe('PlayModeFPS Integration Tests', () => {
       expect(startSpy).toHaveBeenCalledOnce();
     });
 
-    it('should stop physics when exiting play mode', () => {
+    it('should stop physics when exiting play mode', async () => {
       const stopSpy = vi.spyOn(physicsWorld, 'stop');
 
       modeManager.enterPlayMode();
+      await waitForPlayMode();
       stopSpy.mockClear(); // Clear any calls from enterPlayMode
       modeManager.exitPlayMode();
 
       expect(stopSpy).toHaveBeenCalledOnce();
     });
 
-    it('should update physics during play mode with fixed timestep', () => {
+    it('should update physics during play mode with fixed timestep', async () => {
       const updateSpy = vi.spyOn(physicsWorld, 'update');
 
       modeManager.enterPlayMode();
+      await waitForPlayMode();
       modeManager.updatePlayMode(0.05); // larger delta to trigger multiple substeps
 
       expect(updateSpy).toHaveBeenCalledWith(1 / 60);
@@ -237,10 +266,11 @@ describe('PlayModeFPS Integration Tests', () => {
       expect(setEnabledSpy).toHaveBeenCalledWith(false);
     });
 
-    it('should save orbit state before disabling', () => {
+    it('should save orbit state before disabling', async () => {
       const initialState = controls.getState();
 
       modeManager.enterPlayMode();
+      await waitForPlayMode();
       controls.setState({ yaw: 1.5, pitch: 0.5, distance: 10 }); // Change state in play
       modeManager.exitPlayMode();
 
@@ -250,10 +280,11 @@ describe('PlayModeFPS Integration Tests', () => {
       expect(finalState.distance).toBeCloseTo(initialState.distance);
     });
 
-    it('should restore orbit controls when exiting play mode', () => {
+    it('should restore orbit controls when exiting play mode', async () => {
       const setEnabledSpy = vi.spyOn(controls, 'setEnabled');
 
       modeManager.enterPlayMode();
+      await waitForPlayMode();
       setEnabledSpy.mockClear(); // Clear enter call
 
       modeManager.exitPlayMode();
@@ -271,26 +302,29 @@ describe('PlayModeFPS Integration Tests', () => {
       expect(enableSpy).toHaveBeenCalledOnce();
     });
 
-    it('should disable FPS camera when exiting play mode', () => {
+    it('should disable FPS camera when exiting play mode', async () => {
       const disableSpy = vi.spyOn(fpsCamera, 'disable');
 
       modeManager.enterPlayMode();
+      await waitForPlayMode();
       modeManager.exitPlayMode();
 
       expect(disableSpy).toHaveBeenCalledOnce();
     });
 
-    it('should update FPS camera each frame in play mode', () => {
+    it('should update FPS camera each frame in play mode', async () => {
       const updateSpy = vi.spyOn(fpsCamera, 'update');
 
       modeManager.enterPlayMode();
+      await waitForPlayMode();
       modeManager.updatePlayMode(0.016);
 
       expect(updateSpy).toHaveBeenCalled();
     });
 
-    it('should provide player position for FPS camera', () => {
+    it('should provide player position for FPS camera', async () => {
       modeManager.enterPlayMode();
+      await waitForPlayMode();
 
       const playerPos = modeManager.getPlayerPosition();
 
@@ -315,20 +349,22 @@ describe('PlayModeFPS Integration Tests', () => {
       expect(enableSpy).toHaveBeenCalledOnce();
     });
 
-    it('should disable character input when exiting play mode', () => {
+    it('should disable character input when exiting play mode', async () => {
       const disableSpy = vi.spyOn(characterInput, 'disable');
 
       modeManager.enterPlayMode();
+      await waitForPlayMode();
       disableSpy.mockClear(); // Clear any calls that might have happened
       modeManager.exitPlayMode();
 
       expect(disableSpy).toHaveBeenCalledOnce();
     });
 
-    it('should update character input with camera directions', () => {
+    it('should update character input with camera directions', async () => {
       const setCameraDirSpy = vi.spyOn(characterInput, 'setCameraDirections');
 
       modeManager.enterPlayMode();
+      await waitForPlayMode();
       modeManager.updatePlayMode(0.016);
 
       expect(setCameraDirSpy).toHaveBeenCalled();
@@ -339,10 +375,11 @@ describe('PlayModeFPS Integration Tests', () => {
   });
 
   describe('Character Controller System', () => {
-    it('should update character system during play mode with fixed timestep', () => {
+    it('should update character system during play mode with fixed timestep', async () => {
       const updateSpy = vi.spyOn(characterSystem, 'update');
 
       modeManager.enterPlayMode();
+      await waitForPlayMode();
       modeManager.updatePlayMode(0.05);
 
       expect(updateSpy).toHaveBeenCalledWith(1 / 60);
@@ -358,7 +395,7 @@ describe('PlayModeFPS Integration Tests', () => {
   });
 
   describe('Scene Snapshot Preservation', () => {
-    it('should preserve scene state when entering play mode', () => {
+    it('should preserve scene state when entering play mode', async () => {
       const testEntity = new Entity('TestEntity');
       testEntity.transform.position = [5, 2, 3];
       scene.addEntity(testEntity);
@@ -367,6 +404,7 @@ describe('PlayModeFPS Integration Tests', () => {
       expect(scene.entityCount).toBe(2); // Ground + test entity
 
       modeManager.enterPlayMode();
+      await waitForPlayMode();
 
       // Runtime world should have cloned entities + player
       const activeScene = modeManager.getActiveScene();
@@ -376,12 +414,13 @@ describe('PlayModeFPS Integration Tests', () => {
       expect(scene.entityCount).toBe(2); // Ground + test entity
     });
 
-    it('should restore scene state when exiting play mode', () => {
+    it('should restore scene state when exiting play mode', async () => {
       const testEntity = new Entity('TestEntity');
       testEntity.transform.position = [5, 2, 3];
       scene.addEntity(testEntity);
 
       modeManager.enterPlayMode();
+      await waitForPlayMode();
 
       // Modify in play mode
       testEntity.transform.position = [100, 100, 100];
@@ -398,12 +437,13 @@ describe('PlayModeFPS Integration Tests', () => {
       expect(playCreated.length).toBe(0); // Play mode entity removed
     });
 
-    it('should restore selection after exiting play mode', () => {
+    it('should restore selection after exiting play mode', async () => {
       const testEntity = new Entity('TestEntity');
       scene.addEntity(testEntity);
       selection.select(testEntity);
 
       modeManager.enterPlayMode();
+      await waitForPlayMode();
       selection.clearSelection(); // Change selection in play
 
       modeManager.exitPlayMode();
@@ -411,13 +451,14 @@ describe('PlayModeFPS Integration Tests', () => {
       expect(selection.primarySelection?.id).toBe(testEntity.id);
     });
 
-    it('should handle missing entity gracefully after restore', () => {
+    it('should handle missing entity gracefully after restore', async () => {
       const testEntity = new Entity('TestEntity');
       scene.addEntity(testEntity);
       selection.select(testEntity);
       const originalId = testEntity.id;
 
       modeManager.enterPlayMode();
+      await waitForPlayMode();
 
       // Simulate entity that was removed during play
       scene.removeEntity(testEntity);
@@ -432,10 +473,11 @@ describe('PlayModeFPS Integration Tests', () => {
   });
 
   describe('Mode State Management', () => {
-    it('should report correct play mode state', () => {
+    it('should report correct play mode state', async () => {
       expect(modeManager.isPlayMode()).toBe(false);
 
       modeManager.enterPlayMode();
+      await waitForPlayMode();
       expect(modeManager.isPlayMode()).toBe(true);
 
       modeManager.exitPlayMode();
@@ -466,8 +508,9 @@ describe('PlayModeFPS Integration Tests', () => {
       expect(modeManager.isPlayMode()).toBe(false);
     });
 
-    it('should prevent re-entering play mode when already in play', () => {
+    it('should prevent re-entering play mode when already in play', async () => {
       modeManager.enterPlayMode();
+      await waitForPlayMode();
       const activeScene = modeManager.getActiveScene();
       const playerCount1 = activeScene
         .getAllEntities()
@@ -482,8 +525,9 @@ describe('PlayModeFPS Integration Tests', () => {
       expect(playerCount1).toBe(1);
     });
 
-    it('should handle force exit from play mode', () => {
+    it('should handle force exit from play mode', async () => {
       modeManager.enterPlayMode();
+      await waitForPlayMode();
 
       modeManager.forceExitPlayMode();
 
@@ -495,16 +539,18 @@ describe('PlayModeFPS Integration Tests', () => {
   });
 
   describe('History Management', () => {
-    it('should disable history when entering play mode', () => {
+    it('should disable history when entering play mode', async () => {
       expect(state.history.isFrozen()).toBe(false);
 
       modeManager.enterPlayMode();
+      await waitForPlayMode();
 
       expect(state.history.isFrozen()).toBe(true);
     });
 
-    it('should re-enable history when exiting play mode', () => {
+    it('should re-enable history when exiting play mode', async () => {
       modeManager.enterPlayMode();
+      await waitForPlayMode();
       expect(state.history.isFrozen()).toBe(true);
 
       modeManager.exitPlayMode();
@@ -512,10 +558,11 @@ describe('PlayModeFPS Integration Tests', () => {
       expect(state.history.isFrozen()).toBe(false);
     });
 
-    it('should have snapshot when in play mode', () => {
+    it('should have snapshot when in play mode', async () => {
       expect(modeManager.hasSnapshot()).toBe(false);
 
       modeManager.enterPlayMode();
+      await waitForPlayMode();
       expect(modeManager.hasSnapshot()).toBe(true);
 
       modeManager.exitPlayMode();
@@ -524,8 +571,9 @@ describe('PlayModeFPS Integration Tests', () => {
   });
 
   describe('Cleanup and Disposal', () => {
-    it('should cleanup all resources on dispose', () => {
+    it('should cleanup all resources on dispose', async () => {
       modeManager.enterPlayMode();
+      await waitForPlayMode();
 
       modeManager.dispose();
 
@@ -583,8 +631,9 @@ describe('PlayModeFPS Integration Tests', () => {
   });
 
   describe('Player Session Management', () => {
-    it('should create a player session and controller when entering play mode', () => {
+    it('should create a player session and controller when entering play mode', async () => {
       modeManager.enterPlayMode();
+      await waitForPlayMode();
 
       const playerSession = (modeManager as any).playerSession;
       expect(playerSession).toBeDefined();

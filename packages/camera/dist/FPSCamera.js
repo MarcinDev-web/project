@@ -27,6 +27,7 @@ export class FPSCamera {
     invertY = false;
     pointerLockActive = false;
     pendingPointerLock = false;
+    pointerDownHandler = null;
     constructor(canvas, options) {
         this.canvas = canvas;
         this.eyeHeight = options?.eyeHeight ?? 1.6;
@@ -36,6 +37,7 @@ export class FPSCamera {
         this.handlePointerLockChange = this.handlePointerLockChange.bind(this);
         this.handlePointerLockError = this.handlePointerLockError.bind(this);
         this.handleMouseMove = this.handleMouseMove.bind(this);
+        this.handlePointerDown = this.handlePointerDown.bind(this);
         document.addEventListener('pointerlockchange', this.handlePointerLockChange);
         document.addEventListener('pointerlockerror', this.handlePointerLockError);
     }
@@ -44,6 +46,9 @@ export class FPSCamera {
     }
     setEyeHeight(value) {
         this.eyeHeight = value;
+    }
+    getEyeHeight() {
+        return this.eyeHeight;
     }
     setPitchLimit(value) {
         this.pitchLimit = value;
@@ -57,11 +62,19 @@ export class FPSCamera {
         document.removeEventListener('pointerlockchange', this.handlePointerLockChange);
         document.removeEventListener('pointerlockerror', this.handlePointerLockError);
         document.removeEventListener('mousemove', this.handleMouseMove);
+        if (this.pointerDownHandler) {
+            this.canvas.removeEventListener('pointerdown', this.pointerDownHandler, true);
+            this.pointerDownHandler = null;
+        }
     }
     enable() {
         if (this.pointerLockActive)
             return;
         this.pendingPointerLock = true;
+        if (!this.pointerDownHandler) {
+            this.pointerDownHandler = this.handlePointerDown;
+            this.canvas.addEventListener('pointerdown', this.pointerDownHandler, { capture: true });
+        }
         try {
             this.canvas.requestPointerLock();
         }
@@ -71,6 +84,10 @@ export class FPSCamera {
     }
     disable() {
         this.pendingPointerLock = false;
+        if (this.pointerDownHandler) {
+            this.canvas.removeEventListener('pointerdown', this.pointerDownHandler, true);
+            this.pointerDownHandler = null;
+        }
         if (!this.pointerLockActive)
             return;
         try {
@@ -117,8 +134,16 @@ export class FPSCamera {
             return;
         this.pointerLockActive = locked;
         this.pendingPointerLock = false;
+        if (!locked && !this.pointerDownHandler) {
+            this.pointerDownHandler = this.handlePointerDown;
+            this.canvas.addEventListener('pointerdown', this.pointerDownHandler, { capture: true });
+        }
         if (locked) {
             document.addEventListener('mousemove', this.handleMouseMove);
+            if (this.pointerDownHandler) {
+                this.canvas.removeEventListener('pointerdown', this.pointerDownHandler, true);
+                this.pointerDownHandler = null;
+            }
         }
         else {
             document.removeEventListener('mousemove', this.handleMouseMove);
@@ -128,6 +153,21 @@ export class FPSCamera {
         this.pendingPointerLock = false;
         this.pointerLockActive = false;
         document.removeEventListener('mousemove', this.handleMouseMove);
+    }
+    handlePointerDown(event) {
+        if (event.button !== 0)
+            return;
+        event.preventDefault();
+        event.stopImmediatePropagation();
+        if (!this.pointerLockActive && !this.pendingPointerLock) {
+            this.pendingPointerLock = true;
+            try {
+                this.canvas.requestPointerLock();
+            }
+            catch {
+                this.pendingPointerLock = false;
+            }
+        }
     }
     handleMouseMove(event) {
         if (!this.pointerLockActive)

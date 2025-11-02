@@ -3,6 +3,7 @@ import { ShaderEntryPoint } from '../shaders/types';
 import { DEFAULT_INSTANCE_GRID } from '../config';
 import { Logger } from '@engine/core/utils';
 import { TextureAtlas } from '../textures/TextureAtlas';
+import { buildDefaultAtlasMaterials } from './defaultAtlasMaterials';
 // Warn-once flag for mock environments lacking copyBufferToTexture
 let warnedNoCopyBufferToTexture = false;
 /**
@@ -142,7 +143,7 @@ function packVerticesFloat32ToPacked20(source) {
  * position float32x3 (12B), normal snorm8x4 (4B), uv float16x2 (4B), AO unorm8x4 (4B).
  * AO is stored in the X channel; YZW are zero.
  */
-function packVerticesFloat32ToPacked24(source, defaultAO = 1.0) {
+export function packVerticesFloat32ToPacked24(source, defaultAO = 1.0) {
     const floatsPerVertex = 8;
     const vertexCount = Math.floor(source.length / floatsPerVertex);
     const out = new Uint8Array(vertexCount * 24);
@@ -242,8 +243,10 @@ function buildSubdividedCube(segmentsPerEdge) {
     }
     return { vertices: vertexFloats, indices };
 }
-// Increase default vertex count via a 4x4 subdivision per face (adjust as needed)
-const SUBDIVIDED_CUBE_SEGMENTS = 4;
+// Increase default vertex count via subdivision per face
+// Higher segments = smoother geometry, better for spheres (head, effects)
+// 8 segments = 9x9 vertices per face = good balance of quality and performance
+const SUBDIVIDED_CUBE_SEGMENTS = 8;
 const SUBDIVIDED_CUBE = buildSubdividedCube(SUBDIVIDED_CUBE_SEGMENTS);
 export const DEFAULT_GEOMETRY = {
     vertices: packVerticesFloat32ToPacked24(SUBDIVIDED_CUBE.vertices, 1.0),
@@ -251,6 +254,7 @@ export const DEFAULT_GEOMETRY = {
     // Generate a small grid of instances to exercise instanced rendering by default
     // dimensions x dimensions grid
     instanceCount: DEFAULT_INSTANCE_GRID.dimensions * DEFAULT_INSTANCE_GRID.dimensions,
+    opaqueCount: DEFAULT_INSTANCE_GRID.dimensions * DEFAULT_INSTANCE_GRID.dimensions,
     instanceOffsetData: (() => {
         const dim = DEFAULT_INSTANCE_GRID.dimensions;
         const spacing = DEFAULT_INSTANCE_GRID.spacing;
@@ -279,6 +283,40 @@ export const DEFAULT_GEOMETRY = {
                 data[i++] = 0.3 + 0.7 * fy;
                 data[i++] = 0.35 + 0.6 * (1 - fx * fy);
                 data[i++] = 1.0;
+            }
+        }
+        return data;
+    })(),
+    instanceSecondaryColorData: (() => {
+        const dim = DEFAULT_INSTANCE_GRID.dimensions;
+        const data = new Float32Array(dim * dim * 4);
+        let i = 0;
+        for (let y = 0; y < dim; y++) {
+            for (let x = 0; x < dim; x++) {
+                data[i++] = 0.5;
+                data[i++] = 0.5;
+                data[i++] = 0.5;
+                data[i++] = 1.0;
+            }
+        }
+        return data;
+    })(),
+    instanceEmissiveColorData: (() => {
+        const dim = DEFAULT_INSTANCE_GRID.dimensions;
+        const data = new Float32Array(dim * dim * 4);
+        // defaults to no emissive contribution
+        return data;
+    })(),
+    instanceMaterialParamsData: (() => {
+        const dim = DEFAULT_INSTANCE_GRID.dimensions;
+        const data = new Float32Array(dim * dim * 4);
+        let i = 0;
+        for (let y = 0; y < dim; y++) {
+            for (let x = 0; x < dim; x++) {
+                data[i++] = 1.0; // alpha
+                data[i++] = 0.0; // metallic
+                data[i++] = 1.0; // roughness
+                data[i++] = 0.0; // flags
             }
         }
         return data;
@@ -370,6 +408,24 @@ export function createGeometryBuffers(device, geometry) {
         usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
     });
     device.queue.writeBuffer(instanceColorScaleBuffer, 0, geometry.instanceColorScaleData.buffer, geometry.instanceColorScaleData.byteOffset, geometry.instanceColorScaleData.byteLength);
+    const instanceSecondaryColorBuffer = device.createBuffer({
+        label: 'instance-secondary-color-buffer',
+        size: geometry.instanceSecondaryColorData.byteLength,
+        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    });
+    device.queue.writeBuffer(instanceSecondaryColorBuffer, 0, geometry.instanceSecondaryColorData.buffer, geometry.instanceSecondaryColorData.byteOffset, geometry.instanceSecondaryColorData.byteLength);
+    const instanceEmissiveColorBuffer = device.createBuffer({
+        label: 'instance-emissive-color-buffer',
+        size: geometry.instanceEmissiveColorData.byteLength,
+        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    });
+    device.queue.writeBuffer(instanceEmissiveColorBuffer, 0, geometry.instanceEmissiveColorData.buffer, geometry.instanceEmissiveColorData.byteOffset, geometry.instanceEmissiveColorData.byteLength);
+    const instanceMaterialParamsBuffer = device.createBuffer({
+        label: 'instance-material-params-buffer',
+        size: geometry.instanceMaterialParamsData.byteLength,
+        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    });
+    device.queue.writeBuffer(instanceMaterialParamsBuffer, 0, geometry.instanceMaterialParamsData.buffer, geometry.instanceMaterialParamsData.byteOffset, geometry.instanceMaterialParamsData.byteLength);
     const instanceRotationBuffer = device.createBuffer({
         label: 'instance-rotation-buffer',
         size: geometry.instanceRotationData.byteLength,
@@ -396,6 +452,9 @@ export function createGeometryBuffers(device, geometry) {
         indexBuffer,
         instanceOffsetBuffer,
         instanceColorScaleBuffer,
+        instanceSecondaryColorBuffer,
+        instanceEmissiveColorBuffer,
+        instanceMaterialParamsBuffer,
         instanceRotationBuffer,
         instanceMaterialIdBuffer, // NEW
     };
@@ -444,7 +503,7 @@ export function createTextureResources(device, textureBindGroupLayout, textureSi
                 { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } },
             ],
         });
-    const sideTexData = makeTextureData(textureSize, textureSize, 'stripes');
+    const sideTexData = makeTextureData(textureSize, textureSize, 'solid');
     const topTexData = makeTextureData(textureSize, textureSize, 'grid');
     const sideTexture = createTextureFromData(device, textureSize, textureSize, sideTexData, 'side-texture');
     const topTexture = createTextureFromData(device, textureSize, textureSize, topTexData, 'top-texture');
@@ -469,103 +528,6 @@ export function createTextureResources(device, textureBindGroupLayout, textureSi
 // Procedural texture generation helpers for atlas materials
 // NOTE: For advanced procedural textures with PBR support, see ProceduralTextureGenerator
 // These simple functions are kept for backward compatibility and quick atlas generation
-function createStoneTexture(size, color) {
-    const data = new Uint8Array(size * size * 4);
-    const [r, g, b, a] = color;
-    for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
-            const i = (y * size + x) * 4;
-            // Add noise and variation
-            const noise = (Math.random() - 0.5) * 0.3;
-            const darkPatch = (x % 8 < 2 || y % 8 < 2) ? -0.1 : 0;
-            data[i + 0] = Math.max(0, Math.min(255, (r + noise + darkPatch) * 255));
-            data[i + 1] = Math.max(0, Math.min(255, (g + noise + darkPatch) * 255));
-            data[i + 2] = Math.max(0, Math.min(255, (b + noise + darkPatch) * 255));
-            data[i + 3] = a * 255;
-        }
-    }
-    return data;
-}
-function createWoodTexture(size, color) {
-    const data = new Uint8Array(size * size * 4);
-    const [r, g, b, a] = color;
-    for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
-            const i = (y * size + x) * 4;
-            // Wood grain pattern
-            const grain = Math.sin(y * 0.2) * 0.1;
-            const plankLine = (y % (size / 4) < 2) ? -0.2 : 0;
-            const noise = (Math.random() - 0.5) * 0.1;
-            data[i + 0] = Math.max(0, Math.min(255, (r + grain + plankLine + noise) * 255));
-            data[i + 1] = Math.max(0, Math.min(255, (g + grain + plankLine + noise) * 255));
-            data[i + 2] = Math.max(0, Math.min(255, (b + grain + plankLine + noise) * 255));
-            data[i + 3] = a * 255;
-        }
-    }
-    return data;
-}
-function createMetalTexture(size, color) {
-    const data = new Uint8Array(size * size * 4);
-    const [r, g, b, a] = color;
-    for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
-            const i = (y * size + x) * 4;
-            // Smooth metallic look with subtle gradient
-            const gradient = (y / size) * 0.1 - 0.05;
-            const noise = (Math.random() - 0.5) * 0.05;
-            data[i + 0] = Math.max(0, Math.min(255, (r + gradient + noise) * 255));
-            data[i + 1] = Math.max(0, Math.min(255, (g + gradient + noise) * 255));
-            data[i + 2] = Math.max(0, Math.min(255, (b + gradient + noise) * 255));
-            data[i + 3] = a * 255;
-        }
-    }
-    return data;
-}
-function createNoiseTexture(size, color) {
-    const data = new Uint8Array(size * size * 4);
-    const [r, g, b, a] = color;
-    for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
-            const i = (y * size + x) * 4;
-            // Strong noise pattern for dirt/grass
-            const noise = (Math.random() - 0.5) * 0.3;
-            data[i + 0] = Math.max(0, Math.min(255, (r + noise) * 255));
-            data[i + 1] = Math.max(0, Math.min(255, (g + noise) * 255));
-            data[i + 2] = Math.max(0, Math.min(255, (b + noise) * 255));
-            data[i + 3] = a * 255;
-        }
-    }
-    return data;
-}
-function createBrickTexture(size, color) {
-    const data = new Uint8Array(size * size * 4);
-    const [r, g, b, a] = color;
-    const brickHeight = size / 4;
-    const mortarColor = 0.35; // Gray mortar
-    for (let y = 0; y < size; y++) {
-        for (let x = 0; x < size; x++) {
-            const i = (y * size + x) * 4;
-            const row = Math.floor(y / brickHeight);
-            const offset = (row % 2) * (size / 2);
-            const localX = (x + size - offset) % size;
-            // Mortar lines
-            const isMortar = (y % brickHeight < 2) || (localX % (size / 2) < 2);
-            const noise = (Math.random() - 0.5) * 0.1;
-            if (isMortar) {
-                data[i + 0] = mortarColor * 255;
-                data[i + 1] = mortarColor * 255;
-                data[i + 2] = mortarColor * 255;
-            }
-            else {
-                data[i + 0] = Math.max(0, Math.min(255, (r + noise) * 255));
-                data[i + 1] = Math.max(0, Math.min(255, (g + noise) * 255));
-                data[i + 2] = Math.max(0, Math.min(255, (b + noise) * 255));
-            }
-            data[i + 3] = a * 255;
-        }
-    }
-    return data;
-}
 /**
  * Creates a texture atlas with default materials.
  *
@@ -591,124 +553,18 @@ export function createTextureAtlas(device, _textureBindGroupLayout, atlasSize = 
         filterMode: 'anisotropic',
         anisotropyLevel: 8,
     });
-    // Add default materials to atlas (16 varied materials to prevent black blocks)
-    // Using procedural generation for variety
-    const defaultMaterials = [
-        // 0: Default (gray stripes/grid)
-        {
-            name: 'default',
-            sideData: makeTextureData(materialTextureSize, materialTextureSize, 'stripes'),
-            topData: makeTextureData(materialTextureSize, materialTextureSize, 'grid'),
-            size: materialTextureSize,
-        },
-        // 1: Stone (gray, cobblestone-like)
-        {
-            name: 'stone',
-            sideData: createStoneTexture(materialTextureSize, [0.5, 0.5, 0.5, 1]),
-            topData: createStoneTexture(materialTextureSize, [0.5, 0.5, 0.5, 1]),
-            size: materialTextureSize,
-        },
-        // 2: Wood (brown planks)
-        {
-            name: 'wood',
-            sideData: createWoodTexture(materialTextureSize, [0.55, 0.35, 0.2, 1]),
-            topData: makeTextureData(materialTextureSize, materialTextureSize, 'grid'),
-            size: materialTextureSize,
-        },
-        // 3: Metal (silver smooth)
-        {
-            name: 'metal',
-            sideData: createMetalTexture(materialTextureSize, [0.7, 0.7, 0.75, 1]),
-            topData: createMetalTexture(materialTextureSize, [0.7, 0.7, 0.75, 1]),
-            size: materialTextureSize,
-        },
-        // 4: Grass (green top, brown sides)
-        {
-            name: 'grass',
-            sideData: createNoiseTexture(materialTextureSize, [0.4, 0.3, 0.2, 1]),
-            topData: createNoiseTexture(materialTextureSize, [0.3, 0.6, 0.2, 1]),
-            size: materialTextureSize,
-        },
-        // 5: Dirt (brown noise)
-        {
-            name: 'dirt',
-            sideData: createNoiseTexture(materialTextureSize, [0.4, 0.3, 0.2, 1]),
-            topData: createNoiseTexture(materialTextureSize, [0.4, 0.3, 0.2, 1]),
-            size: materialTextureSize,
-        },
-        // 6: Brick (red bricks)
-        {
-            name: 'brick',
-            sideData: createBrickTexture(materialTextureSize, [0.7, 0.2, 0.15, 1]),
-            topData: createBrickTexture(materialTextureSize, [0.7, 0.2, 0.15, 1]),
-            size: materialTextureSize,
-        },
-        // 7: Glass (light blue, smooth)
-        {
-            name: 'glass',
-            sideData: createMetalTexture(materialTextureSize, [0.6, 0.7, 0.85, 1]),
-            topData: createMetalTexture(materialTextureSize, [0.6, 0.7, 0.85, 1]),
-            size: materialTextureSize,
-        },
-        // 8: Gold (yellow/gold)
-        {
-            name: 'gold',
-            sideData: createMetalTexture(materialTextureSize, [0.9, 0.7, 0.2, 1]),
-            topData: createMetalTexture(materialTextureSize, [0.9, 0.7, 0.2, 1]),
-            size: materialTextureSize,
-        },
-        // 9: Sand (tan noise)
-        {
-            name: 'sand',
-            sideData: createNoiseTexture(materialTextureSize, [0.85, 0.75, 0.5, 1]),
-            topData: createNoiseTexture(materialTextureSize, [0.85, 0.75, 0.5, 1]),
-            size: materialTextureSize,
-        },
-        // 10: Plastic Red (smooth, bright red)
-        {
-            name: 'plastic_red',
-            sideData: createMetalTexture(materialTextureSize, [0.9, 0.15, 0.15, 1]),
-            topData: createMetalTexture(materialTextureSize, [0.9, 0.15, 0.15, 1]),
-            size: materialTextureSize,
-        },
-        // 11: Plastic Blue (smooth, bright blue)
-        {
-            name: 'plastic_blue',
-            sideData: createMetalTexture(materialTextureSize, [0.15, 0.4, 0.9, 1]),
-            topData: createMetalTexture(materialTextureSize, [0.15, 0.4, 0.9, 1]),
-            size: materialTextureSize,
-        },
-        // 12: Plastic Green (smooth, bright green)
-        {
-            name: 'plastic_green',
-            sideData: createMetalTexture(materialTextureSize, [0.15, 0.85, 0.15, 1]),
-            topData: createMetalTexture(materialTextureSize, [0.15, 0.85, 0.15, 1]),
-            size: materialTextureSize,
-        },
-        // 13: Plastic Yellow (smooth, bright yellow)
-        {
-            name: 'plastic_yellow',
-            sideData: createMetalTexture(materialTextureSize, [0.95, 0.9, 0.15, 1]),
-            topData: createMetalTexture(materialTextureSize, [0.95, 0.9, 0.15, 1]),
-            size: materialTextureSize,
-        },
-        // 14: Concrete (gray, smooth)
-        {
-            name: 'concrete',
-            sideData: createNoiseTexture(materialTextureSize, [0.6, 0.6, 0.6, 1]),
-            topData: createNoiseTexture(materialTextureSize, [0.6, 0.6, 0.6, 1]),
-            size: materialTextureSize,
-        },
-        // 15: Ice (light blue, smooth)
-        {
-            name: 'ice',
-            sideData: createMetalTexture(materialTextureSize, [0.7, 0.85, 0.95, 1]),
-            topData: createMetalTexture(materialTextureSize, [0.7, 0.85, 0.95, 1]),
-            size: materialTextureSize,
-        },
-    ];
-    for (const material of defaultMaterials) {
-        atlas.addMaterial(material);
+    const builtMaterials = buildDefaultAtlasMaterials(materialTextureSize);
+    const materialParams = [];
+    for (const entry of builtMaterials) {
+        const id = atlas.addMaterial(entry.material);
+        const hasNormals = Boolean(entry.material.sideNormalData && entry.material.sideNormalData.length > 0) ||
+            Boolean(entry.material.topNormalData && entry.material.topNormalData.length > 0);
+        materialParams[id] = {
+            saturation: entry.params.saturation,
+            metallic: entry.params.metallic,
+            roughness: entry.params.roughness,
+            hasNormals,
+        };
     }
     // Build atlas texture data with mipmaps
     const { baseLevel: atlasData, mipmaps: atlasMipmaps } = atlas.buildAtlasDataWithMipmaps();
@@ -802,10 +658,6 @@ export function createTextureAtlas(device, _textureBindGroupLayout, atlasSize = 
         usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
     });
     // Note: bind group will be created after atlasMetaBuffer is ready to satisfy all layout entries
-    // Limit noisy logs by routing through logger (which can be filtered) and avoid repeats here
-    // Note: creation count is already logged in TextureAtlas itself (once per session)
-    // Keeping this info-level log for debugging while reducing spam compared to console.log
-    Logger.info(`[TextureAtlas] Created with ${atlas.getMaterialCount()} materials`);
     // --------- NEW: Build atlas metadata storage buffer ---------
     // Each material has 2 rects (side, top), and material params packed into 48 bytes per entry
     // struct AtlasMeta {
@@ -837,11 +689,11 @@ export function createTextureAtlas(device, _textureBindGroupLayout, atlasSize = 
         metaF32[base + 7] = top.scaleY;
         // flags + params
         // flags at u32 slot (base+8 as u32), then saturation/metallic/roughness as f32
-        const hasNormals = true; // we always fill normal atlas (flat if missing)
-        metaU32[base + 8] = hasNormals ? 1 : 0;
-        metaF32[base + 9] = 1.15; // saturationScale
-        metaF32[base + 10] = 0.0; // metallic default
-        metaF32[base + 11] = 0.6; // roughness default
+        const params = materialParams[i] ?? { saturation: 1.0, metallic: 0.0, roughness: 0.6, hasNormals: false };
+        metaU32[base + 8] = params.hasNormals ? 1 : 0;
+        metaF32[base + 9] = params.saturation;
+        metaF32[base + 10] = params.metallic;
+        metaF32[base + 11] = params.roughness;
     }
     const atlasMetaBuffer = device.createBuffer({
         label: 'material-atlas-meta-buffer',
@@ -949,6 +801,49 @@ export function createPipelines(device, colorFormat, uniformBindGroupLayout, tex
         }
         if (hasErrorScope)
             devAny.pushErrorScope('validation');
+        const transparentPipeline = device.createRenderPipeline({
+            label: 'transparent-pipeline',
+            layout: pipelineLayout,
+            vertex: {
+                module: shaderModule,
+                entryPoint: ShaderEntryPoint.VERTEX_MAIN,
+                buffers: vertexBuffers,
+            },
+            fragment: {
+                module: shaderModule,
+                entryPoint: ShaderEntryPoint.FRAGMENT_MAIN,
+                targets: [
+                    {
+                        format: colorFormat,
+                        blend: {
+                            color: {
+                                srcFactor: 'src-alpha',
+                                dstFactor: 'one-minus-src-alpha',
+                                operation: 'add',
+                            },
+                            alpha: {
+                                srcFactor: 'one',
+                                dstFactor: 'one-minus-src-alpha',
+                                operation: 'add',
+                            },
+                        },
+                    },
+                ],
+            },
+            primitive: { topology: 'triangle-list', cullMode: 'back', frontFace: 'ccw' },
+            depthStencil: { depthWriteEnabled: false, depthCompare: 'less', format: 'depth24plus' },
+            multisample: { count: options.sampleCount },
+        });
+        if (hasErrorScope) {
+            const transparentPipelineError = await devAny.popErrorScope();
+            if (transparentPipelineError) {
+                Logger.error('Transparent pipeline validation error:', transparentPipelineError);
+                options.statusEl.textContent = 'Transparent pipeline error. See console for details.';
+                throw new Error('Transparent pipeline creation failed');
+            }
+        }
+        if (hasErrorScope)
+            devAny.pushErrorScope('validation');
         const overlayPipeline = device.createRenderPipeline({
             label: 'overlay-pipeline',
             layout: pipelineLayout,
@@ -992,7 +887,7 @@ export function createPipelines(device, colorFormat, uniformBindGroupLayout, tex
                 throw new Error('Overlay pipeline creation failed');
             }
         }
-        return { renderPipeline, overlayPipeline };
+        return { renderPipeline, transparentPipeline, overlayPipeline };
     });
 }
 /**
@@ -1054,7 +949,7 @@ export function createRenderAttachmentTexture(device, canvasElement, format, sam
  *
  * @param width - Texture width in pixels.
  * @param height - Texture height in pixels.
- * @param pattern - Procedural pattern to render (`stripes` or `grid`).
+ * @param pattern - Procedural pattern to render (`stripes`, `grid`, or `solid`).
  * @returns A `Uint8Array` containing RGBA texel data.
  */
 export function makeTextureData(width, height, pattern) {
@@ -1066,10 +961,14 @@ export function makeTextureData(width, height, pattern) {
             if (pattern === 'stripes') {
                 v = ((y >> 2) & 1) * 30;
             }
-            else {
+            else if (pattern === 'grid') {
                 const gx = x % 16 === 0 ? 1 : 0;
                 const gy = y % 16 === 0 ? 1 : 0;
                 v = (gx | gy) * 40;
+            }
+            else {
+                // 'solid' pattern - uniform color
+                v = 0;
             }
             data[i + 0] = 180 - v;
             data[i + 1] = 160 - v;

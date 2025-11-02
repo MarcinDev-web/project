@@ -4,7 +4,8 @@
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Scene, Entity, SpawnPointComponent } from '@engine/world';
-import type { PhysicsWorld, RaycastHit } from '@engine/world';
+import type { PhysicsWorld } from '@engine/world';
+import type { RaycastHit } from '@engine/world/physics';
 import { SpawnPointSystem } from '../../editor/systems/SpawnPointSystem';
 import type { Vec3 } from '@engine/core/math';
 
@@ -210,15 +211,9 @@ describe('Spawn Detection Integration', () => {
     });
 
     it('should handle very high camera positions', () => {
-      const mockHit: RaycastHit = {
-        entity: null as any,
-        physics: null as any,
-        colliderIndex: 0,
-        distance: 500.0,
-        point: [0, -490, 0],
-        normal: [0, 1, 0],
-      };
-      vi.mocked(mockPhysicsWorld.raycast).mockReturnValue(mockHit);
+      // Mock raycast to return null when distance exceeds maxDistance (100)
+      // Since camera is at y=1000 and maxDistance is 100, raycast should return null
+      vi.mocked(mockPhysicsWorld.raycast).mockReturnValue(null);
 
       const cameraPosition: Vec3 = [0, 1000, 0]; // Very high
       const result = SpawnPointSystem.findSpawnPoint(scene, mockPhysicsWorld, cameraPosition);

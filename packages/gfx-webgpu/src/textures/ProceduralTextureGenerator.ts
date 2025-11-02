@@ -5,7 +5,7 @@
  * Uses Canvas 2D API and advanced noise algorithms for realistic textures
  */
 
-import type { BlockFaceTexture } from '../blocks/BlockLibrary';
+import type { BlockFaceTexture } from '@engine/blocks';
 import { PerlinNoise, SimplexNoise, WorleyNoise, NoiseUtils } from './NoiseGenerator';
 
 export interface PBRTextureData {

@@ -59,85 +59,54 @@ Po zakończeniu migracji do modularnej architektury monorepo (Fazy 0-8) oraz eli
 
 ## Propozycje Dalszych Ulepszeń
 
-### 🔄 1. Wyodrębnienie BlockLibrary do @engine/blocks
+### ✅ 1. Wyodrębnienie BlockLibrary do @engine/blocks
 
-**Priorytet:** Średni  
-**Effort:** ~2-3 dni
+**Status:** ✅ **DONE** (2025-10-26)
 
-**Problem:**
-- `BlockLibrary` siedzi w `@engine/gfx-webgpu`
-- To łączy "content" (definicje bloków) z warstwą renderera
-- Utrudnia wymianę renderera (WebGPU → WebGL)
+**Wykonane:**
+- `@engine/blocks` pakiet już istnieje z `BlockLibrary`, `BlockDefinition`, `BlockTypes`
+- Wszystkie importy w `@engine/gfx-webgpu` używają `@engine/blocks`
+- `packages/gfx-webgpu/src/blocks/BlockLibrary.ts` jest tylko re-export dla backwards compatibility
+- `@engine/world` używa `@engine/blocks` do `BlockBehaviorSystem`
 
-**Propozycja:**
-```
-packages/blocks/
-  src/
-    BlockLibrary.ts       # Core block registry
-    BlockDefinition.ts    # Block metadata
-    BlockTypes.ts         # Built-in block types
-    index.ts
-```
-
-**Zależności:**
-- `@engine/blocks` zależy od `@engine/core` (math, types)
-- `@engine/gfx-webgpu` zależy od `@engine/blocks` (renderuje bloki)
-- `@engine/world` może opcjonalnie używać `@engine/blocks`
-
-**Korzyści:**
+**Rezultat:**
 - Lepsze separation of concerns (content vs rendering)
 - Łatwiejsza wymiana renderera
-- Możliwość reużycia definicji bloków w różnych kontekstach (server, preview, etc.)
-
-**Kroki:**
-1. Utworzyć `packages/blocks/`
-2. Przenieść `BlockLibrary`, `BlockDefinition` z `gfx-webgpu`
-3. Zaktualizować importy w `gfx-webgpu` i `apps/editor`
-4. Zaktualizować dokumentację
+- Możliwość reużycia definicji bloków w różnych kontekstach
 
 ---
 
-### 🔄 2. CI Job: Headless Test dla @engine/world
+### ✅ 2. CI Job: Headless Test dla @engine/world
 
-**Priorytet:** Wysoki  
-**Effort:** ~1 dzień
+**Status:** ✅ **DONE** (2025-10-26)
 
-**Problem:**
-- Nie ma automatycznego sprawdzania, czy `@engine/world` działa bez DOM/WebGPU
-- To kluczowe dla headless server (multiplayer)
+**Wykonane:**
+- ✅ Utworzono `scripts/headless-smoke-test.js` - smoke test bezpośrednio importujący i testujący `@engine/world`
+- ✅ Dodano GitHub Actions workflow `.github/workflows/headless-test.yml`
+- ✅ Dodano job `test-headless` do głównego workflow `.github/workflows/ci.yml`
+- ✅ Smoke test weryfikuje: World, Scene, Entity creation oraz `fixedUpdate()` bez GPU/DOM
 
-**Propozycja:**
-Dodać GitHub Actions job:
+**Struktura:**
 ```yaml
-headless-test:
-  runs-on: ubuntu-latest
+# .github/workflows/ci.yml
+test-headless:
+  name: Headless Test (@engine/world)
   steps:
-    - uses: actions/checkout@v3
-    - uses: pnpm/action-setup@v2
-    - run: pnpm install
-    - run: cd packages/world && pnpm test
-    - run: node --experimental-vm-modules scripts/headless-smoke-test.js
+    - Build @engine/core
+    - Build @engine/world
+    - Run headless smoke test
 ```
 
-**Smoke test:**
-```js
-// scripts/headless-smoke-test.js
-import { World, Scene, Entity } from '@engine/world';
-
-const world = new World();
-const scene = new Scene('Test');
-const entity = scene.createEntity('Cube');
-
-world.addScene(scene);
-world.fixedUpdate(1/60);  // Simulate one tick
-
-console.log('✅ Headless test passed - World works without GPU!');
-```
+**Smoke test (`scripts/headless-smoke-test.js`):**
+- Tworzy World, Scene, Entity bez GPU/DOM
+- Wykonuje `world.fixedUpdate(1/60)` aby zweryfikować działanie bez zależności renderera
+- Zwraca exit code 0/1 dla CI
 
 **Korzyści:**
-- Gwarantuje czystą separację World od renderera
-- Łatwiejsze testowanie logiki bez GPU
-- Podstawa dla przyszłego multiplayer server
+- ✅ Gwarantuje czystą separację World od renderera
+- ✅ Automatyczne wykrywanie naruszeń headless compatibility
+- ✅ Podstawa dla przyszłego multiplayer server
+- ✅ CI bez GPU zawsze sprawdza headless mode
 
 ---
 
@@ -175,33 +144,20 @@ Rezultat:
 
 ---
 
-### 🔄 4. Package.json: Unified Lint Script
+### ✅ 4. Package.json: Unified Lint Script
 
-**Priorytet:** Niski  
-**Effort:** ~1 godzina
+**Status:** ✅ **DONE** (2025-10-26)
 
-**Problem:**
-- `pnpm lint` nie działa (brak `lint` skryptu w pakietach)
+**Wykonane:**
+- Wszystkie pakiety w `packages/*` mają już `lint` script: `"lint": "eslint src --max-warnings=0"`
+- Root `package.json` ma `"lint": "pnpm -r lint"` który wywołuje lint we wszystkich workspace
+- `apps/editor` i `apps/platform` również mają lint scripts
+- `pnpm lint` działa poprawnie i sprawdza wszystkie pakiety
 
-**Propozycja:**
-Dodać do każdego `packages/*/package.json`:
-```json
-"scripts": {
-  "lint": "eslint src --max-warnings=0"
-}
-```
-
-I w root `package.json`:
-```json
-"scripts": {
-  "lint": "pnpm -r lint && eslint apps/editor/src --max-warnings=0"
-}
-```
-
-**Korzyści:**
-- Spójne linting across monorepo
-- `pnpm lint` działa z root
-- Pre-commit hooks mogą używać `pnpm lint`
+**Rezultat:**
+- ✅ Spójne linting across monorepo
+- ✅ `pnpm lint` działa z root
+- ✅ Pre-commit hooks mogą używać `pnpm lint`
 
 ---
 
@@ -253,11 +209,11 @@ benchmark:
 ### Sprint 1 (Krótkoterminowe - 1 tydzień)
 1. ✅ **DONE:** Egzekwowanie granic modułów (ESLint)
 2. ✅ **DONE:** Synchronizacja dokumentacji
-3. 🔄 **TODO:** CI Job: Headless Test
-4. 🔄 **TODO:** Unified Lint Script
+3. ✅ **DONE:** CI Job: Headless Test
+4. ✅ **DONE:** Unified Lint Script
 
 ### Sprint 2 (Średnioterminowe - 2 tygodnie)
-5. 🔄 **TODO:** Wyodrębnienie BlockLibrary do @engine/blocks
+5. ✅ **DONE:** Wyodrębnienie BlockLibrary do @engine/blocks
 6. 🔄 **TODO:** Performance Baseline: Benchmarki
 
 ### Backlog (Długoterminowe)
@@ -274,7 +230,7 @@ Po implementacji wszystkich ulepszeń:
 | **Egzekwowanie granic** | ✅ ESLint rule | ✅ Done |
 | **Headless test** | ❌ Brak | ✅ CI job |
 | **Lint consistency** | ⚠️ Partial | ✅ Unified |
-| **Block coupling** | ⚠️ W gfx-webgpu | ✅ Separate package |
+| **Block coupling** | ✅ Separate package | ✅ Done |
 | **Performance tracking** | ❌ Brak | ✅ Benchmarks w CI |
 | **Cyclic dependencies** | ⚠️ 1 (world ↔ stdlib) | ⚠️ 1 (OK) lub ✅ 0 (ideal) |
 

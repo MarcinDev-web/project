@@ -7,8 +7,12 @@
     "exports":  {
                     ".":  "./dist/index.js",
                     "./core":  "./dist/core/index.js",
+                    "./config":  "./dist/config.js",
                     "./materials":  "./dist/materials/index.js",
                     "./textures":  "./dist/textures/index.js",
+                    "./textures/*":  "./dist/textures/*.js",
+                    "./blocks/BlockLibrary":  "./dist/blocks/BlockLibrary.js",
+                    "./lighting/LightManager":  "./dist/lighting/LightManager.js",
                     "./shadows":  "./dist/shadows/index.js",
                     "./postprocess":  "./dist/postprocess/index.js"
                 },
@@ -23,6 +27,8 @@
     "dependencies":  {
                          "@engine/core":  "workspace:*",
                          "@engine/world":  "workspace:*",
+                         "@engine/avatar":  "workspace:*",
+                         "@engine/blocks":  "workspace:*",
                          "gl-matrix":  "^3.4.4"
                      },
     "devDependencies":  {

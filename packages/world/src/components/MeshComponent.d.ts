@@ -1,5 +1,5 @@
 import { Component } from './Component';
-export type MeshKind = 'cube' | 'sphere' | 'custom';
+export type MeshKind = 'cube' | 'sphere' | 'custom' | 'avatar_torso' | 'terrain';
 export interface CustomMeshData {
     vertices?: Float32Array | Uint8Array;
     indices?: Uint16Array;

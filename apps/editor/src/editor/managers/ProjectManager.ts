@@ -1,9 +1,12 @@
 import { Entity } from '@engine/world';
 import { EnvironmentComponent } from '@engine/world/components/EnvironmentComponent';
 import { Scene } from '@engine/world';
+import { applyTo, type TemplateMetadata } from '@engine/world-templates';
 import type { EditorState } from '../core/state';
 import { ProjectStorage, type ProjectData, type ProjectMetadata } from './ProjectStorage';
 import { Logger } from '../../utils/logger';
+import { ShareClient } from '@engine/net';
+import { NewProjectDialog, type NewProjectConfig } from '../ui/NewProjectDialog';
 
 export type ProjectSaveStatus = 'Saved' | 'Unsaved' | 'Saving...' | '';
 
@@ -22,6 +25,7 @@ export class ProjectManager {
   private currentProjectId: string | null = null;
   private unsavedChanges = false;
   private autoSaveInterval: number | null = null;
+  private newProjectDialog: NewProjectDialog | null = null;
 
   constructor(private readonly options: ProjectManagerOptions) {
     this.storageReady = this.projectStorage.initialize().catch((error) => {
@@ -53,28 +57,81 @@ export class ProjectManager {
   }
 
   public async newProject(): Promise<void> {
-    if (this.unsavedChanges) {
-      const confirmed = window.confirm('You have unsaved changes. Start a new project?');
-      if (!confirmed) return;
+    if (!this.confirmDiscardChanges()) return;
+
+    // Show new project configuration dialog
+    if (typeof document !== 'undefined') {
+      this.newProjectDialog ??= new NewProjectDialog();
+      const result = await this.newProjectDialog.show({
+        defaultName: 'My Project',
+        defaultSaveImmediately: false,
+      });
+
+      if (!result) {
+        // User cancelled - don't create project
+        return;
+      }
+
+      const { config } = result;
+
+      // Reset scene
+      this.resetScene();
+
+      // Apply template if selected
+      if (config.template) {
+        try {
+          await applyTo(this.options.scene, config.template.id, { clear: true });
+          this.options.scene.name = config.name;
+        } catch (error) {
+          Logger.error('Failed to apply template:', error);
+          this.seedDefaultEnvironment();
+          this.options.scene.name = config.name;
+          this.finalizeNewProject(`Template failed, created project "${config.name}"`);
+          if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+            window.alert('Failed to load selected template. Created an empty project instead.');
+          }
+        }
+      } else {
+        // Create empty project
+        this.seedDefaultEnvironment();
+        this.options.scene.name = config.name;
+      }
+
+      // Save immediately if requested
+      if (config.saveImmediately) {
+        const id = this.normalizeProjectId(config.name);
+        this.currentProjectId = id;
+        await this.performSave(id, config.name);
+        this.options.showStatusMessage(`Created and saved: ${config.name}`, 1500);
+      } else {
+        this.finalizeNewProject(`Created: ${config.name}`);
+      }
+
+      return;
     }
 
-    const rootEntities = [...this.options.scene.rootEntities];
-    for (const entity of rootEntities) {
-      this.options.scene.removeEntity(entity);
-    }
+    // Fallback for non-browser environments (tests)
+    this.resetScene();
+    this.seedDefaultEnvironment();
+    this.finalizeNewProject('New project created');
+  }
 
-    this.currentProjectId = null;
-    this.unsavedChanges = false;
-    this.options.onSaveStatusChange('');
+  public async newProjectFromTemplate(template: TemplateMetadata): Promise<void> {
+    if (!this.confirmDiscardChanges()) return;
+
+    this.resetScene();
     try {
-      const env = new Entity('Environment');
-      env.addComponent(new EnvironmentComponent());
-      this.options.scene.addEntity(env);
-    } catch {
-      // Ignore if unavailable in test environment
+      await applyTo(this.options.scene, template.id, { clear: true });
+      this.options.scene.name = template.name;
+      this.finalizeNewProject(`Created from "${template.name}"`);
+    } catch (error) {
+      Logger.error('Failed to apply template:', error);
+      this.seedDefaultEnvironment();
+      this.finalizeNewProject('Template failed, created empty project');
+      if (typeof window !== 'undefined' && typeof window.alert === 'function') {
+        window.alert('Failed to load selected template. Created an empty project instead.');
+      }
     }
-    this.options.updateSceneBuffers();
-    this.options.showStatusMessage('New project created', 1500);
   }
 
   public async saveProject(): Promise<void> {
@@ -448,5 +505,246 @@ export class ProjectManager {
     for (const entity of entities) {
       this.options.scene.addEntity(entity);
     }
+  }
+
+  private confirmDiscardChanges(): boolean {
+    if (!this.unsavedChanges) return true;
+    return window.confirm('You have unsaved changes. Start a new project?');
+  }
+
+  private resetScene(): void {
+    const rootEntities = [...this.options.scene.rootEntities];
+    for (const entity of rootEntities) {
+      this.options.scene.removeEntity(entity);
+    }
+  }
+
+  private seedDefaultEnvironment(): void {
+    try {
+      const env = new Entity('Environment');
+      env.addComponent(new EnvironmentComponent());
+      this.options.scene.addEntity(env);
+    } catch {
+      // Ignore if unavailable in test environment
+    }
+  }
+
+  private finalizeNewProject(statusMessage: string): void {
+    this.currentProjectId = null;
+    this.unsavedChanges = false;
+    this.options.onSaveStatusChange('');
+    this.options.updateSceneBuffers();
+    this.options.showStatusMessage(statusMessage, 1500);
+  }
+
+  /**
+   * Share the current project and generate a shareable link.
+   * Shows a dialog with the link that can be copied.
+   */
+  public async shareProject(): Promise<void> {
+    if (this.options.state.editorMode.value === 'play') {
+      this.options.showStatusMessage('Stop play mode to share.', 1500);
+      return;
+    }
+
+    if (!this.currentProjectId) {
+      this.options.showStatusMessage('Save project before sharing.', 2000);
+      return;
+    }
+
+    try {
+      this.options.showStatusMessage('Sharing project...', 1000);
+
+      // Load current project data
+      if (!(await this.ensureStorageReady())) {
+        this.options.showStatusMessage('Unable to share: storage unavailable.', 2000);
+        return;
+      }
+
+      const project = await this.projectStorage.loadProject(this.currentProjectId);
+      if (!project) {
+        this.options.showStatusMessage('Project not found.', 2000);
+        return;
+      }
+
+      // Share via ShareClient
+      const shareClient = new ShareClient('');
+      const shareLink = await shareClient.shareProject(this.currentProjectId, project);
+
+      // Show dialog with share link
+      this.showShareDialog(shareLink.url, shareLink.token);
+
+      this.options.showStatusMessage('Project shared!', 1500);
+    } catch (error) {
+      Logger.error('Share failed:', error);
+      this.options.showStatusMessage('Failed to share project.', 2000);
+    }
+  }
+
+  /**
+   * Shows a dialog with the share link and copy button.
+   */
+  private showShareDialog(url: string, token: string): void {
+    const modal = document.createElement('div');
+    Object.assign(modal.style, {
+      position: 'fixed',
+      top: '0',
+      left: '0',
+      width: '100%',
+      height: '100%',
+      background: 'rgba(0, 0, 0, 0.7)',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      zIndex: '1000',
+    } as CSSStyleDeclaration);
+
+    const dialog = document.createElement('div');
+    Object.assign(dialog.style, {
+      background: 'rgba(7, 11, 20, 0.95)',
+      backdropFilter: 'blur(14px)',
+      border: '1px solid rgba(255, 255, 255, 0.12)',
+      borderRadius: '16px',
+      padding: '2rem',
+      maxWidth: '600px',
+      width: '90%',
+      color: '#f5f5f5',
+      fontFamily: 'Inter, system-ui, sans-serif',
+    } as CSSStyleDeclaration);
+
+    const title = document.createElement('h3');
+    title.textContent = 'Project Shared!';
+    Object.assign(title.style, {
+      margin: '0 0 1.5rem 0',
+      fontSize: '1.5rem',
+      fontWeight: '600',
+    } as CSSStyleDeclaration);
+    dialog.appendChild(title);
+
+    const label = document.createElement('label');
+    label.textContent = 'Share Link:';
+    Object.assign(label.style, {
+      display: 'block',
+      marginBottom: '0.5rem',
+      fontSize: '0.9rem',
+      color: 'rgba(255, 255, 255, 0.7)',
+    } as CSSStyleDeclaration);
+    dialog.appendChild(label);
+
+    const inputContainer = document.createElement('div');
+    Object.assign(inputContainer.style, {
+      display: 'flex',
+      gap: '0.5rem',
+      marginBottom: '1.5rem',
+    } as CSSStyleDeclaration);
+
+    const input = document.createElement('input');
+    input.type = 'text';
+    input.value = url;
+    input.readOnly = true;
+    Object.assign(input.style, {
+      flex: '1',
+      padding: '0.75rem 1rem',
+      background: 'rgba(255, 255, 255, 0.05)',
+      border: '1px solid rgba(255, 255, 255, 0.1)',
+      borderRadius: '8px',
+      color: '#f5f5f5',
+      fontSize: '0.9rem',
+      fontFamily: 'monospace',
+    } as CSSStyleDeclaration);
+    inputContainer.appendChild(input);
+
+    const copyButton = document.createElement('button');
+    copyButton.textContent = 'Copy';
+    Object.assign(copyButton.style, {
+      padding: '0.75rem 1.5rem',
+      background: 'rgba(59, 130, 246, 0.8)',
+      border: '1px solid rgba(59, 130, 246, 0.3)',
+      borderRadius: '8px',
+      color: '#fff',
+      fontSize: '0.9rem',
+      fontWeight: '500',
+      cursor: 'pointer',
+      transition: 'all 0.2s',
+    } as CSSStyleDeclaration);
+    copyButton.onmouseover = () => {
+      copyButton.style.background = 'rgba(59, 130, 246, 1)';
+    };
+    copyButton.onmouseout = () => {
+      copyButton.style.background = 'rgba(59, 130, 246, 0.8)';
+    };
+    copyButton.onclick = async () => {
+      try {
+        await navigator.clipboard.writeText(url);
+        copyButton.textContent = 'Copied!';
+        setTimeout(() => {
+          copyButton.textContent = 'Copy';
+        }, 2000);
+      } catch (error) {
+        // Fallback: select text
+        input.select();
+        document.execCommand('copy');
+        copyButton.textContent = 'Copied!';
+        setTimeout(() => {
+          copyButton.textContent = 'Copy';
+        }, 2000);
+      }
+    };
+    inputContainer.appendChild(copyButton);
+    dialog.appendChild(inputContainer);
+
+    const info = document.createElement('p');
+    info.textContent = 'Anyone with this link can view your project.';
+    Object.assign(info.style, {
+      margin: '0 0 1.5rem 0',
+      fontSize: '0.85rem',
+      color: 'rgba(255, 255, 255, 0.5)',
+    } as CSSStyleDeclaration);
+    dialog.appendChild(info);
+
+    const closeButton = document.createElement('button');
+    closeButton.textContent = 'Close';
+    Object.assign(closeButton.style, {
+      width: '100%',
+      padding: '0.75rem',
+      background: 'rgba(255, 255, 255, 0.05)',
+      border: '1px solid rgba(255, 255, 255, 0.1)',
+      borderRadius: '8px',
+      color: '#f5f5f5',
+      fontSize: '0.9rem',
+      fontWeight: '500',
+      cursor: 'pointer',
+      transition: 'all 0.2s',
+    } as CSSStyleDeclaration);
+    closeButton.onmouseover = () => {
+      closeButton.style.background = 'rgba(255, 255, 255, 0.1)';
+    };
+    closeButton.onmouseout = () => {
+      closeButton.style.background = 'rgba(255, 255, 255, 0.05)';
+    };
+    closeButton.onclick = () => {
+      document.body.removeChild(modal);
+    };
+    dialog.appendChild(closeButton);
+
+    modal.appendChild(dialog);
+
+    // Close on background click
+    modal.onclick = (e) => {
+      if (e.target === modal) {
+        document.body.removeChild(modal);
+      }
+    };
+
+    // Close on Escape
+    const escapeHandler = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        document.body.removeChild(modal);
+        window.removeEventListener('keydown', escapeHandler);
+      }
+    };
+    window.addEventListener('keydown', escapeHandler);
+
+    document.body.appendChild(modal);
   }
 }

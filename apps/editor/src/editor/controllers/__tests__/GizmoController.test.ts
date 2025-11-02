@@ -1,4 +1,7 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
+/**
+ * @vitest-environment jsdom
+ */
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { GizmoController } from '../GizmoController';
 import { SelectionManager, Scene, Entity } from '@engine/world';
 import { EditorState } from '../../core/state';
@@ -196,8 +199,10 @@ describe('GizmoController', () => {
       const calls = projectWorldToScreen.mock.calls;
       const lastCall = calls[calls.length - 1];
       
+      // Ensure projectWorldToScreen was called
+      expect(lastCall).toBeDefined();
       // Center should be approximately [1, 0, 0]
-      expect(lastCall[0][0]).toBeCloseTo(1, 1);
+      expect(lastCall![0][0]).toBeCloseTo(1, 1);
     });
 
     it('transforms all selected entities together', () => {

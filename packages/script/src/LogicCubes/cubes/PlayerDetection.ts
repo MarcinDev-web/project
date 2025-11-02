@@ -130,7 +130,7 @@ export class PlayerDetection {
     const result: Entity[] = [];
     const radiusSq = radius * radius;
 
-    this.scene.traverse((entity) => {
+    this.scene.traverse((entity: Entity) => {
       const entityPos = entity.transform.position;
       const dx = entityPos[0] - position[0];
       const dy = entityPos[1] - position[1];
@@ -152,7 +152,7 @@ export class PlayerDetection {
     let closest: Entity | null = null;
     let closestDistSq = maxDistance !== undefined ? maxDistance * maxDistance : Infinity;
 
-    this.scene.traverse((entity) => {
+    this.scene.traverse((entity: Entity) => {
       const entityPos = entity.transform.position;
       const dx = entityPos[0] - position[0];
       const dy = entityPos[1] - position[1];

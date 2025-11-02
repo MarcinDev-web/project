@@ -10,8 +10,7 @@
 
 import type { Scene } from '@engine/world';
 import type { EditorState } from '../core/state';
-import { BLOCK_LIBRARY, type BlockDefinition } from '@engine/gfx-webgpu/blocks/BlockLibrary';
-import { createIcon } from '../utils/icons';
+import { BLOCK_LIBRARY } from '@engine/blocks';
 import type { BlockAsset } from '../types/BlockAssetTypes';
 import { blockToAsset } from '../types/BlockAssetTypes';
 

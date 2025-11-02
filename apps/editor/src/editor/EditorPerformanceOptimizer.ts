@@ -260,14 +260,12 @@ export class GizmoLODManager {
 
   /**
    * Calculates approximate screen size for a gizmo.
-   * @param worldPosition Gizmo position in world space
    * @param cameraDistance Distance from camera
    * @param gizmoSize Base gizmo size in world units
    * @param viewportHeight Viewport height in pixels
    * @param fov Field of view in radians
    */
   calculateScreenSize(
-    worldPosition: [number, number, number],
     cameraDistance: number,
     gizmoSize: number,
     viewportHeight: number,

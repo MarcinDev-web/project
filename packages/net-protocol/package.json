@@ -1,0 +1,27 @@
+{
+  "name": "@engine/net-protocol",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src --max-warnings=0",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "msgpackr": "^1.11.5"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.3"
+  }
+}
+
+

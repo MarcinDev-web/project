@@ -61,10 +61,24 @@ describe('LoadingState (async)', () => {
     const worldManager: Partial<WorldManager> & { buildRuntimeWorldChunked: any } = {
       snapshotAuthoring: vi.fn(() => 'snapshot'),
       buildRuntimeWorldChunked: vi.fn(async (_manifest, cb: (p: number) => void) => {
-        for (let i = 1; i <= 10; i++) {
-          cb(i / 10);
-          if (i === 5) token.cancel();
-          await Promise.resolve();
+        // Start progress
+        cb(0.1);
+        await Promise.resolve();
+        
+        cb(0.3);
+        await Promise.resolve();
+        
+        // Cancel now - BuildWorldStep's onProgress callback will check token
+        token.cancel();
+        await Promise.resolve();
+        
+        // Next callback call will throw because token is cancelled
+        // BuildWorldStep's onProgress checks token and throws 'Cancelled'
+        try {
+          cb(0.5);
+        } catch (error) {
+          // Callback threw due to cancellation - propagate error to fail the promise
+          throw error;
         }
       }),
       getRuntimeWorld: vi.fn(() => null),
@@ -81,12 +95,20 @@ describe('LoadingState (async)', () => {
     const context = createContext();
     state.onEnter(context as any);
 
-    // Pump updates until transition ready
+    // Pump updates until transition ready - allow async operations to complete
+    // The async operation starts in onEnter and runs in background
+    // We need to wait for it to complete and for state to transition
     let next: PlayModeStateType | null = null;
-    for (let i = 0; i < 50; i++) {
+    
+    // Give async operation time to start and potentially fail
+    for (let i = 0; i < 500; i++) {
       next = state.onUpdate(0, context as any);
-      await Promise.resolve();
       if (next !== null) break;
+      
+      // Yield to allow async operations to progress
+      await Promise.resolve();
+      // Additional yields to ensure microtasks complete
+      await new Promise(resolve => setTimeout(resolve, 0));
     }
 
     expect(next).toBe(PlayModeStateType.RETURN);

@@ -1,10 +1,8 @@
 import type { Scene } from '@engine/world';
 import type { Entity, EntityId } from '@engine/world';
 import type { ScriptServices } from '../behavior/Behavior';
-import type { PhysicsWorld } from '@engine/world/physics';
-// TODO: Uncomment in Phase 5 when @engine/stdlib exists
-// import type { AnimationSystem } from '@engine/stdlib/Animation';
-type AnimationSystem = any; // Temp placeholder
+import type { PhysicsWorld } from '@engine/world';
+import type { AnimationSystem } from '@engine/stdlib/Animation';
 // NOTE: Renderer type placeholder (gfx-webgpu exists but not exporting Renderer type cleanly yet)
 type Renderer = any; // Temp placeholder
 
@@ -69,7 +67,7 @@ export class SceneScriptContextBuilder {
 
   private getAnimationSystem(): AnimationSystem | null {
     const runtime = this.scene.scriptRuntime;
-    return runtime?.animationSystem ?? null;
+    return (runtime?.animationSystem as AnimationSystem | undefined) ?? null;
   }
 
   private getRenderer(): Renderer | null {

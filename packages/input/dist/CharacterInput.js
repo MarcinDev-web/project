@@ -1,68 +1,49 @@
+import { KeyboardInputSource } from './sources/KeyboardInputSource';
+import { GamepadInputSource } from './sources/GamepadInputSource';
+import { UnifiedInputManager, InputCombinationStrategy } from './UnifiedInputManager';
+import { InputSourcePriority } from './InputSource';
 /**
  * Keyboard input handler for character controller
  *
  * Provides keyboard-based input for character movement.
- * Can be extended with gamepad, touch, or other input methods.
+ * Now uses Enhanced Input Abstraction internally but maintains backward compatibility.
+ *
+ * For new code, consider using UnifiedInputManager directly.
  */
 export class CharacterInputHandler {
-    /** Key states */
-    keys = new Map();
-    /** Key bindings */
-    bindings = {
-        forward: ['KeyW', 'ArrowUp'],
-        backward: ['KeyS', 'ArrowDown'],
-        left: ['KeyA', 'ArrowLeft'],
-        right: ['KeyD', 'ArrowRight'],
-        jump: ['Space'],
-        sprint: ['ShiftLeft', 'ShiftRight'],
-        interact: ['KeyE'],
-        use: ['Mouse0'],
-    };
+    inputManager;
+    keyboardSource;
     /** Whether input is enabled */
-    enabled = true;
+    _enabled = true;
     /** Camera forward direction (for camera-relative movement) */
     cameraForward = [0, 0, -1];
     /** Camera right direction (for camera-relative movement) */
     cameraRight = [1, 0, 0];
     constructor() {
-        this.setupEventListeners();
+        // Use Enhanced Input Abstraction internally
+        this.inputManager = new UnifiedInputManager();
+        this.keyboardSource = new KeyboardInputSource('keyboard', InputSourcePriority.NORMAL);
+        this.inputManager.addSource(this.keyboardSource);
+        this.inputManager.setCombinationStrategy(InputCombinationStrategy.HIGHEST_PRIORITY);
     }
+    /**
+     * Set key bindings (backward compatibility)
+     */
     setBindings(bindings) {
-        this.bindings.forward = bindings.movement.forward;
-        this.bindings.backward = bindings.movement.backward;
-        this.bindings.left = bindings.movement.left;
-        this.bindings.right = bindings.movement.right;
-        this.bindings.jump = bindings.actions.jump;
-        this.bindings.sprint = bindings.actions.sprint;
-        this.bindings.interact = bindings.actions.interact;
-        this.bindings.use = bindings.actions.interact ?? this.bindings.use;
-    }
-    /**
-     * Setup keyboard event listeners
-     */
-    setupEventListeners() {
-        window.addEventListener('keydown', this.handleKeyDown.bind(this));
-        window.addEventListener('keyup', this.handleKeyUp.bind(this));
-    }
-    /**
-     * Handle key down event
-     */
-    handleKeyDown(event) {
-        if (!this.enabled)
-            return;
-        this.keys.set(event.code, true);
-    }
-    /**
-     * Handle key up event
-     */
-    handleKeyUp(event) {
-        this.keys.set(event.code, false);
-    }
-    /**
-     * Check if any key in a binding is pressed
-     */
-    isKeyPressed(keys) {
-        return keys.some(key => this.keys.get(key) === true);
+        const mapping = {
+            movement: {
+                forward: bindings.movement.forward,
+                backward: bindings.movement.backward,
+                left: bindings.movement.left,
+                right: bindings.movement.right,
+            },
+            actions: {
+                jump: bindings.actions.jump,
+                sprint: bindings.actions.sprint,
+                interact: bindings.actions.interact,
+            },
+        };
+        this.keyboardSource.setMapping(mapping);
     }
     /**
      * Set camera directions for camera-relative movement
@@ -70,138 +51,149 @@ export class CharacterInputHandler {
     setCameraDirections(forward, right) {
         this.cameraForward = [...forward];
         this.cameraRight = [...right];
+        this.inputManager.setCameraDirections(forward, right);
     }
     /**
      * Get current character input state
      */
     getInput() {
-        // Calculate movement direction
-        let x = 0;
-        let z = 0;
-        if (this.isKeyPressed(this.bindings.forward))
-            z += 1;
-        if (this.isKeyPressed(this.bindings.backward))
-            z -= 1;
-        if (this.isKeyPressed(this.bindings.left))
-            x -= 1;
-        if (this.isKeyPressed(this.bindings.right))
-            x += 1;
-        // Normalize diagonal movement
-        const length = Math.sqrt(x * x + z * z);
-        if (length > 0) {
-            x /= length;
-            z /= length;
+        const input = this.inputManager.getInput();
+        // If no input from manager, return default with camera directions
+        if (!input) {
+            return {
+                moveDirection: [0, 0, 0],
+                sprint: false,
+                jump: false,
+                cameraForward: this.cameraForward,
+                cameraRight: this.cameraRight,
+            };
         }
+        // Ensure camera directions are set
         return {
-            moveDirection: [x, 0, z],
-            sprint: this.isKeyPressed(this.bindings.sprint),
-            jump: this.isKeyPressed(this.bindings.jump),
-            cameraForward: this.cameraForward,
-            cameraRight: this.cameraRight,
+            ...input,
+            cameraForward: input.cameraForward ?? this.cameraForward,
+            cameraRight: input.cameraRight ?? this.cameraRight,
         };
     }
     /**
      * Enable input handling
      */
     enable() {
-        this.enabled = true;
+        this._enabled = true;
+        this.inputManager.enableAll();
     }
     /**
      * Disable input handling
      */
     disable() {
-        this.enabled = false;
-        this.keys.clear();
+        this._enabled = false;
+        this.inputManager.disableAll();
     }
     /**
      * Check if input is enabled
      */
     isEnabled() {
-        return this.enabled;
+        return this._enabled;
     }
     /**
      * Clear all key states
      */
     clear() {
-        this.keys.clear();
+        this.keyboardSource.clear();
     }
     /**
      * Cleanup event listeners
+     * @deprecated Use dispose() instead
      */
     destroy() {
-        window.removeEventListener('keydown', this.handleKeyDown.bind(this));
-        window.removeEventListener('keyup', this.handleKeyUp.bind(this));
-        this.keys.clear();
+        this.dispose();
+    }
+    /**
+     * Dispose of the input handler
+     */
+    dispose() {
+        this.inputManager.dispose();
     }
 }
 /**
  * Gamepad input handler for character controller
+ *
+ * Now uses Enhanced Input Abstraction internally but maintains backward compatibility.
+ * For new code, consider using GamepadInputSource or UnifiedInputManager directly.
  */
 export class CharacterGamepadHandler {
-    /** Gamepad index */
-    gamepadIndex = 0;
-    /** Dead zone for analog sticks */
-    deadZone = 0.15;
-    /** Sprint threshold for trigger */
-    sprintThreshold = 0.5;
-    /** Button mappings (standard gamepad layout) */
-    buttons = {
-        jump: 0, // A button
-        sprint: 7, // Right trigger
-    };
-    /** Axis mappings */
-    axes = {
-        moveX: 0, // Left stick X
-        moveY: 1, // Left stick Y
-    };
+    gamepadSource;
+    inputManager;
     constructor(gamepadIndex = 0) {
-        this.gamepadIndex = gamepadIndex;
+        // Use Enhanced Input Abstraction internally
+        this.inputManager = new UnifiedInputManager();
+        this.gamepadSource = new GamepadInputSource(gamepadIndex, `gamepad-${gamepadIndex}`, InputSourcePriority.NORMAL);
+        this.inputManager.addSource(this.gamepadSource);
+        this.inputManager.setCombinationStrategy(InputCombinationStrategy.HIGHEST_PRIORITY);
     }
-    /**
-     * Get connected gamepad
-     */
-    getGamepad() {
-        const gamepads = navigator.getGamepads();
-        return gamepads[this.gamepadIndex] || null;
+    /** Dead zone for analog sticks */
+    get deadZone() {
+        return this.gamepadSource.getMapping().deadZone;
     }
-    /**
-     * Apply dead zone to axis value
-     */
-    applyDeadZone(value) {
-        if (Math.abs(value) < this.deadZone)
-            return 0;
-        // Re-map from [deadZone, 1] to [0, 1]
-        const sign = Math.sign(value);
-        const normalized = (Math.abs(value) - this.deadZone) / (1 - this.deadZone);
-        return sign * normalized;
+    set deadZone(value) {
+        this.gamepadSource.setMapping({ deadZone: value });
+    }
+    /** Sprint threshold for trigger */
+    get sprintThreshold() {
+        return this.gamepadSource.getMapping().sprintThreshold;
+    }
+    set sprintThreshold(value) {
+        this.gamepadSource.setMapping({ sprintThreshold: value });
+    }
+    /** Button mappings (standard gamepad layout) */
+    get buttons() {
+        const mapping = this.gamepadSource.getMapping();
+        return {
+            jump: mapping.buttons.jump,
+            sprint: mapping.buttons.sprint,
+        };
+    }
+    set buttons(value) {
+        this.gamepadSource.setMapping({
+            buttons: {
+                ...this.gamepadSource.getMapping().buttons,
+                ...value,
+            },
+        });
+    }
+    /** Axis mappings */
+    get axes() {
+        const mapping = this.gamepadSource.getMapping();
+        return {
+            moveX: mapping.axes.moveX,
+            moveY: mapping.axes.moveY,
+        };
+    }
+    set axes(value) {
+        this.gamepadSource.setMapping({
+            axes: {
+                ...this.gamepadSource.getMapping().axes,
+                ...value,
+            },
+        });
     }
     /**
      * Get current character input state from gamepad
      */
     getInput() {
-        const gamepad = this.getGamepad();
-        if (!gamepad)
-            return null;
-        // Get stick input
-        const x = this.applyDeadZone(gamepad.axes[this.axes.moveX] ?? 0);
-        const y = this.applyDeadZone(gamepad.axes[this.axes.moveY] ?? 0);
-        // Get button input
-        const jump = gamepad.buttons[this.buttons.jump]?.pressed ?? false;
-        const sprintValue = gamepad.buttons[this.buttons.sprint]?.value ?? 0;
-        const sprint = sprintValue > this.sprintThreshold;
-        return {
-            moveDirection: [x, 0, -y], // Invert Y for forward/backward
-            sprint,
-            jump,
-            cameraForward: [0, 0, -1],
-            cameraRight: [1, 0, 0],
-        };
+        return this.inputManager.getInput();
     }
     /**
      * Check if gamepad is connected
      */
     isConnected() {
-        return this.getGamepad() !== null;
+        return this.gamepadSource.connected;
+    }
+    /**
+     * Dispose of the gamepad handler
+     */
+    dispose() {
+        this.inputManager.dispose();
     }
 }
 //# sourceMappingURL=CharacterInput.js.map

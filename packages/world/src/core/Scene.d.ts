@@ -23,6 +23,10 @@ export declare class Scene {
     readonly events: EventBus;
     /** Optional scripting runtime context injected when ScriptSystem is active */
     scriptRuntime: ScriptRuntime | null;
+    private _queryCache;
+    private _activeEntitiesCache;
+    private _allEntitiesCache;
+    private _queryCacheDirty;
     constructor(name?: string);
     /**
      * Gets all root entities (readonly).
@@ -61,15 +65,18 @@ export declare class Scene {
     findEntitiesByName(name: string): Entity[];
     /**
      * Gets all entities in the scene (flat list).
+     * Uses cache to avoid allocation on every call.
      */
     getAllEntities(): Entity[];
     /**
      * Gets all active entities (flat list).
+     * Uses cache to avoid allocation and filtering on every call.
      */
     getActiveEntities(): Entity[];
     /**
      * Queries entities that have all specified component types.
      * Returns all entities when no component classes are provided.
+     * Uses cache to avoid recomputation on every call.
      */
     queryEntities(...componentClasses: ComponentClass[]): Entity[];
     /**
@@ -92,6 +99,16 @@ export declare class Scene {
     _onComponentAdded(entity: Entity, componentType: ComponentClass): void;
     /** @internal */
     _onComponentRemoved(entity: Entity, componentType: ComponentClass): void;
+    /**
+     * Invalidates the query cache, forcing queries to recompute.
+     * Called when entities or components are added/removed.
+     */
+    private invalidateQueryCache;
+    /**
+     * Validates the query cache after batch updates.
+     * Can be called to mark cache as valid after known safe state.
+     */
+    validateQueryCache(): void;
     private _indexComponent;
     private _unindexComponent;
     private _registerCamera;

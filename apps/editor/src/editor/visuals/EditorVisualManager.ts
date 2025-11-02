@@ -32,6 +32,8 @@ export interface EditorVisualManagerConfig {
   getCameraRotation?: () => import('@engine/core/math').Quat;
   updateSceneBuffers: () => void;
   setControlsEnabled: (enabled: boolean) => void;
+  /** Called when transform changes (for replication) */
+  onTransformChanged?: (entity: Entity) => void;
 }
 
 /**
@@ -122,6 +124,7 @@ export class EditorVisualManager {
       snapSystem: this.config.snapSystem,
       updateSceneBuffers: this.config.updateSceneBuffers,
       setControlsEnabled: this.config.setControlsEnabled,
+      onTransformChanged: this.config.onTransformChanged,
     });
 
     this.gizmoController.mount();

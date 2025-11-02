@@ -7,10 +7,9 @@ import { UnifiedBuildPanel } from '../UnifiedBuildPanel';
 import { Scene } from '@engine/world';
 import { EditorState } from '../../core/state';
 import { PlacementMode } from '../../placement/PlacementMode';
-import { SnapSystem } from '../../snap/SnapSystem';
+import { SnapSystem } from '@engine/editor-utils';
 import { CollisionDetector } from '../../placement/CollisionDetector';
-import type { Asset } from '../../types/BlockAssetTypes';
-import { BLOCK_LIBRARY } from '@engine/gfx-webgpu/blocks/BlockLibrary';
+import { BLOCK_LIBRARY } from '@engine/blocks';
 import { blockToAsset } from '../../types/BlockAssetTypes';
 
 describe('UnifiedBuildPanel', () => {
@@ -23,7 +22,7 @@ describe('UnifiedBuildPanel', () => {
     scene = new Scene('Test Scene');
     state = new EditorState(scene);
     
-    const snapSystem = new SnapSystem(state.snapConfig);
+    const snapSystem = new SnapSystem(state.snapConfig.value);
     const collisionDetector = new CollisionDetector(scene);
     placementMode = new PlacementMode(scene, snapSystem, collisionDetector);
 
@@ -48,10 +47,8 @@ describe('UnifiedBuildPanel', () => {
       panel.mount();
       
       const hotbar = panel.getHotbar();
-      const catalog = panel.getCatalog();
       
       expect(hotbar).toBeDefined();
-      expect(catalog).toBeDefined();
     });
   });
 
@@ -89,28 +86,18 @@ describe('UnifiedBuildPanel', () => {
         return;
       }
 
-      const testAsset = blockToAsset(blocks[0]);
+      const firstBlock = blocks[0];
+      if (!firstBlock) {
+        return;
+      }
+
+      const testAsset = blockToAsset(firstBlock);
       const success = panel.addToHotbar(testAsset);
       
       expect(success).toBe(true);
     });
   });
 
-  describe('Catalog Integration', () => {
-    beforeEach(() => {
-      panel.mount();
-    });
-
-    it('should have catalog component', () => {
-      const catalog = panel.getCatalog();
-      expect(catalog).not.toBeNull();
-    });
-
-    it('should refresh catalog', () => {
-      const catalog = panel.getCatalog();
-      expect(() => catalog?.refresh()).not.toThrow();
-    });
-  });
 
   describe('Placement Coordination', () => {
     beforeEach(() => {

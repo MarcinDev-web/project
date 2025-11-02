@@ -1,6 +1,5 @@
 import { Component } from './Component';
 import { registerComponent } from './registry';
-import type { Vec3 } from '@engine/core/math';
 
 export interface SpawnPointComponentJSON {
   isDefault?: boolean;

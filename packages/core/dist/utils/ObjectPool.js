@@ -8,7 +8,9 @@ export class ObjectPool {
     maxSize;
     constructor(create, reset, maxSize = 1024) {
         this.create = create;
-        this.reset = reset;
+        if (reset !== undefined) {
+            this.reset = reset;
+        }
         this.maxSize = maxSize;
     }
     acquire() {

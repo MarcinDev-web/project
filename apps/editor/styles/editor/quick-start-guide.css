@@ -1,0 +1,349 @@
+/**
+ * Quick Start Guide - Floating reference panel
+ * 
+ * Features:
+ * - Draggable panel
+ * - Minimizable
+ * - Glassmorphism design
+ * - Quick actions and shortcuts reference
+ */
+
+/* ============================================
+   QUICK START GUIDE
+   ============================================ */
+
+.quick-start-guide {
+  position: fixed;
+  bottom: 80px;
+  right: 24px;
+  width: 320px;
+  max-height: calc(100vh - 120px);
+  background: var(--color-surface-glass, rgba(15, 20, 30, 0.95));
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-xl, 16px);
+  box-shadow: 
+    0 16px 48px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+  z-index: 900;
+  opacity: 0;
+  transform: translateY(20px);
+  transition: all 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  overflow: hidden;
+}
+
+.quick-start-guide.visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.quick-start-guide.minimized {
+  height: 48px;
+  overflow: hidden;
+}
+
+.quick-start-guide.dismissed {
+  opacity: 0;
+  transform: translateY(20px) scale(0.95);
+  pointer-events: none;
+}
+
+/* ============================================
+   HEADER
+   ============================================ */
+
+.quick-start-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.875rem 1rem;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(255, 255, 255, 0.02);
+  user-select: none;
+}
+
+.quick-start-guide.minimized .quick-start-header {
+  border-bottom: none;
+}
+
+.quick-start-title {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+  font-size: 0.875rem;
+  font-weight: 600;
+  color: var(--color-base-100, rgba(255, 255, 255, 0.9));
+}
+
+.quick-start-title svg {
+  width: 16px;
+  height: 16px;
+  color: var(--color-accent-400, #667eea);
+}
+
+.quick-start-controls {
+  display: flex;
+  gap: 0.25rem;
+}
+
+.quick-start-control-btn {
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: none;
+  border: none;
+  border-radius: var(--radius-md, 8px);
+  color: var(--color-base-300, rgba(255, 255, 255, 0.6));
+  cursor: pointer;
+  transition: all 0.15s ease;
+  padding: 0;
+}
+
+.quick-start-control-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--color-base-100, rgba(255, 255, 255, 0.9));
+}
+
+.quick-start-control-btn:active {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+/* ============================================
+   CONTENT
+   ============================================ */
+
+.quick-start-content {
+  padding: 1rem;
+  overflow-y: auto;
+  max-height: calc(100vh - 200px);
+}
+
+.quick-start-guide.minimized .quick-start-content {
+  display: none;
+}
+
+/* ============================================
+   SECTIONS
+   ============================================ */
+
+.quick-start-section {
+  margin-bottom: 1.5rem;
+}
+
+.quick-start-section:last-child {
+  margin-bottom: 0;
+}
+
+.quick-start-section-title {
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--color-base-200, rgba(255, 255, 255, 0.8));
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 0.75rem;
+}
+
+/* ============================================
+   QUICK ACTIONS
+   ============================================ */
+
+.quick-start-actions {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 0.5rem;
+}
+
+.quick-start-action-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.75rem 0.5rem;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: var(--radius-lg, 12px);
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: inherit;
+  color: inherit;
+}
+
+.quick-start-action-btn:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.15);
+  transform: translateY(-2px);
+}
+
+.quick-start-action-btn:active {
+  transform: translateY(0);
+}
+
+.quick-start-action-icon {
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.quick-start-action-label {
+  font-size: 0.8125rem;
+  font-weight: 500;
+  color: var(--color-base-200, rgba(255, 255, 255, 0.8));
+}
+
+/* ============================================
+   SHORTCUTS
+   ============================================ */
+
+.quick-start-shortcuts {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.quick-start-shortcut-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: var(--radius-md, 8px);
+  transition: background 0.15s ease;
+}
+
+.quick-start-shortcut-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.quick-start-shortcut-keys {
+  display: flex;
+  gap: 0.25rem;
+  align-items: center;
+}
+
+.quick-start-shortcut-keys kbd {
+  font-family: var(--font-mono, 'Consolas', monospace);
+  font-size: 0.6875rem;
+  padding: 0.25rem 0.4rem;
+  min-width: 1.5rem;
+  text-align: center;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 4px;
+  color: var(--color-base-100, rgba(255, 255, 255, 0.9));
+  box-shadow: 
+    0 1px 2px rgba(0, 0, 0, 0.2),
+    0 0 0 1px rgba(255, 255, 255, 0.05) inset;
+  line-height: 1;
+}
+
+.quick-start-shortcut-label {
+  font-size: 0.8125rem;
+  color: var(--color-base-300, rgba(255, 255, 255, 0.7));
+}
+
+/* ============================================
+   TIPS SECTION
+   ============================================ */
+
+.quick-start-tips {
+  padding: 1rem;
+  background: rgba(103, 126, 234, 0.08);
+  border: 1px solid rgba(103, 126, 234, 0.2);
+  border-radius: var(--radius-lg, 12px);
+}
+
+.quick-start-tips .quick-start-section-title {
+  margin-bottom: 0.625rem;
+}
+
+.quick-start-tips-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.quick-start-tips-list li {
+  font-size: 0.8125rem;
+  color: var(--color-base-300, rgba(255, 255, 255, 0.7));
+  padding-left: 1.25rem;
+  position: relative;
+  line-height: 1.5;
+}
+
+.quick-start-tips-list li::before {
+  content: '💡';
+  position: absolute;
+  left: 0;
+  font-size: 0.875rem;
+}
+
+/* ============================================
+   SCROLLBAR
+   ============================================ */
+
+.quick-start-content::-webkit-scrollbar {
+  width: 6px;
+}
+
+.quick-start-content::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.quick-start-content::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+}
+
+.quick-start-content::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* ============================================
+   ANIMATIONS
+   ============================================ */
+
+@keyframes quick-start-bounce {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-4px);
+  }
+}
+
+.quick-start-guide:not(.minimized) .quick-start-title svg {
+  animation: quick-start-bounce 2s ease-in-out infinite;
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+
+@media (max-width: 768px) {
+  .quick-start-guide {
+    right: 12px;
+    bottom: 70px;
+    width: 280px;
+  }
+
+  .quick-start-content {
+    padding: 0.75rem;
+  }
+}
+
+@media (max-width: 480px) {
+  .quick-start-guide {
+    width: calc(100% - 24px);
+    left: 12px;
+    right: 12px;
+  }
+}
+

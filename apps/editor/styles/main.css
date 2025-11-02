@@ -48,6 +48,7 @@
 @import './editor/logic-panel.css';
 @import './editor/asset-palette.css';
 @import './editor/asset-palette-simple.css';
+@import './editor/terrain-panel.css';
 @import './editor/unified-build-panel.css';
 @import './editor/hotbar-component.css';
 @import './editor/color-picker.css';
@@ -69,6 +70,9 @@
 @import './editor/bookmarks-panel.css';
 @import './editor/history-panel.css';
 @import './editor/resizable-sidebar.css';
+@import './editor/welcome-enhanced.css';
+@import './editor/interactive-tutorial.css';
+@import './editor/quick-start-guide.css';
 
 /* ============================================
    UTILITIES

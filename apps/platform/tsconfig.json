@@ -1,0 +1,26 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@shared/*": ["../../shared/*"],
+      "@engine/core": ["../../packages/core/src"],
+      "@engine/core/*": ["../../packages/core/src/*"],
+      "@engine/world": ["../../packages/world/src"],
+      "@engine/world/*": ["../../packages/world/src/*"],
+      "@engine/gfx-webgpu": ["../../packages/gfx-webgpu/src"],
+      "@engine/gfx-webgpu/*": ["../../packages/gfx-webgpu/src/*"],
+      "@engine/avatar": ["../../packages/avatar/src"],
+      "@engine/avatar/*": ["../../packages/avatar/src/*"],
+      "@engine/camera": ["../../packages/camera/src"],
+      "@engine/camera/*": ["../../packages/camera/src/*"]
+    },
+    "jsx": "react-jsx",
+    "types": ["vite/client", "@testing-library/jest-dom"]
+  },
+  "include": ["src/**/*", "index.html"],
+  "exclude": ["node_modules", "dist"]
+}
+

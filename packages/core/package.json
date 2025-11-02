@@ -9,8 +9,10 @@
     "./math": "./dist/math/index.js",
     "./ecs": "./dist/ecs/index.js",
     "./event": "./dist/event/index.js",
+    "./event/EventBus": "./dist/event/EventBus.js",
     "./job": "./dist/job/index.js",
-    "./utils": "./dist/utils/index.js"
+    "./utils": "./dist/utils/index.js",
+    "./script": "./dist/script/index.js"
   },
   "scripts": {
     "build": "tsc",

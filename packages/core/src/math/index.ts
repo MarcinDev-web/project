@@ -3,6 +3,7 @@ import { mat4 as m4, vec3 as v3, quat as glmQuat } from 'gl-matrix';
 
 export type Vec2 = [number, number];
 export type Vec3 = [number, number, number];
+export type Vec4 = [number, number, number, number];
 export type Mat4 = Float32Array;
 // 3x3 matrix in column-major order to match gl-matrix conventions
 export type Mat3 = [number, number, number, number, number, number, number, number, number];

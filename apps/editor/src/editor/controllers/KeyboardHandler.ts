@@ -249,9 +249,9 @@ export class KeyboardHandler {
     this.registerCommand('e', {
       shortcut: 'e',
       canExecute: () => state.cameraMode.value !== 'free-fly',
-      execute: () => {
+      execute: async () => {
         if (placementMode?.isActive()) {
-          placementMode.rotatePreview(1);
+          await placementMode.rotatePreview(1);
           this.options.statusEl.textContent = 'Rotated CW';
           setTimeout(() => (this.options.statusEl.textContent = ''), 500);
         } else {
@@ -351,8 +351,8 @@ export class KeyboardHandler {
       shortcut: 'q',
       preventDefault: true,
       canExecute: () => !!placementMode?.isActive() && state.cameraMode.value !== 'free-fly',
-      execute: () => {
-        placementMode?.rotatePreview(-1);
+      execute: async () => {
+        await placementMode?.rotatePreview(-1);
         this.options.statusEl.textContent = 'Rotated CCW';
         setTimeout(() => (this.options.statusEl.textContent = ''), 500);
       },

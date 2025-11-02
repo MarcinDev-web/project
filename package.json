@@ -1,5 +1,5 @@
 {
-  "name": "ugc-3d-platform",
+  "name": "forge-engine",
   "version": "0.1.0",
   "private": true,
   "type": "module",
@@ -16,7 +16,11 @@
     "clean": "pnpm -r clean && rm -rf node_modules",
     "build:wasm": "wasm-pack build crates/collision --target bundler --out-dir ../../packages/wasm-collision/pkg",
     "dev:editor": "pnpm --filter @apps/editor dev",
+    "dev:platform": "pnpm --filter @apps/platform dev",
+    "dev:server": "pnpm --filter @apps/net-server dev",
     "build:editor": "pnpm --filter @apps/editor build",
+    "build:platform": "pnpm --filter @apps/platform build",
+    "smoke:ws": "tsx scripts/smoke-ws.ts",
     "test:unit": "vitest run --project unit",
     "test:unit:fast": "vitest run --project unit --no-coverage --reporter=basic",
     "test:integration": "vitest run --project integration",
@@ -24,7 +28,11 @@
     "test:changed": "vitest run --project unit --changed",
     "test:affected": "vitest run --project unit --coverage.enabled=false --bail=1",
     "test:ci": "vitest run --project unit --coverage.enabled=false --reporter=verbose",
+    "test:coverage": "vitest run --coverage.enabled",
+    "test:unit:coverage": "vitest run --project unit --coverage.enabled",
     "precommit": "pnpm lint && pnpm test:changed",
+    "test:headless": "cd packages/world && pnpm test",
+    "test:bench": "tsx packages/core/__benchmarks__/vec3.bench.ts && tsx packages/core/__benchmarks__/mat4.bench.ts && tsx packages/world/__benchmarks__/ecs.bench.ts",
     "measure:heap": "node --expose-gc --import tsx scripts/measure-heap.ts",
     "measure:heap:60s": "node --expose-gc --import tsx scripts/measure-heap.ts --duration=60 --entities=1000"
   },
@@ -44,7 +52,8 @@
     "typescript": "^5.9.3",
     "typescript-eslint": "^8.45.0",
     "vite": "^7.1.9",
-    "vitest": "^2.1.3"
+    "vitest": "^2.1.3",
+    "ws": "^8.18.0"
   },
   "dependencies": {
     "@engine/world": "workspace:*",

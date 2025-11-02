@@ -138,7 +138,7 @@ export class LogicCubeComponent extends Component {
     this.state = { ...state };
   }
 
-  override clone(): LogicCubeComponent {
+  clone(): LogicCubeComponent {
     const copy = new LogicCubeComponent();
     copy.cubeType = this.cubeType;
     copy.config = { ...this.config };

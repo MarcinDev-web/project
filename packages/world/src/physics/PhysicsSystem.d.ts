@@ -77,10 +77,30 @@ export declare class PhysicsSystem {
     private triggerExitListeners;
     /** Track previous frame's overlapping triggers */
     private previousTriggers;
+    /** Scratch set reused each frame for current triggers */
+    private currentTriggersScratch;
     /** Octree for spatial partitioning (broad phase) */
     private octree;
     /** Flag to rebuild octree next frame */
     private needsOctreeRebuild;
+    /** Scratch arrays reused across frames to avoid allocations */
+    private pairsScratch;
+    private collisionsScratch;
+    /** Scratch transforms reused for collision checks to avoid object churn */
+    private readonly transformAPosition;
+    private readonly transformARotation;
+    private readonly transformAScale;
+    private readonly transformBPosition;
+    private readonly transformBRotation;
+    private readonly transformBScale;
+    private readonly colliderTransformA;
+    private readonly colliderTransformB;
+    /** Scratch temporaries for quaternion/axis math */
+    private readonly tmpAxis;
+    private readonly tmpQuatA;
+    private readonly tmpQuatB;
+    /** Pool of CollisionEvent wrappers to reduce per-frame allocations */
+    private readonly collisionEventPool;
     constructor(scene: Scene, config?: Partial<PhysicsConfig>);
     /**
      * Updates the physics simulation by deltaTime
@@ -108,14 +128,7 @@ export declare class PhysicsSystem {
      * Detects all collisions between physics entities
      */
     private detectCollisions;
-    /**
-     * Broad phase using octree spatial partitioning
-     */
-    private getBroadPhasePairsOctree;
-    /**
-     * Broad phase using brute force O(n²) check (fallback)
-     */
-    private getBroadPhasePairsBruteForce;
+    private getBroadPhasePairsBruteForceInto;
     /**
      * Updates the octree with current entity positions
      */

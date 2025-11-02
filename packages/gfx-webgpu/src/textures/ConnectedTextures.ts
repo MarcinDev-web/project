@@ -13,27 +13,11 @@
  */
 
 import type { Vec3 } from '@engine/core/math';
+import type { CTMConfig, CTMPattern } from '@engine/blocks';
 
-export type CTMPattern =
-  | 'none' // No connection
-  | 'horizontal' // Connect left-right only
-  | 'vertical' // Connect top-bottom only
-  | 'cross' // Connect all 4 directions (2D)
-  | 'pillar' // Connect top-bottom with end caps
-  | 'random'; // Random variation (2-4 textures)
+export type { CTMConfig, CTMPattern } from '@engine/blocks';
 
 export type CTMFace = 'top' | 'bottom' | 'north' | 'south' | 'east' | 'west';
-
-export interface CTMConfig {
-  /** Pattern type */
-  pattern: CTMPattern;
-  /** Should connect to same block type only? */
-  matchSameType: boolean;
-  /** Should connect to same category? */
-  matchCategory: boolean;
-  /** Number of random variants (for random pattern) */
-  randomVariants?: number;
-}
 
 export interface CTMNeighbors {
   top: boolean;

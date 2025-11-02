@@ -8,7 +8,8 @@
                     ".":  "./dist/index.js",
                     "./LogicCubes":  "./dist/LogicCubes/index.js",
                     "./runtime":  "./dist/runtime/index.js",
-                    "./behavior":  "./dist/behavior/index.js"
+                    "./behavior":  "./dist/behavior/index.js",
+                    "./Behavior":  "./dist/behavior/Behavior.js"
                 },
     "scripts":  {
                     "build":  "tsc",

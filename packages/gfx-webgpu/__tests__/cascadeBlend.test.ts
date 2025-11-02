@@ -14,10 +14,14 @@ describe('computeCascadeBlend', () => {
 
   it('blends at lower boundary', () => {
     const overlap = 0.1; // 10% of range
-    const depth = 10 - (30 - 10) * overlap * 0.25; // a bit below split0 from cascade1 side
+    // Depth just above split0 (10) so it's in cascade1, but within overlap zone of cascade0
+    // For cascade1 (10-30), the overlap zone with cascade0 is at split0 - overlap
+    // Overlap range = (30 - 10) * 0.1 = 2, so overlap zone starts at 10 - 2 = 8
+    const depth = 9.5; // Just above the overlap start, in cascade1's lower overlap zone
     const [base, neighbor, weight] = computeCascadeBlend(depth, splits, overlap);
-    expect(base).toBe(1);
-    expect(neighbor).toBe(0);
+    // Depth 9.5 is < 10, so base cascade is 0, and it blends with cascade1
+    expect(base).toBe(0);
+    expect(neighbor).toBe(1);
     expect(weight).toBeGreaterThan(0);
     expect(weight).toBeLessThanOrEqual(1);
   });

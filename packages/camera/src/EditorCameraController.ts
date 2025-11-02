@@ -1,5 +1,6 @@
 import type { Vec3, Mat4 } from '@engine/core/math';
 import { mat4LookAt } from '@engine/core/math';
+import { damp } from './utils/Damper';
 
 /**
  * Configuration for EditorCameraController
@@ -21,6 +22,8 @@ export interface EditorCameraConfig {
   initialYaw?: number;
   /** Initial pitch in radians (default: 0) */
   initialPitch?: number;
+  /** Rotation smoothing time constant in seconds (default: 0.05). Lower = more responsive, higher = smoother. */
+  rotationSmoothing?: number;
 }
 
 /**
@@ -37,7 +40,8 @@ function clamp(value: number, min: number, max: number): number {
  * - WASD movement (with Shift to sprint, Alt to slow down)
  * - Right mouse button + drag for look
  * - Q/E for vertical movement (up/down)
- * - Mouse wheel to adjust movement speed
+ * - Mouse wheel to zoom (move forward/backward)
+ * - Ctrl+Mouse wheel to adjust movement speed
  * - No collision, can fly through anything
  *
  * This is NOT for gameplay - it's for editor navigation.
@@ -50,6 +54,11 @@ export class EditorCameraController {
   private position: Vec3;
   private yaw: number;
   private pitch: number;
+  
+  // Smoothed rotation targets (for exponential smoothing)
+  private targetYaw: number;
+  private targetPitch: number;
+  private rotationSmoothing: number;
 
   // Configuration
   private moveSpeed: number;
@@ -69,6 +78,15 @@ export class EditorCameraController {
   private readonly right: Vec3 = [1, 0, 0];
   private readonly up: Vec3 = [0, 1, 0];
 
+  // Scratch buffers (reused to avoid allocations in hot path)
+  private readonly scratch = {
+    movement: new Float32Array(3) as unknown as Vec3,
+    target: new Float32Array(3) as unknown as Vec3,
+  };
+
+  // Lazy update flag for view matrix
+  private viewMatrixDirty = true;
+
   // Event listeners (for cleanup)
   private readonly boundHandlers = {
     keydown: this.handleKeyDown.bind(this),
@@ -78,6 +96,7 @@ export class EditorCameraController {
     mousemove: this.handleMouseMove.bind(this),
     wheel: this.handleWheel.bind(this),
     blur: this.handleBlur.bind(this),
+    focus: this.handleFocus.bind(this),
   };
 
   private enabled = false;
@@ -91,11 +110,14 @@ export class EditorCameraController {
     this.position = config?.initialPosition ? [...config.initialPosition] as Vec3 : [0, 2, 5];
     this.yaw = config?.initialYaw ?? 0;
     this.pitch = config?.initialPitch ?? 0;
+    this.targetYaw = this.yaw;
+    this.targetPitch = this.pitch;
     this.moveSpeed = config?.moveSpeed ?? 5.0;
     this.sprintMultiplier = config?.sprintMultiplier ?? 2.0;
     this.slowMultiplier = config?.slowMultiplier ?? 0.3;
     this.lookSensitivity = config?.lookSensitivity ?? 0.003;
     this.pitchLimit = config?.pitchLimit ?? (Math.PI / 2 - 0.05);
+    this.rotationSmoothing = config?.rotationSmoothing ?? 0.05;
 
     this.updateDirectionVectors();
   }
@@ -105,8 +127,8 @@ export class EditorCameraController {
    */
   enable(): void {
     if (this.enabled || this.disposed) return;
-    console.log('[EditorCameraController] Enabling...');
     this.enabled = true;
+    this.viewMatrixDirty = true; // Ensure matrix is recalculated after enable
 
     window.addEventListener('keydown', this.boundHandlers.keydown);
     window.addEventListener('keyup', this.boundHandlers.keyup);
@@ -115,7 +137,7 @@ export class EditorCameraController {
     window.addEventListener('mousemove', this.boundHandlers.mousemove);
     this.canvas.addEventListener('wheel', this.boundHandlers.wheel, { passive: false });
     window.addEventListener('blur', this.boundHandlers.blur);
-    console.log('[EditorCameraController] ✓ Enabled, listening for events');
+    window.addEventListener('focus', this.boundHandlers.focus);
   }
 
   /**
@@ -132,6 +154,7 @@ export class EditorCameraController {
     window.removeEventListener('mousemove', this.boundHandlers.mousemove);
     this.canvas.removeEventListener('wheel', this.boundHandlers.wheel);
     window.removeEventListener('blur', this.boundHandlers.blur);
+    window.removeEventListener('focus', this.boundHandlers.focus);
 
     this.keysPressed.clear();
     this.isRightMouseDown = false;
@@ -152,9 +175,17 @@ export class EditorCameraController {
   update(deltaTime: number): void {
     if (!this.enabled) return;
     
+    // Smooth rotation towards target (even when not moving)
+    this.yaw = damp(this.yaw, this.targetYaw, this.rotationSmoothing, deltaTime);
+    this.pitch = damp(this.pitch, this.targetPitch, this.rotationSmoothing, deltaTime);
+    
+    // Update direction vectors if rotation changed
+    if (Math.abs(this.yaw - this.targetYaw) > 1e-6 || Math.abs(this.pitch - this.targetPitch) > 1e-6) {
+      this.updateDirectionVectors();
+      this.viewMatrixDirty = true;
+    }
+    
     if (this.keysPressed.size === 0) return;
-
-    console.log('[EditorCameraController] Update called, keys:', Array.from(this.keysPressed), 'deltaTime:', deltaTime);
 
     // Determine speed multiplier
     let speed = this.moveSpeed;
@@ -165,69 +196,79 @@ export class EditorCameraController {
     }
 
     const moveAmount = speed * deltaTime;
-    const movement: Vec3 = [0, 0, 0];
-
-    // WASD movement (horizontal plane) - check both lowercase and original key
-    const hasW = Array.from(this.keysPressed).some(k => k.toLowerCase() === 'w');
-    const hasS = Array.from(this.keysPressed).some(k => k.toLowerCase() === 's');
-    const hasD = Array.from(this.keysPressed).some(k => k.toLowerCase() === 'd');
-    const hasA = Array.from(this.keysPressed).some(k => k.toLowerCase() === 'a');
-    const hasE = Array.from(this.keysPressed).some(k => k.toLowerCase() === 'e');
-    const hasQ = Array.from(this.keysPressed).some(k => k.toLowerCase() === 'q');
     
-    if (hasW) {
-      movement[0] += this.forward[0] * moveAmount;
-      movement[1] += this.forward[1] * moveAmount;
-      movement[2] += this.forward[2] * moveAmount;
+    // Reset scratch buffer for movement
+    this.scratch.movement[0] = 0;
+    this.scratch.movement[1] = 0;
+    this.scratch.movement[2] = 0;
+
+    // Accumulate WASD movement directions (before normalization)
+    let forwardAmount = 0;
+    let rightAmount = 0;
+
+    if (this.keysPressed.has('w') || this.keysPressed.has('W')) {
+      forwardAmount += 1;
     }
-    if (hasS) {
-      movement[0] -= this.forward[0] * moveAmount;
-      movement[1] -= this.forward[1] * moveAmount;
-      movement[2] -= this.forward[2] * moveAmount;
+    if (this.keysPressed.has('s') || this.keysPressed.has('S')) {
+      forwardAmount -= 1;
     }
-    if (hasD) {
-      movement[0] += this.right[0] * moveAmount;
-      movement[1] += this.right[1] * moveAmount;
-      movement[2] += this.right[2] * moveAmount;
+    if (this.keysPressed.has('d') || this.keysPressed.has('D')) {
+      rightAmount += 1;
     }
-    if (hasA) {
-      movement[0] -= this.right[0] * moveAmount;
-      movement[1] -= this.right[1] * moveAmount;
-      movement[2] -= this.right[2] * moveAmount;
+    if (this.keysPressed.has('a') || this.keysPressed.has('A')) {
+      rightAmount -= 1;
     }
+
+    // Normalize diagonal movement to ensure consistent speed
+    const horizontalLength = Math.hypot(forwardAmount, rightAmount);
+    if (horizontalLength > 1e-6) {
+      // Normalize to unit vector, then apply moveAmount
+      const inv = 1 / horizontalLength;
+      forwardAmount *= inv;
+      rightAmount *= inv;
+    }
+
+    // Apply normalized horizontal movement
+    this.scratch.movement[0] += (this.forward[0] * forwardAmount + this.right[0] * rightAmount) * moveAmount;
+    this.scratch.movement[1] += (this.forward[1] * forwardAmount + this.right[1] * rightAmount) * moveAmount;
+    this.scratch.movement[2] += (this.forward[2] * forwardAmount + this.right[2] * rightAmount) * moveAmount;
 
     // Q/E for vertical movement (world up/down)
-    if (hasE) {
-      movement[1] += moveAmount;
+    if (this.keysPressed.has('e') || this.keysPressed.has('E')) {
+      this.scratch.movement[1] += moveAmount;
     }
-    if (hasQ) {
-      movement[1] -= moveAmount;
+    if (this.keysPressed.has('q') || this.keysPressed.has('Q')) {
+      this.scratch.movement[1] -= moveAmount;
     }
 
     // Apply movement
-    const oldPos = [...this.position];
-    this.position[0] += movement[0];
-    this.position[1] += movement[1];
-    this.position[2] += movement[2];
-    console.log('[EditorCameraController] Position:', oldPos, '→', this.position, 'movement:', movement);
+    this.position[0] += this.scratch.movement[0];
+    this.position[1] += this.scratch.movement[1];
+    this.position[2] += this.scratch.movement[2];
+    
+    // Mark view matrix as dirty after position change
+    this.viewMatrixDirty = true;
   }
 
   /**
-   * Get the current view matrix
+   * Get the current view matrix.
+   * 
+   * @warning This method returns a mutable reference to the internal matrix.
+   * Modifying the returned matrix will affect future calculations.
+   * If you need an immutable copy, clone the returned matrix: `new Float32Array(matrix)`
+   * 
+   * @returns Mutable reference to the view matrix (Mat4)
    */
   getViewMatrix(): Mat4 {
-    const target: Vec3 = [
-      this.position[0] + this.forward[0],
-      this.position[1] + this.forward[1],
-      this.position[2] + this.forward[2],
-    ];
-    mat4LookAt(this.viewMatrix, this.position, target, [0, 1, 0]);
-    
-    // Debug: log occasionally
-    if (Math.random() < 0.01) {
-      console.log('[EditorCameraController] getViewMatrix called, position:', this.position, 'forward:', this.forward);
+    if (this.viewMatrixDirty) {
+      // Calculate target in scratch buffer
+      this.scratch.target[0] = this.position[0] + this.forward[0];
+      this.scratch.target[1] = this.position[1] + this.forward[1];
+      this.scratch.target[2] = this.position[2] + this.forward[2];
+      
+      mat4LookAt(this.viewMatrix, this.position, this.scratch.target, [0, 1, 0]);
+      this.viewMatrixDirty = false;
     }
-    
     return this.viewMatrix;
   }
 
@@ -243,6 +284,7 @@ export class EditorCameraController {
    */
   setPosition(pos: Vec3): void {
     this.position = [...pos] as Vec3;
+    this.viewMatrixDirty = true;
   }
 
   /**
@@ -258,7 +300,28 @@ export class EditorCameraController {
   setOrientation(yaw: number, pitch: number): void {
     this.yaw = yaw;
     this.pitch = clamp(pitch, -this.pitchLimit, this.pitchLimit);
+    this.targetYaw = this.yaw;
+    this.targetPitch = this.pitch;
     this.updateDirectionVectors();
+    this.viewMatrixDirty = true;
+  }
+  
+  /**
+   * Set rotation smoothing time constant in seconds
+   * Lower values = more responsive but less smooth
+   * Higher values = smoother but slower response
+   */
+  setRotationSmoothing(tau: number): void {
+    if (tau > 0 && Number.isFinite(tau)) {
+      this.rotationSmoothing = tau;
+    }
+  }
+  
+  /**
+   * Get rotation smoothing time constant
+   */
+  getRotationSmoothing(): number {
+    return this.rotationSmoothing;
   }
 
   /**
@@ -309,12 +372,25 @@ export class EditorCameraController {
       return;
     }
 
-    const key = event.key.toLowerCase();
+    const key = event.key;
     
-    // Only capture movement keys
-    if (['w', 'a', 's', 'd', 'q', 'e'].includes(key)) {
-      console.log('[EditorCameraController] Key pressed:', event.key);
-      this.keysPressed.add(event.key);
+    // Track modifier keys for speed adjustments
+    if (key === 'Shift') {
+      this.keysPressed.add('Shift');
+      event.preventDefault();
+      return;
+    }
+    if (key === 'Alt') {
+      this.keysPressed.add('Alt');
+      event.preventDefault();
+      return;
+    }
+    
+    // Only capture movement keys (store both lowercase and original case for compatibility)
+    const keyLower = key.toLowerCase();
+    if (['w', 'a', 's', 'd', 'q', 'e'].includes(keyLower)) {
+      this.keysPressed.add(key); // Store original key for Shift/Alt detection
+      this.keysPressed.add(keyLower); // Store lowercase for movement detection
       event.preventDefault();
       event.stopPropagation(); // Stop event from reaching KeyboardHandler
     }
@@ -322,9 +398,25 @@ export class EditorCameraController {
 
   private handleKeyUp(event: KeyboardEvent): void {
     if (!this.enabled) return;
-    const key = event.key.toLowerCase();
-    if (['w', 'a', 's', 'd', 'q', 'e'].includes(key)) {
-      this.keysPressed.delete(event.key);
+    const key = event.key;
+    
+    // Remove modifier keys
+    if (key === 'Shift') {
+      this.keysPressed.delete('Shift');
+      event.preventDefault();
+      return;
+    }
+    if (key === 'Alt') {
+      this.keysPressed.delete('Alt');
+      event.preventDefault();
+      return;
+    }
+    
+    const keyLower = key.toLowerCase();
+    if (['w', 'a', 's', 'd', 'q', 'e'].includes(keyLower)) {
+      // Remove both original and lowercase versions
+      this.keysPressed.delete(key);
+      this.keysPressed.delete(keyLower);
       event.preventDefault();
       event.stopPropagation();
     }
@@ -353,27 +445,68 @@ export class EditorCameraController {
     this.lastMouseX = event.clientX;
     this.lastMouseY = event.clientY;
 
-    // Apply rotation
-    this.yaw += deltaX * this.lookSensitivity;
-    this.pitch -= deltaY * this.lookSensitivity;
-    this.pitch = clamp(this.pitch, -this.pitchLimit, this.pitchLimit);
-
+    // Update target rotation (will be smoothed in update())
+    this.targetYaw += deltaX * this.lookSensitivity;
+    this.targetPitch -= deltaY * this.lookSensitivity;
+    this.targetPitch = clamp(this.targetPitch, -this.pitchLimit, this.pitchLimit);
+    
+    // Apply smoothing immediately for responsive feel during mouse movement
+    // Use small deltaTime estimate for immediate smoothing
+    const immediateDelta = 0.008; // ~120fps estimate for immediate response
+    this.yaw = damp(this.yaw, this.targetYaw, this.rotationSmoothing, immediateDelta);
+    this.pitch = damp(this.pitch, this.targetPitch, this.rotationSmoothing, immediateDelta);
+    
     this.updateDirectionVectors();
+    this.viewMatrixDirty = true;
   }
 
   private handleWheel(event: WheelEvent): void {
     if (!this.enabled) return;
 
-    // Only adjust speed if Ctrl is held
-    if (!event.ctrlKey) return;
-
     event.preventDefault();
-    const delta = event.deltaY > 0 ? -0.5 : 0.5;
-    this.moveSpeed = clamp(this.moveSpeed + delta, 0.5, 50);
+
+    // Ctrl+Wheel: Adjust movement speed
+    if (event.ctrlKey) {
+      const delta = event.deltaY > 0 ? -0.5 : 0.5;
+      this.moveSpeed = clamp(this.moveSpeed + delta, 0.5, 50);
+      // Note: speed change doesn't affect view matrix, so no dirty flag needed
+      return;
+    }
+
+    // Wheel (without Ctrl): Zoom by moving camera forward/backward
+    // Normalize delta across devices/browsers and apply exponential movement
+    const deltaNormalized = event.deltaMode === 0 /* DOM_DELTA_PIXEL */ 
+      ? (event.deltaY ?? 0) / 100 
+      : (event.deltaY ?? 0);
+    
+    // Move camera along forward direction (zoom effect)
+    // Scale movement based on current distance from origin for intuitive feel
+    const zoomSpeed = 0.1; // units per wheel step
+    const distanceFromOrigin = Math.hypot(this.position[0], this.position[1], this.position[2]);
+    const zoomScale = Math.max(0.1, Math.min(1.0, distanceFromOrigin / 10)); // Scale 0.1-1.0 based on distance
+    const zoomAmount = -deltaNormalized * zoomSpeed * zoomScale;
+    
+    // Move camera along forward direction
+    this.position[0] += this.forward[0] * zoomAmount;
+    this.position[1] += this.forward[1] * zoomAmount;
+    this.position[2] += this.forward[2] * zoomAmount;
+    this.viewMatrixDirty = true;
   }
 
   private handleBlur(): void {
     // Clear all input state when window loses focus
+    // This prevents stuck keys when window loses focus while a key is held
+    this.keysPressed.clear();
+    this.isRightMouseDown = false;
+    if (this.canvas) {
+      this.canvas.style.cursor = '';
+    }
+  }
+
+  private handleFocus(): void {
+    // Clear all input state when window regains focus
+    // This fixes the issue where a key might be stuck if keyup event was missed
+    // during blur/focus transition
     this.keysPressed.clear();
     this.isRightMouseDown = false;
     if (this.canvas) {

@@ -6,6 +6,14 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['__tests__/**/*.test.ts'],
     setupFiles: ['./__tests__/setup.ts'],
+    onConsoleLog(log, type) {
+      const ignore = [
+        /Timestamp period: no source available/,
+      ];
+      if (ignore.some((r) => r.test(String(log)))) {
+        return false; // silence expected environment warnings
+      }
+    },
     passWithNoTests: true,
   },
 });

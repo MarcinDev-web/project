@@ -383,6 +383,23 @@ describe('HistoryHelpers', () => {
       expect(newScene.rootEntities[0].name).toBe('Test Entity');
     });
 
+    it('should omit editor preview player from serialization', () => {
+      const preview = new Entity('EditorPreviewPlayer', undefined, '__editor_preview_player');
+      preview.userData.isEditorPreviewPlayer = true;
+      scene.addEntity(preview);
+      const regular = new Entity('RegularEntity');
+      scene.addEntity(regular);
+
+      const json = serializeScene(scene);
+      expect(json).not.toContain('__editor_preview_player');
+
+      const newScene = new Scene();
+      hydrateScene(newScene, json);
+
+      expect(newScene.findEntityById('__editor_preview_player')).toBeNull();
+      expect(newScene.rootEntities.some((e) => e.name === 'RegularEntity')).toBe(true);
+    });
+
     it('should roundtrip complex scene', () => {
       // Create complex scene structure
       for (let i = 0; i < 3; i++) {

@@ -1,4 +1,5 @@
-import { Component, registerComponent } from './Component';
+import { Component } from './Component';
+import { registerComponent } from './registry';
 
 export class MorphBindingComponent extends Component {
   static readonly type = 'MorphBinding';
@@ -8,6 +9,13 @@ export class MorphBindingComponent extends Component {
 
   getType(): string {
     return MorphBindingComponent.type;
+  }
+
+  override clone(): MorphBindingComponent {
+    const clone = new MorphBindingComponent();
+    clone.targetCount = this.targetCount;
+    clone.weights = this.weights ? new Float32Array(this.weights) : null;
+    return clone;
   }
 }
 

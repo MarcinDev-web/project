@@ -6,11 +6,14 @@
     "exports":  {
                     ".":  "./dist/index.js",
                     "./Animation":  "./dist/Animation/index.js",
+                    "./Animation/AnimationClip":  "./dist/Animation/AnimationClip.js",
+                    "./Animation/*":  "./dist/Animation/*.js",
                     "./Audio":  "./dist/Audio/index.js",
-                    "./CharacterController":  "./dist/CharacterController/index.js"
+                    "./CharacterController":  "./dist/CharacterController/index.js",
+                    "./MovementProfiles":  "./dist/MovementProfiles/index.js"
                 },
     "scripts":  {
-                    "build":  "tsc",
+                    "build":  "tsc -b",
                     "dev":  "tsc --watch",
                     "test":  "vitest run",
                     "test:watch":  "vitest",

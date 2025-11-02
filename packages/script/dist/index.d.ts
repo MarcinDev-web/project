@@ -11,4 +11,5 @@ export * from './coroutine';
 export * from './connection';
 export { VariableStorage } from './storage/VariableStorage';
 export * from './services';
+export * from './signals';
 //# sourceMappingURL=index.d.ts.map

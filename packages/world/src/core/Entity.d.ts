@@ -136,7 +136,7 @@ export declare class Entity {
 export interface EntityData {
     id: EntityId;
     name: string;
-    active: boolean;
+    active?: boolean;
     components?: Array<{
         type: string;
         props?: Record<string, unknown>;

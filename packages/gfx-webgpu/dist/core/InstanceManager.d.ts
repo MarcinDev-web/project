@@ -7,13 +7,25 @@
  * Performance: Zero-allocation instance data building for large scenes.
  */
 import type { Entity, Scene } from '@engine/world';
+import { MeshComponent } from '@engine/world';
 import type { Frustum } from './FrustumCuller';
 export interface InstanceData {
     instanceCount: number;
+    opaqueCount: number;
     instanceOffsetData: Float32Array;
     instanceColorScaleData: Float32Array;
+    instanceSecondaryColorData: Float32Array;
+    instanceEmissiveColorData: Float32Array;
+    instanceMaterialParamsData: Float32Array;
     instanceRotationData: Float32Array;
     instanceMaterialIdData: Float32Array;
+}
+/**
+ * Entity with custom geometry (meshData)
+ */
+export interface CustomGeometryEntity {
+    entity: Entity;
+    meshComponent: MeshComponent;
 }
 /**
  * InstanceDataBuilder builds instance data by reusing internal buffers.
@@ -22,6 +34,9 @@ export interface InstanceData {
 export declare class InstanceDataBuilder {
     private offsetBuffer;
     private colorScaleBuffer;
+    private secondaryColorBuffer;
+    private emissiveColorBuffer;
+    private materialParamsBuffer;
     private rotationBuffer;
     private materialIdBuffer;
     private capacity;
@@ -31,8 +46,16 @@ export declare class InstanceDataBuilder {
      */
     private grow;
     /**
+     * Separates entities with custom meshData from default geometry entities
+     */
+    separateCustomGeometry(entities: Entity[]): {
+        defaultGeometry: Entity[];
+        customGeometry: CustomGeometryEntity[];
+    };
+    /**
      * Builds instance data by reusing internal buffers.
      * Returns views into reusable buffers (no allocations).
+     * Only processes entities without custom meshData.
      */
     build(entities: Entity[]): InstanceData;
     /**
@@ -64,10 +87,5 @@ export declare class InstanceManager {
  * Legacy function for backward compatibility.
  * @deprecated Use InstanceManager for better performance
  */
-export declare function createInstanceDataFromScene(scene: Scene, frustum?: Frustum): {
-    instanceCount: number;
-    instanceOffsetData: Float32Array;
-    instanceColorScaleData: Float32Array;
-    instanceRotationData: Float32Array;
-};
+export declare function createInstanceDataFromScene(scene: Scene, frustum?: Frustum): InstanceData;
 //# sourceMappingURL=InstanceManager.d.ts.map

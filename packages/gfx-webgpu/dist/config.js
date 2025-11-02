@@ -2,7 +2,7 @@ export const FOV_RADIANS = (2 * Math.PI) / 5;
 export const Z_NEAR = 0.1;
 export const Z_FAR = 100;
 export const MSAA_SAMPLE_COUNT = 4;
-export const CLEAR_COLOR = { r: 0.08, g: 0.08, b: 0.1, a: 1.0 };
+export const CLEAR_COLOR = { r: 0.02, g: 0.02, b: 0.03, a: 1.0 };
 export const DEFAULT_STATUS_MESSAGE = 'Rendering simple cubes…';
 export const UI_STATUS_THROTTLE_MS = 250;
 // Lighting system adds: pointLightCount (16 bytes), directional (32 bytes), ambient (16 bytes), 4 point lights (4*64=256 bytes)
@@ -14,8 +14,9 @@ export const UI_STATUS_THROTTLE_MS = 250;
 // - atlasRects (4*16=64)
 // - filterParams (16)
 // - biasParams (16)
-// New total (unpadded): 448 + 64 + 256 + 16 + 64 + 16 + 16 = 880 bytes
-// We keep 896 bytes to retain headroom/alignment and avoid churn.
+// - shadowExtraParams (16)
+// New total (unpadded): 448 + 64 + 256 + 16 + 64 + 16 + 16 + 16 = 896 bytes
+// Total buffer size remains 896 bytes (no extra headroom).
 export const UNIFORM_BUFFER_SIZE = 896;
 export const UNIFORM_DATA_LENGTH = 224; // 896 bytes / 4 bytes per float32
 // Extended timestamp tracking for detailed profiling

@@ -1,3 +1,6 @@
+/**
+ * @vitest-environment jsdom
+ */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { PropertiesPanel } from './PropertiesPanel';
 import { SelectionManager } from '@engine/world';
@@ -8,7 +11,9 @@ import { AnimationComponent } from '@engine/stdlib/Animation';
 import { AnimationClip } from '@engine/stdlib/Animation/AnimationClip';
 import { ScriptComponent } from '@engine/script';
 import { BehaviorRegistry } from '@engine/script';
-import { BehaviorInstance } from '@engine/script/Behavior';
+import { BehaviorInstance } from '@engine/script/behavior';
+import { CharacterController } from '@engine/world';
+import { PRESET_PROFILES } from '@engine/stdlib/MovementProfiles';
 
 function createHost(): HTMLElement {
   const el = document.createElement('div');
@@ -32,6 +37,19 @@ describe('PropertiesPanel', () => {
     host = createHost();
     editorState = new EditorState(scene);
     editorState.selection.value = [entity];
+    
+    // Mock scriptRuntime for ScriptComponent tests
+    (scene as any).scriptRuntime = {
+      contextBuilder: {
+        getServices: () => ({}),
+      },
+      behaviors: {
+        add: vi.fn(),
+      },
+      scheduler: {
+        attachBehaviorInstance: vi.fn(),
+      },
+    };
   });
 
   afterEach(() => {
@@ -287,5 +305,180 @@ describe('PropertiesPanel', () => {
     const scriptName = host.querySelector('.script-item-name');
     expect(scriptName?.classList.contains('script-item-invalid')).toBe(true);
     expect(scriptName?.getAttribute('title')).toContain('not found in registry');
+  });
+
+  describe('Character Controller Section', () => {
+    it('renders character controller section when component exists', () => {
+      const controller = new CharacterController();
+      entity.addComponent(controller);
+
+      const panel = new PropertiesPanel({
+        selection,
+        onTransformChanged: vi.fn(),
+        onColorChanged: vi.fn(),
+        onEntityRenamed: vi.fn(),
+        state: editorState,
+      });
+      panel.mount(host);
+      panel.refresh();
+
+      const characterSection = host.querySelector('[data-section-id="character-controller"]');
+      expect(characterSection).toBeTruthy();
+    });
+
+    it('does not render character controller section when component missing', () => {
+      const panel = new PropertiesPanel({
+        selection,
+        onTransformChanged: vi.fn(),
+        onColorChanged: vi.fn(),
+        onEntityRenamed: vi.fn(),
+        state: editorState,
+      });
+      panel.mount(host);
+      panel.refresh();
+
+      const characterSection = host.querySelector('[data-section-id="character-controller"]');
+      expect(characterSection).toBeFalsy();
+    });
+
+    it('displays profile selector dropdown', () => {
+      const controller = new CharacterController();
+      entity.addComponent(controller);
+
+      const panel = new PropertiesPanel({
+        selection,
+        onTransformChanged: vi.fn(),
+        onColorChanged: vi.fn(),
+        onEntityRenamed: vi.fn(),
+        state: editorState,
+      });
+      panel.mount(host);
+      panel.refresh();
+
+      const profileSelect = host.querySelector('.property-select') as HTMLSelectElement;
+      expect(profileSelect).toBeTruthy();
+      expect(profileSelect.options.length).toBeGreaterThan(0);
+    });
+
+    it('applies profile when selected from dropdown', () => {
+      const controller = new CharacterController();
+      entity.addComponent(controller);
+      const initialSpeed = controller.config.moveSpeed;
+
+      const panel = new PropertiesPanel({
+        selection,
+        onTransformChanged: vi.fn(),
+        onColorChanged: vi.fn(),
+        onEntityRenamed: vi.fn(),
+        state: editorState,
+      });
+      panel.mount(host);
+      panel.refresh();
+
+      const profileSelect = host.querySelector('.property-select') as HTMLSelectElement;
+      expect(profileSelect).toBeTruthy();
+
+      // Select FAST_HUMAN profile (moveSpeed = 7.0)
+      profileSelect.value = 'fast-human';
+      profileSelect.dispatchEvent(new Event('change'));
+
+      expect(controller.config.moveSpeed).toBe(7.0);
+      expect(controller.config.moveSpeed).not.toBe(initialSpeed);
+      expect(controller.getCurrentProfile()?.id).toBe('fast-human');
+    });
+
+    it('displays profile parameters preview', () => {
+      const controller = new CharacterController();
+      entity.addComponent(controller);
+
+      const panel = new PropertiesPanel({
+        selection,
+        onTransformChanged: vi.fn(),
+        onColorChanged: vi.fn(),
+        onEntityRenamed: vi.fn(),
+        state: editorState,
+      });
+      panel.mount(host);
+      panel.refresh();
+
+      const paramsTable = host.querySelector('.property-table');
+      expect(paramsTable).toBeTruthy();
+
+      const paramRows = host.querySelectorAll('.property-table-row');
+      expect(paramRows.length).toBeGreaterThan(0);
+      
+      // Check if Move Speed is displayed
+      const moveSpeedText = Array.from(paramRows).find(row => 
+        row.textContent?.includes('Move Speed')
+      );
+      expect(moveSpeedText).toBeTruthy();
+    });
+
+    it('displays extension badges for profiles with extensions', () => {
+      const controller = new CharacterController();
+      controller.applyProfile(PRESET_PROFILES.FLYING_HUMAN);
+      entity.addComponent(controller);
+
+      const panel = new PropertiesPanel({
+        selection,
+        onTransformChanged: vi.fn(),
+        onColorChanged: vi.fn(),
+        onEntityRenamed: vi.fn(),
+        state: editorState,
+      });
+      panel.mount(host);
+      panel.refresh();
+
+      const badges = host.querySelectorAll('.extension-badge');
+      expect(badges.length).toBeGreaterThan(0);
+      
+      const flyingBadge = Array.from(badges).find(badge => 
+        badge.textContent?.includes('Flying')
+      );
+      expect(flyingBadge).toBeTruthy();
+    });
+
+    it('resets to default profile when reset button clicked', () => {
+      const controller = new CharacterController();
+      controller.applyProfile(PRESET_PROFILES.FAST_HUMAN);
+      entity.addComponent(controller);
+
+      const panel = new PropertiesPanel({
+        selection,
+        onTransformChanged: vi.fn(),
+        onColorChanged: vi.fn(),
+        onEntityRenamed: vi.fn(),
+        state: editorState,
+      });
+      panel.mount(host);
+      panel.refresh();
+
+      const resetBtn = host.querySelector('.property-reset-btn') as HTMLButtonElement;
+      expect(resetBtn).toBeTruthy();
+
+      expect(controller.getCurrentProfile()?.id).toBe('fast-human');
+      resetBtn.click();
+      expect(controller.getCurrentProfile()?.id).toBe('human');
+      expect(controller.config.moveSpeed).toBe(5.0);
+    });
+
+    it('shows create custom profile button', () => {
+      const controller = new CharacterController();
+      entity.addComponent(controller);
+
+      const panel = new PropertiesPanel({
+        selection,
+        onTransformChanged: vi.fn(),
+        onColorChanged: vi.fn(),
+        onEntityRenamed: vi.fn(),
+        state: editorState,
+      });
+      panel.mount(host);
+      panel.refresh();
+
+      const createBtn = host.querySelector('.property-btn');
+      expect(createBtn).toBeTruthy();
+      expect(createBtn?.textContent).toContain('Create Custom');
+    });
   });
 });

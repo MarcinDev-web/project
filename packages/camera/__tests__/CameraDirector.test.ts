@@ -1,3 +1,6 @@
+/**
+ * @vitest-environment jsdom
+ */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { CameraDirector } from '../src/CameraDirector';
 import { OrbitCamera } from '../src/OrbitCamera';
@@ -105,7 +108,11 @@ describe('CameraDirector', () => {
         logger: mockLogger,
       });
 
+      // First set orbit mode (will log)
+      director.setMode('orbit');
+      // Clear logs
       mockLogger.debug.mockClear();
+      // Try to set orbit again (should not log since mode is already orbit)
       director.setMode('orbit');
 
       expect(mockLogger.debug).not.toHaveBeenCalled();

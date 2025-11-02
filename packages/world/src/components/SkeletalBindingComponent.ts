@@ -1,4 +1,5 @@
-import { Component, registerComponent } from './Component';
+import { Component } from './Component';
+import { registerComponent } from './registry';
 import type { Skeleton, Pose } from '@engine/animation';
 
 export class SkeletalBindingComponent extends Component {
@@ -10,6 +11,14 @@ export class SkeletalBindingComponent extends Component {
 
   getType(): string {
     return SkeletalBindingComponent.type;
+  }
+
+  override clone(): SkeletalBindingComponent {
+    const clone = new SkeletalBindingComponent();
+    clone.skeleton = this.skeleton;
+    clone.pose = this.pose;
+    clone.jointPalette = this.jointPalette ? new Float32Array(this.jointPalette) : null;
+    return clone;
   }
 }
 

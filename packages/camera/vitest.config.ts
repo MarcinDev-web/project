@@ -5,6 +5,15 @@ export default defineConfig({
   test: {
     globals: true,
     environment: 'jsdom',
+    onConsoleLog(log, type) {
+      const ignore = [
+        /EditorCamera is null!/,
+        /Unknown camera mode:/,
+      ];
+      if (ignore.some((r) => r.test(String(log)))) {
+        return false; // silence expected noisy logs
+      }
+    },
     passWithNoTests: true,
   },
   resolve: {

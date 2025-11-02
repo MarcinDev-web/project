@@ -47,6 +47,16 @@ export declare class CollisionDetection {
      */
     private static boxSphere;
     /**
+     * Precise Capsule vs Box collision detection
+     * Computes closest point on box to capsule segment, similar to boxSphere but for capsule segment
+     */
+    private static capsuleBox;
+    /**
+     * Find closest point on segment AB to an axis-aligned box
+     * Uses iterative refinement for accuracy
+     */
+    private static closestPointOnSegmentToBox;
+    /**
      * Capsule collision (simplified - treats as sphere + cylinder)
      */
     private static capsuleCollision;

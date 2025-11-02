@@ -2,27 +2,27 @@
  * Action Cubes - Perform actions when triggered
  */
 import { LogicCube } from './LogicCube';
-import type { LogicCubeMetadata, LogicSignal } from './types';
+import type { LogicCubeMetadata, LogicSignal, LogicExecutionContext } from './types';
 /**
  * SendMessage Action - Sends a message via event bus
  */
 export declare class SendMessageAction extends LogicCube {
     getMetadata(): LogicCubeMetadata;
-    onSignalReceived(portId: string, signal: LogicSignal): Map<string, LogicSignal> | null;
+    onSignalReceived(portId: string, signal: LogicSignal, _context: LogicExecutionContext): Map<string, LogicSignal> | null;
 }
 /**
  * SetVariable Action - Sets a variable value
  */
 export declare class SetVariableAction extends LogicCube {
     getMetadata(): LogicCubeMetadata;
-    onSignalReceived(portId: string, signal: LogicSignal): Map<string, LogicSignal> | null;
+    onSignalReceived(portId: string, signal: LogicSignal, _context: LogicExecutionContext): Map<string, LogicSignal> | null;
 }
 /**
  * SpawnEntity Action - Spawns an entity
  */
 export declare class SpawnEntityAction extends LogicCube {
     getMetadata(): LogicCubeMetadata;
-    onSignalReceived(portId: string, signal: LogicSignal): Map<string, LogicSignal> | null;
+    onSignalReceived(portId: string, signal: LogicSignal, _context: LogicExecutionContext): Map<string, LogicSignal> | null;
 }
 /**
  * DestroyEntity Action - Destroys an entity
@@ -36,6 +36,6 @@ export declare class DestroyEntityAction extends LogicCube {
  */
 export declare class LogAction extends LogicCube {
     getMetadata(): LogicCubeMetadata;
-    onSignalReceived(portId: string, signal: LogicSignal): Map<string, LogicSignal> | null;
+    onSignalReceived(portId: string, signal: LogicSignal, _context: LogicExecutionContext): Map<string, LogicSignal> | null;
 }
 //# sourceMappingURL=ActionCubes.d.ts.map

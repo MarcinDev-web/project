@@ -12,7 +12,8 @@ function clamp(value, min, max) {
  * - WASD movement (with Shift to sprint, Alt to slow down)
  * - Right mouse button + drag for look
  * - Q/E for vertical movement (up/down)
- * - Mouse wheel to adjust movement speed
+ * - Mouse wheel to zoom (move forward/backward)
+ * - Ctrl+Mouse wheel to adjust movement speed
  * - No collision, can fly through anything
  *
  * This is NOT for gameplay - it's for editor navigation.
@@ -48,6 +49,7 @@ export class EditorCameraController {
         mousemove: this.handleMouseMove.bind(this),
         wheel: this.handleWheel.bind(this),
         blur: this.handleBlur.bind(this),
+        focus: this.handleFocus.bind(this),
     };
     enabled = false;
     disposed = false;
@@ -71,7 +73,6 @@ export class EditorCameraController {
     enable() {
         if (this.enabled || this.disposed)
             return;
-        console.log('[EditorCameraController] Enabling...');
         this.enabled = true;
         window.addEventListener('keydown', this.boundHandlers.keydown);
         window.addEventListener('keyup', this.boundHandlers.keyup);
@@ -80,7 +81,7 @@ export class EditorCameraController {
         window.addEventListener('mousemove', this.boundHandlers.mousemove);
         this.canvas.addEventListener('wheel', this.boundHandlers.wheel, { passive: false });
         window.addEventListener('blur', this.boundHandlers.blur);
-        console.log('[EditorCameraController] ✓ Enabled, listening for events');
+        window.addEventListener('focus', this.boundHandlers.focus);
     }
     /**
      * Disable the controller (detach event listeners)
@@ -96,6 +97,7 @@ export class EditorCameraController {
         window.removeEventListener('mousemove', this.boundHandlers.mousemove);
         this.canvas.removeEventListener('wheel', this.boundHandlers.wheel);
         window.removeEventListener('blur', this.boundHandlers.blur);
+        window.removeEventListener('focus', this.boundHandlers.focus);
         this.keysPressed.clear();
         this.isRightMouseDown = false;
     }
@@ -115,7 +117,6 @@ export class EditorCameraController {
             return;
         if (this.keysPressed.size === 0)
             return;
-        console.log('[EditorCameraController] Update called, keys:', Array.from(this.keysPressed), 'deltaTime:', deltaTime);
         // Determine speed multiplier
         let speed = this.moveSpeed;
         if (this.keysPressed.has('Shift')) {
@@ -126,46 +127,38 @@ export class EditorCameraController {
         }
         const moveAmount = speed * deltaTime;
         const movement = [0, 0, 0];
-        // WASD movement (horizontal plane) - check both lowercase and original key
-        const hasW = Array.from(this.keysPressed).some(k => k.toLowerCase() === 'w');
-        const hasS = Array.from(this.keysPressed).some(k => k.toLowerCase() === 's');
-        const hasD = Array.from(this.keysPressed).some(k => k.toLowerCase() === 'd');
-        const hasA = Array.from(this.keysPressed).some(k => k.toLowerCase() === 'a');
-        const hasE = Array.from(this.keysPressed).some(k => k.toLowerCase() === 'e');
-        const hasQ = Array.from(this.keysPressed).some(k => k.toLowerCase() === 'q');
-        if (hasW) {
+        // WASD movement (horizontal plane) - using Set for O(1) lookup
+        if (this.keysPressed.has('w') || this.keysPressed.has('W')) {
             movement[0] += this.forward[0] * moveAmount;
             movement[1] += this.forward[1] * moveAmount;
             movement[2] += this.forward[2] * moveAmount;
         }
-        if (hasS) {
+        if (this.keysPressed.has('s') || this.keysPressed.has('S')) {
             movement[0] -= this.forward[0] * moveAmount;
             movement[1] -= this.forward[1] * moveAmount;
             movement[2] -= this.forward[2] * moveAmount;
         }
-        if (hasD) {
+        if (this.keysPressed.has('d') || this.keysPressed.has('D')) {
             movement[0] += this.right[0] * moveAmount;
             movement[1] += this.right[1] * moveAmount;
             movement[2] += this.right[2] * moveAmount;
         }
-        if (hasA) {
+        if (this.keysPressed.has('a') || this.keysPressed.has('A')) {
             movement[0] -= this.right[0] * moveAmount;
             movement[1] -= this.right[1] * moveAmount;
             movement[2] -= this.right[2] * moveAmount;
         }
         // Q/E for vertical movement (world up/down)
-        if (hasE) {
+        if (this.keysPressed.has('e') || this.keysPressed.has('E')) {
             movement[1] += moveAmount;
         }
-        if (hasQ) {
+        if (this.keysPressed.has('q') || this.keysPressed.has('Q')) {
             movement[1] -= moveAmount;
         }
         // Apply movement
-        const oldPos = [...this.position];
         this.position[0] += movement[0];
         this.position[1] += movement[1];
         this.position[2] += movement[2];
-        console.log('[EditorCameraController] Position:', oldPos, '→', this.position, 'movement:', movement);
     }
     /**
      * Get the current view matrix
@@ -177,10 +170,6 @@ export class EditorCameraController {
             this.position[2] + this.forward[2],
         ];
         mat4LookAt(this.viewMatrix, this.position, target, [0, 1, 0]);
-        // Debug: log occasionally
-        if (Math.random() < 0.01) {
-            console.log('[EditorCameraController] getViewMatrix called, position:', this.position, 'forward:', this.forward);
-        }
         return this.viewMatrix;
     }
     /**
@@ -250,11 +239,12 @@ export class EditorCameraController {
         if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
             return;
         }
-        const key = event.key.toLowerCase();
-        // Only capture movement keys
-        if (['w', 'a', 's', 'd', 'q', 'e'].includes(key)) {
-            console.log('[EditorCameraController] Key pressed:', event.key);
-            this.keysPressed.add(event.key);
+        const key = event.key;
+        // Only capture movement keys (store both lowercase and original case for compatibility)
+        const keyLower = key.toLowerCase();
+        if (['w', 'a', 's', 'd', 'q', 'e'].includes(keyLower)) {
+            this.keysPressed.add(key); // Store original key for Shift/Alt detection
+            this.keysPressed.add(keyLower); // Store lowercase for movement detection
             event.preventDefault();
             event.stopPropagation(); // Stop event from reaching KeyboardHandler
         }
@@ -262,9 +252,12 @@ export class EditorCameraController {
     handleKeyUp(event) {
         if (!this.enabled)
             return;
-        const key = event.key.toLowerCase();
-        if (['w', 'a', 's', 'd', 'q', 'e'].includes(key)) {
-            this.keysPressed.delete(event.key);
+        const key = event.key;
+        const keyLower = key.toLowerCase();
+        if (['w', 'a', 's', 'd', 'q', 'e'].includes(keyLower)) {
+            // Remove both original and lowercase versions
+            this.keysPressed.delete(key);
+            this.keysPressed.delete(keyLower);
             event.preventDefault();
             event.stopPropagation();
         }
@@ -300,15 +293,42 @@ export class EditorCameraController {
     handleWheel(event) {
         if (!this.enabled)
             return;
-        // Only adjust speed if Ctrl is held
-        if (!event.ctrlKey)
-            return;
         event.preventDefault();
-        const delta = event.deltaY > 0 ? -0.5 : 0.5;
-        this.moveSpeed = clamp(this.moveSpeed + delta, 0.5, 50);
+        // Ctrl+Wheel: Adjust movement speed
+        if (event.ctrlKey) {
+            const delta = event.deltaY > 0 ? -0.5 : 0.5;
+            this.moveSpeed = clamp(this.moveSpeed + delta, 0.5, 50);
+            return;
+        }
+        // Wheel (without Ctrl): Zoom by moving camera forward/backward
+        // Normalize delta across devices/browsers and apply exponential movement
+        const deltaNormalized = event.deltaMode === 0 /* DOM_DELTA_PIXEL */
+            ? (event.deltaY ?? 0) / 100
+            : (event.deltaY ?? 0);
+        // Move camera along forward direction (zoom effect)
+        // Scale movement based on current distance from origin for intuitive feel
+        const zoomSpeed = 0.1; // units per wheel step
+        const distanceFromOrigin = Math.hypot(this.position[0], this.position[1], this.position[2]);
+        const zoomScale = Math.max(0.1, Math.min(1.0, distanceFromOrigin / 10)); // Scale 0.1-1.0 based on distance
+        const zoomAmount = -deltaNormalized * zoomSpeed * zoomScale;
+        // Move camera along forward direction
+        this.position[0] += this.forward[0] * zoomAmount;
+        this.position[1] += this.forward[1] * zoomAmount;
+        this.position[2] += this.forward[2] * zoomAmount;
     }
     handleBlur() {
         // Clear all input state when window loses focus
+        // This prevents stuck keys when window loses focus while a key is held
+        this.keysPressed.clear();
+        this.isRightMouseDown = false;
+        if (this.canvas) {
+            this.canvas.style.cursor = '';
+        }
+    }
+    handleFocus() {
+        // Clear all input state when window regains focus
+        // This fixes the issue where a key might be stuck if keyup event was missed
+        // during blur/focus transition
         this.keysPressed.clear();
         this.isRightMouseDown = false;
         if (this.canvas) {

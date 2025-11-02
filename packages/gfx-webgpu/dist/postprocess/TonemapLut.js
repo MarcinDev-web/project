@@ -4,6 +4,9 @@ export class TonemapLutPass {
     bindGroupLayout = null;
     sampler = null;
     lutTexture = null;
+    cachedBindGroup = null;
+    cachedSrcView = null;
+    cachedBloomView = null;
     constructor(device) {
         this.device = device;
     }
@@ -108,25 +111,39 @@ struct VSOut { @builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32> };
             });
         }
     }
-    render(encoder, srcView, bloomView, dstView) {
+    render(encoder, srcView, bloomView, dstView, opts) {
         if (!this.pipeline || !this.bindGroupLayout || !this.sampler || !this.lutTexture)
             return;
-        const bindGroup = this.device.createBindGroup({
-            label: 'tonemap-lut-bg',
-            layout: this.bindGroupLayout,
-            entries: [
-                { binding: 0, resource: srcView },
-                { binding: 1, resource: this.sampler },
-                { binding: 2, resource: this.lutTexture.createView({ dimension: '3d' }) },
-                { binding: 3, resource: bloomView },
-            ],
-        });
-        const pass = encoder.beginRenderPass({
+        if (!this.cachedBindGroup || this.cachedSrcView !== srcView || this.cachedBloomView !== bloomView) {
+            this.cachedBindGroup = this.device.createBindGroup({
+                label: 'tonemap-lut-bg',
+                layout: this.bindGroupLayout,
+                entries: [
+                    { binding: 0, resource: srcView },
+                    { binding: 1, resource: this.sampler },
+                    { binding: 2, resource: this.lutTexture.createView({ dimension: '3d' }) },
+                    { binding: 3, resource: bloomView },
+                ],
+            });
+            this.cachedSrcView = srcView;
+            this.cachedBloomView = bloomView;
+        }
+        const passDesc = {
             label: 'tonemap-pass',
             colorAttachments: [{ view: dstView, loadOp: 'clear', storeOp: 'store' }],
-        });
+            ...(opts?.querySet && typeof opts.begin === 'number' && typeof opts.end === 'number'
+                ? {
+                    timestampWrites: {
+                        querySet: opts.querySet,
+                        beginningOfPassWriteIndex: opts.begin,
+                        endOfPassWriteIndex: opts.end,
+                    },
+                }
+                : {}),
+        };
+        const pass = encoder.beginRenderPass(passDesc);
         pass.setPipeline(this.pipeline);
-        pass.setBindGroup(0, bindGroup);
+        pass.setBindGroup(0, this.cachedBindGroup);
         pass.draw(3, 1, 0, 0);
         pass.end();
     }

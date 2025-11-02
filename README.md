@@ -1,39 +1,89 @@
-# UGC 3D Platform
+# FORGE Engine
 
-**Modular WebGPU/TypeScript game engine** for UGC platforms with professional scene editor.
+**Production-grade WebGPU/TypeScript game engine with modular architecture**
 
-> **🤖 For AI Assistants (Claude 4.5 Sonnet, GPT-5):** Start with **[AI_CONTEXT.md](AI_CONTEXT.md)** for comprehensive context, patterns, and conventions. Also see **[CODEBASE_PATTERNS.md](CODEBASE_PATTERNS.md)** for design patterns used throughout the project.
+---
 
 ## 🎯 Overview
 
-A production-grade 3D engine built from the ground up with modern web technologies, featuring a complete modular architecture, comprehensive testing, and a professional editor.
+FORGE Engine is a modern, open-source 3D game engine built from the ground up with WebGPU and TypeScript. It features a complete modular monorepo architecture, comprehensive testing, and a professional 3D scene editor - all running directly in your browser.
 
-## 🏗️ Architecture
+**Key Features:**
+- ⚡ WebGPU-powered rendering with PBR materials and shadows
+- 🏗️ ECS architecture with physics simulation
+- 🎮 Professional 3D scene editor
+- 🧩 Visual scripting with LogicCubes
+- 🌐 Multiplayer networking support
+- 📦 Modular package architecture
 
-This project follows a **modular monorepo architecture** with clear separation between engine packages and applications.
+---
+
+## 🚀 Quick Start
+
+### Prerequisites
+
+- **Node.js** 18+ (with npm)
+- **pnpm** 8+ (`npm install -g pnpm`)
+- **WebGPU-compatible browser** (Chrome/Edge 113+, Firefox Nightly, Safari Technology Preview)
+
+### Installation
+
+```bash
+# Install dependencies
+pnpm install
+
+# Build all packages
+pnpm build
+
+# Run editor in development mode
+pnpm dev
+```
+
+### Development Commands
+
+```bash
+pnpm dev              # Run editor with hot reload
+pnpm test:watch       # Run tests in watch mode (recommended)
+pnpm test:changed     # Run only changed tests (fast)
+pnpm test:coverage    # Generate coverage report
+pnpm lint             # Run linter
+```
+
+---
+
+## 📦 Project Structure
 
 ```
-ugc-3d-platform/
-├── packages/           # Engine modules (@engine/*)
-│   ├── core/          # Foundation (math, ECS, event, job, utils)
-│   ├── world/         # ECS runtime (entities, components, systems)
-│   ├── gfx-webgpu/    # WebGPU renderer
-│   ├── script/        # UGC scripting (LogicCubes)
-│   ├── input/         # Input management
-│   ├── camera/        # Camera systems
-│   ├── stdlib/        # Standard library (animation, audio, character)
-│   ├── editor-utils/  # Editor tools (history, snap) [NEW Oct 2025]
-│   └── test-utils/    # Test utilities (mocks, fixtures, assertions)
+forge-engine/
+├── packages/          # Engine packages (@engine/*)
+│   ├── core/         # Foundation (math, ECS, events)
+│   ├── world/        # ECS runtime, physics
+│   ├── gfx-webgpu/   # WebGPU renderer
+│   ├── script/       # Visual scripting (LogicCubes)
+│   ├── input/        # Input management
+│   ├── camera/       # Camera systems
+│   ├── stdlib/       # Standard library (animation, audio, character)
+│   ├── editor-utils/ # Editor utilities (history, snap)
+│   ├── test-utils/   # Test utilities (mocks, fixtures)
+│   ├── net/          # Networking
+│   ├── avatar/       # Avatar system
+│   ├── voxel/        # Voxel system
+│   └── ...
 ├── apps/              # Applications
-│   ├── editor/        # Professional 3D scene editor
-│   └── playground/    # Demo/sandbox (future)
+│   ├── editor/        # 3D scene editor
+│   ├── platform/      # Platform UI
+│   ├── player/        # Player client
+│   ├── net-server/    # Network server
+│   └── collab-server/ # Collaboration server
 └── docs/              # Documentation
 ```
 
-## 📦 Engine Packages
+---
+
+## 📚 Core Packages
 
 ### @engine/core
-**Foundation layer** - Core utilities, math, ECS types, event system, job scheduler
+**Foundation layer** - Core utilities, math, ECS types, event system
 - High-performance 3D math (Vec3, Mat4, Quat, AABB, Ray)
 - ECS base types and interfaces
 - Event bus for pub/sub messaging
@@ -54,376 +104,175 @@ ugc-3d-platform/
 - Post-processing effects (bloom, tone mapping)
 - Texture atlas system (100x bind call reduction)
 
-### @engine/test-utils
-**Test utilities** - Reusable testing tools
-- Mock implementations (Canvas, WebGPU, etc.)
-- Entity fixtures for tests
-- Custom assertions (Vec3, AABB, etc.)
-- Async test helpers (waitFor, etc.)
-- Snapshot testing utilities
-
 ### @engine/script
-**UGC scripting** - Visual scripting with LogicCubes
-- LogicCube system (triggers, actions, conditions, data, gates)
-- Behavior system
-- Coroutine scheduler
-- Logic connections and variable storage
-
-### @engine/input
-**Input management** - Keyboard, mouse, gamepad
-- Input context system
-- Character input handling
-- Configurable bindings
-
-### @engine/camera
-**Camera systems** - Orbit, FPS, and director
-- Orbit camera for editor
-- FPS camera for play mode
-- Camera director for mode switching
-
-### @engine/stdlib
-**Standard library** - Common gameplay systems
-- Animation system with state machines
-- Audio system
-- Character controller
-- Player session management
-
-### @engine/editor-utils
-**Editor utilities** - Reusable tools for building editors (NEW - Oct 2025)
-- History manager (undo/redo system)
-- Snap system (grid snapping)
-- Entity path helpers
-
-## 🎨 Applications
-
-### Editor (@apps/editor)
-Professional 3D scene editor with:
-- ✨ Modern glassmorphic UI with smooth animations
-- 🏗️ Block placement system (Minecraft-style)
-- 🎯 Snap-to-grid with visual 3D grid
-- 🎮 Play mode with FPS controls
-- 📝 Undo/redo history
-- 🔧 Logic cubes visual scripting
-- 🎬 Animation editor
-- 💡 Lighting and environment settings
-- 📦 Asset browser and management
-
-## 🚀 Getting Started
-
-### Prerequisites
-
-- **Node.js** 18+ (with npm)
-- **pnpm** 8+ (install with `npm install -g pnpm`)
-- **WebGPU-compatible browser**:
-  - Chrome/Edge 113+
-  - Firefox Nightly with WebGPU enabled
-  - Safari Technology Preview
-
-### Installation
-
-```bash
-# Install dependencies
-pnpm install
-
-# Build all packages
-pnpm build
-```
-
-### Development
-
-```bash
-# Run editor in dev mode (with hot reload)
-pnpm dev
-
-# Or explicitly
-pnpm dev:editor
-
-# Build editor for production
-pnpm build:editor
-
-# Run all tests
-pnpm test
-
-# Run linter
-pnpm lint
-```
-
-### Working with Packages
-
-```bash
-# Build a specific package
-cd packages/core
-pnpm build
-
-# Run tests for a specific package
-cd packages/world
-pnpm test
-
-# Watch mode for development
-cd packages/gfx-webgpu
-pnpm dev
-```
-
-## 🧪 Testing
-
-The project has comprehensive test automation with CI/CD, pre-commit hooks, coverage tracking, and reusable test utilities.
-
-### Quick Start
-
-```bash
-# Setup test environment (first time)
-.\scripts\setup-tests.ps1  # Windows
-# or
-pnpm install && pnpm prepare  # Linux/Mac
-
-# Watch mode (recommended for development)
-pnpm test:watch
-
-# Run only changed tests (fast!)
-pnpm test:changed
-
-# Full coverage report
-pnpm test:coverage
-open coverage/index.html
-```
-
-### Test Automation Features
-
-✅ **CI/CD Pipeline** - GitHub Actions with test sharding (4 parallel jobs)  
-✅ **Pre-commit Hooks** - Automatic linting & testing before commit  
-✅ **Coverage Tracking** - Codecov integration with PR comments (60% threshold)  
-✅ **Test Utilities** - Reusable mocks, fixtures, assertions (`@engine/test-utils`)  
-✅ **Snapshot Testing** - Serialization stability verification  
-✅ **VSCode Integration** - Debug configs, tasks, test explorer  
-
-### Available Commands
-
-```bash
-# Development
-pnpm test:watch         # Watch mode with instant feedback (1-3s)
-pnpm test:changed       # Only changed files (2-5s)
-pnpm test:unit:fast     # Quick run without coverage (~8s)
-pnpm test:ui            # Visual test runner
-
-# Coverage
-pnpm test:coverage      # Full coverage report
-pnpm test:unit:coverage # Unit tests only
-
-# CI/Debugging
-pnpm test:ci            # Optimized for CI
-pnpm test:affected      # Bail on first failure
-pnpm test              # All tests (unit + integration)
-```
-
-### Using Test Utilities
-
-```typescript
-import { 
-  createMockCanvas,
-  entityFixtures,
-  expectVec3ToBeCloseTo,
-  waitFor 
-} from '@engine/test-utils';
-
-test('example', async () => {
-  const canvas = createMockCanvas(800, 600);
-  const entity = entityFixtures.withTransform();
-  
-  await waitFor(() => entity.isReady, 5000);
-  expectVec3ToBeCloseTo(entity.position, [1, 2, 3]);
-});
-```
-
-### Documentation
-
-- **Quick Start**: [QUICK_START_TESTING.md](QUICK_START_TESTING.md)
-- **Full Guide**: [docs/TESTING_AUTOMATION.md](docs/TESTING_AUTOMATION.md)
-- **Commands Cheatsheet**: [TEST_COMMANDS_CHEATSHEET.md](TEST_COMMANDS_CHEATSHEET.md)
-- **Test Utils API**: [packages/test-utils/README.md](packages/test-utils/README.md)
-- **Philosophy**: [docs/TESTING.md](docs/TESTING.md)
-
-## 📦 Package Organization
-
-**Monorepo Structure:**
-- **packages/** (@engine/*) - Shared, reusable code
-- **apps/** - Applications (editor, playground)
-
-**Key Rules:**
-- ✅ Reusable logic → `packages/`
-- ✅ App UI/UX → `apps/`
-- ✅ Always import: `@engine/package-name`
-- ❌ Never duplicate package code in apps
-
-**See:** [PACKAGE_GUIDELINES.md](docs/PACKAGE_GUIDELINES.md) for decision tree and examples.
-
-**Recent:** Oct 2025 refactoring eliminated 6 major duplicates (-1823 lines), created `@engine/editor-utils` package, and achieved 100% import consistency.
-
-## 📖 Documentation
-
-### 🤖 For AI Assistants
-
-📖 **[AI_FILES_INDEX.md](AI_FILES_INDEX.md)** - **Which file should I read? Start here!**
-
-- **[AI_CONTEXT.md](AI_CONTEXT.md)** - **START HERE** - Comprehensive guide for AI coding assistants (Claude, GPT)
-- **[CODEBASE_PATTERNS.md](CODEBASE_PATTERNS.md)** - Design patterns, idioms, and conventions
-- **[AI_PROMPTS.md](AI_PROMPTS.md)** - Example prompts and workflows for AI-assisted development
-- **[QUICK_START_AI.md](QUICK_START_AI.md)** - ⚡ 2-minute quick reference
-- **[.cursorrules](.cursorrules)** - Cursor IDE rules (auto-loaded)
-- **[AI_DOCUMENTATION_CHANGELOG.md](AI_DOCUMENTATION_CHANGELOG.md)** - Documentation changes and improvements
-
-### For Developers
-
-Detailed documentation available in the `docs/` directory:
-
-- [**docs/guidelines/TEAM_ONBOARDING.md**](docs/guidelines/TEAM_ONBOARDING.md) - **New developers start here**
-- [**docs/guidelines/PACKAGE_GUIDELINES.md**](docs/guidelines/PACKAGE_GUIDELINES.md) - **Where code belongs (Must Read)**
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture
-- [docs/guidelines/CODE_REVIEW_CHECKLIST.md](docs/guidelines/CODE_REVIEW_CHECKLIST.md) - PR review checklist
-- [docs/TESTING.md](docs/TESTING.md) - Testing philosophy and guidelines
-- [docs/PERFORMANCE.md](docs/PERFORMANCE.md) - Performance guidelines
-- [docs/refactoring/REFACTORING_COMPLETE.md](docs/refactoring/REFACTORING_COMPLETE.md) - Recent refactoring (Oct 2025)
-- [TEST_COMMANDS_CHEATSHEET.md](TEST_COMMANDS_CHEATSHEET.md) - Testing commands reference
-
-## Quick Start
-
-```bash
-# Install dependencies
-pnpm install
-
-# Setup test environment (first time)
-.\scripts\setup-tests.ps1  # Windows
-# or
-pnpm install && pnpm prepare  # Linux/Mac
-
-# Development
-pnpm dev
-
-# Testing
-pnpm test:watch  # Watch mode (recommended)
-pnpm test:changed  # Only changed files
-pnpm test:coverage  # With coverage report
-```
-
-## Testing
-
-**Quick Start**: [QUICK_START_TESTING.md](QUICK_START_TESTING.md)
-
-**Full Guide**: [docs/TESTING_AUTOMATION.md](docs/TESTING_AUTOMATION.md)
-
-**Commands**: [TEST_COMMANDS_CHEATSHEET.md](TEST_COMMANDS_CHEATSHEET.md)
-
-### Test Automation Features
-
-✅ **CI/CD Pipeline** - GitHub Actions with test sharding  
-✅ **Pre-commit Hooks** - Automatic linting & testing  
-✅ **Coverage Tracking** - Codecov integration with PR comments  
-✅ **Test Utilities** - Reusable mocks, fixtures, assertions (@engine/test-utils)  
-✅ **Snapshot Testing** - Serialization stability  
-✅ **VSCode Integration** - Debug configs, tasks, test explorer  
-
-## Documentation
-
-- [Testing Automation](docs/TESTING_AUTOMATION.md) - Full testing guide
-- [Architecture](docs/ARCHITECTURE.md) - System architecture
-- [Testing Philosophy](docs/TESTING.md) - Testing principles
-- [Quick Fix Guide](docs/QUICK_FIX_GUIDE.md) - Common issues
-
-## Development
-
-```bash
-# Watch mode with live test feedback
-pnpm test:watch  # Terminal 1
-pnpm dev         # Terminal 2
-
-# Before commit (automatic via pre-commit hook)
-pnpm test:changed
-
-# Coverage report
-pnpm test:coverage
-open coverage/index.html
-```
-
-## CI/CD
-
-- **Automatic testing** on every PR/push
-- **Test sharding** (4 parallel jobs) for faster CI
-- **Coverage reports** with PR comments
-- **Build artifacts** preserved for 7 days
-
-See [TEST_AUTOMATION_IMPROVEMENTS.md](TEST_AUTOMATION_IMPROVEMENTS.md) for details.
-
-README.md) - **Critical: Code duplication issues**
-
-## 🎯 Key Features
-
-### WebGPU Rendering
-- Modern GPU API with high performance
-- PBR materials and lighting
-- Shadow mapping and post-processing
-- Texture atlas optimization
-
-### ECS Architecture
-- Clean entity-component-system design
-- Efficient spatial queries
-- Physics integration
-- Serialization support
-
-### Visual Scripting
-- LogicCubes drag-and-drop system
+**Visual scripting** - LogicCubes drag-and-drop system
 - 40+ built-in cube types
 - Triggers, actions, conditions, and logic gates
 - Runtime execution with coroutines
 
-### Professional Editor
-- Modern UI with glassmorphism design
-- Block placement with snap-to-grid
-- Full play mode with character controller
-- History system (undo/redo)
-- Asset management
+### @engine/net
+**Multiplayer networking** - Real-time synchronization
+- WebSocket-based networking
+- Entity synchronization
+- Zone and session management
+
+---
+
+## 🧪 Testing
+
+The project includes comprehensive test automation:
+
+```bash
+# Watch mode (recommended)
+pnpm test:watch
+
+# Run only changed files
+pnpm test:changed
+
+# Full coverage report
+pnpm test:coverage
+
+# Quick unit tests
+pnpm test:unit:fast
+```
+
+**Features:**
+- ✅ CI/CD pipeline with GitHub Actions
+- ✅ Pre-commit hooks for linting & testing
+- ✅ Coverage tracking (60%+ threshold)
+- ✅ Reusable test utilities (`@engine/test-utils`)
+- ✅ Snapshot testing
+
+**Documentation:**
+- [TEST_COMMANDS_CHEATSHEET.md](TEST_COMMANDS_CHEATSHEET.md) - Command reference
+- [docs/TESTING.md](docs/TESTING.md) - Testing philosophy
+- [docs/TESTING_AUTOMATION.md](docs/TESTING_AUTOMATION.md) - Full guide
+
+---
+
+## 📖 Documentation
+
+### For AI Assistants
+
+📖 **[AI_FILES_INDEX.md](AI_FILES_INDEX.md)** - Start here to find the right documentation
+
+- **[AI_CONTEXT.md](AI_CONTEXT.md)** - Complete project context (15 min read)
+- **[CODEBASE_PATTERNS.md](CODEBASE_PATTERNS.md)** - Design patterns and conventions
+- **[QUICK_START_AI.md](QUICK_START_AI.md)** - Quick reference (2 min read)
+- **[.cursorrules](.cursorrules)** - Cursor IDE rules (auto-loaded)
+
+### For Developers
+
+- **[docs/guidelines/TEAM_ONBOARDING.md](docs/guidelines/TEAM_ONBOARDING.md)** - New developers start here
+- **[docs/guidelines/PACKAGE_GUIDELINES.md](docs/guidelines/PACKAGE_GUIDELINES.md)** - Where code belongs
+- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System architecture
+- **[docs/TESTING.md](docs/TESTING.md)** - Testing philosophy
+- **[docs/PERFORMANCE.md](docs/PERFORMANCE.md)** - Performance guidelines
+
+---
 
 ## 🛠️ Technology Stack
 
 - **WebGPU** - Modern GPU API
-- **TypeScript** - Type-safe development
-- **pnpm** - Fast, efficient package manager
-- **Vite** - Next-generation build tool
-- **Vitest** - Fast unit testing
-- **gl-matrix** - High-performance 3D math
+- **TypeScript** 5.9 (strict mode)
+- **pnpm** - Fast package manager
+- **Vite** - Build tool
+- **Vitest** - Unit testing
+- **gl-matrix** - 3D math library
 - **@gltf-transform** - GLTF processing
 
-## 🔮 Roadmap
+---
 
-- [ ] **@engine/voxel** - Voxel/microblock system
-- [ ] **@engine/net** - Multiplayer networking
-- [ ] **apps/playground** - Demo application
-- [ ] Advanced terrain system
-- [ ] Procedural generation tools
-- [ ] Mobile support
+## 📋 Development Guidelines
+
+### Import Policy
+
+```typescript
+// ✅ ALWAYS use @engine/* aliases
+import { Vec3 } from '@engine/core';
+import { Scene } from '@engine/world';
+
+// ❌ NEVER use relative paths for packages
+import { Vec3 } from '../../../packages/core/src/...';
+```
+
+### Code Style
+
+- **TypeScript strict mode** - No `any` without justification comment
+- **Functional patterns** - Prefer composition over inheritance
+- **async/await** over raw Promises
+- **Small functions** (<50 lines ideally)
+- **Performance-first** - Question every allocation in hot paths
+
+### Package Boundaries
+
+- ✅ Reusable logic → `packages/`
+- ✅ App UI/UX → `apps/`
+- ✅ Lower-level → Higher-level (core → world → gfx-webgpu)
+- ❌ No circular dependencies
+- ❌ No package code duplication in apps
+
+See **[docs/guidelines/PACKAGE_GUIDELINES.md](docs/guidelines/PACKAGE_GUIDELINES.md)** for decision tree.
+
+---
+
+## 🔧 Building WASM
+
+The project uses Rust-compiled WebAssembly for high-performance collision detection.
+
+### Prerequisites
+
+1. **Install Rust**: [rustup.rs](https://rustup.rs/)
+2. **Install wasm-pack**: [wasm-pack installer](https://rustwasm.github.io/wasm-pack/installer/)
+3. **Add wasm32 target**: `rustup target add wasm32-unknown-unknown`
+
+### Building
+
+```bash
+# Build WASM from root
+pnpm build:wasm
+
+# Or build from package
+cd packages/wasm-collision
+pnpm build:wasm && pnpm build:ts
+```
+
+**Note:** Pre-built WASM is included in `packages/wasm-collision/pkg/` so development can continue without Rust if needed.
+
+---
 
 ## 🤝 Contributing
 
 This project follows professional development practices:
 
-1. **Code in English**, comments in Polish (or English)
+1. **Code in English**, comments in Polish or English
 2. **Test behavior**, not implementation
 3. **Performance mindset** - question every allocation
 4. **TypeScript strict mode** - no `any` without justification
-5. **Functional components** and modern patterns
+5. **Always cleanup** - dispose() methods, remove listeners
+
+**Want to contribute?**
+- 🐛 Report bugs or suggest features
+- 💻 Submit pull requests
+- 📖 Improve documentation
+- 🎨 Design assets and UI improvements
+
+---
 
 ## 📝 License
 
 ISC
 
-## 🎓 Learning Resources
+---
 
-Check the `examples/` directory for sample projects and tutorials demonstrating:
-- Basic engine usage
-- LogicCubes scripting
-- Custom component creation
-- Renderer integration
+## 🔥 Why FORGE Engine?
+
+- **⚡ Forged for performance** - WebGPU-powered, browser-native
+- **🏗️ Built to scale** - From prototypes to production-ready games
+- **🌐 No barriers** - Create anywhere, share instantly, play everywhere
+- **👥 Community-driven** - Open-source, built by creators for creators
 
 ---
 
 **Built with ❤️ using modern web technologies**
 
-*Migration to modular architecture completed: Phases 0-8 ✅*

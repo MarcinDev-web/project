@@ -26,7 +26,7 @@ export class AnimationComponent extends Component {
   stateMachine = new AnimationStateMachine();
   private activeStateName: string | null = null;
 
-  override onAttach(): void {
+  onAttach(): void {
     super.onAttach();
     if (this.clips.size === 0) {
       return;

@@ -5,23 +5,22 @@
  * preventing conflicts when assets are selected from multiple sources.
  */
 
-import type { Asset, AssetVariant, AssetPreset } from '../types/BlockAssetTypes';
+import type { Asset, AssetPreset } from '../types/BlockAssetTypes';
 import type { PlacementMode } from '../placement/PlacementMode';
 import { Logger } from '../../utils/logger';
 
 export interface PlacementCoordinatorConfig {
   placementMode: PlacementMode;
-  onPlacementStart?: (asset: Asset, variant?: AssetVariant, source?: 'hotbar' | 'catalog') => void;
+  onPlacementStart?: (asset: Asset, source?: 'hotbar' | 'build-menu') => void;
   onPlacementEnd?: (confirmed: boolean) => void;
   onStatusUpdate?: (message: string) => void;
 }
 
-export type PlacementSource = 'hotbar' | 'catalog';
+export type PlacementSource = 'hotbar' | 'build-menu';
 
 export class PlacementCoordinator {
   private config: PlacementCoordinatorConfig;
   private currentAsset: Asset | null = null;
-  private currentVariant: AssetVariant | null = null;
   private currentSource: PlacementSource | null = null;
 
   constructor(config: PlacementCoordinatorConfig) {
@@ -31,32 +30,31 @@ export class PlacementCoordinator {
   /**
    * Starts placement of an asset from a specific source
    */
-  startPlacement(asset: Asset, variant?: AssetVariant, source: PlacementSource = 'catalog'): void {
+  startPlacement(asset: Asset, source: PlacementSource = 'build-menu'): void {
     // Cancel any existing placement first
     if (this.isPlacementActive()) {
       this.cancelPlacement();
     }
 
     this.currentAsset = asset;
-    this.currentVariant = variant || null;
     this.currentSource = source;
 
     // Convert Asset to AssetPreset for PlacementMode
-    const preset = this.assetToPreset(asset, variant);
+    const preset = this.assetToPreset(asset);
 
     // Start placement mode
     this.config.placementMode.startPlacement(preset);
 
     // Notify listeners
-    this.config.onPlacementStart?.(asset, variant, source);
+    this.config.onPlacementStart?.(asset, source);
 
     // Update status
-    const sourceName = source === 'hotbar' ? 'Hotbar' : 'Catalog';
+    const sourceName = source === 'hotbar' ? 'Hotbar' : 'Build Menu';
     this.config.onStatusUpdate?.(
-      `Placing ${asset.metadata.name} from ${sourceName} (Q/E rotate, Enter confirm, Esc cancel)`
+      `Placing ${asset.name} from ${sourceName} (Q/E rotate, Enter confirm, Esc cancel)`
     );
 
-    Logger.debug(`PlacementCoordinator: Started placement from ${source}`, asset.metadata.name);
+    Logger.debug(`PlacementCoordinator: Started placement from ${source}`, asset.name);
   }
 
   /**
@@ -82,7 +80,6 @@ export class PlacementCoordinator {
     // Clear current asset if successful
     if (success) {
       this.currentAsset = null;
-      this.currentVariant = null;
       this.currentSource = null;
     }
 
@@ -104,19 +101,18 @@ export class PlacementCoordinator {
     this.config.onStatusUpdate?.('Placement cancelled');
 
     this.currentAsset = null;
-    this.currentVariant = null;
     this.currentSource = null;
   }
 
   /**
    * Rotates the current placement preview
    */
-  rotatePreview(direction: 1 | -1): void {
+  async rotatePreview(direction: 1 | -1): Promise<void> {
     if (!this.isPlacementActive()) {
       return;
     }
 
-    this.config.placementMode.rotatePreview(direction);
+    await this.config.placementMode.rotatePreview(direction);
     Logger.debug(`PlacementCoordinator: Rotated ${direction > 0 ? 'clockwise' : 'counter-clockwise'}`);
   }
 
@@ -135,13 +131,6 @@ export class PlacementCoordinator {
   }
 
   /**
-   * Gets the current variant being placed
-   */
-  getCurrentVariant(): AssetVariant | null {
-    return this.currentVariant;
-  }
-
-  /**
    * Gets the source of the current placement
    */
   getCurrentSource(): PlacementSource | null {
@@ -149,24 +138,18 @@ export class PlacementCoordinator {
   }
 
   /**
-   * Converts an Asset (with optional variant) to AssetPreset for placement
+   * Converts an Asset to AssetPreset for placement
    */
-  private assetToPreset(asset: Asset, variant?: AssetVariant): AssetPreset {
-    const finalColor = variant?.color || asset.color;
-    const finalScale = variant?.scale || asset.scale;
+  private assetToPreset(asset: Asset): AssetPreset {
+    // Default scale for blocks is 1x1x1
+    const finalScale: [number, number, number] = [1, 1, 1];
 
     const preset: AssetPreset = {
-      name: variant ? `${asset.metadata.name} (${variant.name})` : asset.metadata.name,
-      description: asset.metadata.description || '',
-      category: asset.category as AssetPreset['category'],
+      name: asset.name,
       scale: finalScale,
-      color: finalColor,
+      color: asset.color,
+      ...(asset.blockData?.id && { blockId: asset.blockData.id }),
     };
-
-    // Add blockId if this is a block asset
-    if (asset.blockData?.id) {
-      preset.blockId = asset.blockData.id;
-    }
 
     return preset;
   }

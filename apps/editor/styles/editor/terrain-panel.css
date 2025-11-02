@@ -1,0 +1,66 @@
+/**
+ * Terrain Panel Styles
+ */
+
+.terrain-panel {
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  background: var(--color-bg-secondary);
+}
+
+.terrain-panel-content {
+  flex: 1;
+  overflow-y: auto;
+  padding: var(--spacing-md);
+}
+
+.terrain-panel .panel-section {
+  margin-bottom: var(--spacing-lg);
+}
+
+.terrain-panel .panel-section-title {
+  font-size: var(--font-size-sm);
+  font-weight: 600;
+  margin-bottom: var(--spacing-md);
+  color: var(--color-text-primary);
+}
+
+.terrain-panel .panel-input-group {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-xs);
+  margin-bottom: var(--spacing-md);
+}
+
+.terrain-panel .panel-label-small {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+}
+
+.terrain-panel .panel-button {
+  width: 100%;
+  margin-bottom: var(--spacing-sm);
+}
+
+.terrain-panel .panel-button-primary {
+  background: var(--color-primary);
+  color: var(--color-text-on-primary);
+}
+
+.terrain-panel .panel-button-secondary {
+  background: var(--color-bg-tertiary);
+  color: var(--color-text-primary);
+}
+
+.terrain-panel .panel-slider {
+  width: 100%;
+}
+
+.terrain-panel .panel-value {
+  font-size: var(--font-size-xs);
+  color: var(--color-text-secondary);
+  min-width: 3ch;
+  text-align: right;
+}
+

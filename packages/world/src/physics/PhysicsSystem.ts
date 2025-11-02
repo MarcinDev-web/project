@@ -9,12 +9,12 @@ import { PhysicsComponent, RigidbodyType } from '../components/PhysicsComponent'
 import { JointComponent } from '../components/JointComponent';
 import type { Vec3 } from '@engine/core/math';
 import { CollisionDetection, type ColliderTransform } from './CollisionDetection';
-import { quatMultiply, quatFromAxisAngle, quatNormalize } from '@engine/core/math';
+import { quatMultiplyOut, quatFromAxisAngleOut, quatNormalizeOut } from '@engine/core/math';
 import { ObjectPool } from '@engine/core/utils';
 import { Octree, type OctreeConfig, DEFAULT_OCTREE_CONFIG } from './Octree';
 import { BoundingVolume } from './BoundingVolume';
 import type { Joint } from './Joint';
-// import { ScriptComponent } from '../components/ScriptComponent'; // TODO: Uncomment in Phase 4
+import { ScriptComponent } from '@engine/script';
 
 /**
  * Collision event data
@@ -245,22 +245,24 @@ export class PhysicsSystem {
     this.runScriptFixedUpdate(dt);
   }
 
-  // TODO: Uncomment in Phase 4 when @engine/script exists
-  private runScriptFixedUpdate(_dt: number): void {
-    // const scriptEntities = this.scene.queryEntities(ScriptComponent);
-    // for (const entity of scriptEntities) {
-    //   const scriptComp = entity.getComponent(ScriptComponent);
-    //   if (!scriptComp) continue;
-    //   const instances = scriptComp.getInstances();
-    //   for (const behavior of instances) {
-    //     if (!behavior.enabled) continue;
-    //     try {
-    //       behavior.onFixedUpdate(dt);
-    //     } catch {
-    //       // ignore behavior errors to keep physics running
-    //     }
-    //   }
-    // }
+  private runScriptFixedUpdate(dt: number): void {
+    // Query entities with ScriptComponent - use getAllEntities and filter
+    // because ScriptComponent from @engine/script may not match ComponentClass type exactly
+    const allEntities = this.scene.getAllEntities();
+    for (const entity of allEntities) {
+      const scriptComp = entity.getComponent(ScriptComponent as any);
+      if (!scriptComp) continue;
+      // TypeScript doesn't know getInstances() exists on Component, but it does on ScriptComponent
+      const instances = (scriptComp as any).getInstances();
+      for (const behavior of instances) {
+        if (!behavior.enabled) continue;
+        try {
+          behavior.onFixedUpdate(dt);
+        } catch {
+          // ignore behavior errors to keep physics running
+        }
+      }
+    }
   }
 
   /**
@@ -441,22 +443,6 @@ export class PhysicsSystem {
     return this.collisionsScratch;
   }
 
-  /**
-   * Broad phase using octree spatial partitioning
-   */
-  private getBroadPhasePairsOctree(): Array<[Entity, Entity]> {
-    if (!this.octree) return [];
-    return this.octree.queryPairs();
-  }
-
-  /**
-   * Broad phase using brute force O(n²) check (fallback)
-   */
-  private getBroadPhasePairsBruteForce(entities: Entity[]): Array<[Entity, Entity]> {
-    const out: Array<[Entity, Entity]> = [];
-    this.getBroadPhasePairsBruteForceInto(entities, out);
-    return out;
-  }
 
   private getBroadPhasePairsBruteForceInto(
     entities: Entity[],

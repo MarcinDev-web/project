@@ -173,6 +173,9 @@ export class LogicPanel {
       select.appendChild(group);
     }
 
+    // Set the select value to match component's cube type
+    select.value = component.getCubeType();
+
     select.addEventListener('change', () => {
       component.setCubeType(select.value);
       component.setConfig({}); // Reset config

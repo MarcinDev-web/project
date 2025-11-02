@@ -1,4 +1,5 @@
 import type { GeometryData } from '../resources/resources';
+import { MaterialComponent } from '@engine/world';
 import type { Mat4, Vec3 } from '@engine/core/math';
 import { computeCascades } from './ShadowCascades';
 import { TIMESTAMP_INDICES } from '../config';
@@ -125,9 +126,10 @@ fn quat_rotate(q : vec4<f32>, v : vec3<f32>) -> vec3<f32> {
 @vertex
 fn vs_main(
   @location(0) position : vec3<f32>,
-  @location(1) instanceOffset : vec3<f32>,
-  @location(4) instanceColorScale : vec4<f32>,
-  @location(5) instanceRotation : vec4<f32>
+  @location(4) instanceOffset : vec3<f32>,
+  @location(5) instanceColorScale : vec4<f32>,
+  @location(9) instanceRotation : vec4<f32>,
+  @location(10) instanceMaterialId : f32
 ) -> VSOut {
   var o: VSOut;
   let scale = instanceColorScale.w;
@@ -147,10 +149,10 @@ fn vs_main(
       // Vertex buffer layouts must match main geometry buffers
       const vertexBuffers: GPUVertexBufferLayout[] = [
         { arrayStride: 24, stepMode: 'vertex', attributes: [{ shaderLocation: 0, offset: 0, format: 'float32x3' }] },
-        { arrayStride: 12, stepMode: 'instance', attributes: [{ shaderLocation: 1, offset: 0, format: 'float32x3' }] },
-        { arrayStride: 16, stepMode: 'instance', attributes: [{ shaderLocation: 4, offset: 0, format: 'float32x4' }] },
+        { arrayStride: 12, stepMode: 'instance', attributes: [{ shaderLocation: 4, offset: 0, format: 'float32x3' }] },
         { arrayStride: 16, stepMode: 'instance', attributes: [{ shaderLocation: 5, offset: 0, format: 'float32x4' }] },
-        { arrayStride: 4, stepMode: 'instance', attributes: [{ shaderLocation: 6, offset: 0, format: 'float32' }] },
+        { arrayStride: 16, stepMode: 'instance', attributes: [{ shaderLocation: 9, offset: 0, format: 'float32x4' }] },
+        { arrayStride: 4, stepMode: 'instance', attributes: [{ shaderLocation: 10, offset: 0, format: 'float32' }] },
       ];
 
       this.pipeline = this.device.createRenderPipeline({
@@ -225,6 +227,7 @@ fn vs_main(
     const offsets = geometry.instanceOffsetData;
     const colorScale = geometry.instanceColorScaleData;
     const rotation = geometry.instanceRotationData;
+    const materialParams = geometry.instanceMaterialParamsData;
     // Material IDs may be missing in older payloads; default to 0
     const materialIds = (geometry as any).instanceMaterialIdData as Float32Array | undefined;
     const matIds = materialIds && materialIds.length === geometry.instanceCount ? materialIds : null;
@@ -244,6 +247,10 @@ fn vs_main(
     const nz = this.rowNorm(lightVP as Float32Array, 2);
 
     for (let i = 0; i < n; i++) {
+      const flags = materialParams ? materialParams[i * 4 + 3] ?? 0 : 0;
+      if (((flags | 0) & MaterialComponent.FLAG_TRANSPARENT) != 0) {
+        continue;
+      }
       const ox = offsets[i * 3 + 0]!;
       const oy = offsets[i * 3 + 1]!;
       const oz = offsets[i * 3 + 2]!;

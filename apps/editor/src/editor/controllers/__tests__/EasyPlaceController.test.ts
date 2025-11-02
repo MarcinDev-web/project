@@ -52,7 +52,7 @@ describe('EasyPlaceController', () => {
     };
 
     const mockCollisionDetector = {
-      checkCollisionOBB: vi.fn().mockReturnValue({ hasCollision: false, collidingEntities: [] }),
+      checkCollisionOBB: vi.fn().mockResolvedValue({ hasCollision: false, collidingEntities: [] }),
     };
 
     mockConfig = {

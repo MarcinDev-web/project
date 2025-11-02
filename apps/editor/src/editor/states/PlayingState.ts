@@ -12,10 +12,10 @@ export interface PlayingStateDeps {
   updateFPSCamera: () => void;
   /** Camera director */
   cameraDirector: CameraDirector;
-  /** Re-enable orbit controls */
-  enableOrbitControls: () => void;
-  /** Restore orbit state */
-  restoreOrbitState: () => void;
+  /** Re-enable editor free-fly camera */
+  enableEditorCamera: () => void;
+  /** Restore editor camera state */
+  restoreEditorCameraState: () => void;
   /** Update character input with camera directions */
   updateCharacterInput: (forward: [number, number, number], right: [number, number, number]) => void;
   /** Get FPS camera forward direction */
@@ -28,6 +28,12 @@ export interface PlayingStateDeps {
   updateScripts?: (deltaTime: number) => void;
   /** Update audio */
   updateAudio?: (deltaTime: number) => void;
+  /** Update multiplayer gameplay systems */
+  updateMultiplayer?: (deltaTime: number) => void;
+  /** Process input for multiplayer replication */
+  processMultiplayerInput?: (input: any) => void;
+  /** Update checkpoint system */
+  updateCheckpoints?: (playerPosition: [number, number, number]) => boolean;
 }
 
 /**
@@ -60,8 +66,8 @@ export class PlayingState implements IPlayModeState {
 
   onExit(_context: PlayModeContext): void {
     Logger.debug('Exiting PLAYING state');
-    this.deps.enableOrbitControls();
-    this.deps.restoreOrbitState();
+    this.deps.enableEditorCamera();
+    this.deps.restoreEditorCameraState();
     this.deps.resumeHistory();
   }
 
@@ -70,7 +76,13 @@ export class PlayingState implements IPlayModeState {
       // Update player position for camera
       const player = context.data.get('playerEntity') as Entity | undefined;
       if (player) {
-        this.deps.cameraDirector.setPlayerPosition(player.transform.position);
+        const forward = player.transform.getForward();
+        this.deps.cameraDirector.setPlayerPose(player.transform.position, forward);
+        
+        // Update checkpoint system
+        if (this.deps.updateCheckpoints) {
+          this.deps.updateCheckpoints(player.transform.position);
+        }
       }
       
       // Update FPS camera
@@ -86,6 +98,9 @@ export class PlayingState implements IPlayModeState {
       
       // Update audio (if available)
       this.deps.updateAudio?.(deltaTime);
+      
+      // Update multiplayer gameplay (if available)
+      this.deps.updateMultiplayer?.(deltaTime);
       
       // Check for pause request
       if (this.requestPause) {

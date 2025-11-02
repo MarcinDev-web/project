@@ -1,0 +1,38 @@
+{
+  "compilerOptions": {
+    "outDir": "./dist",
+    "module": "ESNext",
+    "target": "ES2022",
+    "lib": ["ES2022"],
+    "types": ["node"],
+    "baseUrl": ".",
+    "skipLibCheck": true,
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
+    "forceConsistentCasingInFileNames": true,
+    "isolatedModules": true,
+    "verbatimModuleSyntax": true,
+    "moduleResolution": "bundler",
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
+    "sourceMap": true,
+    "declaration": true,
+    "declarationMap": true,
+    "paths": {
+      "@engine/world": ["../../packages/world/src"],
+      "@engine/world/*": ["../../packages/world/src/*"],
+      "@engine/economy": ["../../packages/economy/dist"],
+      "@engine/economy/*": ["../../packages/economy/dist/*"],
+      "@engine/script": ["../../packages/script/dist"],
+      "@engine/script/*": ["../../packages/script/dist/*"],
+      "@shared/*": ["../../shared/*"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "__tests__"]
+}
+

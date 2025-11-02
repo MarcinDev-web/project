@@ -1,3 +1,6 @@
+/**
+ * @vitest-environment jsdom
+ */
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { EditorPlacementController } from '../EditorPlacementController';
 import { Scene } from '@engine/world';
@@ -105,6 +108,134 @@ describe('EditorPlacementController', () => {
     expect(state.selection.value).toEqual([placedEntity]);
 
     dispose();
+  });
+
+  describe('camera modes', () => {
+    it('should handle CameraDirector matrices correctly', () => {
+      const mockDirector = {
+        getViewMatrix: () => new Float32Array(16),
+        getProjectionMatrix: () => new Float32Array(16),
+      };
+
+      const controller = new EditorPlacementController({
+        canvas,
+        controls,
+        cameraDirector: mockDirector as any,
+        scene,
+        selection,
+        state,
+        placementMode: placementModeMock as unknown as PlacementMode,
+        updateSceneBuffers: vi.fn(),
+        recordSnapshot: vi.fn(),
+        onStatusMessage: vi.fn(),
+      });
+
+      const dispose = controller.initialize();
+      
+      // Should not throw when creating ray with CameraDirector
+      const event = new MouseEvent('mousemove', {
+        bubbles: true,
+        clientX: 400,
+        clientY: 300,
+      });
+      
+      expect(() => canvas.dispatchEvent(event)).not.toThrow();
+      
+      dispose();
+    });
+
+    it('should fallback to OrbitControls when CameraDirector matrices are invalid', () => {
+      const mockDirector = {
+        getViewMatrix: () => null,
+        getProjectionMatrix: () => null,
+      };
+
+      const controller = new EditorPlacementController({
+        canvas,
+        controls,
+        cameraDirector: mockDirector as any,
+        scene,
+        selection,
+        state,
+        placementMode: placementModeMock as unknown as PlacementMode,
+        updateSceneBuffers: vi.fn(),
+        recordSnapshot: vi.fn(),
+        onStatusMessage: vi.fn(),
+      });
+
+      const dispose = controller.initialize();
+      
+      // Should fallback to orbit controls
+      const event = new MouseEvent('mousemove', {
+        bubbles: true,
+        clientX: 400,
+        clientY: 300,
+      });
+      
+      expect(() => canvas.dispatchEvent(event)).not.toThrow();
+      
+      dispose();
+    });
+
+    it('should fallback when CameraDirector matrices have wrong dimensions', () => {
+      const mockDirector = {
+        getViewMatrix: () => new Float32Array(9), // Wrong size
+        getProjectionMatrix: () => new Float32Array(9), // Wrong size
+      };
+
+      const controller = new EditorPlacementController({
+        canvas,
+        controls,
+        cameraDirector: mockDirector as any,
+        scene,
+        selection,
+        state,
+        placementMode: placementModeMock as unknown as PlacementMode,
+        updateSceneBuffers: vi.fn(),
+        recordSnapshot: vi.fn(),
+        onStatusMessage: vi.fn(),
+      });
+
+      const dispose = controller.initialize();
+      
+      // Should fallback to orbit controls
+      const event = new MouseEvent('mousemove', {
+        bubbles: true,
+        clientX: 400,
+        clientY: 300,
+      });
+      
+      expect(() => canvas.dispatchEvent(event)).not.toThrow();
+      
+      dispose();
+    });
+
+    it('should use OrbitControls when CameraDirector is not provided', () => {
+      const controller = new EditorPlacementController({
+        canvas,
+        controls,
+        scene,
+        selection,
+        state,
+        placementMode: placementModeMock as unknown as PlacementMode,
+        updateSceneBuffers: vi.fn(),
+        recordSnapshot: vi.fn(),
+        onStatusMessage: vi.fn(),
+      });
+
+      const dispose = controller.initialize();
+      
+      // Should use orbit controls fallback
+      const event = new MouseEvent('mousemove', {
+        bubbles: true,
+        clientX: 400,
+        clientY: 300,
+      });
+      
+      expect(() => canvas.dispatchEvent(event)).not.toThrow();
+      
+      dispose();
+    });
   });
 });
 

@@ -11,7 +11,7 @@
 import { TextureLoader, type LoadedTexture } from './TextureLoader';
 import { ProceduralTextureGenerator } from './ProceduralTextureGenerator';
 import { globalTextureCache } from './TextureCache';
-import type { BlockFaceTexture } from '../blocks/BlockLibrary';
+import type { BlockFaceTexture } from '@engine/blocks';
 
 export interface ManagedTexture {
   /** Texture ID */

@@ -58,6 +58,12 @@ interface RendererOptions {
      * Use this for play mode updates, physics, character controllers, etc.
      */
     onFrameUpdate?: (deltaTime: number) => void;
+    enableHDR?: boolean;
+    enableBloom?: boolean;
+    enableShadows?: boolean;
+    shadowQuality?: 'low' | 'med' | 'high' | 'ultra';
+    enableComputePrepass?: boolean;
+    msaaSampleCount?: 1 | 2 | 4;
 }
 export declare function initRenderer(options: RendererOptions): Promise<Renderer>;
 export {};

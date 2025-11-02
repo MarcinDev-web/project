@@ -36,6 +36,7 @@ export class ThumbnailRenderer {
             vertices: DEFAULT_GEOMETRY.vertices,
             indices: DEFAULT_GEOMETRY.indices,
             instanceCount: 1,
+            opaqueCount: 1,
             instanceOffsetData: new Float32Array([0, 0, 0]),
             instanceColorScaleData: new Float32Array([
                 preset.color[0],
@@ -43,10 +44,23 @@ export class ThumbnailRenderer {
                 preset.color[2],
                 Math.max(preset.scale[0], preset.scale[1], preset.scale[2]),
             ]),
+            instanceSecondaryColorData: new Float32Array([
+                preset.color[0],
+                preset.color[1],
+                preset.color[2],
+                1,
+            ]),
+            instanceEmissiveColorData: new Float32Array([0, 0, 0, 0]),
+            instanceMaterialParamsData: new Float32Array([
+                preset.color[3] ?? 1,
+                0,
+                1,
+                0,
+            ]),
             instanceRotationData: new Float32Array([0, 0, 0, 1]),
             instanceMaterialIdData: new Float32Array([0]),
         };
-        const { vertexBuffer, indexBuffer, instanceOffsetBuffer, instanceColorScaleBuffer, instanceRotationBuffer, instanceMaterialIdBuffer, } = createGeometryBuffers(device, geom);
+        const { vertexBuffer, indexBuffer, instanceOffsetBuffer, instanceColorScaleBuffer, instanceSecondaryColorBuffer, instanceEmissiveColorBuffer, instanceMaterialParamsBuffer, instanceRotationBuffer, instanceMaterialIdBuffer, } = createGeometryBuffers(device, geom);
         // Uniforms and materials (use atlas to match main pipeline)
         const { uniformBuffer, uniformBindGroupLayout } = createUniformResources(device, {
             bufferSize: UNIFORM_BUFFER_SIZE,
@@ -55,23 +69,19 @@ export class ThumbnailRenderer {
         const { textureBindGroupLayout, textureBindGroup, atlas } = createTextureAtlas(device, undefined, 2048, 128);
         const { renderPipeline } = await createPipelines(device, this.presentationFormat, uniformBindGroupLayout, textureBindGroupLayout, [
             {
-                arrayStride: 20,
+                arrayStride: 24,
                 stepMode: 'vertex',
                 attributes: [
                     { shaderLocation: 0, offset: 0, format: 'float32x3' },
-                    { shaderLocation: 2, offset: 12, format: 'snorm8x4' },
-                    { shaderLocation: 3, offset: 16, format: 'float16x2' },
+                    { shaderLocation: 1, offset: 12, format: 'snorm8x4' },
+                    { shaderLocation: 2, offset: 16, format: 'float16x2' },
+                    { shaderLocation: 3, offset: 20, format: 'unorm8x4' },
                 ],
             },
             {
                 arrayStride: 12,
                 stepMode: 'instance',
-                attributes: [{ shaderLocation: 1, offset: 0, format: 'float32x3' }],
-            },
-            {
-                arrayStride: 16,
-                stepMode: 'instance',
-                attributes: [{ shaderLocation: 4, offset: 0, format: 'float32x4' }],
+                attributes: [{ shaderLocation: 4, offset: 0, format: 'float32x3' }],
             },
             {
                 arrayStride: 16,
@@ -79,9 +89,29 @@ export class ThumbnailRenderer {
                 attributes: [{ shaderLocation: 5, offset: 0, format: 'float32x4' }],
             },
             {
+                arrayStride: 16,
+                stepMode: 'instance',
+                attributes: [{ shaderLocation: 6, offset: 0, format: 'float32x4' }],
+            },
+            {
+                arrayStride: 16,
+                stepMode: 'instance',
+                attributes: [{ shaderLocation: 7, offset: 0, format: 'float32x4' }],
+            },
+            {
+                arrayStride: 16,
+                stepMode: 'instance',
+                attributes: [{ shaderLocation: 8, offset: 0, format: 'float32x4' }],
+            },
+            {
+                arrayStride: 16,
+                stepMode: 'instance',
+                attributes: [{ shaderLocation: 9, offset: 0, format: 'float32x4' }],
+            },
+            {
                 arrayStride: 4,
                 stepMode: 'instance',
-                attributes: [{ shaderLocation: 6, offset: 0, format: 'float32' }],
+                attributes: [{ shaderLocation: 10, offset: 0, format: 'float32' }],
             },
         ], { sampleCount: 1, statusEl: document.createElement('div') });
         const uniformBindGroup = device.createBindGroup({
@@ -165,8 +195,11 @@ export class ThumbnailRenderer {
         pass.setVertexBuffer(0, vertexBuffer);
         pass.setVertexBuffer(1, instanceOffsetBuffer);
         pass.setVertexBuffer(2, instanceColorScaleBuffer);
-        pass.setVertexBuffer(3, instanceRotationBuffer);
-        pass.setVertexBuffer(4, instanceMaterialIdBuffer);
+        pass.setVertexBuffer(3, instanceSecondaryColorBuffer);
+        pass.setVertexBuffer(4, instanceEmissiveColorBuffer);
+        pass.setVertexBuffer(5, instanceMaterialParamsBuffer);
+        pass.setVertexBuffer(6, instanceRotationBuffer);
+        pass.setVertexBuffer(7, instanceMaterialIdBuffer);
         pass.setIndexBuffer(indexBuffer, 'uint16');
         pass.setBindGroup(0, uniformBindGroup);
         pass.setBindGroup(1, textureBindGroup);

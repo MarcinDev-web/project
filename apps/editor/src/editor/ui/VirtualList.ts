@@ -116,6 +116,11 @@ export class VirtualList {
         ? this.itemOffsets[mid + 1] 
         : this.totalHeight;
 
+      // Type guard: ensure offsets are defined
+      if (midOffset === undefined || nextOffset === undefined) {
+        return Math.max(0, Math.min(this.items.length - 1, left));
+      }
+
       if (offset >= midOffset && offset < nextOffset) {
         return mid;
       } else if (offset < midOffset) {
@@ -135,8 +140,9 @@ export class VirtualList {
     // Remove items that are no longer visible
     const visibleIds = new Set<string>();
     for (let i = this.visibleStart; i <= this.visibleEnd; i++) {
-      if (this.items[i]) {
-        visibleIds.add(this.items[i].id);
+      const item = this.items[i];
+      if (item) {
+        visibleIds.add(item.id);
       }
     }
 
@@ -183,7 +189,10 @@ export class VirtualList {
    */
   scrollToItem(index: number): void {
     if (index >= 0 && index < this.items.length) {
-      this.scrollContainer.scrollTop = this.itemOffsets[index];
+      const offset = this.itemOffsets[index];
+      if (offset !== undefined) {
+        this.scrollContainer.scrollTop = offset;
+      }
     }
   }
 

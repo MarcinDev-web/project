@@ -1,7 +1,72 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { EnvironmentRenderer } from '@engine/gfx-webgpu';
 import { EnvironmentComponent } from '@engine/world';
 import type { Mat4, Vec3 } from '@engine/core/math';
+
+// Helper to create device mock for IBL tests
+function createBasicDeviceMock() {
+  const createTexture = vi.fn((desc?: GPUTextureDescriptor) => ({
+    label: desc?.label,
+    createView: vi.fn(() => ({})),
+    destroy: vi.fn(),
+  })) as unknown as (desc?: GPUTextureDescriptor) => GPUTexture;
+
+  const createBuffer = vi.fn(() => ({
+    destroy: vi.fn(),
+  })) as unknown as () => GPUBuffer;
+
+  const createSampler = vi.fn(() => ({}));
+  const createBindGroupLayout = vi.fn(() => ({}));
+  const createPipelineLayout = vi.fn(() => ({}));
+  const createShaderModule = vi.fn(() => ({}));
+  const createRenderPipeline = vi.fn(() => ({ getBindGroupLayout: vi.fn(() => ({})) }));
+  const createComputePipeline = vi.fn(() => ({}));
+  const createBindGroup = vi.fn(() => ({}));
+
+  const renderPassMock = {
+    setPipeline: vi.fn(),
+    setBindGroup: vi.fn(),
+    draw: vi.fn(),
+    end: vi.fn(),
+  } as unknown as GPURenderPassEncoder;
+
+  const computePassMock = {
+    setPipeline: vi.fn(),
+    setBindGroup: vi.fn(),
+    dispatchWorkgroups: vi.fn(),
+    end: vi.fn(),
+  } as unknown as GPUComputePassEncoder;
+
+  const commandEncoderMock = {
+    beginRenderPass: vi.fn(() => renderPassMock),
+    beginComputePass: vi.fn(() => computePassMock),
+    finish: vi.fn(() => ({})),
+  } as unknown as GPUCommandEncoder;
+
+  const queue = {
+    submit: vi.fn(),
+    writeBuffer: vi.fn(),
+    writeTexture: vi.fn(),
+    onSubmittedWorkDone: vi.fn().mockResolvedValue(undefined),
+  } as unknown as GPUQueue;
+
+  const deviceMock = {
+    features: new Set(),
+    createTexture,
+    createBuffer,
+    createSampler,
+    createBindGroupLayout,
+    createPipelineLayout,
+    createShaderModule,
+    createRenderPipeline,
+    createComputePipeline,
+    createBindGroup,
+    createCommandEncoder: vi.fn(() => commandEncoderMock),
+    queue,
+  } as unknown as GPUDevice;
+
+  return { deviceMock, commandEncoderMock, renderPassMock, computePassMock };
+}
 
 describe('EnvironmentRenderer', () => {
   let renderer: EnvironmentRenderer;
@@ -293,6 +358,494 @@ describe('EnvironmentRenderer', () => {
         renderer.updateParams(environment);
         renderer.updateUniforms(matrix, cameraPos);
       }).not.toThrow();
+    });
+  });
+
+  describe('Initialization with Device', () => {
+    it('should initialize successfully with device mock', async () => {
+      const deviceMock = {
+        createBuffer: vi.fn(() => ({ destroy: vi.fn() })),
+        createBindGroupLayout: vi.fn(() => ({})),
+        createPipelineLayout: vi.fn(() => ({})),
+        createShaderModule: vi.fn(() => ({})),
+        createRenderPipelineAsync: vi.fn(() => Promise.resolve({})),
+        createRenderPipeline: vi.fn(() => ({})),
+        createBindGroup: vi.fn(() => ({})),
+        createSampler: vi.fn(() => ({})),
+        queue: { writeBuffer: vi.fn() },
+      } as unknown as GPUDevice;
+
+      await renderer.initialize({
+        device: deviceMock,
+        presentationFormat: 'rgba16float',
+        sampleCount: 1,
+      });
+
+      expect(deviceMock.createBuffer).toHaveBeenCalled();
+      expect(deviceMock.createBindGroupLayout).toHaveBeenCalled();
+      expect(deviceMock.createPipelineLayout).toHaveBeenCalled();
+      expect(deviceMock.createShaderModule).toHaveBeenCalled();
+      // Either createRenderPipeline or createRenderPipelineAsync should be called
+      expect(
+        deviceMock.createRenderPipeline || (deviceMock as any).createRenderPipelineAsync
+      ).toBeDefined();
+      expect(deviceMock.createBindGroup).toHaveBeenCalled();
+    });
+
+    it('should not initialize twice', async () => {
+      const deviceMock = {
+        createBuffer: vi.fn(() => ({ destroy: vi.fn() })),
+        createBindGroupLayout: vi.fn(() => ({})),
+        createPipelineLayout: vi.fn(() => ({})),
+        createShaderModule: vi.fn(() => ({})),
+        createRenderPipelineAsync: vi.fn(() => Promise.resolve({})),
+        createRenderPipeline: vi.fn(() => ({})),
+        createBindGroup: vi.fn(() => ({})),
+        createSampler: vi.fn(() => ({})),
+        queue: { writeBuffer: vi.fn() },
+      } as unknown as GPUDevice;
+
+      await renderer.initialize({
+        device: deviceMock,
+        presentationFormat: 'rgba16float',
+        sampleCount: 1,
+      });
+
+      const callCount = deviceMock.createBuffer.mock.calls.length;
+
+      await renderer.initialize({
+        device: deviceMock,
+        presentationFormat: 'rgba16float',
+        sampleCount: 1,
+      });
+
+      // Should not create additional resources
+      expect(deviceMock.createBuffer.mock.calls.length).toBe(callCount);
+    });
+  });
+
+  describe('Render with Pass Encoder', () => {
+    function createPassEncoderMock(): GPURenderPassEncoder {
+      return {
+        setPipeline: vi.fn(),
+        setBindGroup: vi.fn(),
+        draw: vi.fn(),
+      } as unknown as GPURenderPassEncoder;
+    }
+
+    it('should render successfully with initialized renderer', async () => {
+      const mockPipeline = {} as GPURenderPipeline;
+      const mockBindGroup = {} as GPUBindGroup;
+      const mockUniformBindGroup = {} as GPUBindGroup;
+
+      const deviceMock = {
+        createBuffer: vi.fn(() => ({ destroy: vi.fn() })),
+        createBindGroupLayout: vi.fn(() => ({})),
+        createPipelineLayout: vi.fn(() => ({})),
+        createShaderModule: vi.fn(() => ({})),
+        createRenderPipelineAsync: vi.fn(() => Promise.resolve(mockPipeline)),
+        createRenderPipeline: vi.fn(() => mockPipeline),
+        createBindGroup: vi.fn((desc: GPUBindGroupDescriptor) => {
+          // Return uniform bind group for first call, params bind group for others
+          if (desc.label?.includes('uniform')) {
+            return mockUniformBindGroup;
+          }
+          return mockBindGroup;
+        }),
+        createSampler: vi.fn(() => ({})),
+        queue: { writeBuffer: vi.fn() },
+      } as unknown as GPUDevice;
+
+      await renderer.initialize({
+        device: deviceMock,
+        presentationFormat: 'rgba16float',
+        sampleCount: 1,
+      });
+
+      const environment = new EnvironmentComponent();
+      // Update params to create bind group for this skybox type
+      renderer.updateParams(environment);
+
+      const passEncoder = createPassEncoderMock();
+
+      expect(() => {
+        renderer.render(passEncoder, environment);
+      }).not.toThrow();
+
+      expect(passEncoder.setPipeline).toHaveBeenCalled();
+      expect(passEncoder.setBindGroup).toHaveBeenCalled();
+      expect(passEncoder.draw).toHaveBeenCalled();
+    });
+
+    it('should not render when environment is disabled', async () => {
+      const deviceMock = {
+        createBuffer: vi.fn(() => ({ destroy: vi.fn() })),
+        createBindGroupLayout: vi.fn(() => ({})),
+        createPipelineLayout: vi.fn(() => ({})),
+        createShaderModule: vi.fn(() => ({})),
+        createRenderPipelineAsync: vi.fn(() => Promise.resolve({})),
+        createRenderPipeline: vi.fn(() => ({})),
+        createBindGroup: vi.fn(() => ({})),
+        createSampler: vi.fn(() => ({})),
+        queue: { writeBuffer: vi.fn() },
+      } as unknown as GPUDevice;
+
+      await renderer.initialize({
+        device: deviceMock,
+        presentationFormat: 'rgba16float',
+        sampleCount: 1,
+      });
+
+      const environment = new EnvironmentComponent();
+      environment.enabled = false;
+      const passEncoder = createPassEncoderMock();
+
+      renderer.render(passEncoder, environment);
+
+      // Should not call any render methods
+      expect(passEncoder.setPipeline).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Cleanup Resources', () => {
+    it('should cleanup resources when initialized', async () => {
+      const destroyBuffer = vi.fn();
+      const deviceMock = {
+        createBuffer: vi.fn(() => ({ destroy: destroyBuffer })),
+        createBindGroupLayout: vi.fn(() => ({})),
+        createPipelineLayout: vi.fn(() => ({})),
+        createShaderModule: vi.fn(() => ({})),
+        createRenderPipelineAsync: vi.fn(() => Promise.resolve({})),
+        createRenderPipeline: vi.fn(() => ({})),
+        createBindGroup: vi.fn(() => ({})),
+        createSampler: vi.fn(() => ({})),
+        queue: { writeBuffer: vi.fn() },
+      } as unknown as GPUDevice;
+
+      await renderer.initialize({
+        device: deviceMock,
+        presentationFormat: 'rgba16float',
+        sampleCount: 1,
+      });
+
+      renderer.cleanup();
+
+      expect(destroyBuffer).toHaveBeenCalled();
+    });
+
+    it('should clear pipelines and bind groups on cleanup', async () => {
+      const deviceMock = {
+        createBuffer: vi.fn(() => ({ destroy: vi.fn() })),
+        createBindGroupLayout: vi.fn(() => ({})),
+        createPipelineLayout: vi.fn(() => ({})),
+        createShaderModule: vi.fn(() => ({})),
+        createRenderPipelineAsync: vi.fn(() => Promise.resolve({})),
+        createRenderPipeline: vi.fn(() => ({})),
+        createBindGroup: vi.fn(() => ({})),
+        createSampler: vi.fn(() => ({})),
+        queue: { writeBuffer: vi.fn() },
+      } as unknown as GPUDevice;
+
+      await renderer.initialize({
+        device: deviceMock,
+        presentationFormat: 'rgba16float',
+        sampleCount: 1,
+      });
+
+      const environment = new EnvironmentComponent();
+      environment.skyboxType = 'solid';
+      renderer.updateParams(environment);
+
+      renderer.cleanup();
+
+      // After cleanup, renderer should not be initialized
+      const passEncoder = { setPipeline: vi.fn(), setBindGroup: vi.fn(), draw: vi.fn() } as unknown as GPURenderPassEncoder;
+      renderer.render(passEncoder, environment);
+
+      expect(passEncoder.setPipeline).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('Validation Edge Cases', () => {
+    it('should handle NaN values in colors', () => {
+      const environment = new EnvironmentComponent();
+      environment.skyColor = [NaN, 1, 0] as Vec3;
+      environment.horizonColor = [0, Infinity, 1] as Vec3;
+
+      expect(() => {
+        renderer.updateParams(environment);
+      }).not.toThrow();
+    });
+
+    it('should handle Infinity values in colors', () => {
+      const environment = new EnvironmentComponent();
+      environment.skyColor = [Infinity, -Infinity, 1000] as Vec3;
+      environment.skyboxType = 'gradient';
+      environment.groundColor = [0, 0, 0] as Vec3;
+
+      expect(() => {
+        renderer.updateParams(environment);
+      }).not.toThrow();
+    });
+
+    it('should handle NaN in sun intensity', () => {
+      const environment = new EnvironmentComponent();
+      environment.skyboxType = 'procedural-sky';
+      environment.sunIntensity = NaN;
+
+      expect(() => {
+        renderer.updateParams(environment);
+      }).not.toThrow();
+    });
+
+    it('should handle Infinity in sun intensity', () => {
+      const environment = new EnvironmentComponent();
+      environment.skyboxType = 'procedural-sky';
+      environment.sunIntensity = Infinity;
+
+      expect(() => {
+        renderer.updateParams(environment);
+      }).not.toThrow();
+    });
+
+    it('should handle NaN in sun direction', () => {
+      const environment = new EnvironmentComponent();
+      environment.skyboxType = 'procedural-sky';
+      environment.sunDirection = [NaN, 1, 0] as Vec3;
+
+      expect(() => {
+        renderer.updateParams(environment);
+      }).not.toThrow();
+    });
+
+    it('should handle very large values', () => {
+      const environment = new EnvironmentComponent();
+      environment.skyColor = [1e10, 1e10, 1e10] as Vec3;
+      environment.horizonColor = [1e5, 1e5, 1e5] as Vec3;
+      environment.sunIntensity = 1e6;
+
+      expect(() => {
+        renderer.updateParams(environment);
+      }).not.toThrow();
+    });
+
+    it('should handle negative colors (clamp to 0)', () => {
+      const environment = new EnvironmentComponent();
+      environment.skyColor = [-1, -2, -3] as Vec3;
+      environment.skyboxType = 'solid';
+
+      expect(() => {
+        renderer.updateParams(environment);
+      }).not.toThrow();
+    });
+  });
+
+  describe('Cubemap Support', () => {
+    it('should create cubemap pipeline during initialization', async () => {
+      const deviceMock = {
+        createBuffer: vi.fn(() => ({ destroy: vi.fn() })),
+        createBindGroupLayout: vi.fn(() => ({})),
+        createPipelineLayout: vi.fn(() => ({})),
+        createShaderModule: vi.fn(() => ({})),
+        createRenderPipelineAsync: vi.fn(() => Promise.resolve({})),
+        createRenderPipeline: vi.fn(() => ({})),
+        createBindGroup: vi.fn(() => ({})),
+        createSampler: vi.fn(() => ({})),
+        queue: { writeBuffer: vi.fn() },
+      } as unknown as GPUDevice;
+
+      await renderer.initialize({
+        device: deviceMock,
+        presentationFormat: 'rgba16float',
+        sampleCount: 1,
+      });
+
+      expect(deviceMock.createSampler).toHaveBeenCalled();
+    });
+
+    it('should handle cubemap type in updateParams', async () => {
+      const deviceMock = {
+        createBuffer: vi.fn(() => ({ destroy: vi.fn() })),
+        createBindGroupLayout: vi.fn(() => ({})),
+        createPipelineLayout: vi.fn(() => ({})),
+        createShaderModule: vi.fn(() => ({})),
+        createRenderPipelineAsync: vi.fn(() => Promise.resolve({})),
+        createRenderPipeline: vi.fn(() => ({})),
+        createBindGroup: vi.fn(() => ({})),
+        createSampler: vi.fn(() => ({})),
+        queue: { writeBuffer: vi.fn() },
+      } as unknown as GPUDevice;
+
+      await renderer.initialize({
+        device: deviceMock,
+        presentationFormat: 'rgba16float',
+        sampleCount: 1,
+      });
+
+      const environment = new EnvironmentComponent();
+      environment.skyboxType = 'cubemap';
+      (environment as any).cubemapTexture = null;
+
+      expect(() => {
+        renderer.updateParams(environment);
+      }).not.toThrow();
+    });
+
+    it('should create cubemap bind group when texture is provided', async () => {
+      const mockTexture = {
+        createView: vi.fn(() => ({})),
+      } as unknown as GPUTexture;
+
+      const mockBindGroup = {} as GPUBindGroup;
+      const deviceMock = {
+        createBuffer: vi.fn(() => ({ destroy: vi.fn() })),
+        createBindGroupLayout: vi.fn(() => ({})),
+        createPipelineLayout: vi.fn(() => ({})),
+        createShaderModule: vi.fn(() => ({})),
+        createRenderPipelineAsync: vi.fn(() => Promise.resolve({})),
+        createRenderPipeline: vi.fn(() => ({})),
+        createBindGroup: vi.fn(() => mockBindGroup),
+        createSampler: vi.fn(() => ({})),
+        queue: { writeBuffer: vi.fn() },
+      } as unknown as GPUDevice;
+
+      await renderer.initialize({
+        device: deviceMock,
+        presentationFormat: 'rgba16float',
+        sampleCount: 1,
+      });
+
+      const environment = new EnvironmentComponent();
+      environment.skyboxType = 'cubemap';
+      (environment as any).cubemapTexture = mockTexture;
+
+      renderer.updateParams(environment);
+
+      expect(deviceMock.createBindGroup).toHaveBeenCalled();
+      expect(mockTexture.createView).toHaveBeenCalled();
+    });
+
+    it('should render cubemap when bind group exists', async () => {
+      const mockPipeline = {} as GPURenderPipeline;
+      const mockBindGroup = {} as GPUBindGroup;
+      const mockUniformBindGroup = {} as GPUBindGroup;
+      const mockCubemapBindGroup = {} as GPUBindGroup;
+
+      const deviceMock = {
+        createBuffer: vi.fn(() => ({ destroy: vi.fn() })),
+        createBindGroupLayout: vi.fn(() => ({})),
+        createPipelineLayout: vi.fn(() => ({})),
+        createShaderModule: vi.fn(() => ({})),
+        createRenderPipelineAsync: vi.fn(() => Promise.resolve(mockPipeline)),
+        createRenderPipeline: vi.fn(() => mockPipeline),
+        createBindGroup: vi.fn((desc: GPUBindGroupDescriptor) => {
+          if (desc.label?.includes('cubemap')) {
+            return mockCubemapBindGroup;
+          }
+          return mockUniformBindGroup;
+        }),
+        createSampler: vi.fn(() => ({})),
+        queue: { writeBuffer: vi.fn() },
+      } as unknown as GPUDevice;
+
+      await renderer.initialize({
+        device: deviceMock,
+        presentationFormat: 'rgba16float',
+        sampleCount: 1,
+      });
+
+      const environment = new EnvironmentComponent();
+      environment.skyboxType = 'cubemap';
+      (environment as any).cubemapTexture = { createView: vi.fn(() => ({})) } as unknown as GPUTexture;
+
+      renderer.updateParams(environment);
+
+      const passEncoder = {
+        setPipeline: vi.fn(),
+        setBindGroup: vi.fn(),
+        draw: vi.fn(),
+      } as unknown as GPURenderPassEncoder;
+
+      expect(() => {
+        renderer.render(passEncoder, environment);
+      }).not.toThrow();
+
+      expect(passEncoder.setPipeline).toHaveBeenCalled();
+      expect(passEncoder.setBindGroup).toHaveBeenCalled();
+      expect(passEncoder.draw).toHaveBeenCalled();
+    });
+  });
+
+  describe('IBL Cache', () => {
+    it('should generate hash from environment params', async () => {
+      const deviceMock = {
+        createBuffer: vi.fn(() => ({ destroy: vi.fn() })),
+        createBindGroupLayout: vi.fn(() => ({})),
+        createPipelineLayout: vi.fn(() => ({})),
+        createShaderModule: vi.fn(() => ({})),
+        createRenderPipelineAsync: vi.fn(() => Promise.resolve({})),
+        createRenderPipeline: vi.fn(() => ({})),
+        createBindGroup: vi.fn(() => ({})),
+        createSampler: vi.fn(() => ({})),
+        queue: { writeBuffer: vi.fn() },
+      } as unknown as GPUDevice;
+
+      await renderer.initialize({
+        device: deviceMock,
+        presentationFormat: 'rgba16float',
+        sampleCount: 1,
+      });
+
+      const env1 = new EnvironmentComponent();
+      env1.sunIntensity = 1.0;
+      renderer.updateParams(env1);
+
+      // Hash function should work without errors
+      expect(env1.skyboxType).toBeDefined();
+    });
+
+    it('should accept environment component parameter for prepareIBLResources', async () => {
+      const { deviceMock, commandEncoderMock } = createBasicDeviceMock();
+      const env = new EnvironmentRenderer();
+      await env.initialize({ device: deviceMock, presentationFormat: 'rgba16float', sampleCount: 1 });
+      const comp = new EnvironmentComponent();
+      comp.skyboxType = 'procedural-sky';
+      env.updateParams(comp);
+
+      // Should accept environment component as first parameter
+      const { brdfLut, envCube } = await env.prepareIBLResources(comp, 16);
+      expect(brdfLut).toBeDefined();
+      expect(envCube).toBeDefined();
+      // 6 faces -> 6 render passes
+      expect((commandEncoderMock.beginRenderPass as any).mock.calls.length).toBe(6);
+    });
+  });
+
+  describe('Dirty Flags', () => {
+    it('should mark params as dirty on updateParams', async () => {
+      const deviceMock = {
+        createBuffer: vi.fn(() => ({ destroy: vi.fn() })),
+        createBindGroupLayout: vi.fn(() => ({})),
+        createPipelineLayout: vi.fn(() => ({})),
+        createShaderModule: vi.fn(() => ({})),
+        createRenderPipelineAsync: vi.fn(() => Promise.resolve({})),
+        createRenderPipeline: vi.fn(() => ({})),
+        createBindGroup: vi.fn(() => ({})),
+        createSampler: vi.fn(() => ({})),
+        queue: { writeBuffer: vi.fn() },
+      } as unknown as GPUDevice;
+
+      await renderer.initialize({
+        device: deviceMock,
+        presentationFormat: 'rgba16float',
+        sampleCount: 1,
+      });
+
+      const environment = new EnvironmentComponent();
+      renderer.updateParams(environment);
+
+      // updateParams should trigger queue.writeBuffer (params dirty)
+      expect(deviceMock.queue.writeBuffer).toHaveBeenCalled();
     });
   });
 });

@@ -1,6 +1,7 @@
 import type { Vec3, Mat4 } from '@engine/core/math';
-import { mat4LookAt, vec3Length, vec3Normalize } from '@engine/core/math';
-import type { PhysicsWorld, RaycastHit } from '@engine/world';
+import { mat4LookAt } from '@engine/core/math';
+import type { PhysicsWorld } from '@engine/world';
+import { damp } from './utils/Damper';
 
 /**
  * Configuration for ThirdPersonCamera
@@ -24,6 +25,8 @@ export interface ThirdPersonCameraConfig {
   mouseSensitivity?: number;
   /** Enable auto-rotation (default: true) */
   enableAutoRotation?: boolean;
+  /** Rotation smoothing time constant in seconds (default: 0.04). Lower = more responsive, higher = smoother. */
+  rotationSmoothing?: number;
 }
 
 /**
@@ -71,9 +74,11 @@ export class ThirdPersonCamera {
   private position: Vec3;
   private yaw: number;
   private pitch: number;
-
-  // Target position (smoothed)
-  private targetPosition: Vec3;
+  
+  // Smoothed rotation targets (for exponential smoothing)
+  private targetYaw: number;
+  private targetPitch: number;
+  private rotationSmoothing: number;
 
   // Configuration
   private distance: number;
@@ -91,6 +96,7 @@ export class ThirdPersonCamera {
   private isMouseDown = false;
   private lastMouseX = 0;
   private lastMouseY = 0;
+  private activePointerId: number | null = null;
 
   // Direction vectors (cached)
   private readonly forward: Vec3 = [0, 0, -1];
@@ -98,10 +104,14 @@ export class ThirdPersonCamera {
 
   // Event listeners (for cleanup)
   private readonly boundHandlers = {
+    pointerdown: this.handlePointerDown.bind(this),
+    pointerup: this.handlePointerUp.bind(this),
+    pointercancel: this.handlePointerCancel.bind(this),
     mousedown: this.handleMouseDown.bind(this),
     mouseup: this.handleMouseUp.bind(this),
     mousemove: this.handleMouseMove.bind(this),
     blur: this.handleBlur.bind(this),
+    pointerlockchange: this.handlePointerLockChange.bind(this),
   };
 
   private enabled = false;
@@ -121,6 +131,7 @@ export class ThirdPersonCamera {
     this.collisionRadius = config?.collisionRadius ?? 0.3;
     this.mouseSensitivity = config?.mouseSensitivity ?? 0.003;
     this.enableAutoRotation = config?.enableAutoRotation ?? true;
+    this.rotationSmoothing = config?.rotationSmoothing ?? 0.04;
 
     const pitchRange = config?.pitchRange ?? [-30, 60];
     this.pitchMin = (pitchRange[0] * Math.PI) / 180;
@@ -128,9 +139,10 @@ export class ThirdPersonCamera {
 
     // Initialize camera behind player
     this.position = [0, this.height, this.distance];
-    this.targetPosition = [0, this.height, this.distance];
     this.yaw = 0;
     this.pitch = 0;
+    this.targetYaw = this.yaw;
+    this.targetPitch = this.pitch;
 
     this.updateDirectionVectors();
   }
@@ -142,10 +154,14 @@ export class ThirdPersonCamera {
     if (this.enabled || this.disposed) return;
     this.enabled = true;
 
+    this.canvas.addEventListener('pointerdown', this.boundHandlers.pointerdown, { capture: true });
     this.canvas.addEventListener('mousedown', this.boundHandlers.mousedown);
+    window.addEventListener('pointerup', this.boundHandlers.pointerup);
+    window.addEventListener('pointercancel', this.boundHandlers.pointercancel);
     window.addEventListener('mouseup', this.boundHandlers.mouseup);
     window.addEventListener('mousemove', this.boundHandlers.mousemove);
     window.addEventListener('blur', this.boundHandlers.blur);
+    document.addEventListener('pointerlockchange', this.boundHandlers.pointerlockchange);
   }
 
   /**
@@ -155,12 +171,17 @@ export class ThirdPersonCamera {
     if (!this.enabled) return;
     this.enabled = false;
 
+    this.canvas.removeEventListener('pointerdown', this.boundHandlers.pointerdown, true);
     this.canvas.removeEventListener('mousedown', this.boundHandlers.mousedown);
+    window.removeEventListener('pointerup', this.boundHandlers.pointerup);
+    window.removeEventListener('pointercancel', this.boundHandlers.pointercancel);
     window.removeEventListener('mouseup', this.boundHandlers.mouseup);
     window.removeEventListener('mousemove', this.boundHandlers.mousemove);
     window.removeEventListener('blur', this.boundHandlers.blur);
+    document.removeEventListener('pointerlockchange', this.boundHandlers.pointerlockchange);
 
     this.isMouseDown = false;
+    this.activePointerId = null;
   }
 
   /**
@@ -180,10 +201,14 @@ export class ThirdPersonCamera {
   update(playerPosition: Vec3, playerForward: Vec3, deltaTime: number): void {
     if (!this.enabled) return;
 
+    // Smooth rotation towards target
+    this.yaw = damp(this.yaw, this.targetYaw, this.rotationSmoothing, deltaTime);
+    this.pitch = damp(this.pitch, this.targetPitch, this.rotationSmoothing, deltaTime);
+    
     // Auto-rotate camera to follow player forward direction if enabled
     if (this.enableAutoRotation) {
       const targetYaw = Math.atan2(playerForward[0], -playerForward[2]);
-      const yawDiff = targetYaw - this.yaw;
+      const yawDiff = targetYaw - this.targetYaw;
       
       // Handle wrap-around (shortest path)
       let normalizedDiff = yawDiff;
@@ -193,9 +218,12 @@ export class ThirdPersonCamera {
       // Smoothly rotate toward target
       const rotationAmount = this.rotationSpeed * deltaTime;
       if (Math.abs(normalizedDiff) > 0.01) {
-        this.yaw += clamp(normalizedDiff, -rotationAmount, rotationAmount);
+        this.targetYaw += clamp(normalizedDiff, -rotationAmount, rotationAmount);
       }
-      
+    }
+    
+    // Update direction vectors if rotation changed
+    if (Math.abs(this.yaw - this.targetYaw) > 1e-6 || Math.abs(this.pitch - this.targetPitch) > 1e-6) {
       this.updateDirectionVectors();
     }
 
@@ -236,7 +264,6 @@ export class ThirdPersonCamera {
    */
   setPosition(pos: Vec3): void {
     this.position = [...pos] as Vec3;
-    this.targetPosition = [...pos] as Vec3;
   }
 
   /**
@@ -252,7 +279,27 @@ export class ThirdPersonCamera {
   setOrientation(yaw: number, pitch: number): void {
     this.yaw = yaw;
     this.pitch = clamp(pitch, this.pitchMin, this.pitchMax);
+    this.targetYaw = this.yaw;
+    this.targetPitch = this.pitch;
     this.updateDirectionVectors();
+  }
+  
+  /**
+   * Set rotation smoothing time constant in seconds
+   * Lower values = more responsive but less smooth
+   * Higher values = smoother but slower response
+   */
+  setRotationSmoothing(tau: number): void {
+    if (tau > 0 && Number.isFinite(tau)) {
+      this.rotationSmoothing = tau;
+    }
+  }
+  
+  /**
+   * Get rotation smoothing time constant
+   */
+  getRotationSmoothing(): number {
+    return this.rotationSmoothing;
   }
 
   /**
@@ -272,6 +319,7 @@ export class ThirdPersonCamera {
       ],
       mouseSensitivity: this.mouseSensitivity,
       enableAutoRotation: this.enableAutoRotation,
+      rotationSmoothing: this.rotationSmoothing,
     };
   }
 
@@ -287,11 +335,13 @@ export class ThirdPersonCamera {
     if (config.collisionRadius !== undefined) this.collisionRadius = config.collisionRadius;
     if (config.mouseSensitivity !== undefined) this.mouseSensitivity = config.mouseSensitivity;
     if (config.enableAutoRotation !== undefined) this.enableAutoRotation = config.enableAutoRotation;
+    if (config.rotationSmoothing !== undefined) this.rotationSmoothing = config.rotationSmoothing;
     
     if (config.pitchRange) {
       this.pitchMin = (config.pitchRange[0] * Math.PI) / 180;
       this.pitchMax = (config.pitchRange[1] * Math.PI) / 180;
       this.pitch = clamp(this.pitch, this.pitchMin, this.pitchMax);
+      this.targetPitch = this.pitch;
     }
   }
 
@@ -399,6 +449,14 @@ export class ThirdPersonCamera {
 
   // ========== Event Handlers ==========
 
+  private handlePointerDown(event: PointerEvent): void {
+    if (!this.enabled || event.button !== 0) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    this.activePointerId = event.pointerId;
+    this.handleMouseDown(event);
+  }
+
   private handleMouseDown(event: MouseEvent): void {
     if (!this.enabled || event.button !== 0) return; // Left mouse button = 0
     event.preventDefault();
@@ -411,21 +469,49 @@ export class ThirdPersonCamera {
   private handleMouseUp(event: MouseEvent): void {
     if (!this.enabled || event.button !== 0) return;
     this.isMouseDown = false;
+    this.activePointerId = null;
     this.canvas.style.cursor = '';
   }
 
+  private handlePointerUp(event: PointerEvent): void {
+    if (!this.enabled || event.button !== 0) return;
+    if (this.activePointerId !== null && event.pointerId !== this.activePointerId) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    this.activePointerId = null;
+    this.handleMouseUp(event);
+  }
+
   private handleMouseMove(event: MouseEvent): void {
-    if (!this.enabled || !this.isMouseDown) return;
+    if (!this.enabled) return;
 
-    const deltaX = event.clientX - this.lastMouseX;
-    const deltaY = event.clientY - this.lastMouseY;
-    this.lastMouseX = event.clientX;
-    this.lastMouseY = event.clientY;
+    const pointerLocked = this.isPointerLocked();
+    if (!pointerLocked && !this.isMouseDown) return;
 
-    // Apply rotation
-    this.yaw += deltaX * this.mouseSensitivity;
-    this.pitch -= deltaY * this.mouseSensitivity;
-    this.pitch = clamp(this.pitch, this.pitchMin, this.pitchMax);
+    let deltaX: number;
+    let deltaY: number;
+
+    if (pointerLocked && typeof event.movementX === 'number' && typeof event.movementY === 'number') {
+      deltaX = event.movementX;
+      deltaY = event.movementY;
+    } else {
+      deltaX = event.clientX - this.lastMouseX;
+      deltaY = event.clientY - this.lastMouseY;
+      this.lastMouseX = event.clientX;
+      this.lastMouseY = event.clientY;
+    }
+
+    if (deltaX === 0 && deltaY === 0) return;
+
+    // Update target rotation (will be smoothed in update())
+    this.targetYaw += deltaX * this.mouseSensitivity;
+    this.targetPitch -= deltaY * this.mouseSensitivity;
+    this.targetPitch = clamp(this.targetPitch, this.pitchMin, this.pitchMax);
+    
+    // Apply smoothing immediately for responsive feel during mouse movement
+    const immediateDelta = 0.008; // ~120fps estimate for immediate response
+    this.yaw = damp(this.yaw, this.targetYaw, this.rotationSmoothing, immediateDelta);
+    this.pitch = damp(this.pitch, this.targetPitch, this.rotationSmoothing, immediateDelta);
 
     this.updateDirectionVectors();
   }
@@ -433,8 +519,36 @@ export class ThirdPersonCamera {
   private handleBlur(): void {
     // Clear all input state when window loses focus
     this.isMouseDown = false;
+    this.activePointerId = null;
     if (this.canvas) {
       this.canvas.style.cursor = '';
+    }
+  }
+
+  private handlePointerCancel(event: PointerEvent): void {
+    if (!this.enabled) return;
+    if (this.activePointerId !== null && event.pointerId !== this.activePointerId) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    this.activePointerId = null;
+    this.isMouseDown = false;
+    if (this.canvas) {
+      this.canvas.style.cursor = '';
+    }
+  }
+
+  private isPointerLocked(): boolean {
+    return typeof document !== 'undefined' && document.pointerLockElement === this.canvas;
+  }
+
+  private handlePointerLockChange(): void {
+    if (!this.enabled) return;
+    if (!this.isPointerLocked()) {
+      this.isMouseDown = false;
+      this.activePointerId = null;
+      if (this.canvas) {
+        this.canvas.style.cursor = '';
+      }
     }
   }
 }

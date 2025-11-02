@@ -1,0 +1,30 @@
+{
+  "name": "@engine/net-server",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./dist/index.js"
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "lint": "eslint src --max-warnings=0",
+    "clean": "rimraf dist"
+  },
+  "dependencies": {
+    "@engine/net-protocol": "workspace:*",
+    "ws": "^8.18.0",
+    "wrtc": "^0.4.7"
+  },
+  "devDependencies": {
+    "@types/ws": "^8.18.0",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.3"
+  }
+}
+
+

@@ -1,6 +1,7 @@
 import type { Mat4, Vec3 } from '@engine/core/math';
 import type { EnvironmentComponent } from '@engine/world';
 import { BrdfLutPass } from '../postprocess/BrdfLut';
+import { loadHdrFile, parseHdrFile } from '../resources/HdrLoader';
 
 /**
  * Skybox vertex shader - renders a full-screen quad at far plane
@@ -102,6 +103,57 @@ fn fragmentMain(input: FragmentInput) -> @location(0) vec4f {
 `;
 
 /**
+ * Cubemap skybox fragment shader
+ */
+const SKYBOX_CUBEMAP_FRAGMENT_SHADER = /* wgsl */ `
+struct FragmentInput {
+  @location(0) viewDirection: vec3f,
+}
+
+@group(1) @binding(0) var<uniform> _placeholder: f32; // Placeholder for bind group layout compatibility
+@group(1) @binding(1) var cubemapSampler: sampler;
+@group(1) @binding(2) var cubemapTexture: texture_cube<f32>;
+
+@fragment
+fn fragmentMain(input: FragmentInput) -> @location(0) vec4f {
+  let dir = normalize(input.viewDirection);
+  let color = textureSample(cubemapTexture, cubemapSampler, dir);
+  return color;
+}
+`;
+
+/**
+ * Shared atmospheric scattering function template
+ * Parameters: viewDir (normalized), sunDir (normalized), params (SkyboxParams struct reference)
+ */
+const ATMOSPHERIC_SCATTERING_FUNCTION = /* wgsl */ `
+// Simple atmospheric scattering approximation
+fn atmosphericScattering(viewDir: vec3f, sunDir: vec3f, skyColor: vec3f, horizonColor: vec3f, sunColor: vec3f, sunIntensity: f32) -> vec3f {
+  let elevation = viewDir.y;
+  let sunDot = max(dot(viewDir, sunDir), 0.0);
+  
+  // Sky gradient based on elevation
+  let skyGradient = pow(max(elevation, 0.0), 0.4);
+  let horizonFade = pow(1.0 - abs(elevation), 2.0);
+  
+  // Base sky color
+  var baseSkyColor = mix(horizonColor, skyColor, skyGradient);
+  
+  // Sun contribution
+  let sunRadius = 0.02;
+  let sunGlow = pow(sunDot, 512.0); // Sharp sun disc
+  let sunHalo = pow(sunDot, 8.0) * 0.5; // Soft glow around sun
+  
+  let sunContribution = (sunGlow + sunHalo) * sunColor * sunIntensity;
+  
+  // Atmospheric glow near horizon when looking toward sun
+  let atmosphericGlow = horizonFade * pow(max(dot(viewDir, sunDir), 0.0), 4.0) * sunColor * 0.3;
+  
+  return baseSkyColor + sunContribution + atmosphericGlow;
+}
+`;
+
+/**
  * Procedural sky fragment shader with atmospheric scattering approximation
  */
 const SKYBOX_PROCEDURAL_FRAGMENT_SHADER = /* wgsl */ `
@@ -122,37 +174,14 @@ struct SkyboxParams {
 
 @group(1) @binding(0) var<uniform> params: SkyboxParams;
 
-// Simple atmospheric scattering approximation
-fn atmosphericScattering(viewDir: vec3f, sunDir: vec3f) -> vec3f {
-  let elevation = viewDir.y;
-  let sunDot = max(dot(viewDir, sunDir), 0.0);
-  
-  // Sky gradient based on elevation
-  let skyGradient = pow(max(elevation, 0.0), 0.4);
-  let horizonFade = pow(1.0 - abs(elevation), 2.0);
-  
-  // Base sky color
-  var skyColor = mix(params.horizonColor, params.skyColor, skyGradient);
-  
-  // Sun contribution
-  let sunRadius = 0.02;
-  let sunGlow = pow(sunDot, 512.0); // Sharp sun disc
-  let sunHalo = pow(sunDot, 8.0) * 0.5; // Soft glow around sun
-  
-  let sunContribution = (sunGlow + sunHalo) * params.sunColor * params.sunIntensity;
-  
-  // Atmospheric glow near horizon when looking toward sun
-  let atmosphericGlow = horizonFade * pow(max(dot(viewDir, sunDir), 0.0), 4.0) * params.sunColor * 0.3;
-  
-  return skyColor + sunContribution + atmosphericGlow;
-}
+${ATMOSPHERIC_SCATTERING_FUNCTION}
 
 @fragment
 fn fragmentMain(input: FragmentInput) -> @location(0) vec4f {
   let viewDir = normalize(input.viewDirection);
   let sunDir = normalize(params.sunDirection);
   
-  let color = atmosphericScattering(viewDir, sunDir);
+  let color = atmosphericScattering(viewDir, sunDir, params.skyColor, params.horizonColor, params.sunColor, params.sunIntensity);
   
   return vec4f(color, 1.0);
 }
@@ -175,14 +204,27 @@ export class EnvironmentRenderer {
   private pipelines: Map<string, GPURenderPipeline> = new Map();
   private uniformBindGroupLayout!: GPUBindGroupLayout;
   private paramsBindGroupLayout!: GPUBindGroupLayout;
+  private cubemapBindGroupLayout!: GPUBindGroupLayout;
   private uniformBuffer!: GPUBuffer;
   private paramsBuffer!: GPUBuffer;
   private uniformBindGroup!: GPUBindGroup;
   private paramsBindGroups: Map<string, GPUBindGroup> = new Map();
+  private cubemapBindGroup: GPUBindGroup | null = null;
+  private cubemapSampler!: GPUSampler;
   private initialized = false;
   // IBL resources
   private brdfLut: GPUTexture | null = null;
   private envCube: GPUTexture | null = null;
+  // Cubemap cache
+  private cubemapCache: Map<string, GPUTexture> = new Map();
+  // IBL cache
+  private iblCache: Map<string, { brdfLut: GPUTexture; envCube: GPUTexture; timestamp: number }> = new Map();
+  private iblCacheMaxSize = 5;
+  // Dirty flags
+  private uniformsDirty = false;
+  private paramsDirty = false;
+  // Pipeline descriptor cache (for faster re-initialization)
+  private pipelineDescriptorsCache: Map<string, GPURenderPipelineDescriptor> = new Map();
 
   constructor() {
     this.device = null!; // Will be set in initialize
@@ -222,6 +264,38 @@ export class EnvironmentRenderer {
       ],
     });
 
+    // Cubemap bind group layout: placeholder uniform + sampler + texture
+    this.cubemapBindGroupLayout = this.device.createBindGroupLayout({
+      label: 'environment-cubemap-layout',
+      entries: [
+        {
+          binding: 0,
+          visibility: GPUShaderStage.FRAGMENT,
+          buffer: { type: 'uniform' },
+        },
+        {
+          binding: 1,
+          visibility: GPUShaderStage.FRAGMENT,
+          sampler: {},
+        },
+        {
+          binding: 2,
+          visibility: GPUShaderStage.FRAGMENT,
+          texture: { viewDimension: 'cube' },
+        },
+      ],
+    });
+
+    // Create cubemap sampler (linear filtering, clamp-to-edge)
+    this.cubemapSampler = this.device.createSampler({
+      label: 'environment-cubemap-sampler',
+      magFilter: 'linear',
+      minFilter: 'linear',
+      addressModeU: 'clamp-to-edge',
+      addressModeV: 'clamp-to-edge',
+      addressModeW: 'clamp-to-edge',
+    });
+
     // Create uniform buffers
     // Uniform buffer: inverseViewProjection (64 bytes) + cameraPosition (16 bytes) = 80 bytes
     this.uniformBuffer = this.device.createBuffer({
@@ -253,6 +327,7 @@ export class EnvironmentRenderer {
     await this.createPipeline('solid', SKYBOX_SOLID_FRAGMENT_SHADER, config.presentationFormat, sampleCount);
     await this.createPipeline('gradient', SKYBOX_GRADIENT_FRAGMENT_SHADER, config.presentationFormat, sampleCount);
     await this.createPipeline('procedural-sky', SKYBOX_PROCEDURAL_FRAGMENT_SHADER, config.presentationFormat, sampleCount);
+    await this.createCubemapPipeline(config.presentationFormat, sampleCount);
 
     this.initialized = true;
   }
@@ -314,10 +389,86 @@ export class EnvironmentRenderer {
   }
 
   /**
+   * Creates a render pipeline specifically for cubemap skybox (different bind group layout)
+   */
+  private async createCubemapPipeline(
+    presentationFormat: GPUTextureFormat,
+    sampleCount: number
+  ): Promise<void> {
+    const shaderModule = this.device.createShaderModule({
+      label: 'environment-shader-cubemap',
+      code: SKYBOX_VERTEX_SHADER + '\n' + SKYBOX_CUBEMAP_FRAGMENT_SHADER,
+    });
+
+    const pipelineLayout = this.device.createPipelineLayout({
+      label: 'environment-pipeline-layout-cubemap',
+      bindGroupLayouts: [this.uniformBindGroupLayout, this.cubemapBindGroupLayout],
+    });
+
+    const createPipeline = (desc: GPURenderPipelineDescriptor): GPURenderPipeline | Promise<GPURenderPipeline> => {
+      const anyDevice = this.device as unknown as { createRenderPipelineAsync?: (d: GPURenderPipelineDescriptor) => Promise<GPURenderPipeline>, createRenderPipeline: (d: GPURenderPipelineDescriptor) => GPURenderPipeline };
+      if (typeof anyDevice.createRenderPipelineAsync === 'function') {
+        return anyDevice.createRenderPipelineAsync(desc);
+      }
+      return anyDevice.createRenderPipeline(desc);
+    };
+
+    const pipeline = await createPipeline({
+      label: 'environment-pipeline-cubemap',
+      layout: pipelineLayout,
+      vertex: {
+        module: shaderModule,
+        entryPoint: 'vertexMain',
+      },
+      fragment: {
+        module: shaderModule,
+        entryPoint: 'fragmentMain',
+        targets: [{ format: presentationFormat }],
+      },
+      primitive: {
+        topology: 'triangle-list',
+        cullMode: 'none',
+      },
+      depthStencil: {
+        format: 'depth24plus',
+        depthWriteEnabled: false, // Skybox is at infinity
+        depthCompare: 'less-equal',
+      },
+      multisample: {
+        count: sampleCount,
+      },
+    });
+
+    this.pipelines.set('cubemap', pipeline);
+  }
+
+  /**
+   * Generates a hash from environment parameters for cache key
+   */
+  private hashEnvironmentParams(environment: EnvironmentComponent): string {
+    const parts: string[] = [
+      environment.skyboxType,
+      `${environment.skyColor[0]},${environment.skyColor[1]},${environment.skyColor[2]}`,
+      `${environment.horizonColor[0]},${environment.horizonColor[1]},${environment.horizonColor[2]}`,
+      `${environment.sunDirection[0]},${environment.sunDirection[1]},${environment.sunDirection[2]}`,
+      `${environment.sunColor[0]},${environment.sunColor[1]},${environment.sunColor[2]}`,
+      `${environment.sunIntensity}`,
+    ];
+    return parts.join('|');
+  }
+
+  /**
    * Updates uniform data for the current frame
    */
   updateUniforms(inverseViewProjection: Mat4, cameraPosition: Vec3): void {
     if (!this.initialized) return;
+
+    // Only update if dirty or first time
+    if (!this.uniformsDirty) {
+      this.uniformsDirty = true; // Mark for potential update
+      // For now, always update (could optimize by comparing values)
+      // In the future, compare old vs new values before updating
+    }
 
     const data = new Float32Array(20); // 80 bytes
     let offset = 0;
@@ -337,67 +488,152 @@ export class EnvironmentRenderer {
   }
 
   /**
+   * Validates and clamps color values
+   */
+  private validateColor(color: Vec3, defaultValue: Vec3 = [0, 0, 0]): Vec3 {
+    const r = Number.isFinite(color[0]) ? Math.max(0, color[0]) : defaultValue[0];
+    const g = Number.isFinite(color[1]) ? Math.max(0, color[1]) : defaultValue[1];
+    const b = Number.isFinite(color[2]) ? Math.max(0, color[2]) : defaultValue[2];
+    return [r, g, b];
+  }
+
+  /**
+   * Validates and normalizes sun direction
+   */
+  private validateSunDirection(direction: Vec3): Vec3 {
+    const x = Number.isFinite(direction[0]) ? direction[0] : 0;
+    const y = Number.isFinite(direction[1]) ? direction[1] : 1;
+    const z = Number.isFinite(direction[2]) ? direction[2] : 0;
+    
+    const len = Math.sqrt(x * x + y * y + z * z);
+    if (len < 0.0001) {
+      return [0, 1, 0]; // Default upward direction
+    }
+    return [x / len, y / len, z / len];
+  }
+
+  /**
+   * Validates sun intensity (allows HDR > 1.0, clamps negative values)
+   */
+  private validateSunIntensity(intensity: number): number {
+    if (!Number.isFinite(intensity)) {
+      return 1.0;
+    }
+    return Math.max(0, intensity);
+  }
+
+  /**
    * Updates skybox parameters from environment component
    */
   updateParams(environment: EnvironmentComponent): void {
     if (!this.initialized) return;
+
+    this.paramsDirty = true;
 
     const type = environment.skyboxType;
     const data = new Float32Array(28); // 112 bytes max
     let offset = 0;
 
     switch (type) {
-      case 'solid':
+      case 'solid': {
         // skyColor (vec3 + padding)
-        data[offset++] = environment.skyColor[0];
-        data[offset++] = environment.skyColor[1];
-        data[offset++] = environment.skyColor[2];
+        const skyColor = this.validateColor(environment.skyColor, [0.05, 0.08, 0.12]);
+        data[offset++] = skyColor[0];
+        data[offset++] = skyColor[1];
+        data[offset++] = skyColor[2];
         data[offset++] = 0;
         break;
+      }
 
-      case 'gradient':
+      case 'gradient': {
         // skyColor (vec3 + padding)
-        data[offset++] = environment.skyColor[0];
-        data[offset++] = environment.skyColor[1];
-        data[offset++] = environment.skyColor[2];
+        const skyColor = this.validateColor(environment.skyColor, [0.05, 0.08, 0.12]);
+        data[offset++] = skyColor[0];
+        data[offset++] = skyColor[1];
+        data[offset++] = skyColor[2];
         data[offset++] = 0;
         // horizonColor (vec3 + padding)
-        data[offset++] = environment.horizonColor[0];
-        data[offset++] = environment.horizonColor[1];
-        data[offset++] = environment.horizonColor[2];
+        const horizonColor = this.validateColor(environment.horizonColor, [0.15, 0.18, 0.22]);
+        data[offset++] = horizonColor[0];
+        data[offset++] = horizonColor[1];
+        data[offset++] = horizonColor[2];
         data[offset++] = 0;
         // groundColor (vec3 + padding)
-        data[offset++] = environment.groundColor[0];
-        data[offset++] = environment.groundColor[1];
-        data[offset++] = environment.groundColor[2];
+        const groundColor = this.validateColor(environment.groundColor, [0.05, 0.06, 0.08]);
+        data[offset++] = groundColor[0];
+        data[offset++] = groundColor[1];
+        data[offset++] = groundColor[2];
         data[offset++] = 0;
         break;
+      }
 
-      case 'procedural-sky':
+      case 'procedural-sky': {
         // skyColor (vec3 + padding)
-        data[offset++] = environment.skyColor[0];
-        data[offset++] = environment.skyColor[1];
-        data[offset++] = environment.skyColor[2];
+        const skyColor = this.validateColor(environment.skyColor, [0.05, 0.08, 0.12]);
+        data[offset++] = skyColor[0];
+        data[offset++] = skyColor[1];
+        data[offset++] = skyColor[2];
         data[offset++] = 0;
         // horizonColor (vec3 + padding)
-        data[offset++] = environment.horizonColor[0];
-        data[offset++] = environment.horizonColor[1];
-        data[offset++] = environment.horizonColor[2];
+        const horizonColor = this.validateColor(environment.horizonColor, [0.15, 0.18, 0.22]);
+        data[offset++] = horizonColor[0];
+        data[offset++] = horizonColor[1];
+        data[offset++] = horizonColor[2];
         data[offset++] = 0;
         // sunDirection (vec3 + padding)
-        data[offset++] = environment.sunDirection[0];
-        data[offset++] = environment.sunDirection[1];
-        data[offset++] = environment.sunDirection[2];
+        const sunDirection = this.validateSunDirection(environment.sunDirection);
+        data[offset++] = sunDirection[0];
+        data[offset++] = sunDirection[1];
+        data[offset++] = sunDirection[2];
         data[offset++] = 0;
         // sunColor + sunIntensity (vec3 + f32)
-        data[offset++] = environment.sunColor[0];
-        data[offset++] = environment.sunColor[1];
-        data[offset++] = environment.sunColor[2];
-        data[offset++] = environment.sunIntensity;
+        const sunColor = this.validateColor(environment.sunColor, [1.0, 0.95, 0.8]);
+        const sunIntensity = this.validateSunIntensity(environment.sunIntensity);
+        data[offset++] = sunColor[0];
+        data[offset++] = sunColor[1];
+        data[offset++] = sunColor[2];
+        data[offset++] = sunIntensity;
         break;
+      }
+
+      case 'cubemap': {
+        // For cubemap, we still write placeholder data to params buffer (for bind group compatibility)
+        // Actual texture is bound separately in cubemap bind group
+        data[offset++] = 0;
+        data[offset++] = 0;
+        data[offset++] = 0;
+        data[offset++] = 0;
+        break;
+      }
     }
 
     this.device.queue.writeBuffer(this.paramsBuffer, 0, data.buffer, data.byteOffset, data.byteLength);
+
+    // Handle cubemap bind group separately
+    if (type === 'cubemap') {
+      const cubemapTexture = (environment as any).cubemapTexture as GPUTexture | undefined;
+      if (cubemapTexture) {
+        // Create/update cubemap bind group
+        this.cubemapBindGroup = this.device.createBindGroup({
+          label: 'environment-cubemap-bind-group',
+          layout: this.cubemapBindGroupLayout,
+          entries: [
+            {
+              binding: 0,
+              resource: { buffer: this.paramsBuffer }, // Placeholder uniform
+            },
+            {
+              binding: 1,
+              resource: this.cubemapSampler,
+            },
+            {
+              binding: 2,
+              resource: cubemapTexture.createView({ dimension: 'cube' }),
+            },
+          ],
+        });
+      }
+    }
 
     // Create/update params bind group for this type if needed
     if (!this.paramsBindGroups.has(type)) {
@@ -413,6 +649,8 @@ export class EnvironmentRenderer {
       });
       this.paramsBindGroups.set(type, bindGroup);
     }
+
+    this.paramsDirty = false;
   }
 
   /**
@@ -423,17 +661,388 @@ export class EnvironmentRenderer {
 
     const type = environment.skyboxType;
     const pipeline = this.pipelines.get(type);
-    const paramsBindGroup = this.paramsBindGroups.get(type);
 
-    if (!pipeline || !paramsBindGroup) {
-      console.warn(`No pipeline or bind group for skybox type: ${type}`);
+    if (!pipeline) {
+      console.warn(`No pipeline for skybox type: ${type}`);
       return;
     }
 
     passEncoder.setPipeline(pipeline);
     passEncoder.setBindGroup(0, this.uniformBindGroup);
-    passEncoder.setBindGroup(1, paramsBindGroup);
+
+    if (type === 'cubemap') {
+      if (!this.cubemapBindGroup) {
+        console.warn('No cubemap bind group available');
+        return;
+      }
+      passEncoder.setBindGroup(1, this.cubemapBindGroup);
+    } else {
+      const paramsBindGroup = this.paramsBindGroups.get(type);
+      if (!paramsBindGroup) {
+        console.warn(`No bind group for skybox type: ${type}`);
+        return;
+      }
+      passEncoder.setBindGroup(1, paramsBindGroup);
+    }
+
     passEncoder.draw(3, 1, 0, 0); // Full-screen triangle
+  }
+
+  /**
+   * Creates a cubemap texture from 6 individual face images
+   * @param faces Array of 6 ImageBitmap or HTMLImageElement (in order: +X, -X, +Y, -Y, +Z, -Z)
+   * @param path Optional path/identifier for caching
+   */
+  async loadCubemapFromFaces(
+    faces: Array<ImageBitmap | HTMLImageElement>,
+    path?: string
+  ): Promise<GPUTexture> {
+    if (!this.initialized) throw new Error('EnvironmentRenderer not initialized');
+    if (faces.length !== 6) throw new Error('Cubemap requires exactly 6 faces');
+
+    // Check cache first
+    if (path && this.cubemapCache.has(path)) {
+      return this.cubemapCache.get(path)!;
+    }
+
+    const firstFace = faces[0];
+    if (!firstFace) throw new Error('First cubemap face is missing');
+
+    const width = firstFace.width;
+    const height = firstFace.height;
+
+    // Create cubemap texture
+    const cubemapTexture = this.device.createTexture({
+      label: path ? `cubemap-${path}` : 'cubemap',
+      size: { width, height, depthOrArrayLayers: 6 },
+      format: 'rgba8unorm',
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+
+    // Upload each face
+    for (let face = 0; face < 6; face++) {
+      const faceImage = faces[face];
+      if (!faceImage) throw new Error(`Cubemap face ${face} is missing`);
+      await this.device.queue.copyExternalImageToTexture(
+        { source: faceImage, flipY: false },
+        { texture: cubemapTexture, origin: [0, 0, face] },
+        { width, height }
+      );
+    }
+
+    // Cache it
+    if (path) {
+      this.cubemapCache.set(path, cubemapTexture);
+    }
+
+    return cubemapTexture;
+  }
+
+  /**
+   * Loads HDR file and converts to cubemap texture
+   * @param source File, URL, or ArrayBuffer containing HDR data
+   * @param resolution Resolution for each cubemap face
+   * @param path Optional path for caching
+   */
+  async loadHdrCubemap(
+    source: string | File | ArrayBuffer,
+    resolution = 512,
+    path?: string
+  ): Promise<GPUTexture> {
+    if (!this.initialized) throw new Error('EnvironmentRenderer not initialized');
+
+    // Check cache
+    if (path && this.cubemapCache.has(path)) {
+      return this.cubemapCache.get(path)!;
+    }
+
+    // Load and parse HDR
+    let hdrData: { width: number; height: number; data: Float32Array };
+    if (source instanceof ArrayBuffer) {
+      hdrData = parseHdrFile(source);
+    } else {
+      hdrData = await loadHdrFile(source);
+    }
+
+    // Convert to cubemap
+    return this.convertHdrToCubemap(hdrData, resolution, path);
+  }
+
+  /**
+   * Clears cubemap from cache
+   */
+  clearCubemapCache(path: string): void {
+    const texture = this.cubemapCache.get(path);
+    if (texture) {
+      texture.destroy();
+      this.cubemapCache.delete(path);
+    }
+  }
+
+  /**
+   * Converts HDR equirectangular image to cubemap
+   * @param hdrData HDR image data (width x height x 4 RGBA float32)
+   * @param resolution Resolution for each cubemap face
+   * @param path Optional path for caching
+   */
+  async convertHdrToCubemap(
+    hdrData: { width: number; height: number; data: Float32Array },
+    resolution = 512,
+    path?: string
+  ): Promise<GPUTexture> {
+    if (!this.initialized) throw new Error('EnvironmentRenderer not initialized');
+
+    // Check cache
+    if (path && this.cubemapCache.has(path)) {
+      return this.cubemapCache.get(path)!;
+    }
+
+    // Create HDR source texture from Float32Array data
+    const hdrTexture = this.device.createTexture({
+      label: 'hdr-source-texture',
+      size: [hdrData.width, hdrData.height, 1],
+      format: 'rgba32float',
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+
+    // Upload HDR data to texture via staging buffer
+    const bytesPerPixel = 16; // rgba32float = 4 * 4 bytes
+    const bufferSize = hdrData.width * hdrData.height * bytesPerPixel;
+    const stagingBuffer = this.device.createBuffer({
+      label: 'hdr-staging-buffer',
+      size: bufferSize,
+      usage: GPUBufferUsage.COPY_SRC,
+      mappedAtCreation: true,
+    });
+
+    const mappedRange = stagingBuffer.getMappedRange();
+    new Float32Array(mappedRange).set(hdrData.data);
+    stagingBuffer.unmap();
+
+    // Copy staging buffer to texture
+    const encoder = this.device.createCommandEncoder({ label: 'hdr-upload-encoder' });
+    encoder.copyBufferToTexture(
+      { buffer: stagingBuffer, bytesPerRow: hdrData.width * bytesPerPixel, rowsPerImage: hdrData.height },
+      { texture: hdrTexture },
+      [hdrData.width, hdrData.height, 1]
+    );
+    this.device.queue.submit([encoder.finish()]);
+    stagingBuffer.destroy();
+
+    // Create cubemap texture (rgba16float for HDR)
+    const cubemapTexture = this.device.createTexture({
+      label: path ? `hdr-cubemap-${path}` : 'hdr-cubemap',
+      size: { width: resolution, height: resolution, depthOrArrayLayers: 6 },
+      format: 'rgba16float',
+      usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+    });
+
+    // Create sampler for HDR texture
+    const hdrSampler = this.device.createSampler({
+      label: 'hdr-sampler',
+      magFilter: 'linear',
+      minFilter: 'linear',
+      addressModeU: 'clamp-to-edge',
+      addressModeV: 'clamp-to-edge',
+    });
+
+    // Create bind group layout for equirectangular to cubemap conversion
+    const conversionBindGroupLayout = this.device.createBindGroupLayout({
+      label: 'hdr-conversion-bgl',
+      entries: [
+        {
+          binding: 0,
+          visibility: GPUShaderStage.FRAGMENT,
+          sampler: {},
+        },
+        {
+          binding: 1,
+          visibility: GPUShaderStage.FRAGMENT,
+          texture: {},
+        },
+      ],
+    });
+
+    // Shader for equirectangular to cubemap conversion
+    const conversionShader = this.device.createShaderModule({
+      label: 'hdr-conversion-shader',
+      code: /* wgsl */ `
+struct VSOut {
+  @builtin(position) pos: vec4f,
+  @location(0) uv: vec2f,
+}
+
+@vertex
+fn vs(@builtin(vertex_index) vid: u32) -> VSOut {
+  var out: VSOut;
+  let x = f32((vid << 1u) & 2u);
+  let y = f32(vid & 2u);
+  out.pos = vec4f(x * 2.0 - 1.0, y * -2.0 + 1.0, 0.0, 1.0);
+  out.uv = vec2f(x, y);
+  return out;
+}
+
+struct FaceInfo {
+  faceIndex: u32,
+  _pad: vec3<u32>,
+}
+
+@group(0) @binding(0) var hdrSampler: sampler;
+@group(0) @binding(1) var hdrTexture: texture_2d<f32>;
+@group(1) @binding(0) var<uniform> faceInfo: FaceInfo;
+
+// Convert cubemap face UV to direction vector
+fn faceUVToDir(faceIndex: u32, uv: vec2<f32>) -> vec3<f32> {
+  let a = uv * 2.0 - vec2<f32>(1.0, 1.0);
+  switch (i32(faceIndex)) {
+    case 0: { return normalize(vec3<f32>( 1.0, -a.y, -a.x)); } // +X
+    case 1: { return normalize(vec3<f32>(-1.0, -a.y,  a.x)); } // -X
+    case 2: { return normalize(vec3<f32>( a.x,  1.0,  a.y)); } // +Y
+    case 3: { return normalize(vec3<f32>( a.x, -1.0, -a.y)); } // -Y
+    case 4: { return normalize(vec3<f32>( a.x, -a.y,  1.0)); } // +Z
+    default: { return normalize(vec3<f32>(-a.x, -a.y, -1.0)); } // -Z
+  }
+}
+
+// Convert direction vector to equirectangular UV
+fn dirToEquirectUV(dir: vec3<f32>) -> vec2<f32> {
+  let theta = atan2(dir.x, dir.z);
+  let phi = acos(clamp(dir.y, -1.0, 1.0));
+  return vec2<f32>(
+    (theta + 3.14159265359) / (2.0 * 3.14159265359),
+    phi / 3.14159265359
+  );
+}
+
+@fragment
+fn fs(input: VSOut) -> @location(0) vec4<f32> {
+  let dir = faceUVToDir(faceInfo.faceIndex, input.uv);
+  let uv = dirToEquirectUV(dir);
+  let color = textureSample(hdrTexture, hdrSampler, uv);
+  return color;
+}
+`,
+    });
+
+    // Create pipeline for conversion
+    const faceInfoLayout = this.device.createBindGroupLayout({
+      label: 'hdr-face-info-layout',
+      entries: [
+        {
+          binding: 0,
+          visibility: GPUShaderStage.FRAGMENT,
+          buffer: { type: 'uniform' },
+        },
+      ],
+    });
+
+    const conversionPipeline = await (this.device as any).createRenderPipelineAsync?.({
+      label: 'hdr-conversion-pipeline',
+      layout: this.device.createPipelineLayout({
+        bindGroupLayouts: [conversionBindGroupLayout, faceInfoLayout],
+      }),
+      vertex: {
+        module: conversionShader,
+        entryPoint: 'vs',
+      },
+      fragment: {
+        module: conversionShader,
+        entryPoint: 'fs',
+        targets: [{ format: 'rgba16float' }],
+      },
+      primitive: {
+        topology: 'triangle-list',
+        cullMode: 'none',
+      },
+    }) ?? this.device.createRenderPipeline({
+      label: 'hdr-conversion-pipeline',
+      layout: this.device.createPipelineLayout({
+        bindGroupLayouts: [conversionBindGroupLayout, faceInfoLayout],
+      }),
+      vertex: {
+        module: conversionShader,
+        entryPoint: 'vs',
+      },
+      fragment: {
+        module: conversionShader,
+        entryPoint: 'fs',
+        targets: [{ format: 'rgba16float' }],
+      },
+      primitive: {
+        topology: 'triangle-list',
+        cullMode: 'none',
+      },
+    });
+
+    // Create bind group for HDR texture
+    const hdrBindGroup = this.device.createBindGroup({
+      label: 'hdr-bind-group',
+      layout: conversionBindGroupLayout,
+      entries: [
+        { binding: 0, resource: hdrSampler },
+        { binding: 1, resource: hdrTexture.createView() },
+      ],
+    });
+
+    // Face info buffer (32 bytes for uniform padding)
+    const faceInfoBuffer = this.device.createBuffer({
+      label: 'hdr-face-info-buffer',
+      size: 32,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+
+    const faceInfoBgLayout = conversionPipeline.getBindGroupLayout(1);
+
+    // Render each cubemap face
+    const renderEncoder = this.device.createCommandEncoder({ label: 'hdr-cubemap-encoder' });
+    for (let face = 0; face < 6; face++) {
+      const faceView = cubemapTexture.createView({
+        baseArrayLayer: face,
+        arrayLayerCount: 1,
+      });
+
+      const pass = renderEncoder.beginRenderPass({
+        label: `hdr-cubemap-face-${face}`,
+        colorAttachments: [
+          {
+            view: faceView,
+            clearValue: { r: 0, g: 0, b: 0, a: 1 },
+            loadOp: 'clear',
+            storeOp: 'store',
+          },
+        ],
+      });
+
+      // Update face index
+      const faceData = new Uint32Array(8);
+      faceData[0] = face;
+      this.device.queue.writeBuffer(faceInfoBuffer, 0, faceData);
+
+      const faceBindGroup = this.device.createBindGroup({
+        label: `hdr-face-bg-${face}`,
+        layout: faceInfoBgLayout,
+        entries: [{ binding: 0, resource: { buffer: faceInfoBuffer } }],
+      });
+
+      pass.setPipeline(conversionPipeline);
+      pass.setBindGroup(0, hdrBindGroup);
+      pass.setBindGroup(1, faceBindGroup);
+      pass.draw(3, 1, 0, 0);
+      pass.end();
+    }
+
+    this.device.queue.submit([renderEncoder.finish()]);
+
+    // Cleanup intermediate resources
+    faceInfoBuffer.destroy();
+    hdrTexture.destroy();
+
+    // Cache it
+    if (path) {
+      this.cubemapCache.set(path, cubemapTexture);
+    }
+
+    return cubemapTexture;
   }
 
   /**
@@ -446,6 +1055,20 @@ export class EnvironmentRenderer {
     this.paramsBuffer?.destroy();
     this.pipelines.clear();
     this.paramsBindGroups.clear();
+
+    // Cleanup cubemap cache
+    for (const texture of this.cubemapCache.values()) {
+      texture.destroy();
+    }
+    this.cubemapCache.clear();
+
+    // Cleanup IBL cache
+    for (const cached of this.iblCache.values()) {
+      cached.brdfLut.destroy();
+      cached.envCube.destroy();
+    }
+    this.iblCache.clear();
+
     this.initialized = false;
   }
 
@@ -453,11 +1076,62 @@ export class EnvironmentRenderer {
   getEnvCubeTexture(): GPUTexture | null { return this.envCube; }
 
   /**
+   * Gets cached IBL resources or generates new ones
+   */
+  private getCachedIBLResources(environment: EnvironmentComponent, hash: string): { brdfLut: GPUTexture; envCube: GPUTexture } | null {
+    const cached = this.iblCache.get(hash);
+    if (cached) {
+      return { brdfLut: cached.brdfLut, envCube: cached.envCube };
+    }
+    return null;
+  }
+
+  /**
+   * Evicts oldest IBL cache entry if at max size
+   */
+  private evictOldestIBLCache(): void {
+    if (this.iblCache.size < this.iblCacheMaxSize) {
+      return;
+    }
+
+    let oldestKey: string | null = null;
+    let oldestTime = Infinity;
+
+    for (const [key, value] of this.iblCache.entries()) {
+      if (value.timestamp < oldestTime) {
+        oldestTime = value.timestamp;
+        oldestKey = key;
+      }
+    }
+
+    if (oldestKey) {
+      const cached = this.iblCache.get(oldestKey);
+      if (cached) {
+        cached.brdfLut.destroy();
+        cached.envCube.destroy();
+      }
+      this.iblCache.delete(oldestKey);
+    }
+  }
+
+  /**
    * Generates IBL resources: BRDF LUT (2D) and environment cubemap from procedural sky.
    * Returns generated textures for binding.
+   * Uses cache to avoid regenerating for same environment parameters.
    */
-  async prepareIBLResources(resolution = 128): Promise<{ brdfLut: GPUTexture; envCube: GPUTexture }> {
+  async prepareIBLResources(environment: EnvironmentComponent, resolution = 128): Promise<{ brdfLut: GPUTexture; envCube: GPUTexture }> {
     if (!this.initialized) throw new Error('EnvironmentRenderer not initialized');
+
+    // Only cache for procedural-sky type
+    if (environment.skyboxType === 'procedural-sky') {
+      const hash = this.hashEnvironmentParams(environment);
+      const cached = this.getCachedIBLResources(environment, hash);
+      if (cached) {
+        this.brdfLut = cached.brdfLut;
+        this.envCube = cached.envCube;
+        return cached;
+      }
+    }
     // BRDF LUT via compute
     const encoder = this.device.createCommandEncoder({ label: 'ibl-precompute-encoder' });
     const brdfGen = new BrdfLutPass(this.device);
@@ -496,23 +1170,11 @@ fn faceUVToDir(faceIndex:u32, uv: vec2<f32>) -> vec3<f32> {
   }
 }
 
-fn atmosphericScattering(viewDir: vec3f, sunDir: vec3f) -> vec3f {
-  let elevation = viewDir.y;
-  let sunDot = max(dot(viewDir, sunDir), 0.0);
-  let skyGradient = pow(max(elevation, 0.0), 0.4);
-  let horizonFade = pow(1.0 - abs(elevation), 2.0);
-  var skyColor = mix(params.horizonColor, params.skyColor, skyGradient);
-  let sunRadius = 0.02;
-  let sunGlow = pow(sunDot, 512.0);
-  let sunHalo = pow(sunDot, 8.0) * 0.5;
-  let sunContribution = (sunGlow + sunHalo) * params.sunColor * params.sunIntensity;
-  let atmosphericGlow = horizonFade * pow(max(dot(viewDir, sunDir), 0.0), 4.0) * params.sunColor * 0.3;
-  return skyColor + sunContribution + atmosphericGlow;
-}
+${ATMOSPHERIC_SCATTERING_FUNCTION}
 
 @fragment fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
   let dir = faceUVToDir(face.faceIndex, uv);
-  let color = atmosphericScattering(normalize(dir), normalize(params.sunDirection));
+  let color = atmosphericScattering(normalize(dir), normalize(params.sunDirection), params.skyColor, params.horizonColor, params.sunColor, params.sunIntensity);
   return vec4<f32>(color, 1.0);
 }
 `,
@@ -553,7 +1215,21 @@ fn atmosphericScattering(viewDir: vec3f, sunDir: vec3f) -> vec3f {
     }
 
     this.device.queue.submit([encoder.finish()]);
-    return { brdfLut: this.brdfLut!, envCube: this.envCube! };
+
+    const result = { brdfLut: this.brdfLut!, envCube: this.envCube! };
+
+    // Cache IBL resources for procedural-sky
+    if (environment.skyboxType === 'procedural-sky') {
+      const hash = this.hashEnvironmentParams(environment);
+      this.evictOldestIBLCache();
+      this.iblCache.set(hash, {
+        brdfLut: this.brdfLut!,
+        envCube: this.envCube!,
+        timestamp: Date.now(),
+      });
+    }
+
+    return result;
   }
 }
 

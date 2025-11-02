@@ -1,4 +1,10 @@
 use wasm_bindgen::prelude::*;
+
+#[cfg(feature = "panic-hook")]
+#[wasm_bindgen]
+pub fn init_panic_hook() {
+    console_error_panic_hook::set_once();
+}
 use std::collections::HashMap;
 
 const EPSILON: f32 = 1e-4;
@@ -289,11 +295,15 @@ pub fn batch_check_trs(
     let mut halves: Vec<[f32;3]> = Vec::with_capacity(n);
     let mut mins: Vec<[f32;3]> = Vec::with_capacity(n);
     let mut maxs: Vec<[f32;3]> = Vec::with_capacity(n);
-    centers.set_len(n);
-    axess.set_len(n);
-    halves.set_len(n);
-    mins.set_len(n);
-    maxs.set_len(n);
+    // SAFETY: vectors hold plain-old-data (`[f32; N]`). Every slot is written
+    // immediately after this block and before any potential early return.
+    unsafe {
+        centers.set_len(n);
+        axess.set_len(n);
+        halves.set_len(n);
+        mins.set_len(n);
+        maxs.set_len(n);
+    }
 
     // Compute cell size heuristic (based on preview diameter)
     let mut cell_size = (pre_half[0].max(pre_half[1]).max(pre_half[2])) * 2.0;

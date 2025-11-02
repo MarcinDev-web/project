@@ -2,14 +2,17 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "rootDir": "./src",
     "composite": true,
     "declaration": true,
     "declarationMap": true,
-    "sourceMap": true
+    "sourceMap": true,
+    "paths": {
+      "@engine/world-server": ["../world-server/dist"],
+      "@engine/world-server/*": ["../world-server/dist/*"]
+    }
   },
   "include": ["src/**/*"],
-  "exclude": ["__tests__", "dist", "node_modules"],
+  "exclude": ["__tests__", "dist", "node_modules", "../world-server/src"],
   "references": [
     { "path": "../core" },
     { "path": "../world" }

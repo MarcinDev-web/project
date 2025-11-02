@@ -2,6 +2,7 @@ import { LogicCubeRegistry } from '../LogicCubeSystem';
 // Import specific cubes for registration
 import { OnClickTrigger, OnTimerTrigger, OnGameStartTrigger, OnPlayerEnterTrigger, OnPlayerLeaveTrigger, } from './TriggerCubes';
 import { SendMessageAction, SetVariableAction, SpawnEntityAction, DestroyEntityAction, LogAction, } from './ActionCubes';
+import { UIButtonClickTrigger, UIShowElementAction, UISetTextAction, UISetImageAction, UISetValueAction, UIEnableElementAction, } from './UICubes';
 import { CompareVariableCondition, IsPlayerNearCondition, CheckDistanceCondition, } from './ConditionCubes';
 import { VariableData, CounterData, TimerData } from './DataCubes';
 import { ANDGate, ORGate, NOTGate, DelayGate } from './LogicGateCubes';
@@ -34,5 +35,12 @@ export function registerBuiltInLogicCubes() {
     LogicCubeRegistry.register('orGate', ORGate);
     LogicCubeRegistry.register('notGate', NOTGate);
     LogicCubeRegistry.register('delayGate', DelayGate);
+    // UI Cubes
+    LogicCubeRegistry.register('uiButtonClick', UIButtonClickTrigger);
+    LogicCubeRegistry.register('uiShowElement', UIShowElementAction);
+    LogicCubeRegistry.register('uiSetText', UISetTextAction);
+    LogicCubeRegistry.register('uiSetImage', UISetImageAction);
+    LogicCubeRegistry.register('uiSetValue', UISetValueAction);
+    LogicCubeRegistry.register('uiEnableElement', UIEnableElementAction);
 }
 //# sourceMappingURL=registry.js.map

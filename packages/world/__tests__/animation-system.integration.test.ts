@@ -1,15 +1,15 @@
 import { describe, it, expect } from 'vitest';
 import { Scene } from '@engine/world';
 import { AnimatorComponent, SkeletalBindingComponent } from '@engine/world';
-import { AnimationSystem } from '@engine/world';
+import { AnimationSystem } from '@engine/world/systems';
 import { AnimatorController, createClip, createSkeleton } from '@engine/animation';
 
 describe('AnimationSystem integration', () => {
   it('updates joint palette each frame', () => {
     const scene = new Scene('test');
     const entity = scene.createEntity('char');
-    const anim = entity.addComponent(AnimatorComponent);
-    const bind = entity.addComponent(SkeletalBindingComponent);
+    const anim = entity.addComponent(new AnimatorComponent());
+    const bind = entity.addComponent(new SkeletalBindingComponent());
 
     // Minimal skeleton: 1 joint root with identity inverse bind
     const joints = [{ name: 'root' }];

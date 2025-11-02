@@ -68,6 +68,56 @@ describe('WASM vs TS OBB intersect parity', () => {
       expect(wa).toBe(ts);
     }
   });
+
+  it('matches results for deterministic edge cases', async () => {
+    let wasm: Awaited<ReturnType<typeof initWasm>> | null = null;
+    try {
+      wasm = await initWasm();
+    } catch {
+      return;
+    }
+
+    const cases: Array<{
+      a: OBB;
+      b: OBB;
+    }> = [];
+
+    // Extremely thin vs aligned box
+    cases.push({
+      a: obbFromTRS([0, 0, 0], [0, 0, 0, 1], [0.002, 10, 10]),
+      b: obbFromTRS([0.001, 0, 0], [0, 0, 0, 1], [2, 2, 2]),
+    });
+
+    // Very large scales with rotation near 180 degrees
+    cases.push({
+      a: obbFromTRS([1000, -500, 200], [0.01, 0.99, 0.01, -0.02], [4000, 8000, 2000]),
+      b: obbFromTRS([999.5, -500.5, 199.8], [0.02, -0.98, 0.12, 0.15], [3900, 7800, 2100]),
+    });
+
+    // One degenerate (zero scale on one axis) vs regular box
+    cases.push({
+      a: obbFromTRS([2, 2, 2], [0, 0, 0, 1], [2, 2, 0.0001]),
+      b: obbFromTRS([2, 2, 2.001], [0.1, 0.1, 0.1, 0.97], [1, 1, 1]),
+    });
+
+    // Parallel but just-separated boxes to test epsilon boundaries
+    cases.push({
+      a: obbFromTRS([0, 0, 0], [0, 0, 0, 1], [1, 1, 1]),
+      b: obbFromTRS([1.0001, 0, 0], [0, 0, 0, 1], [1, 1, 1]),
+    });
+
+    // Highly skewed rotations
+    cases.push({
+      a: obbFromTRS([5, -3, 8], [0.3, 0.4, 0.5, 0.7], [0.3, 10, 0.2]),
+      b: obbFromTRS([5.15, -2.5, 8.4], [-0.6, 0.1, 0.2, 0.75], [6, 0.4, 12]),
+    });
+
+    for (const { a, b } of cases) {
+      const ts = CollisionDetector.obbIntersect(a, b);
+      const wa = wasm!.obbIntersect(flattenObb(a) as any, flattenObb(b) as any);
+      expect(wa).toBe(ts);
+    }
+  });
 });
 
 
