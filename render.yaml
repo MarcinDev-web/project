@@ -45,15 +45,14 @@ services:
       - key: FRONTEND_URL
         value: https://your-app.vercel.app
 
-  - type: pg
-    name: collab-db
+databases:
+  - name: collab-db
     plan: starter
     region: frankfurt
     databaseName: collab
     user: collab
 
-  - type: pg
-    name: net-server-db
+  - name: net-server-db
     plan: starter
     region: frankfurt
     databaseName: net_server
