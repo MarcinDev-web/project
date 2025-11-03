@@ -1,10 +1,10 @@
 import type { Scene } from '@engine/world';
-import { ScriptComponent } from '../components/ScriptComponent';
-import type { BehaviorInstance } from '../behavior/Behavior';
-import { SceneScriptContextBuilder } from '../services/SceneScriptContextBuilder';
-import { BehaviorRegistry } from '../behavior/BehaviorRegistry';
-import { CoroutineScheduler } from '../coroutine/CoroutineScheduler';
-import type { ScriptRuntime } from '../LogicCubes/types';
+import { ScriptComponent } from '../components/ScriptComponent.js';
+import type { BehaviorInstance } from '../behavior/Behavior.js';
+import { SceneScriptContextBuilder } from '../services/SceneScriptContextBuilder.js';
+import { BehaviorRegistry } from '../behavior/BehaviorRegistry.js';
+import { CoroutineScheduler } from '../coroutine/CoroutineScheduler.js';
+import type { ScriptRuntime } from '../LogicCubes/types.js';
 
 /**
  * Runs Behavior instances on entities with ScriptComponent.

@@ -4,15 +4,15 @@
  * Easy-to-use functions for creators to set up and manage weapons, attachments, ammo, and inventory.
  */
 
-import type { Entity } from '../core/Entity';
-import { WeaponComponent } from '../components/WeaponComponent';
-import { AttachmentComponent } from '../components/AttachmentComponent';
-import { AmmoComponent } from '../components/AmmoComponent';
-import { InventoryComponent, type InventoryComponentData } from '../components/InventoryComponent';
-import { createWeapon } from '../factories/WeaponFactory';
-import { getAttachment, getAllAttachments, getAttachmentsByType } from '../data/attachments';
-import { getAmmoType, getAllAmmoTypes } from '../data/ammo';
-import type { WeaponPresetType, AttachmentType, AmmoType } from '../types/weapon';
+import type { Entity } from '../core/Entity.js';
+import { WeaponComponent } from '../components/WeaponComponent.js';
+import { AttachmentComponent } from '../components/AttachmentComponent.js';
+import { AmmoComponent } from '../components/AmmoComponent.js';
+import { InventoryComponent, type InventoryComponentData } from '../components/InventoryComponent.js';
+import { createWeapon } from '../factories/WeaponFactory.js';
+import { getAttachment, getAllAttachments, getAttachmentsByType } from '../data/attachments.js';
+import { getAmmoType, getAllAmmoTypes } from '../data/ammo.js';
+import type { WeaponPresetType, AttachmentType, AmmoType } from '../types/weapon.js';
 
 /**
  * Setup a weapon entity with weapon, attachments, and ammo

@@ -6,12 +6,13 @@ import { afterEach, beforeEach } from 'vitest';
 import type { Express } from 'express';
 import { app } from '../server';
 import { createDbPool, ensureSchema } from '../lib/db';
-import type { Pool } from 'pg';
+// @ts-expect-error - Prisma client is generated at build time
+import type { PrismaClient } from '../../node_modules/.prisma/net-client';
 import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
 
-let testDbPool: Pool | null = null;
+let testDbPool: PrismaClient | null = null;
 let testDataDir: string | null = null;
 
 /**
@@ -19,7 +20,7 @@ let testDataDir: string | null = null;
  */
 export async function setupTestEnvironment(): Promise<{
   app: Express;
-  dbPool: Pool | null;
+  dbPool: PrismaClient | null;
   dataDir: string;
 }> {
   // Create temporary data directory for JSON storage tests
@@ -28,8 +29,8 @@ export async function setupTestEnvironment(): Promise<{
   // Setup database if DATABASE_URL is available
   if (process.env.DATABASE_URL) {
     try {
-      testDbPool = createDbPool();
-      await ensureSchema(testDbPool);
+      testDbPool = await createDbPool();
+      await ensureSchema();
     } catch (error) {
       console.warn('Failed to setup test database:', error);
       testDbPool = null;
@@ -50,18 +51,10 @@ export async function cleanupTestEnvironment(): Promise<void> {
   // Cleanup database if used
   if (testDbPool) {
     try {
-      // Cleanup test data from database
-      const client = await testDbPool.connect();
-      try {
-        await client.query('DELETE FROM marketplace_builds');
-        await client.query('DELETE FROM marketplace_items');
-        await client.query('DELETE FROM users');
-        // Reset sequences if any
-        await client.query('TRUNCATE TABLE marketplace_items RESTART IDENTITY CASCADE');
-        await client.query('TRUNCATE TABLE users RESTART IDENTITY CASCADE');
-      } finally {
-        client.release();
-      }
+      // Cleanup test data from database using Prisma
+      await testDbPool.marketplaceBuild.deleteMany();
+      await testDbPool.marketplaceItem.deleteMany();
+      // Note: users table doesn't exist in Prisma schema, skip it
     } catch (error) {
       console.warn('Failed to cleanup test database:', error);
     }

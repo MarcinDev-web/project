@@ -2,21 +2,21 @@
  * WeaponSystem - Manages weapon firing, hit-scan, and projectile spawning
  */
 
-import type { Scene } from '../core/Scene';
-import type { Entity } from '../core/Entity';
-import { WeaponComponent } from '../components/WeaponComponent';
-import { ProjectileComponent } from '../components/ProjectileComponent';
-import { HealthComponent } from '../components/HealthComponent';
-import { PhysicsComponent, RigidbodyType } from '../components/PhysicsComponent';
-import { InventoryComponent } from '../components/InventoryComponent';
-import { AttachmentComponent } from '../components/AttachmentComponent';
-import { Raycaster, type Ray } from './Raycaster';
+import type { Scene } from '../core/Scene.js';
+import type { Entity } from '../core/Entity.js';
+import { WeaponComponent } from '../components/WeaponComponent.js';
+import { ProjectileComponent } from '../components/ProjectileComponent.js';
+import { HealthComponent } from '../components/HealthComponent.js';
+import { PhysicsComponent, RigidbodyType } from '../components/PhysicsComponent.js';
+import { InventoryComponent } from '../components/InventoryComponent.js';
+import { AttachmentComponent } from '../components/AttachmentComponent.js';
+import { Raycaster, type Ray } from './Raycaster.js';
 import type {
   WeaponFireEvent,
   WeaponReloadEvent,
-} from '../types/weapon';
+} from '../types/weapon.js';
 import type { Vec3 } from '@engine/core/math';
-import { getAmmoType } from '../data/ammo';
+import { getAmmoType } from '../data/ammo.js';
 import {
   normalizeVec3Out,
   crossVec3Out,

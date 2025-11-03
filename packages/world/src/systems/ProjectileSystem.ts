@@ -2,12 +2,12 @@
  * ProjectileSystem - Manages projectile entities (movement, collision, damage, cleanup)
  */
 
-import type { Scene } from '../core/Scene';
-import type { Entity } from '../core/Entity';
-import { ProjectileComponent } from '../components/ProjectileComponent';
-import { HealthComponent } from '../components/HealthComponent';
-import type { PhysicsSystem, CollisionEvent } from '../physics/PhysicsSystem';
-import type { ProjectileHitEvent } from '../types/weapon';
+import type { Scene } from '../core/Scene.js';
+import type { Entity } from '../core/Entity.js';
+import { ProjectileComponent } from '../components/ProjectileComponent.js';
+import { HealthComponent } from '../components/HealthComponent.js';
+import type { PhysicsSystem, CollisionEvent } from '../physics/PhysicsSystem.js';
+import type { ProjectileHitEvent } from '../types/weapon.js';
 import type { Vec3 } from '@engine/core/math';
 
 /**

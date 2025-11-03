@@ -1,6 +1,5 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import type { PrismaClient } from '../node_modules/.prisma/collab-client';
 import { randomUUID } from 'node:crypto';
 import { verifyJwtFromRequest } from './auth.js';
 import { broadcastToSession } from '../ws/server.js';
@@ -16,7 +15,7 @@ const saveSchema = z.object({
   payload: z.any(),
 });
 
-export function registerSessionRoutes(app: FastifyInstance, prisma: PrismaClient): void {
+export function registerSessionRoutes(app: FastifyInstance, prisma: any): void {
   app.post('/session', async (req, reply) => {
     const auth = verifyJwtFromRequest(req);
     if (!auth) return reply.status(401).send({ error: 'Unauthorized' });
@@ -25,7 +24,7 @@ export function registerSessionRoutes(app: FastifyInstance, prisma: PrismaClient
       const sessionId = body.sessionId ?? randomUUID();
       
       // Create session and ensure membership in transaction
-      await prisma.$transaction(async (tx) => {
+      await prisma.$transaction(async (tx: any) => {
         await tx.session.upsert({
           where: { id: sessionId },
           update: {},

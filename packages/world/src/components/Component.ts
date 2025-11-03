@@ -1,4 +1,4 @@
-import type { Entity } from '../core/Entity';
+import type { Entity } from '../core/Entity.js';
 
 export type ComponentJSON = unknown;
 

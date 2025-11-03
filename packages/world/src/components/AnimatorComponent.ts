@@ -1,5 +1,5 @@
-import { Component } from './Component';
-import { registerComponent } from './registry';
+import { Component } from './Component.js';
+import { registerComponent } from './registry.js';
 import type { Animator, AnimatorController, Pose, Skeleton, MorphTargetClip } from '@engine/animation';
 import { createPose } from '@engine/animation';
 

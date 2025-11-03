@@ -7,12 +7,12 @@
  * - Damage over time (lava/poison)
  */
 
-import type { Scene } from '../core/Scene';
-import type { Entity } from '../core/Entity';
-import { PhysicsComponent, RigidbodyType } from '../components/PhysicsComponent';
-import { CharacterController } from '../components/CharacterController';
-import { HealthComponent } from '../components/HealthComponent';
-import type { PhysicsSystem, CollisionEvent } from '../physics/PhysicsSystem';
+import type { Scene } from '../core/Scene.js';
+import type { Entity } from '../core/Entity.js';
+import { PhysicsComponent, RigidbodyType } from '../components/PhysicsComponent.js';
+import { CharacterController } from '../components/CharacterController.js';
+import { HealthComponent } from '../components/HealthComponent.js';
+import type { PhysicsSystem, CollisionEvent } from '../physics/PhysicsSystem.js';
 // Lazy import to avoid circular dependency (blocks imports world types)
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let getBlock: (id: string) => any = () => undefined;

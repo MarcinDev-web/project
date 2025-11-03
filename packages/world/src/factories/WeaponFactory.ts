@@ -1,6 +1,6 @@
-import { WeaponComponent, type WeaponComponentData } from '../components/WeaponComponent';
-import type { WeaponPresetType } from '../types/weapon';
-import { getWeaponPreset } from '../data/weapons';
+import { WeaponComponent, type WeaponComponentData } from '../components/WeaponComponent.js';
+import type { WeaponPresetType } from '../types/weapon.js';
+import { getWeaponPreset } from '../data/weapons.js';
 
 /**
  * Create a weapon component from a preset

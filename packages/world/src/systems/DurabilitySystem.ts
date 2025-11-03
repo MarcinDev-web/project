@@ -1,5 +1,5 @@
-import type { Scene } from '../core/Scene';
-import { DurabilityComponent } from '../components/DurabilityComponent';
+import type { Scene } from '../core/Scene.js';
+import { DurabilityComponent } from '../components/DurabilityComponent.js';
 
 export class DurabilitySystem {
   private readonly scene: Scene;

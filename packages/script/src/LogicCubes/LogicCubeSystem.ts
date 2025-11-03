@@ -4,13 +4,13 @@
  */
 
 import type { Scene } from '@engine/world';
-import { LogicCubeComponent } from '../components/LogicCubeComponent';
-import { LogicConnectionManager } from '../connection/LogicConnectionManager';
-import { registerLogicConnectionManager } from '../connection/LogicConnectionRegistry';
-import { VariableStorage } from '../storage/VariableStorage';
-import { PlayerDetection } from './cubes/PlayerDetection';
-import type { LogicCube, LogicCubeConstructor } from './cubes/LogicCube';
-import type { LogicSignal, LogicExecutionContext } from './cubes/types';
+import { LogicCubeComponent } from '../components/LogicCubeComponent.js';
+import { LogicConnectionManager } from '../connection/LogicConnectionManager.js';
+import { registerLogicConnectionManager } from '../connection/LogicConnectionRegistry.js';
+import { VariableStorage } from '../storage/VariableStorage.js';
+import { PlayerDetection } from './cubes/PlayerDetection.js';
+import type { LogicCube, LogicCubeConstructor } from './cubes/LogicCube.js';
+import type { LogicSignal, LogicExecutionContext } from './cubes/types.js';
 import type { EntityId } from '@engine/world';
 import { Logger } from '@engine/core/utils';
 

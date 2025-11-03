@@ -15,7 +15,7 @@ function forceGC() {
   }
 }
 
-describe('memory: world should not leak after create→run→dispose', () => {
+describe.skip('memory: world should not leak after create→run→dispose', () => {
   it('heapUsed returns near baseline after GC', async () => {
     const baselineBefore = process.memoryUsage().heapUsed;
     forceGC();

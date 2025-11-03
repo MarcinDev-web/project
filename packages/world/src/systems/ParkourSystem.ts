@@ -2,13 +2,13 @@
  * ParkourSystem - Handles interactive parkour blocks (launch pads, bounce pads, etc.)
  */
 
-import type { Scene } from '../core/Scene';
-import type { Entity } from '../core/Entity';
-import { LaunchPadComponent } from '../components/LaunchPadComponent';
-import { BouncePadComponent } from '../components/BouncePadComponent';
-import { SpeedZoneComponent } from '../components/SpeedZoneComponent';
-import { CharacterController } from '../components/CharacterController';
-import type { Vec3 } from '@engine/core';
+import type { Scene } from '../core/Scene.js';
+import type { Entity } from '../core/Entity.js';
+import { LaunchPadComponent } from '../components/LaunchPadComponent.js';
+import { BouncePadComponent } from '../components/BouncePadComponent.js';
+import { SpeedZoneComponent } from '../components/SpeedZoneComponent.js';
+import { CharacterController } from '../components/CharacterController.js';
+import type { Vec3 } from '@engine/core/math';
 import { lengthVec3, normalizeVec3, scaleVec3, addVec3 } from '@engine/core/math';
 
 interface ActiveLaunchPad {

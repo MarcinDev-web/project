@@ -3,7 +3,8 @@
  * Supports both PostgreSQL (preferred) and JSON file storage (fallback)
  */
 
-import type { Pool } from 'pg';
+// @ts-expect-error - Prisma client is generated at build time
+import type { PrismaClient } from '../../node_modules/.prisma/net-client';
 import { randomBytes } from 'node:crypto';
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -60,7 +61,7 @@ export interface InviteMemberRequest {
  * PostgreSQL-based storage for studio teams
  */
 export class StudioTeamStorageDB {
-  constructor(private readonly pool: Pool) {}
+  constructor(private readonly prisma: PrismaClient) {}
 
   async initialize(): Promise<void> {
     // Schema is managed by ensureSchema() in db.ts
@@ -79,160 +80,168 @@ export class StudioTeamStorageDB {
     }
 
     const id = `team_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-    const client = await this.pool.connect();
-    try {
-      await client.query('BEGIN');
 
+    // Use Prisma transaction
+    const team = await this.prisma.$transaction(async (tx) => {
       // Create team
-      await client.query(
-        `INSERT INTO studio_teams (id, studio_owner_id, name, description, created_at, updated_at)
-         VALUES ($1, $2, $3, $4, NOW(), NOW())`,
-        [id, studioOwnerId, data.name, data.description || null]
-      );
+      const createdTeam = await tx.studioTeam.create({
+        data: {
+          id,
+          studioOwnerId,
+          name: data.name,
+          description: data.description ?? null,
+        },
+      });
 
       // Add owner as member
-      await client.query(
-        `INSERT INTO team_members (team_id, user_id, role, joined_at, invited_by)
-         VALUES ($1, $2, $3, NOW(), $2)`,
-        [id, studioOwnerId, 'owner']
-      );
+      await tx.teamMember.create({
+        data: {
+          teamId: id,
+          userId: studioOwnerId,
+          role: 'owner',
+          invitedBy: studioOwnerId,
+        },
+      });
 
-      await client.query('COMMIT');
+      return createdTeam;
+    });
 
-      return this.getTeam(id) as Promise<StudioTeam>;
-    } catch (error) {
-      await client.query('ROLLBACK');
-      throw error;
-    } finally {
-      client.release();
-    }
+    return {
+      id: team.id,
+      studioOwnerId: team.studioOwnerId,
+      name: team.name,
+      ...(team.description && { description: team.description }),
+      createdAt: team.createdAt.getTime(),
+      updatedAt: team.updatedAt.getTime(),
+    };
   }
 
   async getTeam(teamId: string): Promise<StudioTeam | null> {
-    const result = await this.pool.query<{
-      id: string;
-      studio_owner_id: string;
-      name: string;
-      description: string | null;
-      created_at: Date;
-      updated_at: Date;
-    }>('SELECT * FROM studio_teams WHERE id = $1', [teamId]);
+    const team = await this.prisma.studioTeam.findUnique({
+      where: { id: teamId },
+    });
 
-    if (result.rows.length === 0) {
+    if (!team) {
       return null;
     }
 
-    const row = result.rows[0]!;
-    const team: StudioTeam = {
-      id: row.id,
-      studioOwnerId: row.studio_owner_id,
-      name: row.name,
-      createdAt: row.created_at.getTime(),
-      updatedAt: row.updated_at.getTime(),
+    return {
+      id: team.id,
+      studioOwnerId: team.studioOwnerId,
+      name: team.name,
+      ...(team.description && { description: team.description }),
+      createdAt: team.createdAt.getTime(),
+      updatedAt: team.updatedAt.getTime(),
     };
-
-    if (row.description !== null) {
-      team.description = row.description;
-    }
-
-    return team;
   }
 
   async getTeamByStudioOwner(studioOwnerId: string): Promise<StudioTeam | null> {
-    const result = await this.pool.query<{
-      id: string;
-      studio_owner_id: string;
-      name: string;
-      description: string | null;
-      created_at: Date;
-      updated_at: Date;
-    }>('SELECT * FROM studio_teams WHERE studio_owner_id = $1', [studioOwnerId]);
+    const team = await this.prisma.studioTeam.findFirst({
+      where: { studioOwnerId },
+    });
 
-    if (result.rows.length === 0) {
+    if (!team) {
       return null;
     }
 
-    const row = result.rows[0]!;
-    const team: StudioTeam = {
-      id: row.id,
-      studioOwnerId: row.studio_owner_id,
-      name: row.name,
-      createdAt: row.created_at.getTime(),
-      updatedAt: row.updated_at.getTime(),
+    return {
+      id: team.id,
+      studioOwnerId: team.studioOwnerId,
+      name: team.name,
+      ...(team.description && { description: team.description }),
+      createdAt: team.createdAt.getTime(),
+      updatedAt: team.updatedAt.getTime(),
     };
-
-    if (row.description !== null) {
-      team.description = row.description;
-    }
-
-    return team;
   }
 
   async updateTeam(
     teamId: string,
     updates: { name?: string; description?: string }
   ): Promise<StudioTeam> {
-    const updatesList: string[] = [];
-    const params: unknown[] = [];
-    let paramIndex = 1;
+    const updateData: {
+      name?: string;
+      description?: string | null;
+    } = {};
 
     if (updates.name !== undefined) {
-      updatesList.push(`name = $${paramIndex++}`);
-      params.push(updates.name);
+      updateData.name = updates.name;
     }
     if (updates.description !== undefined) {
-      updatesList.push(`description = $${paramIndex++}`);
-      params.push(updates.description || null);
+      updateData.description = updates.description ?? null;
     }
 
-    if (updatesList.length === 0) {
-      return this.getTeam(teamId) as Promise<StudioTeam>;
+    if (Object.keys(updateData).length === 0) {
+      const team = await this.getTeam(teamId);
+      if (!team) {
+        throw new Error('Team not found');
+      }
+      return team;
     }
 
-    updatesList.push(`updated_at = NOW()`);
-    params.push(teamId);
+    const updated = await this.prisma.studioTeam.update({
+      where: { id: teamId },
+      data: updateData,
+    });
 
-    await this.pool.query(
-      `UPDATE studio_teams SET ${updatesList.join(', ')} WHERE id = $${paramIndex}`,
-      params
-    );
-
-    return this.getTeam(teamId) as Promise<StudioTeam>;
+    return {
+      id: updated.id,
+      studioOwnerId: updated.studioOwnerId,
+      name: updated.name,
+      ...(updated.description && { description: updated.description }),
+      createdAt: updated.createdAt.getTime(),
+      updatedAt: updated.updatedAt.getTime(),
+    };
   }
 
   async deleteTeam(teamId: string): Promise<boolean> {
-    const result = await this.pool.query('DELETE FROM studio_teams WHERE id = $1', [teamId]);
-    return (result.rowCount ?? 0) > 0;
+    try {
+      await this.prisma.studioTeam.delete({
+        where: { id: teamId },
+      });
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async getMembers(teamId: string): Promise<TeamMember[]> {
-    const result = await this.pool.query<{
-      team_id: string;
-      user_id: string;
-      role: string;
-      joined_at: Date;
-      invited_by: string;
-    }>('SELECT * FROM team_members WHERE team_id = $1 ORDER BY joined_at ASC', [teamId]);
+    const members = await this.prisma.teamMember.findMany({
+      where: { teamId },
+      orderBy: { joinedAt: 'asc' },
+    });
 
-    return result.rows.map((row) => ({
-      teamId: row.team_id,
-      userId: row.user_id,
-      role: row.role as 'owner' | 'member',
-      joinedAt: row.joined_at.getTime(),
-      invitedBy: row.invited_by,
+    return members.map((member) => ({
+      teamId: member.teamId,
+      userId: member.userId,
+      role: member.role as 'owner' | 'member',
+      joinedAt: member.joinedAt.getTime(),
+      invitedBy: member.invitedBy,
     }));
   }
 
   async addMember(teamId: string, userId: string, invitedBy: string): Promise<TeamMember> {
-    await this.pool.query(
-      `INSERT INTO team_members (team_id, user_id, role, joined_at, invited_by)
-       VALUES ($1, $2, $3, NOW(), $4)
-       ON CONFLICT (team_id, user_id) DO NOTHING`,
-      [teamId, userId, 'member', invitedBy]
-    );
+    await this.prisma.teamMember.upsert({
+      where: {
+        teamId_userId: {
+          teamId,
+          userId,
+        },
+      },
+      create: {
+        teamId,
+        userId,
+        role: 'member',
+        invitedBy,
+      },
+      update: {},
+    });
 
     const members = await this.getMembers(teamId);
-    return members.find((m) => m.userId === userId)!;
+    const member = members.find((m) => m.userId === userId);
+    if (!member) {
+      throw new Error('Failed to add member');
+    }
+    return member;
   }
 
   async removeMember(teamId: string, userId: string): Promise<boolean> {
@@ -242,33 +251,41 @@ export class StudioTeamStorageDB {
       throw new Error('Cannot remove team owner');
     }
 
-    const result = await this.pool.query(
-      'DELETE FROM team_members WHERE team_id = $1 AND user_id = $2',
-      [teamId, userId]
-    );
-    return (result.rowCount ?? 0) > 0;
+    try {
+      await this.prisma.teamMember.delete({
+        where: {
+          teamId_userId: {
+            teamId,
+            userId,
+          },
+        },
+      });
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async getMember(teamId: string, userId: string): Promise<TeamMember | null> {
-    const result = await this.pool.query<{
-      team_id: string;
-      user_id: string;
-      role: string;
-      joined_at: Date;
-      invited_by: string;
-    }>('SELECT * FROM team_members WHERE team_id = $1 AND user_id = $2', [teamId, userId]);
+    const member = await this.prisma.teamMember.findUnique({
+      where: {
+        teamId_userId: {
+          teamId,
+          userId,
+        },
+      },
+    });
 
-    if (result.rows.length === 0) {
+    if (!member) {
       return null;
     }
 
-    const row = result.rows[0]!;
     return {
-      teamId: row.team_id,
-      userId: row.user_id,
-      role: row.role as 'owner' | 'member',
-      joinedAt: row.joined_at.getTime(),
-      invitedBy: row.invited_by,
+      teamId: member.teamId,
+      userId: member.userId,
+      role: member.role as 'owner' | 'member',
+      joinedAt: member.joinedAt.getTime(),
+      invitedBy: member.invitedBy,
     };
   }
 
@@ -278,196 +295,166 @@ export class StudioTeamStorageDB {
     request: InviteMemberRequest
   ): Promise<TeamInvitation> {
     const token = this.generateToken();
-    const expiresAt = Date.now() + 7 * 24 * 60 * 60 * 1000; // 7 days
+    const expiresAt = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000); // 7 days
 
     const id = `inv_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
-    await this.pool.query(
-      `INSERT INTO team_invitations (
-        id, team_id, inviter_id, invitee_user_id, invitee_email, invitee_username,
-        token, status, expires_at, created_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, TO_TIMESTAMP($9 / 1000.0), NOW())`,
-      [
+    const invitation = await this.prisma.teamInvitation.create({
+      data: {
         id,
         teamId,
         inviterId,
-        request.userId || null,
-        request.email || null,
-        request.username || null,
+        inviteeUserId: request.userId ?? null,
+        inviteeEmail: request.email ?? null,
+        inviteeUsername: request.username ?? null,
         token,
-        'pending',
+        status: 'pending',
         expiresAt,
-      ]
-    );
+      },
+    });
 
-    return this.getInvitation(id) as Promise<TeamInvitation>;
+    return {
+      id: invitation.id,
+      teamId: invitation.teamId,
+      inviterId: invitation.inviterId,
+      ...(invitation.inviteeUserId && { inviteeUserId: invitation.inviteeUserId }),
+      ...(invitation.inviteeEmail && { inviteeEmail: invitation.inviteeEmail }),
+      ...(invitation.inviteeUsername && { inviteeUsername: invitation.inviteeUsername }),
+      token: invitation.token,
+      status: invitation.status as TeamInvitation['status'],
+      expiresAt: invitation.expiresAt.getTime(),
+      createdAt: invitation.createdAt.getTime(),
+    };
   }
 
   async getInvitation(invitationId: string): Promise<TeamInvitation | null> {
-    const result = await this.pool.query<{
-      id: string;
-      team_id: string;
-      inviter_id: string;
-      invitee_user_id: string | null;
-      invitee_email: string | null;
-      invitee_username: string | null;
-      token: string;
-      status: string;
-      expires_at: Date;
-      created_at: Date;
-    }>('SELECT * FROM team_invitations WHERE id = $1', [invitationId]);
+    const invitation = await this.prisma.teamInvitation.findUnique({
+      where: { id: invitationId },
+    });
 
-    if (result.rows.length === 0) {
+    if (!invitation) {
       return null;
     }
 
-    const row = result.rows[0]!;
-    const invitation: TeamInvitation = {
-      id: row.id,
-      teamId: row.team_id,
-      inviterId: row.inviter_id,
-      token: row.token,
-      status: row.status as TeamInvitation['status'],
-      expiresAt: row.expires_at.getTime(),
-      createdAt: row.created_at.getTime(),
+    return {
+      id: invitation.id,
+      teamId: invitation.teamId,
+      inviterId: invitation.inviterId,
+      ...(invitation.inviteeUserId && { inviteeUserId: invitation.inviteeUserId }),
+      ...(invitation.inviteeEmail && { inviteeEmail: invitation.inviteeEmail }),
+      ...(invitation.inviteeUsername && { inviteeUsername: invitation.inviteeUsername }),
+      token: invitation.token,
+      status: invitation.status as TeamInvitation['status'],
+      expiresAt: invitation.expiresAt.getTime(),
+      createdAt: invitation.createdAt.getTime(),
     };
-
-    if (row.invitee_user_id !== null) {
-      invitation.inviteeUserId = row.invitee_user_id;
-    }
-    if (row.invitee_email !== null) {
-      invitation.inviteeEmail = row.invitee_email;
-    }
-    if (row.invitee_username !== null) {
-      invitation.inviteeUsername = row.invitee_username;
-    }
-
-    return invitation;
   }
 
   async getInvitationByToken(token: string): Promise<TeamInvitation | null> {
-    const result = await this.pool.query<{
-      id: string;
-      team_id: string;
-      inviter_id: string;
-      invitee_user_id: string | null;
-      invitee_email: string | null;
-      invitee_username: string | null;
-      token: string;
-      status: string;
-      expires_at: Date;
-      created_at: Date;
-    }>('SELECT * FROM team_invitations WHERE token = $1', [token]);
+    const invitation = await this.prisma.teamInvitation.findFirst({
+      where: { token },
+    });
 
-    if (result.rows.length === 0) {
+    if (!invitation) {
       return null;
     }
 
-    const row = result.rows[0]!;
-    const invitation: TeamInvitation = {
-      id: row.id,
-      teamId: row.team_id,
-      inviterId: row.inviter_id,
-      token: row.token,
-      status: row.status as TeamInvitation['status'],
-      expiresAt: row.expires_at.getTime(),
-      createdAt: row.created_at.getTime(),
+    return {
+      id: invitation.id,
+      teamId: invitation.teamId,
+      inviterId: invitation.inviterId,
+      ...(invitation.inviteeUserId && { inviteeUserId: invitation.inviteeUserId }),
+      ...(invitation.inviteeEmail && { inviteeEmail: invitation.inviteeEmail }),
+      ...(invitation.inviteeUsername && { inviteeUsername: invitation.inviteeUsername }),
+      token: invitation.token,
+      status: invitation.status as TeamInvitation['status'],
+      expiresAt: invitation.expiresAt.getTime(),
+      createdAt: invitation.createdAt.getTime(),
     };
-
-    if (row.invitee_user_id !== null) {
-      invitation.inviteeUserId = row.invitee_user_id;
-    }
-    if (row.invitee_email !== null) {
-      invitation.inviteeEmail = row.invitee_email;
-    }
-    if (row.invitee_username !== null) {
-      invitation.inviteeUsername = row.invitee_username;
-    }
-
-    return invitation;
   }
 
   async getInvitations(teamId?: string, userId?: string): Promise<TeamInvitation[]> {
-    let query = 'SELECT * FROM team_invitations WHERE 1=1';
-    const params: unknown[] = [];
-    let paramIndex = 1;
+    const where: {
+      teamId?: string;
+      OR?: Array<{ inviteeUserId: string } | { inviterId: string }>;
+    } = {};
 
     if (teamId) {
-      query += ` AND team_id = $${paramIndex++}`;
-      params.push(teamId);
+      where.teamId = teamId;
     }
 
     if (userId) {
-      query += ` AND (invitee_user_id = $${paramIndex} OR inviter_id = $${paramIndex})`;
-      params.push(userId);
-      paramIndex++;
+      where.OR = [
+        { inviteeUserId: userId },
+        { inviterId: userId },
+      ];
     }
 
-    query += ' ORDER BY created_at DESC';
-
-    const result = await this.pool.query<{
-      id: string;
-      team_id: string;
-      inviter_id: string;
-      invitee_user_id: string | null;
-      invitee_email: string | null;
-      invitee_username: string | null;
-      token: string;
-      status: string;
-      expires_at: Date;
-      created_at: Date;
-    }>(query, params);
-
-    return result.rows.map((row) => {
-      const invitation: TeamInvitation = {
-        id: row.id,
-        teamId: row.team_id,
-        inviterId: row.inviter_id,
-        token: row.token,
-        status: row.status as TeamInvitation['status'],
-        expiresAt: row.expires_at.getTime(),
-        createdAt: row.created_at.getTime(),
-      };
-
-      if (row.invitee_user_id !== null) {
-        invitation.inviteeUserId = row.invitee_user_id;
-      }
-      if (row.invitee_email !== null) {
-        invitation.inviteeEmail = row.invitee_email;
-      }
-      if (row.invitee_username !== null) {
-        invitation.inviteeUsername = row.invitee_username;
-      }
-
-      return invitation;
+    const invitations = await this.prisma.teamInvitation.findMany({
+      ...(teamId || userId ? { where } : {}),
+      orderBy: { createdAt: 'desc' },
     });
+
+    return invitations.map((invitation) => ({
+      id: invitation.id,
+      teamId: invitation.teamId,
+      inviterId: invitation.inviterId,
+      ...(invitation.inviteeUserId && { inviteeUserId: invitation.inviteeUserId }),
+      ...(invitation.inviteeEmail && { inviteeEmail: invitation.inviteeEmail }),
+      ...(invitation.inviteeUsername && { inviteeUsername: invitation.inviteeUsername }),
+      token: invitation.token,
+      status: invitation.status as TeamInvitation['status'],
+      expiresAt: invitation.expiresAt.getTime(),
+      createdAt: invitation.createdAt.getTime(),
+    }));
   }
 
   async updateInvitation(
     invitationId: string,
     status: 'accepted' | 'declined' | 'expired'
   ): Promise<TeamInvitation> {
-    await this.pool.query('UPDATE team_invitations SET status = $1 WHERE id = $2', [
-      status,
-      invitationId,
-    ]);
+    const invitation = await this.prisma.teamInvitation.update({
+      where: { id: invitationId },
+      data: { status },
+    });
 
-    return this.getInvitation(invitationId) as Promise<TeamInvitation>;
+    return {
+      id: invitation.id,
+      teamId: invitation.teamId,
+      inviterId: invitation.inviterId,
+      ...(invitation.inviteeUserId && { inviteeUserId: invitation.inviteeUserId }),
+      ...(invitation.inviteeEmail && { inviteeEmail: invitation.inviteeEmail }),
+      ...(invitation.inviteeUsername && { inviteeUsername: invitation.inviteeUsername }),
+      token: invitation.token,
+      status: invitation.status as TeamInvitation['status'],
+      expiresAt: invitation.expiresAt.getTime(),
+      createdAt: invitation.createdAt.getTime(),
+    };
   }
 
   async deleteInvitation(invitationId: string): Promise<boolean> {
-    const result = await this.pool.query('DELETE FROM team_invitations WHERE id = $1', [
-      invitationId,
-    ]);
-    return (result.rowCount ?? 0) > 0;
+    try {
+      await this.prisma.teamInvitation.delete({
+        where: { id: invitationId },
+      });
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async cleanupExpiredInvitations(): Promise<void> {
-    await this.pool.query(
-      `UPDATE team_invitations 
-       SET status = 'expired' 
-       WHERE status = 'pending' AND expires_at < NOW()`
-    );
+    await this.prisma.teamInvitation.updateMany({
+      where: {
+        status: 'pending',
+        expiresAt: {
+          lt: new Date(),
+        },
+      },
+      data: {
+        status: 'expired',
+      },
+    });
   }
 
   async shareProjectWithTeam(
@@ -476,118 +463,114 @@ export class StudioTeamStorageDB {
     accessLevel: 'read' | 'write',
     userId?: string
   ): Promise<ProjectTeamAccess> {
-    await this.pool.query(
-      `INSERT INTO project_team_access (project_id, team_id, access_level, user_id)
-       VALUES ($1, $2, $3, $4)
-       ON CONFLICT (project_id, team_id) 
-       DO UPDATE SET access_level = $3, user_id = $4`,
-      [projectId, teamId, accessLevel, userId || null]
-    );
+    const access = await this.prisma.projectTeamAccess.upsert({
+      where: {
+        projectId_teamId: {
+          projectId,
+          teamId,
+        },
+      },
+      create: {
+        projectId,
+        teamId,
+        accessLevel,
+        userId: userId ?? null,
+      },
+      update: {
+        accessLevel,
+        userId: userId ?? null,
+      },
+    });
 
-    const access = await this.getProjectTeamAccess(projectId, teamId);
-    if (!access) {
-      throw new Error('Failed to create project team access');
-    }
-    return access;
+    return {
+      projectId: access.projectId,
+      teamId: access.teamId,
+      accessLevel: access.accessLevel as 'read' | 'write',
+      ...(access.userId && { userId: access.userId }),
+    };
   }
 
   async getProjectTeamAccess(projectId: string, teamId: string): Promise<ProjectTeamAccess | null> {
-    const result = await this.pool.query<{
-      project_id: string;
-      team_id: string;
-      access_level: string;
-      user_id: string | null;
-    }>('SELECT * FROM project_team_access WHERE project_id = $1 AND team_id = $2', [
-      projectId,
-      teamId,
-    ]);
+    const access = await this.prisma.projectTeamAccess.findUnique({
+      where: {
+        projectId_teamId: {
+          projectId,
+          teamId,
+        },
+      },
+    });
 
-    if (result.rows.length === 0) {
+    if (!access) {
       return null;
     }
 
-    const row = result.rows[0]!;
-    const access: ProjectTeamAccess = {
-      projectId: row.project_id,
-      teamId: row.team_id,
-      accessLevel: row.access_level as 'read' | 'write',
+    return {
+      projectId: access.projectId,
+      teamId: access.teamId,
+      accessLevel: access.accessLevel as 'read' | 'write',
+      ...(access.userId && { userId: access.userId }),
     };
-
-    if (row.user_id !== null) {
-      access.userId = row.user_id;
-    }
-
-    return access;
   }
 
   async getProjectsForTeam(teamId: string): Promise<ProjectTeamAccess[]> {
-    const result = await this.pool.query<{
-      project_id: string;
-      team_id: string;
-      access_level: string;
-      user_id: string | null;
-    }>('SELECT * FROM project_team_access WHERE team_id = $1', [teamId]);
-
-    return result.rows.map((row) => {
-      const access: ProjectTeamAccess = {
-        projectId: row.project_id,
-        teamId: row.team_id,
-        accessLevel: row.access_level as 'read' | 'write',
-      };
-
-      if (row.user_id !== null) {
-        access.userId = row.user_id;
-      }
-
-      return access;
+    const accesses = await this.prisma.projectTeamAccess.findMany({
+      where: { teamId },
     });
+
+    return accesses.map((access) => ({
+      projectId: access.projectId,
+      teamId: access.teamId,
+      accessLevel: access.accessLevel as 'read' | 'write',
+      ...(access.userId && { userId: access.userId }),
+    }));
   }
 
   async getProjectsForUser(userId: string): Promise<ProjectTeamAccess[]> {
     // Get all teams user is member of
-    const teams = await this.pool.query<{ team_id: string }>(
-      'SELECT team_id FROM team_members WHERE user_id = $1',
-      [userId]
-    );
+    const members = await this.prisma.teamMember.findMany({
+      where: { userId },
+      select: { teamId: true },
+    });
 
-    if (teams.rows.length === 0) {
+    if (members.length === 0) {
       return [];
     }
 
-    const teamIds = teams.rows.map((r) => r.team_id);
-    const result = await this.pool.query<{
-      project_id: string;
-      team_id: string;
-      access_level: string;
-      user_id: string | null;
-    }>(
-      `SELECT * FROM project_team_access 
-       WHERE team_id = ANY($1) 
-       AND (user_id IS NULL OR user_id = $2)`,
-      [teamIds, userId]
-    );
-
-    return result.rows.map((row) => {
-      const access: ProjectTeamAccess = {
-        projectId: row.project_id,
-        teamId: row.team_id,
-        accessLevel: row.access_level as 'read' | 'write',
-      };
-
-      if (row.user_id !== null) {
-        access.userId = row.user_id;
-      }
-
-      return access;
+    const teamIds = members.map((m) => m.teamId);
+    const accesses = await this.prisma.projectTeamAccess.findMany({
+      where: {
+        teamId: {
+          in: teamIds,
+        },
+        OR: [
+          { userId: null },
+          { userId },
+        ],
+      },
     });
+
+    return accesses.map((access) => ({
+      projectId: access.projectId,
+      teamId: access.teamId,
+      accessLevel: access.accessLevel as 'read' | 'write',
+      ...(access.userId && { userId: access.userId }),
+    }));
   }
 
   async removeProjectTeamAccess(projectId: string, teamId: string): Promise<boolean> {
-    const result = await this.pool.query(
-      'DELETE FROM project_team_access WHERE project_id = $1 AND team_id = $2',
-      [projectId, teamId]
-    );
-    return (result.rowCount ?? 0) > 0;
+    try {
+      await this.prisma.projectTeamAccess.delete({
+        where: {
+          projectId_teamId: {
+            projectId,
+            teamId,
+          },
+        },
+      });
+      return true;
+    } catch {
+      return false;
+    }
   }
 }
 

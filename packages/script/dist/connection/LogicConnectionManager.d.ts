@@ -2,7 +2,7 @@
  * LogicConnectionManager - Manages connections between logic cubes.
  */
 import type { EntityId } from '@engine/world';
-import type { LogicConnection } from '../LogicCubes/cubes/types';
+import type { LogicConnection } from '../LogicCubes/cubes/types.js';
 /**
  * Manages the connection graph between logic cubes
  */

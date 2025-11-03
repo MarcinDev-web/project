@@ -1,4 +1,4 @@
-import type { ComponentClass } from './Component';
+import type { ComponentClass } from './Component.js';
 
 const registry = new Map<string, ComponentClass>();
 

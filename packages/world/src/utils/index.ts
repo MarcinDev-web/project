@@ -1,3 +1,3 @@
-export * from './weaponHelpers';
-export * from './colors';
-export * from './waterHelpers';
+export * from './weaponHelpers.js';
+export * from './colors.js';
+export * from './waterHelpers.js';

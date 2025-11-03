@@ -1,2 +1,2 @@
-export * from './VariableStorage';
+export * from './VariableStorage.js';
 //# sourceMappingURL=index.d.ts.map

@@ -27,7 +27,8 @@ import type { LedgerService } from '../services/LedgerService';
 import type { Request, Response, NextFunction } from 'express';
 import type { RateLimitRequestHandler } from 'express-rate-limit';
 import type { CurrencyAmount } from '@engine/economy';
-import type { Pool } from 'pg';
+// @ts-expect-error - Prisma client is generated at build time
+import type { PrismaClient } from '../../node_modules/.prisma/net-client';
 
 /**
  * RouteDependencies - all dependencies needed by route handlers
@@ -77,7 +78,7 @@ export interface RouteDependencies {
     title: string,
     tags: string[]
   ) => Promise<string>;
-  dbPool: Pool | null;
+  dbPool: PrismaClient | null;
   path: typeof import('path');
   fs: typeof import('fs').promises;
 

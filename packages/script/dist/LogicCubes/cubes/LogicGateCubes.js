@@ -1,7 +1,7 @@
 /**
  * Logic Gate Cubes - Boolean logic operations
  */
-import { LogicCube } from './LogicCube';
+import { LogicCube } from './LogicCube.js';
 /**
  * AND Gate - Outputs true when all inputs are triggered
  */

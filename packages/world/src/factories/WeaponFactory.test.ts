@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
-import { createWeapon, createCustomWeapon } from './WeaponFactory';
-import { WeaponComponent } from '../components/WeaponComponent';
+import { createWeapon, createCustomWeapon } from './WeaponFactory.js';
+import { WeaponComponent } from '../components/WeaponComponent.js';
 
 describe('WeaponFactory', () => {
   describe('createWeapon', () => {

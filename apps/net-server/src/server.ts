@@ -95,7 +95,7 @@ import { createAdminRoutes } from './routes/admin.routes';
 import type { RouteDependencies } from './routes/index';
 
 // Type for Prisma Client (backward compatibility)
-type Pool = Awaited<ReturnType<typeof createDbPool>>;
+// Note: This is PrismaClient, not pg.Pool, but kept name for compatibility
 import path from 'path';
 import { promises as fs } from 'fs';
 
@@ -183,7 +183,7 @@ const marketplaceStorage = dbPool
 const buildStorage = dbPool ? new BuildStorage(dbPool) : null;
 const likesStorage = dbPool
   ? new LikesStorage(dbPool)
-  : new LikesStorage(DATA_DIR, marketplaceStorage);
+  : new LikesStorage(DATA_DIR, marketplaceStorage as MarketplaceStorage);
 const friendsStorage = new FriendsStorage(DATA_DIR);
 const messagesStorage = new MessagesStorage(DATA_DIR);
 const blockedUsersStorage = new BlockedUsersStorage(DATA_DIR);

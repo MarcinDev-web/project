@@ -2,10 +2,10 @@
  * UISystem - Renders UI components as HTML overlay in Play Mode
  */
 
-import type { Scene } from '../core/Scene';
-import type { Entity } from '../core/Entity';
-import { UICanvasComponent } from '../components/UICanvasComponent';
-import { UIElementComponent } from '../components/UIElementComponent';
+import type { Scene } from '../core/Scene.js';
+import type { Entity } from '../core/Entity.js';
+import { UICanvasComponent } from '../components/UICanvasComponent.js';
+import { UIElementComponent } from '../components/UIElementComponent.js';
 
 /**
  * Configuration for UISystem

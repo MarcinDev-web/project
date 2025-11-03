@@ -8,11 +8,11 @@
  * - Event emission for gameplay logic
  */
 
-import type { Scene } from '../core/Scene';
-import type { Entity } from '../core/Entity';
-import { VegetationComponent } from '../components/VegetationComponent';
-import { PhysicsComponent, RigidbodyType } from '../components/PhysicsComponent';
-import type { PhysicsSystem, CollisionEvent } from '../physics/PhysicsSystem';
+import type { Scene } from '../core/Scene.js';
+import type { Entity } from '../core/Entity.js';
+import { VegetationComponent } from '../components/VegetationComponent.js';
+import { PhysicsComponent, RigidbodyType } from '../components/PhysicsComponent.js';
+import type { PhysicsSystem, CollisionEvent } from '../physics/PhysicsSystem.js';
 import type { Vec3 } from '@engine/core/math';
 import { distanceVec3 } from '@engine/core/math';
 

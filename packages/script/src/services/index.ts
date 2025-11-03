@@ -1,2 +1,2 @@
-export * from './SceneScriptContextBuilder';
+export * from './SceneScriptContextBuilder.js';
 

@@ -1,11 +1,11 @@
-import { Component, type ComponentClass } from '../components/Component';
-import { getComponentConstructor } from '../components/registry';
-import { Transform } from '../core/Transform';
-import type { Scene } from '../core/Scene';
-import { MeshComponent, type MeshKind } from '../components/MeshComponent';
-import { MaterialComponent } from '../components/MaterialComponent';
-import type { RgbaColor } from '../utils/colors';
-import type { MeshBounds } from '../systems/Raycaster';
+import { Component, type ComponentClass } from '../components/Component.js';
+import { getComponentConstructor } from '../components/registry.js';
+import { Transform } from '../core/Transform.js';
+import type { Scene } from '../core/Scene.js';
+import { MeshComponent, type MeshKind } from '../components/MeshComponent.js';
+import { MaterialComponent } from '../components/MaterialComponent.js';
+import type { RgbaColor } from '../utils/colors.js';
+import type { MeshBounds } from '../systems/Raycaster.js';
 import { Logger } from '@engine/core/utils';
 
 /**

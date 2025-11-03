@@ -269,17 +269,19 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
     statusEl.textContent = 'Failed to create WebGPU context.';
     throw new Error('Failed to create WebGPU context.');
   }
+  // TypeScript: context is non-null after the check above
+  const webgpuContext: GPUCanvasContext = context;
 
   // Configure canvas format (try preferred, fallback to rgba8unorm/bgra8unorm)
   let presentationFormat: GPUTextureFormat = hasPreferredCanvasFormat(navigator.gpu)
     ? navigator.gpu.getPreferredCanvasFormat()
     : 'rgba8unorm';
   try {
-    context.configure({ device, format: presentationFormat, alphaMode: 'opaque' });
+    webgpuContext.configure({ device, format: presentationFormat, alphaMode: 'opaque' });
   } catch (err) {
     const altFormat: GPUTextureFormat = presentationFormat === 'rgba8unorm' ? 'bgra8unorm' : 'rgba8unorm';
     try {
-      context.configure({ device, format: altFormat, alphaMode: 'opaque' });
+      webgpuContext.configure({ device, format: altFormat, alphaMode: 'opaque' });
       Logger.warn('Canvas configure fallback format used:', { from: presentationFormat, to: altFormat });
       presentationFormat = altFormat;
     } catch (err2) {
@@ -337,11 +339,11 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       
       // Reconfigure the context with the new device
       try {
-        context.configure({ device: newDevice, format: presentationFormat, alphaMode: 'opaque' });
+        webgpuContext.configure({ device: newDevice, format: presentationFormat, alphaMode: 'opaque' });
       } catch (err) {
         const altFormat: GPUTextureFormat = presentationFormat === 'rgba8unorm' ? 'bgra8unorm' : 'rgba8unorm';
         try {
-          context.configure({ device: newDevice, format: altFormat, alphaMode: 'opaque' });
+          webgpuContext.configure({ device: newDevice, format: altFormat, alphaMode: 'opaque' });
           Logger.warn('Canvas configure fallback format used on device recreation:', { from: presentationFormat, to: altFormat });
           // Note: We don't update presentationFormat here to maintain consistency
         } catch (err2) {
@@ -357,7 +359,7 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       
       return newDevice;
     } catch (err) {
-      Logger.error('Device recreation failed:', err);
+      Logger.error('Device recreation failed:', err instanceof Error ? err : new Error(String(err)));
       statusEl.textContent = 'Failed to recreate WebGPU device. Please reload.';
       return null;
     } finally {
@@ -734,7 +736,7 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       {
         device,
         canvas,
-        context,
+        context: webgpuContext,
         presentationFormat,
         frameResources,
         scene: currentScene,

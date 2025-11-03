@@ -24,6 +24,8 @@
                          "@engine/core":  "workspace:*",
                          "@engine/animation":  "workspace:*",
                          "@engine/blocks":  "workspace:*",
+                         "@engine/economy":  "workspace:*",
+                         "@engine/script":  "workspace:*",
                          "gl-matrix":  "^3.4.4"
                      },
     "devDependencies":  {

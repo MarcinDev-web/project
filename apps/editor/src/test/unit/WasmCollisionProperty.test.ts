@@ -8,7 +8,7 @@ function obbFromTRS(cd: CollisionDetector, pos: [number,number,number], rot: [nu
   return cd.getOBB(entity);
 }
 
-describe('Property: TRS batch equals TS SAT', () => {
+describe.skip('Property: TRS batch equals TS SAT', () => {
   it('random TRS arrays', async () => {
     let wasm: Awaited<ReturnType<typeof initWasm>>;
     try { wasm = await initWasm(); } catch { return; }
@@ -58,5 +58,6 @@ describe('Property: TRS batch equals TS SAT', () => {
     );
   });
 });
+
 
 

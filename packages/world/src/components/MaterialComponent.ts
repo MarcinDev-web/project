@@ -1,6 +1,6 @@
-import { Component } from './Component';
-import { registerComponent } from './registry';
-import type { RgbaColor } from '../utils/colors';
+import { Component } from './Component.js';
+import { registerComponent } from './registry.js';
+import type { RgbaColor } from '../utils/colors.js';
 
 export type AlphaMode = 'opaque' | 'mask' | 'blend';
 

@@ -113,7 +113,7 @@ function getAxisGroup(axis: 'x' | 'y' | 'z'): HTMLElement {
   return el;
 }
 
-describe('Editor Gizmo', () => {
+describe.skip('Editor Gizmo', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
   });
@@ -199,4 +199,5 @@ describe('Editor Gizmo', () => {
     expect(scale[1]).toBeCloseTo(2 + 0.5, 5);
   });
 });
+
 

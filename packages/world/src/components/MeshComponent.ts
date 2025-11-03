@@ -1,5 +1,5 @@
-import { Component } from './Component';
-import { registerComponent } from './registry';
+import { Component } from './Component.js';
+import { registerComponent } from './registry.js';
 
 export type MeshKind = 'cube' | 'sphere' | 'custom' | 'avatar_torso' | 'terrain';
 

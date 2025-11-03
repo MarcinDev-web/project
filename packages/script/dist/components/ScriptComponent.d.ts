@@ -1,5 +1,5 @@
 import { Component } from '@engine/world';
-import type { BehaviorInstance } from '../behavior/Behavior';
+import type { BehaviorInstance } from '../behavior/Behavior.js';
 export interface ScriptDefinition {
     /** Registry name for behavior constructor */
     name: string;

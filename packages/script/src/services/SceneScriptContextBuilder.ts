@@ -1,6 +1,6 @@
 import type { Scene } from '@engine/world';
 import type { Entity, EntityId } from '@engine/world';
-import type { ScriptServices } from '../behavior/Behavior';
+import type { ScriptServices } from '../behavior/Behavior.js';
 import type { PhysicsWorld } from '@engine/world';
 import type { AnimationSystem } from '@engine/stdlib/Animation';
 // NOTE: Renderer type placeholder (gfx-webgpu exists but not exporting Renderer type cleanly yet)

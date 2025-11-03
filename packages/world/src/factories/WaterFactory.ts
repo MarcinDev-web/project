@@ -1,4 +1,4 @@
-import { WaterComponent } from '../components/WaterComponent';
+import { WaterComponent } from '../components/WaterComponent.js';
 import type { Vec2, Vec4 } from '@engine/core/math';
 
 /**
@@ -168,7 +168,7 @@ export function createCustomWater(config: {
  * @returns The created WaterComponent
  */
 export function addWaterToEntity(
-  entity: import('../core/Entity').Entity,
+  entity: import('../core/Entity.js').Entity,
   preset: WaterPresetType,
   size?: Vec2
 ): WaterComponent {

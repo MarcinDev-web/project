@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { MaterialComponent } from './MaterialComponent';
+import { MaterialComponent } from './MaterialComponent.js';
 
 describe('MaterialComponent', () => {
   it('clones and serializes material data', () => {

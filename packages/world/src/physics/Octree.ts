@@ -3,8 +3,8 @@
  * Divides 3D space into octants recursively for fast spatial queries
  */
 
-import type { Entity } from '../core/Entity';
-import { BoundingVolume, type AABB } from './BoundingVolume';
+import type { Entity } from '../core/Entity.js';
+import { BoundingVolume, type AABB } from './BoundingVolume.js';
 
 /**
  * Entry stored in octree

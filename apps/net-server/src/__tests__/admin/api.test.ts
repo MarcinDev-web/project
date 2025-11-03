@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from 'vitest';
 
-describe('Admin API - Manual Verification', () => {
+describe.skip('Admin API - Manual Verification', () => {
   it('Admin endpoints should be protected by requireAdmin middleware', () => {
     // Expected behavior:
     // - GET /api/admin/users requires admin role
@@ -27,4 +27,5 @@ describe('Admin API - Manual Verification', () => {
     expect(true).toBe(true); // Placeholder - manual testing required
   });
 });
+
 

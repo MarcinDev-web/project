@@ -1,7 +1,7 @@
 /**
  * Data Cubes - Store and manipulate data
  */
-import { LogicCube } from './LogicCube';
+import { LogicCube } from './LogicCube.js';
 /**
  * Variable Data - Stores a variable
  */

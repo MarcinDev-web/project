@@ -1,8 +1,9 @@
 // Import Prisma Client - handle custom output path from schema.prisma
 // schema.prisma sets output to "../node_modules/.prisma/net-client"
-import type { PrismaClient as PrismaClientType } from '@prisma/client';
+// @ts-expect-error - Prisma client is generated at build time
+import type { PrismaClient as PrismaClientType } from '../../node_modules/.prisma/net-client';
 
-let PrismaClientConstructor: new (args?: any) => PrismaClientType | null = null;
+let PrismaClientConstructor: (new (args?: any) => PrismaClientType) | null = null;
 let prisma: PrismaClientType | null = null;
 
 async function loadPrismaConstructor(): Promise<new (args?: any) => PrismaClientType> {
@@ -12,20 +13,20 @@ async function loadPrismaConstructor(): Promise<new (args?: any) => PrismaClient
   
   try {
     // Try custom output location first (from schema.prisma)
-    const customModule = await import('../node_modules/.prisma/net-client');
-    PrismaClientConstructor = customModule.PrismaClient as any;
+    // @ts-expect-error - Prisma client is generated at build time
+    const customModule = await import('../../node_modules/.prisma/net-client');
+    PrismaClientConstructor = customModule.PrismaClient as new (args?: any) => PrismaClientType;
     return PrismaClientConstructor;
   } catch {
-    // Fallback to standard location
+    // Fallback to standard location (should not happen, but keep for compatibility)
     const standardModule = await import('@prisma/client');
-    PrismaClientConstructor = standardModule.PrismaClient as any;
+    PrismaClientConstructor = (standardModule as any).PrismaClient as new (args?: any) => PrismaClientType;
     return PrismaClientConstructor;
   }
 }
 
 export async function getPrismaClient(): Promise<PrismaClientType> {
   if (!prisma) {
-    const Client = await loadPrismaConstructor();
     const connectionString = process.env.DATABASE_URL;
     if (!connectionString) {
       throw new Error('DATABASE_URL is required');
@@ -37,13 +38,14 @@ export async function getPrismaClient(): Promise<PrismaClientType> {
       console.warn('⚠️  WARNING: DATABASE_URL should use SSL (sslmode=require) in production');
     }
 
-    prisma = new PrismaClientConstructor({
+    const Client = await loadPrismaConstructor();
+    prisma = new Client({
       datasources: {
         db: {
           url: connectionString,
         },
       },
-    });
+    }) as PrismaClientType;
   }
   return prisma;
 }

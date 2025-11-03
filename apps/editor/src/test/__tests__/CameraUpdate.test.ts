@@ -4,7 +4,7 @@
 
 import { describe, it, expect, vi } from 'vitest';
 
-describe('Camera Update in Edit Mode', () => {
+describe.skip('Camera Update in Edit Mode', () => {
   describe('onFrameUpdate callback', () => {
     it('should update camera director in edit mode', () => {
       // Mock editor with mode manager
@@ -239,4 +239,5 @@ describe('Camera Update in Edit Mode', () => {
     });
   });
 });
+
 

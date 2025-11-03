@@ -791,43 +791,36 @@ export function createMarketplaceRoutes(deps: RouteDependencies): Router {
           buildData?: ProjectData;
         };
 
-        const user = await authManager.getUserById(req.user.id);
+        const user = await authManager.getUserById(req.user!.id);
 
         // Use transaction if database is available
         if (dbPool && marketplaceStorage instanceof MarketplaceStorageDB) {
-          const client = await dbPool.connect();
           try {
-            await client.query('BEGIN');
+            // Use Prisma transaction
+            const item = await dbPool.$transaction(async (tx) => {
+              // Create marketplace item within transaction
+              const createdItem = await marketplaceStorage.createItem(
+                {
+                  type: body.type,
+                  title: body.title,
+                  description: body.description ?? '',
+                  authorId: req.user!.id,
+                  authorName: user?.email ?? '',
+                  thumbnailUrl: body.thumbnailUrl ?? '',
+                  fileUrl: body.fileUrl,
+                  tags: body.tags ?? [],
+                  public: true,
+                },
+                tx as any
+              );
 
-            // Create marketplace item within transaction
-            const item = await marketplaceStorage.createItem(
-              {
-                type: body.type,
-                title: body.title,
-                description: body.description ?? '',
-                authorId: req.user.id,
-                authorName: user?.email ?? '',
-                thumbnailUrl: body.thumbnailUrl ?? '',
-                fileUrl: body.fileUrl,
-                tags: body.tags ?? [],
-                public: true,
-              },
-              client
-            );
-
-            // Save build data within transaction if provided
-            if (body.type === 'build' && body.buildData && buildStorage) {
-              try {
-                await buildStorage.saveBuild(item.id, body.buildData, client);
-              } catch (error) {
-                throw new BuildDataErrorClass(
-                  'Failed to save build data',
-                  error instanceof Error ? error : new Error(String(error))
-                );
+              // Save build data within transaction if provided
+              if (body.type === 'build' && body.buildData && buildStorage) {
+                await buildStorage.saveBuild(createdItem.id, body.buildData);
               }
-            }
 
-            await client.query('COMMIT');
+              return createdItem;
+            });
 
             // Track warnings for partial failures (with transactions, should be empty)
             const warnings: string[] = [];
@@ -841,7 +834,7 @@ export function createMarketplaceRoutes(deps: RouteDependencies): Router {
 
                 const forumThread = await forumStorage.createThread({
                   categoryId: 'cat_showcase',
-                  authorId: req.user.id,
+                  authorId: req.user!.id,
                   title: `[Marketplace] ${body.title}`,
                   content: threadContent,
                   isPinned: false,
@@ -856,7 +849,7 @@ export function createMarketplaceRoutes(deps: RouteDependencies): Router {
                 });
 
                 // Broadcast new thread via WebSocket
-                await forumHandler.handleThreadCreated(forumThread, 'cat_showcase', req.user.id);
+                await forumHandler.handleThreadCreated(forumThread, 'cat_showcase', req.user!.id);
               }
             } catch (error) {
               console.error('Failed to create forum thread for marketplace item:', error);
@@ -868,9 +861,6 @@ export function createMarketplaceRoutes(deps: RouteDependencies): Router {
               warnings: warnings.length > 0 ? warnings : undefined,
             });
           } catch (error) {
-            await client.query('ROLLBACK').catch((rollbackError) => {
-              console.error('Failed to rollback transaction:', rollbackError);
-            });
             // Wrap database errors in DatabaseError
             if (
               error instanceof Error &&
@@ -883,8 +873,6 @@ export function createMarketplaceRoutes(deps: RouteDependencies): Router {
               throw new DatabaseErrorClass('Database transaction failed', error);
             }
             throw error;
-          } finally {
-            client.release();
           }
         } else {
           // Fallback for non-DB storage (JSON file)
@@ -892,7 +880,7 @@ export function createMarketplaceRoutes(deps: RouteDependencies): Router {
             type: body.type,
             title: body.title,
             description: body.description ?? '',
-            authorId: req.user.id,
+            authorId: req.user!.id,
             authorName: user?.email ?? '',
             thumbnailUrl: body.thumbnailUrl ?? '',
             fileUrl: body.fileUrl,
@@ -921,7 +909,7 @@ export function createMarketplaceRoutes(deps: RouteDependencies): Router {
 
               const forumThread = await forumStorage.createThread({
                 categoryId: 'cat_showcase',
-                authorId: req.user.id,
+                authorId: req.user!.id,
                 title: `[Marketplace] ${body.title}`,
                 content: threadContent,
                 isPinned: false,

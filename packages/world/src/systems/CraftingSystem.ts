@@ -1,4 +1,4 @@
-import type { Scene } from '../core/Scene';
+import type { Scene } from '../core/Scene.js';
 
 export interface RecipeIngredient { id: string; quantity: number }
 export interface RecipeOutput { id: string; quantity: number }

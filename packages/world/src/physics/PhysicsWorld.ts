@@ -3,12 +3,12 @@
  * Provides easy integration with the scene and entity system
  */
 
-import type { Scene } from '../core/Scene';
-import { PhysicsSystem, type PhysicsConfig, type CollisionEvent, type TriggerEvent } from './PhysicsSystem';
-import { Entity } from '../core/Entity';
-import { PhysicsComponent, RigidbodyType, type AnyCollider } from '../components/PhysicsComponent';
+import type { Scene } from '../core/Scene.js';
+import { PhysicsSystem, type PhysicsConfig, type CollisionEvent, type TriggerEvent } from './PhysicsSystem.js';
+import { Entity } from '../core/Entity.js';
+import { PhysicsComponent, RigidbodyType, type AnyCollider } from '../components/PhysicsComponent.js';
 import { Logger } from '@engine/core/utils';
-import { JointComponent } from '../components/JointComponent';
+import { JointComponent } from '../components/JointComponent.js';
 import type { Vec3 } from '@engine/core/math';
 import {
   createJoint,
@@ -21,8 +21,8 @@ import {
   type HingeJointConfig,
   type BallSocketJointConfig,
   type SliderJointConfig,
-} from './Joint';
-import { PhysicsRaycast, type PhysicsRay, type RaycastHit, type RaycastOptions } from './PhysicsRaycast';
+} from './Joint.js';
+import { PhysicsRaycast, type PhysicsRay, type RaycastHit, type RaycastOptions } from './PhysicsRaycast.js';
 
 /**
  * PhysicsWorld manages physics simulation for a scene

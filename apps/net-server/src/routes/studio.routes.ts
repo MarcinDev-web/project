@@ -486,15 +486,15 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
 
         const revenueByAuthor = new Map<string, number>();
         if (dbPool) {
-          const rows = await dbPool.query<{ author_id: string; gross: string }>(
-            `SELECT mi.author_id, SUM(pi.price_amount) AS gross
-             FROM purchases p
-             JOIN purchase_items pi ON pi.purchase_id = p.id
-             JOIN marketplace_items mi ON mi.id = pi.item_id AND pi.item_type = 'marketplace-item'
-             WHERE p.status = 'completed' AND p.created_at >= NOW() - INTERVAL '${days} days'
-             GROUP BY mi.author_id`
-          );
-          for (const r of rows.rows) revenueByAuthor.set(r.author_id, Number(r.gross) * 0.9);
+          const rows = (await dbPool.$queryRaw<Array<{ author_id: string; gross: string }>>`
+            SELECT mi.author_id, SUM(pi.price_amount) AS gross
+            FROM purchases p
+            JOIN purchase_items pi ON pi.purchase_id = p.id
+            JOIN marketplace_items mi ON mi.id = pi.item_id AND pi.item_type = 'marketplace-item'
+            WHERE p.status = 'completed' AND p.created_at >= NOW() - INTERVAL '${String(days)} days'
+            GROUP BY mi.author_id
+          `);
+          for (const r of rows) revenueByAuthor.set(r.author_id, Number(r.gross) * 0.9);
         } else {
           const allPurchases = await purchaseStorage.getPurchases({
             status: 'completed',
@@ -516,20 +516,20 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
         let growthByAuthor = new Map<string, number>();
         if (metric === 'growth') {
           if (dbPool) {
-            const rows = await dbPool.query<{ author_id: string; period: string; gross: string }>(
-              `WITH r AS (
-                 SELECT mi.author_id, CASE WHEN p.created_at >= NOW() - INTERVAL '7 days' THEN 'cur' ELSE 'prev' END AS period,
-                        SUM(pi.price_amount) AS gross
-                 FROM purchases p
-                 JOIN purchase_items pi ON pi.purchase_id = p.id
-                 JOIN marketplace_items mi ON mi.id = pi.item_id AND pi.item_type = 'marketplace-item'
-                 WHERE p.status = 'completed' AND p.created_at >= NOW() - INTERVAL '14 days'
-                 GROUP BY mi.author_id, CASE WHEN p.created_at >= NOW() - INTERVAL '7 days' THEN 'cur' ELSE 'prev' END
-               )
-               SELECT author_id, period, gross FROM r`
-            );
+            const rows = (await dbPool.$queryRaw<Array<{ author_id: string; period: string; gross: string }>>`
+              WITH r AS (
+                SELECT mi.author_id, CASE WHEN p.created_at >= NOW() - INTERVAL '7 days' THEN 'cur' ELSE 'prev' END AS period,
+                       SUM(pi.price_amount) AS gross
+                FROM purchases p
+                JOIN purchase_items pi ON pi.purchase_id = p.id
+                JOIN marketplace_items mi ON mi.id = pi.item_id AND pi.item_type = 'marketplace-item'
+                WHERE p.status = 'completed' AND p.created_at >= NOW() - INTERVAL '14 days'
+                GROUP BY mi.author_id, CASE WHEN p.created_at >= NOW() - INTERVAL '7 days' THEN 'cur' ELSE 'prev' END
+              )
+              SELECT author_id, period, gross FROM r
+            `);
             const map = new Map<string, { cur: number; prev: number }>();
-            for (const r of rows.rows) {
+            for (const r of rows) {
               const m = map.get(r.author_id) || { cur: 0, prev: 0 };
               if (r.period === 'cur') m.cur = Number(r.gross) * 0.9;
               else m.prev = Number(r.gross) * 0.9;
@@ -1370,42 +1370,41 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
       const byItem = new Map<string, { title?: string; gross: number }>();
 
       if (dbPool) {
-        const dayRows = await dbPool.query<{
+        const userId = req.user.id;
+        const dayRows = (await dbPool.$queryRaw<Array<{
           day: Date;
           gross: string;
-        }>(
-          `SELECT DATE_TRUNC('day', p.created_at) AS day, SUM(pi.price_amount) AS gross
-           FROM purchases p
-           JOIN purchase_items pi ON pi.purchase_id = p.id
-           JOIN marketplace_items mi ON mi.id = pi.item_id AND pi.item_type = 'marketplace-item'
-           WHERE mi.author_id = $1 AND p.status = 'completed' AND p.created_at >= NOW() - INTERVAL '${days} days'
-           GROUP BY 1
-           ORDER BY 1`,
-          [req.user.id]
-        );
-        for (const row of dayRows.rows) {
+        }>>`
+          SELECT DATE_TRUNC('day', p.created_at) AS day, SUM(pi.price_amount) AS gross
+          FROM purchases p
+          JOIN purchase_items pi ON pi.purchase_id = p.id
+          JOIN marketplace_items mi ON mi.id = pi.item_id AND pi.item_type = 'marketplace-item'
+          WHERE mi.author_id = ${userId} AND p.status = 'completed' AND p.created_at >= NOW() - INTERVAL '${String(days)} days'
+          GROUP BY 1
+          ORDER BY 1
+        `);
+        for (const row of dayRows) {
           const dayKey = row.day.toISOString().slice(0, 10);
           const val = Number(row.gross) || 0;
           byDay.set(dayKey, val);
           gross += val;
         }
 
-        const topRows = await dbPool.query<{
+        const topRows = (await dbPool.$queryRaw<Array<{
           item_id: string;
           title: string | null;
           gross: string;
-        }>(
-          `SELECT pi.item_id, mi.title, SUM(pi.price_amount) AS gross
-           FROM purchases p
-           JOIN purchase_items pi ON pi.purchase_id = p.id
-           JOIN marketplace_items mi ON mi.id = pi.item_id AND pi.item_type = 'marketplace-item'
-           WHERE mi.author_id = $1 AND p.status = 'completed' AND p.created_at >= NOW() - INTERVAL '${days} days'
-           GROUP BY pi.item_id, mi.title
-           ORDER BY SUM(pi.price_amount) DESC
-           LIMIT 10`,
-          [req.user.id]
-        );
-        for (const row of topRows.rows) {
+        }>>`
+          SELECT pi.item_id, mi.title, SUM(pi.price_amount) AS gross
+          FROM purchases p
+          JOIN purchase_items pi ON pi.purchase_id = p.id
+          JOIN marketplace_items mi ON mi.id = pi.item_id AND pi.item_type = 'marketplace-item'
+          WHERE mi.author_id = ${userId} AND p.status = 'completed' AND p.created_at >= NOW() - INTERVAL '${String(days)} days'
+          GROUP BY pi.item_id, mi.title
+          ORDER BY SUM(pi.price_amount) DESC
+          LIMIT 10
+        `);
+        for (const row of topRows) {
           const item: { gross: number; title?: string } = { gross: Number(row.gross) || 0 };
           if (row.title) {
             item.title = row.title;

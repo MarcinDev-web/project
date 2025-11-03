@@ -1,7 +1,7 @@
-import { Component } from './Component';
-import { registerComponent } from './registry';
+import { Component } from './Component.js';
+import { registerComponent } from './registry.js';
 import { mat4LookAt, mat4Perspective, mat4Invert, type Mat4, type Vec3 } from '@engine/core/math';
-import type { Entity } from '../core/Entity';
+import type { Entity } from '../core/Entity.js';
 
 const DEFAULT_FOV = (60 * Math.PI) / 180; // 60 degrees in radians
 const DEFAULT_NEAR = 0.1;

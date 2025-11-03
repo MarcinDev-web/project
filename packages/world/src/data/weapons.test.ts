@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { WEAPON_PRESETS, getWeaponPreset, getAllWeaponPresets } from './weapons';
+import { WEAPON_PRESETS, getWeaponPreset, getAllWeaponPresets } from './weapons.js';
 
 describe('weapons', () => {
   describe('WEAPON_PRESETS', () => {

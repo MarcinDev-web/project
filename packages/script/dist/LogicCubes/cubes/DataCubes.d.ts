@@ -1,8 +1,8 @@
 /**
  * Data Cubes - Store and manipulate data
  */
-import { LogicCube } from './LogicCube';
-import type { LogicCubeMetadata, LogicSignal, LogicExecutionContext } from './types';
+import { LogicCube } from './LogicCube.js';
+import type { LogicCubeMetadata, LogicSignal, LogicExecutionContext } from './types.js';
 /**
  * Variable Data - Stores a variable
  */

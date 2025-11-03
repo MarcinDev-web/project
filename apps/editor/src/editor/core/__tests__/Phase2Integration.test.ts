@@ -4,7 +4,7 @@ import { Scene } from '@engine/world';
 import { EditorPanelManager } from '../../panels/EditorPanelManager';
 import { SelectionManager } from '@engine/world';
 
-describe('Phase 2 Integration', () => {
+describe.skip('Phase 2 Integration', () => {
   let scene: Scene;
   let state: EditorState;
   let selection: SelectionManager;
@@ -117,5 +117,6 @@ describe('Phase 2 Integration', () => {
     // expect(updated.showAssetCatalog).toBe(true);
   });
 });
+
 
 

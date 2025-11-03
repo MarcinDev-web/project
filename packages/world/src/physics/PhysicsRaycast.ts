@@ -1,4 +1,4 @@
-import type { Entity } from '../core/Entity';
+import type { Entity } from '../core/Entity.js';
 import type { Vec3 } from '@engine/core/math';
 import {
   addVec3Out,
@@ -7,7 +7,7 @@ import {
   dotVec3,
   transformVec3ByQuatOut,
 } from '@engine/core/math';
-import { PhysicsComponent, type BoxCollider, type SphereCollider, type CapsuleCollider } from '../components/PhysicsComponent';
+import { PhysicsComponent, type BoxCollider, type SphereCollider, type CapsuleCollider } from '../components/PhysicsComponent.js';
 
 /**
  * Represents a ray for physics queries

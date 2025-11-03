@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { AmmoComponent } from './AmmoComponent';
+import { AmmoComponent } from './AmmoComponent.js';
 
 describe('AmmoComponent', () => {
   let ammo: AmmoComponent;

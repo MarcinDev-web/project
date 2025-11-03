@@ -8,7 +8,6 @@ import { generateAndSaveThumbnail } from '../utils/thumbnailGenerator';
 import { createDbPool } from '../lib/db';
 import { BuildStorage } from '../storage/BuildStorage';
 import type { ProjectData } from '../types';
-import type { Pool } from 'pg';
 import path from 'path';
 
 const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
@@ -259,10 +258,10 @@ export async function seedMarketplace(tracker?: GameSessionTracker): Promise<voi
 
     // Initialize build storage if database is available
     let buildStorage: BuildStorage | null = null;
-    let dbPool: Pool | null = null;
+    let dbPool: Awaited<ReturnType<typeof createDbPool>> | null = null;
     if (process.env.DATABASE_URL) {
       try {
-        dbPool = createDbPool();
+        dbPool = await createDbPool();
         buildStorage = new BuildStorage(dbPool);
         console.log('Build storage initialized');
       } catch (error) {
@@ -395,7 +394,7 @@ export async function seedMarketplace(tracker?: GameSessionTracker): Promise<voi
 
     // Cleanup database pool if created
     if (dbPool) {
-      await dbPool.end();
+      await dbPool.$disconnect();
     }
 
     console.log(`✓ Successfully seeded ${mockBuilds.length} mock builds and ${mockAvatars.length} mock avatars!`);

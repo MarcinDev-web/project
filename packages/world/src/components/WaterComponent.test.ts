@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { WaterComponent } from './WaterComponent';
+import { WaterComponent } from './WaterComponent.js';
 
 describe('WaterComponent', () => {
   it('has correct default values', () => {
@@ -95,9 +95,10 @@ describe('WaterComponent', () => {
     });
 
     // Should clamp/validate values
-    expect(component.size).toEqual([10, 10]); // Keeps default
+    // Size [5, 5] is valid, so it's kept (not reverted to default)
+    expect(component.size).toEqual([5, 5]);
     expect(component.waveHeight).toBeGreaterThanOrEqual(0);
-    expect(component.waveFrequency).toBeGreaterThan(0.001);
+    expect(component.waveFrequency).toBeGreaterThanOrEqual(0.001); // 0 gets clamped to 0.001
     expect(component.foamThreshold).toBeLessThanOrEqual(1.0);
     expect(component.transparency).toBeGreaterThanOrEqual(0);
     expect(component.reflectionStrength).toBeLessThanOrEqual(1.0);

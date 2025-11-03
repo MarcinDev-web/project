@@ -10,7 +10,7 @@ import type {
   LogicSignal,
   LogicExecutionContext,
   LogicCubeMetadata,
-} from './types';
+} from './types.js';
 
 /**
  * Abstract base class for logic cubes

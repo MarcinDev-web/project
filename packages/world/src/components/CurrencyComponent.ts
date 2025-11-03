@@ -1,5 +1,5 @@
-import { Component } from './Component';
-import { registerComponent } from './registry';
+import { Component } from './Component.js';
+import { registerComponent } from './registry.js';
 import type { CurrencyManager, CurrencyWallet } from '@engine/economy';
 import type { CurrencyAmount } from '@engine/economy';
 

@@ -1,7 +1,7 @@
-import { ScriptComponent } from '../components/ScriptComponent';
-import { SceneScriptContextBuilder } from '../services/SceneScriptContextBuilder';
-import { BehaviorRegistry } from '../behavior/BehaviorRegistry';
-import { CoroutineScheduler } from '../coroutine/CoroutineScheduler';
+import { ScriptComponent } from '../components/ScriptComponent.js';
+import { SceneScriptContextBuilder } from '../services/SceneScriptContextBuilder.js';
+import { BehaviorRegistry } from '../behavior/BehaviorRegistry.js';
+import { CoroutineScheduler } from '../coroutine/CoroutineScheduler.js';
 /**
  * Runs Behavior instances on entities with ScriptComponent.
  * Also supports hot-reload by monitoring registry changes via a simple version.

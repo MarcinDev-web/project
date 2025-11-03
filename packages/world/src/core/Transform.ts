@@ -7,7 +7,7 @@ import {
   type Mat4,
   type Vec3,
 } from '@engine/core/math';
-import { Component } from '../components/Component';
+import { Component } from '../components/Component.js';
 
 /**
  * Quaternion rotation [x, y, z, w]

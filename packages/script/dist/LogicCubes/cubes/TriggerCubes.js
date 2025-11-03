@@ -1,7 +1,7 @@
 /**
  * Trigger Cubes - Start execution chains when events occur
  */
-import { LogicCube } from './LogicCube';
+import { LogicCube } from './LogicCube.js';
 /**
  * OnClick Trigger - Fires when the entity is clicked
  */

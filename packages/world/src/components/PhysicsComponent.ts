@@ -1,9 +1,9 @@
-import { Component } from './Component';
-import { registerComponent } from './registry';
+import { Component } from './Component.js';
+import { registerComponent } from './registry.js';
 import type { Vec3 } from '@engine/core/math';
 import type { Mat3 } from '@engine/core/math';
 import { quatToMatrix3 } from '@engine/core/math';
-import { calculateInertiaTensor } from '../physics/inertia';
+import { calculateInertiaTensor } from '../physics/inertia.js';
 
 /**
  * Rigidbody types determine how physics affects the object

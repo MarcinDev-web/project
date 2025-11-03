@@ -1,11 +1,11 @@
-import { LogicCubeRegistry } from '../LogicCubeSystem';
+import { LogicCubeRegistry } from '../LogicCubeSystem.js';
 // Import specific cubes for registration
-import { OnClickTrigger, OnTimerTrigger, OnGameStartTrigger, OnPlayerEnterTrigger, OnPlayerLeaveTrigger, } from './TriggerCubes';
-import { SendMessageAction, SetVariableAction, SpawnEntityAction, DestroyEntityAction, LogAction, } from './ActionCubes';
-import { UIButtonClickTrigger, UIShowElementAction, UISetTextAction, UISetImageAction, UISetValueAction, UIEnableElementAction, } from './UICubes';
-import { CompareVariableCondition, IsPlayerNearCondition, CheckDistanceCondition, } from './ConditionCubes';
-import { VariableData, CounterData, TimerData } from './DataCubes';
-import { ANDGate, ORGate, NOTGate, DelayGate } from './LogicGateCubes';
+import { OnClickTrigger, OnTimerTrigger, OnGameStartTrigger, OnPlayerEnterTrigger, OnPlayerLeaveTrigger, } from './TriggerCubes.js';
+import { SendMessageAction, SetVariableAction, SpawnEntityAction, DestroyEntityAction, LogAction, } from './ActionCubes.js';
+import { UIButtonClickTrigger, UIShowElementAction, UISetTextAction, UISetImageAction, UISetValueAction, UIEnableElementAction, } from './UICubes.js';
+import { CompareVariableCondition, IsPlayerNearCondition, CheckDistanceCondition, } from './ConditionCubes.js';
+import { VariableData, CounterData, TimerData } from './DataCubes.js';
+import { ANDGate, ORGate, NOTGate, DelayGate } from './LogicGateCubes.js';
 /**
  * Registers all built-in logic cube types
  */

@@ -59,7 +59,8 @@ export class PlayerSync {
       ...config,
     };
 
-    this.localUserId = this.config.localUserId;
+    // Initialize localUserId - fetch from replicationClient if not provided
+    this.localUserId = this.config.localUserId ?? this.config.replicationClient.getLocalUserId() ?? null;
 
     // Subscribe to player updates from network
     this.config.replicationClient.onPlayerUpdate((message) => {

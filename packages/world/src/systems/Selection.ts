@@ -1,5 +1,5 @@
-import { Entity } from '../core/Entity';
-import type { Scene } from '../core/Scene';
+import { Entity } from '../core/Entity.js';
+import type { Scene } from '../core/Scene.js';
 
 /**
  * Manages selected entities in the scene.

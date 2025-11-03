@@ -110,10 +110,10 @@ describe('HdrLoader', () => {
         view[i] = 0;
       }
 
-      // Create File-like object with arrayBuffer method
-      const file = {
-        arrayBuffer: async () => buffer,
-      } as File;
+      // Create a proper File instance for the test
+      // In test environment, use Blob which File extends, or create File directly
+      const blob = new Blob([buffer], { type: 'application/octet-stream' });
+      const file = new File([blob], 'test.hdr', { type: 'image/vnd.radiance' });
 
       const result = await loadHdrFile(file);
       expect(result.width).toBe(1);

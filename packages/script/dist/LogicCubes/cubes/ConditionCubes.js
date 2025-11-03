@@ -1,7 +1,7 @@
 /**
  * Condition Cubes - Evaluate conditions and route signals
  */
-import { LogicCube } from './LogicCube';
+import { LogicCube } from './LogicCube.js';
 /**
  * CompareVariable Condition - Compares a variable to a value
  */

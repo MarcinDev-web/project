@@ -1,6 +1,6 @@
-import { Component } from './Component';
-import { registerComponent } from './registry';
-import type { AmmoType } from '../types/weapon';
+import { Component } from './Component.js';
+import { registerComponent } from './registry.js';
+import type { AmmoType } from '../types/weapon.js';
 
 /**
  * Ammo component data

@@ -1,6 +1,6 @@
-import { Entity, type EntityId, type EntityData } from '../core/Entity';
-import type { ComponentClass } from '../components/Component';
-import { CameraComponent } from '../components/CameraComponent';
+import { Entity, type EntityId, type EntityData } from '../core/Entity.js';
+import type { ComponentClass } from '../components/Component.js';
+import { CameraComponent } from '../components/CameraComponent.js';
 import { Logger } from '@engine/core/utils';
 import { EventBus } from '@engine/core/event';
 import type { ScriptRuntime } from '@engine/core/script';

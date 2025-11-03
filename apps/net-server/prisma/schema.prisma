@@ -1,7 +1,7 @@
 // Prisma schema for net-server
 generator client {
   provider = "prisma-client-js"
-  output   = "../node_modules/.prisma/net-client"
+  output   = "../../node_modules/.prisma/net-client"
 }
 
 datasource db {

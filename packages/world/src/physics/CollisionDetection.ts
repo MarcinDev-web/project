@@ -10,7 +10,7 @@ import type {
   SphereCollider,
   CapsuleCollider,
   ContactPoint,
-} from '../components/PhysicsComponent';
+} from '../components/PhysicsComponent.js';
 import { normalizeVec3Out, quatToMatrix3 } from '@engine/core/math';
 
 /**

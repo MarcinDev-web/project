@@ -1,2 +1,2 @@
-export * from './ScriptSystem';
+export * from './ScriptSystem.js';
 //# sourceMappingURL=index.js.map

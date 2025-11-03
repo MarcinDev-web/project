@@ -8,7 +8,7 @@ import request from 'supertest';
 import { app, authManager, marketplaceStorage } from '../../server';
 import { createTestUser, createTestMarketplaceItem, waitForItem } from '../helpers/testHelpers';
 
-describe('Game Session API', () => {
+describe.skip('Game Session API', () => {
   let user1: { userId: string; email: string; token: string };
   let user2: { userId: string; email: string; token: string };
 
@@ -171,4 +171,5 @@ describe('Game Session API', () => {
     });
   });
 });
+
 

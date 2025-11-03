@@ -26,8 +26,8 @@ async function main(): Promise<void> {
 
   await app.register(websocket);
 
-  const prisma = getPrismaClient();
   await ensureSchema();
+  const prisma = await getPrismaClient();
 
   registerAuthRoutes(app, prisma);
   registerSessionRoutes(app, prisma);

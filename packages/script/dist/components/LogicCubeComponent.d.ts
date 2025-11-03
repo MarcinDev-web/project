@@ -3,7 +3,7 @@
  * Stores the logic cube type, configuration, and runtime state.
  */
 import { Component } from '@engine/world';
-import type { LogicCubeState } from '../LogicCubes/cubes/types';
+import type { LogicCubeState } from '../LogicCubes/cubes/types.js';
 export declare class LogicCubeComponent extends Component {
     static readonly type = "LogicCube";
     /** Type of logic cube (e.g., 'onClickTrigger', 'sendMessageAction') */

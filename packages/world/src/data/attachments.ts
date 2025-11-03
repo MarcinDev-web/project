@@ -1,4 +1,4 @@
-import type { AttachmentDefinition, AttachmentType } from '../types/weapon';
+import type { AttachmentDefinition, AttachmentType } from '../types/weapon.js';
 
 /**
  * Predefined attachment definitions for PvP gameplay

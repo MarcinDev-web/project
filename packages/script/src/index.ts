@@ -4,13 +4,13 @@
  * LogicCubes, Behaviors, ScriptRuntime, Script Components
  */
 
-export * from './components'; // Script-specific components
-export * from './LogicCubes';
-export * from './runtime';
-export * from './behavior';
-export * from './coroutine';
-export * from './connection';
-export { VariableStorage } from './storage/VariableStorage'; // Named to avoid VariableData conflict
-export * from './services';
-export * from './signals';
+export * from './components/index.js'; // Script-specific components
+export * from './LogicCubes/index.js';
+export * from './runtime/index.js';
+export * from './behavior/index.js';
+export * from './coroutine/index.js';
+export * from './connection/index.js';
+export { VariableStorage } from './storage/VariableStorage.js'; // Named to avoid VariableData conflict
+export * from './services/index.js';
+export * from './signals/index.js';
 

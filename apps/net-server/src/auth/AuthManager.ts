@@ -5,7 +5,8 @@ import { UserStorage } from './UserStorage';
 import { TokenBlacklistService } from './TokenBlacklistService';
 import { securityLogger } from '../logging/SecurityLogger';
 import type { User, PublicUser, Session, JWTPayload, AuthResponse } from '../types/auth';
-import type { Pool } from 'pg';
+// @ts-expect-error - Prisma client is generated at build time
+import type { PrismaClient } from '../../node_modules/.prisma/net-client';
 
 // Validate JWT_SECRET in production
 const isProduction = process.env.NODE_ENV === 'production';
@@ -41,7 +42,7 @@ export class AuthManager {
   private readonly ACCOUNT_LOCKOUT_THRESHOLD = 5; // Lock after 5 failed attempts
   private readonly ACCOUNT_LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes
 
-  constructor(dataDir = './data', dbPool: Pool | null = null) {
+  constructor(dataDir = './data', dbPool: PrismaClient | null = null) {
     this.userStorage = new UserStorage(dataDir);
     this.tokenBlacklist = new TokenBlacklistService(dataDir, dbPool);
   }

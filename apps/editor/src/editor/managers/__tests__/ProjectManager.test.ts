@@ -111,8 +111,11 @@ describe('ProjectManager - Templates', () => {
       onSaveStatusChange,
     });
 
-    vi.spyOn(window, 'confirm').mockReturnValue(true);
-    vi.spyOn(window, 'alert').mockImplementation(() => {});
+    // Mock window methods if window is available (jsdom environment)
+    if (typeof window !== 'undefined') {
+      vi.spyOn(window, 'confirm').mockReturnValue(true);
+      vi.spyOn(window, 'alert').mockImplementation(() => {});
+    }
   });
 
   afterEach(() => {
@@ -145,7 +148,9 @@ describe('ProjectManager - Templates', () => {
       'Template failed, created empty project',
       1500
     );
-    expect(window.alert).toHaveBeenCalled();
+    if (typeof window !== 'undefined') {
+      expect(window.alert).toHaveBeenCalled();
+    }
     expect(scene.rootEntities.some((entity: SceneEntity) => entity.name === 'Environment')).toBe(true);
   });
 });

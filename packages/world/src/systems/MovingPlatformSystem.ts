@@ -2,10 +2,10 @@
  * MovingPlatformSystem - Handles moving platform logic
  */
 
-import type { Scene } from '../core/Scene';
-import type { Entity } from '../core/Entity';
-import { MovingPlatformComponent } from '../components/MovingPlatformComponent';
-import type { Vec3 } from '@engine/core';
+import type { Scene } from '../core/Scene.js';
+import type { Entity } from '../core/Entity.js';
+import { MovingPlatformComponent } from '../components/MovingPlatformComponent.js';
+import type { Vec3 } from '@engine/core/math';
 import { lengthVec3, subVec3, normalizeVec3, scaleVec3, addVec3 } from '@engine/core/math';
 
 /**

@@ -1,6 +1,6 @@
-import type { BehaviorInstance } from '../behavior/Behavior';
-import type { CoroutineScheduler } from '../coroutine/CoroutineScheduler';
-import type { SceneScriptContextBuilder } from '../services/SceneScriptContextBuilder';
+import type { BehaviorInstance } from '../behavior/Behavior.js';
+import type { CoroutineScheduler } from '../coroutine/CoroutineScheduler.js';
+import type { SceneScriptContextBuilder } from '../services/SceneScriptContextBuilder.js';
 import type { PhysicsWorld } from '@engine/world';
 import type { AnimationSystem } from '@engine/stdlib/Animation';
 type Renderer = any;

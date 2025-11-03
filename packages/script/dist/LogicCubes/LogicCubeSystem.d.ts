@@ -3,11 +3,11 @@
  * Similar to ScriptSystem but for visual logic cubes.
  */
 import type { Scene } from '@engine/world';
-import { LogicConnectionManager } from '../connection/LogicConnectionManager';
-import { VariableStorage } from '../storage/VariableStorage';
-import { PlayerDetection } from './cubes/PlayerDetection';
-import type { LogicCube, LogicCubeConstructor } from './cubes/LogicCube';
-import type { LogicSignal } from './cubes/types';
+import { LogicConnectionManager } from '../connection/LogicConnectionManager.js';
+import { VariableStorage } from '../storage/VariableStorage.js';
+import { PlayerDetection } from './cubes/PlayerDetection.js';
+import type { LogicCube, LogicCubeConstructor } from './cubes/LogicCube.js';
+import type { LogicSignal } from './cubes/types.js';
 import type { EntityId } from '@engine/world';
 /**
  * Registry for logic cube types

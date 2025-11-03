@@ -266,7 +266,7 @@ describe('AvatarSkeleton', () => {
       const originalPosition = [...skeleton.getLocalTransform('Head').position];
 
       skeleton.applyLocalPose({
-        Head: { position: [0, 0, 0], rotation: [0, 0, 0, 1] },
+        Head: { rotation: [0, 0, 0, 1] },
       });
 
       const transform = skeleton.getLocalTransform('Head');

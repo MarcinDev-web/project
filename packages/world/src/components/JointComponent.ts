@@ -1,5 +1,5 @@
-import { Component } from './Component';
-import type { Joint } from '../physics/Joint';
+import { Component } from './Component.js';
+import type { Joint } from '../physics/Joint.js';
 
 /**
  * Component for managing joints attached to an entity

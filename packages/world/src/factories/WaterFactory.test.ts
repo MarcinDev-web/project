@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
-import { createWater, createCustomWater, addWaterToEntity } from './WaterFactory';
-import { Scene } from '../core';
-import { WaterComponent } from '../components/WaterComponent';
+import { createWater, createCustomWater, addWaterToEntity } from './WaterFactory.js';
+import { Scene } from '../core/index.js';
+import { WaterComponent } from '../components/WaterComponent.js';
 
 describe('WaterFactory', () => {
   describe('createWater', () => {

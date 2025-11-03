@@ -1,4 +1,4 @@
-import type { AmmoType, AmmoTypeDefinition } from '../types/weapon';
+import type { AmmoType, AmmoTypeDefinition } from '../types/weapon.js';
 
 /**
  * Ammo type definitions for PvP gameplay

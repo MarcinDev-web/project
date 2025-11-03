@@ -3,8 +3,8 @@
  */
 
 import type { Vec3 } from '@engine/core/math';
-import type { Entity } from '../core/Entity';
-import type { PhysicsComponent } from '../components/PhysicsComponent';
+import type { Entity } from '../core/Entity.js';
+import type { PhysicsComponent } from '../components/PhysicsComponent.js';
 
 /**
  * Axis-Aligned Bounding Box

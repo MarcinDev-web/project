@@ -6,7 +6,8 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import type { Pool } from 'pg';
+// @ts-expect-error - Prisma client is generated at build time
+import type { PrismaClient } from '../../node_modules/.prisma/net-client';
 
 /**
  * Token blacklist entry with expiration.
@@ -23,12 +24,12 @@ interface BlacklistEntry {
 export class TokenBlacklistService {
   private readonly dataDir: string;
   private readonly dataFile: string;
-  private readonly dbPool: Pool | null;
+  private readonly dbPool: PrismaClient | null;
   private memoryCache: Set<string> = new Set();
   private cleanupInterval: NodeJS.Timeout | null = null;
   private initialized = false;
 
-  constructor(dataDir = './data', dbPool: Pool | null = null) {
+  constructor(dataDir = './data', dbPool: PrismaClient | null = null) {
     this.dataDir = dataDir;
     this.dataFile = path.join(dataDir, 'token-blacklist.json');
     this.dbPool = dbPool;
@@ -66,34 +67,17 @@ export class TokenBlacklistService {
     if (!this.dbPool) return;
 
     try {
-      const client = await this.dbPool.connect();
-      try {
-        // Create table if it doesn't exist
-        await client.query(`
-          CREATE TABLE IF NOT EXISTS token_blacklist (
-            jti TEXT PRIMARY KEY,
-            expires_at BIGINT NOT NULL,
-            created_at TIMESTAMP NOT NULL DEFAULT NOW()
-          );
-        `);
-
-        // Create index on expires_at for efficient cleanup
-        await client.query(`
-          CREATE INDEX IF NOT EXISTS idx_token_blacklist_expires 
-          ON token_blacklist(expires_at);
-        `);
-
-        // Load active tokens into memory cache
-        const now = Date.now();
-        const result = await client.query<{ jti: string }>(
-          'SELECT jti FROM token_blacklist WHERE expires_at > $1',
-          [now]
-        );
-        for (const row of result.rows) {
-          this.memoryCache.add(row.jti);
-        }
-      } finally {
-        client.release();
+      // Schema is managed by Prisma migrations - table should already exist
+      // Load active tokens into memory cache
+      const now = Date.now();
+      const tokens = await this.dbPool.tokenBlacklist.findMany({
+        where: {
+          expiresAt: { gt: BigInt(now) },
+        },
+        select: { jti: true },
+      });
+      for (const token of tokens) {
+        this.memoryCache.add(token.jti);
       }
     } catch (error) {
       console.error('Failed to initialize token blacklist database:', error);
@@ -147,15 +131,16 @@ export class TokenBlacklistService {
     if (this.dbPool) {
       // Store in database
       try {
-        const client = await this.dbPool.connect();
-        try {
-          await client.query(
-            'INSERT INTO token_blacklist (jti, expires_at) VALUES ($1, $2) ON CONFLICT (jti) DO UPDATE SET expires_at = $2',
-            [jti, expiresAt]
-          );
-        } finally {
-          client.release();
-        }
+        await this.dbPool.tokenBlacklist.upsert({
+          where: { jti },
+          create: {
+            jti,
+            expiresAt: BigInt(expiresAt),
+          },
+          update: {
+            expiresAt: BigInt(expiresAt),
+          },
+        });
       } catch (error) {
         console.error('Failed to add token to blacklist in database:', error);
         // Continue - at least it's in memory cache
@@ -182,20 +167,22 @@ export class TokenBlacklistService {
     if (this.dbPool) {
       // Clean up from database
       try {
-        const client = await this.dbPool.connect();
-        try {
-          await client.query('DELETE FROM token_blacklist WHERE expires_at <= $1', [now]);
+        const nowBigInt = BigInt(now);
+        await this.dbPool.tokenBlacklist.deleteMany({
+          where: {
+            expiresAt: { lte: nowBigInt },
+          },
+        });
 
-          // Update memory cache (remove expired)
-          const result = await client.query<{ jti: string }>(
-            'SELECT jti FROM token_blacklist WHERE expires_at > $1',
-            [now]
-          );
-          const activeJtis = new Set(result.rows.map((row) => row.jti));
-          this.memoryCache = activeJtis;
-        } finally {
-          client.release();
-        }
+        // Update memory cache (remove expired)
+        const tokens = await this.dbPool.tokenBlacklist.findMany({
+          where: {
+            expiresAt: { gt: nowBigInt },
+          },
+          select: { jti: true },
+        });
+        const activeJtis = new Set(tokens.map((token) => token.jti));
+        this.memoryCache = activeJtis;
       } catch (error) {
         console.error('Failed to cleanup expired tokens from database:', error);
       }

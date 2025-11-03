@@ -1,8 +1,8 @@
 import { describe, it, expect, vi } from 'vitest';
-import { Component } from './Component';
-import { registerComponent, getComponentConstructor } from './registry';
-import { MaterialComponent } from './MaterialComponent';
-import { MeshComponent } from './MeshComponent';
+import { Component } from './Component.js';
+import { registerComponent, getComponentConstructor } from './registry.js';
+import { MaterialComponent } from './MaterialComponent.js';
+import { MeshComponent } from './MeshComponent.js';
 
 class TestComponent extends Component {
   getType(): string {

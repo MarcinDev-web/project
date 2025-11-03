@@ -1,4 +1,4 @@
-import { CoroutineScheduler, } from '../coroutine/CoroutineScheduler';
+import { CoroutineScheduler, } from '../coroutine/CoroutineScheduler.js';
 /**
  * Base class for all user-defined behaviors.
  * Extend this and override lifecycle hooks as needed.

@@ -2,11 +2,11 @@
  * UI Cubes - Logic cubes for UI element interactions
  */
 
-import { LogicCube } from './LogicCube';
-import type { LogicCubeMetadata, LogicSignal, LogicExecutionContext } from './types';
+import { LogicCube } from './LogicCube.js';
+import type { LogicCubeMetadata, LogicSignal, LogicExecutionContext } from './types.js';
 import { Logger } from '@engine/core/utils';
 import { UIElementComponent } from '@engine/world/components/UIElementComponent';
-import { getLogicConnectionManager } from '../../connection';
+import { getLogicConnectionManager } from '../../connection/index.js';
 
 /**
  * UIButtonClick Trigger - Fires when a UI button is clicked

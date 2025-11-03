@@ -2,11 +2,11 @@
  * InventorySystem - Manages weapon inventory and switching
  */
 
-import type { Scene } from '../core/Scene';
-import type { Entity } from '../core/Entity';
-import { InventoryComponent } from '../components/InventoryComponent';
-import { WeaponComponent } from '../components/WeaponComponent';
-import type { WeaponSwitchedEvent, InventoryUpdatedEvent } from '../types/weapon';
+import type { Scene } from '../core/Scene.js';
+import type { Entity } from '../core/Entity.js';
+import { InventoryComponent } from '../components/InventoryComponent.js';
+import { WeaponComponent } from '../components/WeaponComponent.js';
+import type { WeaponSwitchedEvent, InventoryUpdatedEvent } from '../types/weapon.js';
 
 /**
  * Configuration for InventorySystem

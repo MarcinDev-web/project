@@ -1,6 +1,6 @@
-import { Component } from './Component';
-import { registerComponent } from './registry';
-import type { WeaponPresetType, AmmoType, StatModifiers } from '../types/weapon';
+import { Component } from './Component.js';
+import { registerComponent } from './registry.js';
+import type { WeaponPresetType, AmmoType, StatModifiers } from '../types/weapon.js';
 
 /**
  * Weapon type

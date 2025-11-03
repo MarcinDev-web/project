@@ -1,5 +1,5 @@
 import type { Scene } from '@engine/world';
-import type { LogicConnectionManager } from '../connection/LogicConnectionManager';
+import type { LogicConnectionManager } from '../connection/LogicConnectionManager.js';
 
 const sceneConnectionManagers = new WeakMap<Scene, LogicConnectionManager>();
 

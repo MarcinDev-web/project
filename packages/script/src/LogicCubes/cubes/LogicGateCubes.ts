@@ -2,8 +2,8 @@
  * Logic Gate Cubes - Boolean logic operations
  */
 
-import { LogicCube } from './LogicCube';
-import type { LogicCubeMetadata, LogicSignal, LogicExecutionContext } from './types';
+import { LogicCube } from './LogicCube.js';
+import type { LogicCubeMetadata, LogicSignal, LogicExecutionContext } from './types.js';
 
 /**
  * AND Gate - Outputs true when all inputs are triggered

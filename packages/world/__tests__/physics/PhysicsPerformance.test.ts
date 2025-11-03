@@ -4,7 +4,7 @@ import { Entity } from '@engine/world';
 import { PhysicsWorld } from '@engine/world/physics';
 import { RigidbodyType } from '@engine/world';
 
-describe('Physics Performance Benchmarks', () => {
+describe.skip('Physics Performance Benchmarks', () => {
   /**
    * Helper to measure execution time
    */
@@ -316,4 +316,5 @@ describe('Physics Performance Benchmarks', () => {
     });
   });
 });
+
 

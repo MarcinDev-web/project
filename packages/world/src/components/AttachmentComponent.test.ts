@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { AttachmentComponent } from './AttachmentComponent';
-import { getAttachment } from '../data/attachments';
+import { AttachmentComponent } from './AttachmentComponent.js';
+import { getAttachment } from '../data/attachments.js';
 
 describe('AttachmentComponent', () => {
   let attachment: AttachmentComponent;

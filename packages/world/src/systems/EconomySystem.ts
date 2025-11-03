@@ -1,6 +1,6 @@
-import type { Scene } from '../core/Scene';
+import type { Scene } from '../core/Scene.js';
 import type { CurrencyAmount, CurrencyManager } from '@engine/economy';
-import { CurrencyComponent } from '../components/CurrencyComponent';
+import { CurrencyComponent } from '../components/CurrencyComponent.js';
 
 export interface RewardEvent {
   walletId?: string;
@@ -21,7 +21,7 @@ export class EconomySystem {
     this.currency = currencyManager;
 
     // Hook reward events
-    this.scene.events.on('economy:reward', (data) => {
+    this.scene.events.on('economy:reward', (data: unknown) => {
       const e = data as RewardEvent;
       if (!e?.amount) return;
       if (e.walletId) {

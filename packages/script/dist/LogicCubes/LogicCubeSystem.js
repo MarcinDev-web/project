@@ -2,11 +2,11 @@
  * LogicCubeSystem - Manages execution of logic cubes in the scene.
  * Similar to ScriptSystem but for visual logic cubes.
  */
-import { LogicCubeComponent } from '../components/LogicCubeComponent';
-import { LogicConnectionManager } from '../connection/LogicConnectionManager';
-import { registerLogicConnectionManager } from '../connection/LogicConnectionRegistry';
-import { VariableStorage } from '../storage/VariableStorage';
-import { PlayerDetection } from './cubes/PlayerDetection';
+import { LogicCubeComponent } from '../components/LogicCubeComponent.js';
+import { LogicConnectionManager } from '../connection/LogicConnectionManager.js';
+import { registerLogicConnectionManager } from '../connection/LogicConnectionRegistry.js';
+import { VariableStorage } from '../storage/VariableStorage.js';
+import { PlayerDetection } from './cubes/PlayerDetection.js';
 import { Logger } from '@engine/core/utils';
 /**
  * Registry for logic cube types

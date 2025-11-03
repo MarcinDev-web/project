@@ -1,13 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Scene } from '../core/Scene';
-import { WeaponSystem } from './WeaponSystem';
-import { InventorySystem } from './InventorySystem';
-import { InventoryComponent } from '../components/InventoryComponent';
-import { AttachmentComponent } from '../components/AttachmentComponent';
-import { HealthComponent } from '../components/HealthComponent';
-import { createWeapon } from '../factories/WeaponFactory';
-import { getAttachment } from '../data/attachments';
-import { getAmmoType } from '../data/ammo';
+import { Scene } from '../core/Scene.js';
+import { WeaponSystem } from './WeaponSystem.js';
+import { InventorySystem } from './InventorySystem.js';
+import { InventoryComponent } from '../components/InventoryComponent.js';
+import { AttachmentComponent } from '../components/AttachmentComponent.js';
+import { HealthComponent } from '../components/HealthComponent.js';
+import { createWeapon } from '../factories/WeaponFactory.js';
+import { getAttachment } from '../data/attachments.js';
+import { getAmmoType } from '../data/ammo.js';
 
 describe('Weapon System Integration', () => {
   let scene: Scene;

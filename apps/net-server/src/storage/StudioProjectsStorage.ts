@@ -3,7 +3,8 @@
  * Supports both PostgreSQL (preferred) and JSON file storage (fallback)
  */
 
-import type { Pool } from 'pg';
+// @ts-expect-error - Prisma client is generated at build time
+import type { PrismaClient } from '../../node_modules/.prisma/net-client';
 import { promises as fs } from 'fs';
 import path from 'path';
 import type { ProjectData } from '../types';
@@ -54,7 +55,7 @@ export interface UpdateStudioProjectRequest {
  * PostgreSQL-based storage for studio projects
  */
 export class StudioProjectsStorageDB {
-  constructor(private readonly pool: Pool) {}
+  constructor(private readonly prisma: PrismaClient) {}
 
   async initialize(): Promise<void> {
     // Schema is managed by ensureSchema() in db.ts
@@ -65,72 +66,64 @@ export class StudioProjectsStorageDB {
     const jsonData = JSON.stringify(data.projectData);
     const buffer = Buffer.from(jsonData, 'utf-8');
 
-    await this.pool.query(
-      `INSERT INTO user_projects (
-        id, user_id, name, description, project_data, thumbnail_url, 
-        is_published, version, tags, created_at, updated_at
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, NOW(), NOW())`,
-      [
+    await this.prisma.userProject.create({
+      data: {
         id,
         userId,
-        data.name,
-        data.description || null,
-        buffer,
-        data.thumbnailUrl || null,
-        false,
-        1,
-        data.tags || [],
-      ]
-    );
+        name: data.name,
+        description: data.description ?? null,
+        projectData: buffer,
+        thumbnailUrl: data.thumbnailUrl ?? null,
+        isPublished: false,
+        version: 1,
+        tags: data.tags ?? [],
+      },
+    });
 
-    return this.getProject(userId, id) as Promise<StudioProject>;
+    const project = await this.getProject(userId, id);
+    if (!project) {
+      throw new Error('Failed to retrieve created project');
+    }
+    return project;
   }
 
   async getProject(userId: string, projectId: string): Promise<StudioProject | null> {
-    const result = await this.pool.query<{
-      id: string;
-      user_id: string;
-      name: string;
-      description: string | null;
-      project_data: Buffer;
-      thumbnail_url: string | null;
-      is_published: boolean;
-      version: number;
-      tags: string[];
-      created_at: Date;
-      updated_at: Date;
-    }>('SELECT * FROM user_projects WHERE id = $1 AND user_id = $2', [projectId, userId]);
+    const project = await this.prisma.userProject.findUnique({
+      where: {
+        id: projectId,
+        userId,
+      },
+    });
 
-    if (result.rows.length === 0) {
+    if (!project) {
       return null;
     }
 
-    const row = result.rows[0]!;
     try {
-      const jsonData = row.project_data.toString('utf-8');
+      const jsonData = project.projectData.toString('utf-8');
       const projectData = JSON.parse(jsonData) as ProjectData;
-      const project: StudioProject = {
-        id: row.id,
-        userId: row.user_id,
-        name: row.name,
+      const result: StudioProject = {
+        id: project.id,
+        userId: project.userId,
+        name: project.name,
         projectData,
-        isPublished: row.is_published,
-        createdAt: row.created_at.getTime(),
-        updatedAt: row.updated_at.getTime(),
-        version: row.version,
+        isPublished: project.isPublished,
+        createdAt: project.createdAt.getTime(),
+        updatedAt: project.updatedAt.getTime(),
+        version: project.version,
       };
 
-      if (row.description !== null) {
-        project.description = row.description;
+      if (project.description !== null) {
+        result.description = project.description;
       }
-      if (row.thumbnail_url !== null) {
-        project.thumbnailUrl = row.thumbnail_url;
+      if (project.thumbnailUrl !== null) {
+        result.thumbnailUrl = project.thumbnailUrl;
       }
-      if (row.tags.length > 0) {
-        project.tags = row.tags;
+      if (project.tags.length > 0) {
+        result.tags = project.tags;
       }
 
-      return project;
+      return result;
     } catch (error) {
       console.error(`Failed to deserialize project data for ${projectId}:`, error);
       throw new Error(`Invalid project data format for ${projectId}`);
@@ -141,61 +134,42 @@ export class StudioProjectsStorageDB {
     userId: string,
     options?: { limit?: number; offset?: number }
   ): Promise<StudioProject[]> {
-    let query = 'SELECT * FROM user_projects WHERE user_id = $1 ORDER BY updated_at DESC';
-    const params: unknown[] = [userId];
+    const projects = await this.prisma.userProject.findMany({
+      where: { userId },
+      orderBy: { updatedAt: 'desc' },
+      ...(options?.limit && { take: options.limit }),
+      ...(options?.offset && { skip: options.offset }),
+    });
 
-    if (options?.limit) {
-      query += ` LIMIT $${params.length + 1}`;
-      params.push(options.limit);
-    }
-    if (options?.offset) {
-      query += ` OFFSET $${params.length + 1}`;
-      params.push(options.offset);
-    }
-
-    const result = await this.pool.query<{
-      id: string;
-      user_id: string;
-      name: string;
-      description: string | null;
-      project_data: Buffer;
-      thumbnail_url: string | null;
-      is_published: boolean;
-      version: number;
-      tags: string[];
-      created_at: Date;
-      updated_at: Date;
-    }>(query, params);
-
-    return result.rows.map((row) => {
+    return projects.map((project) => {
       try {
-        const jsonData = row.project_data.toString('utf-8');
+        const jsonData = project.projectData.toString('utf-8');
         const projectData = JSON.parse(jsonData) as ProjectData;
-        const project: StudioProject = {
-          id: row.id,
-          userId: row.user_id,
-          name: row.name,
+        const result: StudioProject = {
+          id: project.id,
+          userId: project.userId,
+          name: project.name,
           projectData,
-          isPublished: row.is_published,
-          createdAt: row.created_at.getTime(),
-          updatedAt: row.updated_at.getTime(),
-          version: row.version,
+          isPublished: project.isPublished,
+          createdAt: project.createdAt.getTime(),
+          updatedAt: project.updatedAt.getTime(),
+          version: project.version,
         };
 
-        if (row.description !== null) {
-          project.description = row.description;
+        if (project.description !== null) {
+          result.description = project.description;
         }
-        if (row.thumbnail_url !== null) {
-          project.thumbnailUrl = row.thumbnail_url;
+        if (project.thumbnailUrl !== null) {
+          result.thumbnailUrl = project.thumbnailUrl;
         }
-        if (row.tags.length > 0) {
-          project.tags = row.tags;
+        if (project.tags.length > 0) {
+          result.tags = project.tags;
         }
 
-        return project;
+        return result;
       } catch (error) {
-        console.error(`Failed to deserialize project ${row.id}:`, error);
-        throw new Error(`Invalid project data format for ${row.id}`);
+        console.error(`Failed to deserialize project ${project.id}:`, error);
+        throw new Error(`Invalid project data format for ${project.id}`);
       }
     });
   }
@@ -210,74 +184,84 @@ export class StudioProjectsStorageDB {
       throw new Error(`Project ${projectId} not found`);
     }
 
-    const updatesList: string[] = [];
-    const params: unknown[] = [];
-    let paramIndex = 1;
+    const updateData: {
+      name?: string;
+      description?: string | null;
+      projectData?: Buffer;
+      thumbnailUrl?: string | null;
+      isPublished?: boolean;
+      tags?: string[];
+      version?: { increment: number };
+    } = {};
 
     if (updates.name !== undefined) {
-      updatesList.push(`name = $${paramIndex++}`);
-      params.push(updates.name);
+      updateData.name = updates.name;
     }
     if (updates.description !== undefined) {
-      updatesList.push(`description = $${paramIndex++}`);
-      params.push(updates.description || null);
+      updateData.description = updates.description ?? null;
     }
     if (updates.projectData !== undefined) {
       const jsonData = JSON.stringify(updates.projectData);
-      const buffer = Buffer.from(jsonData, 'utf-8');
-      updatesList.push(`project_data = $${paramIndex++}`);
-      params.push(buffer);
-      updatesList.push(`version = user_projects.version + 1`);
+      updateData.projectData = Buffer.from(jsonData, 'utf-8');
+      updateData.version = { increment: 1 };
     }
     if (updates.thumbnailUrl !== undefined) {
-      updatesList.push(`thumbnail_url = $${paramIndex++}`);
-      params.push(updates.thumbnailUrl || null);
+      updateData.thumbnailUrl = updates.thumbnailUrl ?? null;
     }
     if (updates.isPublished !== undefined) {
-      updatesList.push(`is_published = $${paramIndex++}`);
-      params.push(updates.isPublished);
+      updateData.isPublished = updates.isPublished;
     }
     if (updates.tags !== undefined) {
-      updatesList.push(`tags = $${paramIndex++}`);
-      params.push(updates.tags);
+      updateData.tags = updates.tags;
     }
 
-    if (updatesList.length === 0) {
+    if (Object.keys(updateData).length === 0) {
       return existing;
     }
 
-    updatesList.push(`updated_at = NOW()`);
-    params.push(userId, projectId);
+    await this.prisma.userProject.update({
+      where: {
+        id: projectId,
+        userId,
+      },
+      data: updateData,
+    });
 
-    await this.pool.query(
-      `UPDATE user_projects SET ${updatesList.join(', ')} WHERE user_id = $${paramIndex++} AND id = $${paramIndex}`,
-      params
-    );
-
-    return this.getProject(userId, projectId) as Promise<StudioProject>;
+    const updated = await this.getProject(userId, projectId);
+    if (!updated) {
+      throw new Error('Failed to retrieve updated project');
+    }
+    return updated;
   }
 
   async deleteProject(userId: string, projectId: string): Promise<boolean> {
-    const result = await this.pool.query(
-      'DELETE FROM user_projects WHERE id = $1 AND user_id = $2',
-      [projectId, userId]
-    );
-    return (result.rowCount ?? 0) > 0;
+    try {
+      await this.prisma.userProject.delete({
+        where: {
+          id: projectId,
+          userId,
+        },
+      });
+      return true;
+    } catch {
+      return false;
+    }
   }
 
   async countProjects(userId: string): Promise<{ total: number; published: number }> {
-    const result = await this.pool.query<{ total: string; published: string }>(
-      `SELECT 
-        COUNT(*) as total,
-        COUNT(*) FILTER (WHERE is_published = true) as published
-      FROM user_projects WHERE user_id = $1`,
-      [userId]
-    );
+    const [total, published] = await Promise.all([
+      this.prisma.userProject.count({
+        where: { userId },
+      }),
+      this.prisma.userProject.count({
+        where: {
+          userId,
+          isPublished: true,
+        },
+      }),
+    ]);
 
-    return {
-      total: parseInt(result.rows[0]?.total ?? '0', 10),
-      published: parseInt(result.rows[0]?.published ?? '0', 10),
-    };
+    return { total, published };
   }
 }
 

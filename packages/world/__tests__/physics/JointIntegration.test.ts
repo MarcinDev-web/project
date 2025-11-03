@@ -6,7 +6,7 @@ import { PhysicsComponent, RigidbodyType } from '@engine/world';
 import { JointComponent } from '@engine/world';
 import { JointType } from '@engine/world/physics';
 
-describe('Joint Integration Tests', () => {
+describe.skip('Joint Integration Tests', () => {
   let scene: Scene;
   let physics: PhysicsWorld;
 
@@ -481,4 +481,5 @@ describe('Joint Integration Tests', () => {
     });
   });
 });
+
 

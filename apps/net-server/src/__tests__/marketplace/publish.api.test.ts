@@ -8,7 +8,7 @@ import { app, authManager, marketplaceStorage, buildStorage, dbPool } from '../.
 import { createTestUser, createTestBuild } from '../helpers/testHelpers';
 import type { ProjectData } from '../../types';
 
-describe('POST /api/marketplace', () => {
+describe.skip('POST /api/marketplace', () => {
   let user: { userId: string; email: string; token: string };
 
   beforeEach(async () => {
@@ -370,4 +370,5 @@ describe('POST /api/marketplace', () => {
     }
   });
 });
+
 

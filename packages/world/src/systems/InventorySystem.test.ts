@@ -1,8 +1,8 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { Scene } from '../core/Scene';
-import { InventorySystem } from './InventorySystem';
-import { InventoryComponent } from '../components/InventoryComponent';
-import { WeaponComponent } from '../components/WeaponComponent';
+import { Scene } from '../core/Scene.js';
+import { InventorySystem } from './InventorySystem.js';
+import { InventoryComponent } from '../components/InventoryComponent.js';
+import { WeaponComponent } from '../components/WeaponComponent.js';
 
 describe('InventorySystem', () => {
   let scene: Scene;

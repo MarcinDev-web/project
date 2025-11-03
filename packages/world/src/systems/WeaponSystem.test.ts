@@ -1,11 +1,11 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { Scene } from '../core/Scene';
-import { WeaponSystem } from './WeaponSystem';
-import { WeaponComponent } from '../components/WeaponComponent';
-import { HealthComponent } from '../components/HealthComponent';
-import { CameraComponent } from '../components/CameraComponent';
-import { ProjectileComponent } from '../components/ProjectileComponent';
-import { PhysicsComponent } from '../components/PhysicsComponent';
+import { Scene } from '../core/Scene.js';
+import { WeaponSystem } from './WeaponSystem.js';
+import { WeaponComponent } from '../components/WeaponComponent.js';
+import { HealthComponent } from '../components/HealthComponent.js';
+import { CameraComponent } from '../components/CameraComponent.js';
+import { ProjectileComponent } from '../components/ProjectileComponent.js';
+import { PhysicsComponent } from '../components/PhysicsComponent.js';
 
 describe('WeaponSystem', () => {
   let scene: Scene;

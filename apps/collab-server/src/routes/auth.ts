@@ -1,6 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import type { PrismaClient } from '../node_modules/.prisma/collab-client';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { randomUUID } from 'node:crypto';
@@ -18,7 +17,7 @@ interface JwtPayload {
 }
 
 async function findUserByEmail(
-  prisma: PrismaClient,
+  prisma: any,
   email: string
 ): Promise<{ id: string; email: string; passwordHash: string } | null> {
   const user = await prisma.user.findUnique({
@@ -29,7 +28,7 @@ async function findUserByEmail(
 }
 
 async function insertUser(
-  prisma: PrismaClient,
+  prisma: any,
   email: string,
   passwordHash: string
 ): Promise<{ id: string; email: string }> {
@@ -53,7 +52,7 @@ function signToken(userId: string, email: string): { token: string; expiresAt: n
   return { token, expiresAt };
 }
 
-export function registerAuthRoutes(app: FastifyInstance, prisma: PrismaClient): void {
+export function registerAuthRoutes(app: FastifyInstance, prisma: any): void {
   app.post('/auth/login', async (req, reply) => {
     try {
       const body = loginSchema.parse(req.body);

@@ -8,10 +8,10 @@
 /* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
-import type { Entity } from '../core/Entity';
-import type { Scene } from '../core/Scene';
-import { WeaponSystem } from '../systems/WeaponSystem';
-import { InventorySystem } from '../systems/InventorySystem';
+import type { Entity } from '../core/Entity.js';
+import type { Scene } from '../core/Scene.js';
+import { WeaponSystem } from '../systems/WeaponSystem.js';
+import { InventorySystem } from '../systems/InventorySystem.js';
 import {
   setupWeaponEntity,
   setupInventory,
@@ -21,7 +21,7 @@ import {
   addAttachment,
   changeAmmoType,
   getEffectiveWeaponStats,
-} from './weaponHelpers';
+} from './weaponHelpers.js';
 
 /**
  * Example 1: Simple weapon setup

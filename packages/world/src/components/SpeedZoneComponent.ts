@@ -1,6 +1,6 @@
-import { Component } from './Component';
-import { registerComponent } from './registry';
-import type { Vec3 } from '@engine/core';
+import { Component } from './Component.js';
+import { registerComponent } from './registry.js';
+import type { Vec3 } from '@engine/core/math';
 
 export interface SpeedZoneComponentJSON {
   speedMultiplier?: number;

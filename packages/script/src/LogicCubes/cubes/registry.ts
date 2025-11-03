@@ -1,4 +1,4 @@
-import { LogicCubeRegistry } from '../LogicCubeSystem';
+import { LogicCubeRegistry } from '../LogicCubeSystem.js';
 
 // Import specific cubes for registration
 import {
@@ -7,7 +7,7 @@ import {
   OnGameStartTrigger,
   OnPlayerEnterTrigger,
   OnPlayerLeaveTrigger,
-} from './TriggerCubes';
+} from './TriggerCubes.js';
 
 import {
   SendMessageAction,
@@ -15,7 +15,7 @@ import {
   SpawnEntityAction,
   DestroyEntityAction,
   LogAction,
-} from './ActionCubes';
+} from './ActionCubes.js';
 
 import {
   UIButtonClickTrigger,
@@ -24,17 +24,17 @@ import {
   UISetImageAction,
   UISetValueAction,
   UIEnableElementAction,
-} from './UICubes';
+} from './UICubes.js';
 
 import {
   CompareVariableCondition,
   IsPlayerNearCondition,
   CheckDistanceCondition,
-} from './ConditionCubes';
+} from './ConditionCubes.js';
 
-import { VariableData, CounterData, TimerData } from './DataCubes';
+import { VariableData, CounterData, TimerData } from './DataCubes.js';
 
-import { ANDGate, ORGate, NOTGate, DelayGate } from './LogicGateCubes';
+import { ANDGate, ORGate, NOTGate, DelayGate } from './LogicGateCubes.js';
 
 /**
  * Registers all built-in logic cube types

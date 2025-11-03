@@ -1,4 +1,4 @@
-import { Entity } from '../core/Entity';
+import { Entity } from '../core/Entity.js';
 import type { Mat4 } from '@engine/core/math';
 import { mat4Invert } from '@engine/core/math';
 

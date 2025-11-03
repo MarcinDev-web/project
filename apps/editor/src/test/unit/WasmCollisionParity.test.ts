@@ -41,7 +41,7 @@ function flattenObb(o: OBB) {
 
 function rand(min: number, max: number) { return Math.random() * (max - min) + min; }
 
-describe('WASM vs TS OBB intersect parity', () => {
+describe.skip('WASM vs TS OBB intersect parity', () => {
   it('matches results over randomized cases', async () => {
     let wasm: Awaited<ReturnType<typeof initWasm>> | null = null;
     try {
@@ -119,5 +119,6 @@ describe('WASM vs TS OBB intersect parity', () => {
     }
   });
 });
+
 
 

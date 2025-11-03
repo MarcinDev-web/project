@@ -7,6 +7,10 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
+    // Use bundler module resolution (matching root tsconfig)
+    // Note: .js extensions in imports are still required for Node.js ES modules
+    "module": "ESNext",
+    "moduleResolution": "bundler",
     "paths": {
       "@engine/core": ["../core/dist"],
       "@engine/core/*": ["../core/dist/*"],

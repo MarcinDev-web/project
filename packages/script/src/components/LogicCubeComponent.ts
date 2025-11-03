@@ -5,7 +5,7 @@
 
 import { Component } from '@engine/world';
 import { registerComponent } from '@engine/world';
-import type { LogicCubeState } from '../LogicCubes/cubes/types';
+import type { LogicCubeState } from '../LogicCubes/cubes/types.js';
 
 export class LogicCubeComponent extends Component {
   static readonly type = 'LogicCube';

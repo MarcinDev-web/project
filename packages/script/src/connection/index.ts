@@ -1,3 +1,3 @@
-export * from '../connection/LogicConnectionManager';
-export * from '../connection/LogicConnectionRegistry';
+export * from './LogicConnectionManager.js';
+export * from './LogicConnectionRegistry.js';
 

@@ -1,9 +1,31 @@
-import { PrismaClient } from '../node_modules/.prisma/collab-client';
+// Dynamic import to avoid TypeScript compilation issues with custom Prisma output path
+let PrismaClientConstructor: (new (args?: any) => any) | null = null;
+let prisma: any | null = null;
 
-let prisma: PrismaClient | null = null;
+async function loadPrismaConstructor(): Promise<new (args?: any) => any> {
+  if (PrismaClientConstructor) {
+    return PrismaClientConstructor as new (args?: any) => any;
+  }
+  
+  try {
+    // Try custom output location first (from schema.prisma)
+    // @ts-expect-error - Prisma client is generated at build time
+    const customModule = await import('../../node_modules/.prisma/collab-client');
+    PrismaClientConstructor = customModule.PrismaClient as any;
+    return PrismaClientConstructor as new (args?: any) => any;
+  } catch {
+    // Fallback to standard location
+    const standardModule = await import('@prisma/client');
+    // Handle both ESM and CJS formats
+    const PrismaClientClass = (standardModule as any).PrismaClient || (standardModule as any).default?.PrismaClient;
+    PrismaClientConstructor = PrismaClientClass as any;
+    return PrismaClientConstructor as new (args?: any) => any;
+  }
+}
 
-export function getPrismaClient(): PrismaClient {
+export async function getPrismaClient(): Promise<any> {
   if (!prisma) {
+    const PrismaClient = await loadPrismaConstructor();
     const connectionString = process.env.DATABASE_URL;
     if (!connectionString) {
       throw new Error('DATABASE_URL is required');
@@ -20,7 +42,7 @@ export function getPrismaClient(): PrismaClient {
 }
 
 export async function ensureSchema(): Promise<void> {
-  const client = getPrismaClient();
+  const client = await getPrismaClient();
   // Schema is managed by Prisma migrations
   // Run migrations: pnpm db:migrate
   await client.$connect();

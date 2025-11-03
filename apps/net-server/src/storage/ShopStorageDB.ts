@@ -2,9 +2,11 @@
  * Shop Storage DB - PostgreSQL implementation using Prisma
  */
 
-import type { PrismaClient as PrismaClientType } from '@prisma/client';
+// @ts-expect-error - Prisma client is generated at build time
+import type { PrismaClient as PrismaClientType } from '../../node_modules/.prisma/net-client';
+// @ts-expect-error - Prisma client is generated at build time
+import { Prisma } from '../../node_modules/.prisma/net-client';
 import type { ShopItem, ShopItemsFilter } from './ShopStorage';
-import { Prisma } from '@prisma/client';
 
 export class ShopStorageDB {
   constructor(private readonly prisma: PrismaClientType) {}
@@ -82,7 +84,7 @@ export class ShopStorageDB {
       skip: offset,
     });
 
-    return items.map((item) => this.mapPrismaToItem(item));
+    return items.map((item: Parameters<typeof this.mapPrismaToItem>[0]) => this.mapPrismaToItem(item));
   }
 
   async updateItem(
@@ -133,7 +135,7 @@ export class ShopStorageDB {
       });
 
       return this.mapPrismaToItem(updated);
-    } catch (error) {
+    } catch (error: unknown) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
         // Record not found
         return null;
@@ -148,7 +150,7 @@ export class ShopStorageDB {
         where: { id },
       });
       return true;
-    } catch (error) {
+    } catch (error: unknown) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
         return false;
       }
@@ -190,7 +192,7 @@ export class ShopStorageDB {
     description: string | null;
     category: string;
     priceCurrency: string;
-    priceAmount: number;
+    priceAmount: Prisma.Decimal;
     imageUrl: string | null;
     available: boolean;
     stock: number | null;

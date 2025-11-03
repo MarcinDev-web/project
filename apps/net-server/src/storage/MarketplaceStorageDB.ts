@@ -2,9 +2,11 @@
  * Marketplace Storage DB - PostgreSQL implementation using Prisma
  */
 
-import type { PrismaClient as PrismaClientType } from '@prisma/client';
+// @ts-expect-error - Prisma client is generated at build time
+import type { PrismaClient as PrismaClientType } from '../../node_modules/.prisma/net-client';
+// @ts-expect-error - Prisma client is generated at build time
+import { Prisma } from '../../node_modules/.prisma/net-client';
 import type { MarketplaceItem } from './MarketplaceStorage';
-import { Prisma } from '@prisma/client';
 
 export class MarketplaceStorageDB {
   constructor(private readonly prisma: PrismaClientType) {}
@@ -150,7 +152,7 @@ export class MarketplaceStorageDB {
     }
 
     // Build orderBy for Prisma
-    let orderBy: Prisma.MarketplaceItemOrderByWithRelationInput = { createdAt: 'desc' };
+    let orderBy: Prisma.MarketplaceItemOrderByWithRelationInput | Prisma.MarketplaceItemOrderByWithRelationInput[] = { createdAt: 'desc' };
     if (options.sortBy) {
       switch (options.sortBy) {
         case 'newest':
@@ -170,12 +172,12 @@ export class MarketplaceStorageDB {
 
     const items = await this.prisma.marketplaceItem.findMany({
       where,
-      orderBy: Array.isArray(orderBy) ? orderBy : [orderBy],
+      orderBy,
       take: limit,
       skip: offset,
     });
 
-    return items.map((item) => this.mapPrismaToItem(item));
+    return items.map((item: Parameters<typeof this.mapPrismaToItem>[0]) => this.mapPrismaToItem(item));
   }
 
   async updateItem(
@@ -252,7 +254,7 @@ export class MarketplaceStorageDB {
       });
 
       return this.mapPrismaToItem(updated);
-    } catch (error) {
+    } catch (error: unknown) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
         // Record not found
         return null;
@@ -307,7 +309,7 @@ export class MarketplaceStorageDB {
     likes: number;
     isPublic: boolean;
     priceCurrency?: string | null;
-    priceAmount?: number | null;
+    priceAmount?: Prisma.Decimal | null;
     forumThreadId?: string | null;
   }): MarketplaceItem {
     const mapped: MarketplaceItem = {

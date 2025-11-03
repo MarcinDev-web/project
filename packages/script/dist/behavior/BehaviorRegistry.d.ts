@@ -1,4 +1,4 @@
-import type { BehaviorConstructor } from '../behavior/Behavior';
+import type { BehaviorConstructor } from '../behavior/Behavior.js';
 /**
  * Global behavior registry to allow deserialization and hot-reload.
  * Register behavior classes by a unique name.

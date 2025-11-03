@@ -1,7 +1,9 @@
-import type { Scene } from '../core/Scene';
-import { AnimatorComponent } from '../components/AnimatorComponent';
-import { SkeletalBindingComponent } from '../components/SkeletalBindingComponent';
-import { MorphBindingComponent } from '../components/MorphBindingComponent';
+import type { Scene } from '../core/Scene.js';
+import { AnimatorComponent } from '../components/AnimatorComponent.js';
+import { SkeletalBindingComponent } from '../components/SkeletalBindingComponent.js';
+import { MorphBindingComponent } from '../components/MorphBindingComponent.js';
+// Animator and functions are exported via export * from their modules in animation package
+// Import from main package export (subpath imports not supported)
 import { Animator, computeJointPalette, sampleMorphWeightsAt } from '@engine/animation';
 
 export class AnimationSystem {

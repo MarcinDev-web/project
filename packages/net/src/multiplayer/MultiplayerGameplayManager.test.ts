@@ -33,7 +33,7 @@ describe('MultiplayerGameplayManager', () => {
 
     replicationClient = {
       getLocalUserId: vi.fn(() => 'local-user-id'),
-      getState: vi.fn(() => 'connected' as any),
+      getState: vi.fn(() => 'disconnected' as any),
       connect: vi.fn(() => Promise.resolve()),
       onUserJoined: vi.fn((cb) => {
         onUserJoinedHandlers.push(cb);
@@ -49,6 +49,8 @@ describe('MultiplayerGameplayManager', () => {
           if (index >= 0) onUserLeftHandlers.splice(index, 1);
         };
       }),
+      onPlayerUpdate: vi.fn(() => () => {}), // Return unsubscribe function
+      onPhysicsState: vi.fn(() => () => {}), // Return unsubscribe function
     } as unknown as ReplicationClient;
 
     manager = new MultiplayerGameplayManager(

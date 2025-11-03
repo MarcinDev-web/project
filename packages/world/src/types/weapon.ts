@@ -1,4 +1,4 @@
-import type { Entity } from '../core/Entity';
+import type { Entity } from '../core/Entity.js';
 import type { Vec3 } from '@engine/core/math';
 
 /**

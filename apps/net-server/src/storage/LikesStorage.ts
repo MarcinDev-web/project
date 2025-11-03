@@ -4,25 +4,26 @@
 
 import { promises as fs } from 'fs';
 import path from 'path';
-import type { Pool } from 'pg';
+// @ts-expect-error - Prisma client is generated at build time
+import type { PrismaClient } from '../../node_modules/.prisma/net-client';
 import type { MarketplaceStorage } from './MarketplaceStorage';
 
 export class LikesStorage {
   private readonly dataDir?: string;
   private readonly likesFile?: string;
-  private readonly pool?: Pool;
-  private readonly marketplaceStorage?: MarketplaceStorage;
+  private readonly prisma?: PrismaClient;
+  private readonly marketplaceStorage: MarketplaceStorage | undefined;
 
-  constructor(storage: Pool | string, marketplaceStorage?: MarketplaceStorage) {
+  constructor(storage: PrismaClient | string, marketplaceStorage?: MarketplaceStorage) {
     if (typeof storage === 'string') {
       // JSON file storage
       this.dataDir = storage;
       this.likesFile = path.join(storage, 'likes.json');
       this.marketplaceStorage = marketplaceStorage;
-      // pool stays undefined (not set)
+      // prisma stays undefined (not set)
     } else {
       // PostgreSQL storage
-      this.pool = storage;
+      this.prisma = storage;
       // dataDir and likesFile stay undefined (not set)
     }
   }
@@ -68,16 +69,30 @@ export class LikesStorage {
   }
 
   async likeItem(itemId: string, userId: string): Promise<void> {
-    if (this.pool) {
+    if (this.prisma) {
       // PostgreSQL
-      await this.pool.query(
-        'INSERT INTO marketplace_likes (item_id, user_id) VALUES ($1, $2) ON CONFLICT DO NOTHING',
-        [itemId, userId]
-      );
+      await this.prisma.marketplaceLike.upsert({
+        where: {
+          itemId_userId: {
+            itemId,
+            userId,
+          },
+        },
+        create: {
+          itemId,
+          userId,
+        },
+        update: {},
+      });
       // Update like count in marketplace_items
-      await this.pool.query('UPDATE marketplace_items SET likes = likes + 1 WHERE id = $1', [
-        itemId,
-      ]);
+      await this.prisma.marketplaceItem.update({
+        where: { id: itemId },
+        data: {
+          likes: { increment: 1 },
+        },
+      }).catch(() => {
+        // Ignore if item doesn't exist
+      });
     } else {
       // JSON file
       const likes = await this.readLikes();
@@ -101,18 +116,24 @@ export class LikesStorage {
   }
 
   async unlikeItem(itemId: string, userId: string): Promise<void> {
-    if (this.pool) {
+    if (this.prisma) {
       // PostgreSQL
-      const result = await this.pool.query(
-        'DELETE FROM marketplace_likes WHERE item_id = $1 AND user_id = $2',
-        [itemId, userId]
-      );
+      const deleted = await this.prisma.marketplaceLike.deleteMany({
+        where: {
+          itemId,
+          userId,
+        },
+      });
       // Update like count if a like was actually removed
-      if (result.rowCount && result.rowCount > 0) {
-        await this.pool.query(
-          'UPDATE marketplace_items SET likes = GREATEST(likes - 1, 0) WHERE id = $1',
-          [itemId]
-        );
+      if (deleted.count > 0) {
+        await this.prisma.marketplaceItem.update({
+          where: { id: itemId },
+          data: {
+            likes: { decrement: 1 },
+          },
+        }).catch(() => {
+          // Ignore if item doesn't exist
+        });
       }
     } else {
       // JSON file
@@ -139,12 +160,14 @@ export class LikesStorage {
   }
 
   async isLiked(itemId: string, userId: string): Promise<boolean> {
-    if (this.pool) {
-      const result = await this.pool.query<{ count: string }>(
-        'SELECT COUNT(*) as count FROM marketplace_likes WHERE item_id = $1 AND user_id = $2',
-        [itemId, userId]
-      );
-      return parseInt(result.rows[0]?.count ?? '0', 10) > 0;
+    if (this.prisma) {
+      const count = await this.prisma.marketplaceLike.count({
+        where: {
+          itemId,
+          userId,
+        },
+      });
+      return count > 0;
     } else {
       const likes = await this.readLikes();
       return likes[itemId]?.has(userId) ?? false;
@@ -152,12 +175,12 @@ export class LikesStorage {
   }
 
   async getUserLikes(userId: string): Promise<string[]> {
-    if (this.pool) {
-      const result = await this.pool.query<{ item_id: string }>(
-        'SELECT item_id FROM marketplace_likes WHERE user_id = $1',
-        [userId]
-      );
-      return result.rows.map((row) => row.item_id);
+    if (this.prisma) {
+      const likes = await this.prisma.marketplaceLike.findMany({
+        where: { userId },
+        select: { itemId: true },
+      });
+      return likes.map((like) => like.itemId);
     } else {
       const likes = await this.readLikes();
       const userLikes: string[] = [];
@@ -171,12 +194,10 @@ export class LikesStorage {
   }
 
   async getItemLikeCount(itemId: string): Promise<number> {
-    if (this.pool) {
-      const result = await this.pool.query<{ count: string }>(
-        'SELECT COUNT(*) as count FROM marketplace_likes WHERE item_id = $1',
-        [itemId]
-      );
-      return parseInt(result.rows[0]?.count ?? '0', 10);
+    if (this.prisma) {
+      return await this.prisma.marketplaceLike.count({
+        where: { itemId },
+      });
     } else {
       const likes = await this.readLikes();
       return likes[itemId]?.size ?? 0;
@@ -184,12 +205,12 @@ export class LikesStorage {
   }
 
   async getItemLikes(itemId: string): Promise<string[]> {
-    if (this.pool) {
-      const result = await this.pool.query<{ user_id: string }>(
-        'SELECT user_id FROM marketplace_likes WHERE item_id = $1',
-        [itemId]
-      );
-      return result.rows.map((row) => row.user_id);
+    if (this.prisma) {
+      const likes = await this.prisma.marketplaceLike.findMany({
+        where: { itemId },
+        select: { userId: true },
+      });
+      return likes.map((like) => like.userId);
     } else {
       const likes = await this.readLikes();
       return Array.from(likes[itemId] ?? []);

@@ -1,6 +1,6 @@
 import { Component } from '@engine/world';
 import { registerComponent } from '@engine/world';
-import { BehaviorRegistry } from '../behavior/BehaviorRegistry';
+import { BehaviorRegistry } from '../behavior/BehaviorRegistry.js';
 export class ScriptComponent extends Component {
     static type = 'Script';
     scripts = [];

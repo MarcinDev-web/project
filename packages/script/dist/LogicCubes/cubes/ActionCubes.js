@@ -1,7 +1,7 @@
 /**
  * Action Cubes - Perform actions when triggered
  */
-import { LogicCube } from './LogicCube';
+import { LogicCube } from './LogicCube.js';
 import { Logger } from '@engine/core/utils';
 /**
  * SendMessage Action - Sends a message via event bus

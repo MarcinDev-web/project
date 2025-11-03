@@ -7,7 +7,7 @@ import {
   type WaitForFrames,
   type WaitForPredicate,
   type WaitForSeconds,
-} from '../coroutine/CoroutineScheduler';
+} from '../coroutine/CoroutineScheduler.js';
 import type { PhysicsWorld } from '@engine/world';
 import type { AnimationSystem } from '@engine/stdlib/Animation';
 type Renderer = any; // Temp

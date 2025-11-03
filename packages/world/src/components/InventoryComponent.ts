@@ -1,6 +1,6 @@
-import { Component } from './Component';
-import { registerComponent } from './registry';
-import { WeaponComponent } from './WeaponComponent';
+import { Component } from './Component.js';
+import { registerComponent } from './registry.js';
+import { WeaponComponent } from './WeaponComponent.js';
 
 /**
  * Inventory component data

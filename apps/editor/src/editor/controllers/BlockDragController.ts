@@ -286,7 +286,9 @@ export class BlockDragController {
     );
 
     const canPlace = !collisionResult.hasCollision;
-    this.dragState.canPlace = canPlace;
+    if (this.dragState) {
+      this.dragState.canPlace = canPlace;
+    }
 
     // Update visual feedback - green if valid, red if collision
     if (canPlace) {

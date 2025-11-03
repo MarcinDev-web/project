@@ -2,8 +2,8 @@
  * Trigger Cubes - Start execution chains when events occur
  */
 
-import { LogicCube } from './LogicCube';
-import type { LogicCubeMetadata, LogicSignal, LogicExecutionContext } from './types';
+import { LogicCube } from './LogicCube.js';
+import type { LogicCubeMetadata, LogicSignal, LogicExecutionContext } from './types.js';
 
 /**
  * OnClick Trigger - Fires when the entity is clicked

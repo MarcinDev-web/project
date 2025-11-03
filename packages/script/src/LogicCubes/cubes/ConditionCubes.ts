@@ -2,8 +2,8 @@
  * Condition Cubes - Evaluate conditions and route signals
  */
 
-import { LogicCube } from './LogicCube';
-import type { LogicCubeMetadata, LogicSignal } from './types';
+import { LogicCube } from './LogicCube.js';
+import type { LogicCubeMetadata, LogicSignal } from './types.js';
 
 /**
  * CompareVariable Condition - Compares a variable to a value

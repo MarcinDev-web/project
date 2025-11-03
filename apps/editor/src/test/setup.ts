@@ -191,3 +191,25 @@ if (typeof (globalThis as any).devicePixelRatio === 'undefined') {
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   initBrowserPolyfills();
 }
+
+// Global cleanup: Clear all timers after each test to prevent hanging processes
+// This ensures that any intervals/timeouts created during tests are cleaned up
+import { afterEach, vi } from 'vitest';
+
+// Use fake timers to track and clean up all timers
+// This prevents tests from hanging due to uncleaned intervals/timeouts
+afterEach(() => {
+  // Clear all real timers that might have been created
+  // This is a safety net for tests that don't use fake timers
+  try {
+    // Vitest provides clearAllTimers through vi
+    if (vi.clearAllTimers) {
+      vi.clearAllTimers();
+    }
+  } catch {
+    // Ignore if clearAllTimers is not available
+  }
+  
+  // Also clear all mocks to prevent state leakage between tests
+  vi.clearAllMocks();
+});

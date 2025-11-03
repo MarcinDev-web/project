@@ -1,8 +1,8 @@
-import { Component } from './Component';
+import { Component } from './Component.js';
 import type { Vec3 } from '@engine/core/math';
 import { quatFromAxisAngle, quatToEuler } from '@engine/core/math';
-import { PhysicsComponent, RigidbodyType } from './PhysicsComponent';
-import type { MovementController, MovementInput } from '../movement/MovementInterface';
+import { PhysicsComponent, RigidbodyType } from './PhysicsComponent.js';
+import type { MovementController, MovementInput } from '../movement/MovementInterface.js';
 
 /**
  * Character controller state

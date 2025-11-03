@@ -2,9 +2,11 @@
  * Asset Storage DB - PostgreSQL implementation using Prisma
  */
 
-import type { PrismaClient as PrismaClientType } from '@prisma/client';
+// @ts-expect-error - Prisma client is generated at build time
+import type { PrismaClient as PrismaClientType } from '../../node_modules/.prisma/net-client';
+// @ts-expect-error - Prisma client is generated at build time
+import { Prisma } from '../../node_modules/.prisma/net-client';
 import type { Asset, AssetFilter, AssetMetadata } from './AssetStorage';
-import { Prisma } from '@prisma/client';
 
 export class AssetStorageDB {
   constructor(private readonly prisma: PrismaClientType) {}
@@ -144,7 +146,7 @@ export class AssetStorageDB {
       });
 
       return this.mapPrismaToAsset(updated);
-    } catch (error) {
+    } catch (error: unknown) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
         return null;
       }
@@ -158,7 +160,7 @@ export class AssetStorageDB {
         where: { id },
       });
       return true;
-    } catch (error) {
+    } catch (error: unknown) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
         return false;
       }
@@ -205,7 +207,7 @@ export class AssetStorageDB {
     type: string;
     category: string | null;
     priceCurrency: string;
-    priceAmount: number;
+    priceAmount: Prisma.Decimal;
     previewUrl: string | null;
     fileUrl: string;
     metadata: Prisma.JsonValue;

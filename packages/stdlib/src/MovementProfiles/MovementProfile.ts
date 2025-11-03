@@ -92,9 +92,8 @@ export class MovementProfile {
       const extensions = extensionIds
         .map(id => extensionResolver(id))
         .filter((ext): ext is MovementProfileExtension => ext !== null && ext !== undefined);
-      if (extensions.length > 0) {
-        profileData.extensions = extensions;
-      }
+      // Always set extensions array, even if empty (when resolver returns null for all)
+      profileData.extensions = extensions;
     }
     
     return new MovementProfile(profileData);

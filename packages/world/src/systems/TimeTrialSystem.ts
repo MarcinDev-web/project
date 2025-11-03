@@ -2,10 +2,12 @@
  * TimeTrialSystem - Handles time trial timing and scoring
  */
 
-import type { Scene } from '../core/Scene';
-import type { Entity } from '../core/Entity';
-import { TimerGateComponent } from '../components/TimerGateComponent';
-import type { TelemetryCollector } from '@engine/world-server';
+import type { Scene } from '../core/Scene.js';
+import type { Entity } from '../core/Entity.js';
+import { TimerGateComponent } from '../components/TimerGateComponent.js';
+// Optional dependency - only used in server environments
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type TelemetryCollector = any;
 
 interface ActiveTrial {
   playerId: string;

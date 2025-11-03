@@ -3,17 +3,17 @@
  * Handles gravity, forces, velocity integration, and collision resolution
  */
 
-import type { Scene } from '../core/Scene';
-import type { Entity } from '../core/Entity';
-import { PhysicsComponent, RigidbodyType } from '../components/PhysicsComponent';
-import { JointComponent } from '../components/JointComponent';
+import type { Scene } from '../core/Scene.js';
+import type { Entity } from '../core/Entity.js';
+import { PhysicsComponent, RigidbodyType } from '../components/PhysicsComponent.js';
+import { JointComponent } from '../components/JointComponent.js';
 import type { Vec3 } from '@engine/core/math';
-import { CollisionDetection, type ColliderTransform } from './CollisionDetection';
+import { CollisionDetection, type ColliderTransform } from './CollisionDetection.js';
 import { quatMultiplyOut, quatFromAxisAngleOut, quatNormalizeOut } from '@engine/core/math';
 import { ObjectPool } from '@engine/core/utils';
-import { Octree, type OctreeConfig, DEFAULT_OCTREE_CONFIG } from './Octree';
-import { BoundingVolume } from './BoundingVolume';
-import type { Joint } from './Joint';
+import { Octree, type OctreeConfig, DEFAULT_OCTREE_CONFIG } from './Octree.js';
+import { BoundingVolume } from './BoundingVolume.js';
+import type { Joint } from './Joint.js';
 import { ScriptComponent } from '@engine/script';
 
 /**
@@ -149,7 +149,7 @@ export class PhysicsSystem {
       depth: 0,
       contactPoint: [0, 0, 0],
     }),
-    (e) => {
+    (e: { depth: number }) => {
       e.depth = 0;
     },
     2048

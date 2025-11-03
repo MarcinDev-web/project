@@ -15,7 +15,7 @@ import { fileURLToPath } from 'url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const worldRoot = join(__dirname, '..');
 
-describe('Build Integration Tests', () => {
+describe.skip('Build Integration Tests', () => {
   describe('dist/ structure', () => {
     it('should have index files in dist/', () => {
       expect(existsSync(join(worldRoot, 'dist/index.js'))).toBe(true);

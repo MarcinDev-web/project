@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { ProjectileComponent } from './ProjectileComponent';
+import { ProjectileComponent } from './ProjectileComponent.js';
 
 describe('ProjectileComponent', () => {
   let projectile: ProjectileComponent;

@@ -1,4 +1,4 @@
-import type { BehaviorInstance } from '../behavior/Behavior';
+import type { BehaviorInstance } from '../behavior/Behavior.js';
 export type CoroutineGenerator = Generator<CoroutineYield, void, unknown>;
 export type CoroutineYield = number | WaitForSeconds | WaitForFrames | WaitForPredicate;
 export interface WaitForSeconds {

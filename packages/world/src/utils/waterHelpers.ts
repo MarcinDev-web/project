@@ -1,5 +1,5 @@
-import type { Entity } from '../core/Entity';
-import { WaterComponent } from '../components/WaterComponent';
+import type { Entity } from '../core/Entity.js';
+import { WaterComponent } from '../components/WaterComponent.js';
 import type { Vec2, Vec3 } from '@engine/core/math';
 
 /**

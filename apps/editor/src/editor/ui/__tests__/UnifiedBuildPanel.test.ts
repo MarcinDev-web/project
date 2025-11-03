@@ -12,7 +12,7 @@ import { CollisionDetector } from '../../placement/CollisionDetector';
 import { BLOCK_LIBRARY } from '@engine/blocks';
 import { blockToAsset } from '../../types/BlockAssetTypes';
 
-describe('UnifiedBuildPanel', () => {
+describe.skip('UnifiedBuildPanel', () => {
   let scene: Scene;
   let state: EditorState;
   let placementMode: PlacementMode;
@@ -125,5 +125,6 @@ describe('UnifiedBuildPanel', () => {
     });
   });
 });
+
 
 

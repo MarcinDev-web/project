@@ -1,5 +1,4 @@
 import type { FastifyInstance } from 'fastify';
-import type { PrismaClient } from '../node_modules/.prisma/collab-client';
 import type { RawData, WebSocket } from 'ws';
 
 type PublicUser = {
@@ -191,7 +190,7 @@ function checkAndStartPlayMode(requestId: string, sessionId: string, forceTimeou
   }
 }
 
-export function createWsServer(app: FastifyInstance, _prisma: PrismaClient): void {
+export function createWsServer(app: FastifyInstance, _prisma: any): void {
   // @fastify/websocket v11 handler signature: (socket, request)
   app.get('/ws', { websocket: true }, (socket /*, req */) => {
     const ws = socket as unknown as WebSocket;

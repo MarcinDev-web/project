@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { MeshComponent } from './MeshComponent';
+import { MeshComponent } from './MeshComponent.js';
 
 describe('MeshComponent', () => {
   it('clones and serializes mesh data', () => {

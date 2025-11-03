@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { InventoryComponent } from './InventoryComponent';
-import { WeaponComponent } from './WeaponComponent';
+import { InventoryComponent } from './InventoryComponent.js';
+import { WeaponComponent } from './WeaponComponent.js';
 
 describe('InventoryComponent', () => {
   let inventory: InventoryComponent;

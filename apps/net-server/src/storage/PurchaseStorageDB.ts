@@ -2,15 +2,16 @@
  * Purchase Storage DB - PostgreSQL implementation using Prisma
  */
 
-import type { PrismaClient as PrismaClientType } from '@prisma/client';
+// @ts-expect-error - Prisma client is generated at build time
+import type { PrismaClient as PrismaClientType } from '../../node_modules/.prisma/net-client';
+// @ts-expect-error - Prisma client is generated at build time
+import { Prisma } from '../../node_modules/.prisma/net-client';
 import type {
   Purchase,
   PurchaseFilter,
-  PurchaseItem,
   PurchaseItemType,
   PurchaseStatus,
 } from './PurchaseStorage';
-import { Prisma } from '@prisma/client';
 
 export class PurchaseStorageDB {
   constructor(private readonly prisma: PrismaClientType) {}
@@ -33,8 +34,8 @@ export class PurchaseStorageDB {
           totalCurrency: purchase.totalCost.currency,
           totalAmount: purchase.totalCost.amount,
           status: purchase.status,
-          items: {
-            create: purchase.items.map((item) => ({
+        items: {
+          create: purchase.items.map((item: Purchase['items'][0]) => ({
               itemId: item.itemId,
               itemType: item.type,
               name: item.name,
@@ -112,7 +113,7 @@ export class PurchaseStorageDB {
       skip: offset,
     });
 
-    return purchases.map((p) => this.mapPrismaToPurchase(p));
+    return purchases.map((p: Parameters<typeof this.mapPrismaToPurchase>[0]) => this.mapPrismaToPurchase(p));
   }
 
   async updatePurchaseStatus(id: string, status: PurchaseStatus): Promise<Purchase | null> {
@@ -126,7 +127,7 @@ export class PurchaseStorageDB {
       });
 
       return this.mapPrismaToPurchase(updated);
-    } catch (error) {
+    } catch (error: unknown) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
         return null;
       }
@@ -226,7 +227,7 @@ export class PurchaseStorageDB {
     id: string;
     userId: string;
     totalCurrency: string;
-    totalAmount: number;
+    totalAmount: Prisma.Decimal;
     status: string;
     createdAt: Date;
     items: Array<{
@@ -234,7 +235,7 @@ export class PurchaseStorageDB {
       itemType: string;
       name: string;
       priceCurrency: string;
-      priceAmount: number;
+      priceAmount: Prisma.Decimal;
     }>;
   }): Purchase {
     return {

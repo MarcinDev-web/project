@@ -1,2 +1,2 @@
-export * from '../coroutine/CoroutineScheduler';
+export * from './CoroutineScheduler.js';
 

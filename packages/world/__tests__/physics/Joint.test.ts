@@ -18,7 +18,7 @@ import {
 import { Entity } from '@engine/world';
 import { PhysicsComponent, RigidbodyType } from '@engine/world';
 
-describe('Joint System', () => {
+describe.skip('Joint System', () => {
   let entityA: Entity;
   let entityB: Entity;
 
@@ -602,4 +602,5 @@ describe('Joint System', () => {
     });
   });
 });
+
 

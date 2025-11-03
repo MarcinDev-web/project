@@ -758,6 +758,12 @@ importers:
       '@engine/core':
         specifier: workspace:*
         version: link:../core
+      '@engine/economy':
+        specifier: workspace:*
+        version: link:../economy
+      '@engine/script':
+        specifier: workspace:*
+        version: link:../script
       gl-matrix:
         specifier: ^3.4.4
         version: 3.4.4

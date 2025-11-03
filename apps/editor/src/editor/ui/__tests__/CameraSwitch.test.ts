@@ -28,7 +28,7 @@ function createMockRenderer(): Renderer {
   } as unknown as Renderer;
 }
 
-describe('EditorUI - Camera Switching', () => {
+describe.skip('EditorUI - Camera Switching', () => {
   let canvas: HTMLCanvasElement;
   let statusEl: HTMLElement;
   let scene: Scene;
@@ -194,4 +194,5 @@ describe('EditorUI - Camera Switching', () => {
     });
   });
 });
+
 

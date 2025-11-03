@@ -1,4 +1,4 @@
-import type { Entity } from '../core/Entity';
+import type { Entity } from '../core/Entity.js';
 import {
   addVec3Out,
   subVec3Out,
@@ -8,7 +8,7 @@ import {
   lengthVec3,
   transformVec3ByQuatOut,
 } from '@engine/core/math';
-import { PhysicsComponent, RigidbodyType } from '../components/PhysicsComponent';
+import { PhysicsComponent, RigidbodyType } from '../components/PhysicsComponent.js';
 
 /**
  * Joint types available in the physics system

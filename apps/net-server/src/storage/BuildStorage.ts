@@ -2,11 +2,12 @@
  * Build Storage - stores actual project/scene data for marketplace builds
  */
 
-import type { Pool, PoolClient } from 'pg';
+// @ts-expect-error - Prisma client is generated at build time
+import type { PrismaClient } from '../../node_modules/.prisma/net-client';
 import type { ProjectData } from '../types';
 
 export class BuildStorage {
-  constructor(private readonly pool: Pool) {}
+  constructor(private readonly prisma: PrismaClient) {}
 
   async initialize(): Promise<void> {
     // Schema is managed by ensureSchema() in db.ts
@@ -18,45 +19,41 @@ export class BuildStorage {
    */
   async saveBuild(
     marketplaceId: string,
-    projectData: ProjectData,
-    client?: PoolClient
+    projectData: ProjectData
   ): Promise<void> {
     // Serialize ProjectData to JSON
     const jsonData = JSON.stringify(projectData);
     const buffer = Buffer.from(jsonData, 'utf-8');
 
-    const queryClient = client ?? this.pool;
-
-    await queryClient.query(
-      `INSERT INTO marketplace_builds (marketplace_id, project_data, version, updated_at)
-       VALUES ($1, $2, 1, NOW())
-       ON CONFLICT (marketplace_id) 
-       DO UPDATE SET project_data = $2, version = marketplace_builds.version + 1, updated_at = NOW()`,
-      [marketplaceId, buffer]
-    );
+    await this.prisma.marketplaceBuild.upsert({
+      where: { marketplaceId },
+      create: {
+        marketplaceId,
+        projectData: buffer,
+        version: 1,
+      },
+      update: {
+        projectData: buffer,
+        version: { increment: 1 },
+      },
+    });
   }
 
   /**
    * Get build data for a marketplace item
    */
   async getBuild(marketplaceId: string): Promise<ProjectData | null> {
-    const result = await this.pool.query<{
-      marketplace_id: string;
-      project_data: Buffer;
-      version: number;
-      created_at: Date;
-      updated_at: Date;
-    }>('SELECT * FROM marketplace_builds WHERE marketplace_id = $1', [marketplaceId]);
+    const build = await this.prisma.marketplaceBuild.findUnique({
+      where: { marketplaceId },
+    });
 
-    if (result.rows.length === 0) {
+    if (!build) {
       return null;
     }
 
-    const row = result.rows[0]!;
-
     try {
       // Deserialize JSON from BYTEA
-      const jsonData = row.project_data.toString('utf-8');
+      const jsonData = build.projectData.toString('utf-8');
       const projectData = JSON.parse(jsonData) as ProjectData;
       return projectData;
     } catch (error) {
@@ -69,36 +66,33 @@ export class BuildStorage {
    * Delete build data for a marketplace item
    */
   async deleteBuild(marketplaceId: string): Promise<void> {
-    await this.pool.query('DELETE FROM marketplace_builds WHERE marketplace_id = $1', [
-      marketplaceId,
-    ]);
+    await this.prisma.marketplaceBuild.delete({
+      where: { marketplaceId },
+    }).catch(() => {
+      // Ignore errors if build doesn't exist
+    });
   }
 
   /**
    * Get build version for a marketplace item
    */
   async getBuildVersion(marketplaceId: string): Promise<number | null> {
-    const result = await this.pool.query<{ version: number }>(
-      'SELECT version FROM marketplace_builds WHERE marketplace_id = $1',
-      [marketplaceId]
-    );
+    const build = await this.prisma.marketplaceBuild.findUnique({
+      where: { marketplaceId },
+      select: { version: true },
+    });
 
-    if (result.rows.length === 0) {
-      return null;
-    }
-
-    return result.rows[0]!.version;
+    return build?.version ?? null;
   }
 
   /**
    * Check if build exists
    */
   async buildExists(marketplaceId: string): Promise<boolean> {
-    const result = await this.pool.query<{ count: string }>(
-      'SELECT COUNT(*) as count FROM marketplace_builds WHERE marketplace_id = $1',
-      [marketplaceId]
-    );
+    const count = await this.prisma.marketplaceBuild.count({
+      where: { marketplaceId },
+    });
 
-    return parseInt(result.rows[0]?.count ?? '0', 10) > 0;
+    return count > 0;
   }
 }

@@ -1,5 +1,5 @@
-import type { WeaponPresetType } from '../types/weapon';
-import type { WeaponType } from '../components/WeaponComponent';
+import type { WeaponPresetType } from '../types/weapon.js';
+import type { WeaponType } from '../components/WeaponComponent.js';
 
 /**
  * Base weapon stats definition

@@ -1,6 +1,6 @@
 services:
   db:
-    image: postgres:16-alpine
+    image: postgres:17-alpine
     environment:
       POSTGRES_DB: ${POSTGRES_DB:-forge}
       POSTGRES_USER: ${POSTGRES_USER:-forge}
@@ -12,10 +12,12 @@ services:
       interval: 5s
       timeout: 5s
       retries: 20
+      start_period: 10s
     networks:
       - backend
     ports:
       - "5432:5432"
+    restart: unless-stopped
 
   collab-server:
     build:
@@ -32,9 +34,16 @@ services:
       ALLOWED_ORIGINS: ${ALLOWED_ORIGINS:-http://localhost:5173}
       NODE_ENV: ${NODE_ENV:-production}
     ports:
-      - "${COLLAB_PORT:-4000}:${COLLAB_PORT:-4000}"
+      - "${COLLAB_PORT:-4000}:4000"
     networks:
       - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
 
   net-server:
     build:
@@ -48,6 +57,7 @@ services:
       WS_PORT: ${WS_PORT:-3001}
       DATABASE_URL: ${NET_DATABASE_URL:-postgres://${POSTGRES_USER:-forge}:${POSTGRES_PASSWORD:-forge}@db:5432/${POSTGRES_DB:-forge}}
       JWT_SECRET: ${JWT_SECRET:-change-me-in-dev}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-}
       FRONTEND_URL: ${FRONTEND_URL:-http://localhost:5173}
       NODE_ENV: ${NODE_ENV:-production}
     ports:
@@ -55,6 +65,13 @@ services:
       - "${WS_PORT:-3001}:3001"
     networks:
       - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
 
 networks:
   backend:
