@@ -255,9 +255,11 @@ export class MarketplaceStorageDB {
 
       return this.mapPrismaToItem(updated);
     } catch (error: unknown) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-        // Record not found
-        return null;
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2025') {
+          // Record not found
+          return null;
+        }
       }
       throw error;
     }

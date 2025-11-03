@@ -181,7 +181,7 @@ export class TokenBlacklistService {
           },
           select: { jti: true },
         });
-        const activeJtis = new Set(tokens.map((token) => token.jti));
+        const activeJtis = new Set<string>(tokens.map((token: { jti: string }) => token.jti));
         this.memoryCache = activeJtis;
       } catch (error) {
         console.error('Failed to cleanup expired tokens from database:', error);

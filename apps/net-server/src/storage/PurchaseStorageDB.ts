@@ -25,7 +25,7 @@ export class PurchaseStorageDB {
     const id = `purchase_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     const now = new Date();
 
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx: Parameters<Parameters<PrismaClientType['$transaction']>[0]>[0]) => {
       // Insert purchase
       await tx.purchase.create({
         data: {
@@ -128,8 +128,10 @@ export class PurchaseStorageDB {
 
       return this.mapPrismaToPurchase(updated);
     } catch (error: unknown) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-        return null;
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2025') {
+          return null;
+        }
       }
       throw error;
     }
@@ -159,7 +161,7 @@ export class PurchaseStorageDB {
       },
     });
 
-    return owned.map((item) => ({
+    return owned.map((item: { itemId: string; itemType: string; purchasedAt: Date }) => ({
       itemId: item.itemId,
       itemType: item.itemType as PurchaseItemType,
       purchasedAt: item.purchasedAt.getTime(),
@@ -176,7 +178,7 @@ export class PurchaseStorageDB {
     fromUserId: string,
     toUserId: string
   ): Promise<boolean> {
-    return this.prisma.$transaction(async (tx) => {
+    return this.prisma.$transaction(async (tx: Parameters<Parameters<PrismaClientType['$transaction']>[0]>[0]) => {
       // Verify source owns the item
       const count = await tx.userOwnedItem.count({
         where: {
@@ -241,7 +243,7 @@ export class PurchaseStorageDB {
     return {
       id: purchase.id,
       userId: purchase.userId,
-      items: purchase.items.map((item) => ({
+      items: purchase.items.map((item: { itemId: string; itemType: string; name: string; priceCurrency: string; priceAmount: Prisma.Decimal }) => ({
         itemId: item.itemId,
         type: item.itemType as PurchaseItemType,
         name: item.name,

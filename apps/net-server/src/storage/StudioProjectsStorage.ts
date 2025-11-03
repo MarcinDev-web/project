@@ -141,7 +141,7 @@ export class StudioProjectsStorageDB {
       ...(options?.offset && { skip: options.offset }),
     });
 
-    return projects.map((project) => {
+    return projects.map((project: { id: string; userId: string; name: string; description: string | null; thumbnailUrl: string | null; projectData: Buffer; isPublished: boolean; createdAt: Date; updatedAt: Date; version: number }) => {
       try {
         const jsonData = project.projectData.toString('utf-8');
         const projectData = JSON.parse(jsonData) as ProjectData;
@@ -162,7 +162,7 @@ export class StudioProjectsStorageDB {
         if (project.thumbnailUrl !== null) {
           result.thumbnailUrl = project.thumbnailUrl;
         }
-        if (project.tags.length > 0) {
+        if (project.tags && project.tags.length > 0) {
           result.tags = project.tags;
         }
 

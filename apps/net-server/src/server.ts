@@ -242,7 +242,7 @@ const ledgerService = new LedgerService();
 // Subscribe to currency transactions to populate ledger
 try {
   const manager = currencyService.getManager();
-  manager.events.on(CurrencyEventNames.TRANSACTION_COMPLETED, (data) => {
+  manager.events.on(CurrencyEventNames.TRANSACTION_COMPLETED, (data: unknown) => {
     const tx = (data as { transaction?: any }).transaction;
     if (!tx) return;
     switch (tx.type) {

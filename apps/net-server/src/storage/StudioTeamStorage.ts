@@ -82,7 +82,7 @@ export class StudioTeamStorageDB {
     const id = `team_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
     // Use Prisma transaction
-    const team = await this.prisma.$transaction(async (tx) => {
+    const team = await this.prisma.$transaction(async (tx: Parameters<Parameters<typeof this.prisma.$transaction>[0]>[0]) => {
       // Create team
       const createdTeam = await tx.studioTeam.create({
         data: {
@@ -210,12 +210,12 @@ export class StudioTeamStorageDB {
       orderBy: { joinedAt: 'asc' },
     });
 
-    return members.map((member) => ({
+    return members.map((member: { teamId: string; userId: string; role: string; joinedAt: Date; invitedBy: string | null }) => ({
       teamId: member.teamId,
       userId: member.userId,
       role: member.role as 'owner' | 'member',
       joinedAt: member.joinedAt.getTime(),
-      invitedBy: member.invitedBy,
+      invitedBy: member.invitedBy ?? '',
     }));
   }
 
@@ -395,7 +395,7 @@ export class StudioTeamStorageDB {
       orderBy: { createdAt: 'desc' },
     });
 
-    return invitations.map((invitation) => ({
+    return invitations.map((invitation: { id: string; teamId: string; inviterId: string; inviteeUserId: string | null; inviteeEmail: string | null; inviteeUsername: string | null; token: string; status: string; expiresAt: Date; createdAt: Date }) => ({
       id: invitation.id,
       teamId: invitation.teamId,
       inviterId: invitation.inviterId,
@@ -517,7 +517,7 @@ export class StudioTeamStorageDB {
       where: { teamId },
     });
 
-    return accesses.map((access) => ({
+    return accesses.map((access: { projectId: string; teamId: string; accessLevel: string; userId: string | null }) => ({
       projectId: access.projectId,
       teamId: access.teamId,
       accessLevel: access.accessLevel as 'read' | 'write',
@@ -536,7 +536,7 @@ export class StudioTeamStorageDB {
       return [];
     }
 
-    const teamIds = members.map((m) => m.teamId);
+    const teamIds = members.map((m: { teamId: string }) => m.teamId);
     const accesses = await this.prisma.projectTeamAccess.findMany({
       where: {
         teamId: {
@@ -549,7 +549,7 @@ export class StudioTeamStorageDB {
       },
     });
 
-    return accesses.map((access) => ({
+    return accesses.map((access: { projectId: string; teamId: string; accessLevel: string; userId: string | null }) => ({
       projectId: access.projectId,
       teamId: access.teamId,
       accessLevel: access.accessLevel as 'read' | 'write',

@@ -90,7 +90,22 @@ export class AssetStorageDB {
       skip: offset,
     });
 
-    return assets.map((asset) => this.mapPrismaToAsset(asset));
+    return assets.map((asset: {
+      id: string;
+      name: string;
+      description: string | null;
+      type: string;
+      category: string | null;
+      priceCurrency: string;
+      priceAmount: Prisma.Decimal;
+      previewUrl: string | null;
+      fileUrl: string;
+      metadata: Prisma.JsonValue;
+      authorId: string;
+      available: boolean;
+      createdAt: Date;
+      updatedAt: Date;
+    }) => this.mapPrismaToAsset(asset));
   }
 
   async updateAsset(id: string, updates: Partial<Omit<Asset, 'id' | 'createdAt'>>): Promise<Asset | null> {
@@ -147,8 +162,10 @@ export class AssetStorageDB {
 
       return this.mapPrismaToAsset(updated);
     } catch (error: unknown) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-        return null;
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2025') {
+          return null;
+        }
       }
       throw error;
     }
@@ -161,8 +178,10 @@ export class AssetStorageDB {
       });
       return true;
     } catch (error: unknown) {
-      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
-        return false;
+      if (error instanceof Prisma.PrismaClientKnownRequestError) {
+        if (error.code === 'P2025') {
+          return false;
+        }
       }
       throw error;
     }

@@ -180,7 +180,7 @@ export class LikesStorage {
         where: { userId },
         select: { itemId: true },
       });
-      return likes.map((like) => like.itemId);
+      return likes.map((like: { itemId: string }) => like.itemId);
     } else {
       const likes = await this.readLikes();
       const userLikes: string[] = [];
@@ -210,7 +210,7 @@ export class LikesStorage {
         where: { itemId },
         select: { userId: true },
       });
-      return likes.map((like) => like.userId);
+      return likes.map((like: { userId: string }) => like.userId);
     } else {
       const likes = await this.readLikes();
       return Array.from(likes[itemId] ?? []);

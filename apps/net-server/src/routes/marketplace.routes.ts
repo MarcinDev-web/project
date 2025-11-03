@@ -797,7 +797,7 @@ export function createMarketplaceRoutes(deps: RouteDependencies): Router {
         if (dbPool && marketplaceStorage instanceof MarketplaceStorageDB) {
           try {
             // Use Prisma transaction
-            const item = await dbPool.$transaction(async (tx) => {
+            const item = await dbPool.$transaction(async (tx: Parameters<Parameters<typeof dbPool.$transaction>[0]>[0]) => {
               // Create marketplace item within transaction
               const createdItem = await marketplaceStorage.createItem(
                 {
