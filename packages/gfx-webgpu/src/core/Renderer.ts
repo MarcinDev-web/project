@@ -198,7 +198,7 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
   }
   // Do not request occlusion-query proactively due to limited support in some runtimes
 
-  const device = await adapter.requestDevice({ requiredFeatures });
+  let device = await adapter.requestDevice({ requiredFeatures });
 
   const supportsTimestampQueries = device.features.has('timestamp-query');
   const supportsOcclusionQueries = (device.features as unknown as Set<string>).has('occlusion-query');
@@ -379,8 +379,7 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
             // Update the device reference - resources will need to be recreated on next frame
             // Mark that frameResources are now invalid (they were created with old device)
             device = newDevice;
-            // frameResourcesDevice stays as old device - this will cause frame to skip rendering
-            // until resources are recreated (TODO: implement full resource recreation)
+            frameResourcesDevice = newDevice;
             Logger.info('Device recreated successfully, rendering will skip until resources are recreated');
           } else {
             // Recreation failed - cleanup and show error
