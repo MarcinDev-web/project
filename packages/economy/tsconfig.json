@@ -12,8 +12,8 @@
       "@engine/world/*": ["../world/dist/*"],
       "@engine/animation": ["../animation/dist"],
       "@engine/animation/*": ["../animation/dist/*"],
-      "@engine/world-server": ["../world-server/src", "../world-server/dist"],
-      "@engine/world-server/*": ["../world-server/src/*", "../world-server/dist/*"]
+      "@engine/world-server": ["../world-server/dist"],
+      "@engine/world-server/*": ["../world-server/dist/*"]
     }
   },
   "include": ["src/**/*"],

@@ -24,8 +24,7 @@
     { "path": "../core" },
     { "path": "../world" },
     { "path": "../net-protocol" },
-    { "path": "../voxel" },
-    { "path": "../economy" }
+    { "path": "../voxel" }
   ]
 }
 
