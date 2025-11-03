@@ -3,8 +3,9 @@
 ## 📋 Frontend (Vercel) - Wymagane Zmienne
 
 ### 1. `VITE_API_URL` ⚠️ **WYMAGANE**
-- **Opis:** URL do backend API (net-server)
-- **Przykład:** `https://your-backend.railway.app` lub `https://your-backend.render.com`
+- **Opis:** URL do backend API (net-server) - **MUSI zawierać `/api` na końcu!**
+- **Przykład:** `https://your-backend.railway.app/api` lub `https://your-backend.example.com/api`
+- **⚠️ WAŻNE:** Backend ma wszystkie route'y pod prefiksem `/api`, więc URL musi kończyć się na `/api`
 - **Gdzie ustawić:** Vercel Dashboard → Settings → Environment Variables → Production
 - **Zabezpieczenie:** Nie jest secretem, może być publiczny (to URL API)
 
@@ -29,7 +30,7 @@
   # Node.js
   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
   ```
-- **Gdzie ustawić:** Na platformie gdzie wdrożony jest backend (Render/Railway/etc.)
+- **Gdzie ustawić:** Na platformie gdzie wdrożony jest backend (Railway/etc.)
 - **Zabezpieczenie:** 🔴 **SECRET** - NIGDY nie commituj do git!
 
 ### 2. `JWT_REFRESH_SECRET` 🔐 **ZALECANE**
@@ -53,7 +54,6 @@
 - **Format:** `postgresql://user:password@host:port/database?sslmode=require`
 - **Uwaga:** W produkcji **WYMAGANY** `sslmode=require` dla bezpieczeństwa
 - **Gdzie wziąć:** 
-  - Render: Automatycznie generowane dla PostgreSQL service
   - Railway: W settings → Database → Connection String
   - Inne: Skonfiguruj własną bazę PostgreSQL
 - **Zabezpieczenie:** 🔴 **SECRET** - zawiera hasło do bazy!
@@ -114,9 +114,10 @@
 
 3. **Dodaj zmienne:**
    ```
-   VITE_API_URL = https://your-backend-url.com
+   VITE_API_URL = https://your-backend-url.com/api
    ```
    - ⚠️ Zamień `your-backend-url.com` na rzeczywisty URL backendu
+   - ⚠️ **WAŻNE:** URL musi kończyć się na `/api` (backend ma wszystkie route'y pod `/api`)
 
 4. **Wybierz środowiska:**
    - ✅ Production
@@ -128,43 +129,42 @@
 
 ---
 
-## 🔒 Instrukcje Setup - Backend (Render/Railway/etc.)
+## 🔒 Instrukcje Setup - Backend na Railway
 
-### Przykład dla Render.com:
+### Konfiguracja Railway:
 
-1. **Otwórz Render Dashboard**
-2. **Utwórz Web Service:**
-   - **Build Command:** `pnpm install && pnpm --filter @apps/net-server build`
-   - **Start Command:** `node apps/net-server/dist/server.js`
-   - **Environment:** `Node`
+1. **Otwórz Railway Dashboard:**
+   - https://railway.app
+   - **New Project** → **Deploy from GitHub**
+   - Wybierz repozytorium z projektem
 
-3. **Dodaj Environment Variables:**
-   ```
-   NODE_ENV = production
-   JWT_SECRET = <wygeneruj-64-znakowy-secret>
-   JWT_REFRESH_SECRET = <wygeneruj-64-znakowy-secret>
-   FRONTEND_URL = https://your-app.vercel.app
-   DATABASE_URL = <connection-string-z-render>
-   ```
+2. **Dodaj PostgreSQL Database:**
+   - W projekcie kliknij **"+ New"** → **"Database"** → **"PostgreSQL"**
+   - Railway automatycznie utworzy bazę i ustawi `DATABASE_URL`
+   - Railway automatycznie dodaje `sslmode=require`
+   
+   **Uwaga:** Railway pokaże informacje o bazie:
+   - HTTP Domain (np. `net-server-db-production.up.railway.app`) - używane wewnętrznie
+   - TCP Proxy endpoints - opcjonalne, do ręcznego połączenia lokalnego
+   - **Nie musisz używać tych endpointów ręcznie** - Railway automatycznie ustawia `DATABASE_URL` w serwisie
 
-4. **Utwórz PostgreSQL Database:**
-   - Render automatycznie wygeneruje `DATABASE_URL`
-   - Dodaj `?sslmode=require` na końcu jeśli nie ma
-
-### Przykład dla Railway.app:
-
-1. **Otwórz Railway Dashboard**
-2. **New Project → Deploy from GitHub**
 3. **Dodaj zmienne w Variables:**
+   - Przejdź do serwisu `net-server` → **Variables**
+   - Kliknij **"+ New Variable"** i dodaj:
    ```
    NODE_ENV=production
-   JWT_SECRET=<wygeneruj>
-   JWT_REFRESH_SECRET=<wygeneruj>
+   JWT_SECRET=<wygeneruj używając node scripts/generate-jwt-secret.js>
+   JWT_REFRESH_SECRET=<wygeneruj używając node scripts/generate-jwt-secret.js>
    FRONTEND_URL=https://your-app.vercel.app
    ```
+   - **Uwaga:** `DATABASE_URL` powinien być już automatycznie ustawiony przez Railway
 
-4. **Dodaj PostgreSQL Database:**
-   - Railway automatycznie ustawi `DATABASE_URL`
+4. **Generowanie publicznego URL:**
+   - Przejdź do serwisu → **Settings** → **Networking**
+   - Kliknij **"Generate Domain"**
+   - Railway wygeneruje URL w formacie: `https://net-server-production.up.railway.app`
+   - **Dodaj `/api` na końcu:** `https://net-server-production.up.railway.app/api`
+   - Ten URL (z `/api`) będzie potrzebny do ustawienia `VITE_API_URL` w Vercel
 
 ---
 
@@ -213,7 +213,7 @@ Backend automatycznie waliduje konfigurację przy starcie. Sprawdź logi:
 ## 📚 Dodatkowe Informacje
 
 - **Walidacja konfiguracji:** `apps/net-server/src/config/validateConfig.ts`
-- **Przykładowa konfiguracja:** Zobacz `render.yaml` dla przykładu Render.com
+- **Przykładowa konfiguracja:** Zobacz dokumentację deployment dla wybranej platformy
 - **Dokumentacja API:** Backend ma endpoint `/health` do sprawdzenia statusu
 
 ---
@@ -226,11 +226,12 @@ Backend automatycznie waliduje konfigurację przy starcie. Sprawdź logi:
 ### Błąd: "CORS error" w przeglądarce
 **Rozwiązanie:** Upewnij się, że `FRONTEND_URL` w backendzie zawiera dokładny URL frontendu (z `https://`).
 
-### Błąd: "405 Method Not Allowed" na `/api/*`
+### Błąd: "405 Method Not Allowed" na `/auth/register` lub innych endpointach
 **Rozwiązanie:** 
-1. Sprawdź czy backend jest wdrożony i działa
-2. Ustaw `VITE_API_URL` w Vercel na URL backendu
-3. Zrób redeploy frontendu
+1. Sprawdź czy backend jest wdrożony i działa (`curl https://your-backend.railway.app/api/health`)
+2. Ustaw `VITE_API_URL` w Vercel na URL backendu **z `/api` na końcu** (np. `https://your-backend.railway.app/api`)
+3. Zrób redeploy frontendu (zmiany w env variables wymagają redeploy)
+4. Sprawdź w DevTools → Network czy request idzie do poprawnego URL (powinien być `https://your-backend.railway.app/api/auth/register`)
 
 ### Błąd: "Database connection failed"
 **Rozwiązanie:**
