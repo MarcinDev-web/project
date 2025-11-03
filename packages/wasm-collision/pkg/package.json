@@ -1,0 +1,15 @@
+{
+  "name": "collision",
+  "type": "module",
+  "version": "0.1.0",
+  "files": [
+    "collision_bg.wasm",
+    "collision.js",
+    "collision.d.ts"
+  ],
+  "main": "collision.js",
+  "types": "collision.d.ts",
+  "sideEffects": [
+    "./snippets/*"
+  ]
+}
