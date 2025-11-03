@@ -17,6 +17,7 @@ export default defineConfig({
       '@engine/world/components': path.resolve(__dirname, '../../packages/world/src/components'),
       '@engine/gfx-webgpu': path.resolve(__dirname, '../../packages/gfx-webgpu/src'),
       '@engine/avatar': path.resolve(__dirname, '../../packages/avatar/src'),
+      '@engine/blocks': path.resolve(__dirname, '../../packages/blocks/src'),
       '@engine/camera': path.resolve(__dirname, '../../packages/camera/src'),
       '@engine/script': path.resolve(__dirname, '../../packages/script/src'),
       '@engine/net': path.resolve(__dirname, '../../packages/net/src'),

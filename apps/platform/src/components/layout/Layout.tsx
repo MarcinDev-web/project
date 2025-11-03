@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react';
+import { Analytics } from '@vercel/analytics/react';
 import { NavBar } from './NavBar';
 import { Footer } from './Footer';
 import { ToastContainer } from '../shared/Toast';
@@ -16,6 +17,7 @@ export function Layout({ children }: LayoutProps) {
       </main>
       <Footer />
       <ToastContainer />
+      <Analytics />
     </div>
   );
 }
