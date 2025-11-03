@@ -16,9 +16,9 @@
   ],
   "scripts": {
     "build:wasm": "wasm-pack build ../../crates/collision --target web --out-dir ../../packages/wasm-collision/pkg",
-    "build:wasm:skip": "echo 'Skipping WASM build - wasm-pack not available, using pre-built WASM files from pkg/'",
+    "build:wasm:skip": "sh -c 'if [ -f pkg/collision.js ]; then echo \"Skipping WASM build - using pre-built WASM files from pkg/\"; else echo \"ERROR: Pre-built WASM files not found in pkg/ and cannot build (cargo missing)\"; exit 1; fi'",
     "build:ts": "tsc -p tsconfig.json",
-    "build": "sh -c '[ -f ../../.wasm-pack-env.sh ] && . ../../.wasm-pack-env.sh || true; command -v wasm-pack >/dev/null 2>&1 && (pnpm run build:wasm && pnpm run build:ts) || (pnpm run build:wasm:skip && pnpm run build:ts)'",
+    "build": "sh -c '[ -f ../../.wasm-pack-env.sh ] && . ../../.wasm-pack-env.sh || true; command -v wasm-pack >/dev/null 2>&1 && command -v cargo >/dev/null 2>&1 && (pnpm run build:wasm && pnpm run build:ts) || (pnpm run build:wasm:skip && pnpm run build:ts)'",
     "clean": "rimraf dist pkg",
     "lint": "eslint src --max-warnings=0"
   },
