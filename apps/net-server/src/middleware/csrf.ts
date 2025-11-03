@@ -89,4 +89,3 @@ export function csrfMiddleware(req: Request, res: Response, next: NextFunction):
     csrfValidationMiddleware(req, res, next);
   });
 }
-

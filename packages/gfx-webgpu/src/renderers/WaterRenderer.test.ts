@@ -9,7 +9,7 @@ describe('WaterRenderer', () => {
   beforeEach(async () => {
     const mock = createMockGPU();
     const adapter = await mock.requestAdapter();
-    device = await adapter!.requestDevice();
+    device = (await adapter!.requestDevice()) as unknown as GPUDevice;
     canvas = createMockCanvas();
   });
 

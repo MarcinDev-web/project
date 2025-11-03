@@ -8,10 +8,7 @@ import type { AuthRequest } from '../auth/middleware';
  */
 export function createSettingsRoutes(deps: RouteDependencies): ReturnType<typeof Router> {
   const router = Router();
-  const {
-    authMiddleware,
-    userSettingsStorage,
-  } = deps;
+  const { authMiddleware, userSettingsStorage } = deps;
 
   /**
    * GET /api/settings
@@ -45,7 +42,9 @@ export function createSettingsRoutes(deps: RouteDependencies): ReturnType<typeof
       }
 
       const updates = req.body as {
-        notificationPreferences?: Partial<import('../storage/UserSettingsStorage').NotificationPreferences>
+        notificationPreferences?: Partial<
+          import('../storage/UserSettingsStorage').NotificationPreferences
+        >;
       };
 
       // Convert Partial<NotificationPreferences> to proper format for updateSettings
@@ -70,4 +69,3 @@ export function createSettingsRoutes(deps: RouteDependencies): ReturnType<typeof
 
   return router;
 }
-

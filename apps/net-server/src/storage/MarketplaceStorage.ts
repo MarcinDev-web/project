@@ -36,7 +36,7 @@ export class MarketplaceStorage {
 
   async initialize(): Promise<void> {
     await fs.mkdir(this.dataDir, { recursive: true });
-    
+
     try {
       await fs.access(this.itemsFile);
     } catch {
@@ -57,9 +57,11 @@ export class MarketplaceStorage {
     await fs.writeFile(this.itemsFile, JSON.stringify(items, null, 2));
   }
 
-  async createItem(item: Omit<MarketplaceItem, 'id' | 'createdAt' | 'updatedAt' | 'downloads' | 'likes'>): Promise<MarketplaceItem> {
+  async createItem(
+    item: Omit<MarketplaceItem, 'id' | 'createdAt' | 'updatedAt' | 'downloads' | 'likes'>
+  ): Promise<MarketplaceItem> {
     const items = await this.readItems();
-    
+
     const id = `item_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     const newItem: MarketplaceItem = {
       ...item,
@@ -72,7 +74,7 @@ export class MarketplaceStorage {
 
     items[id] = newItem;
     await this.writeItems(items);
-    
+
     return newItem;
   }
 
@@ -81,44 +83,44 @@ export class MarketplaceStorage {
     return items[id] ?? null;
   }
 
-  async getItems(options: {
-    type?: 'build' | 'avatar';
-    authorId?: string;
-    tags?: string[];
-    public?: boolean;
-    limit?: number;
-    offset?: number;
-    search?: string;
-    sortBy?: 'newest' | 'popular' | 'downloads' | 'likes';
-  } = {}): Promise<MarketplaceItem[]> {
+  async getItems(
+    options: {
+      type?: 'build' | 'avatar';
+      authorId?: string;
+      tags?: string[];
+      public?: boolean;
+      limit?: number;
+      offset?: number;
+      search?: string;
+      sortBy?: 'newest' | 'popular' | 'downloads' | 'likes';
+    } = {}
+  ): Promise<MarketplaceItem[]> {
     const items = await this.readItems();
     let filtered = Object.values(items);
 
     if (options.type) {
-      filtered = filtered.filter(item => item.type === options.type);
+      filtered = filtered.filter((item) => item.type === options.type);
     }
 
     if (options.authorId) {
-      filtered = filtered.filter(item => item.authorId === options.authorId);
+      filtered = filtered.filter((item) => item.authorId === options.authorId);
     }
 
     if (options.tags && options.tags.length > 0) {
-      filtered = filtered.filter(item =>
-        options.tags!.some(tag => item.tags.includes(tag))
-      );
+      filtered = filtered.filter((item) => options.tags!.some((tag) => item.tags.includes(tag)));
     }
 
     if (options.public !== undefined) {
-      filtered = filtered.filter(item => item.public === options.public);
+      filtered = filtered.filter((item) => item.public === options.public);
     }
 
     // Client-side search (case-insensitive)
     if (options.search && options.search.trim()) {
       const searchLower = options.search.toLowerCase();
-      filtered = filtered.filter(item => {
+      filtered = filtered.filter((item) => {
         const titleMatch = item.title.toLowerCase().includes(searchLower);
         const descMatch = item.description?.toLowerCase().includes(searchLower) ?? false;
-        const tagsMatch = item.tags.some(tag => tag.toLowerCase().includes(searchLower));
+        const tagsMatch = item.tags.some((tag) => tag.toLowerCase().includes(searchLower));
         return titleMatch || descMatch || tagsMatch;
       });
     }
@@ -157,10 +159,13 @@ export class MarketplaceStorage {
     return filtered.slice(offset, offset + limit);
   }
 
-  async updateItem(id: string, updates: Partial<Omit<MarketplaceItem, 'id' | 'createdAt' | 'authorId'>>): Promise<MarketplaceItem | null> {
+  async updateItem(
+    id: string,
+    updates: Partial<Omit<MarketplaceItem, 'id' | 'createdAt' | 'authorId'>>
+  ): Promise<MarketplaceItem | null> {
     const items = await this.readItems();
     const item = items[id];
-    
+
     if (!item) {
       return null;
     }
@@ -173,32 +178,31 @@ export class MarketplaceStorage {
 
     items[id] = updated;
     await this.writeItems(items);
-    
+
     return updated;
   }
 
   async deleteItem(id: string, authorId: string): Promise<boolean> {
     const items = await this.readItems();
     const item = items[id];
-    
+
     if (!item || item.authorId !== authorId) {
       return false;
     }
 
     delete items[id];
     await this.writeItems(items);
-    
+
     return true;
   }
 
   async incrementDownloads(id: string): Promise<void> {
     const items = await this.readItems();
     const item = items[id];
-    
+
     if (item) {
       item.downloads++;
       await this.writeItems(items);
     }
   }
 }
-

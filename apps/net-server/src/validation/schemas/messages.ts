@@ -43,7 +43,10 @@ export const updateGroupSchema = z.object({
  * Add group members schema.
  */
 export const addGroupMembersSchema = z.object({
-  userIds: arraySchema(uuidSchema.or(z.string().min(1)), 50).min(1, 'At least one user ID is required'),
+  userIds: arraySchema(uuidSchema.or(z.string().min(1)), 50).min(
+    1,
+    'At least one user ID is required'
+  ),
 });
 
 /**
@@ -77,4 +80,3 @@ export type AddGroupMembersRequest = z.infer<typeof addGroupMembersSchema>;
 export type ConversationIdParam = z.infer<typeof conversationIdParamSchema>;
 export type GroupIdParam = z.infer<typeof groupIdParamSchema>;
 export type MessageIdParam = z.infer<typeof messageIdParamSchema>;
-

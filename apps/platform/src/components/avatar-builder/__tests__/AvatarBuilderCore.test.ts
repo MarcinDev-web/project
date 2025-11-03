@@ -14,6 +14,7 @@ const mockCanvas = {
   })),
   addEventListener: vi.fn(),
   removeEventListener: vi.fn(),
+  style: {} as CSSStyleDeclaration,
 } as unknown as HTMLCanvasElement;
 
 const mockStatusEl = document.createElement('div');
@@ -64,7 +65,7 @@ describe('AvatarBuilderCore', () => {
     const customLoadout = {
       version: 1,
       parts: {
-        HeadSlot: { mesh: 'custom_head' },
+        HeadSlot: { mesh: 'head_default' }, // Use existing part ID
       },
     };
 
@@ -75,7 +76,7 @@ describe('AvatarBuilderCore', () => {
     });
 
     const loadout = core.getCurrentLoadout();
-    expect(loadout.parts.HeadSlot?.mesh).toBe('custom_head');
+    expect(loadout.parts.HeadSlot?.mesh).toBe('head_default');
   });
 
   it('should apply loadout changes', () => {
@@ -87,13 +88,14 @@ describe('AvatarBuilderCore', () => {
     const newLoadout = {
       version: 1,
       parts: {
-        HeadSlot: { mesh: 'new_head', colors: { primary: [1, 0, 0, 1] as RgbaColor } },
+        HeadSlot: { mesh: 'head_default', colors: { primary: [1, 0, 0, 1] as RgbaColor } },
       },
     };
 
     core.applyLoadout(newLoadout);
     const loadout = core.getCurrentLoadout();
-    expect(loadout.parts.HeadSlot?.mesh).toBe('new_head');
+    expect(loadout.parts.HeadSlot?.mesh).toBe('head_default');
+    expect(loadout.parts.HeadSlot?.colors?.primary).toEqual([1, 0, 0, 1]);
   });
 
   it('should reset to default loadout', () => {

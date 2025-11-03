@@ -217,7 +217,10 @@ export class SecurityLogger {
    * Get events by type.
    */
   getEventsByType(type: SecurityEventType, count = 100): SecurityEvent[] {
-    return this.events.filter(e => e.type === type).slice(-count).reverse();
+    return this.events
+      .filter((e) => e.type === type)
+      .slice(-count)
+      .reverse();
   }
 
   /**
@@ -254,4 +257,3 @@ export class SecurityLogger {
 
 // Singleton instance
 export const securityLogger = new SecurityLogger();
-

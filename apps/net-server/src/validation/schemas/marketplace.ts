@@ -3,7 +3,14 @@
  */
 
 import { z } from 'zod';
-import { uuidSchema, fileUrlSchema, trimmedStringSchema, arraySchema, positiveNumberSchema, currencySchema } from './base';
+import {
+  uuidSchema,
+  fileUrlSchema,
+  trimmedStringSchema,
+  arraySchema,
+  positiveNumberSchema,
+  currencySchema,
+} from './base';
 
 /**
  * Marketplace item type.
@@ -137,4 +144,3 @@ export type ResaleListingRequest = z.infer<typeof resaleListingSchema>;
 export type BuyResaleRequest = z.infer<typeof buyResaleSchema>;
 export type SearchQueryRequest = z.infer<typeof searchQuerySchema>;
 export type MarketplaceItemIdParam = z.infer<typeof marketplaceItemIdParamSchema>;
-

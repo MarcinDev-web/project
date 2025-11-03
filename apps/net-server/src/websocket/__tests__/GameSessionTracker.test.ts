@@ -51,8 +51,8 @@ describe('GameSessionTracker', () => {
     it('tracks different games separately', () => {
       tracker.joinGame('game1', 'user1');
       tracker.joinGame('game1', 'user2');
-      tracker.joinGame('game2', 'user1');
-      tracker.joinGame('game2', 'user3');
+      tracker.joinGame('game2', 'user3'); // Different user, not user1
+      tracker.joinGame('game2', 'user4');
 
       expect(tracker.getPlayerCount('game1')).toBe(2);
       expect(tracker.getPlayerCount('game2')).toBe(2);

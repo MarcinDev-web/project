@@ -18,11 +18,13 @@ const rotationSchema = z.tuple([z.number(), z.number(), z.number(), z.number()])
 /**
  * Operation schema (flexible structure for scene operations).
  */
-const operationSchema = z.object({
-  type: z.string(),
-  entityId: z.string().optional(),
-  data: z.record(z.unknown()).optional(),
-}).catchall(z.unknown());
+const operationSchema = z
+  .object({
+    type: z.string(),
+    entityId: z.string().optional(),
+    data: z.record(z.unknown()).optional(),
+  })
+  .catchall(z.unknown());
 
 /**
  * Join session message schema.
@@ -118,4 +120,3 @@ export type CursorUpdateMessageRequest = z.infer<typeof cursorUpdateMessageSchem
 export type PingMessageRequest = z.infer<typeof pingMessageSchema>;
 export type MessageTypingRequest = z.infer<typeof messageTypingSchema>;
 export type WebSocketMessageRequest = z.infer<typeof websocketMessageSchema>;
-

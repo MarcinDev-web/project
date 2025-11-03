@@ -72,17 +72,16 @@ export class LikesStorage {
         [itemId, userId]
       );
       // Update like count in marketplace_items
-      await this.pool.query(
-        'UPDATE marketplace_items SET likes = likes + 1 WHERE id = $1',
-        [itemId]
-      );
+      await this.pool.query('UPDATE marketplace_items SET likes = likes + 1 WHERE id = $1', [
+        itemId,
+      ]);
     } else {
       // JSON file
       const likes = await this.readLikes();
       if (!likes[itemId]) {
         likes[itemId] = new Set();
       }
-      likes[itemId]!.add(userId);
+      likes[itemId].add(userId);
       await this.writeLikes(likes);
     }
   }
@@ -105,8 +104,8 @@ export class LikesStorage {
       // JSON file
       const likes = await this.readLikes();
       if (likes[itemId]) {
-        likes[itemId]!.delete(userId);
-        if (likes[itemId]!.size === 0) {
+        likes[itemId].delete(userId);
+        if (likes[itemId].size === 0) {
           delete likes[itemId];
         }
         await this.writeLikes(likes);
@@ -133,7 +132,7 @@ export class LikesStorage {
         'SELECT item_id FROM marketplace_likes WHERE user_id = $1',
         [userId]
       );
-      return result.rows.map(row => row.item_id);
+      return result.rows.map((row) => row.item_id);
     } else {
       const likes = await this.readLikes();
       const userLikes: string[] = [];
@@ -165,11 +164,10 @@ export class LikesStorage {
         'SELECT user_id FROM marketplace_likes WHERE item_id = $1',
         [itemId]
       );
-      return result.rows.map(row => row.user_id);
+      return result.rows.map((row) => row.user_id);
     } else {
       const likes = await this.readLikes();
       return Array.from(likes[itemId] ?? []);
     }
   }
 }
-

@@ -101,6 +101,8 @@ export function mat4Ortho(
   assertFinite('near', near);
   assertFinite('far', far);
   if (!(far > near)) throw new RangeError('far must be greater than near');
+  // orthoZO exists in gl-matrix but types are incomplete
+  /* eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any */
   (m4 as any).orthoZO(out as unknown as m4, left, right, bottom, top, near, far);
   return out;
 }

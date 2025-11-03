@@ -133,7 +133,11 @@ function validateFileUrl(fileUrl: unknown): ValidationError | null {
 
   // Basic URL validation (check if it starts with http/https or /)
   try {
-    if (!fileUrl.startsWith('http://') && !fileUrl.startsWith('https://') && !fileUrl.startsWith('/')) {
+    if (
+      !fileUrl.startsWith('http://') &&
+      !fileUrl.startsWith('https://') &&
+      !fileUrl.startsWith('/')
+    ) {
       return { field: 'fileUrl', message: 'Invalid file URL format' };
     }
   } catch {
@@ -268,7 +272,9 @@ export function validateMarketplacePublishRequest(body: unknown): MarketplaceVal
 /**
  * Sanitize marketplace publish request
  */
-export function sanitizeMarketplacePublishRequest(body: Record<string, unknown>): Record<string, unknown> {
+export function sanitizeMarketplacePublishRequest(
+  body: Record<string, unknown>
+): Record<string, unknown> {
   const sanitized: Record<string, unknown> = { ...body };
 
   // Sanitize title (no HTML allowed)

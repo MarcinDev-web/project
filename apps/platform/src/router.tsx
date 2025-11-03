@@ -1,5 +1,4 @@
 import { createBrowserRouter } from 'react-router-dom';
-import { LandingPage } from './pages/LandingPage';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
@@ -36,10 +35,6 @@ import { ProtectedRoute, AdminRoute, ModeratorRoute } from './components/auth/Pr
 export const router: ReturnType<typeof createBrowserRouter> = createBrowserRouter([
   {
     path: '/',
-    element: <LandingPage />,
-  },
-  {
-    path: '/games',
     element: <HomePage />,
   },
   {

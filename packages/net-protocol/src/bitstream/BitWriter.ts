@@ -18,5 +18,3 @@ export class BitWriter {
     return Uint8Array.from(this.bytes);
   }
 }
-
-

@@ -31,7 +31,10 @@ function validateJwtSecret(secret: string | undefined): { valid: boolean; error?
   // Check for sufficient entropy (at least 8 unique characters)
   const uniqueChars = new Set(secret).size;
   if (uniqueChars < 8) {
-    return { valid: false, error: 'JWT_SECRET must have sufficient entropy (at least 8 unique characters)' };
+    return {
+      valid: false,
+      error: 'JWT_SECRET must have sufficient entropy (at least 8 unique characters)',
+    };
   }
 
   return { valid: true };
@@ -50,7 +53,8 @@ function validateDatabaseUrl(url: string | undefined): { valid: boolean; warning
   if (isProduction && !url.includes('sslmode=require') && !url.includes('ssl=true')) {
     return {
       valid: true,
-      warning: 'DATABASE_URL should use SSL (sslmode=require) in production for encrypted connections',
+      warning:
+        'DATABASE_URL should use SSL (sslmode=require) in production for encrypted connections',
     };
   }
 
@@ -86,7 +90,9 @@ function validateRateLimits(): { valid: boolean; warnings: string[] } {
   // These are validated by express-rate-limit, but we can warn about loose limits
   const authLimiterMax = process.env.AUTH_RATE_LIMIT_MAX;
   if (authLimiterMax && parseInt(authLimiterMax, 10) > 10) {
-    warnings.push('AUTH_RATE_LIMIT_MAX seems high - consider stricter limits for authentication endpoints');
+    warnings.push(
+      'AUTH_RATE_LIMIT_MAX seems high - consider stricter limits for authentication endpoints'
+    );
   }
 
   return { valid: true, warnings };
@@ -174,4 +180,3 @@ export function assertConfigValid(): void {
     console.log('✅ Configuration validation passed');
   }
 }
-

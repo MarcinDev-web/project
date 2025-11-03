@@ -11,7 +11,9 @@
     "test:watch": "vitest",
     "lint": "eslint src --max-warnings=0",
     "seed": "tsx src/scripts/seedMarketplace.ts",
-    "migrate:marketplace": "tsx src/scripts/migrateMarketplaceToDB.ts"
+    "migrate:marketplace": "tsx src/scripts/migrateMarketplaceToDB.ts",
+    "create:admin": "tsx src/scripts/createAdmin.ts",
+    "create:admin:profile": "tsx src/scripts/createAdminProfile.ts"
   },
   "dependencies": {
     "bcrypt": "^5.1.1",

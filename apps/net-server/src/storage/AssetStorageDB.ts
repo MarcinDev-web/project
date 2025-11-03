@@ -116,13 +116,16 @@ export class AssetStorageDB {
     }
 
     if (filter.search) {
-      conditions.push(`(LOWER(name) LIKE $${paramIndex} OR LOWER(description) LIKE $${paramIndex})`);
+      conditions.push(
+        `(LOWER(name) LIKE $${paramIndex} OR LOWER(description) LIKE $${paramIndex})`
+      );
       const searchTerm = `%${filter.search.toLowerCase()}%`;
       params.push(searchTerm, searchTerm);
       paramIndex += 2;
     }
 
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : 'WHERE available = true';
+    const whereClause =
+      conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : 'WHERE available = true';
 
     const limit = filter.limit ?? 50;
     const offset = filter.offset ?? 0;
@@ -152,10 +155,13 @@ export class AssetStorageDB {
       updated_at: Date;
     }>(query, params);
 
-    return result.rows.map(row => this.mapRowToAsset(row));
+    return result.rows.map((row) => this.mapRowToAsset(row));
   }
 
-  async updateAsset(id: string, updates: Partial<Omit<Asset, 'id' | 'createdAt'>>): Promise<Asset | null> {
+  async updateAsset(
+    id: string,
+    updates: Partial<Omit<Asset, 'id' | 'createdAt'>>
+  ): Promise<Asset | null> {
     const setClauses: string[] = [];
     const params: unknown[] = [];
     let paramIndex = 1;
@@ -290,13 +296,16 @@ export class AssetStorageDB {
     }
 
     if (filter.search) {
-      conditions.push(`(LOWER(name) LIKE $${paramIndex} OR LOWER(description) LIKE $${paramIndex})`);
+      conditions.push(
+        `(LOWER(name) LIKE $${paramIndex} OR LOWER(description) LIKE $${paramIndex})`
+      );
       const searchTerm = `%${filter.search.toLowerCase()}%`;
       params.push(searchTerm, searchTerm);
       paramIndex += 2;
     }
 
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : 'WHERE available = true';
+    const whereClause =
+      conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : 'WHERE available = true';
 
     const result = await this.pool.query<{ count: string }>(
       `SELECT COUNT(*) as count FROM shop_assets ${whereClause}`,
@@ -344,4 +353,3 @@ export class AssetStorageDB {
     return asset;
   }
 }
-

@@ -1,13 +1,13 @@
 export interface ObbFlat {
   center: Float32Array; // length 3
-  axes: Float32Array;   // length 9 (u, v, w columns)
-  half: Float32Array;   // length 3
+  axes: Float32Array; // length 9 (u, v, w columns)
+  half: Float32Array; // length 3
 }
 
 export interface ObbFlatArray {
   centers: Float32Array; // length 3 * N
-  axes: Float32Array;    // length 9 * N
-  halves: Float32Array;  // length 3 * N
+  axes: Float32Array; // length 9 * N
+  halves: Float32Array; // length 3 * N
 }
 
 export interface Trs {
@@ -19,7 +19,7 @@ export interface Trs {
 export interface TrsArray {
   positions: Float32Array; // length 3 * N
   rotations: Float32Array; // length 4 * N
-  scales: Float32Array;    // length 3 * N
+  scales: Float32Array; // length 3 * N
 }
 
 export interface WasmCollision {
@@ -37,15 +37,20 @@ async function ensureInit(): Promise<void> {
   if (!initPromise) {
     initPromise = (async () => {
       // Dynamic import to avoid hard dependency at app startup
-      // any: wasm-pack JS has no TypeScript types, require loose import
+      // wasm-pack JS has no TypeScript types, require loose import
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const mod: any = await import('../pkg/collision.js');
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
       const maybeInit = mod && (mod.default || mod.init);
       if (typeof maybeInit === 'function') {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call
         await maybeInit();
       }
       // Optional: when the crate is built with the `panic-hook` feature,
       // install console_error_panic_hook for clearer stack traces.
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       if (typeof mod.init_panic_hook === 'function') {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
         mod.init_panic_hook();
       }
       isReady = true;
@@ -61,12 +66,16 @@ export async function init(): Promise<WasmCollision> {
   });
 
   // Re-import after init to get bound functions
-  // any: wasm-pack JS has no TypeScript types, require loose import
+  // wasm-pack JS has no TypeScript types, require loose import
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const mod: any = await import('../pkg/collision.js');
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   if (typeof mod.init_panic_hook === 'function') {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     mod.init_panic_hook();
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   const obb_intersect = mod.obb_intersect as (
     a_center: Float32Array,
     a_axes: Float32Array,
@@ -76,6 +85,7 @@ export async function init(): Promise<WasmCollision> {
     b_half: Float32Array
   ) => boolean;
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   const batch_check = mod.batch_check as (
     pre_center: Float32Array,
     pre_axes: Float32Array,
@@ -85,6 +95,7 @@ export async function init(): Promise<WasmCollision> {
     others_half: Float32Array
   ) => Uint32Array;
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   const batch_check_trs = mod.batch_check_trs as (
     pre_pos: Float32Array,
     pre_rot: Float32Array,
@@ -107,7 +118,14 @@ export async function init(): Promise<WasmCollision> {
     },
     batchCheck: (preview, others) => {
       try {
-        return batch_check(preview.center, preview.axes, preview.half, others.centers, others.axes, others.halves);
+        return batch_check(
+          preview.center,
+          preview.axes,
+          preview.half,
+          others.centers,
+          others.axes,
+          others.halves
+        );
       } catch (error) {
         console.error('[wasm-collision] batchCheck error:', error);
         throw error;
@@ -115,7 +133,14 @@ export async function init(): Promise<WasmCollision> {
     },
     batchCheckTrs: (preview, others) => {
       try {
-        return batch_check_trs(preview.pos, preview.rot, preview.scl, others.positions, others.rotations, others.scales);
+        return batch_check_trs(
+          preview.pos,
+          preview.rot,
+          preview.scl,
+          others.positions,
+          others.rotations,
+          others.scales
+        );
       } catch (error) {
         console.error('[wasm-collision] batchCheckTrs error:', error);
         throw error;
@@ -132,5 +157,3 @@ export async function init(): Promise<WasmCollision> {
 }
 
 export { getTrsBuffers, releaseTrsBuffers, type TrsBuffers } from './pool';
-
-

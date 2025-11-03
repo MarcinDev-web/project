@@ -42,12 +42,21 @@ export interface ZoneTokenPayload {
 }
 
 async function hmacSha256(keyBytes: Uint8Array, dataBytes: Uint8Array): Promise<Uint8Array> {
-  const key = await crypto.subtle.importKey('raw', keyBytes.buffer as ArrayBuffer, { name: 'HMAC', hash: 'SHA-256' }, false, ['sign', 'verify']);
+  const key = await crypto.subtle.importKey(
+    'raw',
+    keyBytes.buffer as ArrayBuffer,
+    { name: 'HMAC', hash: 'SHA-256' },
+    false,
+    ['sign', 'verify']
+  );
   const sig = await crypto.subtle.sign('HMAC', key, dataBytes.buffer as ArrayBuffer);
   return new Uint8Array(sig);
 }
 
-export async function signZoneToken(payload: ZoneTokenPayload, secret: Uint8Array): Promise<string> {
+export async function signZoneToken(
+  payload: ZoneTokenPayload,
+  secret: Uint8Array
+): Promise<string> {
   const header = { alg: 'HS256', typ: 'JWT' };
   const enc = new TextEncoder();
   const headerB = enc.encode(JSON.stringify(header));
@@ -57,7 +66,10 @@ export async function signZoneToken(payload: ZoneTokenPayload, secret: Uint8Arra
   return `${p1}.${b64uEncode(sig)}`;
 }
 
-export async function verifyZoneToken(token: string, secret: Uint8Array): Promise<ZoneTokenPayload | null> {
+export async function verifyZoneToken(
+  token: string,
+  secret: Uint8Array
+): Promise<ZoneTokenPayload | null> {
   const enc = new TextEncoder();
   const parts = token.split('.');
   if (parts.length !== 3) return null;
@@ -74,5 +86,3 @@ export async function verifyZoneToken(token: string, secret: Uint8Array): Promis
   if (Date.now() / 1000 > payload.exp) return null;
   return payload;
 }
-
-

@@ -7,10 +7,7 @@ import type { AuthRequest } from '../auth/middleware';
  */
 export function createNotificationsRoutes(deps: RouteDependencies): Router {
   const router = Router();
-  const {
-    authMiddleware,
-    notificationsStorage,
-  } = deps;
+  const { authMiddleware, notificationsStorage } = deps;
 
   /**
    * GET /api/notifications
@@ -148,4 +145,3 @@ export function createNotificationsRoutes(deps: RouteDependencies): Router {
 
   return router;
 }
-

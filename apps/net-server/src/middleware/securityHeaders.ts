@@ -14,7 +14,7 @@ const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
 function getCSP(): string {
   // Allow same origin, and frontend URL
   const allowedOrigins = [FRONTEND_URL, "'self'"];
-  
+
   // In production, be more restrictive
   if (isProduction) {
     return [
@@ -113,4 +113,3 @@ export function securityHeadersMiddleware(_req: Request, res: Response, next: Ne
 
   next();
 }
-

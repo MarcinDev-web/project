@@ -7,12 +7,11 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 export default defineConfig(({ command }) => {
   const isBuild = command === 'build';
   const resolvePath = (p: string) => path.resolve(__dirname, p);
+  
+  // During build: externalize all @engine/* packages (use as external dependencies)
+  // During dev: use source files for HMR
   const alias: Record<string, string> = isBuild
-    ? {
-        '@engine/wasm-collision': resolvePath('../../packages/wasm-collision/dist/index.js'),
-        '@engine/net': resolvePath('../../packages/net/dist/src/index.js'),
-        '@engine/world-templates': resolvePath('../../packages/world-templates/dist/index.js'),
-      }
+    ? {} // No aliases needed - packages will be externalized
     : {
         '@engine/core': resolvePath('../../packages/core/src'),
         '@engine/animation': resolvePath('../../packages/animation/src'),
@@ -28,6 +27,7 @@ export default defineConfig(({ command }) => {
         '@engine/stdlib': resolvePath('../../packages/stdlib/src'),
         '@engine/wasm-collision': resolvePath('../../packages/wasm-collision/src'),
         '@engine/net': resolvePath('../../packages/net/src'),
+        '@engine/net-protocol': resolvePath('../../packages/net-protocol/src'),
         '@engine/editor-utils': resolvePath('../../packages/editor-utils/src'),
         '@engine/voxel': resolvePath('../../packages/voxel/src'),
         '@engine/voxel/terrain': resolvePath('../../packages/voxel/src/terrain'),
@@ -42,6 +42,8 @@ export default defineConfig(({ command }) => {
     },
     resolve: {
       alias,
+      conditions: isBuild ? ['import', 'module', 'browser', 'default'] : ['import', 'module', 'browser', 'default'],
+      preserveSymlinks: false,
     },
     server: {
       port: 5173,
@@ -56,6 +58,29 @@ export default defineConfig(({ command }) => {
       commonjsOptions: {
         include: [/node_modules/],
       },
+      rollupOptions: {
+        // Externalize all @engine/* packages during build
+        // They are already built and will be resolved via package.json exports
+        external: isBuild
+          ? (id) => {
+              // Externalize all workspace packages
+              if (id.startsWith('@engine/')) {
+                return true;
+              }
+              // Keep other dependencies internal (node_modules, etc.)
+              return false;
+            }
+          : [],
+        output: {
+          // Generate proper external imports
+          globals: isBuild
+            ? {} // ES modules don't use globals
+            : undefined,
+        },
+      },
+    },
+    optimizeDeps: {
+      exclude: isBuild ? [] : ['@engine/*'],
     },
   };
 });

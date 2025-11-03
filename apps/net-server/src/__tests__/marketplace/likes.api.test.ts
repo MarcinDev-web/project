@@ -4,50 +4,19 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
-import { app } from '../../server';
-import { AuthManager } from '../../auth/AuthManager';
-import { MarketplaceStorage } from '../../storage/MarketplaceStorage';
-import { MarketplaceStorageDB } from '../../storage/MarketplaceStorageDB';
-import { LikesStorage } from '../../storage/LikesStorage';
-import { createTestUser, createTestMarketplaceItem, getAuthHeader } from '../helpers/testHelpers';
-import { createDbPool } from '../../lib/db';
-import type { Pool } from 'pg';
-import { promises as fs } from 'fs';
-import path from 'path';
-import os from 'os';
+import { app, authManager, marketplaceStorage, likesStorage } from '../../server';
+import { createTestUser, createTestMarketplaceItem, getAuthHeader, waitForItem } from '../helpers/testHelpers';
 
 describe('Like API', () => {
-  let authManager: AuthManager;
-  let marketplaceStorage: MarketplaceStorage | MarketplaceStorageDB;
-  let likesStorage: LikesStorage;
-  let dbPool: Pool | null = null;
-  let tempDir: string;
   let user: { userId: string; email: string; token: string };
   let itemId: string;
 
   beforeEach(async () => {
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'forge-test-'));
-
-    authManager = new AuthManager(tempDir);
-    await authManager.initialize();
-
-    if (process.env.DATABASE_URL) {
-      try {
-        dbPool = createDbPool();
-        marketplaceStorage = new MarketplaceStorageDB(dbPool);
-        likesStorage = new LikesStorage(dbPool);
-      } catch {
-        marketplaceStorage = new MarketplaceStorage(tempDir);
-        likesStorage = new LikesStorage(tempDir);
-      }
-    } else {
-      marketplaceStorage = new MarketplaceStorage(tempDir);
-      likesStorage = new LikesStorage(tempDir);
-    }
-    await marketplaceStorage.initialize();
-    await likesStorage.initialize();
-
-    user = await createTestUser(authManager);
+    // Use server's shared instances to ensure tokens and items are valid
+    // Use unique emails to avoid conflicts between parallel test runs
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(7);
+    user = await createTestUser(authManager, `user-${timestamp}-${random}@test.com`);
     const item = await createTestMarketplaceItem(marketplaceStorage, {
       authorId: user.userId,
       type: 'build',
@@ -58,6 +27,9 @@ describe('Like API', () => {
 
   describe('POST /api/marketplace/:id/like', () => {
     it('likes item with auth', async () => {
+      // Wait for item to be available (handles database transaction timing)
+      await waitForItem(marketplaceStorage, itemId);
+
       const response = await request(app)
         .post(`/api/marketplace/${itemId}/like`)
         .set(getAuthHeader(user.token))
@@ -103,6 +75,9 @@ describe('Like API', () => {
 
   describe('GET /api/marketplace/:id/likes', () => {
     it('returns like count', async () => {
+      // Wait for item to be available (handles database transaction timing)
+      await waitForItem(marketplaceStorage, itemId);
+
       const response = await request(app)
         .get(`/api/marketplace/${itemId}/likes`)
         .expect(200);

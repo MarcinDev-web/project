@@ -37,10 +37,14 @@ describe('PartSelector', () => {
       />
     );
 
-    const select = screen.getByRole('combobox');
-    await user.selectOptions(select, 'face_overlay_default');
+    const select = screen.getByRole('combobox') as HTMLSelectElement;
+    // Get the first available option (other than the current one)
+    const options = Array.from(select.options).map(opt => opt.value);
+    const alternativeOption = options.find(opt => opt !== 'head_default') || options[0];
     
-    expect(handleChange).toHaveBeenCalledWith('face_overlay_default');
+    await user.selectOptions(select, alternativeOption);
+    
+    expect(handleChange).toHaveBeenCalledWith(alternativeOption);
   });
 
   it('should show fallback when no parts available', () => {

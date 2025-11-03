@@ -4,37 +4,12 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
-import { app } from '../../server';
-import { MarketplaceStorage } from '../../storage/MarketplaceStorage';
-import { MarketplaceStorageDB } from '../../storage/MarketplaceStorageDB';
-import { createTestMarketplaceItem } from '../helpers/testHelpers';
-import { createDbPool } from '../../lib/db';
-import type { Pool } from 'pg';
-import { promises as fs } from 'fs';
-import path from 'path';
-import os from 'os';
+import { app, marketplaceStorage } from '../../server';
+import { createTestMarketplaceItem, waitForItem } from '../helpers/testHelpers';
 
 describe('GET /api/marketplace/:id', () => {
-  let marketplaceStorage: MarketplaceStorage | MarketplaceStorageDB;
-  let dbPool: Pool | null = null;
-  let tempDir: string;
-
-  beforeEach(async () => {
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'forge-test-'));
-
-    if (process.env.DATABASE_URL) {
-      try {
-        dbPool = createDbPool();
-        marketplaceStorage = new MarketplaceStorageDB(dbPool);
-      } catch {
-        marketplaceStorage = new MarketplaceStorage(tempDir);
-      }
-    } else {
-      marketplaceStorage = new MarketplaceStorage(tempDir);
-    }
-    await marketplaceStorage.initialize();
-
-  });
+  // Use server's shared marketplaceStorage to ensure items are valid
+  // No setup needed - items are created per test
 
   it('returns item details by ID', async () => {
     const item = await createTestMarketplaceItem(marketplaceStorage, {
@@ -44,6 +19,9 @@ describe('GET /api/marketplace/:id', () => {
       description: 'A test build description',
       tags: ['test', 'build'],
     });
+
+    // Wait for item to be available (handles database transaction timing)
+    await waitForItem(marketplaceStorage, item.id);
 
     const response = await request(app)
       .get(`/api/marketplace/${item.id}`)
@@ -69,6 +47,9 @@ describe('GET /api/marketplace/:id', () => {
       title: 'Test Build',
     });
 
+    // Wait for item to be available (handles database transaction timing)
+    await waitForItem(marketplaceStorage, item.id);
+
     const response = await request(app)
       .get(`/api/marketplace/${item.id}`)
       .expect(200);
@@ -85,6 +66,9 @@ describe('GET /api/marketplace/:id', () => {
       description: 'Description',
       authorName: 'Author Name',
     });
+
+    // Wait for item to be available (handles database transaction timing)
+    await waitForItem(marketplaceStorage, item.id);
 
     const response = await request(app)
       .get(`/api/marketplace/${item.id}`)

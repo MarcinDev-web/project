@@ -98,16 +98,18 @@ export class MarketplaceStorageDB {
     return this.mapRowToItem(result.rows[0]!);
   }
 
-  async getItems(options: {
-    type?: 'build' | 'avatar';
-    authorId?: string;
-    tags?: string[];
-    public?: boolean;
-    limit?: number;
-    offset?: number;
-    search?: string;
-    sortBy?: 'newest' | 'popular' | 'downloads' | 'likes';
-  } = {}): Promise<MarketplaceItem[]> {
+  async getItems(
+    options: {
+      type?: 'build' | 'avatar';
+      authorId?: string;
+      tags?: string[];
+      public?: boolean;
+      limit?: number;
+      offset?: number;
+      search?: string;
+      sortBy?: 'newest' | 'popular' | 'downloads' | 'likes';
+    } = {}
+  ): Promise<MarketplaceItem[]> {
     const conditions: string[] = [];
     const params: unknown[] = [];
     let paramIndex = 1;
@@ -142,10 +144,10 @@ export class MarketplaceStorageDB {
       const searchQuery = options.search
         .trim()
         .split(/\s+/)
-        .map(word => word.replace(/[:'&!|()]/g, ''))
-        .filter(word => word.length > 0)
+        .map((word) => word.replace(/[:'&!|()]/g, ''))
+        .filter((word) => word.length > 0)
         .join(' & ');
-      
+
       if (searchQuery) {
         searchParamIndex = paramIndex;
         conditions.push(
@@ -216,7 +218,7 @@ export class MarketplaceStorageDB {
       price_amount: number | null;
     }>(query, params);
 
-    return result.rows.map(row => this.mapRowToItem(row));
+    return result.rows.map((row) => this.mapRowToItem(row));
   }
 
   async updateItem(
@@ -358,10 +360,9 @@ export class MarketplaceStorageDB {
   }
 
   async incrementDownloads(id: string): Promise<void> {
-    await this.pool.query(
-      'UPDATE marketplace_items SET downloads = downloads + 1 WHERE id = $1',
-      [id]
-    );
+    await this.pool.query('UPDATE marketplace_items SET downloads = downloads + 1 WHERE id = $1', [
+      id,
+    ]);
   }
 
   /**
@@ -399,7 +400,7 @@ export class MarketplaceStorageDB {
       likes: row.likes,
       public: row.public,
     };
-    
+
     if (row.description !== null) {
       item.description = row.description;
     }
@@ -415,7 +416,7 @@ export class MarketplaceStorageDB {
     if (row.forum_thread_id !== null && row.forum_thread_id !== undefined) {
       item.forumThreadId = row.forum_thread_id;
     }
-    
+
     return item;
   }
 }

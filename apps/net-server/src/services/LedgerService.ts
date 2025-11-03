@@ -1,7 +1,14 @@
 import crypto from 'crypto';
 import type { Transaction } from '@engine/economy';
 
-export type LedgerReason = 'PURCHASE' | 'FEE' | 'PAYOUT' | 'REFUND' | 'DEPOSIT' | 'WITHDRAW' | 'TRANSFER';
+export type LedgerReason =
+  | 'PURCHASE'
+  | 'FEE'
+  | 'PAYOUT'
+  | 'REFUND'
+  | 'DEPOSIT'
+  | 'WITHDRAW'
+  | 'TRANSFER';
 
 export interface LedgerEntryDto {
   id: string;
@@ -47,5 +54,3 @@ export class LedgerService {
     return this.entries.slice(start).reverse();
   }
 }
-
-

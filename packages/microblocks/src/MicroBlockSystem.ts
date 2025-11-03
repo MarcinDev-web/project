@@ -87,9 +87,8 @@ export class MicroBlockSystem {
     }
 
     // Mark remaining chunks as still dirty (will be processed next frame)
-    for (const chunk of dirtyChunks.slice(this.maxChunksPerFrame)) {
-      // Keep dirty flag, will be processed next frame
-    }
+    // Note: chunks beyond maxChunksPerFrame remain dirty and will be processed in subsequent frames
+    void dirtyChunks.slice(this.maxChunksPerFrame);
   }
 
   /**

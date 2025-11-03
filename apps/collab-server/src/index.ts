@@ -7,7 +7,10 @@ import { registerSessionRoutes } from './routes/session.js';
 import { createWsServer } from './ws/server.js';
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 4000;
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '').split(',').map(s => s.trim()).filter(Boolean);
+const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map((s) => s.trim())
+  .filter(Boolean);
 
 async function main(): Promise<void> {
   const app = Fastify({ logger: true });
@@ -30,11 +33,9 @@ async function main(): Promise<void> {
   registerSessionRoutes(app, pool);
   createWsServer(app, pool);
 
-  app.get('/health', async () => ({ status: 'ok' }));
+  app.get('/health', () => ({ status: 'ok' }));
 
   await app.listen({ port: PORT, host: '0.0.0.0' });
 }
 
 void main();
-
-

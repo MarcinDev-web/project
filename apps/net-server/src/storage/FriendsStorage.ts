@@ -32,13 +32,13 @@ export class FriendsStorage {
 
   async initialize(): Promise<void> {
     await fs.mkdir(this.dataDir, { recursive: true });
-    
+
     try {
       await fs.access(this.requestsFile);
     } catch {
       await fs.writeFile(this.requestsFile, JSON.stringify([], null, 2));
     }
-    
+
     try {
       await fs.access(this.relationsFile);
     } catch {
@@ -78,12 +78,12 @@ export class FriendsStorage {
     }
 
     const requests = await this.readRequests();
-    
+
     // Check if request already exists
     const existing = requests.find(
-      r => (r.fromUserId === fromUserId && r.toUserId === toUserId && r.status === 'pending')
+      (r) => r.fromUserId === fromUserId && r.toUserId === toUserId && r.status === 'pending'
     );
-    
+
     if (existing) {
       throw new Error('Friend request already sent');
     }
@@ -91,8 +91,9 @@ export class FriendsStorage {
     // Check if already friends
     const relations = await this.readRelations();
     const isFriend = relations.some(
-      r => (r.userId1 === fromUserId && r.userId2 === toUserId) ||
-           (r.userId1 === toUserId && r.userId2 === fromUserId)
+      (r) =>
+        (r.userId1 === fromUserId && r.userId2 === toUserId) ||
+        (r.userId1 === toUserId && r.userId2 === fromUserId)
     );
 
     if (isFriend) {
@@ -109,28 +110,26 @@ export class FriendsStorage {
 
     requests.push(request);
     await this.writeRequests(requests);
-    
+
     return request;
   }
 
   async getRequests(userId: string): Promise<FriendRequest[]> {
     const requests = await this.readRequests();
-    return requests.filter(
-      r => r.fromUserId === userId || r.toUserId === userId
-    );
+    return requests.filter((r) => r.fromUserId === userId || r.toUserId === userId);
   }
 
   async getPendingRequests(userId: string): Promise<FriendRequest[]> {
     const requests = await this.readRequests();
-    return requests.filter(
-      r => r.toUserId === userId && r.status === 'pending'
-    );
+    return requests.filter((r) => r.toUserId === userId && r.status === 'pending');
   }
 
   async acceptRequest(requestId: string, userId: string): Promise<boolean> {
     const requests = await this.readRequests();
-    const request = requests.find(r => r.id === requestId && r.toUserId === userId && r.status === 'pending');
-    
+    const request = requests.find(
+      (r) => r.id === requestId && r.toUserId === userId && r.status === 'pending'
+    );
+
     if (!request) {
       return false;
     }
@@ -153,30 +152,33 @@ export class FriendsStorage {
 
   async declineRequest(requestId: string, userId: string): Promise<boolean> {
     const requests = await this.readRequests();
-    const request = requests.find(r => r.id === requestId && r.toUserId === userId && r.status === 'pending');
-    
+    const request = requests.find(
+      (r) => r.id === requestId && r.toUserId === userId && r.status === 'pending'
+    );
+
     if (!request) {
       return false;
     }
 
     request.status = 'declined';
     await this.writeRequests(requests);
-    
+
     return true;
   }
 
   async getFriends(userId: string): Promise<string[]> {
     const relations = await this.readRelations();
     return relations
-      .filter(r => r.userId1 === userId || r.userId2 === userId)
-      .map(r => r.userId1 === userId ? r.userId2 : r.userId1);
+      .filter((r) => r.userId1 === userId || r.userId2 === userId)
+      .map((r) => (r.userId1 === userId ? r.userId2 : r.userId1));
   }
 
   async removeFriend(userId1: string, userId2: string): Promise<boolean> {
     const relations = await this.readRelations();
     const index = relations.findIndex(
-      r => (r.userId1 === userId1 && r.userId2 === userId2) ||
-           (r.userId1 === userId2 && r.userId2 === userId1)
+      (r) =>
+        (r.userId1 === userId1 && r.userId2 === userId2) ||
+        (r.userId1 === userId2 && r.userId2 === userId1)
     );
 
     if (index === -1) {
@@ -185,8 +187,7 @@ export class FriendsStorage {
 
     relations.splice(index, 1);
     await this.writeRelations(relations);
-    
+
     return true;
   }
 }
-

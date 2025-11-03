@@ -1,7 +1,8 @@
 /**
  * Simple logger utility.
+ * Logger is the centralized console output - console usage is intentional
  */
-
+/* eslint-disable no-console */
 export class Logger {
   static info(message: string, ...args: unknown[]): void {
     console.log(`[INFO] ${message}`, ...args);
@@ -23,3 +24,4 @@ export class Logger {
     console.debug(`[DEBUG] ${message}`, ...args);
   }
 }
+/* eslint-enable no-console */

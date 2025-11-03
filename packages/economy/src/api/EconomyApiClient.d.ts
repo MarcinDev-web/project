@@ -1,4 +1,4 @@
-import type { CartItem, CheckoutResponse, DepositWithdrawRequest, GetWalletResponse, ListLedgerResponse, TransferRequest } from './types';
+import type { CartItem, CheckoutResponse, DepositWithdrawRequest, GetWalletResponse, ListLedgerResponse, TransferRequest } from './types.js';
 export interface EconomyApiClientOptions {
     baseUrl?: string;
     getAuthToken?: () => string | null;

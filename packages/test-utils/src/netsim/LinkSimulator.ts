@@ -14,5 +14,3 @@ export class LinkSimulator {
     setTimeout(() => deliver(payload), delay);
   }
 }
-
-

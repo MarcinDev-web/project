@@ -1,7 +1,7 @@
 /**
  * Creator Economy - Rewards for creators based on player engagement
  */
-import { CurrencyManager } from '../index';
+import { CurrencyManager } from '../index.js';
 import type { TelemetryCollector } from '@engine/world-server';
 /**
  * Creator reward configuration

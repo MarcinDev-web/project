@@ -3,9 +3,9 @@
  * This demonstrates how to integrate the currency system with player entities.
  */
 
-import { CurrencyManager, CurrencyWallet, type CurrencyAmount } from '../index';
-import { CurrencyEventNames } from '../events';
-import type { CurrencyDepositedEvent, CurrencyTransferredEvent } from '../events';
+import { CurrencyManager, CurrencyWallet, type CurrencyAmount } from '../index.js';
+import { CurrencyEventNames } from '../events.js';
+import type { CurrencyDepositedEvent, CurrencyTransferredEvent } from '../events.js';
 
 /**
  * Example: Setting up currency system for a game world

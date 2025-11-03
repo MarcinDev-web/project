@@ -2,7 +2,7 @@
  * Example usage of the currency system in a game world.
  * This demonstrates how to integrate the currency system with player entities.
  */
-import { CurrencyManager, CurrencyWallet, type CurrencyAmount } from '../index';
+import { CurrencyManager, CurrencyWallet, type CurrencyAmount } from '../index.js';
 /**
  * Example: Setting up currency system for a game world
  */

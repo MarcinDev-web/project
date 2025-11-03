@@ -27,7 +27,10 @@ export interface CheckoutResult {
 
 interface IShopStorage {
   getItem(id: string): Promise<ShopItem | null>;
-  updateItem(id: string, updates: Partial<Omit<ShopItem, 'id' | 'createdAt' | 'updatedAt'>>): Promise<ShopItem | null>;
+  updateItem(
+    id: string,
+    updates: Partial<Omit<ShopItem, 'id' | 'createdAt' | 'updatedAt'>>
+  ): Promise<ShopItem | null>;
 }
 
 interface IAssetStorage {
@@ -36,7 +39,19 @@ interface IAssetStorage {
 
 interface IPurchaseStorage {
   isOwned(userId: string, itemId: string, itemType: PurchaseItemType): Promise<boolean>;
-  createPurchase(purchase: { userId: string; items: PurchaseItem[]; totalCost: CurrencyAmount; status: 'pending' }): Promise<{ id: string; userId: string; items: PurchaseItem[]; totalCost: CurrencyAmount; status: string; createdAt: number }>;
+  createPurchase(purchase: {
+    userId: string;
+    items: PurchaseItem[];
+    totalCost: CurrencyAmount;
+    status: 'pending';
+  }): Promise<{
+    id: string;
+    userId: string;
+    items: PurchaseItem[];
+    totalCost: CurrencyAmount;
+    status: string;
+    createdAt: number;
+  }>;
   updatePurchaseStatus(id: string, status: 'completed' | 'failed'): Promise<{ id: string } | null>;
 }
 
@@ -132,14 +147,17 @@ export class PurchaseService {
       // Check ownership
       const isOwned = await this.purchaseStorage.isOwned(userId, cartItem.itemId, cartItem.type);
       if (isOwned) {
-        errors.push(`You already own ${(item as ShopItem).name || (item as Asset).name || (item as MarketplaceItem).title}`);
+        errors.push(
+          `You already own ${(item as ShopItem).name || (item as Asset).name || (item as MarketplaceItem).title}`
+        );
         continue;
       }
 
       const currentTotal = totals.get(price.currency) ?? 0;
-      const multiplier = Number.isFinite(overrideMultiplier) && (overrideMultiplier as number) > 0
-        ? (overrideMultiplier as number)
-        : this.priceMultiplier;
+      const multiplier =
+        Number.isFinite(overrideMultiplier) && (overrideMultiplier as number) > 0
+          ? (overrideMultiplier as number)
+          : this.priceMultiplier;
       const adjusted = Math.max(0, price.amount * multiplier);
       totals.set(price.currency, currentTotal + adjusted * cartItem.quantity);
     }
@@ -167,7 +185,11 @@ export class PurchaseService {
   /**
    * Process checkout
    */
-  async checkout(userId: string, request: CheckoutRequest, overrideMultiplier?: number): Promise<CheckoutResult> {
+  async checkout(
+    userId: string,
+    request: CheckoutRequest,
+    overrideMultiplier?: number
+  ): Promise<CheckoutResult> {
     // Validate cart
     const { total, errors } = await this.calculateTotal(userId, request.items, overrideMultiplier);
 
@@ -244,11 +266,7 @@ export class PurchaseService {
 
     // Withdraw currency first (before creating purchase record)
     try {
-      this.currencyService.withdraw(
-        userId,
-        total,
-        `Purchase transaction`
-      );
+      this.currencyService.withdraw(userId, total, `Purchase transaction`);
     } catch (error) {
       return {
         success: false,
@@ -274,10 +292,17 @@ export class PurchaseService {
           if (pItem.type === 'marketplace-item') {
             const mpItem = await this.marketplaceStorage.getItem(pItem.itemId);
             if (mpItem && mpItem.authorId) {
-              const royaltyAmount = Math.max(0, Math.round(pItem.price.amount * 0.10 * 100) / 100);
+              const royaltyAmount = Math.max(0, Math.round(pItem.price.amount * 0.1 * 100) / 100);
               if (royaltyAmount > 0) {
-                const payout: CurrencyAmount = { currency: pItem.price.currency, amount: royaltyAmount };
-                this.currencyService.deposit(mpItem.authorId, payout, `Royalty payout for ${pItem.name}`);
+                const payout: CurrencyAmount = {
+                  currency: pItem.price.currency,
+                  amount: royaltyAmount,
+                };
+                this.currencyService.deposit(
+                  mpItem.authorId,
+                  payout,
+                  `Royalty payout for ${pItem.name}`
+                );
               }
             }
           }

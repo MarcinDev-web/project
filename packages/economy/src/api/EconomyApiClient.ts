@@ -6,7 +6,7 @@ import type {
   GetWalletResponse,
   ListLedgerResponse,
   TransferRequest,
-} from './types';
+} from './types.js';
 
 export interface EconomyApiClientOptions {
   baseUrl?: string; // e.g. '/api'

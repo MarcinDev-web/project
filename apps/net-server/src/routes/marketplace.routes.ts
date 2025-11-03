@@ -71,7 +71,7 @@ export function createMarketplaceRoutes(deps: RouteDependencies): Router {
       // Add online player count and liked status for each item
       const userId = await getUserIdFromToken(req.headers.authorization);
       const itemsWithMetadata = await Promise.all(
-        items.map(async item => {
+        items.map(async (item) => {
           const playersOnline = gameSessionTracker.getPlayerCount(item.id);
           let liked: boolean | undefined;
           if (userId) {
@@ -118,7 +118,7 @@ export function createMarketplaceRoutes(deps: RouteDependencies): Router {
         offset: 0,
       });
 
-      const paidItems = allItems.filter(item => item.price !== undefined);
+      const paidItems = allItems.filter((item) => item.price !== undefined);
 
       // Apply pagination
       const paginatedItems = paidItems.slice(offset, offset + limit);
@@ -170,7 +170,9 @@ export function createMarketplaceRoutes(deps: RouteDependencies): Router {
       if (body.price) {
         const min = ECONOMY_MIN_PRICE[body.price.currency] ?? 0;
         if (!(Number.isFinite(body.price.amount) && body.price.amount >= min)) {
-          return res.status(400).json({ error: `Price below minimum for ${body.price.currency}: ${min}` });
+          return res
+            .status(400)
+            .json({ error: `Price below minimum for ${body.price.currency}: ${min}` });
         }
       }
 
@@ -199,7 +201,11 @@ export function createMarketplaceRoutes(deps: RouteDependencies): Router {
         const feeAmount = ECONOMY_LISTING_FEE[body.price.currency] ?? 0;
         if (feeAmount > 0) {
           try {
-            currencyService.withdraw(req.user.id, { currency: body.price.currency, amount: feeAmount }, 'Listing fee');
+            currencyService.withdraw(
+              req.user.id,
+              { currency: body.price.currency, amount: feeAmount },
+              'Listing fee'
+            );
           } catch (e) {
             return res.status(400).json({ error: 'Insufficient balance for listing fee' });
           }
@@ -246,7 +252,8 @@ export function createMarketplaceRoutes(deps: RouteDependencies): Router {
    * POST /api/marketplace/:id/resale
    * Create or update a secondary resale listing for the current user.
    */
-  router.post('/:id/resale',
+  router.post(
+    '/:id/resale',
     authMiddleware,
     economyLimiter,
     validateParams(marketplaceItemIdParamSchema),
@@ -269,13 +276,16 @@ export function createMarketplaceRoutes(deps: RouteDependencies): Router {
         // Price floor
         const min = ECONOMY_MIN_PRICE[body.price.currency] ?? 0;
         if (!(Number.isFinite(body.price.amount) && body.price.amount >= min)) {
-          return res.status(400).json({ error: `Price below minimum for ${body.price.currency}: ${min}` });
+          return res
+            .status(400)
+            .json({ error: `Price below minimum for ${body.price.currency}: ${min}` });
         }
 
         const list = resaleListings.get(id) ?? [];
         const idx = list.findIndex((l) => l.sellerId === req.user!.id);
         const newListing = { sellerId: req.user.id, price: body.price, createdAt: Date.now() };
-        if (idx >= 0) list[idx] = newListing; else list.push(newListing);
+        if (idx >= 0) list[idx] = newListing;
+        else list.push(newListing);
         resaleListings.set(id, list);
         res.json({ success: true, listing: newListing });
       } catch (error) {
@@ -289,70 +299,102 @@ export function createMarketplaceRoutes(deps: RouteDependencies): Router {
    * POST /api/marketplace/:id/buy-resale
    * Buy a resale listing from a specific seller.
    */
-  router.post('/:id/buy-resale', authMiddleware, economyLimiter, async (req: AuthRequest, res: Response) => {
-    try {
-      if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
-      const buyerId = req.user.id;
-      const { id } = req.params;
-      if (!id) {
-        return res.status(400).json({ error: 'Item ID required' });
-      }
-      const body = req.body as { sellerId: string };
-      if (!body?.sellerId || body.sellerId === buyerId) {
-        return res.status(400).json({ error: 'Invalid seller' });
-      }
-
-      const item = await marketplaceStorage.getItem(id);
-      if (!item) return res.status(404).json({ error: 'Item not found' });
-
-      // Find listing
-      const list = resaleListings.get(id) ?? [];
-      const listing = list.find((l) => l.sellerId === body.sellerId);
-      if (!listing) return res.status(404).json({ error: 'Listing not found' });
-
-      // Validate seller still owns the item
-      const sellerOwns = await (purchaseStorage as any).isOwned(body.sellerId, id, 'marketplace-item');
-      if (!sellerOwns) return res.status(400).json({ error: 'Seller no longer owns item' });
-
-      // Check buyer balance and withdraw
+  router.post(
+    '/:id/buy-resale',
+    authMiddleware,
+    economyLimiter,
+    async (req: AuthRequest, res: Response) => {
       try {
-        currencyService.withdraw(buyerId, listing.price, `Secondary purchase ${id}`);
-      } catch (e) {
-        return res.status(400).json({ error: 'Insufficient balance' });
-      }
-
-      // Compute fees: platform fee + creator royalty (10%)
-      const royaltyBps = 1000; // 10%
-      const platformFeeBps = ECONOMY_PLATFORM_FEE_BPS;
-      const amount = listing.price.amount;
-      const currency = listing.price.currency;
-      const royalty = Math.round((amount * royaltyBps) / 10000 * 100) / 100;
-      const platformFee = Math.round((amount * platformFeeBps) / 10000 * 100) / 100;
-      const sellerProceeds = Math.max(0, Math.round((amount - royalty - platformFee) * 100) / 100);
-
-      // Payouts
-      if (royalty > 0) currencyService.deposit(item.authorId, { currency, amount: royalty }, `Secondary royalty ${id}`);
-      if (platformFee > 0) currencyService.deposit('platform', { currency, amount: platformFee }, `Secondary platform fee ${id}`);
-      if (sellerProceeds > 0) currencyService.deposit(body.sellerId, { currency, amount: sellerProceeds }, `Secondary sale proceeds ${id}`);
-
-      // Transfer ownership
-      if ('transferOwnership' in (purchaseStorage as any)) {
-        const ok = await (purchaseStorage as any).transferOwnership(id, 'marketplace-item', body.sellerId, buyerId);
-        if (!ok) {
-          return res.status(400).json({ error: 'Ownership transfer failed' });
+        if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+        const buyerId = req.user.id;
+        const { id } = req.params;
+        if (!id) {
+          return res.status(400).json({ error: 'Item ID required' });
         }
+        const body = req.body as { sellerId: string };
+        if (!body?.sellerId || body.sellerId === buyerId) {
+          return res.status(400).json({ error: 'Invalid seller' });
+        }
+
+        const item = await marketplaceStorage.getItem(id);
+        if (!item) return res.status(404).json({ error: 'Item not found' });
+
+        // Find listing
+        const list = resaleListings.get(id) ?? [];
+        const listing = list.find((l) => l.sellerId === body.sellerId);
+        if (!listing) return res.status(404).json({ error: 'Listing not found' });
+
+        // Validate seller still owns the item
+        const sellerOwns = await (purchaseStorage as any).isOwned(
+          body.sellerId,
+          id,
+          'marketplace-item'
+        );
+        if (!sellerOwns) return res.status(400).json({ error: 'Seller no longer owns item' });
+
+        // Check buyer balance and withdraw
+        try {
+          currencyService.withdraw(buyerId, listing.price, `Secondary purchase ${id}`);
+        } catch (e) {
+          return res.status(400).json({ error: 'Insufficient balance' });
+        }
+
+        // Compute fees: platform fee + creator royalty (10%)
+        const royaltyBps = 1000; // 10%
+        const platformFeeBps = ECONOMY_PLATFORM_FEE_BPS;
+        const amount = listing.price.amount;
+        const currency = listing.price.currency;
+        const royalty = Math.round(((amount * royaltyBps) / 10000) * 100) / 100;
+        const platformFee = Math.round(((amount * platformFeeBps) / 10000) * 100) / 100;
+        const sellerProceeds = Math.max(
+          0,
+          Math.round((amount - royalty - platformFee) * 100) / 100
+        );
+
+        // Payouts
+        if (royalty > 0)
+          currencyService.deposit(
+            item.authorId,
+            { currency, amount: royalty },
+            `Secondary royalty ${id}`
+          );
+        if (platformFee > 0)
+          currencyService.deposit(
+            'platform',
+            { currency, amount: platformFee },
+            `Secondary platform fee ${id}`
+          );
+        if (sellerProceeds > 0)
+          currencyService.deposit(
+            body.sellerId,
+            { currency, amount: sellerProceeds },
+            `Secondary sale proceeds ${id}`
+          );
+
+        // Transfer ownership
+        if ('transferOwnership' in (purchaseStorage as any)) {
+          const ok = await (purchaseStorage as any).transferOwnership(
+            id,
+            'marketplace-item',
+            body.sellerId,
+            buyerId
+          );
+          if (!ok) {
+            return res.status(400).json({ error: 'Ownership transfer failed' });
+          }
+        }
+
+        // Remove listing
+        const newList = (resaleListings.get(id) ?? []).filter((l) => l.sellerId !== body.sellerId);
+        resaleListings.set(id, newList);
+
+        res.json({ success: true });
+      } catch (error) {
+        console.error('Buy resale error:', error);
+        res.status(500).json({ error: 'Failed to buy resale listing' });
       }
-
-      // Remove listing
-      const newList = (resaleListings.get(id) ?? []).filter((l) => l.sellerId !== body.sellerId);
-      resaleListings.set(id, newList);
-
-      res.json({ success: true });
-    } catch (error) {
-      console.error('Buy resale error:', error);
-      res.status(500).json({ error: 'Failed to buy resale listing' });
     }
-  });
+  );
 
   /**
    * GET /api/marketplace/avatars
@@ -375,7 +417,7 @@ export function createMarketplaceRoutes(deps: RouteDependencies): Router {
       // Add online player count and liked status for each item
       const userId = await getUserIdFromToken(req.headers.authorization);
       const itemsWithMetadata = await Promise.all(
-        items.map(async item => {
+        items.map(async (item) => {
           const playersOnline = gameSessionTracker.getPlayerCount(item.id);
           let liked: boolean | undefined;
           if (userId) {
@@ -408,8 +450,13 @@ export function createMarketplaceRoutes(deps: RouteDependencies): Router {
    * GET /api/marketplace/search
    * Search marketplace items with full-text search.
    */
-  router.get('/search',
-    validateQuery(searchQuerySchema.partial().extend({ q: z.string().min(1, 'Query parameter "q" is required') })),
+  router.get(
+    '/search',
+    validateQuery(
+      searchQuerySchema
+        .partial()
+        .extend({ q: z.string().min(1, 'Query parameter "q" is required') })
+    ),
     async (req: Request, res: Response) => {
       try {
         const query = req.query as z.infer<typeof searchQuerySchema> & { q: string };
@@ -425,8 +472,13 @@ export function createMarketplaceRoutes(deps: RouteDependencies): Router {
           sortBy = 'newest';
         } else if (sortByValue && sortByValue !== 'price') {
           const validSortBy = sortByValue as string;
-          if (validSortBy === 'newest' || validSortBy === 'popular' || validSortBy === 'downloads' || validSortBy === 'likes') {
-            sortBy = validSortBy as 'newest' | 'popular' | 'downloads' | 'likes';
+          if (
+            validSortBy === 'newest' ||
+            validSortBy === 'popular' ||
+            validSortBy === 'downloads' ||
+            validSortBy === 'likes'
+          ) {
+            sortBy = validSortBy;
           }
         }
 
@@ -443,7 +495,7 @@ export function createMarketplaceRoutes(deps: RouteDependencies): Router {
         // Add online player count and liked status for each item
         const userId = await getUserIdFromToken(req.headers.authorization);
         const itemsWithMetadata = await Promise.all(
-          items.map(async item => {
+          items.map(async (item) => {
             const playersOnline = gameSessionTracker.getPlayerCount(item.id);
             let liked: boolean | undefined;
             if (userId) {
@@ -560,12 +612,7 @@ export function createMarketplaceRoutes(deps: RouteDependencies): Router {
         try {
           const item = await marketplaceStorage.getItem(id);
           if (item) {
-            await generateAndSaveThumbnail(
-              THUMBNAIL_DIR,
-              item.id,
-              item.title,
-              item.tags
-            );
+            await generateAndSaveThumbnail(THUMBNAIL_DIR, item.id, item.title, item.tags);
             // Update item with thumbnail URL if missing
             if (!item.thumbnailUrl) {
               await marketplaceStorage.updateItem(item.id, {
@@ -722,7 +769,8 @@ export function createMarketplaceRoutes(deps: RouteDependencies): Router {
    * POST /api/marketplace
    * Publish item to marketplace (auth required).
    */
-  router.post('/',
+  router.post(
+    '/',
     authMiddleware,
     publishLimiter,
     bodySizeLimit(BodySizeLimits.MARKETPLACE_PUBLISH),
@@ -734,7 +782,9 @@ export function createMarketplaceRoutes(deps: RouteDependencies): Router {
         }
 
         // Sanitize the body (HTML content)
-        const sanitizedBody = sanitizeMarketplacePublishRequest(req.body as Record<string, unknown>);
+        const sanitizedBody = sanitizeMarketplacePublishRequest(
+          req.body as Record<string, unknown>
+        );
 
         const body = sanitizedBody as z.infer<typeof publishItemSchema> & {
           thumbnailUrl?: string;
@@ -750,17 +800,20 @@ export function createMarketplaceRoutes(deps: RouteDependencies): Router {
             await client.query('BEGIN');
 
             // Create marketplace item within transaction
-            const item = await marketplaceStorage.createItem({
-              type: body.type,
-              title: body.title,
-              description: body.description ?? '',
-              authorId: req.user.id,
-              authorName: user?.email ?? '',
-              thumbnailUrl: body.thumbnailUrl ?? '',
-              fileUrl: body.fileUrl,
-              tags: body.tags ?? [],
-              public: true,
-            }, client);
+            const item = await marketplaceStorage.createItem(
+              {
+                type: body.type,
+                title: body.title,
+                description: body.description ?? '',
+                authorId: req.user.id,
+                authorName: user?.email ?? '',
+                thumbnailUrl: body.thumbnailUrl ?? '',
+                fileUrl: body.fileUrl,
+                tags: body.tags ?? [],
+                public: true,
+              },
+              client
+            );
 
             // Save build data within transaction if provided
             if (body.type === 'build' && body.buildData && buildStorage) {
@@ -819,7 +872,14 @@ export function createMarketplaceRoutes(deps: RouteDependencies): Router {
               console.error('Failed to rollback transaction:', rollbackError);
             });
             // Wrap database errors in DatabaseError
-            if (error instanceof Error && !(error instanceof ValidationErrorClass || error instanceof BuildDataErrorClass || error instanceof PayloadTooLargeErrorClass)) {
+            if (
+              error instanceof Error &&
+              !(
+                error instanceof ValidationErrorClass ||
+                error instanceof BuildDataErrorClass ||
+                error instanceof PayloadTooLargeErrorClass
+              )
+            ) {
               throw new DatabaseErrorClass('Database transaction failed', error);
             }
             throw error;
@@ -1106,4 +1166,3 @@ export function createMarketplaceRoutes(deps: RouteDependencies): Router {
 
   return router;
 }
-

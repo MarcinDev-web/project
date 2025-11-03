@@ -67,5 +67,3 @@ export async function ensureSchema(pool: Pool): Promise<void> {
     client.release();
   }
 }
-
-

@@ -4,13 +4,7 @@ import { randomBytes } from 'node:crypto';
 import { UserStorage } from './UserStorage';
 import { TokenBlacklistService } from './TokenBlacklistService';
 import { securityLogger } from '../logging/SecurityLogger';
-import type {
-  User,
-  PublicUser,
-  Session,
-  JWTPayload,
-  AuthResponse,
-} from '../types/auth';
+import type { User, PublicUser, Session, JWTPayload, AuthResponse } from '../types/auth';
 import type { Pool } from 'pg';
 
 // Validate JWT_SECRET in production
@@ -23,7 +17,9 @@ if (isProduction && (!process.env.JWT_SECRET || JWT_SECRET === 'change-me-in-pro
 }
 
 if (!isProduction && JWT_SECRET === 'change-me-in-production') {
-  console.warn('⚠️  WARNING: Using default JWT_SECRET. Set JWT_SECRET environment variable for production.');
+  console.warn(
+    '⚠️  WARNING: Using default JWT_SECRET. Set JWT_SECRET environment variable for production.'
+  );
 }
 
 // Short-lived access tokens for better security (15 minutes)
@@ -38,7 +34,10 @@ const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
 export class AuthManager {
   private readonly userStorage: UserStorage;
   private readonly tokenBlacklist: TokenBlacklistService;
-  private readonly failedLoginAttempts = new Map<string, { count: number; lockoutUntil?: number }>(); // email -> attempts
+  private readonly failedLoginAttempts = new Map<
+    string,
+    { count: number; lockoutUntil?: number }
+  >(); // email -> attempts
   private readonly ACCOUNT_LOCKOUT_THRESHOLD = 5; // Lock after 5 failed attempts
   private readonly ACCOUNT_LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes
 
@@ -157,19 +156,19 @@ export class AuthManager {
   async verifyToken(token: string): Promise<User | null> {
     try {
       const payload = jwt.verify(token, JWT_SECRET) as JWTPayload;
-      
+
       // Check token blacklist (persistent)
       if (payload.jti && this.tokenBlacklist.isBlacklisted(payload.jti)) {
         return null;
       }
-      
+
       const user = await this.userStorage.findUserById(payload.userId);
-      
+
       // Check if user exists and is active
       if (!user || user.active === false) {
         return null;
       }
-      
+
       return user;
     } catch (error) {
       return null;
@@ -183,14 +182,14 @@ export class AuthManager {
   async refreshSession(refreshToken: string): Promise<Session | null> {
     try {
       const payload = jwt.verify(refreshToken, JWT_REFRESH_SECRET) as JWTPayload;
-      
+
       // Check token blacklist (persistent)
       if (payload.jti && this.tokenBlacklist.isBlacklisted(payload.jti)) {
         return null;
       }
-      
+
       const user = await this.userStorage.findUserById(payload.userId);
-      
+
       // Check if user exists and is active
       if (!user || user.active === false) {
         return null;
@@ -215,7 +214,7 @@ export class AuthManager {
       return null;
     }
   }
-  
+
   /**
    * Revoke a token by adding its jti to the persistent blacklist.
    */
@@ -227,7 +226,11 @@ export class AuthManager {
         const expiresAt = decoded.exp ? decoded.exp * 1000 : Date.now() + 7 * 24 * 60 * 60 * 1000; // Default 7 days
         await this.tokenBlacklist.addToken(decoded.jti, expiresAt);
         if (userId || decoded.userId) {
-          securityLogger.logTokenRevoked(userId || decoded.userId, decoded.jti, 'manual_revocation');
+          securityLogger.logTokenRevoked(
+            userId || decoded.userId,
+            decoded.jti,
+            'manual_revocation'
+          );
         }
         return true;
       }
@@ -236,26 +239,28 @@ export class AuthManager {
       return false;
     }
   }
-  
+
   /**
    * Verify token and return expiration time (for WebSocket re-verification).
    */
-  async verifyTokenWithExpiration(token: string): Promise<{ user: User | null; expiresAt: number | null }> {
+  async verifyTokenWithExpiration(
+    token: string
+  ): Promise<{ user: User | null; expiresAt: number | null }> {
     try {
       const payload = jwt.verify(token, JWT_SECRET) as JWTPayload;
-      
+
       // Check token blacklist (persistent)
       if (payload.jti && this.tokenBlacklist.isBlacklisted(payload.jti)) {
         return { user: null, expiresAt: null };
       }
-      
+
       const user = await this.userStorage.findUserById(payload.userId);
-      
+
       // Check if user exists and is active
       if (!user || user.active === false) {
         return { user: null, expiresAt: null };
       }
-      
+
       return {
         user,
         expiresAt: payload.exp ? payload.exp * 1000 : null, // Convert to milliseconds
@@ -287,7 +292,7 @@ export class AuthManager {
     // Generate unique JWT IDs for token revocation
     const accessJti = randomBytes(16).toString('hex');
     const refreshJti = randomBytes(16).toString('hex');
-    
+
     const accessPayload: JWTPayload = {
       userId: user.id,
       email: user.email,
@@ -321,7 +326,7 @@ export class AuthManager {
       userId: user.id,
     };
   }
-  
+
   /**
    * Validate password strength.
    */
@@ -364,4 +369,3 @@ export class AuthManager {
     };
   }
 }
-

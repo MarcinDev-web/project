@@ -51,10 +51,10 @@ export interface SnapshotMessage {
 export const Channels = {
   control: 0,
   state: 1,
-  chat: 2
+  chat: 2,
 } as const;
 
-export type ChannelId = typeof Channels[keyof typeof Channels];
+export type ChannelId = (typeof Channels)[keyof typeof Channels];
 
 // WebRTC signaling messages
 export interface WebRTCOffer {
@@ -87,6 +87,3 @@ export * from './auth/PoP.js';
 export * from './bitstream/BitWriter.js';
 export * from './bitstream/BitReader.js';
 export * from './bitstream/VarInt.js';
-
-
-

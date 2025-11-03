@@ -17,7 +17,9 @@ export interface Component {
 
 /**
  * Component class constructor type.
+ * Component constructors can have any signature
  */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 export type ComponentClass<T extends Component = Component> = new (...args: any[]) => T;
 
 /**

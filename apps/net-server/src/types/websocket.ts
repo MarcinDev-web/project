@@ -383,4 +383,3 @@ export interface CollaborationSession {
   createdAt: number;
   users: Map<string, PublicUser>; // userId -> user
 }
-

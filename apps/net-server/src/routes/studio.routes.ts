@@ -64,7 +64,10 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
       net30 = rev.net;
     } else {
       // Compute quickly if not in cache
-      const allPurchases = await purchaseStorage.getPurchases({ status: 'completed', limit: 100000 });
+      const allPurchases = await purchaseStorage.getPurchases({
+        status: 'completed',
+        limit: 100000,
+      });
       const since = Date.now() - 30 * 24 * 60 * 60 * 1000;
       for (const p of allPurchases) {
         if (p.createdAt < since) continue;
@@ -87,14 +90,21 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     const since90 = now - 90 * 24 * 60 * 60 * 1000;
     const since30 = now - 30 * 24 * 60 * 60 * 1000;
     const builds90 = await marketplaceStorage.getItems({ authorId: userId, type: 'build' });
-    const releases90 = builds90.filter(b => b.createdAt && b.createdAt >= since90).length;
-    const userProjects = await studioProjectsStorage.listProjects(userId, { limit: 10000, offset: 0 });
-    const updates30 = userProjects.filter(p => p.updatedAt >= since30).length;
+    const releases90 = builds90.filter((b) => b.createdAt && b.createdAt >= since90).length;
+    const userProjects = await studioProjectsStorage.listProjects(userId, {
+      limit: 10000,
+      offset: 0,
+    });
+    const updates30 = userProjects.filter((p) => p.updatedAt >= since30).length;
     const cadenceTarget = 2;
-    const shippingCadence = Math.min(100, Math.round(((releases90 / 3 + updates30 / (cadenceTarget || 1)) / 2) * 100));
+    const shippingCadence = Math.min(
+      100,
+      Math.round(((releases90 / 3 + updates30 / (cadenceTarget || 1)) / 2) * 100)
+    );
 
     // CustomerLove using likes/downloads ratio last 30d
-    let likes = 0; let downloads = 0;
+    let likes = 0;
+    let downloads = 0;
     for (const b of builds90) {
       if (!b.createdAt || b.createdAt < since30) continue;
       likes += b.likes || 0;
@@ -105,30 +115,36 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
 
     // PortfolioBreadth based on presence of both builds and other assets
     const allItems = await marketplaceStorage.getItems({ authorId: userId });
-    const gamesCnt = allItems.filter(i => i.type === 'build').length;
-    const assetsCnt = allItems.filter(i => i.type !== 'build').length;
-    const breadth = gamesCnt > 0 && assetsCnt > 0 ? 1 : (gamesCnt + assetsCnt > 0 ? 0.6 : 0);
+    const gamesCnt = allItems.filter((i) => i.type === 'build').length;
+    const assetsCnt = allItems.filter((i) => i.type !== 'build').length;
+    const breadth = gamesCnt > 0 && assetsCnt > 0 ? 1 : gamesCnt + assetsCnt > 0 ? 0.6 : 0;
     const portfolioBreadth = Math.round(breadth * 100);
 
     // CommunityImpact (placeholder 0 until we track followers/comments)
     const communityImpact = 0;
 
     const score = Math.round(
-      0.40 * revenueVelocity +
-      0.25 * shippingCadence +
-      0.20 * customerLove +
-      0.10 * portfolioBreadth +
-      0.05 * communityImpact
+      0.4 * revenueVelocity +
+        0.25 * shippingCadence +
+        0.2 * customerLove +
+        0.1 * portfolioBreadth +
+        0.05 * communityImpact
     );
 
     return {
       score,
-      breakdown: { revenueVelocity, shippingCadence, customerLove, portfolioBreadth, communityImpact },
+      breakdown: {
+        revenueVelocity,
+        shippingCadence,
+        customerLove,
+        portfolioBreadth,
+        communityImpact,
+      },
     };
   }
 
   // STUDIO PROJECTS ROUTES
-  router.get('/studio/projects', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.get('/projects', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -148,7 +164,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.get('/studio/projects/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.get('/projects/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -174,7 +190,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.post('/studio/projects', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.post('/projects', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -214,7 +230,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.put('/studio/projects/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.put('/projects/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -248,7 +264,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.delete('/studio/projects/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.delete('/projects/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -274,80 +290,90 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.post('/studio/projects/:id/publish', authMiddleware, async (req: AuthRequest, res: Response) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+  router.post(
+    '/studio/projects/:id/publish',
+    authMiddleware,
+    async (req: AuthRequest, res: Response) => {
+      try {
+        if (!req.user) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const { id } = req.params;
+        if (!id) {
+          return res.status(400).json({ error: 'Project ID required' });
+        }
+
+        const body = req.body as {
+          title: string;
+          description?: string;
+          tags?: string[];
+          price?: { currency: string; amount: number };
+        };
+
+        if (!body.title || typeof body.title !== 'string') {
+          return res.status(400).json({ error: 'Title is required for publishing' });
+        }
+
+        const project = await studioProjectsStorage.getProject(req.user.id, id);
+        if (!project) {
+          return res.status(404).json({ error: 'Project not found' });
+        }
+
+        const profile = await profileStorage.getProfile(req.user.id);
+        const authorName = profile?.displayName || req.user.email;
+
+        const marketplaceId = `build_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
+        const marketplaceItem: Omit<
+          MarketplaceItem,
+          'id' | 'createdAt' | 'updatedAt' | 'downloads' | 'likes'
+        > = {
+          type: 'build' as const,
+          title: body.title,
+          ...(body.description && { description: body.description }),
+          ...(project.description && !body.description && { description: project.description }),
+          authorId: req.user.id,
+          ...(authorName && { authorName }),
+          ...(project.thumbnailUrl && { thumbnailUrl: project.thumbnailUrl }),
+          fileUrl: '',
+          tags: body.tags || project.tags || [],
+          public: true,
+          ...(body.price && { price: body.price }),
+        };
+
+        await marketplaceStorage.createItem(marketplaceItem);
+
+        if (buildStorage) {
+          await buildStorage.saveBuild(marketplaceId, project.projectData);
+        }
+
+        await studioProjectsStorage.updateProject(req.user.id, id, { isPublished: true });
+
+        res.status(201).json({
+          marketplaceItem,
+          project,
+        });
+      } catch (error) {
+        console.error('Publish studio project error:', error);
+        res.status(500).json({
+          error: 'Failed to publish project',
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
-
-      const { id } = req.params;
-      if (!id) {
-        return res.status(400).json({ error: 'Project ID required' });
-      }
-
-      const body = req.body as {
-        title: string;
-        description?: string;
-        tags?: string[];
-        price?: { currency: string; amount: number };
-      };
-
-      if (!body.title || typeof body.title !== 'string') {
-        return res.status(400).json({ error: 'Title is required for publishing' });
-      }
-
-      const project = await studioProjectsStorage.getProject(req.user.id, id);
-      if (!project) {
-        return res.status(404).json({ error: 'Project not found' });
-      }
-
-      const profile = await profileStorage.getProfile(req.user.id);
-      const authorName = profile?.displayName || req.user.email;
-
-      const marketplaceId = `build_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-      const marketplaceItem: Omit<MarketplaceItem, 'id' | 'createdAt' | 'updatedAt' | 'downloads' | 'likes'> = {
-        type: 'build' as const,
-        title: body.title,
-        ...(body.description && { description: body.description }),
-        ...(project.description && !body.description && { description: project.description }),
-        authorId: req.user.id,
-        ...(authorName && { authorName }),
-        ...(project.thumbnailUrl && { thumbnailUrl: project.thumbnailUrl }),
-        fileUrl: '',
-        tags: body.tags || project.tags || [],
-        public: true,
-        ...(body.price && { price: body.price }),
-      };
-
-      await marketplaceStorage.createItem(marketplaceItem);
-
-      if (buildStorage) {
-        await buildStorage.saveBuild(marketplaceId, project.projectData);
-      }
-
-      await studioProjectsStorage.updateProject(req.user.id, id, { isPublished: true });
-
-      res.status(201).json({
-        marketplaceItem,
-        project,
-      });
-    } catch (error) {
-      console.error('Publish studio project error:', error);
-      res.status(500).json({
-        error: 'Failed to publish project',
-        message: error instanceof Error ? error.message : String(error),
-      });
     }
-  });
+  );
 
-  router.get('/studio/stats', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.get('/stats', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
       }
 
       const counts = await studioProjectsStorage.countProjects(req.user.id);
-      const userBuilds = await marketplaceStorage.getItems({ authorId: req.user.id, type: 'build' });
+      const userBuilds = await marketplaceStorage.getItems({
+        authorId: req.user.id,
+        type: 'build',
+      });
       let totalViews = 0;
       let totalDownloads = 0;
       let totalLikes = 0;
@@ -371,7 +397,10 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
       const revCached = cacheGet<any>(`rev:${req.user.id}:30`);
       let netRevenue30d = revCached?.net ?? 0;
       if (revCached == null) {
-        const allPurchases = await purchaseStorage.getPurchases({ status: 'completed', limit: 100000 });
+        const allPurchases = await purchaseStorage.getPurchases({
+          status: 'completed',
+          limit: 100000,
+        });
         const since = Date.now() - 30 * 24 * 60 * 60 * 1000;
         for (const p of allPurchases) {
           if (p.createdAt < since) continue;
@@ -395,17 +424,32 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.get('/studio/leaderboard', async (req: Request, res: Response) => {
+  router.get('/leaderboard', async (req: Request, res: Response) => {
     try {
-      const metric = (req.query.metric as 'views' | 'downloads' | 'likes' | 'projects' | 'revenue' | 'score' | 'growth') || 'views';
+      const metric =
+        (req.query.metric as
+          | 'views'
+          | 'downloads'
+          | 'likes'
+          | 'projects'
+          | 'revenue'
+          | 'score'
+          | 'growth') || 'views';
       const period = (req.query.period as 'all' | 'week' | 'month') || 'all';
       const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 100;
 
       const allBuilds = await marketplaceStorage.getItems({ type: 'build' });
-      
+
       const userStats = new Map<
         string,
-        { userId: string; userName?: string; views: number; downloads: number; likes: number; projects: number }
+        {
+          userId: string;
+          userName?: string;
+          views: number;
+          downloads: number;
+          likes: number;
+          projects: number;
+        }
       >();
 
       for (const build of allBuilds) {
@@ -452,7 +496,10 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
           );
           for (const r of rows.rows) revenueByAuthor.set(r.author_id, Number(r.gross) * 0.9);
         } else {
-          const allPurchases = await purchaseStorage.getPurchases({ status: 'completed', limit: 100000 });
+          const allPurchases = await purchaseStorage.getPurchases({
+            status: 'completed',
+            limit: 100000,
+          });
           const since = Date.now() - days * 24 * 60 * 60 * 1000;
           for (const p of allPurchases) {
             if (p.createdAt < since) continue;
@@ -484,10 +531,16 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
             const map = new Map<string, { cur: number; prev: number }>();
             for (const r of rows.rows) {
               const m = map.get(r.author_id) || { cur: 0, prev: 0 };
-              if (r.period === 'cur') m.cur = Number(r.gross) * 0.9; else m.prev = Number(r.gross) * 0.9;
+              if (r.period === 'cur') m.cur = Number(r.gross) * 0.9;
+              else m.prev = Number(r.gross) * 0.9;
               map.set(r.author_id, m);
             }
-            growthByAuthor = new Map(Array.from(map.entries()).map(([k, v]) => [k, v.prev > 0 ? (v.cur / v.prev) - 1 : (v.cur > 0 ? 1 : 0)]));
+            growthByAuthor = new Map(
+              Array.from(map.entries()).map(([k, v]) => [
+                k,
+                v.prev > 0 ? v.cur / v.prev - 1 : v.cur > 0 ? 1 : 0,
+              ])
+            );
           } else {
             const all = await purchaseStorage.getPurchases({ status: 'completed', limit: 100000 });
             const now = Date.now();
@@ -504,15 +557,21 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
                 if (!mp) continue;
                 const rec = map.get(mp.authorId) || { cur: 0, prev: 0 };
                 const val = Number(it.price.amount) * 0.9;
-                if (inCur) rec.cur += val; else if (inPrev) rec.prev += val;
+                if (inCur) rec.cur += val;
+                else if (inPrev) rec.prev += val;
                 map.set(mp.authorId, rec);
               }
             }
-            growthByAuthor = new Map(Array.from(map.entries()).map(([k, v]) => [k, v.prev > 0 ? (v.cur / v.prev) - 1 : (v.cur > 0 ? 1 : 0)]));
+            growthByAuthor = new Map(
+              Array.from(map.entries()).map(([k, v]) => [
+                k,
+                v.prev > 0 ? v.cur / v.prev - 1 : v.cur > 0 ? 1 : 0,
+              ])
+            );
           }
         }
 
-        enriched = enriched.map(e => {
+        enriched = enriched.map((e) => {
           const base = { ...e };
           const revenue = revenueByAuthor.get(e.userId) || 0;
           const growth = growthByAuthor.get(e.userId) || 0;
@@ -524,7 +583,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
           if (metric === 'score') {
             result.score = Math.round(
               0.6 * Math.min(100, (Math.log10(1 + revenue) / Math.log10(1 + 10000)) * 100) +
-              0.4 * Math.min(100, e.downloads)
+                0.4 * Math.min(100, e.downloads)
             );
           } else if ('score' in e && e.score !== undefined) {
             result.score = e.score;
@@ -570,7 +629,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.get('/studio/compare/:userId', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.get('/compare/:userId', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -582,7 +641,10 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
       }
 
       const currentUserCounts = await studioProjectsStorage.countProjects(req.user.id);
-      const currentUserBuilds = await marketplaceStorage.getItems({ authorId: req.user.id, type: 'build' });
+      const currentUserBuilds = await marketplaceStorage.getItems({
+        authorId: req.user.id,
+        type: 'build',
+      });
       const currentUserStats = {
         userId: req.user.id,
         totalProjects: currentUserCounts.total,
@@ -598,7 +660,10 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
       } catch {
         // User might not have studio yet
       }
-      const comparedUserBuilds = await marketplaceStorage.getItems({ authorId: userId, type: 'build' });
+      const comparedUserBuilds = await marketplaceStorage.getItems({
+        authorId: userId,
+        type: 'build',
+      });
       const comparedUserStats = {
         userId,
         totalProjects: comparedUserCounts.total,
@@ -622,7 +687,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
   });
 
   // STUDIO TEAM ROUTES (continuing in next part due to size...)
-  router.post('/studio/team', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.post('/team', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -652,7 +717,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.get('/studio/team', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.get('/team', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -673,7 +738,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.put('/studio/team/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.put('/team/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -704,7 +769,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.delete('/studio/team/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.delete('/team/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -734,7 +799,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.get('/studio/team/members', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.get('/team/members', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -774,7 +839,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.post('/studio/team/invite', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.post('/team/invite', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -867,287 +932,316 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.put('/studio/team/invitations/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-
-      const { id } = req.params;
-      if (!id) {
-        return res.status(400).json({ error: 'Invitation ID required' });
-      }
-      const body = req.body as { action: 'accept' | 'decline' };
-
-      if (!body.action || (body.action !== 'accept' && body.action !== 'decline')) {
-        return res.status(400).json({ error: 'action must be "accept" or "decline"' });
-      }
-
-      const invitation = await studioTeamStorage.getInvitation(id);
-      if (!invitation) {
-        return res.status(404).json({ error: 'Invitation not found' });
-      }
-
-      if (invitation.inviteeUserId !== req.user.id) {
-        return res.status(403).json({ error: 'This invitation is not for you' });
-      }
-
-      if (invitation.status !== 'pending') {
-        return res.status(400).json({ error: 'Invitation is no longer pending' });
-      }
-
-      if (invitation.expiresAt < Date.now()) {
-        await studioTeamStorage.updateInvitation(id, 'expired');
-        return res.status(400).json({ error: 'Invitation has expired' });
-      }
-
-      if (body.action === 'accept') {
-        await studioTeamStorage.addMember(invitation.teamId, req.user.id, invitation.inviterId);
-        await studioTeamStorage.updateInvitation(id, 'accepted');
-
-        try {
-          await notificationsStorage.createNotification({
-            userId: invitation.inviterId,
-            type: 'team_invitation_accepted',
-            title: 'Team Invitation Accepted',
-            message: `${req.user.email} accepted your team invitation`,
-            metadata: { teamId: invitation.teamId },
-          });
-        } catch (notificationError) {
-          console.error('Failed to create notification:', notificationError);
+  router.put(
+    '/studio/team/invitations/:id',
+    authMiddleware,
+    async (req: AuthRequest, res: Response) => {
+      try {
+        if (!req.user) {
+          return res.status(401).json({ error: 'Unauthorized' });
         }
-      } else {
-        if (id) {
-          await studioTeamStorage.updateInvitation(id, 'declined');
+
+        const { id } = req.params;
+        if (!id) {
+          return res.status(400).json({ error: 'Invitation ID required' });
         }
-      }
+        const body = req.body as { action: 'accept' | 'decline' };
 
-      const updated = id ? await studioTeamStorage.getInvitation(id) : null;
-      res.json(updated);
-    } catch (error) {
-      console.error('Update invitation error:', error);
-      res.status(500).json({
-        error: 'Failed to update invitation',
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
-  });
-
-  router.get('/studio/team/invitations', authMiddleware, async (req: AuthRequest, res: Response) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-
-      const team = req.query.teamId ? await studioTeamStorage.getTeam(String(req.query.teamId)) : null;
-
-      if (team) {
-        const member = await studioTeamStorage.getMember(team.id, req.user.id);
-        if (!member || member.role !== 'owner') {
-          return res.status(403).json({ error: 'Only team owner can view team invitations' });
+        if (!body.action || (body.action !== 'accept' && body.action !== 'decline')) {
+          return res.status(400).json({ error: 'action must be "accept" or "decline"' });
         }
-      }
 
-      const invitations = team
-        ? await studioTeamStorage.getInvitations(team.id)
-        : await studioTeamStorage.getInvitations(undefined, req.user.id);
-
-      await studioTeamStorage.cleanupExpiredInvitations();
-
-      res.json({ invitations });
-    } catch (error) {
-      console.error('Get invitations error:', error);
-      res.status(500).json({
-        error: 'Failed to get invitations',
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
-  });
-
-  router.delete('/studio/team/members/:userId', authMiddleware, async (req: AuthRequest, res: Response) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-
-      const { userId } = req.params;
-      if (!userId) {
-        return res.status(400).json({ error: 'User ID required' });
-      }
-      const team = await studioTeamStorage.getTeamByStudioOwner(req.user.id);
-      if (!team) {
-        return res.status(404).json({ error: 'Team not found' });
-      }
-
-      const member = await studioTeamStorage.getMember(team.id, req.user.id);
-      if (!member || member.role !== 'owner') {
-        return res.status(403).json({ error: 'Only team owner can remove members' });
-      }
-
-      if (userId === req.user.id) {
-        return res.status(400).json({ error: 'Cannot remove yourself' });
-      }
-
-      const removed = await studioTeamStorage.removeMember(team.id, userId);
-      if (!removed) {
-        return res.status(404).json({ error: 'Member not found' });
-      }
-
-      res.status(204).send();
-    } catch (error) {
-      console.error('Remove member error:', error);
-      if (error instanceof Error && error.message.includes('Cannot remove team owner')) {
-        return res.status(400).json({ error: error.message });
-      }
-      res.status(500).json({
-        error: 'Failed to remove member',
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
-  });
-
-  router.post('/studio/projects/:id/share-team', authMiddleware, async (req: AuthRequest, res: Response) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-
-      const { id } = req.params;
-      if (!id) {
-        return res.status(400).json({ error: 'Project ID required' });
-      }
-      const body = req.body as { accessLevel: 'read' | 'write'; userId?: string };
-
-      if (!body.accessLevel || !['read', 'write'].includes(body.accessLevel)) {
-        return res.status(400).json({ error: 'accessLevel must be "read" or "write"' });
-      }
-
-      const project = await studioProjectsStorage.getProject(req.user.id, id);
-      if (!project) {
-        return res.status(404).json({ error: 'Project not found' });
-      }
-
-      const team = await studioTeamStorage.getTeamByStudioOwner(req.user.id);
-      if (!team) {
-        return res.status(404).json({ error: 'Team not found' });
-      }
-
-      const member = await studioTeamStorage.getMember(team.id, req.user.id);
-      if (!member || member.role !== 'owner') {
-        return res.status(403).json({ error: 'Only team owner can share projects' });
-      }
-
-      if (body.userId) {
-        const assignedMember = await studioTeamStorage.getMember(team.id, body.userId);
-        if (!assignedMember) {
-          return res.status(404).json({ error: 'User is not a team member' });
+        const invitation = await studioTeamStorage.getInvitation(id);
+        if (!invitation) {
+          return res.status(404).json({ error: 'Invitation not found' });
         }
-      }
 
-      const access = await studioTeamStorage.shareProjectWithTeam(
-        id,
-        team.id,
-        body.accessLevel,
-        body.userId
-      );
+        if (invitation.inviteeUserId !== req.user.id) {
+          return res.status(403).json({ error: 'This invitation is not for you' });
+        }
 
-      const members = await studioTeamStorage.getMembers(team.id);
-      for (const teamMember of members) {
-        if (teamMember.userId !== req.user.id && (!body.userId || teamMember.userId === body.userId)) {
+        if (invitation.status !== 'pending') {
+          return res.status(400).json({ error: 'Invitation is no longer pending' });
+        }
+
+        if (invitation.expiresAt < Date.now()) {
+          await studioTeamStorage.updateInvitation(id, 'expired');
+          return res.status(400).json({ error: 'Invitation has expired' });
+        }
+
+        if (body.action === 'accept') {
+          await studioTeamStorage.addMember(invitation.teamId, req.user.id, invitation.inviterId);
+          await studioTeamStorage.updateInvitation(id, 'accepted');
+
           try {
             await notificationsStorage.createNotification({
-              userId: teamMember.userId,
-              type: 'project_shared',
-              title: 'Project Shared',
-              message: `Project "${project.name}" has been shared with the team`,
-              metadata: { projectId: id, teamId: team.id },
+              userId: invitation.inviterId,
+              type: 'team_invitation_accepted',
+              title: 'Team Invitation Accepted',
+              message: `${req.user.email} accepted your team invitation`,
+              metadata: { teamId: invitation.teamId },
             });
           } catch (notificationError) {
             console.error('Failed to create notification:', notificationError);
           }
+        } else {
+          if (id) {
+            await studioTeamStorage.updateInvitation(id, 'declined');
+          }
         }
-      }
 
-      res.status(201).json(access);
-    } catch (error) {
-      console.error('Share project with team error:', error);
-      res.status(500).json({
-        error: 'Failed to share project',
-        message: error instanceof Error ? error.message : String(error),
-      });
+        const updated = id ? await studioTeamStorage.getInvitation(id) : null;
+        res.json(updated);
+      } catch (error) {
+        console.error('Update invitation error:', error);
+        res.status(500).json({
+          error: 'Failed to update invitation',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
-  });
+  );
 
-  router.get('/studio/projects/:id/team-access', authMiddleware, async (req: AuthRequest, res: Response) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+  router.get(
+    '/studio/team/invitations',
+    authMiddleware,
+    async (req: AuthRequest, res: Response) => {
+      try {
+        if (!req.user) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const team = req.query.teamId
+          ? await studioTeamStorage.getTeam(String(req.query.teamId))
+          : null;
+
+        if (team) {
+          const member = await studioTeamStorage.getMember(team.id, req.user.id);
+          if (!member || member.role !== 'owner') {
+            return res.status(403).json({ error: 'Only team owner can view team invitations' });
+          }
+        }
+
+        const invitations = team
+          ? await studioTeamStorage.getInvitations(team.id)
+          : await studioTeamStorage.getInvitations(undefined, req.user.id);
+
+        await studioTeamStorage.cleanupExpiredInvitations();
+
+        res.json({ invitations });
+      } catch (error) {
+        console.error('Get invitations error:', error);
+        res.status(500).json({
+          error: 'Failed to get invitations',
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
-
-      const { id } = req.params;
-      if (!id) {
-        return res.status(400).json({ error: 'Project ID required' });
-      }
-
-      const project = await studioProjectsStorage.getProject(req.user.id, id);
-      if (!project) {
-        return res.status(404).json({ error: 'Project not found' });
-      }
-
-      const team = await studioTeamStorage.getTeamByStudioOwner(req.user.id);
-      if (!team) {
-        return res.status(404).json({ error: 'No team found' });
-      }
-
-      const access = await studioTeamStorage.getProjectTeamAccess(id, team.id);
-      res.json({ access: access || null });
-    } catch (error) {
-      console.error('Get project team access error:', error);
-      res.status(500).json({
-        error: 'Failed to get project team access',
-        message: error instanceof Error ? error.message : String(error),
-      });
     }
-  });
+  );
 
-  router.delete('/studio/projects/:id/share-team', authMiddleware, async (req: AuthRequest, res: Response) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+  router.delete(
+    '/studio/team/members/:userId',
+    authMiddleware,
+    async (req: AuthRequest, res: Response) => {
+      try {
+        if (!req.user) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const { userId } = req.params;
+        if (!userId) {
+          return res.status(400).json({ error: 'User ID required' });
+        }
+        const team = await studioTeamStorage.getTeamByStudioOwner(req.user.id);
+        if (!team) {
+          return res.status(404).json({ error: 'Team not found' });
+        }
+
+        const member = await studioTeamStorage.getMember(team.id, req.user.id);
+        if (!member || member.role !== 'owner') {
+          return res.status(403).json({ error: 'Only team owner can remove members' });
+        }
+
+        if (userId === req.user.id) {
+          return res.status(400).json({ error: 'Cannot remove yourself' });
+        }
+
+        const removed = await studioTeamStorage.removeMember(team.id, userId);
+        if (!removed) {
+          return res.status(404).json({ error: 'Member not found' });
+        }
+
+        res.status(204).send();
+      } catch (error) {
+        console.error('Remove member error:', error);
+        if (error instanceof Error && error.message.includes('Cannot remove team owner')) {
+          return res.status(400).json({ error: error.message });
+        }
+        res.status(500).json({
+          error: 'Failed to remove member',
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
-
-      const { id } = req.params;
-      if (!id) {
-        return res.status(400).json({ error: 'Project ID required' });
-      }
-
-      const project = await studioProjectsStorage.getProject(req.user.id, id);
-      if (!project) {
-        return res.status(404).json({ error: 'Project not found' });
-      }
-
-      const team = await studioTeamStorage.getTeamByStudioOwner(req.user.id);
-      if (!team) {
-        return res.status(404).json({ error: 'Team not found' });
-      }
-
-      const member = await studioTeamStorage.getMember(team.id, req.user.id);
-      if (!member || member.role !== 'owner') {
-        return res.status(403).json({ error: 'Only team owner can remove project access' });
-      }
-
-      await studioTeamStorage.removeProjectTeamAccess(id, team.id);
-      res.status(204).send();
-    } catch (error) {
-      console.error('Remove project team access error:', error);
-      res.status(500).json({
-        error: 'Failed to remove project team access',
-        message: error instanceof Error ? error.message : String(error),
-      });
     }
-  });
+  );
 
-  router.get('/studio/shared-projects', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.post(
+    '/studio/projects/:id/share-team',
+    authMiddleware,
+    async (req: AuthRequest, res: Response) => {
+      try {
+        if (!req.user) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const { id } = req.params;
+        if (!id) {
+          return res.status(400).json({ error: 'Project ID required' });
+        }
+        const body = req.body as { accessLevel: 'read' | 'write'; userId?: string };
+
+        if (!body.accessLevel || !['read', 'write'].includes(body.accessLevel)) {
+          return res.status(400).json({ error: 'accessLevel must be "read" or "write"' });
+        }
+
+        const project = await studioProjectsStorage.getProject(req.user.id, id);
+        if (!project) {
+          return res.status(404).json({ error: 'Project not found' });
+        }
+
+        const team = await studioTeamStorage.getTeamByStudioOwner(req.user.id);
+        if (!team) {
+          return res.status(404).json({ error: 'Team not found' });
+        }
+
+        const member = await studioTeamStorage.getMember(team.id, req.user.id);
+        if (!member || member.role !== 'owner') {
+          return res.status(403).json({ error: 'Only team owner can share projects' });
+        }
+
+        if (body.userId) {
+          const assignedMember = await studioTeamStorage.getMember(team.id, body.userId);
+          if (!assignedMember) {
+            return res.status(404).json({ error: 'User is not a team member' });
+          }
+        }
+
+        const access = await studioTeamStorage.shareProjectWithTeam(
+          id,
+          team.id,
+          body.accessLevel,
+          body.userId
+        );
+
+        const members = await studioTeamStorage.getMembers(team.id);
+        for (const teamMember of members) {
+          if (
+            teamMember.userId !== req.user.id &&
+            (!body.userId || teamMember.userId === body.userId)
+          ) {
+            try {
+              await notificationsStorage.createNotification({
+                userId: teamMember.userId,
+                type: 'project_shared',
+                title: 'Project Shared',
+                message: `Project "${project.name}" has been shared with the team`,
+                metadata: { projectId: id, teamId: team.id },
+              });
+            } catch (notificationError) {
+              console.error('Failed to create notification:', notificationError);
+            }
+          }
+        }
+
+        res.status(201).json(access);
+      } catch (error) {
+        console.error('Share project with team error:', error);
+        res.status(500).json({
+          error: 'Failed to share project',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  );
+
+  router.get(
+    '/studio/projects/:id/team-access',
+    authMiddleware,
+    async (req: AuthRequest, res: Response) => {
+      try {
+        if (!req.user) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const { id } = req.params;
+        if (!id) {
+          return res.status(400).json({ error: 'Project ID required' });
+        }
+
+        const project = await studioProjectsStorage.getProject(req.user.id, id);
+        if (!project) {
+          return res.status(404).json({ error: 'Project not found' });
+        }
+
+        const team = await studioTeamStorage.getTeamByStudioOwner(req.user.id);
+        if (!team) {
+          return res.status(404).json({ error: 'No team found' });
+        }
+
+        const access = await studioTeamStorage.getProjectTeamAccess(id, team.id);
+        res.json({ access: access || null });
+      } catch (error) {
+        console.error('Get project team access error:', error);
+        res.status(500).json({
+          error: 'Failed to get project team access',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  );
+
+  router.delete(
+    '/studio/projects/:id/share-team',
+    authMiddleware,
+    async (req: AuthRequest, res: Response) => {
+      try {
+        if (!req.user) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const { id } = req.params;
+        if (!id) {
+          return res.status(400).json({ error: 'Project ID required' });
+        }
+
+        const project = await studioProjectsStorage.getProject(req.user.id, id);
+        if (!project) {
+          return res.status(404).json({ error: 'Project not found' });
+        }
+
+        const team = await studioTeamStorage.getTeamByStudioOwner(req.user.id);
+        if (!team) {
+          return res.status(404).json({ error: 'Team not found' });
+        }
+
+        const member = await studioTeamStorage.getMember(team.id, req.user.id);
+        if (!member || member.role !== 'owner') {
+          return res.status(403).json({ error: 'Only team owner can remove project access' });
+        }
+
+        await studioTeamStorage.removeProjectTeamAccess(id, team.id);
+        res.status(204).send();
+      } catch (error) {
+        console.error('Remove project team access error:', error);
+        res.status(500).json({
+          error: 'Failed to remove project team access',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  );
+
+  router.get('/shared-projects', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -1160,12 +1254,19 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
           if (!team) {
             return null;
           }
-          const project = await studioProjectsStorage.getProject(team.studioOwnerId, access.projectId);
+          const project = await studioProjectsStorage.getProject(
+            team.studioOwnerId,
+            access.projectId
+          );
           return project ? { project, access } : null;
         })
       );
 
-      res.json({ projects: projects.filter((p): p is { project: StudioProject; access: ProjectTeamAccess } => p !== null) });
+      res.json({
+        projects: projects.filter(
+          (p): p is { project: StudioProject; access: ProjectTeamAccess } => p !== null
+        ),
+      });
     } catch (error) {
       console.error('Get shared projects error:', error);
       res.status(500).json({
@@ -1176,7 +1277,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
   });
 
   // STUDIO SETTINGS ROUTES
-  router.get('/studio/settings', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.get('/settings', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -1206,7 +1307,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.put('/studio/settings', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.put('/settings', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -1214,7 +1315,11 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
 
       const body = req.body as {
         focus?: 'games' | 'assets' | 'balanced';
-        goals?: { monthlyRevenueTarget?: number; monthlyReleasesTarget?: number; monthlyUpdatesTarget?: number };
+        goals?: {
+          monthlyRevenueTarget?: number;
+          monthlyReleasesTarget?: number;
+          monthlyUpdatesTarget?: number;
+        };
         cadenceTarget?: number;
         showRevenue?: boolean;
         featureFlags?: Record<string, unknown>;
@@ -1224,7 +1329,10 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
         return res.status(400).json({ error: 'Invalid focus' });
       }
 
-      if (body.cadenceTarget !== undefined && (typeof body.cadenceTarget !== 'number' || body.cadenceTarget < 0)) {
+      if (
+        body.cadenceTarget !== undefined &&
+        (typeof body.cadenceTarget !== 'number' || body.cadenceTarget < 0)
+      ) {
         return res.status(400).json({ error: 'Invalid cadenceTarget' });
       }
 
@@ -1240,7 +1348,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
   });
 
   // STUDIO REVENUE ROUTE
-  router.get('/studio/revenue', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.get('/revenue', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -1272,8 +1380,8 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
            JOIN marketplace_items mi ON mi.id = pi.item_id AND pi.item_type = 'marketplace-item'
            WHERE mi.author_id = $1 AND p.status = 'completed' AND p.created_at >= NOW() - INTERVAL '${days} days'
            GROUP BY 1
-           ORDER BY 1`
-          , [req.user.id]
+           ORDER BY 1`,
+          [req.user.id]
         );
         for (const row of dayRows.rows) {
           const dayKey = row.day.toISOString().slice(0, 10);
@@ -1294,7 +1402,8 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
            WHERE mi.author_id = $1 AND p.status = 'completed' AND p.created_at >= NOW() - INTERVAL '${days} days'
            GROUP BY pi.item_id, mi.title
            ORDER BY SUM(pi.price_amount) DESC
-           LIMIT 10` , [req.user.id]
+           LIMIT 10`,
+          [req.user.id]
         );
         for (const row of topRows.rows) {
           const item: { gross: number; title?: string } = { gross: Number(row.gross) || 0 };
@@ -1304,7 +1413,10 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
           byItem.set(row.item_id, item);
         }
       } else {
-        const allPurchases = await purchaseStorage.getPurchases({ status: 'completed', limit: 100000 });
+        const allPurchases = await purchaseStorage.getPurchases({
+          status: 'completed',
+          limit: 100000,
+        });
         for (const p of allPurchases) {
           if (p.createdAt < since) continue;
           const dayKey = new Date(p.createdAt).toISOString().slice(0, 10);
@@ -1323,7 +1435,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
         }
       }
 
-      const platformFee = gross * 0.10;
+      const platformFee = gross * 0.1;
       const net = gross - platformFee;
 
       const trend = Array.from(byDay.entries())
@@ -1348,7 +1460,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
   });
 
   // STUDIO SCORE ROUTE
-  router.get('/studio/score', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.get('/score', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
       const cacheKey = `score:${req.user.id}`;
@@ -1359,12 +1471,15 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
       res.json(result);
     } catch (error) {
       console.error('Get studio score error:', error);
-      res.status(500).json({ error: 'Failed to get studio score', message: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({
+        error: 'Failed to get studio score',
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
   });
 
   // STUDIO INSIGHTS ROUTE
-  router.get('/studio/insights', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.get('/insights', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
 
@@ -1376,8 +1491,11 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
       const days = 30;
       const since30 = Date.now() - days * 24 * 60 * 60 * 1000;
       const since14 = Date.now() - 14 * 24 * 60 * 60 * 1000;
-      const projects = await studioProjectsStorage.listProjects(req.user.id, { limit: 10000, offset: 0 });
-      const updatedRecently = projects.some(p => p.updatedAt >= since14);
+      const projects = await studioProjectsStorage.listProjects(req.user.id, {
+        limit: 10000,
+        offset: 0,
+      });
+      const updatedRecently = projects.some((p) => p.updatedAt >= since14);
 
       const rev = await (async () => {
         if (!req.user) return null;
@@ -1385,42 +1503,77 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
         return cached || null;
       })();
 
-      const insights: Array<{ id: string; message: string; impact: 'low'|'medium'|'high'; action?: { type: string; href?: string } }> = [];
+      const insights: Array<{
+        id: string;
+        message: string;
+        impact: 'low' | 'medium' | 'high';
+        action?: { type: string; href?: string };
+      }> = [];
 
       if (!updatedRecently) {
-        insights.push({ id: 'nudge-inactive', message: 'Brak aktualizacji od 14 dni — wypuść mały update projektu lub popraw miniaturę, aby utrzymać zainteresowanie.', impact: 'medium', action: { type: 'navigate', href: '/studio?tab=projects' } });
+        insights.push({
+          id: 'nudge-inactive',
+          message:
+            'Brak aktualizacji od 14 dni — wypuść mały update projektu lub popraw miniaturę, aby utrzymać zainteresowanie.',
+          impact: 'medium',
+          action: { type: 'navigate', href: '/studio?tab=projects' },
+        });
       }
 
       if (settings?.goals?.monthlyRevenueTarget && rev?.net) {
         const target = settings.goals.monthlyRevenueTarget;
         if (target > 0 && rev.net >= 0.8 * target) {
-          insights.push({ id: 'goal-proximity', message: 'Jesteś blisko celu przychodu w tym miesiącu (≥80%). Rozważ promocję bestsellera, aby go przekroczyć.', impact: 'high' });
+          insights.push({
+            id: 'goal-proximity',
+            message:
+              'Jesteś blisko celu przychodu w tym miesiącu (≥80%). Rozważ promocję bestsellera, aby go przekroczyć.',
+            impact: 'high',
+          });
         }
       }
 
       const items = await marketplaceStorage.getItems({ authorId: req.user.id });
-      const assetsLast30 = items.filter(i => i.type !== 'build' && i.createdAt && i.createdAt >= since30).length;
+      const assetsLast30 = items.filter(
+        (i) => i.type !== 'build' && i.createdAt && i.createdAt >= since30
+      ).length;
       if ((settings?.focus === 'assets' || settings?.focus === 'balanced') && assetsLast30 === 0) {
-        insights.push({ id: 'mix-advice-assets', message: 'Masz fokus na zasoby, ale w ostatnich 30 dniach nie dodałeś nowych assetów. Dodaj model/avatar/blok do marketplace.', impact: 'medium', action: { type: 'navigate', href: '/studio?tab=projects' } });
+        insights.push({
+          id: 'mix-advice-assets',
+          message:
+            'Masz fokus na zasoby, ale w ostatnich 30 dniach nie dodałeś nowych assetów. Dodaj model/avatar/blok do marketplace.',
+          impact: 'medium',
+          action: { type: 'navigate', href: '/studio?tab=projects' },
+        });
       }
 
       const revData = rev || { topItems: [] };
       if (Array.isArray(revData.topItems) && revData.topItems.length > 0) {
         const top = revData.topItems[0];
-        insights.push({ id: 'bundle-or-update', message: `Twój bestseller: "${top.title || top.itemId}". Rozważ aktualizację lub bundlowanie z powiązanymi elementami.`, impact: 'medium' });
+        insights.push({
+          id: 'bundle-or-update',
+          message: `Twój bestseller: "${top.title || top.itemId}". Rozważ aktualizację lub bundlowanie z powiązanymi elementami.`,
+          impact: 'medium',
+        });
       }
 
       if (score.score < 50) {
-        insights.push({ id: 'health-low', message: 'Wskaźnik zdrowia studia jest poniżej 50. Skup się na regularnych publikacjach i jakości (miniatury, opisy, tagi).', impact: 'high' });
+        insights.push({
+          id: 'health-low',
+          message:
+            'Wskaźnik zdrowia studia jest poniżej 50. Skup się na regularnych publikacjach i jakości (miniatury, opisy, tagi).',
+          impact: 'high',
+        });
       }
 
       res.json({ insights });
     } catch (error) {
       console.error('Get studio insights error:', error);
-      res.status(500).json({ error: 'Failed to get insights', message: error instanceof Error ? error.message : String(error) });
+      res.status(500).json({
+        error: 'Failed to get insights',
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
   });
 
   return router;
 }
-

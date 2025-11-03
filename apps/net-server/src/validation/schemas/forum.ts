@@ -43,7 +43,10 @@ export const updatePostSchema = z.object({
 export const createCategorySchema = z.object({
   name: trimmedStringSchema(100).min(1, 'Name is required'),
   description: trimmedStringSchema(500).optional(),
-  color: z.string().regex(/^#[0-9A-F]{6}$/i, 'Invalid color format').optional(),
+  color: z
+    .string()
+    .regex(/^#[0-9A-F]{6}$/i, 'Invalid color format')
+    .optional(),
 });
 
 /**
@@ -52,7 +55,10 @@ export const createCategorySchema = z.object({
 export const updateCategorySchema = z.object({
   name: trimmedStringSchema(100).optional(),
   description: trimmedStringSchema(500).optional(),
-  color: z.string().regex(/^#[0-9A-F]{6}$/i, 'Invalid color format').optional(),
+  color: z
+    .string()
+    .regex(/^#[0-9A-F]{6}$/i, 'Invalid color format')
+    .optional(),
 });
 
 /**
@@ -89,4 +95,3 @@ export type UpdateCategoryRequest = z.infer<typeof updateCategorySchema>;
 export type AddReactionRequest = z.infer<typeof addReactionSchema>;
 export type ForumItemIdParam = z.infer<typeof forumItemIdParamSchema>;
 export type ForumReactionParam = z.infer<typeof forumReactionParamSchema>;
-

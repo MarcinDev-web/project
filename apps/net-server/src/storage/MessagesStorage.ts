@@ -41,13 +41,13 @@ export class MessagesStorage {
 
   async initialize(): Promise<void> {
     await fs.mkdir(this.dataDir, { recursive: true });
-    
+
     try {
       await fs.access(this.messagesFile);
     } catch {
       await fs.writeFile(this.messagesFile, JSON.stringify([], null, 2));
     }
-    
+
     try {
       await fs.access(this.conversationsFile);
     } catch {
@@ -94,9 +94,9 @@ export class MessagesStorage {
   async getOrCreateConversation(userId1: string, userId2: string): Promise<Conversation> {
     const conversations = await this.readConversations();
     const conversationId = this.getConversationId(userId1, userId2);
-    
-    let conversation = conversations.find(c => c.id === conversationId);
-    
+
+    let conversation = conversations.find((c) => c.id === conversationId);
+
     if (!conversation) {
       conversation = {
         id: conversationId,
@@ -107,7 +107,7 @@ export class MessagesStorage {
       conversations.push(conversation);
       await this.writeConversations(conversations);
     }
-    
+
     return conversation;
   }
 
@@ -118,10 +118,10 @@ export class MessagesStorage {
     groupAvatar?: string
   ): Promise<Conversation> {
     const conversations = await this.readConversations();
-    
+
     // Ensure owner is in members
     const allMembers = Array.from(new Set([ownerId, ...memberIds]));
-    
+
     const conversation: Conversation = {
       id: this.generateGroupConversationId(),
       type: 'group',
@@ -132,30 +132,40 @@ export class MessagesStorage {
       ...(groupAvatar !== undefined && { groupAvatar }),
       lastMessageAt: Date.now(),
     };
-    
+
     conversations.push(conversation);
     await this.writeConversations(conversations);
-    
+
     return conversation;
   }
 
   async getConversations(userId: string): Promise<Conversation[]> {
     const conversations = await this.readConversations();
     return conversations
-      .filter(c => c.participants.includes(userId))
+      .filter((c) => c.participants.includes(userId))
       .sort((a, b) => b.lastMessageAt - a.lastMessageAt);
   }
 
   async getConversation(conversationId: string): Promise<Conversation | null> {
     const conversations = await this.readConversations();
-    return conversations.find(c => c.id === conversationId) ?? null;
+    return conversations.find((c) => c.id === conversationId) ?? null;
   }
 
   async createMessage(fromUserId: string, toUserId: string, content: string): Promise<Message>;
-  async createMessage(fromUserId: string, conversationId: string, content: string, isGroup: boolean): Promise<Message>;
-  async createMessage(fromUserId: string, toUserIdOrConversationId: string, content: string, isGroup = false): Promise<Message> {
+  async createMessage(
+    fromUserId: string,
+    conversationId: string,
+    content: string,
+    isGroup: boolean
+  ): Promise<Message>;
+  async createMessage(
+    fromUserId: string,
+    toUserIdOrConversationId: string,
+    content: string,
+    isGroup = false
+  ): Promise<Message> {
     let conversation: Conversation;
-    
+
     if (isGroup) {
       // Group message - conversation ID provided
       const foundConversation = await this.getConversation(toUserIdOrConversationId);
@@ -170,7 +180,7 @@ export class MessagesStorage {
       // Direct message
       conversation = await this.getOrCreateConversation(fromUserId, toUserIdOrConversationId);
     }
-    
+
     const messages = await this.readMessages();
 
     // For groups, toUserId represents the conversation (for consistency with Message interface)
@@ -189,7 +199,7 @@ export class MessagesStorage {
 
     // Update conversation
     const conversations = await this.readConversations();
-    const conv = conversations.find(c => c.id === conversation.id);
+    const conv = conversations.find((c) => c.id === conversation.id);
     if (conv) {
       conv.lastMessageAt = message.createdAt;
       conv.lastMessage = content;
@@ -202,34 +212,34 @@ export class MessagesStorage {
   async getMessages(conversationId: string, limit = 100): Promise<Message[]> {
     const messages = await this.readMessages();
     return messages
-      .filter(m => m.conversationId === conversationId)
+      .filter((m) => m.conversationId === conversationId)
       .sort((a, b) => a.createdAt - b.createdAt)
       .slice(-limit);
   }
 
   async getMessageById(messageId: string): Promise<Message | null> {
     const messages = await this.readMessages();
-    return messages.find(m => m.id === messageId) ?? null;
+    return messages.find((m) => m.id === messageId) ?? null;
   }
 
   async markAsRead(messageId: string, userId: string): Promise<boolean> {
     const messages = await this.readMessages();
-    const message = messages.find(m => m.id === messageId && m.toUserId === userId);
-    
+    const message = messages.find((m) => m.id === messageId && m.toUserId === userId);
+
     if (!message || message.read) {
       return false;
     }
 
     message.read = true;
     await this.writeMessages(messages);
-    
+
     return true;
   }
 
   async markConversationAsRead(conversationId: string, userId: string): Promise<void> {
     const messages = await this.readMessages();
     const unread = messages.filter(
-      m => m.conversationId === conversationId && m.toUserId === userId && !m.read
+      (m) => m.conversationId === conversationId && m.toUserId === userId && !m.read
     );
 
     for (const message of unread) {
@@ -243,23 +253,23 @@ export class MessagesStorage {
 
   async getUnreadCount(userId: string): Promise<number> {
     const messages = await this.readMessages();
-    return messages.filter(m => m.toUserId === userId && !m.read).length;
+    return messages.filter((m) => m.toUserId === userId && !m.read).length;
   }
 
   async getUnreadCountForConversation(conversationId: string, userId: string): Promise<number> {
     const messages = await this.readMessages();
     const conversation = await this.getConversation(conversationId);
-    
+
     if (conversation?.type === 'group') {
       // For groups, count messages not from the user
-      return messages.filter(m => 
-        m.conversationId === conversationId && m.fromUserId !== userId && !m.read
+      return messages.filter(
+        (m) => m.conversationId === conversationId && m.fromUserId !== userId && !m.read
       ).length;
     }
-    
+
     // For direct messages
-    return messages.filter(m => 
-      m.conversationId === conversationId && m.toUserId === userId && !m.read
+    return messages.filter(
+      (m) => m.conversationId === conversationId && m.toUserId === userId && !m.read
     ).length;
   }
 
@@ -268,85 +278,84 @@ export class MessagesStorage {
     updates: { groupName?: string; groupAvatar?: string }
   ): Promise<Conversation | null> {
     const conversations = await this.readConversations();
-    const conversation = conversations.find(c => c.id === conversationId && c.type === 'group');
-    
+    const conversation = conversations.find((c) => c.id === conversationId && c.type === 'group');
+
     if (!conversation) {
       return null;
     }
-    
+
     if (updates.groupName !== undefined) {
       conversation.groupName = updates.groupName;
     }
     if (updates.groupAvatar !== undefined) {
       conversation.groupAvatar = updates.groupAvatar;
     }
-    
+
     await this.writeConversations(conversations);
     return conversation;
   }
 
   async addGroupMembers(conversationId: string, memberIds: string[]): Promise<boolean> {
     const conversations = await this.readConversations();
-    const conversation = conversations.find(c => c.id === conversationId && c.type === 'group');
-    
+    const conversation = conversations.find((c) => c.id === conversationId && c.type === 'group');
+
     if (!conversation) {
       return false;
     }
-    
+
     const existingMembers = new Set(conversation.participants);
-    const newMembers = memberIds.filter(id => !existingMembers.has(id));
-    
+    const newMembers = memberIds.filter((id) => !existingMembers.has(id));
+
     if (newMembers.length === 0) {
       return false;
     }
-    
+
     conversation.participants = [...conversation.participants, ...newMembers];
     conversation.members = conversation.participants;
-    
+
     await this.writeConversations(conversations);
     return true;
   }
 
   async removeGroupMember(conversationId: string, memberId: string): Promise<boolean> {
     const conversations = await this.readConversations();
-    const conversation = conversations.find(c => c.id === conversationId && c.type === 'group');
-    
+    const conversation = conversations.find((c) => c.id === conversationId && c.type === 'group');
+
     if (!conversation) {
       return false;
     }
-    
+
     const index = conversation.participants.indexOf(memberId);
     if (index === -1) {
       return false;
     }
-    
+
     conversation.participants.splice(index, 1);
     conversation.members = conversation.participants;
-    
+
     await this.writeConversations(conversations);
     return true;
   }
 
   async deleteGroupConversation(conversationId: string, userId: string): Promise<boolean> {
     const conversations = await this.readConversations();
-    const conversation = conversations.find(c => c.id === conversationId && c.type === 'group');
-    
+    const conversation = conversations.find((c) => c.id === conversationId && c.type === 'group');
+
     if (!conversation || conversation.ownerId !== userId) {
       return false;
     }
-    
-    const index = conversations.findIndex(c => c.id === conversationId);
+
+    const index = conversations.findIndex((c) => c.id === conversationId);
     if (index === -1) {
       return false;
     }
-    
+
     conversations.splice(index, 1);
     await this.writeConversations(conversations);
-    
+
     // Optionally delete all messages in this conversation
     // For now, we'll keep them for history
-    
+
     return true;
   }
 }
-

@@ -16,7 +16,11 @@ export class BuildStorage {
   /**
    * Save build data for a marketplace item
    */
-  async saveBuild(marketplaceId: string, projectData: ProjectData, client?: PoolClient): Promise<void> {
+  async saveBuild(
+    marketplaceId: string,
+    projectData: ProjectData,
+    client?: PoolClient
+  ): Promise<void> {
     // Serialize ProjectData to JSON
     const jsonData = JSON.stringify(projectData);
     const buffer = Buffer.from(jsonData, 'utf-8');
@@ -49,7 +53,7 @@ export class BuildStorage {
     }
 
     const row = result.rows[0]!;
-    
+
     try {
       // Deserialize JSON from BYTEA
       const jsonData = row.project_data.toString('utf-8');
@@ -65,10 +69,9 @@ export class BuildStorage {
    * Delete build data for a marketplace item
    */
   async deleteBuild(marketplaceId: string): Promise<void> {
-    await this.pool.query(
-      'DELETE FROM marketplace_builds WHERE marketplace_id = $1',
-      [marketplaceId]
-    );
+    await this.pool.query('DELETE FROM marketplace_builds WHERE marketplace_id = $1', [
+      marketplaceId,
+    ]);
   }
 
   /**

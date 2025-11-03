@@ -37,9 +37,7 @@ import { GameSessionTracker } from './websocket/GameSessionTracker';
 import { MessageHandler } from './websocket/MessageHandler';
 import { ForumHandler } from './websocket/ForumHandler';
 import { UserProfileStorage } from './storage/UserProfileStorage';
-import {
-  sanitizeMarketplacePublishRequest,
-} from './validation/marketplace';
+import { sanitizeMarketplacePublishRequest } from './validation/marketplace';
 import { MarketplaceStorage } from './storage/MarketplaceStorage';
 import { MarketplaceStorageDB } from './storage/MarketplaceStorageDB';
 import { BuildStorage } from './storage/BuildStorage';
@@ -64,10 +62,7 @@ import { PurchaseStorage } from './storage/PurchaseStorage';
 import { PurchaseStorageDB } from './storage/PurchaseStorageDB';
 import { StudioProjectsStorage, StudioProjectsStorageDB } from './storage/StudioProjectsStorage';
 import { StudioSettingsStorage, StudioSettingsStorageDB } from './storage/StudioSettingsStorage';
-import {
-  StudioTeamStorage,
-  StudioTeamStorageDB,
-} from './storage/StudioTeamStorage';
+import { StudioTeamStorage, StudioTeamStorageDB } from './storage/StudioTeamStorage';
 import { CurrencyService } from './services/CurrencyService';
 import { PurchaseService } from './services/PurchaseService';
 import { LedgerService } from './services/LedgerService';
@@ -104,9 +99,18 @@ type Pool = ReturnType<typeof createDbPool>;
 import path from 'path';
 import { promises as fs } from 'fs';
 
-
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
-const WS_PORT = process.env.WS_PORT ? parseInt(process.env.WS_PORT, 10) : 3001;
+// Use dynamic port in test environment to avoid conflicts between parallel test workers
+// Port is based on worker thread ID if available, otherwise PID modulo
+const getTestPort = (basePort: number): number => {
+  if (process.env.VITEST_WORKER_ID) {
+    return basePort + parseInt(process.env.VITEST_WORKER_ID, 10);
+  }
+  return basePort + (process.pid % 100); // Use PID modulo for uniqueness
+};
+const WS_PORT = process.env.WS_PORT 
+  ? parseInt(process.env.WS_PORT, 10) 
+  : (process.env.NODE_ENV === 'test' || process.env.VITEST ? getTestPort(3001) : 3001);
 const DATA_DIR = process.env.DATA_DIR || './data';
 const THUMBNAIL_DIR = path.join(DATA_DIR, 'thumbnails');
 // Default frontend URLs: editor (5173) and platform (5174)
@@ -126,11 +130,17 @@ if (!process.env.JWT_REFRESH_SECRET && !isProduction) {
 const ECONOMY_MIN_PRICE: Record<string, number> = {
   credits: parseFloat(String(process.env.ECONOMY_MIN_PRICE_CREDITS ?? '0.1')),
 };
-const ECONOMY_PRICE_CHANGE_COOLDOWN_SEC = parseInt(String(process.env.ECONOMY_PRICE_CHANGE_COOLDOWN_SEC ?? '3600'), 10);
+const ECONOMY_PRICE_CHANGE_COOLDOWN_SEC = parseInt(
+  String(process.env.ECONOMY_PRICE_CHANGE_COOLDOWN_SEC ?? '3600'),
+  10
+);
 const ECONOMY_LISTING_FEE: Record<string, number> = {
   credits: parseFloat(String(process.env.ECONOMY_LISTING_FEE_CREDITS ?? '0.1')),
 };
-const ECONOMY_PLATFORM_FEE_BPS = parseInt(String(process.env.ECONOMY_PLATFORM_FEE_BPS ?? '800'), 10); // 8%
+const ECONOMY_PLATFORM_FEE_BPS = parseInt(
+  String(process.env.ECONOMY_PLATFORM_FEE_BPS ?? '800'),
+  10
+); // 8%
 
 // Validate configuration on startup
 assertConfigValid();
@@ -171,15 +181,9 @@ const messageHandler = new MessageHandler(messagesStorage, sessionManager);
 const forumHandler = new ForumHandler(sessionManager, forumStorage);
 
 // Shop storage (use database if available, otherwise JSON)
-const shopStorage = dbPool
-  ? new ShopStorageDB(dbPool)
-  : new ShopStorage(DATA_DIR);
-const assetStorage = dbPool
-  ? new AssetStorageDB(dbPool)
-  : new AssetStorage(DATA_DIR);
-const purchaseStorage = dbPool
-  ? new PurchaseStorageDB(dbPool)
-  : new PurchaseStorage(DATA_DIR);
+const shopStorage = dbPool ? new ShopStorageDB(dbPool) : new ShopStorage(DATA_DIR);
+const assetStorage = dbPool ? new AssetStorageDB(dbPool) : new AssetStorage(DATA_DIR);
+const purchaseStorage = dbPool ? new PurchaseStorageDB(dbPool) : new PurchaseStorage(DATA_DIR);
 
 // Studio projects storage (use database if available, otherwise JSON)
 const studioProjectsStorage = dbPool
@@ -260,7 +264,10 @@ const purchaseService = new PurchaseService(
 );
 
 // Cart storage (in-memory for MVP, per-user)
-const userCarts = new Map<string, Array<{ itemId: string; type: 'shop-item' | 'asset' | 'marketplace-item'; quantity: number }>>();
+const userCarts = new Map<
+  string,
+  Array<{ itemId: string; type: 'shop-item' | 'asset' | 'marketplace-item'; quantity: number }>
+>();
 
 // In-memory secondary resale listings (keyed by marketplace item id)
 type ResaleListing = { sellerId: string; price: CurrencyAmount; createdAt: number };
@@ -283,24 +290,26 @@ if (isProduction) {
 }
 
 // CORS configuration - hardened
-const allowedOrigins = FRONTEND_URL.split(',').map(origin => origin.trim());
-app.use(cors({
-  origin: (origin, callback) => {
-    // Allow requests with no origin (like mobile apps, curl, Postman)
-    if (!origin) {
-      return callback(null, true);
-    }
-    // Check if origin is in allowed list
-    if (allowedOrigins.includes(origin)) {
-      return callback(null, true);
-    }
-    callback(new Error('Not allowed by CORS'));
-  },
-  credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
-  maxAge: 86400, // 24 hours
-}));
+const allowedOrigins = FRONTEND_URL.split(',').map((origin) => origin.trim());
+app.use(
+  cors({
+    origin: (origin, callback) => {
+      // Allow requests with no origin (like mobile apps, curl, Postman)
+      if (!origin) {
+        return callback(null, true);
+      }
+      // Check if origin is in allowed list
+      if (allowedOrigins.includes(origin)) {
+        return callback(null, true);
+      }
+      callback(new Error('Not allowed by CORS'));
+    },
+    credentials: true,
+    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+    allowedHeaders: ['Content-Type', 'Authorization'],
+    maxAge: 86400, // 24 hours
+  })
+);
 
 // Body parser with default limit (can be overridden per route)
 app.use(express.json({ limit: '10mb' })); // Default limit, increased per endpoint as needed
@@ -359,7 +368,7 @@ void storage.initialize().then(() => {
 
 void authManager.initialize().then(async () => {
   console.log('Auth manager initialized');
-  
+
   // Initialize database schema if database is available
   if (dbPool) {
     try {
@@ -370,7 +379,7 @@ void authManager.initialize().then(async () => {
       throw error;
     }
   }
-  
+
   // Initialize new storage systems
   await profileStorage.initialize();
   await marketplaceStorage.initialize();
@@ -382,7 +391,7 @@ void authManager.initialize().then(async () => {
   await userSettingsStorage.initialize();
   await forumStorage.initialize();
   console.log('All storage systems initialized');
-  
+
   // Auto-seed marketplace if empty (development only)
   if (!isProduction) {
     const existingItems = await marketplaceStorage.getItems({ limit: 100 });
@@ -399,17 +408,14 @@ void authManager.initialize().then(async () => {
       }
     } else {
       // Add mock players and generate thumbnails for existing games
-      console.log(`Adding mock players and thumbnails to ${existingItems.length} existing games...`);
+      console.log(
+        `Adding mock players and thumbnails to ${existingItems.length} existing games...`
+      );
       for (const item of existingItems) {
         // Generate thumbnail if missing
         if (!item.thumbnailUrl) {
           try {
-            await generateAndSaveThumbnail(
-              THUMBNAIL_DIR,
-              item.id,
-              item.title,
-              item.tags
-            );
+            await generateAndSaveThumbnail(THUMBNAIL_DIR, item.id, item.title, item.tags);
             const thumbnailUrl = `/api/marketplace/thumbnails/${item.id}`;
             await marketplaceStorage.updateItem(item.id, { thumbnailUrl });
             console.log(`  → ${item.title}: Generated thumbnail`);
@@ -417,7 +423,7 @@ void authManager.initialize().then(async () => {
             console.warn(`  → ${item.title}: Failed to generate thumbnail:`, error);
           }
         }
-        
+
         // Add mock players (if no players already)
         const currentPlayers = gameSessionTracker.getPlayerCount(item.id);
         if (currentPlayers === 0) {
@@ -433,9 +439,9 @@ void authManager.initialize().then(async () => {
       }
     }
   }
-  
+
   // Initialize WebSocket server after auth is ready
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   const wsHandler = new WebSocketHandler(WS_PORT, sessionManager, authManager, messageHandler);
   // wsHandler is kept alive by its internal WebSocket server
   void wsHandler;
@@ -500,11 +506,11 @@ const routeDeps: RouteDependencies = {
   dbPool,
   path,
   fs,
-  
+
   // Cache functions
   cacheGet,
   cacheSet,
-  
+
   // In-memory stores
   userCarts,
   resaleListings,
@@ -519,26 +525,26 @@ const routeDeps: RouteDependencies = {
 
   // Helper functions
   getUserIdFromToken,
-  
+
   // Error classes (constructors)
   ValidationError,
   BuildDataError,
   PayloadTooLargeError,
   DatabaseError,
-  
+
   // Validation utilities
   sanitizeMarketplacePublishRequest,
-  
+
   // Middleware & schemas
   publishItemSchema,
   resaleListingSchema,
   searchQuerySchema,
   marketplaceItemIdParamSchema,
   validateQuery,
-  
+
   // Async handler wrapper (for routes that don't catch errors)
   asyncHandler,
-  
+
   // Economy config
   ECONOMY_MIN_PRICE,
   ECONOMY_PRICE_CHANGE_COOLDOWN_SEC,
@@ -573,7 +579,7 @@ app.get('/health', (_req: Request, res: Response) => {
  */
 app.use((err: unknown, _req: Request, res: Response, _next: express.NextFunction) => {
   console.error('Unhandled error:', err);
-  
+
   // Handle known error types
   if (err instanceof ValidationError) {
     return res.status(400).json({
@@ -640,8 +646,8 @@ app.use((_req: Request, res: Response) => {
   });
 });
 
-// Export app for testing
-export { app };
+// Export app and dependencies for testing
+export { app, authManager, marketplaceStorage, likesStorage, buildStorage, gameSessionTracker };
 
 // Start server (only if not in test environment)
 if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {

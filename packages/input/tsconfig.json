@@ -4,9 +4,29 @@
     "outDir": "./dist",
     "declaration": true,
     "declarationMap": true,
-    "composite": true
+    "composite": true,
+    "skipLibCheck": true,
+    "paths": {
+      "@engine/economy": ["../economy/dist"],
+      "@engine/economy/*": ["../economy/dist/*"],
+      "@engine/net-protocol": ["../net-protocol/dist"],
+      "@engine/net-protocol/*": ["../net-protocol/dist/*"],
+      "@engine/voxel": ["../voxel/dist"],
+      "@engine/voxel/*": ["../voxel/dist/*"],
+      "@engine/world-server": ["../world-server/dist"],
+      "@engine/world-server/*": ["../world-server/dist/*"]
+    }
   },
   "include": ["src/**/*"],
+  "exclude": [
+    "__tests__",
+    "dist",
+    "node_modules",
+    "../economy/src",
+    "../net-protocol/src",
+    "../voxel/src",
+    "../world-server/src"
+  ],
   "references": [
     { "path": "../camera" },
     { "path": "../core" },

@@ -3,11 +3,10 @@
  */
 
 import type { Scene } from '@engine/world';
-import type { LogicConnectionManager } from '../logic/LogicConnectionManager';
-import type { LogicConnection } from '../logic/cubes/types';
 import type { Mat4, Vec3 } from '@engine/core/math';
 import { createLineShaderCode } from './shaders/lineShader';
 import { LogicCubeComponent } from '@engine/script';
+import type { LogicConnectionManager, LogicConnection } from '@engine/script';
 // Note: LogicCubeLibrary is in apps/editor, which violates package boundaries
 // For now, using fallback colors when library is unavailable
 // TODO: Move LogicCubeLibrary to @engine/editor-utils or make this configurable

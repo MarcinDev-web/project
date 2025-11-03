@@ -22,15 +22,21 @@ export function encodeSnapshot(msg: SnapshotMessage): Uint8Array {
 
 export function decodeSnapshot(bytes: Uint8Array): SnapshotMessage {
   let off = 0;
-  let r = readVarUint(bytes, off); const seq = r.value; off = r.next;
-  r = readVarUint(bytes, off); const ackInputSeq = r.value; off = r.next;
-  r = readVarUint(bytes, off); const baselineSeq = r.value; off = r.next;
-  r = readVarUint(bytes, off); const payloadLen = r.value; off = r.next;
+  let r = readVarUint(bytes, off);
+  const seq = r.value;
+  off = r.next;
+  r = readVarUint(bytes, off);
+  const ackInputSeq = r.value;
+  off = r.next;
+  r = readVarUint(bytes, off);
+  const baselineSeq = r.value;
+  off = r.next;
+  r = readVarUint(bytes, off);
+  const payloadLen = r.value;
+  off = r.next;
   const payload = bytes.slice(off, off + payloadLen);
   return {
     header: { seq, ackInputSeq, baselineSeq, byteLength: payloadLen },
     payload,
   };
 }
-
-

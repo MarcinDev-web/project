@@ -22,7 +22,7 @@ export class BlockedUsersStorage {
 
   async initialize(): Promise<void> {
     await fs.mkdir(this.dataDir, { recursive: true });
-    
+
     try {
       await fs.access(this.blockedFile);
     } catch {
@@ -49,12 +49,10 @@ export class BlockedUsersStorage {
     }
 
     const blocked = await this.readBlocked();
-    
+
     // Check if already blocked
-    const existing = blocked.find(
-      b => b.userId === userId && b.blockedUserId === blockedUserId
-    );
-    
+    const existing = blocked.find((b) => b.userId === userId && b.blockedUserId === blockedUserId);
+
     if (existing) {
       return existing;
     }
@@ -67,14 +65,14 @@ export class BlockedUsersStorage {
 
     blocked.push(block);
     await this.writeBlocked(blocked);
-    
+
     return block;
   }
 
   async unblockUser(userId: string, blockedUserId: string): Promise<boolean> {
     const blocked = await this.readBlocked();
     const index = blocked.findIndex(
-      b => b.userId === userId && b.blockedUserId === blockedUserId
+      (b) => b.userId === userId && b.blockedUserId === blockedUserId
     );
 
     if (index === -1) {
@@ -83,15 +81,13 @@ export class BlockedUsersStorage {
 
     blocked.splice(index, 1);
     await this.writeBlocked(blocked);
-    
+
     return true;
   }
 
   async isBlocked(userId: string, blockedUserId: string): Promise<boolean> {
     const blocked = await this.readBlocked();
-    return blocked.some(
-      b => b.userId === userId && b.blockedUserId === blockedUserId
-    );
+    return blocked.some((b) => b.userId === userId && b.blockedUserId === blockedUserId);
   }
 
   async isBlockedBy(userId: string, blockerUserId: string): Promise<boolean> {
@@ -101,16 +97,11 @@ export class BlockedUsersStorage {
 
   async getBlockedUsers(userId: string): Promise<string[]> {
     const blocked = await this.readBlocked();
-    return blocked
-      .filter(b => b.userId === userId)
-      .map(b => b.blockedUserId);
+    return blocked.filter((b) => b.userId === userId).map((b) => b.blockedUserId);
   }
 
   async getBlockedByUsers(userId: string): Promise<string[]> {
     const blocked = await this.readBlocked();
-    return blocked
-      .filter(b => b.blockedUserId === userId)
-      .map(b => b.userId);
+    return blocked.filter((b) => b.blockedUserId === userId).map((b) => b.userId);
   }
 }
-

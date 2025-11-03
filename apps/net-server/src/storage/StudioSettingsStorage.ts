@@ -64,12 +64,11 @@ export class StudioSettingsStorageDB {
   }
 
   async get(userId: string): Promise<StudioSettings | null> {
-    const result = await this.pool.query(
-      'SELECT * FROM studio_settings WHERE user_id = $1',
-      [userId]
-    );
+    const result = await this.pool.query('SELECT * FROM studio_settings WHERE user_id = $1', [
+      userId,
+    ]);
     if (result.rows.length === 0) return null;
-    return this.mapRow(result.rows[0]!);
+    return this.mapRow(result.rows[0]);
   }
 
   async upsert(userId: string, updates: UpdateStudioSettingsRequest): Promise<StudioSettings> {
@@ -88,7 +87,7 @@ export class StudioSettingsStorageDB {
           updates.featureFlags ?? {},
         ]
       );
-      return this.mapRow(result.rows[0]!);
+      return this.mapRow(result.rows[0]);
     }
 
     const merged = {
@@ -113,7 +112,7 @@ export class StudioSettingsStorageDB {
         userId,
       ]
     );
-    return this.mapRow(result.rows[0]!);
+    return this.mapRow(result.rows[0]);
   }
 }
 
@@ -178,5 +177,3 @@ export class StudioSettingsStorage {
     return next;
   }
 }
-
-

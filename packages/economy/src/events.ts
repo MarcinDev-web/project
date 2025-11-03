@@ -1,5 +1,5 @@
-import type { Currency, CurrencyAmount, CurrencyBalance, WalletId } from './types';
-import type { Transaction } from './Transaction';
+import type { Currency, CurrencyAmount, CurrencyBalance, WalletId } from './types.js';
+import type { Transaction } from './Transaction.js';
 
 /**
  * Event emitted when currency is deposited into a wallet.

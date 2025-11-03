@@ -34,7 +34,7 @@ async function migrateUserRoles() {
       }
 
       // Optionally set first user as admin (only if no admins exist)
-      if (!adminSet && migrated === 1 && !Object.values(users).some(u => u.role === 'admin')) {
+      if (!adminSet && migrated === 1 && !Object.values(users).some((u) => u.role === 'admin')) {
         user.role = 'admin';
         adminSet = true;
         console.log(`Set ${email} as admin (first user)`);
@@ -67,4 +67,3 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 }
 
 export { migrateUserRoles };
-

@@ -45,4 +45,3 @@ export type FriendRequest = z.infer<typeof friendRequestSchema>;
 export type AcceptFriendRequest = z.infer<typeof acceptFriendRequestSchema>;
 export type FriendRequestIdParam = z.infer<typeof friendRequestIdParamSchema>;
 export type FriendIdParam = z.infer<typeof friendIdParamSchema>;
-

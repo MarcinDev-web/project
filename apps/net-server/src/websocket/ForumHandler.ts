@@ -40,7 +40,11 @@ export class ForumHandler {
    * Handle new thread created.
    * Broadcast to all users (clients can filter by category if needed).
    */
-  async handleThreadCreated(thread: ForumThread, categoryId: string, excludeUserId?: string): Promise<void> {
+  async handleThreadCreated(
+    thread: ForumThread,
+    categoryId: string,
+    excludeUserId?: string
+  ): Promise<void> {
     const message: ForumThreadNewMessage = {
       type: 'forum:thread:new',
       timestamp: Date.now(),
@@ -110,7 +114,11 @@ export class ForumHandler {
    * Handle new post created.
    * Broadcast to all users (clients can filter by thread if needed).
    */
-  async handlePostCreated(post: ForumPost, threadId: string, excludeUserId?: string): Promise<void> {
+  async handlePostCreated(
+    post: ForumPost,
+    threadId: string,
+    excludeUserId?: string
+  ): Promise<void> {
     const message: ForumPostNewMessage = {
       type: 'forum:post:new',
       timestamp: Date.now(),
@@ -133,7 +141,11 @@ export class ForumHandler {
    * Handle post updated.
    * Broadcast to all users.
    */
-  async handlePostUpdated(post: ForumPost, _threadId: string, excludeUserId?: string): Promise<void> {
+  async handlePostUpdated(
+    post: ForumPost,
+    _threadId: string,
+    excludeUserId?: string
+  ): Promise<void> {
     const message: ForumPostUpdatedMessage = {
       type: 'forum:post:updated',
       timestamp: Date.now(),

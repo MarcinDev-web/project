@@ -127,7 +127,8 @@ export function isDisposable(obj: unknown): obj is IDisposable {
     typeof obj === 'object' &&
     obj !== null &&
     'dispose' in obj &&
-    typeof (obj as any).dispose === 'function'
+    // Type guard needs to check property at runtime before narrowing
+    typeof (obj as { dispose?: unknown }).dispose === 'function'
   );
 }
 

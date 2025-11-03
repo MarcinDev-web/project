@@ -68,11 +68,7 @@ export class StudioTeamStorageDB {
 
   private generateToken(): string {
     const bytes = randomBytes(32);
-    return bytes
-      .toString('base64')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=/g, '');
+    return bytes.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
   }
 
   async createTeam(studioOwnerId: string, data: CreateTeamRequest): Promise<StudioTeam> {
@@ -134,11 +130,11 @@ export class StudioTeamStorageDB {
       createdAt: row.created_at.getTime(),
       updatedAt: row.updated_at.getTime(),
     };
-    
+
     if (row.description !== null) {
       team.description = row.description;
     }
-    
+
     return team;
   }
 
@@ -164,15 +160,18 @@ export class StudioTeamStorageDB {
       createdAt: row.created_at.getTime(),
       updatedAt: row.updated_at.getTime(),
     };
-    
+
     if (row.description !== null) {
       team.description = row.description;
     }
-    
+
     return team;
   }
 
-  async updateTeam(teamId: string, updates: { name?: string; description?: string }): Promise<StudioTeam> {
+  async updateTeam(
+    teamId: string,
+    updates: { name?: string; description?: string }
+  ): Promise<StudioTeam> {
     const updatesList: string[] = [];
     const params: unknown[] = [];
     let paramIndex = 1;
@@ -332,7 +331,7 @@ export class StudioTeamStorageDB {
       expiresAt: row.expires_at.getTime(),
       createdAt: row.created_at.getTime(),
     };
-    
+
     if (row.invitee_user_id !== null) {
       invitation.inviteeUserId = row.invitee_user_id;
     }
@@ -342,7 +341,7 @@ export class StudioTeamStorageDB {
     if (row.invitee_username !== null) {
       invitation.inviteeUsername = row.invitee_username;
     }
-    
+
     return invitation;
   }
 
@@ -374,7 +373,7 @@ export class StudioTeamStorageDB {
       expiresAt: row.expires_at.getTime(),
       createdAt: row.created_at.getTime(),
     };
-    
+
     if (row.invitee_user_id !== null) {
       invitation.inviteeUserId = row.invitee_user_id;
     }
@@ -384,7 +383,7 @@ export class StudioTeamStorageDB {
     if (row.invitee_username !== null) {
       invitation.inviteeUsername = row.invitee_username;
     }
-    
+
     return invitation;
   }
 
@@ -429,7 +428,7 @@ export class StudioTeamStorageDB {
         expiresAt: row.expires_at.getTime(),
         createdAt: row.created_at.getTime(),
       };
-      
+
       if (row.invitee_user_id !== null) {
         invitation.inviteeUserId = row.invitee_user_id;
       }
@@ -439,7 +438,7 @@ export class StudioTeamStorageDB {
       if (row.invitee_username !== null) {
         invitation.inviteeUsername = row.invitee_username;
       }
-      
+
       return invitation;
     });
   }
@@ -513,11 +512,11 @@ export class StudioTeamStorageDB {
       teamId: row.team_id,
       accessLevel: row.access_level as 'read' | 'write',
     };
-    
+
     if (row.user_id !== null) {
       access.userId = row.user_id;
     }
-    
+
     return access;
   }
 
@@ -535,11 +534,11 @@ export class StudioTeamStorageDB {
         teamId: row.team_id,
         accessLevel: row.access_level as 'read' | 'write',
       };
-      
+
       if (row.user_id !== null) {
         access.userId = row.user_id;
       }
-      
+
       return access;
     });
   }
@@ -574,11 +573,11 @@ export class StudioTeamStorageDB {
         teamId: row.team_id,
         accessLevel: row.access_level as 'read' | 'write',
       };
-      
+
       if (row.user_id !== null) {
         access.userId = row.user_id;
       }
-      
+
       return access;
     });
   }
@@ -612,11 +611,7 @@ export class StudioTeamStorage {
 
   private generateToken(): string {
     const bytes = randomBytes(32);
-    return bytes
-      .toString('base64')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=/g, '');
+    return bytes.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
   }
 
   async initialize(): Promise<void> {
@@ -722,7 +717,10 @@ export class StudioTeamStorage {
     return Object.values(teams).find((t) => t.studioOwnerId === studioOwnerId) || null;
   }
 
-  async updateTeam(teamId: string, updates: { name?: string; description?: string }): Promise<StudioTeam> {
+  async updateTeam(
+    teamId: string,
+    updates: { name?: string; description?: string }
+  ): Promise<StudioTeam> {
     const teams = await this.readTeams();
     const team = teams[teamId];
     if (!team) {
@@ -775,8 +773,8 @@ export class StudioTeamStorage {
     }
 
     // Check if already member
-    if (members[teamId]!.some((m) => m.userId === userId)) {
-      return members[teamId]!.find((m) => m.userId === userId)!;
+    if (members[teamId].some((m) => m.userId === userId)) {
+      return members[teamId].find((m) => m.userId === userId)!;
     }
 
     const member: TeamMember = {
@@ -787,7 +785,7 @@ export class StudioTeamStorage {
       invitedBy,
     };
 
-    members[teamId]!.push(member);
+    members[teamId].push(member);
     await this.writeMembers(members);
 
     return member;
@@ -871,9 +869,7 @@ export class StudioTeamStorage {
     }
 
     if (userId) {
-      filtered = filtered.filter(
-        (inv) => inv.inviteeUserId === userId || inv.inviterId === userId
-      );
+      filtered = filtered.filter((inv) => inv.inviteeUserId === userId || inv.inviterId === userId);
     }
 
     return filtered.sort((a, b) => b.createdAt - a.createdAt);
@@ -936,7 +932,7 @@ export class StudioTeamStorage {
       access[teamId] = [];
     }
 
-    const existing = access[teamId]!.findIndex((a) => a.projectId === projectId);
+    const existing = access[teamId].findIndex((a) => a.projectId === projectId);
     const newAccess: ProjectTeamAccess = {
       projectId,
       teamId,
@@ -945,9 +941,9 @@ export class StudioTeamStorage {
     };
 
     if (existing >= 0) {
-      access[teamId]![existing] = newAccess;
+      access[teamId][existing] = newAccess;
     } else {
-      access[teamId]!.push(newAccess);
+      access[teamId].push(newAccess);
     }
 
     await this.writeAccess(access);
@@ -1006,4 +1002,3 @@ export class StudioTeamStorage {
     return true;
   }
 }
-

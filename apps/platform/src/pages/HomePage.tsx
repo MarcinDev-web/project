@@ -6,6 +6,180 @@ import { useAuth } from '../contexts/AuthContext';
 
 type SortOption = 'newest' | 'popular' | 'trending';
 
+// Helper functions for game visuals
+const getGameEmoji = (tags: string[]): string => {
+  const tag = tags[0]?.toLowerCase() || '';
+  const emojiMap: Record<string, string> = {
+    adventure: '🏰',
+    racing: '🏎️',
+    puzzle: '🧩',
+    strategy: '🚀',
+    roguelike: '⚔️',
+    simulation: '🌾',
+    'battle-royale': '🎯',
+    'tower-defense': '🗼',
+    rpg: '🎮',
+    action: '⚡',
+    multiplayer: '👥',
+    casual: '🎨',
+    default: '🎮',
+  };
+  return emojiMap[tag] || emojiMap.default;
+};
+
+const getGameGradient = (id: string): string => {
+  const gradients = [
+    'linear-gradient(135deg, rgba(102, 126, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%)',
+    'linear-gradient(135deg, rgba(234, 102, 126, 0.3) 0%, rgba(162, 75, 118, 0.3) 100%)',
+    'linear-gradient(135deg, rgba(126, 234, 102, 0.3) 0%, rgba(75, 162, 118, 0.3) 100%)',
+    'linear-gradient(135deg, rgba(234, 178, 102, 0.3) 0%, rgba(162, 118, 75, 0.3) 100%)',
+    'linear-gradient(135deg, rgba(102, 234, 178, 0.3) 0%, rgba(75, 118, 162, 0.3) 100%)',
+    'linear-gradient(135deg, rgba(178, 102, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%)',
+  ];
+  const hash = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
+  return gradients[hash % gradients.length];
+};
+
+// Mock games dla development/demo
+const MOCK_GAMES: MarketplaceItem[] = [
+  {
+    id: 'mock-1',
+    type: 'build',
+    title: 'Sky Fortress Adventure',
+    description: 'Epic adventure in floating castles. Explore, fight monsters, and discover ancient secrets high above the clouds.',
+    authorId: 'demo-user-1',
+    authorName: 'DragonMaster',
+    thumbnailUrl: '',
+    fileUrl: '',
+    tags: ['adventure', 'action', 'singleplayer'],
+    createdAt: Date.now() - 2 * 24 * 60 * 60 * 1000,
+    updatedAt: Date.now() - 2 * 24 * 60 * 60 * 1000,
+    downloads: 1247,
+    likes: 342,
+    public: true,
+    playersOnline: 12,
+  },
+  {
+    id: 'mock-2',
+    type: 'build',
+    title: 'Neon Racing Circuit',
+    description: 'High-speed racing in cyberpunk city. Customize your vehicle and compete in underground races.',
+    authorId: 'demo-user-2',
+    authorName: 'SpeedDemon',
+    thumbnailUrl: '',
+    fileUrl: '',
+    tags: ['racing', 'multiplayer', 'competitive'],
+    createdAt: Date.now() - 5 * 24 * 60 * 60 * 1000,
+    updatedAt: Date.now() - 5 * 24 * 60 * 60 * 1000,
+    downloads: 2893,
+    likes: 567,
+    public: true,
+    playersOnline: 28,
+  },
+  {
+    id: 'mock-3',
+    type: 'build',
+    title: 'Crystal Puzzle Mines',
+    description: 'Mind-bending puzzles in mysterious crystal caves. Solve intricate challenges to unlock deeper levels.',
+    authorId: 'demo-user-3',
+    authorName: 'PuzzleGenius',
+    thumbnailUrl: '',
+    fileUrl: '',
+    tags: ['puzzle', 'logic', 'singleplayer'],
+    createdAt: Date.now() - 1 * 24 * 60 * 60 * 1000,
+    updatedAt: Date.now() - 1 * 24 * 60 * 60 * 1000,
+    downloads: 856,
+    likes: 234,
+    public: true,
+    playersOnline: 5,
+  },
+  {
+    id: 'mock-4',
+    type: 'build',
+    title: 'Space Colony Builder',
+    description: 'Build and manage your own space station. Balance resources, defend against pirates, and expand your colony.',
+    authorId: 'demo-user-4',
+    authorName: 'CosmicArchitect',
+    thumbnailUrl: '',
+    fileUrl: '',
+    tags: ['strategy', 'builder', 'simulation'],
+    createdAt: Date.now() - 7 * 24 * 60 * 60 * 1000,
+    updatedAt: Date.now() - 3 * 24 * 60 * 60 * 1000,
+    downloads: 3421,
+    likes: 891,
+    public: true,
+    playersOnline: 34,
+  },
+  {
+    id: 'mock-5',
+    type: 'build',
+    title: 'Dungeon Crawler Legends',
+    description: 'Classic roguelike dungeon crawler. Procedurally generated levels, permadeath, and epic loot.',
+    authorId: 'demo-user-5',
+    authorName: 'LootHunter',
+    thumbnailUrl: '',
+    fileUrl: '',
+    tags: ['roguelike', 'rpg', 'hardcore'],
+    createdAt: Date.now() - 3 * 24 * 60 * 60 * 1000,
+    updatedAt: Date.now() - 1 * 24 * 60 * 60 * 1000,
+    downloads: 1678,
+    likes: 445,
+    public: true,
+    playersOnline: 18,
+  },
+  {
+    id: 'mock-6',
+    type: 'build',
+    title: 'Peaceful Farm Valley',
+    description: 'Relaxing farming simulation. Grow crops, raise animals, and build your dream farm in a cozy valley.',
+    authorId: 'demo-user-6',
+    authorName: 'FarmerJoe',
+    thumbnailUrl: '',
+    fileUrl: '',
+    tags: ['simulation', 'casual', 'relaxing'],
+    createdAt: Date.now() - 10 * 24 * 60 * 60 * 1000,
+    updatedAt: Date.now() - 10 * 24 * 60 * 60 * 1000,
+    downloads: 4567,
+    likes: 1203,
+    public: true,
+    playersOnline: 42,
+  },
+  {
+    id: 'mock-7',
+    type: 'build',
+    title: 'Battle Royale Arena',
+    description: '100 players, one survivor. Fast-paced battle royale with destructible environments and unique weapons.',
+    authorId: 'demo-user-7',
+    authorName: 'WarriorKing',
+    thumbnailUrl: '',
+    fileUrl: '',
+    tags: ['battle-royale', 'multiplayer', 'pvp'],
+    createdAt: Date.now() - 4 * 24 * 60 * 60 * 1000,
+    updatedAt: Date.now() - 4 * 24 * 60 * 60 * 1000,
+    downloads: 5234,
+    likes: 1456,
+    public: true,
+    playersOnline: 87,
+  },
+  {
+    id: 'mock-8',
+    type: 'build',
+    title: 'Mystic Tower Defense',
+    description: 'Defend your realm with magical towers. Combine elements and upgrade defenses against endless waves.',
+    authorId: 'demo-user-8',
+    authorName: 'MageDefender',
+    thumbnailUrl: '',
+    fileUrl: '',
+    tags: ['tower-defense', 'strategy', 'magic'],
+    createdAt: Date.now() - 6 * 24 * 60 * 60 * 1000,
+    updatedAt: Date.now() - 2 * 24 * 60 * 60 * 1000,
+    downloads: 2134,
+    likes: 678,
+    public: true,
+    playersOnline: 23,
+  },
+];
+
 export function HomePage() {
   const { isAuthenticated } = useAuth();
   const [builds, setBuilds] = useState<MarketplaceItem[]>([]);
@@ -35,6 +209,11 @@ export function HomePage() {
       const response = await marketplaceApi.getBuilds({ limit: 50 });
       let sortedBuilds = [...response.items];
 
+      // Fallback to mock data if no real builds available
+      if (sortedBuilds.length === 0) {
+        sortedBuilds = [...MOCK_GAMES];
+      }
+
       // Apply sorting
       if (sortBy === 'newest') {
         sortedBuilds.sort((a, b) => b.createdAt - a.createdAt);
@@ -54,6 +233,8 @@ export function HomePage() {
       setBuilds(sortedBuilds);
     } catch (error) {
       console.error('Failed to load builds:', error);
+      // Use mock data on error
+      setBuilds([...MOCK_GAMES]);
     } finally {
       if (!silent) {
         setLoading(false);
@@ -166,7 +347,7 @@ export function HomePage() {
                   <div style={{
                     width: '100%',
                     aspectRatio: '16/9',
-                    background: 'var(--color-base-200)',
+                    background: getGameGradient(build.id),
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -187,13 +368,13 @@ export function HomePage() {
                           e.currentTarget.style.display = 'none';
                           const parent = e.currentTarget.parentElement;
                           if (parent) {
-                            parent.textContent = '🎮';
+                            parent.textContent = getGameEmoji(build.tags);
                             parent.style.fontSize = '3rem';
                           }
                         }}
                       />
                     ) : (
-                      '🎮'
+                      getGameEmoji(build.tags)
                     )}
                   </div>
 

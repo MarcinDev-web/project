@@ -4,21 +4,18 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
-import { app } from '../../server';
-import { AuthManager } from '../../auth/AuthManager';
+import { app, authManager } from '../../server';
 import { createTestUser } from '../helpers/testHelpers';
 
 describe('Studio Progress & Monetization API', () => {
-  let authManager: AuthManager;
   let user: { userId: string; email: string; token: string };
 
   beforeEach(async () => {
-    // Reuse helper similar to other tests
-    // AuthManager uses temp data dir by default if not provided in server
-    authManager = new AuthManager();
-    await authManager.initialize();
-
-    user = await createTestUser(authManager);
+    // Use server's shared authManager to ensure tokens are valid
+    // Use unique emails to avoid conflicts between parallel test runs
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(7);
+    user = await createTestUser(authManager, `user-${timestamp}-${random}@test.com`);
   });
 
   it('GET /api/studio/settings returns defaults for new user', async () => {

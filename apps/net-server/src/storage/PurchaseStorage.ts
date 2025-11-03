@@ -45,7 +45,7 @@ export class PurchaseStorage {
 
   async initialize(): Promise<void> {
     await fs.mkdir(this.dataDir, { recursive: true });
-    
+
     try {
       await fs.access(this.purchasesFile);
     } catch {
@@ -72,7 +72,9 @@ export class PurchaseStorage {
     await fs.writeFile(this.purchasesFile, JSON.stringify(purchases, null, 2));
   }
 
-  private async readOwnedItems(): Promise<Record<string, Record<string, { itemType: PurchaseItemType; purchasedAt: number }>>> {
+  private async readOwnedItems(): Promise<
+    Record<string, Record<string, { itemType: PurchaseItemType; purchasedAt: number }>>
+  > {
     try {
       const data = await fs.readFile(this.ownedItemsFile, 'utf-8');
       return JSON.parse(data);
@@ -81,14 +83,16 @@ export class PurchaseStorage {
     }
   }
 
-  private async writeOwnedItems(owned: Record<string, Record<string, { itemType: PurchaseItemType; purchasedAt: number }>>): Promise<void> {
+  private async writeOwnedItems(
+    owned: Record<string, Record<string, { itemType: PurchaseItemType; purchasedAt: number }>>
+  ): Promise<void> {
     await fs.writeFile(this.ownedItemsFile, JSON.stringify(owned, null, 2));
   }
 
   async createPurchase(purchase: Omit<Purchase, 'id' | 'createdAt'>): Promise<Purchase> {
     const purchases = await this.readPurchases();
     const ownedItems = await this.readOwnedItems();
-    
+
     const id = `purchase_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     const now = Date.now();
     const newPurchase: Purchase = {
@@ -114,7 +118,7 @@ export class PurchaseStorage {
 
     await this.writePurchases(purchases);
     await this.writeOwnedItems(ownedItems);
-    
+
     return newPurchase;
   }
 
@@ -128,11 +132,11 @@ export class PurchaseStorage {
     let filtered = Object.values(purchases);
 
     if (filter.userId) {
-      filtered = filtered.filter(p => p.userId === filter.userId);
+      filtered = filtered.filter((p) => p.userId === filter.userId);
     }
 
     if (filter.status) {
-      filtered = filtered.filter(p => p.status === filter.status);
+      filtered = filtered.filter((p) => p.status === filter.status);
     }
 
     // Sort by createdAt (newest first)
@@ -156,7 +160,7 @@ export class PurchaseStorage {
     purchase.status = status;
     purchases[id] = purchase;
     await this.writePurchases(purchases);
-    
+
     return purchase;
   }
 
@@ -171,24 +175,31 @@ export class PurchaseStorage {
     return key in userOwned;
   }
 
-  async getOwnedItems(userId: string): Promise<Array<{ itemId: string; itemType: PurchaseItemType; purchasedAt: number }>> {
+  async getOwnedItems(
+    userId: string
+  ): Promise<Array<{ itemId: string; itemType: PurchaseItemType; purchasedAt: number }>> {
     const ownedItems = await this.readOwnedItems();
     const userOwned = ownedItems[userId];
     if (!userOwned) {
       return [];
     }
 
-    return Object.entries(userOwned).map(([key, value]) => {
-      const [itemId, itemType] = key.split(':');
-      if (!itemId || !itemType) {
-        throw new Error(`Invalid owned item key: ${key}`);
-      }
-      return {
-        itemId,
-        itemType: itemType as PurchaseItemType,
-        purchasedAt: value.purchasedAt,
-      };
-    }).filter((item): item is { itemId: string; itemType: PurchaseItemType; purchasedAt: number } => item.itemId !== undefined);
+    return Object.entries(userOwned)
+      .map(([key, value]) => {
+        const [itemId, itemType] = key.split(':');
+        if (!itemId || !itemType) {
+          throw new Error(`Invalid owned item key: ${key}`);
+        }
+        return {
+          itemId,
+          itemType: itemType as PurchaseItemType,
+          purchasedAt: value.purchasedAt,
+        };
+      })
+      .filter(
+        (item): item is { itemId: string; itemType: PurchaseItemType; purchasedAt: number } =>
+          item.itemId !== undefined
+      );
   }
 
   /**
@@ -214,7 +225,7 @@ export class PurchaseStorage {
 
     // Add to buyer
     if (!ownedItems[toUserId]) ownedItems[toUserId] = {};
-    ownedItems[toUserId]![key] = {
+    ownedItems[toUserId][key] = {
       itemType,
       purchasedAt: Date.now(),
     };
@@ -223,4 +234,3 @@ export class PurchaseStorage {
     return true;
   }
 }
-

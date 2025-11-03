@@ -28,10 +28,10 @@ function parseSize(size: BodySizeLimit): number {
 
   const multipliers: Record<string, number> = {
     '': 1,
-    'b': 1,
-    'kb': 1024,
-    'mb': 1024 * 1024,
-    'gb': 1024 * 1024 * 1024,
+    b: 1,
+    kb: 1024,
+    mb: 1024 * 1024,
+    gb: 1024 * 1024 * 1024,
   };
 
   return value * (multipliers[unit] || 1);
@@ -72,4 +72,3 @@ export const BodySizeLimits = {
   MARKETPLACE_PUBLISH: 50 * 1024 * 1024, // 50MB
   FILE_UPLOAD: 100 * 1024 * 1024, // 100MB
 } as const;
-

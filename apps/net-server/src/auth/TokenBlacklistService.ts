@@ -49,9 +49,12 @@ export class TokenBlacklistService {
     }
 
     // Start cleanup interval (clean expired tokens every hour)
-    this.cleanupInterval = setInterval(() => {
-      void this.cleanupExpired();
-    }, 60 * 60 * 1000); // 1 hour
+    this.cleanupInterval = setInterval(
+      () => {
+        void this.cleanupExpired();
+      },
+      60 * 60 * 1000
+    ); // 1 hour
 
     this.initialized = true;
   }
@@ -107,27 +110,27 @@ export class TokenBlacklistService {
       await mkdir(this.dataDir, { recursive: true });
     }
 
-      // Load existing blacklist if file exists
-      if (existsSync(this.dataFile)) {
-        try {
-          const data = await readFile(this.dataFile, 'utf-8');
-          const entries = JSON.parse(data) as BlacklistEntry[];
-          const now = Date.now();
+    // Load existing blacklist if file exists
+    if (existsSync(this.dataFile)) {
+      try {
+        const data = await readFile(this.dataFile, 'utf-8');
+        const entries = JSON.parse(data) as BlacklistEntry[];
+        const now = Date.now();
 
-          // Only keep non-expired entries
-          for (const entry of entries) {
-            if (entry.expiresAt > now) {
-              this.memoryCache.add(entry.jti);
-            }
+        // Only keep non-expired entries
+        for (const entry of entries) {
+          if (entry.expiresAt > now) {
+            this.memoryCache.add(entry.jti);
           }
-
-          // Persist cleaned up list
-          await this.persistFileStorage();
-        } catch (error) {
-          console.error('Failed to load token blacklist file:', error);
-          this.memoryCache.clear();
         }
+
+        // Persist cleaned up list
+        await this.persistFileStorage();
+      } catch (error) {
+        console.error('Failed to load token blacklist file:', error);
+        this.memoryCache.clear();
       }
+    }
   }
 
   /**
@@ -182,13 +185,13 @@ export class TokenBlacklistService {
         const client = await this.dbPool.connect();
         try {
           await client.query('DELETE FROM token_blacklist WHERE expires_at <= $1', [now]);
-          
+
           // Update memory cache (remove expired)
           const result = await client.query<{ jti: string }>(
             'SELECT jti FROM token_blacklist WHERE expires_at > $1',
             [now]
           );
-          const activeJtis = new Set(result.rows.map(row => row.jti));
+          const activeJtis = new Set(result.rows.map((row) => row.jti));
           this.memoryCache = activeJtis;
         } finally {
           client.release();
@@ -233,4 +236,3 @@ export class TokenBlacklistService {
     }
   }
 }
-

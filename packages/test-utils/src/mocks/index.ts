@@ -47,6 +47,15 @@ export function createMockCanvas(width = 800, height = 600): HTMLCanvasElement {
 }
 
 /**
+ * Creates a mock WebGPU adapter
+ */
+function createMockAdapter() {
+  return {
+    requestDevice: vi.fn(() => Promise.resolve(createMockGPUDevice())),
+  };
+}
+
+/**
  * Creates a mock WebGPU device with common methods
  */
 export function createMockGPUDevice() {
@@ -78,11 +87,21 @@ export function createMockGPUDevice() {
     createBindGroupLayout: vi.fn(() => ({})),
     createPipelineLayout: vi.fn(() => ({})),
     createSampler: vi.fn(() => ({})),
+    destroy: vi.fn(),
     queue: {
       submit: vi.fn(),
       writeBuffer: vi.fn(),
       writeTexture: vi.fn(),
     },
+  };
+}
+
+/**
+ * Creates a mock WebGPU navigator with adapter support
+ */
+export function createMockGPU() {
+  return {
+    requestAdapter: vi.fn(() => Promise.resolve(createMockAdapter())),
   };
 }
 

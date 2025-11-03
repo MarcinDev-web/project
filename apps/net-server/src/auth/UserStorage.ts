@@ -49,7 +49,7 @@ export class UserStorage {
             needsMigration = true;
           }
         }
-        
+
         // Persist migrations if any
         if (needsMigration) {
           await this.persist();
@@ -133,7 +133,10 @@ export class UserStorage {
   /**
    * Update user data by email.
    */
-  async updateUser(email: string, updates: Partial<Omit<User, 'id' | 'email' | 'createdAt'>>): Promise<void> {
+  async updateUser(
+    email: string,
+    updates: Partial<Omit<User, 'id' | 'email' | 'createdAt'>>
+  ): Promise<void> {
     if (!this.initialized) {
       await this.initialize();
     }
@@ -156,7 +159,10 @@ export class UserStorage {
   /**
    * Update user data by ID.
    */
-  async updateUserById(userId: string, updates: Partial<Omit<User, 'id' | 'email' | 'createdAt'>>): Promise<User> {
+  async updateUserById(
+    userId: string,
+    updates: Partial<Omit<User, 'id' | 'email' | 'createdAt'>>
+  ): Promise<User> {
     if (!this.initialized) {
       await this.initialize();
     }
@@ -214,4 +220,3 @@ export class UserStorage {
     await writeFile(this.dataFile, json, 'utf-8');
   }
 }
-

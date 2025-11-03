@@ -54,11 +54,7 @@ export class ProjectStorage {
    */
   private generateToken(): string {
     const bytes = randomBytes(32);
-    return bytes
-      .toString('base64')
-      .replace(/\+/g, '-')
-      .replace(/\//g, '_')
-      .replace(/=/g, '');
+    return bytes.toString('base64').replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '');
   }
 
   /**
@@ -194,4 +190,3 @@ export class ProjectStorage {
     return Array.from(this.storage.keys());
   }
 }
-

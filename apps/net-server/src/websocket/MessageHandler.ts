@@ -27,7 +27,7 @@ export class MessageHandler {
    */
   async handleNewMessage(message: Message): Promise<void> {
     const conversation = await this.messagesStorage.getConversation(message.conversationId);
-    
+
     if (conversation?.type === 'group') {
       // Group message - send to all members except sender
       for (const participantId of conversation.participants) {
@@ -69,10 +69,14 @@ export class MessageHandler {
    * Handle message read notification.
    * Broadcast to sender if they're connected.
    */
-  async handleMessageRead(messageId: string, conversationId: string, userId: string): Promise<void> {
+  async handleMessageRead(
+    messageId: string,
+    conversationId: string,
+    userId: string
+  ): Promise<void> {
     // Get message to find sender
     const message = await this.messagesStorage.getMessageById(messageId);
-    
+
     if (message && message.fromUserId !== userId) {
       // Notify sender that their message was read
       this.sessionManager.sendToUser(message.fromUserId, {
@@ -89,12 +93,7 @@ export class MessageHandler {
    * Handle typing indicator.
    * Broadcast to other participants in conversation.
    */
-  handleTyping(
-    conversationId: string,
-    userId: string,
-    typing: boolean,
-    ws: WebSocket
-  ): void {
+  handleTyping(conversationId: string, userId: string, typing: boolean, ws: WebSocket): void {
     // Clear existing timeout for this user in this conversation
     const conversationTyping = this.typingUsers.get(conversationId);
     if (conversationTyping) {
@@ -155,4 +154,3 @@ export class MessageHandler {
     }
   }
 }
-

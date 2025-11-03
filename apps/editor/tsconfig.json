@@ -28,6 +28,8 @@
       "@engine/wasm-collision/*": ["../../packages/wasm-collision/src/*"],
       "@engine/net": ["../../packages/net/src"],
       "@engine/net/*": ["../../packages/net/src/*"],
+      "@engine/net-protocol": ["../../packages/net-protocol/src"],
+      "@engine/net-protocol/*": ["../../packages/net-protocol/src/*"],
       "@engine/editor-utils": ["../../packages/editor-utils/src"],
       "@engine/editor-utils/*": ["../../packages/editor-utils/src/*"],
       "@engine/economy": ["../../packages/economy/src"],

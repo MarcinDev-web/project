@@ -75,4 +75,3 @@ export interface AuthResponse {
   user: PublicUser;
   session: Session;
 }
-

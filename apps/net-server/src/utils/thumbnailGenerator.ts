@@ -29,14 +29,7 @@ const DEFAULT_COLORS = [
  * Generate an SVG thumbnail for a game
  */
 export function generateThumbnailSVG(options: ThumbnailOptions): string {
-  const {
-    title,
-    tags,
-    width = 320,
-    height = 180,
-    backgroundColor,
-    accentColor,
-  } = options;
+  const { title, tags, width = 320, height = 180, backgroundColor, accentColor } = options;
 
   // Select colors based on title hash for consistency
   const titleHash = title.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
@@ -106,7 +99,9 @@ export function generateThumbnailSVG(options: ThumbnailOptions): string {
         filter="url(#shadow)">
     ${displayLines[0] || title}
   </text>
-  ${displayLines.length > 1 ? `
+  ${
+    displayLines.length > 1
+      ? `
   <text x="${width / 2}" y="${height / 2 + 20}" 
         font-family="system-ui, -apple-system, sans-serif" 
         font-size="24" 
@@ -115,16 +110,26 @@ export function generateThumbnailSVG(options: ThumbnailOptions): string {
         text-anchor="middle" 
         filter="url(#shadow)">
     ${displayLines[1]}
-  </text>` : ''}
+  </text>`
+      : ''
+  }
   
   <!-- Tags at bottom -->
-  ${displayTags.length > 0 ? `
-  <g transform="translate(${width / 2 - (displayTags.length * 50)}, ${height - 40})">
-    ${displayTags.map((tag, i) => `
+  ${
+    displayTags.length > 0
+      ? `
+  <g transform="translate(${width / 2 - displayTags.length * 50}, ${height - 40})">
+    ${displayTags
+      .map(
+        (tag, i) => `
     <rect x="${i * 60}" y="0" width="50" height="20" rx="10" fill="rgba(255,255,255,0.2)" stroke="rgba(255,255,255,0.3)" stroke-width="1"/>
     <text x="${i * 60 + 25}" y="14" font-family="system-ui" font-size="10" fill="white" text-anchor="middle">${tag.substring(0, 6)}</text>
-    `).join('')}
-  </g>` : ''}
+    `
+      )
+      .join('')}
+  </g>`
+      : ''
+  }
   
   <!-- Platform badge -->
   <rect x="10" y="10" width="60" height="24" rx="12" fill="rgba(0,0,0,0.3)"/>
@@ -141,12 +146,12 @@ export async function saveThumbnail(
   svg: string
 ): Promise<string> {
   await fs.mkdir(thumbnailDir, { recursive: true });
-  
+
   const filename = `${itemId}.svg`;
   const filepath = path.join(thumbnailDir, filename);
-  
+
   await fs.writeFile(filepath, svg, 'utf-8');
-  
+
   return filename;
 }
 

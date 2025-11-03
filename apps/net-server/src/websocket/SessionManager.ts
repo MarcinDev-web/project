@@ -22,9 +22,9 @@ export class SessionManager {
    */
   async createSession(projectId: string, ownerId: string): Promise<CollaborationSession> {
     const sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    
+
     const ownerUser = await this.getPublicUser(ownerId);
-    
+
     const session: CollaborationSession = {
       id: sessionId,
       projectId,
@@ -177,7 +177,7 @@ export class SessionManager {
         };
       }
     }
-    
+
     // Fallback if AuthManager is not available or user not found
     return {
       id: userId,
@@ -227,7 +227,7 @@ export class SessionManager {
   setUserOnline(userId: string, ws: WebSocket): void {
     const wasOnline = this.isUserOnline(userId);
     this.connections.set(userId, ws);
-    
+
     // Broadcast online status to friends if this is a new connection
     if (!wasOnline) {
       this.broadcastPresenceChange(userId, true);
@@ -240,7 +240,7 @@ export class SessionManager {
   setUserOffline(userId: string): void {
     const wasOnline = this.isUserOnline(userId);
     this.connections.delete(userId);
-    
+
     // Broadcast offline status to friends if user was online
     if (wasOnline) {
       this.broadcastPresenceChange(userId, false);
@@ -267,4 +267,3 @@ export class SessionManager {
     this.presenceCallback = callback;
   }
 }
-

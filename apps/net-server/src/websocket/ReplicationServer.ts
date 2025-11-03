@@ -27,9 +27,16 @@ export class ReplicationServer {
   private readonly authManager: AuthManager;
   private readonly messageHandler: MessageHandler | null;
   private readonly connections = new Map<WebSocket, string>(); // ws -> userId
-  private readonly connectionTokens = new Map<WebSocket, { token: string; expiresAt: number | null }>(); // ws -> token info
+  private readonly connectionTokens = new Map<
+    WebSocket,
+    { token: string; expiresAt: number | null }
+  >(); // ws -> token info
 
-  constructor(sessionManager: SessionManager, authManager: AuthManager, messageHandler?: MessageHandler) {
+  constructor(
+    sessionManager: SessionManager,
+    authManager: AuthManager,
+    messageHandler?: MessageHandler
+  ) {
     this.sessionManager = sessionManager;
     this.authManager = authManager;
     this.messageHandler = messageHandler ?? null;
@@ -62,17 +69,19 @@ export class ReplicationServer {
         parsed = JSON.parse(rawMessage);
       } catch (error: unknown) {
         this.sendError(ws, 'Invalid JSON format', 'INVALID_FORMAT');
-        securityLogger.logSuspiciousActivity(
-          undefined,
-          'Invalid JSON in WebSocket message'
-        );
+        securityLogger.logSuspiciousActivity(undefined, 'Invalid JSON in WebSocket message');
         return;
       }
 
       // Validate message schema
       const validationResult = websocketMessageSchema.safeParse(parsed);
       if (!validationResult.success) {
-        const errors = validationResult.error.errors.map((e: { path: (string | number)[]; message: string }) => `${e.path.join('.')}: ${e.message}`).join(', ');
+        const errors = validationResult.error.errors
+          .map(
+            (e: { path: (string | number)[]; message: string }) =>
+              `${e.path.join('.')}: ${e.message}`
+          )
+          .join(', ');
         this.sendError(ws, `Invalid message format: ${errors}`, 'VALIDATION_FAILED');
         securityLogger.logSuspiciousActivity(
           undefined,
@@ -168,7 +177,6 @@ export class ReplicationServer {
         user: publicUser,
       };
       this.sendToWebSocket(ws, confirmation);
-
     } catch (error) {
       console.error('Error joining session:', error);
       this.sendError(ws, 'Failed to join session', 'JOIN_FAILED');
@@ -211,7 +219,7 @@ export class ReplicationServer {
         this.sendError(ws, 'Token expired', 'TOKEN_EXPIRED');
         return;
       }
-      
+
       const userId = this.getUserIdFromConnection(ws);
       if (!userId) {
         this.sendError(ws, 'Not authenticated', 'NOT_AUTHENTICATED');
@@ -242,7 +250,7 @@ export class ReplicationServer {
       if (!this.isTokenValid(ws)) {
         return; // Silently ignore expired token for player updates (frequent messages)
       }
-      
+
       const userId = this.getUserIdFromConnection(ws);
       if (!userId) {
         return;
@@ -269,7 +277,7 @@ export class ReplicationServer {
       if (!this.isTokenValid(ws)) {
         return; // Silently ignore expired token for cursor updates (frequent messages)
       }
-      
+
       const userId = this.getUserIdFromConnection(ws);
       if (!userId) {
         return;
@@ -330,7 +338,7 @@ export class ReplicationServer {
   private getUserIdFromConnection(ws: WebSocket): string | null {
     return this.connections.get(ws) ?? null;
   }
-  
+
   /**
    * Check if token is still valid (not expired).
    */
@@ -339,14 +347,14 @@ export class ReplicationServer {
     if (!tokenInfo) {
       return false;
     }
-    
+
     // If expiration time is available, check if it's expired
     if (tokenInfo.expiresAt !== null) {
       const now = Date.now();
       // Add 5 minute buffer before expiration
       return tokenInfo.expiresAt > now + 5 * 60 * 1000;
     }
-    
+
     // If expiration time is not available, assume valid (backward compatibility)
     return true;
   }
@@ -377,4 +385,3 @@ export class ReplicationServer {
     }
   }
 }
-

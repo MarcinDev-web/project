@@ -60,4 +60,3 @@ export interface ShareMetadataResponse {
   createdAt: number;
   expiresAt?: number;
 }
-

@@ -124,7 +124,7 @@ const mockGames = [
 export async function seedMarketplace(tracker?: GameSessionTracker): Promise<void> {
   try {
     await storage.initialize();
-    
+
     // Check if marketplace already has items
     const existing = await storage.getItems({ limit: 1 });
     if (existing.length > 0) {
@@ -133,7 +133,7 @@ export async function seedMarketplace(tracker?: GameSessionTracker): Promise<voi
     }
 
     console.log('Seeding marketplace with mock games...');
-    
+
     // Initialize build storage if database is available
     let buildStorage: BuildStorage | null = null;
     let dbPool: Pool | null = null;
@@ -146,19 +146,19 @@ export async function seedMarketplace(tracker?: GameSessionTracker): Promise<voi
         console.warn('Failed to initialize build storage:', error);
       }
     }
-    
+
     // Use provided tracker or create a new one
     const trackerToUse = tracker ?? gameSessionTracker;
-    
+
     for (const game of mockGames) {
       // Create item first to get the ID
       const item = await storage.createItem(game);
       console.log(`✓ Created: ${item.title}`);
-      
+
       // In Kogama style: builds are accessed via their marketplace ID
       // Replace placeholder {id} with actual item ID
       const fileUrl = `/api/marketplace/${item.id}/build`;
-      
+
       // Generate thumbnail (with error handling)
       let thumbnailUrl: string | undefined;
       try {
@@ -174,11 +174,11 @@ export async function seedMarketplace(tracker?: GameSessionTracker): Promise<voi
         console.warn(`  → Failed to generate thumbnail for ${item.title}:`, error);
         // Continue without thumbnail - will be generated later if needed
       }
-      
+
       // Simulate some downloads and likes for variety
       const downloads = Math.floor(Math.random() * 1000) + 10;
       const likes = Math.floor(Math.random() * 500) + 5;
-      
+
       // Update with correct fileUrl, simulated stats and thumbnail
       await storage.updateItem(item.id, {
         fileUrl, // Set proper fileUrl with actual ID
@@ -186,7 +186,7 @@ export async function seedMarketplace(tracker?: GameSessionTracker): Promise<voi
         likes,
         ...(thumbnailUrl && { thumbnailUrl }), // Only add thumbnailUrl if it was generated
       });
-      
+
       // Save build data if storage is available and item is a build
       if (item.type === 'build' && buildStorage) {
         try {
@@ -278,11 +278,12 @@ export async function seedMarketplace(tracker?: GameSessionTracker): Promise<voi
 
 // Run if called directly (not imported)
 if (import.meta.url.endsWith(process.argv[1]?.replace(/\\/g, '/') || '')) {
-  void seedMarketplace().then(() => {
-    process.exit(0);
-  }).catch((error) => {
-    console.error('Seed failed:', error);
-    process.exit(1);
-  });
+  void seedMarketplace()
+    .then(() => {
+      process.exit(0);
+    })
+    .catch((error) => {
+      console.error('Seed failed:', error);
+      process.exit(1);
+    });
 }
-

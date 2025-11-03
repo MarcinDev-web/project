@@ -71,17 +71,25 @@ export interface RouteDependencies {
   isProduction: boolean;
   THUMBNAIL_DIR: string;
   FRONTEND_URL: string;
-  generateAndSaveThumbnail: (thumbnailDir: string, itemId: string, title: string, tags: string[]) => Promise<string>;
+  generateAndSaveThumbnail: (
+    thumbnailDir: string,
+    itemId: string,
+    title: string,
+    tags: string[]
+  ) => Promise<string>;
   dbPool: Pool | null;
   path: typeof import('path');
   fs: typeof import('fs').promises;
-  
+
   // Cache functions (for studio routes)
   cacheGet: <T>(key: string) => T | null;
   cacheSet: <T>(key: string, data: T, ttlMs?: number) => void;
-  
+
   // In-memory stores
-  userCarts: Map<string, Array<{ itemId: string; type: 'shop-item' | 'asset' | 'marketplace-item'; quantity: number }>>;
+  userCarts: Map<
+    string,
+    Array<{ itemId: string; type: 'shop-item' | 'asset' | 'marketplace-item'; quantity: number }>
+  >;
   resaleListings: Map<string, { sellerId: string; price: CurrencyAmount; createdAt: number }[]>;
 
   // Rate limiters
@@ -98,27 +106,42 @@ export interface RouteDependencies {
 
   // Helper functions
   getUserIdFromToken: (authHeader: string | undefined) => Promise<string | null>;
-  
+
   // Error classes (constructors)
-  ValidationError: new (message: string, errors?: Array<{ field: string; message: string }>) => import('../errors/MarketplaceErrors').ValidationError;
-  BuildDataError: new (message: string, originalError?: Error) => import('../errors/MarketplaceErrors').BuildDataError;
-  PayloadTooLargeError: new (message: string) => import('../errors/MarketplaceErrors').PayloadTooLargeError;
-  DatabaseError: new (message: string, originalError?: Error) => import('../errors/MarketplaceErrors').DatabaseError;
-  
+  ValidationError: new (
+    message: string,
+    errors?: Array<{ field: string; message: string }>
+  ) => import('../errors/MarketplaceErrors').ValidationError;
+  BuildDataError: new (
+    message: string,
+    originalError?: Error
+  ) => import('../errors/MarketplaceErrors').BuildDataError;
+  PayloadTooLargeError: new (
+    message: string
+  ) => import('../errors/MarketplaceErrors').PayloadTooLargeError;
+  DatabaseError: new (
+    message: string,
+    originalError?: Error
+  ) => import('../errors/MarketplaceErrors').DatabaseError;
+
   // Validation utilities
   sanitizeMarketplacePublishRequest: (body: Record<string, unknown>) => Record<string, unknown>;
-  
+
   // Middleware & schemas
   publishItemSchema: typeof import('../validation/schemas/marketplace').publishItemSchema;
   resaleListingSchema: typeof import('../validation/schemas/marketplace').resaleListingSchema;
   searchQuerySchema: typeof import('../validation/schemas/marketplace').searchQuerySchema;
   marketplaceItemIdParamSchema: typeof import('../validation/schemas/marketplace').marketplaceItemIdParamSchema;
   validateQuery: typeof import('../validation/middleware').validateQuery;
-  
+
+  // Async handler wrapper (for routes that don't catch errors)
+  asyncHandler: (
+    fn: (req: Request, res: Response, next: NextFunction) => Promise<unknown>
+  ) => (req: Request, res: Response, next: NextFunction) => void;
+
   // Economy config
   ECONOMY_MIN_PRICE: Record<string, number>;
   ECONOMY_PRICE_CHANGE_COOLDOWN_SEC: number;
   ECONOMY_LISTING_FEE: Record<string, number>;
   ECONOMY_PLATFORM_FEE_BPS: number;
 }
-

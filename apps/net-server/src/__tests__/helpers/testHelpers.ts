@@ -17,7 +17,7 @@ const JWT_SECRET = process.env.JWT_SECRET || 'test-secret-key';
 export async function createTestUser(
   authManager: AuthManager,
   email = `test_${Date.now()}@example.com`,
-  password = 'testpassword123'
+  password = 'TestPassword123'
 ): Promise<{ userId: string; email: string; token: string }> {
   const result = await authManager.register(email, password);
   const token = result.session.token;
@@ -75,6 +75,29 @@ export async function createTestMarketplaceItem(
     tags: options.tags || ['test'],
     public: true,
   });
+}
+
+/**
+ * Wait for an item to be available in storage (with retry for database transaction timing)
+ */
+export async function waitForItem(
+  storage: MarketplaceStorage | MarketplaceStorageDB,
+  itemId: string,
+  maxAttempts = 10,
+  delayMs = 50
+): Promise<void> {
+  for (let i = 0; i < maxAttempts; i++) {
+    const item = await storage.getItem(itemId);
+    if (item) {
+      return;
+    }
+    await new Promise((resolve) => setTimeout(resolve, delayMs));
+  }
+  // Final attempt without delay - let it throw if still not found
+  const item = await storage.getItem(itemId);
+  if (!item) {
+    throw new Error(`Item ${itemId} not found after ${maxAttempts} attempts`);
+  }
 }
 
 /**

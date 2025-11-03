@@ -3,7 +3,12 @@ import { z } from 'zod';
 import type { RouteDependencies } from './index';
 import type { AuthRequest } from '../auth/middleware';
 import { validateBody } from '../validation/middleware';
-import { registerSchema, loginSchema, refreshTokenSchema, logoutSchema } from '../validation/schemas/auth';
+import {
+  registerSchema,
+  loginSchema,
+  refreshTokenSchema,
+  logoutSchema,
+} from '../validation/schemas/auth';
 import { bodySizeLimit, BodySizeLimits } from '../middleware/bodySizeLimit';
 
 /**
@@ -11,20 +16,15 @@ import { bodySizeLimit, BodySizeLimits } from '../middleware/bodySizeLimit';
  */
 export function createAuthRoutes(deps: RouteDependencies): Router {
   const router = Router();
-  const {
-    authManager,
-    authMiddleware,
-    profileStorage,
-    authLimiter,
-    isProduction,
-    securityLogger,
-  } = deps;
+  const { authManager, authMiddleware, profileStorage, authLimiter, isProduction, securityLogger } =
+    deps;
 
   /**
    * POST /api/auth/register
    * Register a new user account.
    */
-  router.post('/register',
+  router.post(
+    '/register',
     bodySizeLimit(BodySizeLimits.AUTH),
     authLimiter,
     validateBody(registerSchema),
@@ -57,9 +57,8 @@ export function createAuthRoutes(deps: RouteDependencies): Router {
         );
 
         const status = message.includes('already exists') ? 409 : 400;
-        const errorMessage = isProduction && !message.includes('already exists')
-          ? 'Registration failed'
-          : message;
+        const errorMessage =
+          isProduction && !message.includes('already exists') ? 'Registration failed' : message;
 
         res.status(status).json({
           error: 'Registration failed',
@@ -73,7 +72,8 @@ export function createAuthRoutes(deps: RouteDependencies): Router {
    * POST /api/auth/login
    * Login with email and password.
    */
-  router.post('/login',
+  router.post(
+    '/login',
     bodySizeLimit(BodySizeLimits.AUTH),
     authLimiter,
     validateBody(loginSchema),
@@ -127,13 +127,25 @@ export function createAuthRoutes(deps: RouteDependencies): Router {
       }
 
       // Get profile with extended data
-      const profile = await profileStorage.getProfile(req.user.id);
-      res.json(profile ?? user);
+      let profile;
+      try {
+        profile = await profileStorage.getProfile(req.user.id);
+      } catch (profileError) {
+        // Log but don't fail - fallback to user data
+        console.warn('Failed to get profile for user', req.user.id, profileError);
+        profile = null;
+      }
+
+      // Return profile if exists, otherwise return user
+      const result = profile ?? user;
+      res.json(result);
     } catch (error) {
       console.error('Get user error:', error);
       const message = isProduction
         ? 'Failed to get user'
-        : error instanceof Error ? error.message : String(error);
+        : error instanceof Error
+          ? error.message
+          : String(error);
 
       res.status(500).json({
         error: 'Failed to get user',
@@ -146,7 +158,8 @@ export function createAuthRoutes(deps: RouteDependencies): Router {
    * POST /api/auth/refresh
    * Refresh authentication token using refresh token.
    */
-  router.post('/refresh',
+  router.post(
+    '/refresh',
     bodySizeLimit(BodySizeLimits.AUTH),
     validateBody(refreshTokenSchema),
     async (req: Request, res: Response) => {
@@ -163,7 +176,9 @@ export function createAuthRoutes(deps: RouteDependencies): Router {
         console.error('Refresh token error:', error);
         const message = isProduction
           ? 'Token refresh failed'
-          : error instanceof Error ? error.message : 'Token refresh failed';
+          : error instanceof Error
+            ? error.message
+            : 'Token refresh failed';
 
         res.status(401).json({
           error: 'Token refresh failed',
@@ -177,7 +192,8 @@ export function createAuthRoutes(deps: RouteDependencies): Router {
    * POST /api/auth/logout
    * Logout and revoke current session tokens.
    */
-  router.post('/logout',
+  router.post(
+    '/logout',
     authMiddleware,
     bodySizeLimit(BodySizeLimits.AUTH),
     validateBody(logoutSchema),
@@ -201,7 +217,11 @@ export function createAuthRoutes(deps: RouteDependencies): Router {
         console.error('Logout error:', error);
         res.status(500).json({
           error: 'Logout failed',
-          message: isProduction ? 'Logout failed' : error instanceof Error ? error.message : String(error),
+          message: isProduction
+            ? 'Logout failed'
+            : error instanceof Error
+              ? error.message
+              : String(error),
         });
       }
     }
@@ -209,4 +229,3 @@ export function createAuthRoutes(deps: RouteDependencies): Router {
 
   return router;
 }
-

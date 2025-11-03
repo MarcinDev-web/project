@@ -19,6 +19,8 @@ export default defineConfig({
       '@engine/avatar': path.resolve(__dirname, '../../packages/avatar/src'),
       '@engine/camera': path.resolve(__dirname, '../../packages/camera/src'),
       '@engine/script': path.resolve(__dirname, '../../packages/script/src'),
+      '@engine/net': path.resolve(__dirname, '../../packages/net/src'),
+      '@engine/net-protocol': path.resolve(__dirname, '../../packages/net-protocol/src'),
       '@shared': path.resolve(__dirname, '../../shared'),
       '@shared/types': path.resolve(__dirname, '../../shared/types'),
     },

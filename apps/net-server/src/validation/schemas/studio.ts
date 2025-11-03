@@ -62,13 +62,15 @@ export const studioTeamIdParamSchema = z.object({
 /**
  * Invite team member schema.
  */
-export const inviteTeamMemberSchema = z.object({
-  userId: uuidSchema.or(z.string().min(1)).optional(),
-  email: z.string().email().optional(),
-  username: trimmedStringSchema(100).optional(),
-}).refine((data) => data.userId || data.email || data.username, {
-  message: 'Either userId, email, or username must be provided',
-});
+export const inviteTeamMemberSchema = z
+  .object({
+    userId: uuidSchema.or(z.string().min(1)).optional(),
+    email: z.string().email().optional(),
+    username: trimmedStringSchema(100).optional(),
+  })
+  .refine((data) => data.userId || data.email || data.username, {
+    message: 'Either userId, email, or username must be provided',
+  });
 
 /**
  * Team invitation ID param schema.
@@ -115,4 +117,3 @@ export type InviteTeamMemberRequest = z.infer<typeof inviteTeamMemberSchema>;
 export type TeamInvitationIdParam = z.infer<typeof teamInvitationIdParamSchema>;
 export type ShareProjectWithTeamRequest = z.infer<typeof shareProjectWithTeamSchema>;
 export type UpdateStudioSettingsRequest = z.infer<typeof updateStudioSettingsSchema>;
-

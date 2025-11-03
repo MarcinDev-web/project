@@ -79,7 +79,10 @@ export function createFriendsRoutes(deps: RouteDependencies): Router {
       const request = await friendsStorage.createRequest(req.user.id, toUserId);
 
       // Check notification preference
-      const wantsNotifications = await userSettingsStorage.getNotificationPreference(toUserId, 'friendRequests');
+      const wantsNotifications = await userSettingsStorage.getNotificationPreference(
+        toUserId,
+        'friendRequests'
+      );
 
       if (wantsNotifications) {
         // Create notification for recipient
@@ -94,7 +97,9 @@ export function createFriendsRoutes(deps: RouteDependencies): Router {
         });
 
         // Notify via WebSocket if online
-        const notification = await notificationsStorage.getNotifications(toUserId, 1).then(n => n[0]);
+        const notification = await notificationsStorage
+          .getNotifications(toUserId, 1)
+          .then((n) => n[0]);
         if (notification) {
           sessionManager.sendToUser(toUserId, {
             type: 'notification:new',
@@ -161,7 +166,7 @@ export function createFriendsRoutes(deps: RouteDependencies): Router {
 
       if (action === 'accept') {
         const requests = await friendsStorage.getRequests(req.user.id);
-        const request = requests.find(r => r.id === id);
+        const request = requests.find((r) => r.id === id);
 
         const accepted = await friendsStorage.acceptRequest(id, req.user.id);
         if (!accepted) {
@@ -170,7 +175,10 @@ export function createFriendsRoutes(deps: RouteDependencies): Router {
 
         // Create notification for sender
         if (request) {
-          const wantsNotifications = await userSettingsStorage.getNotificationPreference(request.fromUserId, 'friendAccepted');
+          const wantsNotifications = await userSettingsStorage.getNotificationPreference(
+            request.fromUserId,
+            'friendAccepted'
+          );
 
           if (wantsNotifications) {
             const toUser = await authManager.getUserById(req.user.id);
@@ -184,7 +192,9 @@ export function createFriendsRoutes(deps: RouteDependencies): Router {
             });
 
             // Notify via WebSocket if online
-            const notification = await notificationsStorage.getNotifications(request.fromUserId, 1).then(n => n[0]);
+            const notification = await notificationsStorage
+              .getNotifications(request.fromUserId, 1)
+              .then((n) => n[0]);
             if (notification) {
               sessionManager.sendToUser(request.fromUserId, {
                 type: 'notification:new',
@@ -241,7 +251,10 @@ export function createFriendsRoutes(deps: RouteDependencies): Router {
 
       // Get all users (simplified - in production, use pagination/cursor)
       // For now, we'll get users from conversations and friends of friends
-      const suggestions = new Map<string, { userId: string; score: number; mutualFriends: number }>();
+      const suggestions = new Map<
+        string,
+        { userId: string; score: number; mutualFriends: number }
+      >();
 
       // Find mutual friends (friends of friends)
       for (const friendId of userFriends) {
@@ -342,4 +355,3 @@ export function createFriendsRoutes(deps: RouteDependencies): Router {
 
   return router;
 }
-

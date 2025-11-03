@@ -691,6 +691,7 @@ fn fragmentMain(
 
     for (let i = 0; i < instanceCount; i++) {
       const inst = instances[i];
+      if (!inst) continue;
       const pos = inst.position;
       const veg = inst.vegetation;
 

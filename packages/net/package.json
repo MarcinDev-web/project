@@ -17,6 +17,7 @@
   },
   "dependencies": {
     "@engine/core": "workspace:*",
+    "@engine/net-protocol": "workspace:*",
     "@engine/world": "workspace:*"
   },
   "devDependencies": {

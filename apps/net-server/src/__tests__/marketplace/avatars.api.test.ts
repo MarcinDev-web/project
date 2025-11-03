@@ -2,55 +2,37 @@
  * Integration tests for GET /api/marketplace/avatars
  */
 
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import request from 'supertest';
-import { app } from '../../server';
-import { MarketplaceStorage } from '../../storage/MarketplaceStorage';
-import { MarketplaceStorageDB } from '../../storage/MarketplaceStorageDB';
-import { createTestMarketplaceItem, createMultipleTestItems } from '../helpers/testHelpers';
-import { createDbPool } from '../../lib/db';
-import type { Pool } from 'pg';
-import { promises as fs } from 'fs';
-import path from 'path';
-import os from 'os';
+import { app, marketplaceStorage } from '../../server';
+import { createTestMarketplaceItem, createMultipleTestItems, waitForItem } from '../helpers/testHelpers';
 
 describe('GET /api/marketplace/avatars', () => {
-  let marketplaceStorage: MarketplaceStorage | MarketplaceStorageDB;
-  let dbPool: Pool | null = null;
-  let tempDir: string;
-
-  beforeEach(async () => {
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'forge-test-'));
-
-    if (process.env.DATABASE_URL) {
-      try {
-        dbPool = createDbPool();
-        marketplaceStorage = new MarketplaceStorageDB(dbPool);
-      } catch {
-        marketplaceStorage = new MarketplaceStorage(tempDir);
-      }
-    } else {
-      marketplaceStorage = new MarketplaceStorage(tempDir);
-    }
-    await marketplaceStorage.initialize();
-  });
+  // Use server's shared marketplaceStorage to ensure items are valid
 
   it('returns list of avatars', async () => {
-    await createTestMarketplaceItem(marketplaceStorage, {
+    const item1 = await createTestMarketplaceItem(marketplaceStorage, {
       authorId: 'user1',
       type: 'avatar',
       title: 'Avatar 1',
     });
-    await createTestMarketplaceItem(marketplaceStorage, {
+    const item2 = await createTestMarketplaceItem(marketplaceStorage, {
       authorId: 'user1',
       type: 'avatar',
       title: 'Avatar 2',
     });
-    await createTestMarketplaceItem(marketplaceStorage, {
+    const item3 = await createTestMarketplaceItem(marketplaceStorage, {
       authorId: 'user1',
       type: 'build',
       title: 'Build Item', // Should not appear
     });
+
+    // Wait for items to be available (handles database transaction timing)
+    await Promise.all([
+      waitForItem(marketplaceStorage, item1.id),
+      waitForItem(marketplaceStorage, item2.id),
+      waitForItem(marketplaceStorage, item3.id),
+    ]);
 
     const response = await request(app)
       .get('/api/marketplace/avatars')
@@ -87,6 +69,9 @@ describe('GET /api/marketplace/avatars', () => {
       type: 'avatar',
       title: 'Test Avatar',
     });
+
+    // Wait for item to be available (handles database transaction timing)
+    await waitForItem(marketplaceStorage, item.id);
 
     const response = await request(app)
       .get('/api/marketplace/avatars')

@@ -10,11 +10,7 @@ import { updateProfileSchema, userIdParamSchema } from '../validation/schemas/us
  */
 export function createUsersRoutes(deps: RouteDependencies): Router {
   const router = Router();
-  const {
-    authMiddleware,
-    profileStorage,
-    marketplaceStorage,
-  } = deps;
+  const { authMiddleware, profileStorage, marketplaceStorage } = deps;
 
   /**
    * GET /api/users/:id
@@ -46,7 +42,8 @@ export function createUsersRoutes(deps: RouteDependencies): Router {
    * PUT /api/users/:id
    * Update user profile (own profile only).
    */
-  router.put('/:id',
+  router.put(
+    '/:id',
     authMiddleware,
     validateParams(userIdParamSchema),
     validateBody(updateProfileSchema),
@@ -179,16 +176,32 @@ export function createUsersRoutes(deps: RouteDependencies): Router {
       }
 
       // Convert parts to proper type structure
-      const typedLoadout: { version: number; parts: Record<string, { mesh: string; mat?: string; material?: string; colors?: Record<string, [number, number, number, number]> }> } = {
+      const typedLoadout: {
+        version: number;
+        parts: Record<
+          string,
+          {
+            mesh: string;
+            mat?: string;
+            material?: string;
+            colors?: Record<string, [number, number, number, number]>;
+          }
+        >;
+      } = {
         version: loadout.version,
         parts: Object.fromEntries(
           Object.entries(loadout.parts).map(([key, value]) => [
             key,
             typeof value === 'object' && value !== null && 'mesh' in value
-              ? (value as { mesh: string; mat?: string; material?: string; colors?: Record<string, [number, number, number, number]> })
-              : { mesh: String(value) }
+              ? (value as {
+                  mesh: string;
+                  mat?: string;
+                  material?: string;
+                  colors?: Record<string, [number, number, number, number]>;
+                })
+              : { mesh: String(value) },
           ])
-        )
+        ),
       };
 
       const profile = await profileStorage.updateProfile(req.user.id, {
@@ -216,4 +229,3 @@ export function createUsersRoutes(deps: RouteDependencies): Router {
 
   return router;
 }
-

@@ -16,6 +16,7 @@ export default defineConfig({
       '@engine/gfx-webgpu': path.resolve(__dirname, '../../packages/gfx-webgpu/src'),
       '@engine/avatar': path.resolve(__dirname, '../../packages/avatar/src'),
       '@engine/camera': path.resolve(__dirname, '../../packages/camera/src'),
+      '@engine/script': path.resolve(__dirname, '../../packages/script/src'),
       '@shared/types': path.resolve(__dirname, '../../shared/types'),
     },
   },

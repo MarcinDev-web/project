@@ -72,5 +72,3 @@ export function getPoolMetrics(): PoolMetrics {
     hitRate: total > 0 ? metrics.hits / total : 0,
   };
 }
-
-

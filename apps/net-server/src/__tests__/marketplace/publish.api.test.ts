@@ -4,47 +4,19 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
-import { app } from '../../server';
-import { AuthManager } from '../../auth/AuthManager';
-import { MarketplaceStorage } from '../../storage/MarketplaceStorage';
-import { MarketplaceStorageDB } from '../../storage/MarketplaceStorageDB';
-import { BuildStorage } from '../../storage/BuildStorage';
+import { app, authManager, marketplaceStorage, buildStorage } from '../../server';
 import { createTestUser, createTestBuild } from '../helpers/testHelpers';
-import { createDbPool } from '../../lib/db';
-import type { Pool } from 'pg';
 import type { ProjectData } from '../../types';
-import { promises as fs } from 'fs';
-import path from 'path';
-import os from 'os';
 
 describe('POST /api/marketplace', () => {
-  let authManager: AuthManager;
-  let marketplaceStorage: MarketplaceStorage | MarketplaceStorageDB;
-  let buildStorage: BuildStorage | null = null;
-  let dbPool: Pool | null = null;
-  let tempDir: string;
   let user: { userId: string; email: string; token: string };
 
   beforeEach(async () => {
-    tempDir = await fs.mkdtemp(path.join(os.tmpdir(), 'forge-test-'));
-
-    authManager = new AuthManager(tempDir);
-    await authManager.initialize();
-
-    if (process.env.DATABASE_URL) {
-      try {
-        dbPool = createDbPool();
-        marketplaceStorage = new MarketplaceStorageDB(dbPool);
-        buildStorage = new BuildStorage(dbPool);
-      } catch {
-        marketplaceStorage = new MarketplaceStorage(tempDir);
-      }
-    } else {
-      marketplaceStorage = new MarketplaceStorage(tempDir);
-    }
-    await marketplaceStorage.initialize();
-
-    user = await createTestUser(authManager);
+    // Use server's shared instances to ensure tokens and items are valid
+    // Use unique emails to avoid conflicts between parallel test runs
+    const timestamp = Date.now();
+    const random = Math.random().toString(36).substring(7);
+    user = await createTestUser(authManager, `user-${timestamp}-${random}@test.com`);
   });
 
   it('publishes item successfully with auth', async () => {

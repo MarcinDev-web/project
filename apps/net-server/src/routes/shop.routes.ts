@@ -31,15 +31,29 @@ export function createShopRoutes(deps: RouteDependencies): Router {
       const offset = req.query.offset ? parseInt(String(req.query.offset), 10) : 0;
       const search = req.query.search as string | undefined;
 
-      const filter: { category?: 'consumable' | 'cosmetic' | 'upgrade' | 'collectible'; currency?: string; available: boolean; limit?: number; offset?: number; search?: string } = { available, limit, offset };
-      if (category !== undefined) filter.category = category as 'consumable' | 'cosmetic' | 'upgrade' | 'collectible';
+      const filter: {
+        category?: 'consumable' | 'cosmetic' | 'upgrade' | 'collectible';
+        currency?: string;
+        available: boolean;
+        limit?: number;
+        offset?: number;
+        search?: string;
+      } = { available, limit, offset };
+      if (category !== undefined)
+        filter.category = category as 'consumable' | 'cosmetic' | 'upgrade' | 'collectible';
       if (currency !== undefined) filter.currency = currency;
       if (search !== undefined) filter.search = search;
 
       const items = await shopStorage.getItems(filter);
 
-      const countFilter: { category?: 'consumable' | 'cosmetic' | 'upgrade' | 'collectible'; currency?: string; available: boolean; search?: string } = { available };
-      if (category !== undefined) countFilter.category = category as 'consumable' | 'cosmetic' | 'upgrade' | 'collectible';
+      const countFilter: {
+        category?: 'consumable' | 'cosmetic' | 'upgrade' | 'collectible';
+        currency?: string;
+        available: boolean;
+        search?: string;
+      } = { available };
+      if (category !== undefined)
+        countFilter.category = category as 'consumable' | 'cosmetic' | 'upgrade' | 'collectible';
       if (currency !== undefined) countFilter.currency = currency;
       if (search !== undefined) countFilter.search = search;
 
@@ -134,71 +148,81 @@ export function createShopRoutes(deps: RouteDependencies): Router {
    * PUT /api/shop/items/:id
    * Update shop item (admin only)
    */
-  router.put('/items/:id', authMiddleware, requireAdmin(), async (req: AuthRequest, res: Response) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+  router.put(
+    '/items/:id',
+    authMiddleware,
+    requireAdmin(),
+    async (req: AuthRequest, res: Response) => {
+      try {
+        if (!req.user) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const { id } = req.params;
+        if (!id || typeof id !== 'string') {
+          return res.status(400).json({ error: 'Item ID is required' });
+        }
+        const updates = req.body as Partial<{
+          name: string;
+          description: string;
+          category: 'consumable' | 'cosmetic' | 'upgrade' | 'collectible';
+          price: { currency: string; amount: number };
+          imageUrl: string;
+          available: boolean;
+          stock: number;
+        }>;
+
+        const item = await shopStorage.updateItem(id, updates);
+
+        if (!item) {
+          return res.status(404).json({ error: 'Item not found' });
+        }
+
+        res.json(item);
+      } catch (error) {
+        console.error('Update shop item error:', error);
+        res.status(500).json({
+          error: 'Failed to update shop item',
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
-
-      const { id } = req.params;
-      if (!id || typeof id !== 'string') {
-        return res.status(400).json({ error: 'Item ID is required' });
-      }
-      const updates = req.body as Partial<{
-        name: string;
-        description: string;
-        category: 'consumable' | 'cosmetic' | 'upgrade' | 'collectible';
-        price: { currency: string; amount: number };
-        imageUrl: string;
-        available: boolean;
-        stock: number;
-      }>;
-
-      const item = await shopStorage.updateItem(id, updates);
-
-      if (!item) {
-        return res.status(404).json({ error: 'Item not found' });
-      }
-
-      res.json(item);
-    } catch (error) {
-      console.error('Update shop item error:', error);
-      res.status(500).json({
-        error: 'Failed to update shop item',
-        message: error instanceof Error ? error.message : String(error),
-      });
     }
-  });
+  );
 
   /**
    * DELETE /api/shop/items/:id
    * Delete shop item (admin only)
    */
-  router.delete('/items/:id', authMiddleware, requireAdmin(), async (req: AuthRequest, res: Response) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
+  router.delete(
+    '/items/:id',
+    authMiddleware,
+    requireAdmin(),
+    async (req: AuthRequest, res: Response) => {
+      try {
+        if (!req.user) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
 
-      const { id } = req.params;
-      if (!id || typeof id !== 'string') {
-        return res.status(400).json({ error: 'Item ID is required' });
-      }
-      const deleted = await shopStorage.deleteItem(id);
+        const { id } = req.params;
+        if (!id || typeof id !== 'string') {
+          return res.status(400).json({ error: 'Item ID is required' });
+        }
+        const deleted = await shopStorage.deleteItem(id);
 
-      if (!deleted) {
-        return res.status(404).json({ error: 'Item not found' });
-      }
+        if (!deleted) {
+          return res.status(404).json({ error: 'Item not found' });
+        }
 
-      res.status(204).send();
-    } catch (error) {
-      console.error('Delete shop item error:', error);
-      res.status(500).json({
-        error: 'Failed to delete shop item',
-        message: error instanceof Error ? error.message : String(error),
-      });
+        res.status(204).send();
+      } catch (error) {
+        console.error('Delete shop item error:', error);
+        res.status(500).json({
+          error: 'Failed to delete shop item',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
-  });
+  );
 
   /**
    * GET /api/shop/cart
@@ -246,7 +270,7 @@ export function createShopRoutes(deps: RouteDependencies): Router {
 
       // Check if item already in cart
       const existingIndex = cart.findIndex(
-        item => item.itemId === body.itemId && item.type === body.type
+        (item) => item.itemId === body.itemId && item.type === body.type
       );
 
       if (existingIndex >= 0) {
@@ -288,9 +312,7 @@ export function createShopRoutes(deps: RouteDependencies): Router {
       }
 
       const cart = userCarts.get(req.user.id) ?? [];
-      const filtered = cart.filter(
-        item => !(item.itemId === itemId && item.type === itemType)
-      );
+      const filtered = cart.filter((item) => !(item.itemId === itemId && item.type === itemType));
 
       userCarts.set(req.user.id, filtered);
       res.json({ items: filtered });
@@ -342,10 +364,15 @@ export function createShopRoutes(deps: RouteDependencies): Router {
 
       // Simple A/B tuning via header: X-AB-Group: 'A' | 'B'
       const abGroup = (req.headers['x-ab-group'] as string | undefined)?.toUpperCase();
-      const overrideMultiplier = abGroup === 'B'
-        ? parseFloat(String(process.env.ECONOMY_PRICE_MULTIPLIER_B ?? '1'))
-        : undefined;
-      const result = await purchaseService.checkout(req.user.id, { items: cart }, overrideMultiplier);
+      const overrideMultiplier =
+        abGroup === 'B'
+          ? parseFloat(String(process.env.ECONOMY_PRICE_MULTIPLIER_B ?? '1'))
+          : undefined;
+      const result = await purchaseService.checkout(
+        req.user.id,
+        { items: cart },
+        overrideMultiplier
+      );
 
       if (result.success && result.purchaseId) {
         // Clear cart on success
@@ -377,7 +404,15 @@ export function createShopRoutes(deps: RouteDependencies): Router {
       const offset = req.query.offset ? parseInt(String(req.query.offset), 10) : 0;
       const search = req.query.search as string | undefined;
 
-      const filter: { type?: 'material' | 'model' | 'texture' | 'script'; category?: string; authorId?: string; available: boolean; limit?: number; offset?: number; search?: string } = { available, limit, offset };
+      const filter: {
+        type?: 'material' | 'model' | 'texture' | 'script';
+        category?: string;
+        authorId?: string;
+        available: boolean;
+        limit?: number;
+        offset?: number;
+        search?: string;
+      } = { available, limit, offset };
       if (type !== undefined) filter.type = type;
       if (category !== undefined) filter.category = category;
       if (authorId !== undefined) filter.authorId = authorId;
@@ -385,7 +420,13 @@ export function createShopRoutes(deps: RouteDependencies): Router {
 
       const assets = await assetStorage.getAssets(filter);
 
-      const countFilter: { type?: 'material' | 'model' | 'texture' | 'script'; category?: string; authorId?: string; available: boolean; search?: string } = { available };
+      const countFilter: {
+        type?: 'material' | 'model' | 'texture' | 'script';
+        category?: string;
+        authorId?: string;
+        available: boolean;
+        search?: string;
+      } = { available };
       if (type !== undefined) countFilter.type = type;
       if (category !== undefined) countFilter.category = category;
       if (authorId !== undefined) countFilter.authorId = authorId;
@@ -476,63 +517,75 @@ export function createShopRoutes(deps: RouteDependencies): Router {
    * PUT /api/shop/assets/:id
    * Update asset (admin only)
    */
-  router.put('/assets/:id', authMiddleware, requireAdmin(), async (req: AuthRequest, res: Response) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+  router.put(
+    '/assets/:id',
+    authMiddleware,
+    requireAdmin(),
+    async (req: AuthRequest, res: Response) => {
+      try {
+        if (!req.user) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
+
+        const { id } = req.params;
+        if (!id || typeof id !== 'string') {
+          return res.status(400).json({ error: 'Asset ID is required' });
+        }
+        const updates = req.body as Partial<
+          Omit<import('../storage/AssetStorage').Asset, 'id' | 'createdAt' | 'authorId'>
+        >;
+
+        const asset = await assetStorage.updateAsset(id, updates);
+
+        if (!asset) {
+          return res.status(404).json({ error: 'Asset not found' });
+        }
+
+        res.json(asset);
+      } catch (error) {
+        console.error('Update asset error:', error);
+        res.status(500).json({
+          error: 'Failed to update asset',
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
-
-      const { id } = req.params;
-      if (!id || typeof id !== 'string') {
-        return res.status(400).json({ error: 'Asset ID is required' });
-      }
-      const updates = req.body as Partial<Omit<import('../storage/AssetStorage').Asset, 'id' | 'createdAt' | 'authorId'>>;
-
-      const asset = await assetStorage.updateAsset(id, updates);
-
-      if (!asset) {
-        return res.status(404).json({ error: 'Asset not found' });
-      }
-
-      res.json(asset);
-    } catch (error) {
-      console.error('Update asset error:', error);
-      res.status(500).json({
-        error: 'Failed to update asset',
-        message: error instanceof Error ? error.message : String(error),
-      });
     }
-  });
+  );
 
   /**
    * DELETE /api/shop/assets/:id
    * Delete asset (admin only)
    */
-  router.delete('/assets/:id', authMiddleware, requireAdmin(), async (req: AuthRequest, res: Response) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
+  router.delete(
+    '/assets/:id',
+    authMiddleware,
+    requireAdmin(),
+    async (req: AuthRequest, res: Response) => {
+      try {
+        if (!req.user) {
+          return res.status(401).json({ error: 'Unauthorized' });
+        }
 
-      const { id } = req.params;
-      if (!id || typeof id !== 'string') {
-        return res.status(400).json({ error: 'Asset ID is required' });
-      }
-      const deleted = await assetStorage.deleteAsset(id);
+        const { id } = req.params;
+        if (!id || typeof id !== 'string') {
+          return res.status(400).json({ error: 'Asset ID is required' });
+        }
+        const deleted = await assetStorage.deleteAsset(id);
 
-      if (!deleted) {
-        return res.status(404).json({ error: 'Asset not found' });
-      }
+        if (!deleted) {
+          return res.status(404).json({ error: 'Asset not found' });
+        }
 
-      res.status(204).send();
-    } catch (error) {
-      console.error('Delete asset error:', error);
-      res.status(500).json({
-        error: 'Failed to delete asset',
-        message: error instanceof Error ? error.message : String(error),
-      });
+        res.status(204).send();
+      } catch (error) {
+        console.error('Delete asset error:', error);
+        res.status(500).json({
+          error: 'Failed to delete asset',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
-  });
+  );
 
   /**
    * POST /api/shop/assets
@@ -697,4 +750,3 @@ export function createShopRoutes(deps: RouteDependencies): Router {
 
   return router;
 }
-

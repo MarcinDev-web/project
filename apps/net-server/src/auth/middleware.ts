@@ -20,7 +20,7 @@ export function createAuthMiddleware(authManager: AuthManager) {
   return async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
     try {
       const authHeader = req.headers.authorization;
-      
+
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
         res.status(401).json({ error: 'Missing or invalid authorization header' });
         return;
@@ -113,4 +113,3 @@ export function requireRole(role: UserRole) {
     next();
   };
 }
-

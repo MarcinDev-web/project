@@ -50,4 +50,3 @@ export type UpdateUserRequest = z.infer<typeof updateUserSchema>;
 export type AdminUserIdParam = z.infer<typeof adminUserIdParamSchema>;
 export type AdminMarketplaceItemIdParam = z.infer<typeof adminMarketplaceItemIdParamSchema>;
 export type AdminProjectTokenParam = z.infer<typeof adminProjectTokenParamSchema>;
-

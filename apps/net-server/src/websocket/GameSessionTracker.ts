@@ -17,10 +17,17 @@ export class GameSessionTracker {
 
   /**
    * Join a game session (player starts playing).
+   * If user is already in another game, they will leave that game first.
    */
   joinGame(gameId: string, userId: string): void {
+    // If user is already in a different game, leave it first
+    const currentGameId = this.playerGames.get(userId);
+    if (currentGameId && currentGameId !== gameId) {
+      this.leaveGame(currentGameId, userId);
+    }
+
     let session = this.gameSessions.get(gameId);
-    
+
     if (!session) {
       session = {
         gameId,
@@ -102,4 +109,3 @@ export class GameSessionTracker {
     }));
   }
 }
-

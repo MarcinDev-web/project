@@ -13,17 +13,20 @@ const PROFILES_FILE = path.join(DATA_DIR, 'profiles.json');
 
 async function createAdminProfile() {
   console.log('Loading users...');
-  
+
   if (!existsSync(USERS_FILE)) {
     console.error('❌ users.json not found');
     process.exit(1);
   }
 
   const usersData = await readFile(USERS_FILE, 'utf-8');
-  const users = JSON.parse(usersData) as Record<string, { id: string; email: string; role?: string; createdAt: number }>;
+  const users = JSON.parse(usersData) as Record<
+    string,
+    { id: string; email: string; role?: string; createdAt: number }
+  >;
 
   // Find admin user
-  const adminUser = Object.values(users).find(u => u.role === 'admin');
+  const adminUser = Object.values(users).find((u) => u.role === 'admin');
   if (!adminUser) {
     console.error('❌ No admin user found');
     process.exit(1);
@@ -67,4 +70,3 @@ void createAdminProfile().catch((error) => {
   console.error('❌ Error:', error);
   process.exit(1);
 });
-

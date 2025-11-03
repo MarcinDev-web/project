@@ -17,12 +17,22 @@ interface JwtPayload {
   email: string;
 }
 
-async function findUserByEmail(pool: Pool, email: string): Promise<{ id: string; email: string; password_hash: string } | null> {
-  const { rows } = await pool.query('SELECT id, email, password_hash FROM users WHERE email=$1', [email]);
+async function findUserByEmail(
+  pool: Pool,
+  email: string
+): Promise<{ id: string; email: string; password_hash: string } | null> {
+  const { rows } = await pool.query<{ id: string; email: string; password_hash: string }>(
+    'SELECT id, email, password_hash FROM users WHERE email=$1',
+    [email]
+  );
   return rows[0] ?? null;
 }
 
-async function insertUser(pool: Pool, email: string, passwordHash: string): Promise<{ id: string; email: string }> {
+async function insertUser(
+  pool: Pool,
+  email: string,
+  passwordHash: string
+): Promise<{ id: string; email: string }> {
   const id = randomUUID();
   await pool.query(
     'INSERT INTO users (id, email, password_hash) VALUES ($1, $2, $3) ON CONFLICT (email) DO NOTHING',
@@ -67,14 +77,14 @@ export function registerAuthRoutes(app: FastifyInstance, pool: Pool): void {
         user: { id: userId, email: body.email, createdAt: Date.now() },
         session: { token, expiresAt },
       });
-    } catch (err) {
+    } catch {
       return reply.status(400).send({ error: 'Invalid request' });
     }
   });
 
   app.get('/me', async (req, reply) => {
     try {
-      const authHeader = (req.headers['authorization'] as string | undefined) || '';
+      const authHeader = req.headers['authorization'] || '';
       if (!authHeader.startsWith('Bearer ')) {
         return reply.status(401).send({ error: 'Unauthorized' });
       }
@@ -87,9 +97,11 @@ export function registerAuthRoutes(app: FastifyInstance, pool: Pool): void {
   });
 }
 
-export function verifyJwtFromRequest(req: FastifyRequest): { userId: string; email: string } | null {
+export function verifyJwtFromRequest(
+  req: FastifyRequest
+): { userId: string; email: string } | null {
   try {
-    const header = (req.headers['authorization'] as string | undefined) || '';
+    const header = req.headers['authorization'] || '';
     if (!header.startsWith('Bearer ')) return null;
     const token = header.slice(7);
     const payload = jwt.verify(token, JWT_SECRET) as JwtPayload;
@@ -98,5 +110,3 @@ export function verifyJwtFromRequest(req: FastifyRequest): { userId: string; ema
     return null;
   }
 }
-
-

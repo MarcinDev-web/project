@@ -91,4 +91,3 @@ export class CurrencyService {
     this.manager.dispose();
   }
 }
-

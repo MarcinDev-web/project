@@ -7,7 +7,7 @@
 
 import { DisposableGroup } from '@engine/core';
 import type { CustomMeshData } from '@engine/world';
-import type { MicroBlockChunk, MicroBlock, MicroBlockType } from './types';
+import type { MicroBlockChunk, MicroBlock } from './types';
 import { MICRO_BLOCK_SIZE, DEFAULT_CHUNK_SIZE } from './MicroBlockStore';
 
 /**
@@ -34,17 +34,15 @@ const FACE_NORMALS: Array<[number, number, number]> = [
   [0, -1, 0], // Bottom
 ];
 
-/**
- * Face UV offsets for different faces
- */
-const FACE_UVS: Array<[number, number, number, number, number, number, number, number]> = [
-  [0, 0, 1, 0, 1, 1, 0, 1], // Front
-  [1, 0, 0, 0, 0, 1, 1, 1], // Back
-  [0, 0, 0, 1, 1, 1, 1, 0], // Left
-  [1, 0, 1, 1, 0, 1, 0, 0], // Right
-  [0, 1, 1, 1, 1, 0, 0, 0], // Top
-  [0, 0, 1, 0, 1, 1, 0, 1], // Bottom
-];
+// Face UV offsets for different faces (reserved for future texture mapping)
+// const FACE_UVS: Array<[number, number, number, number, number, number, number, number]> = [
+//   [0, 0, 1, 0, 1, 1, 0, 1], // Front
+//   [1, 0, 0, 0, 0, 1, 1, 1], // Back
+//   [0, 0, 0, 1, 1, 1, 1, 0], // Left
+//   [1, 0, 1, 1, 0, 1, 0, 0], // Right
+//   [0, 1, 1, 1, 1, 0, 0, 0], // Top
+//   [0, 0, 1, 0, 1, 1, 0, 1], // Bottom
+// ];
 
 /**
  * Generates mesh geometry for micro block chunks using greedy meshing
@@ -110,7 +108,7 @@ export class MicroBlockMesher {
    * Generates faces for a specific direction using greedy meshing
    */
   private generateFacesForDirection(
-    chunk: MicroBlockChunk,
+    _chunk: MicroBlockChunk,
     blockGrid: Map<number, MicroBlock>,
     direction: FaceDirection
   ): { vertices: Array<[number, number, number] | [number, number, number, number, number, number]>; indices: number[] } {
@@ -118,23 +116,10 @@ export class MicroBlockMesher {
     const indices: number[] = [];
 
     const normal = FACE_NORMALS[direction];
-    const [nx, ny, nz] = normal;
-
-    // Determine axes based on face direction
-    let uAxis: [number, number, number];
-    let vAxis: [number, number, number];
-
-    if (direction === FaceDirection.Top || direction === FaceDirection.Bottom) {
-      uAxis = [1, 0, 0];
-      vAxis = [0, 0, 1];
-    } else if (direction === FaceDirection.Front || direction === FaceDirection.Back) {
-      uAxis = [1, 0, 0];
-      vAxis = [0, 1, 0];
-    } else {
-      // Left or Right
-      uAxis = [0, 1, 0];
-      vAxis = [0, 0, 1];
+    if (!normal) {
+      throw new Error(`Invalid face direction: ${direction}`);
     }
+    const [nx, ny, nz] = normal;
 
     // Check each block position
     for (let z = 0; z < this.chunkSize; z++) {
@@ -165,7 +150,7 @@ export class MicroBlockMesher {
           const faceVertices = this.generateFaceVertices(
             [x, y, z],
             direction,
-            normal
+            normal as [number, number, number]
           );
 
           // Add vertices

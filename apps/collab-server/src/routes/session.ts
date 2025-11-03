@@ -33,7 +33,7 @@ export function registerSessionRoutes(app: FastifyInstance, pool: Pool): void {
         [body.projectId, auth.userId, 'editor']
       );
       return reply.send({ sessionId });
-    } catch (err) {
+    } catch {
       return reply.status(400).send({ error: 'Invalid request' });
     }
   });
@@ -71,17 +71,17 @@ export function registerSessionRoutes(app: FastifyInstance, pool: Pool): void {
       const q = req.query as { projectId?: string };
       const projectId = q.projectId ?? '';
       if (!projectId) return reply.status(400).send({ error: 'projectId required' });
-      const { rows } = await pool.query(
+      const { rows } = await pool.query<{ payload: Buffer }>(
         'SELECT payload FROM scene_snapshots WHERE project_id=$1 ORDER BY created_at DESC LIMIT 1',
         [projectId]
       );
       if (rows.length === 0) return reply.status(404).send({ error: 'Not found' });
-      const payload = JSON.parse(Buffer.from(rows[0].payload).toString('utf-8')) as unknown;
+      const payload = JSON.parse(
+        Buffer.from(rows[0]?.payload ?? Buffer.alloc(0)).toString('utf-8')
+      ) as unknown;
       return reply.send({ payload });
     } catch {
       return reply.status(500).send({ error: 'Failed to load snapshot' });
     }
   });
 }
-
-

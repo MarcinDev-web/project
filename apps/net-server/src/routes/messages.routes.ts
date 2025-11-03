@@ -148,7 +148,10 @@ export function createMessagesRoutes(deps: RouteDependencies): Router {
         // Group message - create notifications for all members except sender
         for (const memberId of conversation.participants) {
           if (memberId !== req.user.id) {
-            const wantsNotifications = await userSettingsStorage.getNotificationPreference(memberId, 'messages');
+            const wantsNotifications = await userSettingsStorage.getNotificationPreference(
+              memberId,
+              'messages'
+            );
 
             if (wantsNotifications) {
               await notificationsStorage.createNotification({
@@ -161,7 +164,9 @@ export function createMessagesRoutes(deps: RouteDependencies): Router {
               });
 
               // Send notification via WebSocket
-              const notification = await notificationsStorage.getNotifications(memberId, 1).then(n => n[0]);
+              const notification = await notificationsStorage
+                .getNotifications(memberId, 1)
+                .then((n) => n[0]);
               if (notification) {
                 sessionManager.sendToUser(memberId, {
                   type: 'notification:new',
@@ -181,7 +186,10 @@ export function createMessagesRoutes(deps: RouteDependencies): Router {
         }
       } else if (toUserId) {
         // Direct message (toUserId is guaranteed here due to earlier checks)
-        const wantsNotifications = await userSettingsStorage.getNotificationPreference(toUserId, 'messages');
+        const wantsNotifications = await userSettingsStorage.getNotificationPreference(
+          toUserId,
+          'messages'
+        );
 
         if (wantsNotifications) {
           await notificationsStorage.createNotification({
@@ -194,7 +202,9 @@ export function createMessagesRoutes(deps: RouteDependencies): Router {
           });
 
           // Send notification via WebSocket
-          const notification = await notificationsStorage.getNotifications(toUserId, 1).then(n => n[0]);
+          const notification = await notificationsStorage
+            .getNotifications(toUserId, 1)
+            .then((n) => n[0]);
           if (notification) {
             sessionManager.sendToUser(toUserId, {
               type: 'notification:new',
@@ -273,7 +283,7 @@ export function createMessagesRoutes(deps: RouteDependencies): Router {
       }
 
       const conversations = await messagesStorage.getConversations(req.user.id);
-      const groups = conversations.filter(c => c.type === 'group');
+      const groups = conversations.filter((c) => c.type === 'group');
 
       // Add unread count for each group
       const groupsWithUnread = await Promise.all(
@@ -492,4 +502,3 @@ export function createMessagesRoutes(deps: RouteDependencies): Router {
 
   return router;
 }
-

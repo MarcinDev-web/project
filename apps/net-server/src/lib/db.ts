@@ -50,7 +50,7 @@ export async function ensureSchema(pool: Pool): Promise<void> {
         forum_thread_id TEXT
       );
     `);
-    
+
     // Add forum_thread_id column if it doesn't exist (migration)
     await client.query(`
       ALTER TABLE marketplace_items 

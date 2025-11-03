@@ -337,7 +337,8 @@ export class WaterRenderer implements IDisposable {
 
     // Find all entities with WaterComponent
     const waterEntities: Array<{ entity: Entity; component: WaterComponent }> = [];
-    for (const entity of scene.entities()) {
+    const entities = scene.queryEntities(WaterComponent);
+    for (const entity of entities) {
       const waterComp = entity.getComponent(WaterComponent);
       if (waterComp && waterComp.enabled) {
         waterEntities.push({ entity, component: waterComp });

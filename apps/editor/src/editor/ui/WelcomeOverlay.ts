@@ -39,10 +39,15 @@ export class WelcomeOverlay {
 
     const container = document.createElement('div');
     container.className = 'welcome-overlay-enhanced';
+    container.setAttribute('role', 'dialog');
+    container.setAttribute('aria-modal', 'true');
+    container.setAttribute('aria-labelledby', 'welcome-title');
+    container.setAttribute('aria-describedby', 'welcome-subtitle');
 
     // Background blur overlay
     const backdrop = document.createElement('div');
     backdrop.className = 'welcome-overlay-backdrop';
+    backdrop.setAttribute('aria-hidden', 'true');
     container.appendChild(backdrop);
 
     // Main panel with modern design
@@ -54,23 +59,64 @@ export class WelcomeOverlay {
     hero.className = 'welcome-hero';
     hero.innerHTML = `
       <div class="welcome-icon">
-        <svg width="64" height="64" viewBox="0 0 64 64" fill="none">
-          <rect x="8" y="8" width="48" height="48" rx="12" fill="url(#gradient1)" opacity="0.2"/>
-          <path d="M32 16L20 28h8v12h8V28h8z" fill="url(#gradient2)"/>
+        <svg width="80" height="80" viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <!-- Background glow -->
+          <circle cx="40" cy="40" r="35" fill="url(#iconGlow)" opacity="0.3"/>
+          
+          <!-- 3D Cube faces with depth -->
+          <g class="welcome-icon-cube">
+            <!-- Back face (darkest) -->
+            <path d="M40 20 L60 30 L60 50 L40 60 L40 40 Z" fill="url(#cubeFace1)" opacity="0.6"/>
+            <!-- Left face (medium) -->
+            <path d="M40 20 L20 30 L20 50 L40 60 L40 40 Z" fill="url(#cubeFace2)" opacity="0.8"/>
+            <!-- Top face (lightest) -->
+            <path d="M40 20 L20 30 L40 40 L60 30 Z" fill="url(#cubeFace3)"/>
+            
+            <!-- Edges for definition -->
+            <path d="M40 20 L60 30 M40 20 L20 30 M20 30 L20 50 M60 30 L60 50 M20 50 L40 60 M60 50 L40 60 M40 40 L40 60" 
+                  stroke="url(#edgeGlow)" stroke-width="1.5" stroke-linecap="round"/>
+            
+            <!-- Highlight sparkle -->
+            <circle cx="50" cy="28" r="2" fill="white" opacity="0.8" class="welcome-icon-sparkle"/>
+            <circle cx="32" cy="35" r="1.5" fill="white" opacity="0.6" class="welcome-icon-sparkle"/>
+          </g>
+          
           <defs>
-            <linearGradient id="gradient1" x1="8" y1="8" x2="56" y2="56">
+            <linearGradient id="iconGlow" x1="0" y1="0" x2="80" y2="80">
               <stop offset="0%" stop-color="#667eea"/>
               <stop offset="100%" stop-color="#764ba2"/>
             </linearGradient>
-            <linearGradient id="gradient2" x1="20" y1="16" x2="44" y2="40">
+            <linearGradient id="cubeFace1" x1="40" y1="20" x2="60" y2="60">
+              <stop offset="0%" stop-color="#764ba2"/>
+              <stop offset="100%" stop-color="#4c3a6d"/>
+            </linearGradient>
+            <linearGradient id="cubeFace2" x1="20" y1="30" x2="40" y2="60">
               <stop offset="0%" stop-color="#667eea"/>
-              <stop offset="100%" stop-color="#764ba2"/>
+              <stop offset="100%" stop-color="#4a5db8"/>
+            </linearGradient>
+            <linearGradient id="cubeFace3" x1="20" y1="20" x2="60" y2="40">
+              <stop offset="0%" stop-color="#8094f0"/>
+              <stop offset="100%" stop-color="#667eea"/>
+            </linearGradient>
+            <linearGradient id="edgeGlow" x1="20" y1="20" x2="60" y2="60">
+              <stop offset="0%" stop-color="rgba(255,255,255,0.8)"/>
+              <stop offset="100%" stop-color="rgba(255,255,255,0.4)"/>
             </linearGradient>
           </defs>
         </svg>
       </div>
-      <h1 class="welcome-title">Welcome to 3D Scene Editor</h1>
-      <p class="welcome-subtitle">Professional 3D scene creation powered by WebGPU</p>
+      <h1 id="welcome-title" class="welcome-title">Engine Initialized</h1>
+      <p id="welcome-subtitle" class="welcome-subtitle">Professional 3D scene creation powered by WebGPU</p>
+      <div class="welcome-hero-badges">
+        <div class="welcome-hero-badge welcome-hero-badge-purple">
+          <span class="badge-dot"></span>
+          <span>WebGPU Accelerated</span>
+        </div>
+        <div class="welcome-hero-badge welcome-hero-badge-green">
+          <span class="badge-dot"></span>
+          <span>Servers Available</span>
+        </div>
+      </div>
     `;
     panel.appendChild(hero);
 
@@ -90,13 +136,6 @@ export class WelcomeOverlay {
         <div class="welcome-feature-text">
           <strong>Play Mode Testing</strong>
           <span>Test your creations instantly</span>
-        </div>
-      </div>
-      <div class="welcome-feature">
-        <div class="welcome-feature-icon">⚡</div>
-        <div class="welcome-feature-text">
-          <strong>High Performance</strong>
-          <span>Built with WebGPU for speed</span>
         </div>
       </div>
     `;
@@ -134,19 +173,25 @@ export class WelcomeOverlay {
 
     const tutorialBtn = document.createElement('button');
     tutorialBtn.className = 'welcome-btn welcome-btn-primary';
+    tutorialBtn.setAttribute('aria-label', 'Start interactive tutorial to learn editor basics');
     tutorialBtn.innerHTML = `
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-        <path d="M10 2L3 7v6l7 5 7-5V7z"/>
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M10 2L3 7v6l7 5 7-5V7z" stroke-linejoin="round"/>
+        <circle cx="10" cy="10" r="2" fill="currentColor"/>
       </svg>
       <span>Start Interactive Tutorial</span>
+      <svg class="welcome-btn-arrow" width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
+        <path d="M6 4l4 4-4 4" stroke="currentColor" stroke-width="2" fill="none" stroke-linecap="round"/>
+      </svg>
     `;
     tutorialBtn.addEventListener('click', () => this.handleStartTutorial());
 
     const quickStartBtn = document.createElement('button');
     quickStartBtn.className = 'welcome-btn welcome-btn-secondary';
+    quickStartBtn.setAttribute('aria-label', 'Skip tutorial and start creating immediately');
     quickStartBtn.innerHTML = `
-      <svg width="20" height="20" viewBox="0 0 20 20" fill="currentColor">
-        <path d="M8 5v10l7-5z"/>
+      <svg width="20" height="20" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M7 5l8 5-8 5z" fill="currentColor"/>
       </svg>
       <span>Quick Start</span>
     `;
@@ -165,15 +210,7 @@ export class WelcomeOverlay {
     showGuideLink.textContent = 'Show Quick Guide';
     showGuideLink.addEventListener('click', () => this.handleShowQuickGuide());
 
-    const dontShowAgain = document.createElement('label');
-    dontShowAgain.className = 'welcome-checkbox-label';
-    dontShowAgain.innerHTML = `
-      <input type="checkbox" id="welcome-dont-show" class="welcome-checkbox">
-      <span>Don't show this again</span>
-    `;
-
     footer.appendChild(showGuideLink);
-    footer.appendChild(dontShowAgain);
     panel.appendChild(footer);
 
     container.appendChild(panel);
@@ -214,18 +251,15 @@ export class WelcomeOverlay {
     this.dismiss();
   }
 
-  /** Dismisses and removes the overlay. */
+  /** Dismisses and removes the overlay. Automatically saves dismissal state. */
   public dismiss(): void {
     if (!this.container) {
       this.isDismissed = true;
       return;
     }
 
-    // Check if "don't show again" is checked
-    const checkbox = this.container.querySelector('#welcome-dont-show') as HTMLInputElement;
-    if (checkbox?.checked) {
-      storageSave(STORAGE_KEY, true);
-    }
+    // Automatically save that user has seen this overlay
+    storageSave(STORAGE_KEY, true);
 
     this.container.classList.add('dismissed');
     setTimeout(() => {

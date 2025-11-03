@@ -42,12 +42,12 @@ export function validateBody<T extends z.ZodTypeAny>(schema: T) {
     } catch (error) {
       if (error instanceof z.ZodError) {
         const errors = formatZodErrors(error);
-        
+
         // Log validation failure
         const ip = req.ip || req.socket.remoteAddress || 'unknown';
         securityLogger.logSuspiciousActivity(
           undefined,
-          `Validation failed for ${req.path}: ${errors.map(e => `${e.field}: ${e.message}`).join(', ')}`,
+          `Validation failed for ${req.path}: ${errors.map((e) => `${e.field}: ${e.message}`).join(', ')}`,
           ip
         );
 
@@ -57,7 +57,7 @@ export function validateBody<T extends z.ZodTypeAny>(schema: T) {
         });
         return;
       }
-      
+
       // Unexpected error
       console.error('Validation middleware error:', error);
       res.status(500).json({
@@ -76,17 +76,17 @@ export function validateQuery<T extends z.ZodTypeAny>(schema: T) {
     try {
       const result = await schema.parseAsync(req.query);
       // Replace query with validated and transformed data
-      req.query = result as any;
+      req.query = result;
       next();
     } catch (error) {
       if (error instanceof z.ZodError) {
         const errors = formatZodErrors(error);
-        
+
         // Log validation failure
         const ip = req.ip || req.socket.remoteAddress || 'unknown';
         securityLogger.logSuspiciousActivity(
           undefined,
-          `Query validation failed for ${req.path}: ${errors.map(e => `${e.field}: ${e.message}`).join(', ')}`,
+          `Query validation failed for ${req.path}: ${errors.map((e) => `${e.field}: ${e.message}`).join(', ')}`,
           ip
         );
 
@@ -96,7 +96,7 @@ export function validateQuery<T extends z.ZodTypeAny>(schema: T) {
         });
         return;
       }
-      
+
       console.error('Query validation middleware error:', error);
       res.status(500).json({
         error: 'Validation error',
@@ -114,17 +114,17 @@ export function validateParams<T extends z.ZodTypeAny>(schema: T) {
     try {
       const result = await schema.parseAsync(req.params);
       // Replace params with validated data
-      req.params = result as any;
+      req.params = result;
       next();
     } catch (error) {
       if (error instanceof z.ZodError) {
         const errors = formatZodErrors(error);
-        
+
         // Log validation failure
         const ip = req.ip || req.socket.remoteAddress || 'unknown';
         securityLogger.logSuspiciousActivity(
           undefined,
-          `Path parameter validation failed for ${req.path}: ${errors.map(e => `${e.field}: ${e.message}`).join(', ')}`,
+          `Path parameter validation failed for ${req.path}: ${errors.map((e) => `${e.field}: ${e.message}`).join(', ')}`,
           ip
         );
 
@@ -134,7 +134,7 @@ export function validateParams<T extends z.ZodTypeAny>(schema: T) {
         });
         return;
       }
-      
+
       console.error('Params validation middleware error:', error);
       res.status(500).json({
         error: 'Validation error',
@@ -147,11 +147,11 @@ export function validateParams<T extends z.ZodTypeAny>(schema: T) {
 /**
  * Validate request (body, query, and params) using schemas.
  */
-export function validateRequest<TBody extends z.ZodTypeAny, TQuery extends z.ZodTypeAny, TParams extends z.ZodTypeAny>(options: {
-  body?: TBody;
-  query?: TQuery;
-  params?: TParams;
-}) {
+export function validateRequest<
+  TBody extends z.ZodTypeAny,
+  TQuery extends z.ZodTypeAny,
+  TParams extends z.ZodTypeAny,
+>(options: { body?: TBody; query?: TQuery; params?: TParams }) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     try {
       // Validate body if schema provided
@@ -161,24 +161,24 @@ export function validateRequest<TBody extends z.ZodTypeAny, TQuery extends z.Zod
 
       // Validate query if schema provided
       if (options.query) {
-        req.query = await options.query.parseAsync(req.query) as any;
+        req.query = await options.query.parseAsync(req.query);
       }
 
       // Validate params if schema provided
       if (options.params) {
-        req.params = await options.params.parseAsync(req.params) as any;
+        req.params = await options.params.parseAsync(req.params);
       }
 
       next();
     } catch (error) {
       if (error instanceof z.ZodError) {
         const errors = formatZodErrors(error);
-        
+
         // Log validation failure
         const ip = req.ip || req.socket.remoteAddress || 'unknown';
         securityLogger.logSuspiciousActivity(
           undefined,
-          `Request validation failed for ${req.path}: ${errors.map(e => `${e.field}: ${e.message}`).join(', ')}`,
+          `Request validation failed for ${req.path}: ${errors.map((e) => `${e.field}: ${e.message}`).join(', ')}`,
           ip
         );
 
@@ -188,7 +188,7 @@ export function validateRequest<TBody extends z.ZodTypeAny, TQuery extends z.Zod
         });
         return;
       }
-      
+
       console.error('Request validation middleware error:', error);
       res.status(500).json({
         error: 'Validation error',
@@ -203,12 +203,14 @@ export function validateRequest<TBody extends z.ZodTypeAny, TQuery extends z.Zod
  * Requires multer or similar middleware to have processed files first.
  * Checks file size, MIME type, and content (magic bytes).
  */
-export function validateFileUpload(options: {
-  maxSize?: number; // in bytes
-  allowedTypes?: string[]; // MIME types
-  required?: boolean;
-  fieldName?: string; // Default: 'file'
-} = {}) {
+export function validateFileUpload(
+  options: {
+    maxSize?: number; // in bytes
+    allowedTypes?: string[]; // MIME types
+    required?: boolean;
+    fieldName?: string; // Default: 'file'
+  } = {}
+) {
   return async (req: Request, res: Response, next: NextFunction): Promise<void> => {
     const fieldName = options.fieldName || 'file';
     const file = (req as any).file || (req as any).files?.[fieldName];
@@ -238,7 +240,9 @@ export function validateFileUpload(options: {
 
       res.status(400).json({
         error: 'Validation failed',
-        errors: [{ field: fieldName, message: `File size exceeds maximum of ${options.maxSize} bytes` }],
+        errors: [
+          { field: fieldName, message: `File size exceeds maximum of ${options.maxSize} bytes` },
+        ],
       });
       return;
     }
@@ -255,7 +259,12 @@ export function validateFileUpload(options: {
 
       res.status(400).json({
         error: 'Validation failed',
-        errors: [{ field: fieldName, message: `Invalid file type. Allowed: ${options.allowedTypes.join(', ')}` }],
+        errors: [
+          {
+            field: fieldName,
+            message: `Invalid file type. Allowed: ${options.allowedTypes.join(', ')}`,
+          },
+        ],
       });
       return;
     }

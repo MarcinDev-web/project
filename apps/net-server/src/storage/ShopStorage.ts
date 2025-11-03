@@ -39,7 +39,7 @@ export class ShopStorage {
 
   async initialize(): Promise<void> {
     await fs.mkdir(this.dataDir, { recursive: true });
-    
+
     try {
       await fs.access(this.itemsFile);
     } catch {
@@ -62,7 +62,7 @@ export class ShopStorage {
 
   async createItem(item: Omit<ShopItem, 'id' | 'createdAt' | 'updatedAt'>): Promise<ShopItem> {
     const items = await this.readItems();
-    
+
     const id = `shop_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     const now = Date.now();
     const newItem: ShopItem = {
@@ -74,7 +74,7 @@ export class ShopStorage {
 
     items[id] = newItem;
     await this.writeItems(items);
-    
+
     return newItem;
   }
 
@@ -88,25 +88,26 @@ export class ShopStorage {
     let filtered = Object.values(items);
 
     if (filter.category) {
-      filtered = filtered.filter(item => item.category === filter.category);
+      filtered = filtered.filter((item) => item.category === filter.category);
     }
 
     if (filter.currency) {
-      filtered = filtered.filter(item => item.price.currency === filter.currency);
+      filtered = filtered.filter((item) => item.price.currency === filter.currency);
     }
 
     if (filter.available !== undefined) {
-      filtered = filtered.filter(item => item.available === filter.available);
+      filtered = filtered.filter((item) => item.available === filter.available);
     } else {
       // By default, only show available items
-      filtered = filtered.filter(item => item.available);
+      filtered = filtered.filter((item) => item.available);
     }
 
     if (filter.search) {
       const searchLower = filter.search.toLowerCase();
-      filtered = filtered.filter(item => 
-        item.name.toLowerCase().includes(searchLower) ||
-        item.description?.toLowerCase().includes(searchLower)
+      filtered = filtered.filter(
+        (item) =>
+          item.name.toLowerCase().includes(searchLower) ||
+          item.description?.toLowerCase().includes(searchLower)
       );
     }
 
@@ -120,7 +121,10 @@ export class ShopStorage {
     return filtered.slice(offset, offset + limit);
   }
 
-  async updateItem(id: string, updates: Partial<Omit<ShopItem, 'id' | 'createdAt'>>): Promise<ShopItem | null> {
+  async updateItem(
+    id: string,
+    updates: Partial<Omit<ShopItem, 'id' | 'createdAt'>>
+  ): Promise<ShopItem | null> {
     const items = await this.readItems();
     const item = items[id];
 
@@ -136,20 +140,20 @@ export class ShopStorage {
 
     items[id] = updatedItem;
     await this.writeItems(items);
-    
+
     return updatedItem;
   }
 
   async deleteItem(id: string): Promise<boolean> {
     const items = await this.readItems();
-    
+
     if (!items[id]) {
       return false;
     }
 
     delete items[id];
     await this.writeItems(items);
-    
+
     return true;
   }
 
@@ -162,4 +166,3 @@ export class ShopStorage {
     return items.length;
   }
 }
-

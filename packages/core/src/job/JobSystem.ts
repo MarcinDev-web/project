@@ -190,10 +190,38 @@ export class JobSystem {
    * Process background queue with available workers
    */
   private processBackgroundQueue(): void {
+    if (this.backgroundQueue.length === 0) {
+      return;
+    }
+
+    // If Workers are not available, process tasks directly on main thread asynchronously
+    if (typeof Worker === 'undefined' || this.workerPool.length === 0) {
+      const queuedTask = this.backgroundQueue.shift();
+      if (!queuedTask || queuedTask.cancelled) {
+        // Skip cancelled tasks
+        if (queuedTask) {
+          queuedTask.resolve();
+          this.tasks.delete(queuedTask.id);
+        }
+        // Process next task
+        this.processBackgroundQueue();
+        return;
+      }
+
+      // Execute on main thread asynchronously (defer to next tick)
+      queueMicrotask(() => {
+        void this.executeTaskAsync(queuedTask).then(() => {
+          // Process next task in queue
+          this.processBackgroundQueue();
+        });
+      });
+      return;
+    }
+
     // Find available worker
     const availableWorker = this.workerPool.find((pool) => !pool.busy);
 
-    if (!availableWorker || this.backgroundQueue.length === 0) {
+    if (!availableWorker) {
       return;
     }
 

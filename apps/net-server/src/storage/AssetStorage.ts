@@ -50,7 +50,7 @@ export class AssetStorage {
 
   async initialize(): Promise<void> {
     await fs.mkdir(this.dataDir, { recursive: true });
-    
+
     try {
       await fs.access(this.assetsFile);
     } catch {
@@ -73,7 +73,7 @@ export class AssetStorage {
 
   async createAsset(asset: Omit<Asset, 'id' | 'createdAt' | 'updatedAt'>): Promise<Asset> {
     const assets = await this.readAssets();
-    
+
     const id = `asset_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     const now = Date.now();
     const newAsset: Asset = {
@@ -85,7 +85,7 @@ export class AssetStorage {
 
     assets[id] = newAsset;
     await this.writeAssets(assets);
-    
+
     return newAsset;
   }
 
@@ -99,30 +99,31 @@ export class AssetStorage {
     let filtered = Object.values(assets);
 
     if (filter.type) {
-      filtered = filtered.filter(asset => asset.type === filter.type);
+      filtered = filtered.filter((asset) => asset.type === filter.type);
     }
 
     if (filter.category) {
-      filtered = filtered.filter(asset => asset.category === filter.category);
+      filtered = filtered.filter((asset) => asset.category === filter.category);
     }
 
     if (filter.authorId) {
-      filtered = filtered.filter(asset => asset.authorId === filter.authorId);
+      filtered = filtered.filter((asset) => asset.authorId === filter.authorId);
     }
 
     if (filter.available !== undefined) {
-      filtered = filtered.filter(asset => asset.available === filter.available);
+      filtered = filtered.filter((asset) => asset.available === filter.available);
     } else {
       // By default, only show available assets
-      filtered = filtered.filter(asset => asset.available);
+      filtered = filtered.filter((asset) => asset.available);
     }
 
     if (filter.search) {
       const searchLower = filter.search.toLowerCase();
-      filtered = filtered.filter(asset => 
-        asset.name.toLowerCase().includes(searchLower) ||
-        asset.description?.toLowerCase().includes(searchLower) ||
-        asset.metadata.tags?.some(tag => tag.toLowerCase().includes(searchLower))
+      filtered = filtered.filter(
+        (asset) =>
+          asset.name.toLowerCase().includes(searchLower) ||
+          asset.description?.toLowerCase().includes(searchLower) ||
+          asset.metadata.tags?.some((tag) => tag.toLowerCase().includes(searchLower))
       );
     }
 
@@ -136,7 +137,10 @@ export class AssetStorage {
     return filtered.slice(offset, offset + limit);
   }
 
-  async updateAsset(id: string, updates: Partial<Omit<Asset, 'id' | 'createdAt'>>): Promise<Asset | null> {
+  async updateAsset(
+    id: string,
+    updates: Partial<Omit<Asset, 'id' | 'createdAt'>>
+  ): Promise<Asset | null> {
     const assets = await this.readAssets();
     const asset = assets[id];
 
@@ -152,20 +156,20 @@ export class AssetStorage {
 
     assets[id] = updatedAsset;
     await this.writeAssets(assets);
-    
+
     return updatedAsset;
   }
 
   async deleteAsset(id: string): Promise<boolean> {
     const assets = await this.readAssets();
-    
+
     if (!assets[id]) {
       return false;
     }
 
     delete assets[id];
     await this.writeAssets(assets);
-    
+
     return true;
   }
 
@@ -178,4 +182,3 @@ export class AssetStorage {
     return assets.length;
   }
 }
-

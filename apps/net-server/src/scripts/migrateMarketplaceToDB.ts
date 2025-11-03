@@ -45,7 +45,7 @@ async function migrateMarketplace(): Promise<void> {
   // Load JSON data
   let jsonStorage: MarketplaceStorage;
   let items: Awaited<ReturnType<MarketplaceStorage['getItems']>>;
-  
+
   try {
     jsonStorage = new MarketplaceStorage(DATA_DIR);
     await jsonStorage.initialize();
@@ -108,16 +108,16 @@ async function migrateMarketplace(): Promise<void> {
         const client = await pool.connect();
         try {
           if (createdAt) {
-            await client.query(
-              'UPDATE marketplace_items SET created_at = $1 WHERE id = $2',
-              [new Date(createdAt), id]
-            );
+            await client.query('UPDATE marketplace_items SET created_at = $1 WHERE id = $2', [
+              new Date(createdAt),
+              id,
+            ]);
           }
           if (updatedAt) {
-            await client.query(
-              'UPDATE marketplace_items SET updated_at = $1 WHERE id = $2',
-              [new Date(updatedAt), id]
-            );
+            await client.query('UPDATE marketplace_items SET updated_at = $1 WHERE id = $2', [
+              new Date(updatedAt),
+              id,
+            ]);
           }
         } finally {
           client.release();
@@ -137,7 +137,7 @@ async function migrateMarketplace(): Promise<void> {
   // Verify migration
   console.log('\nVerifying migration...');
   const dbItems = await dbStorage.getItems({ limit: 10000 });
-  
+
   console.log(`\nMigration complete!`);
   console.log(`  ✓ Migrated: ${migrated} items`);
   console.log(`  ⏭  Skipped: ${skipped} items (already exist)`);

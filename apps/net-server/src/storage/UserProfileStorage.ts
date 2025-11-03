@@ -20,39 +20,39 @@ export class UserProfileStorage {
 
   async initialize(): Promise<void> {
     await fs.mkdir(this.dataDir, { recursive: true });
-    
+
     // Create empty profiles file if it doesn't exist
     try {
       await fs.access(this.profilesFile);
     } catch {
       await fs.writeFile(this.profilesFile, JSON.stringify({}, null, 2));
     }
-    
+
     // Preload cache
     await this.readProfiles();
   }
-  
+
   /**
    * Invalidate cache (call after external file modifications)
    */
   invalidateCache(): void {
     this.cacheDirty = true;
   }
-  
+
   /**
    * Get multiple profiles efficiently (batch read)
    */
   async getProfiles(userIds: string[]): Promise<Map<string, UserProfile>> {
     const profiles = await this.readProfiles();
     const result = new Map<string, UserProfile>();
-    
+
     for (const userId of userIds) {
       const profile = profiles[userId];
       if (profile) {
         result.set(userId, profile);
       }
     }
-    
+
     return result;
   }
 
@@ -81,10 +81,10 @@ export class UserProfileStorage {
     // Atomic write: write to temp file first, then rename
     const tmpFile = `${this.profilesFile}.tmp`;
     const content = JSON.stringify(profiles, null, 2);
-    
+
     await fs.writeFile(tmpFile, content, 'utf-8');
     await fs.rename(tmpFile, this.profilesFile);
-    
+
     // Update cache
     this.cache = { ...profiles };
     this.cacheDirty = false;
@@ -97,9 +97,9 @@ export class UserProfileStorage {
 
   async updateProfile(userId: string, updates: UpdateProfileRequest): Promise<UserProfile> {
     const profiles = await this.readProfiles();
-    
+
     const existing = profiles[userId];
-    
+
     // Get base user data if profile doesn't exist (fallback to creating new profile)
     if (!existing) {
       throw new Error(`Profile not found for user ${userId}. Create profile first.`);
@@ -113,7 +113,7 @@ export class UserProfileStorage {
       createdAt: existing.createdAt,
       updatedAt: Date.now(),
     };
-    
+
     // Copy existing optional properties
     if (existing.bio !== undefined) {
       profile.bio = existing.bio;
@@ -127,7 +127,7 @@ export class UserProfileStorage {
     if (existing.avatarLoadout !== undefined) {
       profile.avatarLoadout = existing.avatarLoadout;
     }
-    
+
     // Apply updates
     if ('bio' in updates) {
       if (updates.bio !== undefined && updates.bio !== null) {
@@ -160,13 +160,13 @@ export class UserProfileStorage {
 
     profiles[userId] = profile;
     await this.writeProfiles(profiles);
-    
+
     return profile;
   }
 
   async createProfile(user: PublicUser): Promise<UserProfile> {
     const profiles = await this.readProfiles();
-    
+
     const existing = profiles[user.id];
     if (existing) {
       return existing;
@@ -179,8 +179,7 @@ export class UserProfileStorage {
 
     profiles[user.id] = profile;
     await this.writeProfiles(profiles);
-    
+
     return profile;
   }
 }
-

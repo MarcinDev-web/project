@@ -3,7 +3,13 @@
  */
 
 import type { Pool } from 'pg';
-import type { Purchase, PurchaseFilter, PurchaseItem, PurchaseItemType, PurchaseStatus } from './PurchaseStorage';
+import type {
+  Purchase,
+  PurchaseFilter,
+  PurchaseItem,
+  PurchaseItemType,
+  PurchaseStatus,
+} from './PurchaseStorage';
 
 export class PurchaseStorageDB {
   constructor(private readonly pool: Pool) {}
@@ -40,14 +46,7 @@ export class PurchaseStorageDB {
         await client.query(
           `INSERT INTO purchase_items (purchase_id, item_id, item_type, name, price_currency, price_amount)
            VALUES ($1, $2, $3, $4, $5, $6)`,
-          [
-            id,
-            item.itemId,
-            item.type,
-            item.name,
-            item.price.currency,
-            item.price.amount,
-          ]
+          [id, item.itemId, item.type, item.name, item.price.currency, item.price.amount]
         );
 
         // Update owned items
@@ -98,7 +97,7 @@ export class PurchaseStorageDB {
       price_amount: number;
     }>('SELECT * FROM purchase_items WHERE purchase_id = $1', [id]);
 
-    const items: PurchaseItem[] = itemsResult.rows.map(row => ({
+    const items: PurchaseItem[] = itemsResult.rows.map((row) => ({
       itemId: row.item_id,
       type: row.item_type as PurchaseItemType,
       name: row.name,
@@ -171,7 +170,7 @@ export class PurchaseStorageDB {
         price_amount: number;
       }>('SELECT * FROM purchase_items WHERE purchase_id = $1', [purchaseRow.id]);
 
-      const items: PurchaseItem[] = itemsResult.rows.map(row => ({
+      const items: PurchaseItem[] = itemsResult.rows.map((row) => ({
         itemId: row.item_id,
         type: row.item_type as PurchaseItemType,
         name: row.name,
@@ -205,10 +204,7 @@ export class PurchaseStorageDB {
       total_amount: number;
       status: string;
       created_at: Date;
-    }>(
-      'UPDATE purchases SET status = $1 WHERE id = $2 RETURNING *',
-      [status, id]
-    );
+    }>('UPDATE purchases SET status = $1 WHERE id = $2 RETURNING *', [status, id]);
 
     if (result.rows.length === 0) {
       return null;
@@ -224,7 +220,7 @@ export class PurchaseStorageDB {
       price_amount: number;
     }>('SELECT * FROM purchase_items WHERE purchase_id = $1', [id]);
 
-    const items: PurchaseItem[] = itemsResult.rows.map(row => ({
+    const items: PurchaseItem[] = itemsResult.rows.map((row) => ({
       itemId: row.item_id,
       type: row.item_type as PurchaseItemType,
       name: row.name,
@@ -257,17 +253,18 @@ export class PurchaseStorageDB {
     return parseInt(result.rows[0]?.count ?? '0', 10) > 0;
   }
 
-  async getOwnedItems(userId: string): Promise<Array<{ itemId: string; itemType: PurchaseItemType; purchasedAt: number }>> {
+  async getOwnedItems(
+    userId: string
+  ): Promise<Array<{ itemId: string; itemType: PurchaseItemType; purchasedAt: number }>> {
     const result = await this.pool.query<{
       item_id: string;
       item_type: string;
       purchased_at: Date;
-    }>(
-      'SELECT item_id, item_type, purchased_at FROM user_owned_items WHERE user_id = $1',
-      [userId]
-    );
+    }>('SELECT item_id, item_type, purchased_at FROM user_owned_items WHERE user_id = $1', [
+      userId,
+    ]);
 
-    return result.rows.map(row => ({
+    return result.rows.map((row) => ({
       itemId: row.item_id,
       itemType: row.item_type as PurchaseItemType,
       purchasedAt: row.purchased_at.getTime(),
@@ -323,4 +320,3 @@ export class PurchaseStorageDB {
     }
   }
 }
-

@@ -27,7 +27,7 @@ async function loadUsers(): Promise<Record<string, User>> {
   if (!existsSync(USERS_FILE)) {
     return {};
   }
-  
+
   const data = await readFile(USERS_FILE, 'utf-8');
   return JSON.parse(data) as Record<string, User>;
 }
@@ -37,7 +37,7 @@ async function saveUsers(users: Record<string, User>): Promise<void> {
   if (!existsSync(DATA_DIR)) {
     await mkdir(DATA_DIR, { recursive: true });
   }
-  
+
   await writeFile(USERS_FILE, JSON.stringify(users, null, 2), 'utf-8');
 }
 
@@ -79,15 +79,17 @@ async function createAdminAccount(options: CreateAdminOptions): Promise<void> {
         updatedAt: Date.now(),
       };
     } else {
-      throw new Error(`User with email ${emailLower} already exists. Use --make-existing-admin to promote existing user.`);
+      throw new Error(
+        `User with email ${emailLower} already exists. Use --make-existing-admin to promote existing user.`
+      );
     }
   } else {
     // Create new admin user
     console.log(`Creating new admin account for ${emailLower}...`);
-    
+
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
     const now = Date.now();
-    
+
     const user: User = {
       id: generateUserId(),
       email: emailLower,
@@ -103,7 +105,7 @@ async function createAdminAccount(options: CreateAdminOptions): Promise<void> {
 
   console.log('Saving users...');
   await saveUsers(users);
-  
+
   console.log(`✅ Admin account created/updated successfully!`);
   console.log(`   Email: ${emailLower}`);
   console.log(`   Role: admin`);
@@ -112,10 +114,10 @@ async function createAdminAccount(options: CreateAdminOptions): Promise<void> {
 // Parse command line arguments
 function parseArgs(): CreateAdminOptions | null {
   const args = process.argv.slice(2);
-  
+
   // Remove quotes from arguments (PowerShell/Windows issue)
-  const cleanArgs = args.map(arg => arg.replace(/^["']|["']$/g, ''));
-  
+  const cleanArgs = args.map((arg) => arg.replace(/^["']|["']$/g, ''));
+
   // Check for --email and --password flags
   let email: string | undefined;
   let password: string | undefined;
@@ -124,7 +126,7 @@ function parseArgs(): CreateAdminOptions | null {
   for (let i = 0; i < cleanArgs.length; i++) {
     const arg = cleanArgs[i];
     if (!arg) continue;
-    
+
     if (arg === '--email' && i + 1 < cleanArgs.length) {
       email = cleanArgs[i + 1];
       i++;
@@ -147,7 +149,9 @@ function parseArgs(): CreateAdminOptions | null {
     console.error('  tsx src/scripts/createAdmin.ts --email <email> --password <password>');
     console.error('');
     console.error('Options:');
-    console.error('  --make-existing-admin    Promote existing user to admin instead of creating new');
+    console.error(
+      '  --make-existing-admin    Promote existing user to admin instead of creating new'
+    );
     console.error('');
     console.error('Received arguments:', JSON.stringify(cleanArgs));
     return null;
@@ -177,4 +181,3 @@ async function main() {
 void main();
 
 export { createAdminAccount };
-

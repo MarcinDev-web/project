@@ -5,10 +5,7 @@ import { AuthManager } from '../auth/AuthManager';
 import { MessageHandler } from './MessageHandler';
 import { FriendsStorage } from '../storage/FriendsStorage';
 import { securityLogger } from '../logging/SecurityLogger';
-import type {
-  PresenceOnlineMessage,
-  PresenceOfflineMessage,
-} from '../types/websocket';
+import type { PresenceOnlineMessage, PresenceOfflineMessage } from '../types/websocket';
 
 /**
  * WebSocket security constants.
@@ -41,13 +38,13 @@ export class WebSocketHandler {
     this.sessionManager = sessionManager;
     this.replicationServer = new ReplicationServer(sessionManager, authManager, messageHandler);
     this.friendsStorage = friendsStorage ?? null;
-    
+
     // Set up presence callback
     this.sessionManager.setPresenceCallback((userId, isOnline) => {
       this.handlePresenceChange(userId, isOnline);
     });
 
-    this.wss = new WebSocketServer({ 
+    this.wss = new WebSocketServer({
       port,
       maxPayload: MAX_MESSAGE_SIZE, // Limit message size
     });
@@ -57,9 +54,12 @@ export class WebSocketHandler {
     });
 
     // Start cleanup interval for timed-out connections
-    this.cleanupInterval = setInterval(() => {
-      this.cleanupInactiveConnections();
-    }, 5 * 60 * 1000); // Check every 5 minutes
+    this.cleanupInterval = setInterval(
+      () => {
+        this.cleanupInactiveConnections();
+      },
+      5 * 60 * 1000
+    ); // Check every 5 minutes
 
     console.log(`WebSocket server listening on ws://localhost:${port}`);
   }
@@ -70,7 +70,7 @@ export class WebSocketHandler {
   private handleConnection(ws: WebSocket, req: any): void {
     // Get client IP
     const ip = req.socket.remoteAddress || req.headers['x-forwarded-for'] || 'unknown';
-    
+
     // Rate limit connections per IP
     const connectionCount = this.ipConnectionCounts.get(ip) || 0;
     if (connectionCount >= MAX_CONNECTIONS_PER_IP) {
@@ -90,7 +90,7 @@ export class WebSocketHandler {
     console.log(`New WebSocket connection from ${ip}`);
 
     // Set up connection metadata
-    let userId: string | null = null;
+    const userId: string | null = null;
 
     // Handle incoming messages with size validation
     ws.on('message', async (data: Buffer) => {
@@ -110,7 +110,7 @@ export class WebSocketHandler {
         this.connectionTimes.set(ws, Date.now());
 
         const message = data.toString('utf-8');
-        
+
         // Validate JSON
         let parsed: any;
         try {
@@ -135,9 +135,9 @@ export class WebSocketHandler {
           ws.close(1003, 'Invalid message structure');
           return;
         }
-        
+
         await this.replicationServer.handleMessage(ws, message);
-        
+
         // After join-session, track the user as online
         if (parsed.type === 'join-session' && this.connections.has(ws)) {
           // User ID will be set after authentication
@@ -180,10 +180,12 @@ export class WebSocketHandler {
     });
 
     // Send welcome message
-    ws.send(JSON.stringify({
-      type: 'connected',
-      timestamp: Date.now(),
-    }));
+    ws.send(
+      JSON.stringify({
+        type: 'connected',
+        timestamp: Date.now(),
+      })
+    );
   }
 
   /**
@@ -205,7 +207,7 @@ export class WebSocketHandler {
     try {
       // Get user's friends
       const friends = await this.friendsStorage.getFriends(userId);
-      
+
       // Broadcast presence change to all friends
       const presenceMessage: PresenceOnlineMessage | PresenceOfflineMessage = {
         type: isOnline ? 'presence:online' : 'presence:offline',
@@ -261,4 +263,3 @@ export class WebSocketHandler {
     this.wss.close();
   }
 }
-

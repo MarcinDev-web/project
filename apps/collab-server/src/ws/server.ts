@@ -11,15 +11,39 @@ type PublicUser = {
 type WsMessage =
   | { type: 'join'; sessionId: string; token: string }
   | { type: 'join-session'; sessionId: string; token: string }
-  | { type: 'cursor-update'; sessionId: string; userId?: string; position: [number, number, number]; rotation?: [number, number, number, number] }
+  | {
+      type: 'cursor-update';
+      sessionId: string;
+      userId?: string;
+      position: [number, number, number];
+      rotation?: [number, number, number, number];
+    }
   | { type: 'operation'; sessionId: string; userId?: string; operation: Record<string, unknown> }
   | { type: 'presence:update'; sessionId: string; userId?: string; data: unknown }
   | { type: 'selection:update'; sessionId: string; userId?: string; data: unknown }
-  | { type: 'transform:begin' | 'transform:update' | 'transform:end'; sessionId: string; userId?: string; entityId: string; data: unknown }
+  | {
+      type: 'transform:begin' | 'transform:update' | 'transform:end';
+      sessionId: string;
+      userId?: string;
+      entityId: string;
+      data: unknown;
+    }
   | { type: 'chat:message'; sessionId: string; userId?: string; message: string }
   | { type: 'lock:acquire' | 'lock:release'; sessionId: string; userId?: string; entityId: string }
-  | { type: 'play-mode-request'; sessionId: string; userId?: string; requestId: string; fromUser: PublicUser }
-  | { type: 'play-mode-response'; sessionId: string; userId?: string; requestId: string; accepted: boolean }
+  | {
+      type: 'play-mode-request';
+      sessionId: string;
+      userId?: string;
+      requestId: string;
+      fromUser: PublicUser;
+    }
+  | {
+      type: 'play-mode-response';
+      sessionId: string;
+      userId?: string;
+      requestId: string;
+      accepted: boolean;
+    }
   | { type: 'ping' };
 
 interface ConnectionMeta {
@@ -48,7 +72,11 @@ interface PlayModeRequest {
 
 const activePlayModeRequests = new Map<string, PlayModeRequest>(); // requestId -> PlayModeRequest
 
-export function broadcastToSession(sessionId: string, data: Record<string, unknown>, except?: WebSocket): void {
+export function broadcastToSession(
+  sessionId: string,
+  data: Record<string, unknown>,
+  except?: WebSocket
+): void {
   const conns = rooms.get(sessionId);
   if (!conns) return;
   const payload = JSON.stringify(data);
@@ -65,7 +93,11 @@ export function broadcastToSession(sessionId: string, data: Record<string, unkno
 /**
  * Broadcast message to specific users in a session.
  */
-function broadcastToUsers(sessionId: string, userIds: Set<string>, data: Record<string, unknown>): void {
+function broadcastToUsers(
+  sessionId: string,
+  userIds: Set<string>,
+  data: Record<string, unknown>
+): void {
   const sessionUsers = userSessions.get(sessionId);
   if (!sessionUsers) return;
   const payload = JSON.stringify(data);
@@ -98,24 +130,26 @@ function checkAndStartPlayMode(requestId: string, sessionId: string, forceTimeou
   if (!request || request.sessionId !== sessionId) {
     return;
   }
-  
+
   const allUsers = getUsersInSession(sessionId);
   const otherUsers = new Set(allUsers);
   otherUsers.delete(request.fromUserId); // Remove initiator
-  
+
   // If no other users, start immediately (initiator only)
   if (otherUsers.size === 0) {
     // Start for initiator only
     const initiatorWs = userSessions.get(sessionId)?.get(request.fromUserId);
     if (initiatorWs) {
       try {
-        initiatorWs.send(JSON.stringify({
-          type: 'play-mode-start',
-          timestamp: Date.now(),
-          requestId,
-          fromUser: request.fromUser,
-          sessionId,
-        }));
+        initiatorWs.send(
+          JSON.stringify({
+            type: 'play-mode-start',
+            timestamp: Date.now(),
+            requestId,
+            fromUser: request.fromUser,
+            sessionId,
+          })
+        );
       } catch {
         // ignore
       }
@@ -124,10 +158,10 @@ function checkAndStartPlayMode(requestId: string, sessionId: string, forceTimeou
     clearTimeout(request.timeout);
     return;
   }
-  
+
   // Collect accepted users (initiator is always accepted)
   const acceptedUsers = new Set<string>([request.fromUserId]);
-  
+
   let allResponded = true;
   for (const userId of otherUsers) {
     const response = request.responses.get(userId);
@@ -137,7 +171,7 @@ function checkAndStartPlayMode(requestId: string, sessionId: string, forceTimeou
       acceptedUsers.add(userId);
     }
   }
-  
+
   // Start if:
   // 1. All users responded (forceTimeout = false), OR
   // 2. Force timeout (forceTimeout = true) and at least someone accepted
@@ -150,7 +184,7 @@ function checkAndStartPlayMode(requestId: string, sessionId: string, forceTimeou
       fromUser: request.fromUser,
       sessionId,
     });
-    
+
     // Cleanup
     activePlayModeRequests.delete(requestId);
     clearTimeout(request.timeout);
@@ -158,7 +192,6 @@ function checkAndStartPlayMode(requestId: string, sessionId: string, forceTimeou
 }
 
 export function createWsServer(app: FastifyInstance, _pool: Pool): void {
-
   // @fastify/websocket v11 handler signature: (socket, request)
   app.get('/ws', { websocket: true }, (socket /*, req */) => {
     const ws = socket as unknown as WebSocket;
@@ -166,7 +199,13 @@ export function createWsServer(app: FastifyInstance, _pool: Pool): void {
 
     ws.on('message', (raw: RawData) => {
       try {
-        const msg = JSON.parse(raw.toString('utf-8')) as WsMessage;
+        const text =
+          typeof raw === 'string'
+            ? raw
+            : Buffer.isBuffer(raw)
+              ? raw.toString('utf-8')
+              : Buffer.from(raw as ArrayLike<number>).toString('utf-8');
+        const msg = JSON.parse(text) as WsMessage;
         handleMessage(ws, msg);
       } catch {
         // ignore invalid
@@ -176,12 +215,12 @@ export function createWsServer(app: FastifyInstance, _pool: Pool): void {
     ws.on('close', () => {
       if (meta.sessionId && rooms.has(meta.sessionId)) {
         rooms.get(meta.sessionId)!.delete(ws);
-        
+
         // Remove from userSessions
         if (meta.userId && userSessions.has(meta.sessionId)) {
           userSessions.get(meta.sessionId)!.delete(meta.userId);
         }
-        
+
         // Cleanup any active Play Mode requests where this user was involved
         if (meta.sessionId) {
           for (const [requestId, request] of activePlayModeRequests.entries()) {
@@ -198,7 +237,7 @@ export function createWsServer(app: FastifyInstance, _pool: Pool): void {
             }
           }
         }
-        
+
         // Broadcast user-left
         broadcastToSession(meta.sessionId, {
           type: 'user-left',
@@ -216,22 +255,26 @@ export function createWsServer(app: FastifyInstance, _pool: Pool): void {
           meta.sessionId = msg.sessionId;
           if (!rooms.has(msg.sessionId)) rooms.set(msg.sessionId, new Set());
           rooms.get(msg.sessionId)!.add(ws);
-          
+
           // Track userId -> WebSocket mapping for this session
           if (!userSessions.has(msg.sessionId)) {
             userSessions.set(msg.sessionId, new Map());
           }
           userSessions.get(msg.sessionId)!.set(meta.userId, ws);
-          
+
           // Acknowledge
           send(ws, { type: 'connected', timestamp: Date.now(), userId: meta.userId });
           // Notify others
-          broadcastToSession(msg.sessionId, {
-            type: 'user-joined',
-            timestamp: Date.now(),
-            userId: meta.userId,
-            user: { id: meta.userId },
-          } as unknown as Record<string, unknown>, ws);
+          broadcastToSession(
+            msg.sessionId,
+            {
+              type: 'user-joined',
+              timestamp: Date.now(),
+              userId: meta.userId,
+              user: { id: meta.userId },
+            } as unknown as Record<string, unknown>,
+            ws
+          );
         } catch {
           send(ws, { type: 'error', timestamp: Date.now(), error: 'Unauthorized' });
           ws.close();
@@ -287,7 +330,7 @@ export function createWsServer(app: FastifyInstance, _pool: Pool): void {
               activePlayModeRequests.delete(requestId);
             }
           }
-          
+
           // Create new Play Mode request
           const requestId = msg.requestId;
           const timeout = setTimeout(() => {
@@ -298,7 +341,7 @@ export function createWsServer(app: FastifyInstance, _pool: Pool): void {
               activePlayModeRequests.delete(requestId);
             }
           }, 30000); // 30 seconds
-          
+
           const request: PlayModeRequest = {
             requestId,
             fromUserId: meta.userId,
@@ -308,18 +351,22 @@ export function createWsServer(app: FastifyInstance, _pool: Pool): void {
             timeout,
             createdAt: Date.now(),
           };
-          
+
           activePlayModeRequests.set(requestId, request);
-          
+
           // Broadcast request to all other users in session
-          broadcastToSession(meta.sessionId, {
-            type: 'play-mode-request',
-            timestamp: Date.now(),
-            requestId,
-            fromUser: msg.fromUser,
-            sessionId: meta.sessionId,
-          } as unknown as Record<string, unknown>, ws);
-          
+          broadcastToSession(
+            meta.sessionId,
+            {
+              type: 'play-mode-request',
+              timestamp: Date.now(),
+              requestId,
+              fromUser: msg.fromUser,
+              sessionId: meta.sessionId,
+            } as unknown as Record<string, unknown>,
+            ws
+          );
+
           // Check if there are any other users to wait for
           const allUsers = getUsersInSession(meta.sessionId);
           if (allUsers.size <= 1) {
@@ -336,15 +383,15 @@ export function createWsServer(app: FastifyInstance, _pool: Pool): void {
             // Request doesn't exist or already processed
             break;
           }
-          
+
           // Don't allow response from initiator (they're auto-accepted)
           if (msg.userId === request.fromUserId) {
             break;
           }
-          
+
           // Update response (allow overwriting previous response)
           request.responses.set(msg.userId || '', msg.accepted);
-          
+
           // Check if we should start Play Mode
           checkAndStartPlayMode(msg.requestId, meta.sessionId);
           break;
@@ -365,8 +412,5 @@ export function createWsServer(app: FastifyInstance, _pool: Pool): void {
         // ignore
       }
     }
-
   });
 }
-
-

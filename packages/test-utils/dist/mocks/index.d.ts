@@ -45,6 +45,50 @@ export declare function createMockGPUDevice(): {
     };
 };
 /**
+ * Creates a mock WebGPU navigator with adapter support
+ */
+export declare function createMockGPU(): {
+    requestAdapter: import("vitest").Mock<() => Promise<{
+        requestDevice: import("vitest").Mock<() => Promise<{
+            createBuffer: import("vitest").Mock<() => {
+                destroy: import("vitest").Mock<(...args: any[]) => any>;
+                getMappedRange: import("vitest").Mock<(...args: any[]) => any>;
+                mapAsync: import("vitest").Mock<() => Promise<void>>;
+                unmap: import("vitest").Mock<(...args: any[]) => any>;
+            }>;
+            createTexture: import("vitest").Mock<() => {
+                destroy: import("vitest").Mock<(...args: any[]) => any>;
+                createView: import("vitest").Mock<() => {}>;
+            }>;
+            createShaderModule: import("vitest").Mock<() => {
+                getCompilationInfo: import("vitest").Mock<() => Promise<{
+                    messages: never[];
+                }>>;
+            }>;
+            createRenderPipeline: import("vitest").Mock<() => {}>;
+            createComputePipeline: import("vitest").Mock<() => {}>;
+            createCommandEncoder: import("vitest").Mock<() => {
+                beginRenderPass: import("vitest").Mock<() => {
+                    end: import("vitest").Mock<(...args: any[]) => any>;
+                    setPipeline: import("vitest").Mock<(...args: any[]) => any>;
+                    draw: import("vitest").Mock<(...args: any[]) => any>;
+                }>;
+                finish: import("vitest").Mock<() => {}>;
+            }>;
+            createBindGroup: import("vitest").Mock<() => {}>;
+            createBindGroupLayout: import("vitest").Mock<() => {}>;
+            createPipelineLayout: import("vitest").Mock<() => {}>;
+            createSampler: import("vitest").Mock<() => {}>;
+            destroy: import("vitest").Mock<(...args: any[]) => any>;
+            queue: {
+                submit: import("vitest").Mock<(...args: any[]) => any>;
+                writeBuffer: import("vitest").Mock<(...args: any[]) => any>;
+                writeTexture: import("vitest").Mock<(...args: any[]) => any>;
+            };
+        }>>;
+    }>>;
+};
+/**
  * Creates a mock ResizeObserver
  */
 export declare function createMockResizeObserver(): {

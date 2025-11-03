@@ -3,14 +3,12 @@
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
     "ecmaVersion": "latest",
-    "sourceType": "module",
-    "project": "./tsconfig.json"
+    "sourceType": "module"
   },
   "plugins": ["@typescript-eslint", "prettier"],
   "extends": [
     "eslint:recommended",
     "plugin:@typescript-eslint/recommended",
-    "plugin:@typescript-eslint/recommended-requiring-type-checking",
     "prettier"
   ],
   "rules": {
@@ -24,5 +22,6 @@
     "browser": true,
     "es2021": true
   },
-  "ignorePatterns": ["dist", "node_modules", "*.config.ts", "*.config.js", "**/*.d.ts", "**/*.js", "**/*.js.map", "**/*.d.ts.map"]
+  "ignorePatterns": ["*.d.ts", "*.js", "*.js.map", "*.d.ts.map"]
 }
+

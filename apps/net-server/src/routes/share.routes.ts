@@ -1,16 +1,18 @@
 import { Router, type Request, type Response } from 'express';
 import type { RouteDependencies } from './index';
-import type { ShareProjectRequest, ShareProjectResponse, ShareMetadataResponse, ProjectData } from '../types';
+import type {
+  ShareProjectRequest,
+  ShareProjectResponse,
+  ShareMetadataResponse,
+  ProjectData,
+} from '../types';
 
 /**
  * Create share routes
  */
 export function createShareRoutes(deps: RouteDependencies): Router {
   const router = Router();
-  const {
-    storage,
-    FRONTEND_URL,
-  } = deps;
+  const { storage, FRONTEND_URL } = deps;
 
   /**
    * POST /api/share
@@ -29,7 +31,7 @@ export function createShareRoutes(deps: RouteDependencies): Router {
         return res.status(400).json({ error: 'Invalid projectData' });
       }
 
-      const projectData = body.projectData as ProjectData;
+      const projectData = body.projectData;
 
       // Validate project data structure
       if (
@@ -156,4 +158,3 @@ export function createShareRoutes(deps: RouteDependencies): Router {
 
   return router;
 }
-

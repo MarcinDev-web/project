@@ -15,7 +15,11 @@
       "@engine/avatar": ["../../packages/avatar/src"],
       "@engine/avatar/*": ["../../packages/avatar/src/*"],
       "@engine/camera": ["../../packages/camera/src"],
-      "@engine/camera/*": ["../../packages/camera/src/*"]
+      "@engine/camera/*": ["../../packages/camera/src/*"],
+      "@engine/net": ["../../packages/net/src"],
+      "@engine/net/*": ["../../packages/net/src/*"],
+      "@engine/net-protocol": ["../../packages/net-protocol/src"],
+      "@engine/net-protocol/*": ["../../packages/net-protocol/src/*"]
     },
     "jsx": "react-jsx",
     "types": ["vite/client", "@testing-library/jest-dom"]

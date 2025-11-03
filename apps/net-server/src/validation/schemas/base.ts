@@ -68,7 +68,12 @@ export const positiveIntegerSchema = z
   .number()
   .int()
   .positive('Must be a positive integer')
-  .or(z.string().transform((val) => parseInt(val, 10)).pipe(z.number().int().positive()));
+  .or(
+    z
+      .string()
+      .transform((val) => parseInt(val, 10))
+      .pipe(z.number().int().positive())
+  );
 
 /**
  * Non-negative integer schema.
@@ -77,7 +82,12 @@ export const nonNegativeIntegerSchema = z
   .number()
   .int()
   .nonnegative('Must be a non-negative integer')
-  .or(z.string().transform((val) => parseInt(val, 10)).pipe(z.number().int().nonnegative()));
+  .or(
+    z
+      .string()
+      .transform((val) => parseInt(val, 10))
+      .pipe(z.number().int().nonnegative())
+  );
 
 /**
  * Positive number schema (can be decimal).
@@ -179,7 +189,12 @@ export const timestampSchema = z
   .number()
   .int()
   .nonnegative()
-  .or(z.string().transform((val) => parseInt(val, 10)).pipe(z.number().int().nonnegative()))
+  .or(
+    z
+      .string()
+      .transform((val) => parseInt(val, 10))
+      .pipe(z.number().int().nonnegative())
+  )
   .or(isoDateStringSchema.transform((val) => new Date(val).getTime()));
 
 /**
@@ -215,4 +230,3 @@ export function trimmedStringSchema(maxLength?: number, minLength = 0): z.ZodStr
 
   return schema;
 }
-

@@ -20,5 +20,3 @@ export function readVarUint(bytes: Uint8Array, offset: number): { value: number;
   }
   return { value: result >>> 0, next: i };
 }
-
-

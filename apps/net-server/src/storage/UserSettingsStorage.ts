@@ -30,7 +30,7 @@ export class UserSettingsStorage {
 
   async initialize(): Promise<void> {
     await fs.mkdir(this.dataDir, { recursive: true });
-    
+
     try {
       await fs.access(this.settingsFile);
     } catch {
@@ -53,8 +53,8 @@ export class UserSettingsStorage {
 
   async getSettings(userId: string): Promise<UserSettings> {
     const settings = await this.readSettings();
-    let userSettings = settings.find(s => s.userId === userId);
-    
+    let userSettings = settings.find((s) => s.userId === userId);
+
     if (!userSettings) {
       // Create default settings
       userSettings = {
@@ -71,14 +71,14 @@ export class UserSettingsStorage {
       settings.push(userSettings);
       await this.writeSettings(settings);
     }
-    
+
     return userSettings;
   }
 
   async updateSettings(userId: string, updates: Partial<UserSettings>): Promise<UserSettings> {
     const settings = await this.readSettings();
-    let userSettings = settings.find(s => s.userId === userId);
-    
+    let userSettings = settings.find((s) => s.userId === userId);
+
     if (!userSettings) {
       // Create with defaults
       userSettings = {
@@ -94,7 +94,7 @@ export class UserSettingsStorage {
       };
       settings.push(userSettings);
     }
-    
+
     // Update
     if (updates.notificationPreferences) {
       userSettings.notificationPreferences = {
@@ -102,16 +102,18 @@ export class UserSettingsStorage {
         ...updates.notificationPreferences,
       };
     }
-    
+
     userSettings.updatedAt = Date.now();
-    
+
     await this.writeSettings(settings);
     return userSettings;
   }
 
-  async getNotificationPreference(userId: string, type: keyof NotificationPreferences): Promise<boolean> {
+  async getNotificationPreference(
+    userId: string,
+    type: keyof NotificationPreferences
+  ): Promise<boolean> {
     const settings = await this.getSettings(userId);
     return settings.notificationPreferences[type];
   }
 }
-

@@ -102,13 +102,16 @@ export class ShopStorageDB {
     }
 
     if (filter.search) {
-      conditions.push(`(LOWER(name) LIKE $${paramIndex} OR LOWER(description) LIKE $${paramIndex})`);
+      conditions.push(
+        `(LOWER(name) LIKE $${paramIndex} OR LOWER(description) LIKE $${paramIndex})`
+      );
       const searchTerm = `%${filter.search.toLowerCase()}%`;
       params.push(searchTerm, searchTerm);
       paramIndex += 2;
     }
 
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : 'WHERE available = true';
+    const whereClause =
+      conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : 'WHERE available = true';
 
     const limit = filter.limit ?? 50;
     const offset = filter.offset ?? 0;
@@ -135,10 +138,13 @@ export class ShopStorageDB {
       updated_at: Date;
     }>(query, params);
 
-    return result.rows.map(row => this.mapRowToItem(row));
+    return result.rows.map((row) => this.mapRowToItem(row));
   }
 
-  async updateItem(id: string, updates: Partial<Omit<ShopItem, 'id' | 'createdAt'>>): Promise<ShopItem | null> {
+  async updateItem(
+    id: string,
+    updates: Partial<Omit<ShopItem, 'id' | 'createdAt'>>
+  ): Promise<ShopItem | null> {
     const setClauses: string[] = [];
     const params: unknown[] = [];
     let paramIndex = 1;
@@ -252,13 +258,16 @@ export class ShopStorageDB {
     }
 
     if (filter.search) {
-      conditions.push(`(LOWER(name) LIKE $${paramIndex} OR LOWER(description) LIKE $${paramIndex})`);
+      conditions.push(
+        `(LOWER(name) LIKE $${paramIndex} OR LOWER(description) LIKE $${paramIndex})`
+      );
       const searchTerm = `%${filter.search.toLowerCase()}%`;
       params.push(searchTerm, searchTerm);
       paramIndex += 2;
     }
 
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : 'WHERE available = true';
+    const whereClause =
+      conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : 'WHERE available = true';
 
     const result = await this.pool.query<{ count: string }>(
       `SELECT COUNT(*) as count FROM shop_items ${whereClause}`,
@@ -293,7 +302,7 @@ export class ShopStorageDB {
       createdAt: row.created_at.getTime(),
       updatedAt: row.updated_at.getTime(),
     };
-    
+
     if (row.description !== null) {
       item.description = row.description;
     }
@@ -303,8 +312,7 @@ export class ShopStorageDB {
     if (row.stock !== null) {
       item.stock = row.stock;
     }
-    
+
     return item;
   }
 }
-

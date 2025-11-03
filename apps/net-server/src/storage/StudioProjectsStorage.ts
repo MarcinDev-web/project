@@ -119,7 +119,7 @@ export class StudioProjectsStorageDB {
         updatedAt: row.updated_at.getTime(),
         version: row.version,
       };
-      
+
       if (row.description !== null) {
         project.description = row.description;
       }
@@ -129,7 +129,7 @@ export class StudioProjectsStorageDB {
       if (row.tags.length > 0) {
         project.tags = row.tags;
       }
-      
+
       return project;
     } catch (error) {
       console.error(`Failed to deserialize project data for ${projectId}:`, error);
@@ -137,7 +137,10 @@ export class StudioProjectsStorageDB {
     }
   }
 
-  async listProjects(userId: string, options?: { limit?: number; offset?: number }): Promise<StudioProject[]> {
+  async listProjects(
+    userId: string,
+    options?: { limit?: number; offset?: number }
+  ): Promise<StudioProject[]> {
     let query = 'SELECT * FROM user_projects WHERE user_id = $1 ORDER BY updated_at DESC';
     const params: unknown[] = [userId];
 
@@ -178,7 +181,7 @@ export class StudioProjectsStorageDB {
           updatedAt: row.updated_at.getTime(),
           version: row.version,
         };
-        
+
         if (row.description !== null) {
           project.description = row.description;
         }
@@ -188,7 +191,7 @@ export class StudioProjectsStorageDB {
         if (row.tags.length > 0) {
           project.tags = row.tags;
         }
-        
+
         return project;
       } catch (error) {
         console.error(`Failed to deserialize project ${row.id}:`, error);
@@ -321,7 +324,9 @@ export class StudioProjectsStorage {
     }
   }
 
-  private async writeProjects(projects: Record<string, Record<string, StudioProject>>): Promise<void> {
+  private async writeProjects(
+    projects: Record<string, Record<string, StudioProject>>
+  ): Promise<void> {
     const tmpFile = `${this.projectsFile}.tmp`;
     const content = JSON.stringify(projects, null, 2);
     await fs.writeFile(tmpFile, content, 'utf-8');
@@ -353,7 +358,7 @@ export class StudioProjectsStorage {
       ...(data.tags !== undefined && { tags: data.tags }),
     };
 
-    projects[userId]![id] = project;
+    projects[userId][id] = project;
     await this.writeProjects(projects);
 
     return project;
@@ -364,12 +369,20 @@ export class StudioProjectsStorage {
     return projects[userId]?.[projectId] ?? null;
   }
 
-  async listProjects(userId: string, options?: { limit?: number; offset?: number }): Promise<StudioProject[]> {
+  async listProjects(
+    userId: string,
+    options?: { limit?: number; offset?: number }
+  ): Promise<StudioProject[]> {
     const projects = await this.readProjects();
-    const userProjects = Object.values(projects[userId] || {}).sort((a, b) => b.updatedAt - a.updatedAt);
+    const userProjects = Object.values(projects[userId] || {}).sort(
+      (a, b) => b.updatedAt - a.updatedAt
+    );
 
     if (options?.offset) {
-      return userProjects.slice(options.offset, options.limit ? options.offset + options.limit : undefined);
+      return userProjects.slice(
+        options.offset,
+        options.limit ? options.offset + options.limit : undefined
+      );
     }
     if (options?.limit) {
       return userProjects.slice(0, options.limit);
@@ -393,7 +406,10 @@ export class StudioProjectsStorage {
       ...project,
       ...(updates.name !== undefined && { name: updates.name }),
       ...(updates.description !== undefined && { description: updates.description }),
-      ...(updates.projectData !== undefined && { projectData: updates.projectData, version: project.version + 1 }),
+      ...(updates.projectData !== undefined && {
+        projectData: updates.projectData,
+        version: project.version + 1,
+      }),
       ...(updates.thumbnailUrl !== undefined && { thumbnailUrl: updates.thumbnailUrl }),
       ...(updates.isPublished !== undefined && { isPublished: updates.isPublished }),
       ...(updates.tags !== undefined && { tags: updates.tags }),
@@ -409,8 +425,8 @@ export class StudioProjectsStorage {
   async deleteProject(userId: string, projectId: string): Promise<boolean> {
     const projects = await this.readProjects();
     if (projects[userId]?.[projectId]) {
-      delete projects[userId]![projectId];
-      if (Object.keys(projects[userId]!).length === 0) {
+      delete projects[userId][projectId];
+      if (Object.keys(projects[userId]).length === 0) {
         delete projects[userId];
       }
       await this.writeProjects(projects);
@@ -428,4 +444,3 @@ export class StudioProjectsStorage {
     };
   }
 }
-
