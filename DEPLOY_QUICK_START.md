@@ -41,12 +41,12 @@ Railway powinien automatycznie wykryć monorepo. Jeśli nie:
 - Przejdź: **Settings** → **Build & Deploy**
 - **Build Command:** 
   ```bash
-  curl -LO https://github.com/rustwasm/wasm-pack/releases/download/v0.12.1/wasm-pack-v0.12.1-x86_64-unknown-linux-musl.tar.gz && tar -xzf wasm-pack-v0.12.1-x86_64-unknown-linux-musl.tar.gz && mv wasm-pack-v0.12.1-x86_64-unknown-linux-musl/wasm-pack /usr/local/bin/ && pnpm i --frozen-lockfile && pnpm -w --filter @apps/net-server build
+  curl -LO https://github.com/rustwasm/wasm-pack/releases/download/v0.12.1/wasm-pack-v0.12.1-x86_64-unknown-linux-musl.tar.gz && tar -xzf wasm-pack-v0.12.1-x86_64-unknown-linux-musl.tar.gz && export PATH="$PATH:$(pwd)/wasm-pack-v0.12.1-x86_64-unknown-linux-musl" && chmod +x wasm-pack-v0.12.1-x86_64-unknown-linux-musl/wasm-pack && pnpm i --frozen-lockfile && pnpm -w --filter @apps/net-server build
   ```
 - **Start Command:** `node apps/net-server/dist/server.js`
 - **Root Directory:** *(zostaw puste)*
 
-**⚠️ Ważne:** Build command pobiera i instaluje `wasm-pack` (wymagane do buildu pakietu `@engine/wasm-collision`). Jeśli build nadal się nie powiedzie, zobacz sekcję Troubleshooting poniżej.
+**⚠️ Ważne:** Build command pobiera i instaluje `wasm-pack` (wymagane do buildu pakietu `@engine/wasm-collision`). Jeśli build nadal się nie powiedzie, zobacz sekcję Troubleshooting poniżej lub użyj alternatywnego rozwiązania z Dockerfile.
 
 ### 2.3. Dodanie PostgreSQL Database
 
@@ -232,15 +232,26 @@ curl https://your-net-server.railway.app/health
 **Błąd:** `sh: 1: wasm-pack: not found` podczas buildu na Railway
 
 **Rozwiązanie:**
-1. Upewnij się, że build command w Railway zawiera instalację `wasm-pack` (patrz Krok 2.2)
-2. Alternatywnie, jeśli build command nie działa, możesz:
-   - Dodać plik `apps/net-server/nixpacks.toml` (zobacz przykład w repo)
-   - Lub użyć Dockerfile zamiast build command
-3. Sprawdź logi buildu w Railway - czy `wasm-pack` został zainstalowany poprawnie
 
-**Jeśli problem nadal występuje:**
-- Sprawdź czy Railway używa odpowiedniego base image (Node.js 22)
-- Możesz spróbować użyć Dockerfile zamiast build command (plik `apps/net-server/Dockerfile` w repo)
+**Opcja 1: Użyj poprawionego build command** (zalecane)
+1. Railway Dashboard → `net-server` → Settings → Build & Deploy
+2. Skopiuj build command z Krok 2.2 (zawiera instalację wasm-pack)
+3. Zapisz i zrób redeploy
+
+**Opcja 2: Użyj Dockerfile** (zalecane jeśli build command nie działa)
+1. Railway Dashboard → `net-server` → Settings → Build & Deploy
+2. **Usuń Build Command** (zostaw puste lub ustaw na `" "`)
+3. Railway automatycznie użyje `apps/net-server/Dockerfile`
+4. **✅ Dockerfile został zaktualizowany** - automatycznie instaluje `wasm-pack`
+
+**Opcja 3: Pomiń budowanie wasm-collision** (tymczasowo)
+Jeśli `net-server` nie używa bezpośrednio `wasm-collision`, możesz:
+1. Zmień build command na: `pnpm i --frozen-lockfile && pnpm -C apps/net-server build`
+2. To zbuduje tylko `net-server` bez wszystkich zależności workspace
+
+**Sprawdź logi:**
+- Railway Dashboard → `net-server` → Logs
+- Szukaj czy `wasm-pack` został pobrany i czy jest w PATH
 
 ---
 
