@@ -38,6 +38,17 @@ export async function getPrismaClient(): Promise<PrismaClientType> {
       console.warn('⚠️  WARNING: DATABASE_URL should use SSL (sslmode=require) in production');
     }
 
+    // Validate connection string format
+    try {
+      const url = new URL(connectionString);
+      if (!url.protocol.startsWith('postgres')) {
+        console.warn('⚠️  WARNING: DATABASE_URL should use postgresql:// or postgres:// protocol');
+      }
+    } catch (error) {
+      console.error('❌ ERROR: Invalid DATABASE_URL format:', error);
+      throw new Error('DATABASE_URL is not a valid URL');
+    }
+
     const Client = await loadPrismaConstructor();
     prisma = new Client({
       datasources: {
@@ -45,7 +56,17 @@ export async function getPrismaClient(): Promise<PrismaClientType> {
           url: connectionString,
         },
       },
+      log: isProduction ? ['error', 'warn'] : ['query', 'error', 'warn'],
     }) as PrismaClientType;
+
+    // Test connection immediately
+    try {
+      await prisma.$connect();
+      console.log('✅ Database connection established');
+    } catch (error) {
+      console.error('❌ Failed to connect to database:', error);
+      throw error;
+    }
   }
   return prisma;
 }
@@ -59,7 +80,14 @@ export async function ensureSchema(): Promise<void> {
   const client = await getPrismaClient();
   // Schema is managed by Prisma migrations
   // Run migrations: pnpm db:migrate
-  await client.$connect();
+  try {
+    // Test connection with a simple query
+    await client.$queryRaw`SELECT 1`;
+    console.log('✅ Database schema check passed');
+  } catch (error) {
+    console.error('❌ Database schema check failed:', error);
+    throw error;
+  }
 }
 
 export async function disconnectPrisma(): Promise<void> {
