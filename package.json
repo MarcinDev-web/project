@@ -11,7 +11,7 @@
   "scripts": {
     "prebuild": "sh scripts/install-wasm-pack.sh || echo 'Warning: Could not install wasm-pack, will attempt to use pre-built WASM files'",
     "postinstall": "sh -c '[ -f .wasm-pack-env.sh ] && . .wasm-pack-env.sh || true'",
-    "build": "pnpm -r build",
+    "build": "pnpm --filter '@engine/world-server' build && pnpm -r --filter='!@engine/world-server' build",
     "dev": "pnpm --filter @apps/editor dev",
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",

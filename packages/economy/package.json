@@ -10,7 +10,7 @@
     "./examples": "./dist/examples/CurrencySystemExample.js"
   },
   "scripts": {
-    "build": "tsc -b --force",
+    "build": "tsc -b",
     "dev": "tsc --watch",
     "test": "vitest run",
     "test:watch": "vitest",
