@@ -796,8 +796,8 @@ export class EditorUI {
 
     // Initialize Collaboration Manager (optional - requires auth token)
     try {
-      // TODO: Get JWT token from auth system
-      const jwtToken = localStorage.getItem('auth_token') || 'temp_token';
+      // Get JWT token from localStorage (using same key as platform app)
+      const jwtToken = localStorage.getItem('forge_token') || 'temp_token';
       this.collaborationManager = new CollaborationManager({
         scene: this.config.scene,
         physicsWorld: this.config.physicsWorld ?? null,

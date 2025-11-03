@@ -91,12 +91,17 @@ export class BloomPass {
         code: `
 @group(0) @binding(0) var hdrTex : texture_2d<f32>;
 @group(0) @binding(1) var smp : sampler;
-struct BloomConfig { threshold: f32, intensity: f32, _pad0: f32, _pad1: f32; }
+struct BloomConfig {
+  threshold: f32,
+  intensity: f32,
+  _pad0: f32,
+  _pad1: f32,
+}
 @group(0) @binding(2) var<uniform> config : BloomConfig;
 @fragment fn fs_main(@location(0) v_uv:vec2<f32>) -> @location(0) vec4<f32> {
   let col = vec3<f32>(textureSample(hdrTex, smp, v_uv).xyz);
   let lum = dot(col, vec3<f32>(0.2126, 0.7152, 0.0722));
-  let bright = max(lum - config.threshold, 0.0);
+  var bright = max(lum - config.threshold, 0.0);
   bright = bright / (bright + 1.0);
   return vec4<f32>(col * bright, 1.0);
 }`,
@@ -129,7 +134,10 @@ struct BloomConfig { threshold: f32, intensity: f32, _pad0: f32, _pad1: f32; }
         code: `
 @group(0) @binding(0) var srcTex : texture_2d<f32>;
 @group(0) @binding(1) var smp : sampler;
-struct BlurParams { direction: vec2<f32>, texSize: vec2<f32>; }
+struct BlurParams {
+  direction: vec2<f32>,
+  texSize: vec2<f32>,
+}
 @group(0) @binding(2) var<uniform> params : BlurParams;
 @fragment fn fs_main(@location(0) v_uv:vec2<f32>) -> @location(0) vec4<f32> {
   let texel = params.texSize;
@@ -212,10 +220,15 @@ struct BlurParams { direction: vec2<f32>, texSize: vec2<f32>; }
     const iterations = this.config.iterations;
     const neededMips = iterations + 1; // +1 for bright-pass output
 
+    // Calculate expected first mip size (half resolution)
+    const expectedFirstMipWidth = Math.floor(width / 2);
+    const expectedFirstMipHeight = Math.floor(height / 2);
+
     // Destroy old mip chain if size changed
+    // CRITICAL: Compare with expected first mip size, not full canvas size!
     if (this.mipChain.length > 0) {
       const firstMip = this.mipChain[0];
-      if (firstMip && (firstMip.width !== width || firstMip.height !== height)) {
+      if (firstMip && (firstMip.width !== expectedFirstMipWidth || firstMip.height !== expectedFirstMipHeight)) {
         for (const tex of this.mipChain) {
           try {
             tex?.destroy();
@@ -230,8 +243,8 @@ struct BlurParams { direction: vec2<f32>, texSize: vec2<f32>; }
 
     // Create mip chain
     if (this.mipChain.length === 0 && this.format) {
-      let currentWidth = Math.floor(width / 2);
-      let currentHeight = Math.floor(height / 2);
+      let currentWidth = expectedFirstMipWidth;
+      let currentHeight = expectedFirstMipHeight;
 
       for (let i = 0; i < neededMips; i++) {
         if (currentWidth < 1 || currentHeight < 1) break;
@@ -302,39 +315,12 @@ struct BlurParams { direction: vec2<f32>, texSize: vec2<f32>; }
     brightPass.end();
 
     // Step 2: Downsample and blur each mip level
+    // Track temp textures to destroy after all render passes are finished
+    const tempTextures: GPUTexture[] = [];
+    
     for (let i = 0; i < this.config.iterations && i < this.mipChain.length - 1; i++) {
       const srcMip = this.mipViews[i]!;
       const dstMip = this.mipViews[i + 1]!;
-
-      // Horizontal blur
-      const blurHKey = `blur-h-${i}-${srcMip}`;
-      let blurHBg = this.cachedBindGroups.get(blurHKey);
-      if (!blurHBg && this.blurPipeline) {
-        const blurLayout = this.blurPipeline.getBindGroupLayout(0);
-        // Create blur params buffer for direction
-        const blurParamsBuffer = this.device.createBuffer({
-          label: `bloom-blur-params-${i}`,
-          size: 16, // vec2 direction + vec2 texSize
-          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        });
-        const texSize = new Float32Array(4);
-        texSize[0] = 1.0; // horizontal direction
-        texSize[1] = 0.0;
-        texSize[2] = 1.0 / Math.floor(width / Math.pow(2, i));
-        texSize[3] = 1.0 / Math.floor(height / Math.pow(2, i));
-        this.device.queue.writeBuffer(blurParamsBuffer, 0, texSize);
-
-        blurHBg = this.device.createBindGroup({
-          label: `bloom-blur-h-bg-${i}`,
-          layout: blurLayout,
-          entries: [
-            { binding: 0, resource: srcMip },
-            { binding: 1, resource: this.sampler },
-            { binding: 2, resource: { buffer: blurParamsBuffer } },
-          ],
-        });
-        this.cachedBindGroups.set(blurHKey, blurHBg);
-      }
 
       // Create temporary texture for horizontal blur output
       const tempMip = this.device.createTexture({
@@ -344,64 +330,102 @@ struct BlurParams { direction: vec2<f32>, texSize: vec2<f32>; }
         usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
       });
       const tempView = tempMip.createView();
+      tempTextures.push(tempMip); // Track for cleanup
+
+      // Horizontal blur - create bind group fresh (don't cache, uses temp texture)
+      const blurLayout = this.blurPipeline.getBindGroupLayout(0);
+      const blurHParamsBuffer = this.device.createBuffer({
+        label: `bloom-blur-h-params-${i}`,
+        size: 16, // vec2 direction + vec2 texSize
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
+      const texSizeH = new Float32Array(4);
+      texSizeH[0] = 1.0; // horizontal direction
+      texSizeH[1] = 0.0;
+      texSizeH[2] = 1.0 / Math.floor(width / Math.pow(2, i));
+      texSizeH[3] = 1.0 / Math.floor(height / Math.pow(2, i));
+      this.device.queue.writeBuffer(blurHParamsBuffer, 0, texSizeH);
+
+      const blurHBg = this.device.createBindGroup({
+        label: `bloom-blur-h-bg-${i}`,
+        layout: blurLayout,
+        entries: [
+          { binding: 0, resource: srcMip },
+          { binding: 1, resource: this.sampler },
+          { binding: 2, resource: { buffer: blurHParamsBuffer } },
+        ],
+      });
 
       const blurH = encoder.beginRenderPass({
         label: `bloom-blur-h-${i}`,
         colorAttachments: [{ view: tempView, loadOp: 'clear', storeOp: 'store' }],
       });
       blurH.setPipeline(this.blurPipeline);
-      blurH.setBindGroup(0, blurHBg!);
+      blurH.setBindGroup(0, blurHBg);
       blurH.draw(3, 1, 0, 0);
       blurH.end();
 
-      // Vertical blur (blur horizontally blurred temp into dst mip)
-      const blurVKey = `blur-v-${i}-${tempView}`;
-      let blurVBg = this.cachedBindGroups.get(blurVKey);
-      if (!blurVBg && this.blurPipeline) {
-        const blurLayout = this.blurPipeline.getBindGroupLayout(0);
-        const blurParamsBuffer = this.device.createBuffer({
-          label: `bloom-blur-v-params-${i}`,
-          size: 16,
-          usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-        });
-        const texSize = new Float32Array(4);
-        texSize[0] = 0.0; // vertical direction
-        texSize[1] = 1.0;
-        texSize[2] = 1.0 / tempMip.width;
-        texSize[3] = 1.0 / tempMip.height;
-        this.device.queue.writeBuffer(blurParamsBuffer, 0, texSize);
+      // Vertical blur - create bind group fresh (don't cache, uses temp texture)
+      const blurVParamsBuffer = this.device.createBuffer({
+        label: `bloom-blur-v-params-${i}`,
+        size: 16,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
+      const texSizeV = new Float32Array(4);
+      texSizeV[0] = 0.0; // vertical direction
+      texSizeV[1] = 1.0;
+      texSizeV[2] = 1.0 / tempMip.width;
+      texSizeV[3] = 1.0 / tempMip.height;
+      this.device.queue.writeBuffer(blurVParamsBuffer, 0, texSizeV);
 
-        blurVBg = this.device.createBindGroup({
-          label: `bloom-blur-v-bg-${i}`,
-          layout: blurLayout,
-          entries: [
-            { binding: 0, resource: tempView },
-            { binding: 1, resource: this.sampler },
-            { binding: 2, resource: { buffer: blurParamsBuffer } },
-          ],
-        });
-        this.cachedBindGroups.set(blurVKey, blurVBg);
-      }
+      const blurVBg = this.device.createBindGroup({
+        label: `bloom-blur-v-bg-${i}`,
+        layout: blurLayout,
+        entries: [
+          { binding: 0, resource: tempView },
+          { binding: 1, resource: this.sampler },
+          { binding: 2, resource: { buffer: blurVParamsBuffer } },
+        ],
+      });
 
       const blurV = encoder.beginRenderPass({
         label: `bloom-blur-v-${i}`,
         colorAttachments: [{ view: dstMip, loadOp: 'clear', storeOp: 'store' }],
       });
       blurV.setPipeline(this.blurPipeline);
-      blurV.setBindGroup(0, blurVBg!);
+      blurV.setBindGroup(0, blurVBg);
       blurV.draw(3, 1, 0, 0);
       blurV.end();
 
-      tempMip.destroy();
+      // Note: tempMip will be destroyed after encoder.finish() is called
+      // We track it in tempTextures array but don't destroy here
+      // The textures will be cleaned up by the caller or via GC
     }
 
     // Step 3: Upsample and combine (from smallest to largest)
+    // CRITICAL: We cannot use a texture as both render attachment and texture binding
+    // in the same render pass. When i > 0, we read from highResView (mipViews[i])
+    // and want to write back to it, but that's not allowed in the same pass.
+    // Solution: Always write to a separate temp texture, then use that as input for next iteration
+    let prevUpsampleView: GPUTextureView | null = null;
+    
     for (let i = this.config.iterations - 1; i >= 0; i--) {
       if (i >= this.mipChain.length - 1) continue;
 
-      const lowResView = this.mipViews[i + 1]!;
+      const lowResView = i === this.config.iterations - 1 
+        ? this.mipViews[i + 1]!  // First iteration: use mip chain
+        : prevUpsampleView!;      // Later iterations: use previous upsample result
       const highResView = this.mipViews[i]!;
-      const outputView = i === 0 ? dstView : highResView; // Final output goes to dstView
+      
+      // Always create temp texture for output to avoid usage conflicts
+      const upsampleTempTex = this.device.createTexture({
+        label: `bloom-upsample-temp-${i}`,
+        size: [this.mipChain[i]!.width, this.mipChain[i]!.height, 1],
+        format: this.format,
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+      });
+      const outputView = i === 0 ? dstView : upsampleTempTex.createView();
+      tempTextures.push(upsampleTempTex);
 
       const upsampleKey = `upsample-${i}-${lowResView}-${highResView}`;
       let upsampleBg = this.cachedBindGroups.get(upsampleKey);
@@ -426,7 +450,15 @@ struct BlurParams { direction: vec2<f32>, texSize: vec2<f32>; }
       upsample.setBindGroup(0, upsampleBg!);
       upsample.draw(3, 1, 0, 0);
       upsample.end();
+      
+      // For next iteration, use this temp as the low-res input
+      if (i > 0) {
+        prevUpsampleView = upsampleTempTex.createView();
+      }
     }
+    
+    // Update temp textures array on encoder with all textures (blur + upsample)
+    (encoder as any).__bloomTempTextures = tempTextures;
   }
 }
 

@@ -103,16 +103,23 @@ export const profilesApi = {
 
   /**
    * Load avatar loadout for a user
+   * Returns null if loadout doesn't exist (404 is expected for new users)
    */
   async loadAvatarLoadout(userId: string): Promise<AvatarLoadout | null> {
     try {
-      const data = await apiClient.get<AvatarLoadoutData>(`/users/${userId}/avatar-loadout`);
-      return dataToLoadout(data);
-    } catch (error) {
-      // If loadout doesn't exist, return null instead of throwing
-      if (error instanceof Error && 'message' in error && error.message.includes('404')) {
+      const data = await apiClient.get<AvatarLoadoutData>(`/users/${userId}/avatar-loadout`, {
+        allow404: true,
+      });
+      
+      // If data is null (404), return null
+      if (!data) {
         return null;
       }
+      
+      return dataToLoadout(data);
+    } catch (error) {
+      // This should only catch non-404 errors now
+      console.error('Failed to load avatar loadout:', error);
       throw error;
     }
   },

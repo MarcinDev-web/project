@@ -396,7 +396,7 @@ void authManager.initialize().then(async () => {
   if (!isProduction) {
     const existingItems = await marketplaceStorage.getItems({ limit: 100 });
     if (existingItems.length === 0) {
-      console.log('Marketplace is empty, seeding mock games...');
+      console.log('Marketplace is empty, seeding mock builds and avatars...');
       try {
         // Dynamic import to avoid circular dependency
         const seedModule = await import('./scripts/seedMarketplace.js');
@@ -407,21 +407,19 @@ void authManager.initialize().then(async () => {
         console.warn('Failed to auto-seed marketplace:', error);
       }
     } else {
-      // Add mock players and generate thumbnails for existing games
+      // Add mock players and regenerate thumbnails for existing items (to remove old "GAME" badge)
       console.log(
-        `Adding mock players and thumbnails to ${existingItems.length} existing games...`
+        `Adding mock players and regenerating thumbnails for ${existingItems.length} existing items...`
       );
       for (const item of existingItems) {
-        // Generate thumbnail if missing
-        if (!item.thumbnailUrl) {
-          try {
-            await generateAndSaveThumbnail(THUMBNAIL_DIR, item.id, item.title, item.tags);
-            const thumbnailUrl = `/api/marketplace/thumbnails/${item.id}`;
-            await marketplaceStorage.updateItem(item.id, { thumbnailUrl });
-            console.log(`  → ${item.title}: Generated thumbnail`);
-          } catch (error) {
-            console.warn(`  → ${item.title}: Failed to generate thumbnail:`, error);
-          }
+        // Always regenerate thumbnail to ensure latest format (no "GAME" badge)
+        try {
+          await generateAndSaveThumbnail(THUMBNAIL_DIR, item.id, item.title, item.tags);
+          const thumbnailUrl = `/api/marketplace/thumbnails/${item.id}`;
+          await marketplaceStorage.updateItem(item.id, { thumbnailUrl });
+          console.log(`  → ${item.title}: Regenerated thumbnail`);
+        } catch (error) {
+          console.warn(`  → ${item.title}: Failed to regenerate thumbnail:`, error);
         }
 
         // Add mock players (if no players already)
@@ -565,6 +563,36 @@ app.use('/api/shop', createShopRoutes(routeDeps));
 app.use('/api/studio', createStudioRoutes(routeDeps));
 app.use('/api/forum', createForumRoutes(routeDeps));
 app.use('/api/admin', createAdminRoutes(routeDeps));
+
+/**
+ * GET /api/projects/:token/preview
+ * Get preview information for a shared project (used in forum link previews).
+ */
+app.get('/api/projects/:token/preview', async (req: Request, res: Response) => {
+  try {
+    const { token } = req.params;
+    if (!token || typeof token !== 'string') {
+      return res.status(400).json({ error: 'Token is required' });
+    }
+    const share = await storage.load(token);
+
+    if (!share) {
+      return res.status(404).json({ error: 'Project not found' });
+    }
+
+    res.json({
+      token,
+      createdAt: share.createdAt,
+      title: (share.projectData as { title?: string } | undefined)?.title || 'Shared Project',
+    });
+  } catch (error) {
+    console.error('Get project preview error:', error);
+    res.status(500).json({
+      error: 'Failed to get project preview',
+      message: error instanceof Error ? error.message : String(error),
+    });
+  }
+});
 
 /**
  * Health check endpoint.

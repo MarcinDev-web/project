@@ -607,6 +607,9 @@ importers:
       '@engine/core':
         specifier: workspace:*
         version: link:../core
+      '@engine/net-protocol':
+        specifier: workspace:*
+        version: link:../net-protocol
       '@engine/world':
         specifier: workspace:*
         version: link:../world

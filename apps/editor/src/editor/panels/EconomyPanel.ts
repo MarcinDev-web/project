@@ -6,7 +6,13 @@ export class EconomyPanel {
   private balancesContainer: HTMLElement;
 
   constructor() {
-    this.client = new EconomyApiClient({ baseUrl: '/api' });
+    this.client = new EconomyApiClient({
+      baseUrl: '/api',
+      getAuthToken: () => {
+        // Get auth token from localStorage (using same key as platform app)
+        return localStorage.getItem('forge_token') || null;
+      },
+    });
     this.element = document.createElement('div');
     this.element.className = 'economy-panel';
 

@@ -1,5 +1,5 @@
 /**
- * Seed script to add mock games to marketplace
+ * Seed script to add mock builds and avatars to marketplace
  */
 
 import { MarketplaceStorage } from '../storage/MarketplaceStorage';
@@ -16,107 +16,230 @@ const THUMBNAIL_DIR = path.join(DATA_DIR, 'thumbnails');
 const storage = new MarketplaceStorage(DATA_DIR);
 const gameSessionTracker = new GameSessionTracker();
 
-// Mock builds data - Kogama style: short, simple names describing the build
-// In Kogama, builds are models (like "House", "Car", "Castle") - simple 3D structures
-const mockGames = [
+// Mock builds data - buildings and structures only
+const mockBuilds = [
   {
     type: 'build' as const,
-    title: 'Dungeon Build',
-    description: 'A detailed dungeon with traps, treasure rooms, and multiple floors.',
+    title: 'Medieval Castle',
+    description: 'Imposing castle with towers, gates, and a grand courtyard.',
     authorId: 'mock_user_1',
-    authorName: 'GameMaster42',
+    authorName: 'BuilderMaster',
     fileUrl: '', // Will be set after creation
-    tags: ['dungeon', 'building', 'fantasy'],
-    public: true,
-  },
-  {
-    type: 'build' as const,
-    title: 'Race Car',
-    description: 'Fast racing car model with detailed wheels and spoiler.',
-    authorId: 'mock_user_2',
-    authorName: 'SpeedRacer99',
-    fileUrl: '',
-    tags: ['car', 'vehicle', 'racing'],
-    public: true,
-  },
-  {
-    type: 'build' as const,
-    title: 'Space Station',
-    description: 'Modular space station with docking ports and solar panels.',
-    authorId: 'mock_user_3',
-    authorName: 'SpaceArchitect',
-    fileUrl: '',
-    tags: ['space', 'station', 'sci-fi'],
-    public: true,
-  },
-  {
-    type: 'build' as const,
-    title: 'Puzzle Block',
-    description: 'Interactive puzzle block set for brain teasers.',
-    authorId: 'mock_user_4',
-    authorName: 'PuzzleMaster',
-    fileUrl: '',
-    tags: ['puzzle', 'block', 'game'],
-    public: true,
-  },
-  {
-    type: 'build' as const,
-    title: 'Zombie Arena',
-    description: 'Arena with walls, obstacles, and spawn points for zombie battles.',
-    authorId: 'mock_user_5',
-    authorName: 'ZombieSlayer',
-    fileUrl: '',
-    tags: ['arena', 'zombie', 'combat'],
-    public: true,
-  },
-  {
-    type: 'build' as const,
-    title: 'Castle',
-    description: 'Medieval castle with towers, gates, and a courtyard.',
-    authorId: 'mock_user_1',
-    authorName: 'GameMaster42',
-    fileUrl: '',
-    tags: ['castle', 'medieval', 'building'],
-    public: true,
-  },
-  {
-    type: 'build' as const,
-    title: 'Cyber City Block',
-    description: 'Futuristic city block with neon signs and flying vehicles.',
-    authorId: 'mock_user_6',
-    authorName: 'CyberExplorer',
-    fileUrl: '',
-    tags: ['city', 'cyberpunk', 'building'],
-    public: true,
-  },
-  {
-    type: 'build' as const,
-    title: 'Ocean Base',
-    description: 'Underwater base with glass corridors and sea life viewing areas.',
-    authorId: 'mock_user_7',
-    authorName: 'DeepSeaDiver',
-    fileUrl: '',
-    tags: ['ocean', 'base', 'underwater'],
+    tags: ['castle', 'medieval', 'building', 'defense'],
     public: true,
   },
   {
     type: 'build' as const,
     title: 'Modern House',
-    description: 'Contemporary house with clean lines and modern design.',
-    authorId: 'mock_user_8',
-    authorName: 'BuilderPro',
+    description: 'Contemporary house with clean lines, large windows, and modern design.',
+    authorId: 'mock_user_2',
+    authorName: 'ArchitectPro',
     fileUrl: '',
-    tags: ['house', 'modern', 'residential'],
+    tags: ['house', 'modern', 'residential', 'home'],
     public: true,
   },
   {
     type: 'build' as const,
-    title: 'Medieval Village',
-    description: 'Small village with houses, a market, and a central square.',
-    authorId: 'mock_user_1',
-    authorName: 'GameMaster42',
+    title: 'Skyscraper Tower',
+    description: 'Tall commercial tower with glass facade and multiple floors.',
+    authorId: 'mock_user_3',
+    authorName: 'CityBuilder',
     fileUrl: '',
-    tags: ['village', 'medieval', 'town'],
+    tags: ['tower', 'skyscraper', 'building', 'urban'],
+    public: true,
+  },
+  {
+    type: 'build' as const,
+    title: 'Victorian Mansion',
+    description: 'Elegant Victorian-era mansion with ornate details and gardens.',
+    authorId: 'mock_user_4',
+    authorName: 'ClassicDesign',
+    fileUrl: '',
+    tags: ['mansion', 'victorian', 'luxury', 'historic'],
+    public: true,
+  },
+  {
+    type: 'build' as const,
+    title: 'Shopping Mall',
+    description: 'Large shopping center with multiple stores and food court.',
+    authorId: 'mock_user_5',
+    authorName: 'MallBuilder',
+    fileUrl: '',
+    tags: ['mall', 'shopping', 'commercial', 'building'],
+    public: true,
+  },
+  {
+    type: 'build' as const,
+    title: 'Apartment Complex',
+    description: 'Multi-story apartment building with balconies and parking.',
+    authorId: 'mock_user_1',
+    authorName: 'BuilderMaster',
+    fileUrl: '',
+    tags: ['apartment', 'residential', 'building', 'multi-unit'],
+    public: true,
+  },
+  {
+    type: 'build' as const,
+    title: 'Futuristic Office',
+    description: 'High-tech office building with sleek design and modern amenities.',
+    authorId: 'mock_user_6',
+    authorName: 'FutureBuilds',
+    fileUrl: '',
+    tags: ['office', 'futuristic', 'commercial', 'modern'],
+    public: true,
+  },
+  {
+    type: 'build' as const,
+    title: 'Log Cabin',
+    description: 'Rustic log cabin nestled in the woods with a cozy fireplace.',
+    authorId: 'mock_user_7',
+    authorName: 'NatureBuilder',
+    fileUrl: '',
+    tags: ['cabin', 'rustic', 'wood', 'cottage'],
+    public: true,
+  },
+  {
+    type: 'build' as const,
+    title: 'Warehouse',
+    description: 'Industrial warehouse with loading docks and storage areas.',
+    authorId: 'mock_user_8',
+    authorName: 'IndustrialPro',
+    fileUrl: '',
+    tags: ['warehouse', 'industrial', 'commercial', 'storage'],
+    public: true,
+  },
+  {
+    type: 'build' as const,
+    title: 'Town Square',
+    description: 'Public square with fountain, benches, and surrounding shops.',
+    authorId: 'mock_user_1',
+    authorName: 'BuilderMaster',
+    fileUrl: '',
+    tags: ['square', 'public', 'community', 'town'],
+    public: true,
+  },
+  {
+    type: 'build' as const,
+    title: 'Japanese Temple',
+    description: 'Traditional Japanese temple with curved roof and serene gardens.',
+    authorId: 'mock_user_9',
+    authorName: 'ZenBuilder',
+    fileUrl: '',
+    tags: ['temple', 'japanese', 'traditional', 'cultural'],
+    public: true,
+  },
+  {
+    type: 'build' as const,
+    title: 'Hospital',
+    description: 'Modern hospital building with emergency entrance and helipad.',
+    authorId: 'mock_user_10',
+    authorName: 'PublicBuilds',
+    fileUrl: '',
+    tags: ['hospital', 'medical', 'public', 'building'],
+    public: true,
+  },
+];
+
+// Mock avatars data
+const mockAvatars = [
+  {
+    type: 'avatar' as const,
+    title: 'Knight Avatar',
+    description: 'Medieval knight with armor, sword, and shield.',
+    authorId: 'mock_user_11',
+    authorName: 'AvatarCreator1',
+    fileUrl: '', // Will be set after creation
+    tags: ['knight', 'medieval', 'warrior', 'armor'],
+    public: true,
+  },
+  {
+    type: 'avatar' as const,
+    title: 'Robot Avatar',
+    description: 'Futuristic robot with metallic finish and LED eyes.',
+    authorId: 'mock_user_12',
+    authorName: 'TechAvatars',
+    fileUrl: '',
+    tags: ['robot', 'futuristic', 'mech', 'tech'],
+    public: true,
+  },
+  {
+    type: 'avatar' as const,
+    title: 'Ninja Avatar',
+    description: 'Stealthy ninja with dark outfit and mask.',
+    authorId: 'mock_user_13',
+    authorName: 'ShadowMakers',
+    fileUrl: '',
+    tags: ['ninja', 'stealth', 'warrior', 'assassin'],
+    public: true,
+  },
+  {
+    type: 'avatar' as const,
+    title: 'Wizard Avatar',
+    description: 'Powerful wizard with robes, staff, and magical accessories.',
+    authorId: 'mock_user_14',
+    authorName: 'MagicDesign',
+    fileUrl: '',
+    tags: ['wizard', 'magic', 'fantasy', 'mage'],
+    public: true,
+  },
+  {
+    type: 'avatar' as const,
+    title: 'Pirate Avatar',
+    description: 'Swashbuckling pirate with hat, eyepatch, and hook.',
+    authorId: 'mock_user_15',
+    authorName: 'SeaCreators',
+    fileUrl: '',
+    tags: ['pirate', 'sea', 'adventure', 'treasure'],
+    public: true,
+  },
+  {
+    type: 'avatar' as const,
+    title: 'Astronaut Avatar',
+    description: 'Space explorer in a detailed spacesuit with helmet.',
+    authorId: 'mock_user_16',
+    authorName: 'SpaceAvatars',
+    fileUrl: '',
+    tags: ['astronaut', 'space', 'sci-fi', 'explorer'],
+    public: true,
+  },
+  {
+    type: 'avatar' as const,
+    title: 'Samurai Avatar',
+    description: 'Honorable samurai with traditional armor and katana.',
+    authorId: 'mock_user_17',
+    authorName: 'WarriorMakers',
+    fileUrl: '',
+    tags: ['samurai', 'japanese', 'warrior', 'traditional'],
+    public: true,
+  },
+  {
+    type: 'avatar' as const,
+    title: 'Cyborg Avatar',
+    description: 'Human-robot hybrid with mechanical limbs and enhancements.',
+    authorId: 'mock_user_18',
+    authorName: 'CyberDesign',
+    fileUrl: '',
+    tags: ['cyborg', 'cyberpunk', 'tech', 'enhanced'],
+    public: true,
+  },
+  {
+    type: 'avatar' as const,
+    title: 'Elf Avatar',
+    description: 'Mystical elf with pointed ears, elegant robes, and bow.',
+    authorId: 'mock_user_19',
+    authorName: 'FantasyBuilders',
+    fileUrl: '',
+    tags: ['elf', 'fantasy', 'magical', 'nature'],
+    public: true,
+  },
+  {
+    type: 'avatar' as const,
+    title: 'Viking Avatar',
+    description: 'Fierce viking warrior with helmet, beard, and battle axe.',
+    authorId: 'mock_user_20',
+    authorName: 'NordicCreators',
+    fileUrl: '',
+    tags: ['viking', 'warrior', 'nordic', 'battle'],
     public: true,
   },
 ];
@@ -132,7 +255,7 @@ export async function seedMarketplace(tracker?: GameSessionTracker): Promise<voi
       return;
     }
 
-    console.log('Seeding marketplace with mock games...');
+    console.log('Seeding marketplace with mock builds and avatars...');
 
     // Initialize build storage if database is available
     let buildStorage: BuildStorage | null = null;
@@ -150,14 +273,18 @@ export async function seedMarketplace(tracker?: GameSessionTracker): Promise<voi
     // Use provided tracker or create a new one
     const trackerToUse = tracker ?? gameSessionTracker;
 
-    for (const game of mockGames) {
-      // Create item first to get the ID
-      const item = await storage.createItem(game);
-      console.log(`✓ Created: ${item.title}`);
+    // Combine all mock items
+    const allMockItems = [...mockBuilds, ...mockAvatars];
 
-      // In Kogama style: builds are accessed via their marketplace ID
-      // Replace placeholder {id} with actual item ID
-      const fileUrl = `/api/marketplace/${item.id}/build`;
+    for (const mockItem of allMockItems) {
+      // Create item first to get the ID
+      const item = await storage.createItem(mockItem);
+      console.log(`✓ Created: ${item.title} (${item.type})`);
+
+      // Set fileUrl based on item type
+      const fileUrl = item.type === 'build'
+        ? `/api/marketplace/${item.id}/build`
+        : `/api/marketplace/${item.id}/avatar`;
 
       // Generate thumbnail (with error handling)
       let thumbnailUrl: string | undefined;
@@ -252,15 +379,17 @@ export async function seedMarketplace(tracker?: GameSessionTracker): Promise<voi
         }
       }
 
-      // Simulate some players online (mock users playing)
-      const playersOnline = Math.floor(Math.random() * 20); // 0-19 players
-      if (playersOnline > 0 && trackerToUse) {
-        // Create mock user IDs and join them to the game
-        for (let i = 0; i < playersOnline; i++) {
-          const mockUserId = `mock_player_${item.id}_${i}`;
-          trackerToUse.joinGame(item.id, mockUserId);
+      // Simulate some players online only for builds (mock users playing)
+      if (item.type === 'build') {
+        const playersOnline = Math.floor(Math.random() * 20); // 0-19 players
+        if (playersOnline > 0 && trackerToUse) {
+          // Create mock user IDs and join them to the build
+          for (let i = 0; i < playersOnline; i++) {
+            const mockUserId = `mock_player_${item.id}_${i}`;
+            trackerToUse.joinGame(item.id, mockUserId);
+          }
+          console.log(`  → ${playersOnline} mock players online`);
         }
-        console.log(`  → ${playersOnline} mock players online`);
       }
     }
 
@@ -269,7 +398,7 @@ export async function seedMarketplace(tracker?: GameSessionTracker): Promise<voi
       await dbPool.end();
     }
 
-    console.log(`✓ Successfully seeded ${mockGames.length} mock games!`);
+    console.log(`✓ Successfully seeded ${mockBuilds.length} mock builds and ${mockAvatars.length} mock avatars!`);
   } catch (error) {
     console.error('Error seeding marketplace:', error);
     throw error;

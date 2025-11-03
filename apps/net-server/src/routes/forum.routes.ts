@@ -19,7 +19,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
   } = deps;
 
   // CATEGORIES
-  router.get('/forum/categories', async (_req: Request, res: Response) => {
+  router.get('/categories', async (_req: Request, res: Response) => {
     try {
       const categories = await forumStorage.getCategories();
       res.json(categories);
@@ -32,7 +32,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.get('/forum/categories/:id', async (req: Request, res: Response) => {
+  router.get('/categories/:id', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       if (!id) {
@@ -57,7 +57,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
   });
 
   router.post(
-    '/forum/categories',
+    '/categories',
     authMiddleware,
     requireAdmin(),
     async (req: AuthRequest, res: Response) => {
@@ -94,7 +94,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
   );
 
   // THREADS
-  router.get('/forum/threads/:id', async (req: Request, res: Response) => {
+  router.get('/threads/:id', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       if (!id) {
@@ -123,7 +123,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.post('/forum/threads', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.post('/threads', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -161,7 +161,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.put('/forum/threads/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.put('/threads/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -205,7 +205,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.delete('/forum/threads/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.delete('/threads/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -246,7 +246,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
 
   // POSTS
   router.post(
-    '/forum/threads/:id/posts',
+    '/threads/:id/posts',
     authMiddleware,
     async (req: AuthRequest, res: Response) => {
       try {
@@ -296,7 +296,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.put('/forum/posts/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.put('/posts/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -352,7 +352,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.delete('/forum/posts/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.delete('/posts/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -394,7 +394,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
 
   // REACTIONS
   router.post(
-    '/forum/threads/:id/reactions',
+    '/threads/:id/reactions',
     authMiddleware,
     async (req: AuthRequest, res: Response) => {
       try {
@@ -449,7 +449,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
   );
 
   router.delete(
-    '/forum/threads/:id/reactions/:emoji',
+    '/threads/:id/reactions/:emoji',
     authMiddleware,
     async (req: AuthRequest, res: Response) => {
       try {
@@ -482,7 +482,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
   );
 
   router.post(
-    '/forum/posts/:id/reactions',
+    '/posts/:id/reactions',
     authMiddleware,
     async (req: AuthRequest, res: Response) => {
       try {
@@ -533,7 +533,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
   );
 
   router.delete(
-    '/forum/posts/:id/reactions/:emoji',
+    '/posts/:id/reactions/:emoji',
     authMiddleware,
     async (req: AuthRequest, res: Response) => {
       try {
@@ -567,7 +567,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
 
   // VOTES
   router.post(
-    '/forum/threads/:id/vote',
+    '/threads/:id/vote',
     authMiddleware,
     async (req: AuthRequest, res: Response) => {
       try {
@@ -608,7 +608,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
   );
 
   router.delete(
-    '/forum/threads/:id/vote',
+    '/threads/:id/vote',
     authMiddleware,
     async (req: AuthRequest, res: Response) => {
       try {
@@ -643,7 +643,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.post('/forum/posts/:id/vote', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.post('/posts/:id/vote', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -681,7 +681,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
   });
 
   router.delete(
-    '/forum/posts/:id/vote',
+    '/posts/:id/vote',
     authMiddleware,
     async (req: AuthRequest, res: Response) => {
       try {
@@ -718,7 +718,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
 
   // MODERATOR ACTIONS
   router.post(
-    '/forum/threads/:id/pin',
+    '/threads/:id/pin',
     authMiddleware,
     requireModerator(),
     async (req: AuthRequest, res: Response) => {
@@ -750,7 +750,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
   );
 
   router.delete(
-    '/forum/threads/:id/pin',
+    '/threads/:id/pin',
     authMiddleware,
     requireModerator(),
     async (req: AuthRequest, res: Response) => {
@@ -782,7 +782,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
   );
 
   router.post(
-    '/forum/threads/:id/lock',
+    '/threads/:id/lock',
     authMiddleware,
     requireModerator(),
     async (req: AuthRequest, res: Response) => {
@@ -814,7 +814,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
   );
 
   router.delete(
-    '/forum/threads/:id/lock',
+    '/threads/:id/lock',
     authMiddleware,
     requireModerator(),
     async (req: AuthRequest, res: Response) => {
@@ -846,7 +846,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
   );
 
   // SEARCH & UTILITIES
-  router.get('/forum/search', async (req: Request, res: Response) => {
+  router.get('/search', async (req: Request, res: Response) => {
     try {
       const query = req.query.q as string | undefined;
 
@@ -867,7 +867,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.get('/forum/preview-marketplace/:id', async (req: Request, res: Response) => {
+  router.get('/preview-marketplace/:id', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       if (!id || typeof id !== 'string') {
@@ -898,33 +898,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.get('/api/projects/:token/preview', async (req: Request, res: Response) => {
-    try {
-      const { token } = req.params;
-      if (!token || typeof token !== 'string') {
-        return res.status(400).json({ error: 'Token is required' });
-      }
-      const share = await storage.load(token);
-
-      if (!share) {
-        return res.status(404).json({ error: 'Project not found' });
-      }
-
-      res.json({
-        token,
-        createdAt: share.createdAt,
-        title: (share.projectData as { title?: string } | undefined)?.title || 'Shared Project',
-      });
-    } catch (error) {
-      console.error('Get project preview error:', error);
-      res.status(500).json({
-        error: 'Failed to get project preview',
-        message: error instanceof Error ? error.message : String(error),
-      });
-    }
-  });
-
-  router.post('/forum/share-project', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.post('/share-project', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });

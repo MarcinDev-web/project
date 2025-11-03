@@ -96,7 +96,7 @@ describe('GET /api/marketplace/builds', () => {
       authorId: 'user1',
       type: 'build',
       title: 'Game Build',
-      tags: ['game', 'action'],
+      tags: ['building', 'action'],
     });
     await createTestMarketplaceItem(marketplaceStorage, {
       authorId: 'user1',
@@ -107,11 +107,11 @@ describe('GET /api/marketplace/builds', () => {
 
     const response = await request(app)
       .get('/api/marketplace/builds')
-      .query({ tags: 'game' })
+      .query({ tags: 'building' })
       .expect(200);
 
     expect(response.body.items.every((item: { tags: string[] }) => 
-      item.tags.includes('game')
+      item.tags.includes('building')
     )).toBe(true);
   });
 

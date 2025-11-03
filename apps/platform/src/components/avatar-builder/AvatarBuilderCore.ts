@@ -107,7 +107,11 @@ export class AvatarBuilderCore {
 
       // Check WebGPU availability before attempting initialization
       if (!('gpu' in navigator)) {
-        throw new Error('WebGPU not supported in this browser. Please use Chrome 113+, Edge 113+, Opera 99+, Firefox 110+, or Safari 18.0+.');
+        const errorMsg = 'WebGPU not supported in this browser. Please use Chrome 113+, Edge 113+, Opera 99+, Firefox 110+, or Safari 18.0+.';
+        if (this.statusEl) {
+          this.statusEl.textContent = errorMsg;
+        }
+        throw new Error(errorMsg);
       }
 
       this.renderer = await initRenderer({
@@ -140,23 +144,32 @@ export class AvatarBuilderCore {
       this.lastFrameTime = performance.now();
       this.startGameLoop();
     } catch (error) {
-      // Provide more specific error messages
+      // Provide more specific error messages with better formatting
       let errorMessage = 'Failed to initialize WebGPU renderer';
       if (error instanceof Error) {
-        if (error.message.includes('WebGPU not supported')) {
-          errorMessage = error.message;
-        } else if (error.message.includes('Failed to acquire GPU adapter')) {
-          errorMessage = 'WebGPU adapter not available. Your GPU may not be supported or GPU drivers need updating.';
-        } else if (error.message.includes('Failed to create WebGPU context')) {
+        const msg = error.message;
+        if (msg.includes('WebGPU not supported')) {
+          errorMessage = msg.includes('Please use') ? msg : 'WebGPU not supported in this browser. Please use Chrome 113+, Edge 113+, Opera 99+, Firefox 110+, or Safari 18.0+.';
+        } else if (msg.includes('Failed to acquire GPU adapter') || msg.includes('adapter')) {
+          errorMessage = 'Failed to acquire WebGPU adapter. Your GPU may not be supported or GPU drivers need updating.';
+        } else if (msg.includes('Failed to create WebGPU context') || msg.includes('context')) {
           errorMessage = 'Failed to create WebGPU rendering context. Please try refreshing the page.';
+        } else if (msg.includes('canvas configuration')) {
+          errorMessage = 'WebGPU canvas configuration failed. Please try refreshing the page.';
         } else {
-          errorMessage = `WebGPU initialization failed: ${error.message}`;
+          errorMessage = `WebGPU initialization failed: ${msg}`;
         }
+      } else {
+        errorMessage = `WebGPU initialization failed: ${String(error)}`;
       }
       
       if (this.statusEl) {
         this.statusEl.textContent = errorMessage;
       }
+      
+      // Log the full error for debugging
+      console.error('AvatarBuilderCore: WebGPU initialization error:', error);
+      
       throw new Error(errorMessage);
     }
   }
@@ -195,14 +208,18 @@ export class AvatarBuilderCore {
 
   /**
    * Apply a loadout to the avatar
+   * @param loadout - The loadout to apply
+   * @param silent - If true, don't trigger onLoadoutChange callback (useful for external updates)
    */
-  applyLoadout(loadout: AvatarLoadout): void {
+  applyLoadout(loadout: AvatarLoadout, silent = false): void {
     if (!this.avatar) {
       throw new Error('Avatar not initialized');
     }
 
     this.avatar.applyLoadout(loadout);
-    this.notifyLoadoutChange();
+    if (!silent) {
+      this.notifyLoadoutChange();
+    }
   }
 
   /**
@@ -330,6 +347,48 @@ export class AvatarBuilderCore {
    */
   getScene(): Scene {
     return this.scene;
+  }
+
+  /**
+   * Get controls (for camera operations)
+   */
+  getControls(): OrbitControls {
+    return this.controls;
+  }
+
+  /**
+   * Reset camera to default position
+   */
+  resetCamera(): void {
+    this.controls.setState({
+      yaw: 0,
+      pitch: 0.5,
+      distance: 3,
+    });
+  }
+
+  /**
+   * Rotate camera left (negative yaw)
+   */
+  rotateLeft(amount: number = 0.5): void {
+    const state = this.controls.getState();
+    this.controls.setState({
+      yaw: state.yaw - amount,
+      pitch: state.pitch,
+      distance: state.distance,
+    });
+  }
+
+  /**
+   * Rotate camera right (positive yaw)
+   */
+  rotateRight(amount: number = 0.5): void {
+    const state = this.controls.getState();
+    this.controls.setState({
+      yaw: state.yaw + amount,
+      pitch: state.pitch,
+      distance: state.distance,
+    });
   }
 
   /**

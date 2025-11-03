@@ -9,6 +9,7 @@ import { PartSelector } from './PartSelector';
 import { MaterialSelector } from './MaterialSelector';
 import { AvatarPreviewControls } from './AvatarPreviewControls';
 import type { RgbaColor } from '@engine/world';
+import type { AvatarBuilderCore } from './AvatarBuilderCore';
 
 export interface AvatarCustomizationPanelProps {
   loadout: AvatarLoadout;
@@ -16,6 +17,7 @@ export interface AvatarCustomizationPanelProps {
   onReset: () => void;
   onSave: () => void;
   isSaving?: boolean;
+  builderCore?: AvatarBuilderCore | null;
 }
 
 /**
@@ -27,6 +29,7 @@ export function AvatarCustomizationPanel({
   onReset,
   onSave,
   isSaving = false,
+  builderCore,
 }: AvatarCustomizationPanelProps) {
   const [selectedSlot, setSelectedSlot] = useState<AvatarSlot | null>(null);
   const [activeTab, setActiveTab] = useState<'parts' | 'colors' | 'materials'>('parts');
@@ -177,7 +180,11 @@ export function AvatarCustomizationPanel({
         )}
       </div>
 
-      <AvatarPreviewControls />
+      <AvatarPreviewControls
+        onResetCamera={() => builderCore?.resetCamera()}
+        onRotateLeft={() => builderCore?.rotateLeft()}
+        onRotateRight={() => builderCore?.rotateRight()}
+      />
     </div>
   );
 }

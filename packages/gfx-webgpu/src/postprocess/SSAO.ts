@@ -5,6 +5,8 @@
  * Uses a high-quality implementation with temporal accumulation for smoothness.
  */
 
+import { Logger } from '@engine/core/utils';
+
 export interface SSAOConfig {
   /** Sample count (16, 32, or 64 - higher = better quality, slower) */
   sampleCount?: number;
@@ -63,7 +65,7 @@ export class SSAOPass {
    * Initializes SSAO resources
    */
   initialize(format: GPUTextureFormat): void {
-    // Create sampler for depth and normals
+    // Create regular sampler for normals and noise textures
     if (!this.sampler) {
       this.sampler = this.device.createSampler({
         label: 'ssao-sampler',
@@ -109,8 +111,10 @@ export class SSAOPass {
     }
 
     // Generate sample kernel (hemisphere oriented along normal)
+    // Shader expects max(sampleCount, 64) samples, so always generate 64 to match shader declaration
     if (!this.sampleBuffer) {
-      const samples = this.generateSampleKernel(this.config.sampleCount);
+      const maxSamples = Math.max(this.config.sampleCount, 64);
+      const samples = this.generateSampleKernel(maxSamples);
       const sampleData = new Float32Array(samples.length * 4); // vec4 aligned
       for (let i = 0; i < samples.length; i++) {
         sampleData[i * 4 + 0] = samples[i]![0];
@@ -119,9 +123,11 @@ export class SSAOPass {
         sampleData[i * 4 + 3] = 0; // padding
       }
 
+      // Uniform buffer must be at least 1024 bytes (64 samples * 16 bytes per vec4)
+      // WebGPU pads uniform buffers to multiples of 16 bytes
       this.sampleBuffer = this.device.createBuffer({
         label: 'ssao-samples',
-        size: sampleData.byteLength,
+        size: sampleData.byteLength, // This will be 1024 bytes for 64 samples
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       });
       this.device.queue.writeBuffer(this.sampleBuffer, 0, sampleData);
@@ -137,23 +143,25 @@ export class SSAOPass {
     }
 
     // Create bind group layout
+    // Note: We use textureLoad for depth (which works with both multisampled and non-multisampled)
+    // so we don't need a sampler for depth - textureLoad reads directly
     if (!this.bindGroupLayout) {
       this.bindGroupLayout = this.device.createBindGroupLayout({
         label: 'ssao-bgl',
         entries: [
           { binding: 0, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'depth' } },
-          { binding: 1, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } },
-          { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float', viewDimension: '2d' } }, // normals
-          { binding: 3, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } }, // noise
+          { binding: 1, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float', viewDimension: '2d' } }, // normals
+          { binding: 2, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'float' } }, // noise
+          { binding: 3, visibility: GPUShaderStage.FRAGMENT, sampler: { type: 'filtering' } }, // For normalTex and noiseTex
           { binding: 4, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } }, // samples
           { binding: 5, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } }, // config
         ],
       });
     }
 
-    // Create render pipeline
-    if (!this.pipeline) {
-      const shader = this.createSSAOShader();
+    // Create render pipeline (recreate if needed to ensure valid state)
+    const shader = this.createSSAOShader();
+    try {
       this.pipeline = this.device.createRenderPipeline({
         label: 'ssao-pipeline',
         layout: this.device.createPipelineLayout({
@@ -177,7 +185,11 @@ struct VSOut { @builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32> };
           targets: [{ format }],
         },
         primitive: { topology: 'triangle-list' },
+        multisample: { count: 1 }, // Single-sampled post-processing pass
       });
+    } catch (err) {
+      Logger.error('Failed to create SSAO pipeline:', err as unknown as Error);
+      this.pipeline = null;
     }
   }
 
@@ -227,9 +239,9 @@ struct SSAOConfig {
 }
 
 @group(0) @binding(0) var depthTex : texture_depth_2d;
-@group(0) @binding(1) var depthSmp : sampler;
-@group(0) @binding(2) var normalTex : texture_2d<f32>;
-@group(0) @binding(3) var noiseTex : texture_2d<f32>;
+@group(0) @binding(1) var normalTex : texture_2d<f32>;
+@group(0) @binding(2) var noiseTex : texture_2d<f32>;
+@group(0) @binding(3) var normalSmp : sampler;
 @group(0) @binding(4) var<uniform> samples : array<vec4<f32>, ${maxSamples}>;
 @group(0) @binding(5) var<uniform> config : SSAOConfig;
 
@@ -246,22 +258,59 @@ fn rand(vec: vec2<f32>) -> vec2<f32> {
   );
 }
 
+// Manual bilinear filtering for depth texture
+fn sampleDepthBilinear(depthTex: texture_depth_2d, uv: vec2<f32>, screenSize: vec2<f32>) -> f32 {
+  let texSize = vec2<f32>(textureDimensions(depthTex, 0));
+  let pixelCoord = uv * texSize;
+  let i = vec2<i32>(floor(pixelCoord));
+  let f = pixelCoord - vec2<f32>(i);
+  
+  // Clamp coordinates to texture bounds
+  let size = vec2<i32>(textureDimensions(depthTex, 0));
+  let maxCoord = size - vec2<i32>(1, 1);
+  
+  // Sample 4 corners with clamping (textureLoad on depth returns f32 directly)
+  let c00 = vec2<i32>(min(max(i.x, 0), maxCoord.x), min(max(i.y, 0), maxCoord.y));
+  let c10 = vec2<i32>(min(max(i.x + 1, 0), maxCoord.x), min(max(i.y, 0), maxCoord.y));
+  let c01 = vec2<i32>(min(max(i.x, 0), maxCoord.x), min(max(i.y + 1, 0), maxCoord.y));
+  let c11 = vec2<i32>(min(max(i.x + 1, 0), maxCoord.x), min(max(i.y + 1, 0), maxCoord.y));
+  
+  let d00 = textureLoad(depthTex, c00, 0);
+  let d10 = textureLoad(depthTex, c10, 0);
+  let d01 = textureLoad(depthTex, c01, 0);
+  let d11 = textureLoad(depthTex, c11, 0);
+  
+  // Bilinear interpolation
+  let d0 = mix(d00, d10, f.x);
+  let d1 = mix(d01, d11, f.x);
+  return mix(d0, d1, f.y);
+}
+
 @fragment
 fn fs_main(@location(0) v_uv: vec2<f32>) -> @location(0) vec4<f32> {
-  let depth = textureSample(depthTex, depthSmp, v_uv);
-  if (depth >= 0.999) { return vec4<f32>(1.0, 1.0, 1.0, 1.0); } // Skip background
+  // Sample all textures FIRST to maintain uniform control flow
+  // Use textureLoad with bilinear filtering for depth (works with both multisampled and non-multisampled)
+  let depth = sampleDepthBilinear(depthTex, v_uv, config.screenSize);
+  let normalEncoded = textureSample(normalTex, normalSmp, v_uv).xyz;
   
+  // Noise texture sampling
+  let texSize = vec2<f32>(textureDimensions(noiseTex, 0));
+  let noiseUV = v_uv * (config.screenSize / texSize);
+  let noiseSample = textureSample(noiseTex, normalSmp, noiseUV);
+  
+  // Default to white (no occlusion) for background pixels
+  var result = vec4<f32>(1.0, 1.0, 1.0, 1.0);
+  
+  // Check if this is a valid surface pixel (not background)
+  let isSurface = select(0.0, 1.0, depth < 0.999);
+  
+  // Always compute view position and decode normal (needed for occlusion calculation)
   let viewPos = viewPosFromDepth(v_uv, depth);
-  // Decode normal from [0,1] range back to [-1,1]
-  let normalEncoded = textureSample(normalTex, depthSmp, v_uv).xyz;
   let normal = normalize(normalEncoded * 2.0 - 1.0);
   
   // Random rotation vector from noise texture
   // Noise texture stores (cos(angle), sin(angle), 0, 1) in rgba16float format
   // Values are in [-1,1] range stored directly as float16 (not encoded)
-  let texSize = vec2<f32>(textureDimensions(noiseTex, 0));
-  let noiseUV = v_uv * (config.screenSize / texSize);
-  let noiseSample = textureSample(noiseTex, depthSmp, noiseUV);
   // Extract rotation vector (cos, sin, 0) and normalize
   let randomVec = normalize(vec3<f32>(noiseSample.xy, 0.0));
   
@@ -274,10 +323,11 @@ fn fs_main(@location(0) v_uv: vec2<f32>) -> @location(0) vec4<f32> {
     tangent.z, bitangent.z, normal.z
   );
   
-  // Sample occlusion
+  // Sample occlusion - execute loop in uniform control flow
   var occlusion = 0.0;
   let sampleCount = min(config.sampleCount, 64u);
   
+  // Pre-sample all depths in uniform control flow to avoid non-uniform textureSample calls
   for (var i = 0u; i < sampleCount; i++) {
     // Get sample position in tangent space
     let sampleTS = samples[i].xyz;
@@ -291,21 +341,30 @@ fn fs_main(@location(0) v_uv: vec2<f32>) -> @location(0) vec4<f32> {
     let sampleNDC = sampleClip.xyz / sampleClip.w;
     let sampleUV = sampleNDC.xy * 0.5 + 0.5;
     
-    // Sample depth at sample position
-    let sampleDepth = textureSample(depthTex, depthSmp, sampleUV);
+    // Sample depth at sample position (always executed in uniform control flow)
+    // Use bilinear filtered depth sampling
+    let sampleDepth = sampleDepthBilinear(depthTex, sampleUV, config.screenSize);
     let sampleViewPos = viewPosFromDepth(sampleUV, sampleDepth);
     
-    // Range check and accumulate
+    // Range check and accumulate (only if this is a surface pixel)
     let rangeCheck = smoothstep(0.0, 1.0, config.radius / abs(viewPos.z - sampleViewPos.z));
-    if (sampleViewPos.z >= samplePos.z + config.bias) {
-      occlusion += rangeCheck;
-    }
+    let isOccluded = select(0.0, 1.0, sampleViewPos.z >= samplePos.z + config.bias);
+    occlusion += rangeCheck * isOccluded * isSurface;
   }
   
+  // Compute final occlusion only for surface pixels
   occlusion = 1.0 - (occlusion / f32(sampleCount));
   occlusion = pow(max(occlusion, 0.0), config.intensity);
   
-  return vec4<f32>(occlusion, occlusion, occlusion, 1.0);
+  // Use select to return occlusion for surface, white for background
+  result = vec4<f32>(
+    select(1.0, occlusion, depth < 0.999),
+    select(1.0, occlusion, depth < 0.999),
+    select(1.0, occlusion, depth < 0.999),
+    1.0
+  );
+  
+  return result;
 }`;
   }
 
@@ -387,9 +446,9 @@ fn fs_main(@location(0) v_uv: vec2<f32>) -> @location(0) vec4<f32> {
         layout: this.bindGroupLayout,
         entries: [
           { binding: 0, resource: depthView },
-          { binding: 1, resource: this.sampler },
-          { binding: 2, resource: normalView },
-          { binding: 3, resource: this.noiseTexture.createView() },
+          { binding: 1, resource: normalView },
+          { binding: 2, resource: this.noiseTexture.createView() },
+          { binding: 3, resource: this.sampler },
           { binding: 4, resource: { buffer: this.sampleBuffer } },
           { binding: 5, resource: { buffer: this.configBuffer } },
         ],

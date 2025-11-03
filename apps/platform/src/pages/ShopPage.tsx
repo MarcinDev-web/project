@@ -146,34 +146,22 @@ export function ShopPage() {
 
   return (
     <Layout>
-      <div style={{ padding: '2rem' }}>
+      <div className="shop-page">
         <h1>Shop</h1>
 
-        <div style={{ display: 'flex', gap: '2rem', marginTop: '2rem' }}>
-          <div style={{ flex: '1' }}>
+        <div className="shop-content-wrapper">
+          <div className="shop-main-content">
             {/* Tabs */}
-            <div style={{ display: 'flex', gap: '1rem', marginBottom: '2rem', borderBottom: '1px solid var(--border-default)' }}>
+            <div className="shop-tabs">
               <button
                 onClick={() => setActiveTab('items')}
-                style={{
-                  padding: '0.5rem 1rem',
-                  border: 'none',
-                  background: activeTab === 'items' ? 'var(--bg-button-primary)' : 'transparent',
-                  color: activeTab === 'items' ? 'white' : 'var(--text-1)',
-                  cursor: 'pointer',
-                }}
+                className={`shop-tab-button ${activeTab === 'items' ? 'active' : ''}`}
               >
                 Virtual Items
               </button>
               <button
                 onClick={() => setActiveTab('assets')}
-                style={{
-                  padding: '0.5rem 1rem',
-                  border: 'none',
-                  background: activeTab === 'assets' ? 'var(--bg-button-primary)' : 'transparent',
-                  color: activeTab === 'assets' ? 'white' : 'var(--text-1)',
-                  cursor: 'pointer',
-                }}
+                className={`shop-tab-button ${activeTab === 'assets' ? 'active' : ''}`}
               >
                 Assets
               </button>
@@ -181,31 +169,49 @@ export function ShopPage() {
 
             {/* Content */}
             {loading ? (
-              <div>Loading...</div>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(250px, 1fr))', gap: '1rem' }}>
-                {activeTab === 'items' && items.map((item) => (
-                  <ShopItemCard
-                    key={item.id}
-                    item={item}
-                    owned={ownedItems.has(`${item.id}:shop-item`)}
-                    onAddToCart={() => handleAddToCart(item.id, 'shop-item')}
-                  />
-                ))}
-                {activeTab === 'assets' && assets.map((asset) => (
-                  <ShopAssetCard
-                    key={asset.id}
-                    asset={asset}
-                    owned={ownedItems.has(`${asset.id}:asset`)}
-                    onAddToCart={() => handleAddToCart(asset.id, 'asset')}
-                  />
-                ))}
+              <div className="shop-loading">
+                Loading...
               </div>
+            ) : (
+              <>
+                {activeTab === 'items' && items.length === 0 ? (
+                  <div className="shop-empty-state">
+                    <p>No virtual items available at the moment.</p>
+                  </div>
+                ) : (
+                  <div className="shop-items-grid">
+                    {activeTab === 'items' && items.map((item) => (
+                      <ShopItemCard
+                        key={item.id}
+                        item={item}
+                        owned={ownedItems.has(`${item.id}:shop-item`)}
+                        onAddToCart={() => handleAddToCart(item.id, 'shop-item')}
+                      />
+                    ))}
+                  </div>
+                )}
+                {activeTab === 'assets' && assets.length === 0 ? (
+                  <div className="shop-empty-state">
+                    <p>No assets available at the moment.</p>
+                  </div>
+                ) : (
+                  <div className="shop-items-grid">
+                    {activeTab === 'assets' && assets.map((asset) => (
+                      <ShopAssetCard
+                        key={asset.id}
+                        asset={asset}
+                        owned={ownedItems.has(`${asset.id}:asset`)}
+                        onAddToCart={() => handleAddToCart(asset.id, 'asset')}
+                      />
+                    ))}
+                  </div>
+                )}
+              </>
             )}
           </div>
 
           {/* Sidebar */}
-          <div style={{ width: '300px' }}>
+          <div className="shop-sidebar">
             <WalletDisplay balances={wallet} loading={loading} />
             <div style={{ marginTop: '1rem' }}>
               <ShoppingCart

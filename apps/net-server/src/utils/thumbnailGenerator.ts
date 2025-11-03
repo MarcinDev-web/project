@@ -1,5 +1,5 @@
 /**
- * Thumbnail Generator - Creates SVG thumbnails for marketplace games
+ * Thumbnail Generator - Creates SVG thumbnails for marketplace items
  */
 
 import { promises as fs } from 'fs';
@@ -26,7 +26,7 @@ const DEFAULT_COLORS = [
 ];
 
 /**
- * Generate an SVG thumbnail for a game
+ * Generate an SVG thumbnail for a marketplace item
  */
 export function generateThumbnailSVG(options: ThumbnailOptions): string {
   const { title, tags, width = 320, height = 180, backgroundColor, accentColor } = options;
@@ -131,9 +131,6 @@ export function generateThumbnailSVG(options: ThumbnailOptions): string {
       : ''
   }
   
-  <!-- Platform badge -->
-  <rect x="10" y="10" width="60" height="24" rx="12" fill="rgba(0,0,0,0.3)"/>
-  <text x="40" y="26" font-family="system-ui" font-size="11" font-weight="600" fill="white" text-anchor="middle">GAME</text>
 </svg>`;
 }
 

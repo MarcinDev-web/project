@@ -16,7 +16,7 @@ describe('GET /api/marketplace/search', () => {
       type: 'build',
       title: 'Dungeon Crawler',
       description: 'A dungeon exploration game',
-      tags: ['game'],
+      tags: ['building'],
     });
     const item2 = await createTestMarketplaceItem(marketplaceStorage, {
       authorId: 'user1',
@@ -86,13 +86,13 @@ describe('GET /api/marketplace/search', () => {
       authorId: 'user1',
       type: 'build',
       title: 'Game Build',
-      tags: ['game'],
+      tags: ['building'],
     });
     const item2 = await createTestMarketplaceItem(marketplaceStorage, {
       authorId: 'user1',
       type: 'avatar',
       title: 'Game Avatar',
-      tags: ['game'],
+      tags: ['building'],
     });
 
     // Wait for items to be available (handles database transaction timing)
@@ -178,7 +178,7 @@ describe('GET /api/marketplace/search', () => {
       authorId: 'user1',
       type: 'build',
       title: 'Game: Adventure',
-      tags: ['game'],
+      tags: ['building'],
     });
 
     const response = await request(app)
@@ -195,7 +195,7 @@ describe('GET /api/marketplace/search', () => {
       authorId: 'user1',
       type: 'build',
       title: 'Dungeon Explorer',
-      tags: ['game'],
+      tags: ['building'],
     });
 
     const lower = await request(app)

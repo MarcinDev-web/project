@@ -98,6 +98,61 @@ describe('AvatarBuilderCore', () => {
     expect(loadout.parts.HeadSlot?.colors?.primary).toEqual([1, 0, 0, 1]);
   });
 
+  it('should reset camera to default position', () => {
+    core = new AvatarBuilderCore({
+      canvas: mockCanvas,
+      statusEl: mockStatusEl,
+    });
+
+    const controls = core.getControls();
+    const initialState = controls.getState();
+
+    // Change camera position
+    controls.setState({ yaw: 1.5, pitch: 0.8, distance: 5 });
+
+    // Reset camera
+    core.resetCamera();
+
+    const stateAfterReset = controls.getState();
+    expect(stateAfterReset.yaw).toBe(0);
+    expect(stateAfterReset.pitch).toBe(0.5);
+    expect(stateAfterReset.distance).toBe(3);
+  });
+
+  it('should rotate camera left', () => {
+    core = new AvatarBuilderCore({
+      canvas: mockCanvas,
+      statusEl: mockStatusEl,
+    });
+
+    const controls = core.getControls();
+    const initialState = controls.getState();
+
+    core.rotateLeft(0.3);
+
+    const stateAfterRotate = controls.getState();
+    expect(stateAfterRotate.yaw).toBe(initialState.yaw - 0.3);
+    expect(stateAfterRotate.pitch).toBe(initialState.pitch);
+    expect(stateAfterRotate.distance).toBe(initialState.distance);
+  });
+
+  it('should rotate camera right', () => {
+    core = new AvatarBuilderCore({
+      canvas: mockCanvas,
+      statusEl: mockStatusEl,
+    });
+
+    const controls = core.getControls();
+    const initialState = controls.getState();
+
+    core.rotateRight(0.3);
+
+    const stateAfterRotate = controls.getState();
+    expect(stateAfterRotate.yaw).toBe(initialState.yaw + 0.3);
+    expect(stateAfterRotate.pitch).toBe(initialState.pitch);
+    expect(stateAfterRotate.distance).toBe(initialState.distance);
+  });
+
   it('should reset to default loadout', () => {
     core = new AvatarBuilderCore({
       canvas: mockCanvas,

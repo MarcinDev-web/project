@@ -24,10 +24,8 @@ export class NormalRenderPass {
    * Reuses vertex shader from PBR, but fragment shader only outputs normals
    */
   private createNormalShader(): string {
-    // Import helpers
-    const { WGSL_COMMON_HELPERS } = require('../shaders/chunks');
-    
     // Get the full PBR shader to extract needed parts
+    // Note: WGSL_COMMON_HELPERS are already included in the PBR shader code
     const pbrCode = createPbrShaderCode();
     
     // Split at fragment shader to get everything before it
@@ -102,12 +100,8 @@ fn fs_normal(
           cullMode: 'back', 
           frontFace: 'ccw' 
         },
-        depthStencil: { 
-          depthWriteEnabled: true, 
-          depthCompare: 'less', 
-          format: 'depth24plus' 
-        },
-        multisample: { count: sampleCount },
+        // No depth stencil - normal pass doesn't use depth attachment
+        multisample: { count: 1 }, // Single-sampled for shader sampling compatibility
       });
 
       if (hasErrorScope) {

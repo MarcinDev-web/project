@@ -28,7 +28,7 @@ describe('POST /api/marketplace', () => {
         title: 'New Build',
         description: 'A new build',
         fileUrl: '/api/marketplace/test/build',
-        tags: ['game'],
+        tags: ['building'],
       })
       .expect(201);
 

@@ -15,6 +15,21 @@ export interface WalletDisplayProps {
 }
 
 export function WalletDisplay({ balances, loading }: WalletDisplayProps) {
+  // Default currencies that should always be displayed
+  const defaultCurrencies = ['coins', 'gems', 'credits'];
+  
+  // Create a map of balances for quick lookup
+  const balanceMap = new Map<string, number>();
+  balances.forEach(balance => {
+    balanceMap.set(balance.currency.toLowerCase(), balance.balance);
+  });
+
+  // Get balances for default currencies (use 0 if not found)
+  const displayBalances = defaultCurrencies.map(currency => ({
+    currency,
+    balance: balanceMap.get(currency) ?? 0,
+  }));
+
   if (loading) {
     return (
       <Card className="wallet-display">
@@ -23,22 +38,15 @@ export function WalletDisplay({ balances, loading }: WalletDisplayProps) {
     );
   }
 
-  if (balances.length === 0) {
-    return (
-      <Card className="wallet-display">
-        <div className="wallet-empty">No currency available</div>
-      </Card>
-    );
-  }
-
   return (
     <Card className="wallet-display">
       <h3>Wallet</h3>
       <div className="wallet-balances">
-        {balances.map((balance) => (
+        {displayBalances.map((balance) => (
           <div key={balance.currency} className="wallet-balance">
-            <span className="wallet-currency">{balance.currency}</span>
-            <span className="wallet-amount">{balance.balance}</span>
+            <span className="wallet-currency-amount">
+              {balance.currency}{balance.balance}
+            </span>
           </div>
         ))}
       </div>

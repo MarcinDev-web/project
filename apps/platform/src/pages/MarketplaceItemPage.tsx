@@ -56,7 +56,7 @@ export function MarketplaceItemPage() {
   const [loading, setLoading] = useState(true);
   const [forumThreadId, setForumThreadId] = useState<string | null>(null);
   const [loadingThread, setLoadingThread] = useState(false);
-  const [playingGame, setPlayingGame] = useState(false);
+  const [purchasing, setPurchasing] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -83,24 +83,43 @@ export function MarketplaceItemPage() {
     }
   };
 
-  const handlePlayBuild = async () => {
-    if (!item || item.type !== 'build') {
-      console.warn('Can only play builds, not avatars');
+  const handlePurchase = async () => {
+    if (!item) return;
+    
+    if (!item.price) {
+      // If no price, it's free - just download
+      // TODO: Handle free download
+      console.log('Free item - download functionality not implemented yet');
       return;
     }
 
     try {
-      setPlayingGame(true);
-      
-      // Track player joining (for players online counter)
-      await marketplaceApi.joinGame(item.id);
-      
-      // Navigate to player page with build ID
-      navigate(`/player/${item.id}`);
+      setPurchasing(true);
+      // Use shop checkout API for marketplace items
+      const response = await apiClient.post('/api/shop/checkout', {
+        items: [
+          {
+            itemId: item.id,
+            type: 'marketplace-item',
+            quantity: 1,
+          },
+        ],
+      });
+
+      if (response.success) {
+        // Reload item to reflect ownership
+        await loadItem();
+        // TODO: Show success message
+        console.log('Purchase successful!');
+      } else {
+        // TODO: Show error message
+        console.error('Purchase failed:', response.error);
+      }
     } catch (error) {
-      console.error('Failed to join game:', error);
-      setPlayingGame(false);
+      console.error('Failed to purchase item:', error);
       // TODO: Show error toast
+    } finally {
+      setPurchasing(false);
     }
   };
 
@@ -198,23 +217,25 @@ export function MarketplaceItemPage() {
                 <p style={{ margin: 0, color: 'var(--text-2)' }}>
                   <strong>Downloads:</strong> {item.downloads}
                 </p>
-                {(item.playersOnline ?? 0) > 0 && (
-                  <p style={{ margin: 0, color: 'var(--color-success)', fontWeight: 'var(--font-medium)' }}>
-                    🟢 <strong>{item.playersOnline}</strong> players online
+                {item.price && (
+                  <p style={{ margin: 0, color: 'var(--text-1)', fontSize: 'var(--text-xl)', fontWeight: 'var(--font-semibold)', marginTop: 'var(--spacing-2)' }}>
+                    <strong>Price:</strong> {item.price.amount} {item.price.currency.toUpperCase()}
+                  </p>
+                )}
+                {!item.price && (
+                  <p style={{ margin: 0, color: 'var(--color-success)', fontSize: 'var(--text-lg)', fontWeight: 'var(--font-semibold)', marginTop: 'var(--spacing-2)' }}>
+                    <strong>Free</strong>
                   </p>
                 )}
               </div>
               <div style={{ display: 'flex', gap: 'var(--spacing-3)', alignItems: 'center', flexWrap: 'wrap' }}>
-                {item.type === 'build' && (
-                  <Button 
-                    variant="primary" 
-                    onClick={handlePlayBuild}
-                    disabled={playingGame}
-                  >
-                    {playingGame ? 'Loading...' : 'Play Game'}
-                  </Button>
-                )}
-                <Button variant="secondary">Download</Button>
+                <Button 
+                  variant="primary" 
+                  onClick={handlePurchase}
+                  disabled={purchasing}
+                >
+                  {purchasing ? 'Loading...' : 'Kup'}
+                </Button>
                 {forumThreadId && (
                   <Button 
                     variant="secondary" 

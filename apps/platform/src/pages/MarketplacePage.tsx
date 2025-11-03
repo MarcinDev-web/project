@@ -232,11 +232,6 @@ export function MarketplacePage() {
                     <div>by {item.authorName ?? 'Unknown'}</div>
                     <div style={{ display: 'flex', gap: 'var(--spacing-2)', alignItems: 'center', marginTop: 'var(--spacing-1)' }}>
                       <span>{item.likes ?? 0} ❤️</span>
-                      {(item.playersOnline ?? 0) > 0 && (
-                        <span style={{ color: 'var(--color-success)', fontSize: 'var(--text-xs)' }}>
-                          🟢 {item.playersOnline} online
-                        </span>
-                      )}
                     </div>
                   </div>
                   <div style={{ display: 'flex', gap: 'var(--spacing-2)', alignItems: 'center' }}>

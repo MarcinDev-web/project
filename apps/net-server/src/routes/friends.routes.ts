@@ -232,6 +232,36 @@ export function createFriendsRoutes(deps: RouteDependencies): Router {
   });
 
   /**
+   * GET /api/friends/presence
+   * Get online presence status for all friends.
+   * Returns a map of friend IDs to their online status (boolean).
+   */
+  router.get('/presence', authMiddleware, async (req: AuthRequest, res: Response) => {
+    try {
+      if (!req.user) {
+        return res.status(401).json({ error: 'Unauthorized' });
+      }
+
+      // Get user's friends
+      const friendIds = await friendsStorage.getFriends(req.user.id);
+
+      // Build presence map
+      const presence: Record<string, boolean> = {};
+      for (const friendId of friendIds) {
+        presence[friendId] = sessionManager.isUserOnline(friendId);
+      }
+
+      res.json(presence);
+    } catch (error) {
+      console.error('Get friends presence error:', error);
+      res.status(500).json({
+        error: 'Failed to get friends presence',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  /**
    * GET /api/friends/suggestions
    * Get friend suggestions based on mutual friends and activity.
    */

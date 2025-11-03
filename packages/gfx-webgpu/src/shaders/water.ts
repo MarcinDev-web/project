@@ -199,8 +199,8 @@ fn fragmentMain(input: VertexOutput) -> @location(0) vec4<f32> {
   let fresnelStrength = waterUniforms.reflectionStrength;
   
   // Blend reflection and refraction based on Fresnel
-  let surfaceColor = mix(refractionColor, reflectionColor, fresnel * fresnelStrength);
-  
+  var surfaceColor = mix(refractionColor, reflectionColor, fresnel * fresnelStrength);
+
   // Apply water color tint
   surfaceColor *= waterUniforms.waterColor.rgb;
   

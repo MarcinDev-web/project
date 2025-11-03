@@ -212,9 +212,13 @@ export class WaterRenderer implements IDisposable {
 
     // Create uniform buffer (WaterUniforms + LightingUniforms)
     // WaterUniforms: ~400 bytes, LightingUniforms: ~256 bytes
+    // Uniform buffers require 256-byte alignment, so round up first block to 512
+    const waterUniformsSize = 512; // Round up from ~400 to 256-byte alignment
+    const totalSize = waterUniformsSize + 256; // + LightingUniforms
+    
     this.uniformBuffer = this.device.createBuffer({
       label: 'water-uniform-buffer',
-      size: 656, // Approximate size for both uniform blocks
+      size: totalSize,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
@@ -229,7 +233,7 @@ export class WaterRenderer implements IDisposable {
         },
         {
           binding: 1,
-          resource: { buffer: this.uniformBuffer, offset: 400 }, // Offset for lighting uniforms
+          resource: { buffer: this.uniformBuffer, offset: waterUniformsSize }, // Aligned to 256 bytes
         },
       ],
     });

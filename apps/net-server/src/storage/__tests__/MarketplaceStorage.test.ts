@@ -114,7 +114,7 @@ describe('MarketplaceStorage', () => {
         title: 'Build 1',
         authorId: 'user1',
         fileUrl: '/api/marketplace/item1/build',
-        tags: ['game', 'action'],
+        tags: ['building', 'action'],
         public: true,
       });
 
@@ -123,7 +123,7 @@ describe('MarketplaceStorage', () => {
         title: 'Build 2',
         authorId: 'user2',
         fileUrl: '/api/marketplace/item2/build',
-        tags: ['game', 'puzzle'],
+        tags: ['building', 'puzzle'],
         public: true,
       });
 
@@ -168,9 +168,9 @@ describe('MarketplaceStorage', () => {
     });
 
     it('filters by tags', async () => {
-      const items = await storage.getItems({ tags: ['game'] });
+      const items = await storage.getItems({ tags: ['building'] });
       expect(items.length).toBeGreaterThanOrEqual(2);
-      expect(items.every(item => item.tags.includes('game'))).toBe(true);
+      expect(items.every(item => item.tags.includes('building'))).toBe(true);
     });
 
     it('filters by public flag', async () => {
@@ -184,10 +184,10 @@ describe('MarketplaceStorage', () => {
     });
 
     it('filters by multiple tags', async () => {
-      const items = await storage.getItems({ tags: ['game', 'puzzle'] });
+      const items = await storage.getItems({ tags: ['building', 'puzzle'] });
       expect(items.length).toBeGreaterThanOrEqual(1);
       expect(
-        items.every(item => item.tags.includes('game') || item.tags.includes('puzzle'))
+        items.every(item => item.tags.includes('building') || item.tags.includes('puzzle'))
       ).toBe(true);
     });
 

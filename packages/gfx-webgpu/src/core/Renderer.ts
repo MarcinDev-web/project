@@ -294,17 +294,110 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
   const gpuTimingListeners: Array<(timings: { label: string; timeMs: number }[]) => void> = [];
 
   let cleanedUp = false;
+  
+  // Track the device that was used to configure the context
+  // This ensures we can validate device consistency before rendering
+  let configuredDevice: GPUDevice = device;
+  // Track which device was used to create frameResources
+  // This allows us to detect when resources become invalid after device recreation
+  let frameResourcesDevice: GPUDevice = device;
+  let deviceRecreationAttempts = 0;
+  const MAX_DEVICE_RECREATION_ATTEMPTS = 3;
+  let isRecreatingDevice = false;
 
-  // Handle device loss
+  /**
+   * Attempts to recreate the device and reconfigure the context after device loss.
+   * This allows the renderer to recover from transient device loss.
+   */
+  async function recreateDeviceAndReconfigure(): Promise<GPUDevice | null> {
+    if (isRecreatingDevice || cleanedUp || renderAbortSignal.aborted) {
+      return null;
+    }
+    
+    if (deviceRecreationAttempts >= MAX_DEVICE_RECREATION_ATTEMPTS) {
+      Logger.error('Max device recreation attempts reached. Manual reload required.');
+      statusEl.textContent = 'WebGPU device lost. Please reload the page.';
+      return null;
+    }
+
+    isRecreatingDevice = true;
+    deviceRecreationAttempts++;
+    
+    try {
+      Logger.info(`Attempting to recreate device (attempt ${deviceRecreationAttempts}/${MAX_DEVICE_RECREATION_ATTEMPTS})`);
+      statusEl.textContent = 'Recreating WebGPU device...';
+      
+      // Request a new adapter and device
+      const newAdapter = await navigator.gpu.requestAdapter();
+      if (!newAdapter) {
+        throw new Error('Failed to acquire GPU adapter');
+      }
+
+      const newDevice = await newAdapter.requestDevice({ requiredFeatures });
+      
+      // Reconfigure the context with the new device
+      try {
+        context.configure({ device: newDevice, format: presentationFormat, alphaMode: 'opaque' });
+      } catch (err) {
+        const altFormat: GPUTextureFormat = presentationFormat === 'rgba8unorm' ? 'bgra8unorm' : 'rgba8unorm';
+        try {
+          context.configure({ device: newDevice, format: altFormat, alphaMode: 'opaque' });
+          Logger.warn('Canvas configure fallback format used on device recreation:', { from: presentationFormat, to: altFormat });
+          // Note: We don't update presentationFormat here to maintain consistency
+        } catch (err2) {
+          throw new Error(`Failed to reconfigure canvas: ${err instanceof Error ? err.message : String(err)}`);
+        }
+      }
+
+      // Update the configured device reference
+      configuredDevice = newDevice;
+      
+      Logger.info('Device recreated and context reconfigured successfully');
+      statusEl.textContent = DEFAULT_STATUS_MESSAGE;
+      
+      return newDevice;
+    } catch (err) {
+      Logger.error('Device recreation failed:', err);
+      statusEl.textContent = 'Failed to recreate WebGPU device. Please reload.';
+      return null;
+    } finally {
+      isRecreatingDevice = false;
+    }
+  }
+
+  // Handle device loss with recreation attempt
   device.lost
-    .then((info) => {
+    .then(async (info) => {
       if (!cleanedUp && !renderAbortSignal.aborted) {
         Logger.error('WebGPU device lost', info as unknown as Error);
-        statusEl.textContent = 'WebGPU device lost. Please reload.';
-        try {
-          cleanup();
-        } catch (cleanupErr) {
-          Logger.warn('Cleanup after device loss threw', cleanupErr);
+        
+        // Attempt to recreate the device if the loss was transient (reason: 'destroyed')
+        // Permanent losses (e.g., GPU crash) won't be recoverable
+        if (info.reason === 'destroyed') {
+          const newDevice = await recreateDeviceAndReconfigure();
+          if (newDevice) {
+            // Update the device reference - resources will need to be recreated on next frame
+            // Mark that frameResources are now invalid (they were created with old device)
+            device = newDevice;
+            // frameResourcesDevice stays as old device - this will cause frame to skip rendering
+            // until resources are recreated (TODO: implement full resource recreation)
+            Logger.info('Device recreated successfully, rendering will skip until resources are recreated');
+          } else {
+            // Recreation failed - cleanup and show error
+            try {
+              cleanup();
+            } catch (cleanupErr) {
+              Logger.warn('Cleanup after device recreation failure threw', cleanupErr);
+            }
+          }
+        } else {
+          // Permanent device loss - cleanup immediately
+          statusEl.textContent = 'WebGPU device lost. Please reload.';
+          try {
+            cleanup();
+          } catch (cleanupErr) {
+            Logger.warn('Cleanup after device loss threw', cleanupErr);
+          }
         }
       }
     })
@@ -418,6 +511,8 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
     };
 
     const bufferPool = new GPUBufferPool(device);
+    // Record which device created these resources
+    frameResourcesDevice = device;
     frameResources = {
       ...geometryBuffers,
       uniformBuffer: uniformResources.uniformBuffer,
@@ -617,6 +712,19 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
         } as GPURenderPassDescriptor;
       }
 
+    // Validate device consistency before rendering
+    // The device used for rendering must match the device that configured the context
+    // This prevents WebGPU errors like "texture view associated with different device"
+    if (device !== configuredDevice) {
+      Logger.warn('Device mismatch detected - skipping frame render. Device may have been recreated.');
+      // If device was recreated, frameResources and other GPU resources are now invalid
+      // because they were created with the old device. Skip this frame to avoid errors.
+      // TODO: Full resource recreation would be needed for proper device recovery
+      // This would require recreating all buffers, textures, pipelines, etc. with the new device
+      scheduleNextFrame();
+      return;
+    }
+
     // Render frame (handles all rendering operations)
     // Calculate time for animations
     const currentTime = typeof performance !== 'undefined' && typeof performance.now === 'function'
@@ -648,6 +756,8 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
         shadowQuality: renderSettings.shadowQuality,
         msaaSampleCount: renderSettings.msaaSampleCount,
         time: currentTime,
+        configuredDevice, // Pass the device that configured the context for validation
+        frameResourcesDevice, // Pass the device that created frameResources for validation
         ...(gpuTimingListeners.length
           ? {
               onGpuTimings: (timings) => {
@@ -802,10 +912,11 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
         throw new Error('Invalid grid renderer');
       }
       // Match frame pass color format to avoid attachment state mismatches
-      await renderer.initialize(device, 'rgba16float', 'depth24plus');
+      // Use configuredDevice to ensure consistency with context
+      await renderer.initialize(configuredDevice, 'rgba16float', 'depth24plus');
       gridRenderer = renderer;
     },
-    getDevice: () => device,
+    getDevice: () => configuredDevice,
     getPresentationFormat: () => presentationFormat,
     getCapabilities: () => capabilities,
     supportsTimestampQueries: () => capabilities.features.timestampQuery,

@@ -10,6 +10,7 @@ export interface AvatarBuilderViewportProps {
   onLoadoutChange?: (loadout: AvatarLoadout) => void;
   initialLoadout?: AvatarLoadout;
   className?: string;
+  onCoreReady?: (core: AvatarBuilderCore) => void;
 }
 
 /**
@@ -19,12 +20,15 @@ export function AvatarBuilderViewport({
   onLoadoutChange,
   initialLoadout,
   className,
+  onCoreReady,
 }: AvatarBuilderViewportProps) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const coreRef = useRef<AvatarBuilderCore | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const statusRef = useRef<HTMLDivElement>(null);
+  // Track last applied loadout to prevent infinite loops when applying external updates
+  const lastLoadoutRef = useRef<AvatarLoadout | undefined>(initialLoadout);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -55,6 +59,8 @@ export function AvatarBuilderViewport({
 
         if (mounted) {
           setIsInitializing(false);
+          // Notify parent that core is ready
+          onCoreReady?.(core);
         }
       } catch (err) {
         console.error('Failed to initialize Avatar Builder:', err);
@@ -76,10 +82,30 @@ export function AvatarBuilderViewport({
     };
   }, []); // Only run once on mount
 
-  // Update core when loadout changes externally
+  // Update core when loadout changes externally (from parent)
+  // This effect only runs when initialLoadout prop changes from parent state
   useEffect(() => {
-    if (coreRef.current && initialLoadout) {
-      coreRef.current.applyLoadout(initialLoadout);
+    if (!coreRef.current) {
+      // Core not ready yet, will be set when it initializes
+      lastLoadoutRef.current = initialLoadout;
+      return;
+    }
+
+    // If no initialLoadout provided, nothing to apply
+    if (!initialLoadout) {
+      return;
+    }
+
+    // Only apply if loadout actually changed (avoid infinite loops)
+    // Compare by serializing to JSON for deep equality check
+    const currentSerialized = JSON.stringify(initialLoadout);
+    const lastSerialized = JSON.stringify(lastLoadoutRef.current);
+    
+    if (currentSerialized !== lastSerialized) {
+      // Apply silently to prevent triggering onLoadoutChange callback
+      // This breaks the loop: initialLoadout change -> apply (silent) -> no callback -> no state update
+      coreRef.current.applyLoadout(initialLoadout, true);
+      lastLoadoutRef.current = initialLoadout;
     }
   }, [initialLoadout]);
 

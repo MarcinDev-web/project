@@ -10,6 +10,7 @@ import { AvatarBuilderViewport } from '../components/avatar-builder/AvatarBuilde
 import { AvatarCustomizationPanel } from '../components/avatar-builder/AvatarCustomizationPanel';
 import { profilesApi } from '../api/profiles';
 import { DEFAULT_AVATAR_LOADOUT, type AvatarLoadout } from '@engine/avatar';
+import type { AvatarBuilderCore } from '../components/avatar-builder/AvatarBuilderCore';
 
 /**
  * Main Avatar Builder Studio page
@@ -21,6 +22,7 @@ export function AvatarBuilderStudioPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [builderCore, setBuilderCore] = useState<AvatarBuilderCore | null>(null);
 
   // Load saved loadout on mount
   useEffect(() => {
@@ -34,10 +36,20 @@ export function AvatarBuilderStudioPage() {
         const savedLoadout = await profilesApi.loadAvatarLoadout(user.id);
         if (savedLoadout) {
           setLoadout(savedLoadout);
+        } else {
+          // Explicitly use default loadout when no saved loadout exists (404)
+          setLoadout(DEFAULT_AVATAR_LOADOUT);
         }
       } catch (error) {
+        // When loading fails (network error, server error, etc.), use base avatar
         console.error('Failed to load saved avatar loadout:', error);
-        showToast('Failed to load saved avatar', 'error');
+        setLoadout(DEFAULT_AVATAR_LOADOUT);
+        
+        // Only show error toast for non-404 errors (404 means no saved loadout, which is fine)
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        if (!errorMessage.includes('404') && !errorMessage.includes('not found')) {
+          showToast('Failed to load saved avatar. Using base avatar.', 'warning');
+        }
       } finally {
         setIsLoading(false);
       }
@@ -96,12 +108,14 @@ export function AvatarBuilderStudioPage() {
               onReset={handleReset}
               onSave={handleSave}
               isSaving={isSaving}
+              builderCore={builderCore}
             />
           </div>
           <div className="avatar-builder-viewport">
             <AvatarBuilderViewport
               initialLoadout={loadout}
               onLoadoutChange={handleLoadoutChange}
+              onCoreReady={setBuilderCore}
             />
           </div>
         </div>

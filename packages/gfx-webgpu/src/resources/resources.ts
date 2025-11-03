@@ -1260,7 +1260,7 @@ export function createRenderAttachmentTexture(
     size: { width: canvasElement.width, height: canvasElement.height, depthOrArrayLayers: 1 },
     format,
     sampleCount,
-    usage: GPUTextureUsage.RENDER_ATTACHMENT,
+    usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
   });
 }
 

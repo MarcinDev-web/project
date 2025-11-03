@@ -13,6 +13,7 @@ import type { PresenceOnlineMessage, PresenceOfflineMessage } from '../types/web
 const MAX_MESSAGE_SIZE = 1 * 1024 * 1024; // 1MB max message size
 const MAX_CONNECTIONS_PER_IP = 5; // Max 5 connections per IP
 const CONNECTION_TIMEOUT = 30 * 60 * 1000; // 30 minutes inactivity timeout
+const LOG_THROTTLE_MS = 5000; // Log same event max once per 5 seconds per IP
 
 /**
  * WebSocket server handler for real-time collaboration.
@@ -25,6 +26,7 @@ export class WebSocketHandler {
   private readonly connectionTimes = new Map<WebSocket, number>(); // ws -> last activity time
   private readonly ipConnectionCounts = new Map<string, number>(); // ip -> connection count
   private readonly connectionIPs = new Map<WebSocket, string>(); // ws -> ip
+  private readonly lastLogTimes = new Map<string, number>(); // logKey -> last log time
   private friendsStorage: FriendsStorage | null = null;
   private cleanupInterval: NodeJS.Timeout | null = null;
 
@@ -45,6 +47,7 @@ export class WebSocketHandler {
     });
 
     this.wss = new WebSocketServer({
+      host: '0.0.0.0', // Listen on all interfaces (IPv4 and IPv6)
       port,
       maxPayload: MAX_MESSAGE_SIZE, // Limit message size
     });
@@ -65,6 +68,19 @@ export class WebSocketHandler {
   }
 
   /**
+   * Check if log should be throttled (rate limited).
+   */
+  private shouldLog(key: string): boolean {
+    const now = Date.now();
+    const lastLog = this.lastLogTimes.get(key) || 0;
+    if (now - lastLog < LOG_THROTTLE_MS) {
+      return false;
+    }
+    this.lastLogTimes.set(key, now);
+    return true;
+  }
+
+  /**
    * Handle new WebSocket connection.
    */
   private handleConnection(ws: WebSocket, req: any): void {
@@ -74,11 +90,14 @@ export class WebSocketHandler {
     // Rate limit connections per IP
     const connectionCount = this.ipConnectionCounts.get(ip) || 0;
     if (connectionCount >= MAX_CONNECTIONS_PER_IP) {
-      securityLogger.logSuspiciousActivity(
-        undefined,
-        `Too many WebSocket connections from IP ${ip}`,
-        ip
-      );
+      const logKey = `security:too-many-connections:${ip}`;
+      if (this.shouldLog(logKey)) {
+        securityLogger.logSuspiciousActivity(
+          undefined,
+          `Too many WebSocket connections from IP ${ip}`,
+          ip
+        );
+      }
       ws.close(1008, 'Too many connections from this IP');
       return;
     }
@@ -87,7 +106,11 @@ export class WebSocketHandler {
     this.connectionIPs.set(ws, ip);
     this.connectionTimes.set(ws, Date.now());
 
-    console.log(`New WebSocket connection from ${ip}`);
+    // Throttle connection logs
+    const connectionLogKey = `connection:${ip}`;
+    if (this.shouldLog(connectionLogKey)) {
+      console.log(`New WebSocket connection from ${ip}`);
+    }
 
     // Set up connection metadata
     const userId: string | null = null;
@@ -171,7 +194,11 @@ export class WebSocketHandler {
         this.connections.delete(ws);
         this.replicationServer.unregisterConnection(ws);
       }
-      console.log('WebSocket connection closed');
+      // Throttle close logs
+      const closeLogKey = connectionIP ? `close:${connectionIP}` : 'close:unknown';
+      if (this.shouldLog(closeLogKey)) {
+        console.log('WebSocket connection closed');
+      }
     });
 
     // Handle errors
