@@ -270,9 +270,8 @@ ISC
 - **⚡ Forged for performance** - WebGPU-powered, browser-native
 - **🏗️ Built to scale** - From prototypes to production-ready games
 - **🌐 No barriers** - Create anywhere, share instantly, play everywhere
-- **👥 Community-driven** - Open-source, built by creators for creators
 
 ---
 
-**Built with ❤️ using modern web technologies**
+**Built with ❤️**
 
