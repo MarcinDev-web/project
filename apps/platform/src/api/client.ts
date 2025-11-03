@@ -5,7 +5,9 @@
 import { getTokens, setTokens, clearTokens } from '../utils/storage';
 import type { ApiError } from '../types/api';
 
-const API_BASE_URL = '/api';
+// Use environment variable if set (for production backend URL),
+// otherwise use relative path (for same-origin requests or proxy)
+const API_BASE_URL = import.meta.env.VITE_API_URL || '/api';
 
 class ApiClient {
   private async request<T>(

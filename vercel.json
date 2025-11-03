@@ -3,7 +3,6 @@
   "buildCommand": "pnpm build:platform",
   "outputDirectory": "apps/platform/dist",
   "installCommand": "pnpm install",
-  "framework": "vite",
   "rewrites": [
     {
       "source": "/(.*)",
