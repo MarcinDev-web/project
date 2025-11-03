@@ -1,6 +1,6 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import { Pool } from 'pg';
+import type { PrismaClient } from '../node_modules/.prisma/collab-client';
 import { randomUUID } from 'node:crypto';
 import { verifyJwtFromRequest } from './auth.js';
 import { broadcastToSession } from '../ws/server.js';
@@ -16,22 +16,43 @@ const saveSchema = z.object({
   payload: z.any(),
 });
 
-export function registerSessionRoutes(app: FastifyInstance, pool: Pool): void {
+export function registerSessionRoutes(app: FastifyInstance, prisma: PrismaClient): void {
   app.post('/session', async (req, reply) => {
     const auth = verifyJwtFromRequest(req);
     if (!auth) return reply.status(401).send({ error: 'Unauthorized' });
     try {
       const body = createSessionSchema.parse(req.body);
       const sessionId = body.sessionId ?? randomUUID();
-      await pool.query(
-        'INSERT INTO sessions (id, project_id, created_by) VALUES ($1, $2, $3) ON CONFLICT (id) DO NOTHING',
-        [sessionId, body.projectId, auth.userId]
-      );
-      // Ensure membership
-      await pool.query(
-        'INSERT INTO project_members (project_id, user_id, role) VALUES ($1, $2, $3) ON CONFLICT DO NOTHING',
-        [body.projectId, auth.userId, 'editor']
-      );
+      
+      // Create session and ensure membership in transaction
+      await prisma.$transaction(async (tx) => {
+        await tx.session.upsert({
+          where: { id: sessionId },
+          update: {},
+          create: {
+            id: sessionId,
+            projectId: body.projectId,
+            createdBy: auth.userId,
+          },
+        });
+        
+        // Ensure membership
+        await tx.projectMember.upsert({
+          where: {
+            projectId_userId: {
+              projectId: body.projectId,
+              userId: auth.userId,
+            },
+          },
+          update: {},
+          create: {
+            projectId: body.projectId,
+            userId: auth.userId,
+            role: 'editor',
+          },
+        });
+      });
+      
       return reply.send({ sessionId });
     } catch {
       return reply.status(400).send({ error: 'Invalid request' });
@@ -45,10 +66,17 @@ export function registerSessionRoutes(app: FastifyInstance, pool: Pool): void {
       const body = saveSchema.parse(req.body);
       const snapshotId = randomUUID();
       const payloadBuffer = Buffer.from(JSON.stringify(body.payload), 'utf-8');
-      await pool.query(
-        'INSERT INTO scene_snapshots (id, project_id, session_id, created_by, payload) VALUES ($1, $2, $3, $4, $5)',
-        [snapshotId, body.projectId, body.sessionId, auth.userId, payloadBuffer]
-      );
+      
+      await prisma.sceneSnapshot.create({
+        data: {
+          id: snapshotId,
+          projectId: body.projectId,
+          sessionId: body.sessionId,
+          createdBy: auth.userId,
+          payload: payloadBuffer,
+        },
+      });
+      
       // Notify collaborators in session
       broadcastToSession(body.sessionId, {
         type: 'checkpoint:saved',
@@ -71,13 +99,17 @@ export function registerSessionRoutes(app: FastifyInstance, pool: Pool): void {
       const q = req.query as { projectId?: string };
       const projectId = q.projectId ?? '';
       if (!projectId) return reply.status(400).send({ error: 'projectId required' });
-      const { rows } = await pool.query<{ payload: Buffer }>(
-        'SELECT payload FROM scene_snapshots WHERE project_id=$1 ORDER BY created_at DESC LIMIT 1',
-        [projectId]
-      );
-      if (rows.length === 0) return reply.status(404).send({ error: 'Not found' });
+      
+      const snapshot = await prisma.sceneSnapshot.findFirst({
+        where: { projectId },
+        orderBy: { createdAt: 'desc' },
+        select: { payload: true },
+      });
+      
+      if (!snapshot) return reply.status(404).send({ error: 'Not found' });
+      
       const payload = JSON.parse(
-        Buffer.from(rows[0]?.payload ?? Buffer.alloc(0)).toString('utf-8')
+        Buffer.from(snapshot.payload).toString('utf-8')
       ) as unknown;
       return reply.send({ payload });
     } catch {

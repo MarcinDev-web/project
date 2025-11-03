@@ -3,13 +3,13 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { createDbPool, ensureSchema } from '../../lib/db';
+import { getPrismaClient, ensureSchema, disconnectPrisma } from '../../lib/db';
 import { BuildStorage } from '../BuildStorage';
-import type { Pool } from 'pg';
+import type { PrismaClient } from '../../node_modules/.prisma/net-client';
 import type { ProjectData } from '../../types';
 
 describe('BuildStorage', () => {
-  let pool: Pool;
+  let prisma: PrismaClient;
   let storage: BuildStorage;
   let testMarketplaceId: string;
 
@@ -19,25 +19,34 @@ describe('BuildStorage', () => {
       return;
     }
 
-    pool = createDbPool();
-    await ensureSchema(pool);
-    storage = new BuildStorage(pool);
+    prisma = await getPrismaClient();
+    await ensureSchema();
+    storage = new BuildStorage(prisma);
 
     // Create a test marketplace item (required for foreign key constraint)
     testMarketplaceId = `test_item_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    await pool.query(
-      `INSERT INTO marketplace_items (id, type, title, author_id, file_url, tags, public)
-       VALUES ($1, 'build', 'Test Build', 'test_user', '/test', '{}', true)`,
-      [testMarketplaceId]
-    );
+    await prisma.marketplaceItem.create({
+      data: {
+        id: testMarketplaceId,
+        type: 'build',
+        title: 'Test Build',
+        authorId: 'test_user',
+        fileUrl: '/test',
+        tags: [],
+        isPublic: true,
+      },
+    });
   });
 
   afterEach(async () => {
-    if (pool) {
+    if (prisma) {
       // Cleanup
-      await pool.query('DELETE FROM marketplace_builds WHERE marketplace_id = $1', [testMarketplaceId]);
-      await pool.query('DELETE FROM marketplace_items WHERE id = $1', [testMarketplaceId]);
-      await pool.end();
+      await prisma.marketplaceBuild.deleteMany({
+        where: { marketplaceId: testMarketplaceId },
+      });
+      await prisma.marketplaceItem.deleteMany({
+        where: { id: testMarketplaceId },
+      });
     }
   });
 
@@ -230,10 +239,13 @@ describe('BuildStorage', () => {
       }
 
       // Manually insert corrupted data
-      await pool.query(
-        'INSERT INTO marketplace_builds (marketplace_id, project_data, version) VALUES ($1, $2, 1)',
-        [testMarketplaceId, Buffer.from('invalid json')]
-      );
+      await prisma.marketplaceBuild.create({
+        data: {
+          marketplaceId: testMarketplaceId,
+          projectData: Buffer.from('invalid json'),
+          version: 1,
+        },
+      });
 
       await expect(storage.getBuild(testMarketplaceId)).rejects.toThrow();
     });

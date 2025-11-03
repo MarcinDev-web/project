@@ -87,11 +87,17 @@ describe('Like API', () => {
     });
 
     it('returns liked status if authenticated', async () => {
+      // Wait for item to be available first
+      await waitForItem(marketplaceStorage, itemId);
+      
       // Like first
       await request(app)
         .post(`/api/marketplace/${itemId}/like`)
         .set(getAuthHeader(user.token))
         .expect(200);
+
+      // Wait a bit for like to propagate (especially for JSON storage)
+      await new Promise(resolve => setTimeout(resolve, 50));
 
       const response = await request(app)
         .get(`/api/marketplace/${itemId}/likes`)

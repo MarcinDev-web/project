@@ -1,0 +1,296 @@
+// Prisma schema for net-server
+generator client {
+  provider = "prisma-client-js"
+  output   = "../node_modules/.prisma/net-client"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Marketplace
+model MarketplaceItem {
+  id            String    @id
+  type          String    // 'build' | 'avatar'
+  title         String
+  description   String?
+  authorId      String    @map("author_id")
+  authorName    String?   @map("author_name")
+  thumbnailUrl  String?   @map("thumbnail_url")
+  fileUrl       String    @map("file_url")
+  tags          String[]  @default([])
+  createdAt     DateTime  @default(now()) @map("created_at")
+  updatedAt     DateTime  @default(now()) @updatedAt @map("updated_at")
+  downloads     Int       @default(0)
+  likes         Int       @default(0)
+  isPublic      Boolean   @default(true) @map("public")
+  priceCurrency String?   @map("price_currency")
+  priceAmount   Decimal?  @map("price_amount") @db.Decimal
+  forumThreadId String?   @map("forum_thread_id")
+
+  build     MarketplaceBuild?
+  itemLikes MarketplaceLike[]
+
+  @@index([type])
+  @@index([authorId])
+  @@index([createdAt(sort: Desc)])
+  @@index([tags], type: Gin)
+  @@map("marketplace_items")
+}
+
+model MarketplaceBuild {
+  marketplaceId String   @id @map("marketplace_id")
+  projectData   Bytes    @map("project_data")
+  version       Int      @default(1)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+
+  marketplaceItem MarketplaceItem @relation(fields: [marketplaceId], references: [id], onDelete: Cascade)
+
+  @@map("marketplace_builds")
+}
+
+model MarketplaceLike {
+  itemId    String   @map("item_id")
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  item MarketplaceItem @relation(fields: [itemId], references: [id], onDelete: Cascade)
+
+  @@id([itemId, userId])
+  @@index([itemId])
+  @@index([userId])
+  @@map("marketplace_likes")
+}
+
+model GameSession {
+  gameId  String   @map("game_id")
+  userId  String   @map("user_id")
+  joinedAt DateTime @default(now()) @map("joined_at")
+
+  @@id([gameId, userId])
+  @@map("game_sessions")
+}
+
+// Shop
+model ShopItem {
+  id           String   @id
+  name         String
+  description  String?
+  category     String   // 'consumable' | 'cosmetic' | 'upgrade' | 'collectible'
+  priceCurrency String   @map("price_currency")
+  priceAmount  Decimal  @map("price_amount") @db.Decimal
+  imageUrl     String?  @map("image_url")
+  available    Boolean  @default(true)
+  stock        Int?
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@index([available])
+  @@index([priceCurrency])
+  @@map("shop_items")
+}
+
+model ShopAsset {
+  id          String   @id
+  name        String
+  description String?
+  type        String   // 'material' | 'model' | 'texture' | 'script'
+  category    String?
+  priceCurrency String   @map("price_currency")
+  priceAmount  Decimal  @map("price_amount") @db.Decimal
+  previewUrl  String?  @map("preview_url")
+  fileUrl     String   @map("file_url")
+  metadata    Json?
+  authorId    String   @map("author_id")
+  available   Boolean  @default(true)
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([type])
+  @@index([category])
+  @@index([available])
+  @@index([authorId])
+  @@map("shop_assets")
+}
+
+// Purchases
+model Purchase {
+  id           String   @id
+  userId       String   @map("user_id")
+  totalCurrency String   @map("total_currency")
+  totalAmount   Decimal  @map("total_amount") @db.Decimal
+  status       String   // 'pending' | 'completed' | 'failed'
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  items PurchaseItem[]
+
+  @@index([userId])
+  @@index([createdAt(sort: Desc)])
+  @@map("purchases")
+}
+
+model PurchaseItem {
+  purchaseId   String   @map("purchase_id")
+  itemId       String   @map("item_id")
+  itemType     String   @map("item_type") // 'shop-item' | 'asset' | 'marketplace-item'
+  name         String
+  priceCurrency String   @map("price_currency")
+  priceAmount  Decimal  @map("price_amount") @db.Decimal
+
+  purchase Purchase @relation(fields: [purchaseId], references: [id], onDelete: Cascade)
+
+  @@id([purchaseId, itemId, itemType])
+  @@map("purchase_items")
+}
+
+model UserOwnedItem {
+  userId     String   @map("user_id")
+  itemId     String   @map("item_id")
+  itemType   String   @map("item_type") // 'shop-item' | 'asset' | 'marketplace-item'
+  purchasedAt DateTime @map("purchased_at")
+
+  @@id([userId, itemId, itemType])
+  @@index([userId])
+  @@index([itemType])
+  @@map("user_owned_items")
+}
+
+// Studio Projects
+model UserProject {
+  id          String   @id
+  userId      String   @map("user_id")
+  name        String
+  description String?
+  projectData Bytes    @map("project_data")
+  thumbnailUrl String? @map("thumbnail_url")
+  isPublished Boolean  @default(false) @map("is_published")
+  version     Int      @default(1)
+  tags        String[] @default([])
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  teamAccess ProjectTeamAccess[]
+
+  @@index([userId])
+  @@index([updatedAt(sort: Desc)])
+  @@index([isPublished])
+  @@index([tags], type: Gin)
+  @@map("user_projects")
+}
+
+// Studio Teams
+model StudioTeam {
+  id          String   @id
+  studioOwnerId String @unique @map("studio_owner_id")
+  name        String
+  description String?
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  members     TeamMember[]
+  invitations TeamInvitation[]
+  projectAccess ProjectTeamAccess[]
+
+  @@index([studioOwnerId])
+  @@map("studio_teams")
+}
+
+model TeamMember {
+  teamId    String   @map("team_id")
+  userId    String   @map("user_id")
+  role      String   // 'owner' | 'member'
+  joinedAt  DateTime @default(now()) @map("joined_at")
+  invitedBy String   @map("invited_by")
+
+  team StudioTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@id([teamId, userId])
+  @@index([teamId])
+  @@index([userId])
+  @@map("team_members")
+}
+
+model TeamInvitation {
+  id            String   @id
+  teamId        String   @map("team_id")
+  inviterId     String   @map("inviter_id")
+  inviteeUserId String?  @map("invitee_user_id")
+  inviteeEmail  String?  @map("invitee_email")
+  inviteeUsername String? @map("invitee_username")
+  token         String   @unique
+  status        String   @default("pending") // 'pending' | 'accepted' | 'declined' | 'expired'
+  expiresAt     DateTime @map("expires_at")
+  createdAt     DateTime @default(now()) @map("created_at")
+
+  team StudioTeam @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@index([teamId])
+  @@index([inviteeUserId])
+  @@index([token])
+  @@index([status])
+  @@map("team_invitations")
+}
+
+model ProjectTeamAccess {
+  projectId  String @map("project_id")
+  teamId     String @map("team_id")
+  accessLevel String @map("access_level") // 'read' | 'write'
+  userId     String? @map("user_id")
+
+  project UserProject @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  team    StudioTeam  @relation(fields: [teamId], references: [id], onDelete: Cascade)
+
+  @@id([projectId, teamId])
+  @@index([projectId])
+  @@index([teamId])
+  @@index([userId])
+  @@map("project_team_access")
+}
+
+// Studio Settings
+model StudioSetting {
+  userId      String   @id @map("user_id")
+  focus       String   @default("balanced") // 'games' | 'assets' | 'balanced'
+  goals       Json     @default("{}")
+  cadenceTarget Int     @default(2) @map("cadence_target")
+  showRevenue Boolean  @default(true) @map("show_revenue")
+  featureFlags Json    @default("{}") @map("feature_flags")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([focus])
+  @@map("studio_settings")
+}
+
+model StudioMetricsDaily {
+  userId      String   @map("user_id")
+  date        DateTime @db.Date
+  portfolioSize Int?    @map("portfolio_size")
+  releases    Int?
+  updates     Int?
+  downloads   Int?
+  ratingsCount Int?     @map("ratings_count")
+  avgRating   Decimal? @map("avg_rating") @db.Decimal
+  salesCount  Int?     @map("sales_count")
+  grossRevenue Decimal? @map("gross_revenue") @db.Decimal
+  netRevenue  Decimal? @map("net_revenue") @db.Decimal
+  score       Decimal? @db.Decimal
+
+  @@id([userId, date])
+  @@index([date])
+  @@map("studio_metrics_daily")
+}
+
+// Token blacklist
+model TokenBlacklist {
+  jti       String   @id
+  expiresAt BigInt   @map("expires_at")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  @@index([expiresAt])
+  @@map("token_blacklist")
+}
+

@@ -1,7 +1,7 @@
 import Fastify from 'fastify';
 import websocket from '@fastify/websocket';
 import cors from '@fastify/cors';
-import { createDbPool, ensureSchema } from './lib/db.js';
+import { getPrismaClient, ensureSchema, disconnectPrisma } from './lib/db.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerSessionRoutes } from './routes/session.js';
 import { createWsServer } from './ws/server.js';
@@ -26,14 +26,19 @@ async function main(): Promise<void> {
 
   await app.register(websocket);
 
-  const pool = createDbPool();
-  await ensureSchema(pool);
+  const prisma = getPrismaClient();
+  await ensureSchema();
 
-  registerAuthRoutes(app, pool);
-  registerSessionRoutes(app, pool);
-  createWsServer(app, pool);
+  registerAuthRoutes(app, prisma);
+  registerSessionRoutes(app, prisma);
+  createWsServer(app, prisma);
 
   app.get('/health', () => ({ status: 'ok' }));
+
+  // Graceful shutdown
+  app.addHook('onClose', async () => {
+    await disconnectPrisma();
+  });
 
   await app.listen({ port: PORT, host: '0.0.0.0' });
 }

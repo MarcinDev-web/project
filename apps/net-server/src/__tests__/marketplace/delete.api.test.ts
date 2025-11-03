@@ -35,6 +35,9 @@ describe('DELETE /api/marketplace/:id', () => {
       .set('Authorization', `Bearer ${user1.token}`)
       .expect(204);
 
+    // Wait a bit for deletion to propagate (especially for database storage)
+    await new Promise(resolve => setTimeout(resolve, 50));
+
     // Verify item is deleted
     const deleted = await marketplaceStorage.getItem(item.id);
     expect(deleted).toBeNull();

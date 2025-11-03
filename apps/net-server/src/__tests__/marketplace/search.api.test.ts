@@ -98,6 +98,9 @@ describe('GET /api/marketplace/search', () => {
     // Wait for items to be available (handles database transaction timing)
     await waitForItem(marketplaceStorage, item1.id);
     await waitForItem(marketplaceStorage, item2.id);
+    
+    // Wait a bit more for search indexing (especially for PostgreSQL full-text search)
+    await new Promise(resolve => setTimeout(resolve, 100));
 
     const response = await request(app)
       .get('/api/marketplace/search')
@@ -107,7 +110,7 @@ describe('GET /api/marketplace/search', () => {
     expect(response.body.items.every((item: { type: string }) => 
       item.type === 'build'
     )).toBe(true);
-  });
+  }, 10000); // Increase timeout for this test
 
   it('combines search with tags filter', async () => {
     const item1 = await createTestMarketplaceItem(marketplaceStorage, {

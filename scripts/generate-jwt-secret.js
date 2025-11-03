@@ -43,6 +43,6 @@ if (!refreshValidation.valid) {
 console.log('✅ Generated secure secrets:\n');
 console.log('JWT_SECRET=' + jwtSecret);
 console.log('JWT_REFRESH_SECRET=' + jwtRefreshSecret);
-console.log('\n📋 Copy these values to your Render/Railway environment variables.');
+console.log('\n📋 Copy these values to your deployment platform environment variables (e.g. Railway).');
 console.log('⚠️  Keep these secrets secure - never commit them to git!\n');
 

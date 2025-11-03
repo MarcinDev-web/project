@@ -772,9 +772,9 @@ export function createMarketplaceRoutes(deps: RouteDependencies): Router {
   router.post(
     '/',
     authMiddleware,
-    publishLimiter,
     bodySizeLimit(BodySizeLimits.MARKETPLACE_PUBLISH),
     validateBody(publishItemSchema),
+    publishLimiter,
     async (req: AuthRequest, res: Response) => {
       try {
         if (!req.user) {

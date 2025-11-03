@@ -5,17 +5,20 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import type { Pool } from 'pg';
+import type { MarketplaceStorage } from './MarketplaceStorage';
 
 export class LikesStorage {
   private readonly dataDir?: string;
   private readonly likesFile?: string;
   private readonly pool?: Pool;
+  private readonly marketplaceStorage?: MarketplaceStorage;
 
-  constructor(storage: Pool | string) {
+  constructor(storage: Pool | string, marketplaceStorage?: MarketplaceStorage) {
     if (typeof storage === 'string') {
       // JSON file storage
       this.dataDir = storage;
       this.likesFile = path.join(storage, 'likes.json');
+      this.marketplaceStorage = marketplaceStorage;
       // pool stays undefined (not set)
     } else {
       // PostgreSQL storage
@@ -78,11 +81,22 @@ export class LikesStorage {
     } else {
       // JSON file
       const likes = await this.readLikes();
+      const wasLiked = likes[itemId]?.has(userId) ?? false;
       if (!likes[itemId]) {
         likes[itemId] = new Set();
       }
       likes[itemId].add(userId);
       await this.writeLikes(likes);
+      
+      // Update like count in marketplace item (only if it wasn't already liked)
+      if (!wasLiked && this.marketplaceStorage) {
+        const item = await this.marketplaceStorage.getItem(itemId);
+        if (item) {
+          await this.marketplaceStorage.updateItem(itemId, {
+            likes: item.likes + 1,
+          });
+        }
+      }
     }
   }
 
@@ -103,12 +117,23 @@ export class LikesStorage {
     } else {
       // JSON file
       const likes = await this.readLikes();
+      const wasLiked = likes[itemId]?.has(userId) ?? false;
       if (likes[itemId]) {
         likes[itemId].delete(userId);
         if (likes[itemId].size === 0) {
           delete likes[itemId];
         }
         await this.writeLikes(likes);
+      }
+      
+      // Update like count in marketplace item (only if it was actually liked)
+      if (wasLiked && this.marketplaceStorage) {
+        const item = await this.marketplaceStorage.getItem(itemId);
+        if (item) {
+          await this.marketplaceStorage.updateItem(itemId, {
+            likes: Math.max(0, item.likes - 1),
+          });
+        }
       }
     }
   }

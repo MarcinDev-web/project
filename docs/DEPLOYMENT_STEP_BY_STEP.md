@@ -2,44 +2,58 @@
 
 ## 📋 Przegląd
 
-Ten przewodnik przeprowadzi Cię przez:
-1. Wdrożenie backendu (`net-server`) na Render.com
+Ten przewodnik przeprowadzi Cię przez wdrożenie na **Railway.app**:
+1. Wdrożenie backendu (`net-server`) na Railway
 2. Konfigurację zmiennych środowiskowych
 3. Ustawienie `VITE_API_URL` w Vercel
 4. Redeploy frontendu
 
 ---
 
-## Krok 1: Wdrożenie Backendu na Render.com
+## Krok 1: Wdrożenie Backendu na Railway
 
-### 1.1. Przygotowanie repozytorium
+### 1.1. Utworzenie projektu
 
-✅ **Już zrobione:** `render.yaml` został zaktualizowany z konfiguracją `net-server`
+1. **Przejdź na Railway.app:**
+   - Zaloguj się: https://railway.app
+   - Kliknij **"New Project"** → **"Deploy from GitHub"**
 
-### 1.2. Wdrożenie przez Render Blueprint
-
-1. **Przejdź na Render.com:**
-   - Zaloguj się: https://dashboard.render.com
-   - Kliknij **"New"** → **"Blueprint"**
-
-2. **Połącz z GitHub:**
+2. **Wybierz repozytorium:**
    - Wybierz repozytorium z tym projektem
-   - Render automatycznie wykryje `render.yaml`
+   - Railway automatycznie wykryje projekt
 
-3. **Przejrzyj konfigurację:**
-   - Render pokaże wszystkie serwisy z `render.yaml`
-   - Powinieneś zobaczyć:
-     - ✅ `collab-server` (już istniejący)
-     - ✅ `net-server` (nowy)
-     - ✅ `net-server-db` (PostgreSQL database)
+3. **Dodaj serwis:**
+   - Railway może automatycznie wykryć `net-server` z monorepo
+   - Jeśli nie, kliknij **"+ New"** → **"GitHub Repo"** → wybierz repo
+   - W konfiguracji serwisu ustaw:
+     - **Root Directory:** *(zostaw puste - monorepo root)*
+     - Railway powinien automatycznie wykryć `package.json`
 
-4. **Potwierdź wdrożenie:**
-   - Kliknij **"Apply"** lub **"Create"**
-   - Render zacznie budować i wdrażać serwisy
+4. **Skonfiguruj Build & Start:**
+   - Przejdź do **Settings** → **Build & Deploy**
+   - **Build Command:** `pnpm i --frozen-lockfile && pnpm -w --filter @apps/net-server build`
+   - **Start Command:** `node apps/net-server/dist/server.js`
+
+### 1.2. Dodanie PostgreSQL Database
+
+1. **W projekcie Railway kliknij "+ New":**
+   - Wybierz **"Database"** → **"PostgreSQL"**
+   - Railway automatycznie utworzy bazę i ustawi zmienną `DATABASE_URL`
+   - **Uwaga:** Railway automatycznie dodaje `sslmode=require`
+
+2. **Railway pokaże informacje o bazie:**
+   - HTTP Domain: `net-server-db-production.up.railway.app` *(używane wewnętrznie przez Railway)*
+   - TCP Proxy: `interchange.proxy.rlwy.net:17882` *(do ręcznego połączenia, opcjonalne)*
+   - **Nie musisz używać tych endpointów ręcznie** - Railway automatycznie ustawi `DATABASE_URL` w serwisie `net-server`
+
+3. **Sprawdź czy `DATABASE_URL` jest ustawione:**
+   - Przejdź do serwisu `net-server` → **Variables**
+   - Powinieneś zobaczyć `DATABASE_URL` ustawione automatycznie
+   - Connection string będzie w formacie: `postgresql://...@.../?sslmode=require`
 
 ### 1.3. Generowanie JWT Secrets
 
-Podczas gdy Render buduje, wygeneruj secrets:
+Wygeneruj secrets przed wdrożeniem:
 
 ```bash
 # W terminalu projektu:
@@ -50,34 +64,38 @@ node scripts/generate-jwt-secret.js
 
 ---
 
-## Krok 2: Konfiguracja Zmiennych Środowiskowych w Render
+## Krok 2: Konfiguracja Zmiennych Środowiskowych
 
 ### 2.1. Otwórz konfigurację net-server
 
-1. W Render Dashboard → Services → `net-server`
-2. Przejdź do **Settings** → **Environment**
+1. W Railway Dashboard → Twój projekt → `net-server`
+2. Przejdź do **Variables** (lub **Settings** → **Variables**)
 
-### 2.2. Zaktualizuj zmienne
+### 2.2. Dodaj wymagane zmienne
 
-**Ważne:** `render.yaml` automatycznie utworzy większość zmiennych, ale musisz zaktualizować `FRONTEND_URL`.
+1. **`NODE_ENV`:**
+   - **Value:** `production`
 
-1. **Znajdź `FRONTEND_URL`:**
-   - Kliknij na wartość
-   - Zaktualizuj na: `https://nowy-folder-4.vercel.app`
-   - *(lub twój custom domain jeśli masz)*
+2. **`JWT_SECRET`:**
+   - **Value:** *(wartość z kroku 1.3)*
+   - Minimum 32 znaki
 
-2. **Sprawdź czy `JWT_SECRET` i `JWT_REFRESH_SECRET` są ustawione:**
-   - Render powinien automatycznie wygenerować wartości
-   - Jeśli nie ma, dodaj ręcznie używając wartości z kroku 1.3
+3. **`JWT_REFRESH_SECRET`:**
+   - **Value:** *(wartość z kroku 1.3)*
+   - Minimum 32 znaki
 
-3. **Sprawdź `DATABASE_URL`:**
-   - Powinno być automatycznie ustawione przez Render
-   - Format: `postgresql://...?sslmode=require`
+4. **`FRONTEND_URL`:**
+   - **Value:** `https://your-app.vercel.app`
+   - *(zastąp swoim URL frontendu)*
 
-### 2.3. Zapisz i zrestartuj
+5. **`DATABASE_URL`:**
+   - ✅ Railway automatycznie ustawi to przy dodaniu PostgreSQL Database
+   - Jeśli nie widzisz tej zmiennej, upewnij się że baza została dodana do projektu
 
-- Kliknij **"Save Changes"**
-- Render automatycznie zrestartuje serwis
+### 2.3. Zapisz zmiany
+
+- Railway automatycznie zapisuje zmienne przy każdej edycji
+- Railway automatycznie zrestartuje serwis po zmianie zmiennych środowiskowych
 
 ---
 
@@ -85,24 +103,27 @@ node scripts/generate-jwt-secret.js
 
 ### 3.1. Monitoruj logi
 
-1. W Render Dashboard → `net-server` → **Logs**
+1. W Railway Dashboard → `net-server` → **Deployments** → kliknij najnowszy deployment → **View Logs**
+   - Lub przejdź bezpośrednio do **Logs** w bocznym menu serwisu
 2. Szukaj komunikatu:
    ```
    ✅ Configuration validation passed
    ```
 3. Jeśli widzisz błędy, sprawdź zmienne środowiskowe
 
-### 3.2. Test endpointu
+### 3.2. Uzyskaj publiczny URL
 
-Gdy deploy się zakończy:
+1. **W Railway Dashboard → `net-server`:**
+   - Przejdź do **Settings** → **Networking**
+   - Kliknij **"Generate Domain"** (jeśli jeszcze nie masz)
+   - Railway wygeneruje URL w formacie: `https://net-server-production.up.railway.app`
+   - **Skopiuj ten URL** - będzie potrzebny w następnym kroku
 
-1. **Skopiuj URL serwisu:**
-   - W Render Dashboard → `net-server`
-   - Skopiuj URL (np. `https://net-server-xyz.onrender.com`)
+### 3.3. Test endpointu
 
-2. **Test health check:**
+1. **Test health check:**
    ```bash
-   curl https://net-server-xyz.onrender.com/health
+   curl https://net-server-production.up.railway.app/health
    ```
    Powinno zwrócić: `{"status":"ok"}`
 
@@ -121,7 +142,7 @@ Gdy deploy się zakończy:
 
 3. **Dodaj nową zmienną:**
    - **Key:** `VITE_API_URL`
-   - **Value:** `https://net-server-xyz.onrender.com` *(URL z kroku 3.2)*
+   - **Value:** `https://net-server-production.up.railway.app` *(URL z kroku 3.2)*
    - **Environments:** ✅ Production, ✅ Preview (opcjonalnie)
 
 4. **Zapisz**
@@ -133,7 +154,7 @@ Gdy deploy się zakończy:
 vercel env add VITE_API_URL production
 
 # Wprowadź wartość gdy zostaniesz zapytany:
-# https://net-server-xyz.onrender.com
+# https://net-server-production.up.railway.app
 
 # Powtórz dla preview (opcjonalnie):
 vercel env add VITE_API_URL preview
@@ -178,10 +199,12 @@ vercel --prod
 
 ## ✅ Checklist Podsumowujący
 
-- [ ] Backend wdrożony na Render (`net-server`)
-- [ ] `JWT_SECRET` i `JWT_REFRESH_SECRET` ustawione w Render
-- [ ] `FRONTEND_URL` zaktualizowane w Render na URL Vercel
-- [ ] `DATABASE_URL` automatycznie ustawione przez Render
+- [ ] Backend wdrożony na Railway (`net-server`)
+- [ ] PostgreSQL Database dodana do projektu Railway
+- [ ] `JWT_SECRET` i `JWT_REFRESH_SECRET` ustawione w Railway Variables
+- [ ] `FRONTEND_URL` ustawione na URL Vercel w Railway
+- [ ] `DATABASE_URL` automatycznie ustawione przez Railway
+- [ ] Publiczny domain wygenerowany w Railway (Settings → Networking)
 - [ ] Health check zwraca `{"status":"ok"}`
 - [ ] `VITE_API_URL` ustawione w Vercel (Production)
 - [ ] Frontend zrobiony redeploy
@@ -212,7 +235,7 @@ vercel --prod
 
 ### Problem: Backend nie startuje - "Configuration validation failed"
 
-**Sprawdź logi Render** - pokażą dokładny błąd.
+**Sprawdź logi w Railway Dashboard** (Deployments → View Logs) - pokażą dokładny błąd.
 
 **Najczęstsze problemy:**
 - `JWT_SECRET` za krótkie (< 32 znaki)
@@ -222,12 +245,12 @@ vercel --prod
 ### Problem: CORS errors w przeglądarce
 
 **Sprawdź:**
-1. Czy `FRONTEND_URL` w Render zawiera dokładny URL frontendu (z `https://`)
+1. Czy `FRONTEND_URL` w platformie zawiera dokładny URL frontendu (z `https://`)
 2. Czy frontend URL jest bez trailing slash
 
 **Rozwiązanie:**
-- Zaktualizuj `FRONTEND_URL` w Render
-- Zrób restart serwisu
+- Zaktualizuj `FRONTEND_URL` w Railway Variables
+- Railway automatycznie zrestartuje serwis po zmianie
 
 ---
 
@@ -235,7 +258,6 @@ vercel --prod
 
 - `docs/ENV_VARIABLES.md` - Pełna lista zmiennych środowiskowych
 - `docs/DEPLOY_NET_SERVER.md` - Szczegóły deploy backendu
-- `render.yaml` - Konfiguracja Render
 
 ---
 

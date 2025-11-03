@@ -83,15 +83,17 @@ export async function createTestMarketplaceItem(
 export async function waitForItem(
   storage: MarketplaceStorage | MarketplaceStorageDB,
   itemId: string,
-  maxAttempts = 10,
-  delayMs = 50
+  maxAttempts = 20,
+  delayMs = 100
 ): Promise<void> {
   for (let i = 0; i < maxAttempts; i++) {
     const item = await storage.getItem(itemId);
     if (item) {
       return;
     }
-    await new Promise((resolve) => setTimeout(resolve, delayMs));
+    // Exponential backoff for later attempts
+    const currentDelay = i < 5 ? delayMs : delayMs * Math.min(2 ** (i - 5), 4);
+    await new Promise((resolve) => setTimeout(resolve, currentDelay));
   }
   // Final attempt without delay - let it throw if still not found
   const item = await storage.getItem(itemId);

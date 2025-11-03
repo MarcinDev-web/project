@@ -1,101 +1,59 @@
 /**
- * Marketplace Storage DB - PostgreSQL implementation
+ * Marketplace Storage DB - PostgreSQL implementation using Prisma
  */
 
-import type { Pool, PoolClient } from 'pg';
+import type { PrismaClient as PrismaClientType } from '@prisma/client';
 import type { MarketplaceItem } from './MarketplaceStorage';
+import { Prisma } from '@prisma/client';
 
 export class MarketplaceStorageDB {
-  constructor(private readonly pool: Pool) {}
+  constructor(private readonly prisma: PrismaClientType) {}
 
   async initialize(): Promise<void> {
-    // Schema is managed by ensureSchema() in db.ts
+    // Schema is managed by Prisma migrations
     // No additional initialization needed
   }
 
   async createItem(
     item: Omit<MarketplaceItem, 'id' | 'createdAt' | 'updatedAt' | 'downloads' | 'likes'>,
-    client?: PoolClient
+    tx?: PrismaClientType
   ): Promise<MarketplaceItem> {
     const id = `item_${Date.now()}_${Math.random().toString(36).substring(7)}`;
-    const now = new Date();
+    const client = tx ?? this.prisma;
 
-    const queryClient = client ?? this.pool;
-
-    const result = await queryClient.query<{
-      id: string;
-      type: string;
-      title: string;
-      description: string | null;
-      author_id: string;
-      author_name: string | null;
-      thumbnail_url: string | null;
-      file_url: string;
-      tags: string[];
-      created_at: Date;
-      updated_at: Date;
-      downloads: number;
-      likes: number;
-      public: boolean;
-      price_currency: string | null;
-      price_amount: number | null;
-    }>(
-      `INSERT INTO marketplace_items (
-        id, type, title, description, author_id, author_name,
-        thumbnail_url, file_url, tags, created_at, updated_at,
-        downloads, likes, public, price_currency, price_amount, forum_thread_id
-      ) VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17)
-      RETURNING *`,
-      [
+    const created = await client.marketplaceItem.create({
+      data: {
         id,
-        item.type,
-        item.title,
-        item.description ?? null,
-        item.authorId,
-        item.authorName ?? null,
-        item.thumbnailUrl ?? null,
-        item.fileUrl,
-        item.tags,
-        now,
-        now,
-        0, // downloads
-        0, // likes
-        item.public,
-        item.price?.currency ?? null,
-        item.price?.amount ?? null,
-        item.forumThreadId ?? null,
-      ]
-    );
+        type: item.type,
+        title: item.title,
+        description: item.description ?? null,
+        authorId: item.authorId,
+        authorName: item.authorName ?? null,
+        thumbnailUrl: item.thumbnailUrl ?? null,
+        fileUrl: item.fileUrl,
+        tags: item.tags,
+        downloads: 0,
+        likes: 0,
+        isPublic: item.public,
+        priceCurrency: item.price?.currency ?? null,
+        priceAmount: item.price?.amount ?? null,
+        forumThreadId: item.forumThreadId ?? null,
+      },
+    });
 
-    return this.mapRowToItem(result.rows[0]!);
+    return this.mapPrismaToItem(created);
   }
 
   async getItem(id: string): Promise<MarketplaceItem | null> {
-    const result = await this.pool.query<{
-      id: string;
-      type: string;
-      title: string;
-      description: string | null;
-      author_id: string;
-      author_name: string | null;
-      thumbnail_url: string | null;
-      file_url: string;
-      tags: string[];
-      created_at: Date;
-      updated_at: Date;
-      downloads: number;
-      likes: number;
-      public: boolean;
-      price_currency: string | null;
-      price_amount: number | null;
-      forum_thread_id: string | null;
-    }>('SELECT * FROM marketplace_items WHERE id = $1', [id]);
+    const item = await this.prisma.marketplaceItem.findUnique({
+      where: { id },
+    });
 
-    if (result.rows.length === 0) {
+    if (!item) {
       return null;
     }
 
-    return this.mapRowToItem(result.rows[0]!);
+    return this.mapPrismaToItem(item);
   }
 
   async getItems(
@@ -110,263 +68,283 @@ export class MarketplaceStorageDB {
       sortBy?: 'newest' | 'popular' | 'downloads' | 'likes';
     } = {}
   ): Promise<MarketplaceItem[]> {
-    const conditions: string[] = [];
-    const params: unknown[] = [];
-    let paramIndex = 1;
-    let searchParamIndex = 0;
-
-    if (options.type) {
-      conditions.push(`type = $${paramIndex}`);
-      params.push(options.type);
-      paramIndex++;
-    }
-
-    if (options.authorId) {
-      conditions.push(`author_id = $${paramIndex}`);
-      params.push(options.authorId);
-      paramIndex++;
-    }
-
-    if (options.tags && options.tags.length > 0) {
-      conditions.push(`tags && $${paramIndex}::text[]`);
-      params.push(options.tags);
-      paramIndex++;
-    }
-
-    if (options.public !== undefined) {
-      conditions.push(`public = $${paramIndex}`);
-      params.push(options.public);
-      paramIndex++;
-    }
-
-    if (options.search && options.search.trim()) {
-      // Escape special characters for tsquery
-      const searchQuery = options.search
-        .trim()
-        .split(/\s+/)
-        .map((word) => word.replace(/[:'&!|()]/g, ''))
-        .filter((word) => word.length > 0)
-        .join(' & ');
-
-      if (searchQuery) {
-        searchParamIndex = paramIndex;
-        conditions.push(
-          `to_tsvector('english', title || ' ' || COALESCE(description, '') || ' ' || array_to_string(tags, ' ')) @@ to_tsquery('english', $${paramIndex})`
-        );
-        params.push(searchQuery);
-        paramIndex++;
-      }
-    }
-
-    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
     const limit = options.limit ?? 100;
     const offset = options.offset ?? 0;
 
-    params.push(limit, offset);
-    const limitParam = paramIndex;
-    const offsetParam = paramIndex + 1;
+    // Build where clause for Prisma
+    const where: Prisma.MarketplaceItemWhereInput = {};
 
-    // Determine sort order
-    let orderBy = 'ORDER BY created_at DESC'; // Default
-    if (searchParamIndex > 0) {
-      // Use relevance ranking if search is provided
-      orderBy = `ORDER BY ts_rank(
-        to_tsvector('english', title || ' ' || COALESCE(description, '') || ' ' || array_to_string(tags, ' ')),
-        to_tsquery('english', $${searchParamIndex})
-      ) DESC, created_at DESC`;
-    } else if (options.sortBy) {
-      // Use specified sort option
+    if (options.type) {
+      where.type = options.type;
+    }
+
+    if (options.authorId) {
+      where.authorId = options.authorId;
+    }
+
+    if (options.tags && options.tags.length > 0) {
+      where.tags = {
+        hasSome: options.tags,
+      };
+    }
+
+    if (options.public !== undefined) {
+      where.isPublic = options.public;
+    }
+
+    // For full-text search, we need to use raw SQL
+    if (options.search && options.search.trim()) {
+      // Use raw SQL for full-text search with tsvector
+      const searchWords = options.search
+        .trim()
+        .split(/\s+/)
+        .map((word) => word.replace(/[:'&!|()]/g, ''))
+        .filter((word) => word.length > 0);
+
+      if (searchWords.length > 0) {
+        const searchQuery = searchWords.map((word) => `${word}:*`).join(' & ');
+
+        // Use raw SQL for full-text search
+        const rawQuery = Prisma.sql`
+          SELECT * FROM marketplace_items
+          WHERE ${Prisma.join([
+            options.type ? Prisma.sql`type = ${options.type}` : Prisma.empty,
+            options.authorId ? Prisma.sql`author_id = ${options.authorId}` : Prisma.empty,
+            options.tags && options.tags.length > 0
+              ? Prisma.sql`tags && ${options.tags}::text[]`
+              : Prisma.empty,
+            options.public !== undefined
+              ? Prisma.sql`public = ${options.public}`
+              : Prisma.empty,
+            Prisma.sql`to_tsvector('english', title || ' ' || COALESCE(description, '') || ' ' || array_to_string(tags, ' ')) @@ to_tsquery('english', ${searchQuery})`,
+          ])}
+          ORDER BY ts_rank(
+            to_tsvector('english', title || ' ' || COALESCE(description, '') || ' ' || array_to_string(tags, ' ')),
+            to_tsquery('english', ${searchQuery})
+          ) DESC, created_at DESC
+          LIMIT ${limit} OFFSET ${offset}
+        `;
+
+        const results = (await this.prisma.$queryRaw(rawQuery)) as Array<{
+          id: string;
+          type: string;
+          title: string;
+          description: string | null;
+          author_id: string;
+          author_name: string | null;
+          thumbnail_url: string | null;
+          file_url: string;
+          tags: string[];
+          created_at: Date;
+          updated_at: Date;
+          downloads: number;
+          likes: number;
+          public: boolean;
+          price_currency: string | null;
+          price_amount: number | null;
+          forum_thread_id: string | null;
+        }>;
+
+        return results.map((row) => this.mapRowToItem(row));
+      }
+    }
+
+    // Build orderBy for Prisma
+    let orderBy: Prisma.MarketplaceItemOrderByWithRelationInput = { createdAt: 'desc' };
+    if (options.sortBy) {
       switch (options.sortBy) {
         case 'newest':
-          orderBy = 'ORDER BY created_at DESC';
+          orderBy = { createdAt: 'desc' };
           break;
         case 'popular':
-          orderBy = 'ORDER BY downloads DESC, likes DESC, created_at DESC';
+          orderBy = [{ downloads: 'desc' }, { likes: 'desc' }, { createdAt: 'desc' }];
           break;
         case 'downloads':
-          orderBy = 'ORDER BY downloads DESC, created_at DESC';
+          orderBy = [{ downloads: 'desc' }, { createdAt: 'desc' }];
           break;
         case 'likes':
-          orderBy = 'ORDER BY likes DESC, created_at DESC';
+          orderBy = [{ likes: 'desc' }, { createdAt: 'desc' }];
           break;
       }
     }
 
-    const query = `
-      SELECT * FROM marketplace_items
-      ${whereClause}
-      ${orderBy}
-      LIMIT $${limitParam} OFFSET $${offsetParam}
-    `;
+    const items = await this.prisma.marketplaceItem.findMany({
+      where,
+      orderBy: Array.isArray(orderBy) ? orderBy : [orderBy],
+      take: limit,
+      skip: offset,
+    });
 
-    const result = await this.pool.query<{
-      id: string;
-      type: string;
-      title: string;
-      description: string | null;
-      author_id: string;
-      author_name: string | null;
-      thumbnail_url: string | null;
-      file_url: string;
-      tags: string[];
-      created_at: Date;
-      updated_at: Date;
-      downloads: number;
-      likes: number;
-      public: boolean;
-      price_currency: string | null;
-      price_amount: number | null;
-    }>(query, params);
-
-    return result.rows.map((row) => this.mapRowToItem(row));
+    return items.map((item) => this.mapPrismaToItem(item));
   }
 
   async updateItem(
     id: string,
     updates: Partial<Omit<MarketplaceItem, 'id' | 'createdAt' | 'authorId'>>,
-    client?: PoolClient
+    tx?: PrismaClientType
   ): Promise<MarketplaceItem | null> {
-    const updateFields: string[] = [];
-    const params: unknown[] = [];
-    let paramIndex = 1;
+    const client = tx ?? this.prisma;
+
+    // Build update data
+    const updateData: Prisma.MarketplaceItemUpdateInput = {};
 
     if (updates.title !== undefined) {
-      updateFields.push(`title = $${paramIndex}`);
-      params.push(updates.title);
-      paramIndex++;
+      updateData.title = updates.title;
     }
 
     if (updates.description !== undefined) {
-      updateFields.push(`description = $${paramIndex}`);
-      params.push(updates.description ?? null);
-      paramIndex++;
+      updateData.description = updates.description ?? null;
     }
 
     if (updates.authorName !== undefined) {
-      updateFields.push(`author_name = $${paramIndex}`);
-      params.push(updates.authorName ?? null);
-      paramIndex++;
+      updateData.authorName = updates.authorName ?? null;
     }
 
     if (updates.thumbnailUrl !== undefined) {
-      updateFields.push(`thumbnail_url = $${paramIndex}`);
-      params.push(updates.thumbnailUrl ?? null);
-      paramIndex++;
+      updateData.thumbnailUrl = updates.thumbnailUrl ?? null;
     }
 
     if (updates.fileUrl !== undefined) {
-      updateFields.push(`file_url = $${paramIndex}`);
-      params.push(updates.fileUrl);
-      paramIndex++;
+      updateData.fileUrl = updates.fileUrl;
     }
 
     if (updates.tags !== undefined) {
-      updateFields.push(`tags = $${paramIndex}`);
-      params.push(updates.tags);
-      paramIndex++;
+      updateData.tags = updates.tags;
     }
 
     if (updates.downloads !== undefined) {
-      updateFields.push(`downloads = $${paramIndex}`);
-      params.push(updates.downloads);
-      paramIndex++;
+      updateData.downloads = updates.downloads;
     }
 
     if (updates.likes !== undefined) {
-      updateFields.push(`likes = $${paramIndex}`);
-      params.push(updates.likes);
-      paramIndex++;
+      updateData.likes = updates.likes;
     }
 
     if (updates.public !== undefined) {
-      updateFields.push(`public = $${paramIndex}`);
-      params.push(updates.public);
-      paramIndex++;
+      updateData.isPublic = updates.public;
     }
 
     if (updates.price !== undefined) {
       if (updates.price) {
-        updateFields.push(`price_currency = $${paramIndex}, price_amount = $${paramIndex + 1}`);
-        params.push(updates.price.currency, updates.price.amount);
-        paramIndex += 2;
+        updateData.priceCurrency = updates.price.currency;
+        updateData.priceAmount = updates.price.amount;
       } else {
-        updateFields.push(`price_currency = $${paramIndex}, price_amount = $${paramIndex + 1}`);
-        params.push(null, null);
-        paramIndex += 2;
+        updateData.priceCurrency = null;
+        updateData.priceAmount = null;
       }
     }
 
     if (updates.forumThreadId !== undefined) {
-      updateFields.push(`forum_thread_id = $${paramIndex}`);
-      params.push(updates.forumThreadId ?? null);
-      paramIndex++;
+      updateData.forumThreadId = updates.forumThreadId ?? null;
     }
 
-    if (updateFields.length === 0) {
+    // updatedAt is handled automatically by Prisma @updatedAt
+
+    if (Object.keys(updateData).length === 0) {
       // No updates provided, just return the item
       return this.getItem(id);
     }
 
-    // Always update updated_at
-    updateFields.push(`updated_at = $${paramIndex}`);
-    params.push(new Date());
-    paramIndex++;
+    try {
+      const updated = await client.marketplaceItem.update({
+        where: { id },
+        data: updateData,
+      });
 
-    params.push(id);
-    const idParam = paramIndex;
-
-    const query = `
-      UPDATE marketplace_items
-      SET ${updateFields.join(', ')}
-      WHERE id = $${idParam}
-      RETURNING *
-    `;
-
-    const queryClient = client ?? this.pool;
-
-    const result = await queryClient.query<{
-      id: string;
-      type: string;
-      title: string;
-      description: string | null;
-      author_id: string;
-      author_name: string | null;
-      thumbnail_url: string | null;
-      file_url: string;
-      tags: string[];
-      created_at: Date;
-      updated_at: Date;
-      downloads: number;
-      likes: number;
-      public: boolean;
-      price_currency: string | null;
-      price_amount: number | null;
-    }>(query, params);
-
-    if (result.rows.length === 0) {
-      return null;
+      return this.mapPrismaToItem(updated);
+    } catch (error) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2025') {
+        // Record not found
+        return null;
+      }
+      throw error;
     }
-
-    return this.mapRowToItem(result.rows[0]!);
   }
 
   async deleteItem(id: string, authorId: string): Promise<boolean> {
-    const result = await this.pool.query(
-      'DELETE FROM marketplace_items WHERE id = $1 AND author_id = $2',
-      [id, authorId]
-    );
+    try {
+      const result = await this.prisma.marketplaceItem.deleteMany({
+        where: {
+          id,
+          authorId,
+        },
+      });
 
-    return result.rowCount !== null && result.rowCount > 0;
+      return result.count > 0;
+    } catch {
+      return false;
+    }
   }
 
   async incrementDownloads(id: string): Promise<void> {
-    await this.pool.query('UPDATE marketplace_items SET downloads = downloads + 1 WHERE id = $1', [
-      id,
-    ]);
+    await this.prisma.marketplaceItem.update({
+      where: { id },
+      data: {
+        downloads: {
+          increment: 1,
+        // updatedAt is handled automatically
+        },
+      },
+    });
   }
 
   /**
-   * Maps database row to MarketplaceItem
+   * Maps Prisma MarketplaceItem to MarketplaceItem interface
+   */
+  private mapPrismaToItem(item: {
+    id: string;
+    type: string;
+    title: string;
+    description: string | null;
+    authorId: string;
+    authorName: string | null;
+    thumbnailUrl: string | null;
+    fileUrl: string;
+    tags: string[];
+    createdAt: Date;
+    updatedAt: Date;
+    downloads: number;
+    likes: number;
+    isPublic: boolean;
+    priceCurrency?: string | null;
+    priceAmount?: number | null;
+    forumThreadId?: string | null;
+  }): MarketplaceItem {
+    const mapped: MarketplaceItem = {
+      id: item.id,
+      type: item.type as 'build' | 'avatar',
+      title: item.title,
+      authorId: item.authorId,
+      fileUrl: item.fileUrl,
+      tags: item.tags,
+      createdAt: item.createdAt.getTime(),
+      updatedAt: item.updatedAt.getTime(),
+      downloads: item.downloads,
+      likes: item.likes,
+      public: item.isPublic,
+    };
+
+    if (item.description !== null) {
+      mapped.description = item.description;
+    }
+    if (item.authorName !== null) {
+      mapped.authorName = item.authorName;
+    }
+    if (item.thumbnailUrl !== null) {
+      mapped.thumbnailUrl = item.thumbnailUrl;
+    }
+    if (item.priceCurrency && item.priceAmount !== null && item.priceAmount !== undefined) {
+      mapped.price = { currency: item.priceCurrency, amount: Number(item.priceAmount) };
+    }
+    if (item.forumThreadId !== null && item.forumThreadId !== undefined) {
+      mapped.forumThreadId = item.forumThreadId;
+    }
+
+    return mapped;
+  }
+
+  /**
+   * Maps database row (from raw SQL) to MarketplaceItem
    */
   private mapRowToItem(row: {
     id: string;
@@ -411,7 +389,7 @@ export class MarketplaceStorageDB {
       item.thumbnailUrl = row.thumbnail_url;
     }
     if (row.price_currency && row.price_amount !== null && row.price_amount !== undefined) {
-      item.price = { currency: row.price_currency, amount: row.price_amount };
+      item.price = { currency: row.price_currency, amount: Number(row.price_amount) };
     }
     if (row.forum_thread_id !== null && row.forum_thread_id !== undefined) {
       item.forumThreadId = row.forum_thread_id;

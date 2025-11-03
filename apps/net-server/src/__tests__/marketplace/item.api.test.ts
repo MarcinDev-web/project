@@ -49,6 +49,9 @@ describe('GET /api/marketplace/:id', () => {
 
     // Wait for item to be available (handles database transaction timing)
     await waitForItem(marketplaceStorage, item.id);
+    
+    // Additional small wait to ensure item is fully accessible
+    await new Promise(resolve => setTimeout(resolve, 50));
 
     const response = await request(app)
       .get(`/api/marketplace/${item.id}`)

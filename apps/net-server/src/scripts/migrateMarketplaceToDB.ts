@@ -2,7 +2,7 @@
  * Migration script to migrate marketplace data from JSON to PostgreSQL
  */
 
-import { createDbPool, ensureSchema } from '../lib/db';
+import { getPrismaClient, ensureSchema, disconnectPrisma } from '../lib/db';
 import { MarketplaceStorage } from '../storage/MarketplaceStorage';
 import { MarketplaceStorageDB } from '../storage/MarketplaceStorageDB';
 import { promises as fs } from 'fs';
@@ -33,9 +33,9 @@ async function migrateMarketplace(): Promise<void> {
   console.log(`Database: ${process.env.DATABASE_URL.split('@')[1] || 'connected'}`);
 
   // Initialize database
-  const pool = createDbPool();
+  const prisma = await getPrismaClient();
   try {
-    await ensureSchema(pool);
+    await ensureSchema();
     console.log('✓ Database schema ensured');
   } catch (error) {
     console.error('Failed to ensure database schema:', error);
@@ -58,6 +58,7 @@ async function migrateMarketplace(): Promise<void> {
 
   if (items.length === 0) {
     console.log('No items to migrate.');
+    await disconnectPrisma();
     process.exit(0);
   }
 
@@ -71,7 +72,7 @@ async function migrateMarketplace(): Promise<void> {
   }
 
   // Migrate to database
-  const dbStorage = new MarketplaceStorageDB(pool);
+  const dbStorage = new MarketplaceStorageDB(prisma);
   let migrated = 0;
   let skipped = 0;
   let errors = 0;
@@ -103,25 +104,19 @@ async function migrateMarketplace(): Promise<void> {
         });
       }
 
-      // Update timestamps to match original (need to do this via raw SQL)
+      // Update timestamps to match original
       if (createdAt || updatedAt) {
-        const client = await pool.connect();
-        try {
-          if (createdAt) {
-            await client.query('UPDATE marketplace_items SET created_at = $1 WHERE id = $2', [
-              new Date(createdAt),
-              id,
-            ]);
-          }
-          if (updatedAt) {
-            await client.query('UPDATE marketplace_items SET updated_at = $1 WHERE id = $2', [
-              new Date(updatedAt),
-              id,
-            ]);
-          }
-        } finally {
-          client.release();
+        const updateData: { createdAt?: Date; updatedAt?: Date } = {};
+        if (createdAt) {
+          updateData.createdAt = new Date(createdAt);
         }
+        if (updatedAt) {
+          updateData.updatedAt = new Date(updatedAt);
+        }
+        await prisma.marketplaceItem.update({
+          where: { id },
+          data: updateData,
+        });
       }
 
       migrated++;
@@ -152,7 +147,7 @@ async function migrateMarketplace(): Promise<void> {
   }
 
   // Close database connection
-  await pool.end();
+  await disconnectPrisma();
 }
 
 // Run migration

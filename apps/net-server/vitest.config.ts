@@ -14,6 +14,8 @@ export default defineConfig({
       '@engine/script': path.resolve(__dirname, '../../packages/script/src'),
       '@engine/script/*': path.resolve(__dirname, '../../packages/script/src/*'),
       '@shared/*': path.resolve(__dirname, '../../shared/*'),
+      // Alias for Prisma Client custom output location
+      '../node_modules/.prisma/net-client': path.resolve(__dirname, 'node_modules/.prisma/net-client'),
     },
   },
   test: {

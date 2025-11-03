@@ -13,9 +13,14 @@
     "seed": "tsx src/scripts/seedMarketplace.ts",
     "migrate:marketplace": "tsx src/scripts/migrateMarketplaceToDB.ts",
     "create:admin": "tsx src/scripts/createAdmin.ts",
-    "create:admin:profile": "tsx src/scripts/createAdminProfile.ts"
+    "create:admin:profile": "tsx src/scripts/createAdminProfile.ts",
+    "db:generate": "prisma generate",
+    "db:migrate": "prisma migrate dev",
+    "db:push": "prisma db push",
+    "db:studio": "prisma studio"
   },
   "dependencies": {
+    "@prisma/client": "^5.22.0",
     "bcrypt": "^5.1.1",
     "cors": "^2.8.5",
     "express": "^4.18.2",
@@ -35,6 +40,7 @@
     "@types/pg": "^8.11.6",
     "@types/supertest": "^6.0.2",
     "@types/ws": "^8.5.10",
+    "prisma": "^5.22.0",
     "supertest": "^7.0.0",
     "tsx": "^4.7.0",
     "typescript": "^5.9.3",

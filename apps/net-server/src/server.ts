@@ -68,7 +68,7 @@ import { PurchaseService } from './services/PurchaseService';
 import { LedgerService } from './services/LedgerService';
 import { CurrencyEventNames, type CurrencyAmount } from '@engine/economy';
 import { generateAndSaveThumbnail } from './utils/thumbnailGenerator';
-import { createDbPool, ensureSchema } from './lib/db';
+import { createDbPool, ensureSchema, getPrismaClient, disconnectPrisma } from './lib/db';
 
 // Helper to wrap async route handlers and catch errors
 function asyncHandler(
@@ -94,8 +94,8 @@ import { createForumRoutes } from './routes/forum.routes';
 import { createAdminRoutes } from './routes/admin.routes';
 import type { RouteDependencies } from './routes/index';
 
-// Use ReturnType to get Pool type from createDbPool (pg is optional dependency)
-type Pool = ReturnType<typeof createDbPool>;
+// Type for Prisma Client (backward compatibility)
+type Pool = Awaited<ReturnType<typeof createDbPool>>;
 import path from 'path';
 import { promises as fs } from 'fs';
 
@@ -147,17 +147,28 @@ assertConfigValid();
 
 const app: Express = express();
 
-// Database connection pool (optional)
-let dbPool: Pool | null = null;
+// Database connection (optional) - using Prisma Client
+let dbPool: Awaited<ReturnType<typeof getPrismaClient>> | null = null;
 if (process.env.DATABASE_URL) {
   try {
-    dbPool = createDbPool();
+    dbPool = await createDbPool();
     console.log('Database connection pool created');
   } catch (error) {
     console.error('Failed to create database connection pool:', error);
     console.warn('Continuing with JSON file storage...');
   }
 }
+
+// Graceful shutdown
+process.on('SIGINT', async () => {
+  await disconnectPrisma();
+  process.exit(0);
+});
+
+process.on('SIGTERM', async () => {
+  await disconnectPrisma();
+  process.exit(0);
+});
 
 const storage = new ProjectStorage(DATA_DIR);
 const authManager = new AuthManager(DATA_DIR, dbPool);
@@ -170,7 +181,9 @@ const marketplaceStorage = dbPool
   ? new MarketplaceStorageDB(dbPool)
   : new MarketplaceStorage(DATA_DIR);
 const buildStorage = dbPool ? new BuildStorage(dbPool) : null;
-const likesStorage = dbPool ? new LikesStorage(dbPool) : new LikesStorage(DATA_DIR);
+const likesStorage = dbPool
+  ? new LikesStorage(dbPool)
+  : new LikesStorage(DATA_DIR, marketplaceStorage);
 const friendsStorage = new FriendsStorage(DATA_DIR);
 const messagesStorage = new MessagesStorage(DATA_DIR);
 const blockedUsersStorage = new BlockedUsersStorage(DATA_DIR);
@@ -372,7 +385,7 @@ void authManager.initialize().then(async () => {
   // Initialize database schema if database is available
   if (dbPool) {
     try {
-      await ensureSchema(dbPool);
+      await ensureSchema();
       console.log('Database schema ensured');
     } catch (error) {
       console.error('Failed to ensure database schema:', error);

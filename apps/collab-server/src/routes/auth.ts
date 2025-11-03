@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { Pool } from 'pg';
+import type { PrismaClient } from '../node_modules/.prisma/collab-client';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import { randomUUID } from 'node:crypto';
@@ -18,26 +18,31 @@ interface JwtPayload {
 }
 
 async function findUserByEmail(
-  pool: Pool,
+  prisma: PrismaClient,
   email: string
-): Promise<{ id: string; email: string; password_hash: string } | null> {
-  const { rows } = await pool.query<{ id: string; email: string; password_hash: string }>(
-    'SELECT id, email, password_hash FROM users WHERE email=$1',
-    [email]
-  );
-  return rows[0] ?? null;
+): Promise<{ id: string; email: string; passwordHash: string } | null> {
+  const user = await prisma.user.findUnique({
+    where: { email },
+    select: { id: true, email: true, passwordHash: true },
+  });
+  return user;
 }
 
 async function insertUser(
-  pool: Pool,
+  prisma: PrismaClient,
   email: string,
   passwordHash: string
 ): Promise<{ id: string; email: string }> {
   const id = randomUUID();
-  await pool.query(
-    'INSERT INTO users (id, email, password_hash) VALUES ($1, $2, $3) ON CONFLICT (email) DO NOTHING',
-    [id, email, passwordHash]
-  );
+  await prisma.user.upsert({
+    where: { email },
+    update: {},
+    create: {
+      id,
+      email,
+      passwordHash,
+    },
+  });
   return { id, email };
 }
 
@@ -48,11 +53,11 @@ function signToken(userId: string, email: string): { token: string; expiresAt: n
   return { token, expiresAt };
 }
 
-export function registerAuthRoutes(app: FastifyInstance, pool: Pool): void {
+export function registerAuthRoutes(app: FastifyInstance, prisma: PrismaClient): void {
   app.post('/auth/login', async (req, reply) => {
     try {
       const body = loginSchema.parse(req.body);
-      const existing = await findUserByEmail(pool, body.email);
+      const existing = await findUserByEmail(prisma, body.email);
 
       // Auto-register if not exists (optional, controlled by env)
       let userId: string;
@@ -62,10 +67,10 @@ export function registerAuthRoutes(app: FastifyInstance, pool: Pool): void {
           return reply.status(401).send({ error: 'Invalid credentials' });
         }
         const hash = await bcrypt.hash(body.password, 10);
-        const created = await insertUser(pool, body.email, hash);
+        const created = await insertUser(prisma, body.email, hash);
         userId = created.id;
       } else {
-        const valid = await bcrypt.compare(body.password, existing.password_hash);
+        const valid = await bcrypt.compare(body.password, existing.passwordHash);
         if (!valid) {
           return reply.status(401).send({ error: 'Invalid credentials' });
         }
