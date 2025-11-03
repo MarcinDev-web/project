@@ -7,6 +7,17 @@ RUN corepack enable
 # Build stage
 FROM base AS builder
 
+# Install curl and tar (required for wasm-pack download)
+RUN apk add --no-cache curl tar
+
+# Install wasm-pack (required for @engine/wasm-collision build)
+# Using latest stable version
+RUN curl -LO https://github.com/rustwasm/wasm-pack/releases/download/v0.12.1/wasm-pack-v0.12.1-x86_64-unknown-linux-musl.tar.gz \
+ && tar -xzf wasm-pack-v0.12.1-x86_64-unknown-linux-musl.tar.gz \
+ && mv wasm-pack-v0.12.1-x86_64-unknown-linux-musl/wasm-pack /usr/local/bin/ \
+ && chmod +x /usr/local/bin/wasm-pack \
+ && rm -rf wasm-pack-v0.12.1-x86_64-unknown-linux-musl*
+
 WORKDIR /app
 
 # Copy workspace configuration files first (better layer cache)
