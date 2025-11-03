@@ -53,6 +53,11 @@ interface WorkerPool {
   currentTaskId: number | null;
 }
 
+interface WorkerMessage {
+  taskId: number;
+  error?: string;
+}
+
 /**
  * Job System for task scheduling with Worker pool support.
  */
@@ -63,7 +68,10 @@ export class JobSystem {
   private backgroundQueue: QueuedTask[] = [];
   private idleQueue: QueuedTask[] = [];
   private workerPool: WorkerPool[] = [];
-  private idleCallbackId: ReturnType<typeof requestIdleCallback> | ReturnType<typeof setTimeout> | null = null;
+  private idleCallbackId:
+    | ReturnType<typeof requestIdleCallback>
+    | ReturnType<typeof setTimeout>
+    | null = null;
   private isShutdown = false;
 
   constructor(public readonly workerCount: number = 4) {
@@ -103,7 +111,7 @@ export class JobSystem {
 
     // Auto-execute RenderCritical tasks immediately
     if (task.priority === TaskPriority.RenderCritical) {
-      this.executeRenderCriticalTask(queuedTask);
+      void this.executeRenderCriticalTask(queuedTask);
     } else if (task.priority === TaskPriority.Background) {
       this.enqueueBackgroundTask(queuedTask);
     } else {
@@ -200,7 +208,7 @@ export class JobSystem {
       return;
     }
 
-    this.executeBackgroundTask(queuedTask, availableWorker);
+    void this.executeBackgroundTask(queuedTask, availableWorker);
   }
 
   /**
@@ -255,8 +263,9 @@ export class JobSystem {
       const taskId = queuedTask.id;
 
       // Setup message handler
-      const messageHandler = (e: MessageEvent): void => {
-        if (e.data.taskId !== taskId) {
+      const messageHandler = (e: MessageEvent<WorkerMessage>): void => {
+        const data = e.data;
+        if (data.taskId !== taskId) {
           return; // Message for different task
         }
 
@@ -268,17 +277,22 @@ export class JobSystem {
           return;
         }
 
-        if (e.data.error) {
-          reject(new Error(e.data.error));
+        if (data.error) {
+          reject(new Error(data.error));
         } else {
           resolve();
         }
       };
 
-      const errorHandler = (error: ErrorEvent): void => {
+      const errorHandler = (errorEvent: ErrorEvent): void => {
         worker.removeEventListener('message', messageHandler);
         worker.removeEventListener('error', errorHandler);
-        reject(error);
+        const errorMessage =
+          errorEvent.message ||
+          (errorEvent.error instanceof Error
+            ? errorEvent.error.message
+            : String(errorEvent.error ?? 'Worker error'));
+        reject(new Error(errorMessage));
       };
 
       worker.addEventListener('message', messageHandler);

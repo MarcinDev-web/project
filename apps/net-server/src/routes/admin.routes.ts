@@ -29,7 +29,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
   // ========================================
 
   // ADMIN USERS
-  router.get('/api/admin/users', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
+  router.get('/admin/users', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -86,7 +86,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.get('/api/admin/users/:id', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
+  router.get('/admin/users/:id', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -123,7 +123,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.put('/api/admin/users/:id', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
+  router.put('/admin/users/:id', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -166,7 +166,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
   });
 
   // ADMIN STATS
-  router.get('/api/admin/stats', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
+  router.get('/admin/stats', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -216,7 +216,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
   });
 
   // ADMIN MARKETPLACE
-  router.get('/api/admin/marketplace', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
+  router.get('/admin/marketplace', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -249,7 +249,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.delete('/api/admin/marketplace/:id', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
+  router.delete('/admin/marketplace/:id', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -282,7 +282,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
   });
 
   // ADMIN PROJECTS
-  router.get('/api/admin/projects', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
+  router.get('/admin/projects', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -309,7 +309,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.delete('/api/admin/projects/:token', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
+  router.delete('/admin/projects/:token', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -818,7 +818,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
   // ADMIN SHOP & FORUM ENDPOINTS
   // ========================================
 
-  router.get('/api/admin/shop/stats', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
+  router.get('/admin/shop/stats', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -873,7 +873,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.get('/api/admin/forum/stats', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
+  router.get('/admin/forum/stats', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -890,7 +890,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.get('/api/admin/forum/categories', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
+  router.get('/admin/forum/categories', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -907,7 +907,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.put('/api/admin/forum/categories/:id', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
+  router.put('/admin/forum/categories/:id', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -934,7 +934,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.delete('/api/admin/forum/categories/:id', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
+  router.delete('/admin/forum/categories/:id', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -966,7 +966,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.get('/api/admin/forum/threads', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
+  router.get('/admin/forum/threads', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -1000,7 +1000,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.delete('/api/admin/forum/threads/:id', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
+  router.delete('/admin/forum/threads/:id', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -1031,7 +1031,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.get('/api/admin/forum/posts', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
+  router.get('/admin/forum/posts', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -1066,7 +1066,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.delete('/api/admin/forum/posts/:id', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
+  router.delete('/admin/forum/posts/:id', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });

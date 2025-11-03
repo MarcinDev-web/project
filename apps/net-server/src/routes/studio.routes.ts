@@ -128,7 +128,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
   }
 
   // STUDIO PROJECTS ROUTES
-  router.get('/api/studio/projects', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.get('/studio/projects', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -148,7 +148,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.get('/api/studio/projects/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.get('/studio/projects/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -174,7 +174,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.post('/api/studio/projects', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.post('/studio/projects', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -214,7 +214,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.put('/api/studio/projects/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.put('/studio/projects/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -248,7 +248,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.delete('/api/studio/projects/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.delete('/studio/projects/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -274,7 +274,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.post('/api/studio/projects/:id/publish', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.post('/studio/projects/:id/publish', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -340,7 +340,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.get('/api/studio/stats', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.get('/studio/stats', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -395,7 +395,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.get('/api/studio/leaderboard', async (req: Request, res: Response) => {
+  router.get('/studio/leaderboard', async (req: Request, res: Response) => {
     try {
       const metric = (req.query.metric as 'views' | 'downloads' | 'likes' | 'projects' | 'revenue' | 'score' | 'growth') || 'views';
       const period = (req.query.period as 'all' | 'week' | 'month') || 'all';
@@ -570,7 +570,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.get('/api/studio/compare/:userId', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.get('/studio/compare/:userId', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -622,7 +622,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
   });
 
   // STUDIO TEAM ROUTES (continuing in next part due to size...)
-  router.post('/api/studio/team', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.post('/studio/team', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -652,7 +652,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.get('/api/studio/team', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.get('/studio/team', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -673,7 +673,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.put('/api/studio/team/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.put('/studio/team/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -704,7 +704,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.delete('/api/studio/team/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.delete('/studio/team/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -734,7 +734,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.get('/api/studio/team/members', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.get('/studio/team/members', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -774,7 +774,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.post('/api/studio/team/invite', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.post('/studio/team/invite', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -867,7 +867,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.put('/api/studio/team/invitations/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.put('/studio/team/invitations/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -933,7 +933,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.get('/api/studio/team/invitations', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.get('/studio/team/invitations', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -964,7 +964,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.delete('/api/studio/team/members/:userId', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.delete('/studio/team/members/:userId', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -1006,7 +1006,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.post('/api/studio/projects/:id/share-team', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.post('/studio/projects/:id/share-team', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -1078,7 +1078,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.get('/api/studio/projects/:id/team-access', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.get('/studio/projects/:id/team-access', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -1110,7 +1110,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.delete('/api/studio/projects/:id/share-team', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.delete('/studio/projects/:id/share-team', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -1147,7 +1147,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.get('/api/studio/shared-projects', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.get('/studio/shared-projects', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -1176,7 +1176,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
   });
 
   // STUDIO SETTINGS ROUTES
-  router.get('/api/studio/settings', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.get('/studio/settings', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -1206,7 +1206,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.put('/api/studio/settings', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.put('/studio/settings', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -1240,7 +1240,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
   });
 
   // STUDIO REVENUE ROUTE
-  router.get('/api/studio/revenue', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.get('/studio/revenue', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -1348,7 +1348,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
   });
 
   // STUDIO SCORE ROUTE
-  router.get('/api/studio/score', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.get('/studio/score', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
       const cacheKey = `score:${req.user.id}`;
@@ -1364,7 +1364,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
   });
 
   // STUDIO INSIGHTS ROUTE
-  router.get('/api/studio/insights', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.get('/studio/insights', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
 

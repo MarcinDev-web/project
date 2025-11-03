@@ -75,6 +75,15 @@ import { CurrencyEventNames, type CurrencyAmount } from '@engine/economy';
 import { generateAndSaveThumbnail } from './utils/thumbnailGenerator';
 import { createDbPool, ensureSchema } from './lib/db';
 
+// Helper to wrap async route handlers and catch errors
+function asyncHandler(
+  fn: (req: Request, res: Response, next: express.NextFunction) => Promise<unknown>
+) {
+  return (req: Request, res: Response, next: express.NextFunction) => {
+    Promise.resolve(fn(req, res, next)).catch(next);
+  };
+}
+
 // Import route modules
 import { createAuthRoutes } from './routes/auth.routes';
 import { createUsersRoutes } from './routes/users.routes';
@@ -100,8 +109,18 @@ const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 3000;
 const WS_PORT = process.env.WS_PORT ? parseInt(process.env.WS_PORT, 10) : 3001;
 const DATA_DIR = process.env.DATA_DIR || './data';
 const THUMBNAIL_DIR = path.join(DATA_DIR, 'thumbnails');
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+// Default frontend URLs: editor (5173) and platform (5174)
+const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173,http://localhost:5174';
 const isProduction = process.env.NODE_ENV === 'production';
+
+// Set default JWT secrets for development if not provided (must be at least 32 chars)
+// Must be set BEFORE validateConfig() is called
+if (!process.env.JWT_SECRET && !isProduction) {
+  process.env.JWT_SECRET = 'dev-secret-key-change-me-in-production-12345678';
+}
+if (!process.env.JWT_REFRESH_SECRET && !isProduction) {
+  process.env.JWT_REFRESH_SECRET = 'dev-refresh-secret-key-change-me-in-production-12345678';
+}
 
 // Economy configuration (basic feature flags / anti-abuse controls)
 const ECONOMY_MIN_PRICE: Record<string, number> = {
@@ -517,6 +536,9 @@ const routeDeps: RouteDependencies = {
   marketplaceItemIdParamSchema,
   validateQuery,
   
+  // Async handler wrapper (for routes that don't catch errors)
+  asyncHandler,
+  
   // Economy config
   ECONOMY_MIN_PRICE,
   ECONOMY_PRICE_CHANGE_COOLDOWN_SEC,
@@ -524,25 +546,98 @@ const routeDeps: RouteDependencies = {
   ECONOMY_PLATFORM_FEE_BPS,
 };
 
-// Register all route modules
-app.use(createAuthRoutes(routeDeps));
-app.use(createUsersRoutes(routeDeps));
-app.use(createMarketplaceRoutes(routeDeps));
-app.use(createFriendsRoutes(routeDeps));
-app.use(createMessagesRoutes(routeDeps));
-app.use(createShareRoutes(routeDeps));
-app.use(createNotificationsRoutes(routeDeps));
-app.use(createSettingsRoutes(routeDeps));
-app.use(createShopRoutes(routeDeps));
-app.use(createStudioRoutes(routeDeps));
-app.use(createForumRoutes(routeDeps));
-app.use(createAdminRoutes(routeDeps));
+// Register all route modules under /api prefix
+app.use('/api/auth', createAuthRoutes(routeDeps));
+app.use('/api/users', createUsersRoutes(routeDeps));
+app.use('/api/marketplace', createMarketplaceRoutes(routeDeps));
+app.use('/api/friends', createFriendsRoutes(routeDeps));
+app.use('/api/messages', createMessagesRoutes(routeDeps));
+app.use('/api/share', createShareRoutes(routeDeps));
+app.use('/api/notifications', createNotificationsRoutes(routeDeps));
+app.use('/api/settings', createSettingsRoutes(routeDeps));
+app.use('/api/shop', createShopRoutes(routeDeps));
+app.use('/api/studio', createStudioRoutes(routeDeps));
+app.use('/api/forum', createForumRoutes(routeDeps));
+app.use('/api/admin', createAdminRoutes(routeDeps));
 
 /**
  * Health check endpoint.
  */
 app.get('/health', (_req: Request, res: Response) => {
   res.json({ status: 'ok' });
+});
+
+/**
+ * Global error handler middleware (must be after all routes).
+ * Catches unhandled errors and returns proper error responses.
+ */
+app.use((err: unknown, _req: Request, res: Response, _next: express.NextFunction) => {
+  console.error('Unhandled error:', err);
+  
+  // Handle known error types
+  if (err instanceof ValidationError) {
+    return res.status(400).json({
+      error: 'Validation failed',
+      message: err.message,
+      errors: err.errors,
+    });
+  }
+
+  if (err instanceof BuildDataError) {
+    return res.status(400).json({
+      error: 'Build data error',
+      message: err.message,
+    });
+  }
+
+  if (err instanceof PayloadTooLargeError) {
+    return res.status(413).json({
+      error: 'Payload too large',
+      message: err.message,
+    });
+  }
+
+  if (err instanceof DatabaseError) {
+    return res.status(500).json({
+      error: 'Database error',
+      message: isProduction ? 'Database operation failed' : err.message,
+    });
+  }
+
+  // Handle JWT errors
+  if (err instanceof jwt.JsonWebTokenError) {
+    return res.status(401).json({
+      error: 'Invalid token',
+      message: 'Authentication token is invalid',
+    });
+  }
+
+  if (err instanceof jwt.TokenExpiredError) {
+    return res.status(401).json({
+      error: 'Token expired',
+      message: 'Authentication token has expired',
+    });
+  }
+
+  // Generic error handler
+  const message = err instanceof Error ? err.message : 'Internal server error';
+  const status = (err as { statusCode?: number })?.statusCode || 500;
+
+  res.status(status).json({
+    error: 'Internal server error',
+    message: isProduction && status === 500 ? 'An unexpected error occurred' : message,
+    ...(isProduction ? {} : { stack: err instanceof Error ? err.stack : undefined }),
+  });
+});
+
+/**
+ * 404 handler (must be after all routes and error handler).
+ */
+app.use((_req: Request, res: Response) => {
+  res.status(404).json({
+    error: 'Not found',
+    message: 'The requested resource was not found',
+  });
 });
 
 // Export app for testing

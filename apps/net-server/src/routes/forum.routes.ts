@@ -19,7 +19,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
   } = deps;
 
   // CATEGORIES
-  router.get('/api/forum/categories', async (_req: Request, res: Response) => {
+  router.get('/forum/categories', async (_req: Request, res: Response) => {
     try {
       const categories = await forumStorage.getCategories();
       res.json(categories);
@@ -32,7 +32,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.get('/api/forum/categories/:id', async (req: Request, res: Response) => {
+  router.get('/forum/categories/:id', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       if (!id) {
@@ -53,7 +53,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.post('/api/forum/categories', authMiddleware, requireAdmin(), async (req: AuthRequest, res: Response) => {
+  router.post('/forum/categories', authMiddleware, requireAdmin(), async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -86,7 +86,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
   });
 
   // THREADS
-  router.get('/api/forum/threads/:id', async (req: Request, res: Response) => {
+  router.get('/forum/threads/:id', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       if (!id) {
@@ -115,7 +115,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.post('/api/forum/threads', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.post('/forum/threads', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -153,7 +153,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.put('/api/forum/threads/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.put('/forum/threads/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -197,7 +197,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.delete('/api/forum/threads/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.delete('/forum/threads/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -237,7 +237,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
   });
 
   // POSTS
-  router.post('/api/forum/threads/:id/posts', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.post('/forum/threads/:id/posts', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -284,7 +284,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.put('/api/forum/posts/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.put('/forum/posts/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -336,7 +336,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.delete('/api/forum/posts/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.delete('/forum/posts/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -377,7 +377,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
   });
 
   // REACTIONS
-  router.post('/api/forum/threads/:id/reactions', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.post('/forum/threads/:id/reactions', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -426,7 +426,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.delete('/api/forum/threads/:id/reactions/:emoji', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.delete('/forum/threads/:id/reactions/:emoji', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -455,7 +455,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.post('/api/forum/posts/:id/reactions', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.post('/forum/posts/:id/reactions', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -500,7 +500,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.delete('/api/forum/posts/:id/reactions/:emoji', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.delete('/forum/posts/:id/reactions/:emoji', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -530,7 +530,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
   });
 
   // VOTES
-  router.post('/api/forum/threads/:id/vote', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.post('/forum/threads/:id/vote', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -561,7 +561,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.delete('/api/forum/threads/:id/vote', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.delete('/forum/threads/:id/vote', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -587,7 +587,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.post('/api/forum/posts/:id/vote', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.post('/forum/posts/:id/vote', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -618,7 +618,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.delete('/api/forum/posts/:id/vote', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.delete('/forum/posts/:id/vote', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -645,7 +645,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
   });
 
   // MODERATOR ACTIONS
-  router.post('/api/forum/threads/:id/pin', authMiddleware, requireModerator(), async (req: AuthRequest, res: Response) => {
+  router.post('/forum/threads/:id/pin', authMiddleware, requireModerator(), async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -672,7 +672,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.delete('/api/forum/threads/:id/pin', authMiddleware, requireModerator(), async (req: AuthRequest, res: Response) => {
+  router.delete('/forum/threads/:id/pin', authMiddleware, requireModerator(), async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -699,7 +699,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.post('/api/forum/threads/:id/lock', authMiddleware, requireModerator(), async (req: AuthRequest, res: Response) => {
+  router.post('/forum/threads/:id/lock', authMiddleware, requireModerator(), async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -726,7 +726,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.delete('/api/forum/threads/:id/lock', authMiddleware, requireModerator(), async (req: AuthRequest, res: Response) => {
+  router.delete('/forum/threads/:id/lock', authMiddleware, requireModerator(), async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
@@ -754,7 +754,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
   });
 
   // SEARCH & UTILITIES
-  router.get('/api/forum/search', async (req: Request, res: Response) => {
+  router.get('/forum/search', async (req: Request, res: Response) => {
     try {
       const query = req.query.q as string | undefined;
       
@@ -775,7 +775,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.get('/api/forum/preview-marketplace/:id', async (req: Request, res: Response) => {
+  router.get('/forum/preview-marketplace/:id', async (req: Request, res: Response) => {
     try {
       const { id } = req.params;
       if (!id || typeof id !== 'string') {
@@ -832,7 +832,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     }
   });
 
-  router.post('/api/forum/share-project', authMiddleware, async (req: AuthRequest, res: Response) => {
+  router.post('/forum/share-project', authMiddleware, async (req: AuthRequest, res: Response) => {
     try {
       if (!req.user) {
         return res.status(401).json({ error: 'Unauthorized' });
