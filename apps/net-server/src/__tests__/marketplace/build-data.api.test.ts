@@ -6,7 +6,6 @@ import { describe, it, expect } from 'vitest';
 import request from 'supertest';
 import { app, marketplaceStorage, buildStorage } from '../../server';
 import { createTestMarketplaceItem, createTestBuild, waitForItem } from '../helpers/testHelpers';
-import { createDbPool } from '../../lib/db';
 
 describe('GET /api/marketplace/:id/build', () => {
   // Use server's shared instances to ensure items are valid

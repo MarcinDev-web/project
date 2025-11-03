@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
-import { app, authManager, marketplaceStorage, buildStorage } from '../../server';
+import { app, authManager, marketplaceStorage, buildStorage, dbPool } from '../../server';
 import { createTestUser, createTestBuild } from '../helpers/testHelpers';
 import type { ProjectData } from '../../types';
 
@@ -123,7 +123,7 @@ describe('POST /api/marketplace', () => {
   });
 
   it('transaction rolls back if build data save fails', async () => {
-    if (!buildStorage || !dbPool || !(marketplaceStorage instanceof MarketplaceStorageDB)) {
+    if (!buildStorage || !dbPool) {
       return; // Skip if no database
     }
 

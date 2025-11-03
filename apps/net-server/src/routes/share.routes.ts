@@ -4,7 +4,6 @@ import type {
   ShareProjectRequest,
   ShareProjectResponse,
   ShareMetadataResponse,
-  ProjectData,
 } from '../types';
 
 /**

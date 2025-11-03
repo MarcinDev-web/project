@@ -647,7 +647,15 @@ app.use((_req: Request, res: Response) => {
 });
 
 // Export app and dependencies for testing
-export { app, authManager, marketplaceStorage, likesStorage, buildStorage, gameSessionTracker };
+export {
+  app,
+  authManager,
+  marketplaceStorage,
+  likesStorage,
+  buildStorage,
+  gameSessionTracker,
+  dbPool,
+};
 
 // Start server (only if not in test environment)
 if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {

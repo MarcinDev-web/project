@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
-import { app, authManager, marketplaceStorage, likesStorage } from '../../server';
+import { app, authManager, marketplaceStorage } from '../../server';
 import { createTestUser, createTestMarketplaceItem, getAuthHeader, waitForItem } from '../helpers/testHelpers';
 
 describe('Like API', () => {

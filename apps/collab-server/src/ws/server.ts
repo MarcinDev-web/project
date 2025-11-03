@@ -199,12 +199,19 @@ export function createWsServer(app: FastifyInstance, _pool: Pool): void {
 
     ws.on('message', (raw: RawData) => {
       try {
-        const text =
-          typeof raw === 'string'
-            ? raw
-            : Buffer.isBuffer(raw)
-              ? raw.toString('utf-8')
-              : Buffer.from(raw as ArrayLike<number>).toString('utf-8');
+        let text: string;
+        if (typeof raw === 'string') {
+          text = raw;
+        } else if (Buffer.isBuffer(raw)) {
+          text = raw.toString('utf-8');
+        } else if (Array.isArray(raw)) {
+          // Handle Buffer[] case
+          text = Buffer.concat(raw).toString('utf-8');
+        } else {
+          // Handle ArrayBuffer or ArrayBufferView
+          const buffer = raw as ArrayBuffer | ArrayBufferView;
+          text = Buffer.from(buffer as ArrayBuffer).toString('utf-8');
+        }
         const msg = JSON.parse(text) as WsMessage;
         handleMessage(ws, msg);
       } catch {
