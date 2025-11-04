@@ -6,10 +6,9 @@ async function loadPrismaConstructor(): Promise<new (args?: any) => any> {
   if (PrismaClientConstructor) {
     return PrismaClientConstructor as new (args?: any) => any;
   }
-  
+
   try {
     // Try custom output location first (from schema.prisma)
-    // @ts-expect-error - Prisma client is generated at build time
     const customModule = await import('../../node_modules/.prisma/collab-client');
     PrismaClientConstructor = customModule.PrismaClient as any;
     return PrismaClientConstructor as new (args?: any) => any;
@@ -17,8 +16,9 @@ async function loadPrismaConstructor(): Promise<new (args?: any) => any> {
     // Fallback to standard location
     const standardModule = await import('@prisma/client');
     // Handle both ESM and CJS formats
-    const PrismaClientClass = (standardModule as any).PrismaClient || (standardModule as any).default?.PrismaClient;
-    PrismaClientConstructor = PrismaClientClass as any;
+    const PrismaClientClass =
+      (standardModule as any).PrismaClient || (standardModule as any).default?.PrismaClient;
+    PrismaClientConstructor = PrismaClientClass;
     return PrismaClientConstructor as new (args?: any) => any;
   }
 }

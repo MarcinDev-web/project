@@ -1,6 +1,5 @@
 // Import Prisma Client - handle custom output path from schema.prisma
 // schema.prisma sets output to "../node_modules/.prisma/net-client"
-// @ts-expect-error - Prisma client is generated at build time
 import type { PrismaClient as PrismaClientType } from '../../node_modules/.prisma/net-client';
 
 let PrismaClientConstructor: (new (args?: any) => PrismaClientType) | null = null;
@@ -10,17 +9,18 @@ async function loadPrismaConstructor(): Promise<new (args?: any) => PrismaClient
   if (PrismaClientConstructor) {
     return PrismaClientConstructor;
   }
-  
+
   try {
     // Try custom output location first (from schema.prisma)
-    // @ts-expect-error - Prisma client is generated at build time
     const customModule = await import('../../node_modules/.prisma/net-client');
     PrismaClientConstructor = customModule.PrismaClient as new (args?: any) => PrismaClientType;
     return PrismaClientConstructor;
   } catch {
     // Fallback to standard location (should not happen, but keep for compatibility)
     const standardModule = await import('@prisma/client');
-    PrismaClientConstructor = (standardModule as any).PrismaClient as new (args?: any) => PrismaClientType;
+    PrismaClientConstructor = (standardModule as any).PrismaClient as new (
+      args?: any
+    ) => PrismaClientType;
     return PrismaClientConstructor;
   }
 }
@@ -57,7 +57,7 @@ export async function getPrismaClient(): Promise<PrismaClientType> {
         },
       },
       log: isProduction ? ['error', 'warn'] : ['query', 'error', 'warn'],
-    }) as PrismaClientType;
+    });
 
     // Test connection immediately
     try {

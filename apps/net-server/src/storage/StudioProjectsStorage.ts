@@ -3,7 +3,6 @@
  * Supports both PostgreSQL (preferred) and JSON file storage (fallback)
  */
 
-// @ts-expect-error - Prisma client is generated at build time
 import type { PrismaClient } from '../../node_modules/.prisma/net-client';
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -141,37 +140,47 @@ export class StudioProjectsStorageDB {
       ...(options?.offset && { skip: options.offset }),
     });
 
-    return projects.map((project: { id: string; userId: string; name: string; description: string | null; thumbnailUrl: string | null; projectData: Buffer; isPublished: boolean; createdAt: Date; updatedAt: Date; version: number }) => {
-      try {
-        const jsonData = project.projectData.toString('utf-8');
-        const projectData = JSON.parse(jsonData) as ProjectData;
-        const result: StudioProject = {
-          id: project.id,
-          userId: project.userId,
-          name: project.name,
-          projectData,
-          isPublished: project.isPublished,
-          createdAt: project.createdAt.getTime(),
-          updatedAt: project.updatedAt.getTime(),
-          version: project.version,
-        };
+    return projects.map(
+      (project: {
+        id: string;
+        userId: string;
+        name: string;
+        description: string | null;
+        thumbnailUrl: string | null;
+        projectData: Buffer;
+        isPublished: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+        version: number;
+      }) => {
+        try {
+          const jsonData = project.projectData.toString('utf-8');
+          const projectData = JSON.parse(jsonData) as ProjectData;
+          const result: StudioProject = {
+            id: project.id,
+            userId: project.userId,
+            name: project.name,
+            projectData,
+            isPublished: project.isPublished,
+            createdAt: project.createdAt.getTime(),
+            updatedAt: project.updatedAt.getTime(),
+            version: project.version,
+          };
 
-        if (project.description !== null) {
-          result.description = project.description;
-        }
-        if (project.thumbnailUrl !== null) {
-          result.thumbnailUrl = project.thumbnailUrl;
-        }
-        if (project.tags && project.tags.length > 0) {
-          result.tags = project.tags;
-        }
+          if (project.description !== null) {
+            result.description = project.description;
+          }
+          if (project.thumbnailUrl !== null) {
+            result.thumbnailUrl = project.thumbnailUrl;
+          }
 
-        return result;
-      } catch (error) {
-        console.error(`Failed to deserialize project ${project.id}:`, error);
-        throw new Error(`Invalid project data format for ${project.id}`);
+          return result;
+        } catch (error) {
+          console.error(`Failed to deserialize project ${project.id}:`, error);
+          throw new Error(`Invalid project data format for ${project.id}`);
+        }
       }
-    });
+    );
   }
 
   async updateProject(

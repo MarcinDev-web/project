@@ -2,9 +2,7 @@
  * Marketplace Storage DB - PostgreSQL implementation using Prisma
  */
 
-// @ts-expect-error - Prisma client is generated at build time
 import type { PrismaClient as PrismaClientType } from '../../node_modules/.prisma/net-client';
-// @ts-expect-error - Prisma client is generated at build time
 import { Prisma } from '../../node_modules/.prisma/net-client';
 import type { MarketplaceItem } from './MarketplaceStorage';
 
@@ -115,9 +113,7 @@ export class MarketplaceStorageDB {
             options.tags && options.tags.length > 0
               ? Prisma.sql`tags && ${options.tags}::text[]`
               : Prisma.empty,
-            options.public !== undefined
-              ? Prisma.sql`public = ${options.public}`
-              : Prisma.empty,
+            options.public !== undefined ? Prisma.sql`public = ${options.public}` : Prisma.empty,
             Prisma.sql`to_tsvector('english', title || ' ' || COALESCE(description, '') || ' ' || array_to_string(tags, ' ')) @@ to_tsquery('english', ${searchQuery})`,
           ])}
           ORDER BY ts_rank(
@@ -142,9 +138,9 @@ export class MarketplaceStorageDB {
           downloads: number;
           likes: number;
           public: boolean;
-          price_currency: string | null;
-          price_amount: number | null;
-          forum_thread_id: string | null;
+          price_currency?: string | null;
+          price_amount?: number | null;
+          forum_thread_id?: string | null;
         }>;
 
         return results.map((row) => this.mapRowToItem(row));
@@ -152,7 +148,9 @@ export class MarketplaceStorageDB {
     }
 
     // Build orderBy for Prisma
-    let orderBy: Prisma.MarketplaceItemOrderByWithRelationInput | Prisma.MarketplaceItemOrderByWithRelationInput[] = { createdAt: 'desc' };
+    let orderBy:
+      | Prisma.MarketplaceItemOrderByWithRelationInput
+      | Prisma.MarketplaceItemOrderByWithRelationInput[] = { createdAt: 'desc' };
     if (options.sortBy) {
       switch (options.sortBy) {
         case 'newest':
@@ -177,7 +175,9 @@ export class MarketplaceStorageDB {
       skip: offset,
     });
 
-    return items.map((item: Parameters<typeof this.mapPrismaToItem>[0]) => this.mapPrismaToItem(item));
+    return items.map((item: Parameters<typeof this.mapPrismaToItem>[0]) =>
+      this.mapPrismaToItem(item)
+    );
   }
 
   async updateItem(
@@ -286,7 +286,7 @@ export class MarketplaceStorageDB {
       data: {
         downloads: {
           increment: 1,
-        // updatedAt is handled automatically
+          // updatedAt is handled automatically
         },
       },
     });
