@@ -23,6 +23,8 @@ export { LightComponent, type LightType } from './components/LightComponent.js';
 export { MaterialComponent } from './components/MaterialComponent.js';
 export { MeshComponent } from './components/MeshComponent.js';
 export type { MeshKind, CustomMeshData } from './components/MeshComponent.js';
+export { LODComponent } from './components/LODComponent.js';
+export type { LODLevel } from './components/LODComponent.js';
 export { PhysicsComponent, RigidbodyType } from './components/PhysicsComponent.js';
 export { WaterComponent } from './components/WaterComponent.js';
 export type { WaterComponentJSON } from './components/WaterComponent.js';
@@ -48,6 +50,10 @@ export * from './utils/waterHelpers.js';
 
 // Export all other components
 export * from './components/index.js';
+
+// Spatial structures
+export { BVH } from './spatial/BVH';
+export type { BVHEntry } from './spatial/BVH';
 
 // Systems (selective to avoid duplicates)
 export { Raycaster, type Ray, type RaycastHit } from './systems/Raycaster.js';

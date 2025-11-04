@@ -123,6 +123,36 @@ export interface Renderer {
   supportsTextureCompression(): boolean;
   getFrameRenderer(): FrameRenderer;
   onGpuTimings(handler: (timings: { label: string; timeMs: number }[]) => void): void;
+  onCpuTimings(handler: (timings: {
+    cullingTime: number;
+    instanceUpdateTime: number;
+    totalCPUTime: number;
+  }) => void): void;
+  onShadowMetrics(handler: (metrics: readonly [number, number, number, number]) => void): void;
+  updateRenderSettings(settings: Partial<{
+    enableHDR: boolean;
+    enableBloom: boolean;
+    enableFXAA: boolean;
+    enableSSAO: boolean;
+    enableShadows: boolean;
+    enableForwardPlus: boolean;
+    enableScreenLOD: boolean;
+    shadowQuality: 'low' | 'med' | 'high' | 'ultra';
+    enableComputePrepass: boolean;
+    msaaSampleCount: 1 | 2 | 4;
+  }>): void;
+  getRenderSettings(): Readonly<{
+    enableHDR: boolean;
+    enableBloom: boolean;
+    enableFXAA: boolean;
+    enableSSAO: boolean;
+    enableShadows: boolean;
+    enableForwardPlus: boolean;
+    enableScreenLOD: boolean;
+    shadowQuality: 'low' | 'med' | 'high' | 'ultra';
+    enableComputePrepass: boolean;
+    msaaSampleCount: 1 | 2 | 4;
+  }>;
   [key: string]: unknown;
 }
 
@@ -167,16 +197,19 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
   const currentScene = options.scene ?? null;
   let currentCameraEntity = options.cameraEntity ?? null;
 
-  // Resolve render settings with defaults
-  const renderSettings = {
+  // Resolve render settings with defaults (mutable for runtime updates)
+  let renderSettings = {
     enableHDR: options.enableHDR !== false,
     enableBloom: options.enableBloom !== false,
     enableShadows: options.enableShadows !== false,
     enableSSAO: options.enableSSAO !== false,
+    enableFXAA: false,
+    enableForwardPlus: false,
+    enableScreenLOD: false,
     shadowQuality: (options.shadowQuality ?? 'med') as 'low' | 'med' | 'high' | 'ultra',
     enableComputePrepass: options.enableComputePrepass !== false,
     msaaSampleCount: (options.msaaSampleCount ?? MSAA_SAMPLE_COUNT) as 1 | 2 | 4,
-  } as const;
+  };
 
   // Initialize light manager for the scene
   const lightManager = currentScene ? new LightManager(currentScene) : null;
@@ -294,6 +327,12 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
   const renderAbortController = new AbortController();
   const renderAbortSignal = renderAbortController.signal;
   const gpuTimingListeners: Array<(timings: { label: string; timeMs: number }[]) => void> = [];
+  const cpuTimingListeners: Array<(timings: {
+    cullingTime: number;
+    instanceUpdateTime: number;
+    totalCPUTime: number;
+  }) => void> = [];
+  const shadowMetricsListeners: Array<(metrics: readonly [number, number, number, number]) => void> = [];
 
   let cleanedUp = false;
   
@@ -753,6 +792,9 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
           enableBloom: renderSettings.enableBloom,
           enableHDR: renderSettings.enableHDR,
           enableSSAO: renderSettings.enableSSAO,
+          enableFXAA: renderSettings.enableFXAA,
+          enableForwardPlus: renderSettings.enableForwardPlus,
+          enableScreenLOD: renderSettings.enableScreenLOD,
         },
         shadowQuality: renderSettings.shadowQuality,
         msaaSampleCount: renderSettings.msaaSampleCount,
@@ -767,6 +809,32 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
                     listener(timings);
                   } catch (err) {
                     Logger.warn('GPU timing listener failed', err);
+                  }
+                }
+              },
+            }
+          : {}),
+        ...(cpuTimingListeners.length
+          ? {
+              onCpuTimings: (timings) => {
+                for (const listener of cpuTimingListeners) {
+                  try {
+                    listener(timings);
+                  } catch (err) {
+                    Logger.warn('CPU timing listener failed', err);
+                  }
+                }
+              },
+            }
+          : {}),
+        ...(shadowMetricsListeners.length
+          ? {
+              onShadowMetrics: (metrics) => {
+                for (const listener of shadowMetricsListeners) {
+                  try {
+                    listener(metrics);
+                  } catch (err) {
+                    Logger.warn('Shadow metrics listener failed', err);
                   }
                 }
               },
@@ -930,6 +998,20 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
     onGpuTimings: (handler: (timings: { label: string; timeMs: number }[]) => void) => {
       gpuTimingListeners.push(handler);
     },
+    onCpuTimings: (handler: (timings: {
+      cullingTime: number;
+      instanceUpdateTime: number;
+      totalCPUTime: number;
+    }) => void) => {
+      cpuTimingListeners.push(handler);
+    },
+    onShadowMetrics: (handler: (metrics: readonly [number, number, number, number]) => void) => {
+      shadowMetricsListeners.push(handler);
+    },
+    updateRenderSettings: (settings: Partial<typeof renderSettings>) => {
+      renderSettings = { ...renderSettings, ...settings };
+    },
+    getRenderSettings: () => ({ ...renderSettings }),
   };
 }
 

@@ -31,6 +31,7 @@ import { UICanvasComponent } from '@engine/world/components/UICanvasComponent';
 import { UIElementComponent } from '@engine/world/components/UIElementComponent';
 import { TerrainPanel } from '../terrain/ui/TerrainPanel';
 import type { TerrainBuilderStudio } from '../terrain/TerrainBuilderStudio';
+import { RenderSettingsPanel } from './RenderSettingsPanel';
 
 export interface PanelVisibility {
   sidebar?: boolean;
@@ -63,6 +64,7 @@ export interface EditorPanelManagerConfig {
     isActive: () => boolean;
   } | null;
   getTerrainBuilderStudio?: () => TerrainBuilderStudio | null;
+  getRenderer?: () => import('@engine/gfx-webgpu').Renderer | null;
 }
 
 /**
@@ -83,6 +85,7 @@ export class EditorPanelManager {
   private vegetationPanel: VegetationPanel | null = null;
   private uiPanel: UIPanel | null = null;
   private terrainPanel: TerrainPanel | null = null;
+  private renderSettingsPanel: RenderSettingsPanel | null = null;
   private assetPalette: AssetPalette | null = null;
   private assetBrowserWrapper: { refresh: () => void } | null = null;
   private resizableSidebar: ResizableSidebar | null = null;
@@ -161,8 +164,29 @@ export class EditorPanelManager {
       updateSceneBuffers: this.config.updateSceneBuffers,
     });
 
-    // Create settings panel (placeholder for now)
-    const settingsPanel = this.createSettingsPanel();
+    // Create render settings panel
+    const renderSettingsContainer = document.createElement('div');
+    renderSettingsContainer.className = 'render-settings-container';
+    this.renderSettingsPanel = new RenderSettingsPanel({
+      state: this.config.state,
+      onSettingsChanged: (settings) => {
+        // Update renderer settings dynamically
+        const renderer = this.config.getRenderer?.();
+        if (renderer && typeof (renderer as any).updateRenderSettings === 'function') {
+          (renderer as any).updateRenderSettings({
+            enableHDR: settings.enableHDR,
+            enableBloom: settings.enableBloom,
+            enableFXAA: settings.enableFXAA,
+            enableSSAO: settings.enableSSAO,
+            enableShadows: settings.enableShadows,
+            enableForwardPlus: settings.enableForwardPlus,
+            enableScreenLOD: settings.enableScreenLOD,
+            shadowQuality: settings.shadowQuality,
+          });
+        }
+      },
+    });
+    this.renderSettingsPanel.mount(renderSettingsContainer);
 
     // Initialize Vegetation Panel
     this.vegetationPanel = new VegetationPanel({
@@ -347,6 +371,14 @@ export class EditorPanelManager {
       label: 'Settings',
       icon: 'settings',
       content: settingsPanel,
+    });
+
+    // Add render settings tab
+    this.sidebarTabs.addTab({
+      id: 'render-settings',
+      label: 'Render',
+      icon: 'image',
+      content: renderSettingsContainer,
     });
 
     // Remember containers for visibility control
@@ -619,6 +651,9 @@ export class EditorPanelManager {
 
     this.terrainPanel?.dispose();
     this.terrainPanel = null;
+
+    this.renderSettingsPanel?.dispose();
+    this.renderSettingsPanel = null;
 
     // Clear references to panels without dispose methods
     // (Their DOM elements will be removed when parent is cleared)

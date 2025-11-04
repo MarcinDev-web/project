@@ -53,7 +53,9 @@ export declare class CharacterControllerSystem {
      * - Jumping → "jump" animation
      * - Falling → "fall" animation
      * - Landing → "land" animation
+     *
+     * Public for testing purposes.
      */
-    private syncAnimation;
+    syncAnimation(controller: CharacterController): void;
 }
 //# sourceMappingURL=CharacterControllerSystem.d.ts.map

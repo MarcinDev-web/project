@@ -300,10 +300,30 @@ fn fs_main(
   // Flat normal (no normal mapping)
   let N = Ngeom;
 
-  // Ambient term
+  // PBR material parameters
   let metallic = clamp(materialParams.y, 0.0, 1.0);
   let roughness = clamp(materialParams.z, 0.0, 1.0);
-  let ambient = uniforms.ambientColor * uniforms.ambientIntensity * baseColor * (1.0 - metallic * 0.35);
+  
+  // Calculate F0 (base specular reflectance)
+  let F0 = mix(vec3<f32>(0.04, 0.04, 0.04), baseColor, metallic);
+  
+  // Image-Based Lighting (IBL)
+  // Diffuse irradiance (use environment cubemap directly for now, or generate irradiance map)
+  let NdotV = max(dot(N, V), 0.0);
+  let R = reflect(-V, N);
+  
+  // Sample environment cubemap for diffuse
+  let diffuseIBL = textureSample(prefilteredEnvTex, texSampler, N).rgb;
+  
+  // Specular IBL (prefiltered environment + BRDF LUT)
+  let prefilteredColor = textureSampleLevel(prefilteredEnvTex, texSampler, R, roughness * 10.0).rgb;
+  let brdf = textureSample(brdfLutTex, texSampler, vec2<f32>(NdotV, roughness)).xy;
+  let specularIBL = prefilteredColor * (F0 * brdf.x + brdf.y);
+  
+  // Combine diffuse and specular IBL
+  let kS = fresnel_schlick(max(dot(N, V), 0.0), F0);
+  let kD = (1.0 - kS) * (1.0 - metallic);
+  let ambient = (kD * diffuseIBL * baseColor + specularIBL) * uniforms.ambientIntensity;
 
   // Simple voxel tri-tone based on face orientation (top/side/bottom)
   let topMask = step(0.5, N.y);
@@ -311,10 +331,13 @@ fn fs_main(
   let sideMask = clamp(1.0 - topMask - bottomMask, 0.0, 1.0);
   let tone = topMask * 1.15 + sideMask * 0.95 + bottomMask * 0.80;
 
-  // Directional light - subtle Lambert only (keeps sense of sun without glare) with cascaded shadows
+  // Directional light - Full Cook-Torrance PBR with GGX
   let Ld = normalize(-uniforms.directionalLightDir);
-  let NdotL_dir = max(dot(N, Ld), 0.0);
-  // Compute linear view-space depth for cascade selection
+  let L = Ld;
+  let H = normalize(V + L);
+  let NdotL = max(dot(N, L), 0.0);
+  
+  // Compute shadows
   let viewPos = uniforms.viewMatrix * vec4<f32>(worldPos, 1.0);
   let linearDepth = -viewPos.z;
   let blendInfo = computeCascadeBlend(linearDepth, uniforms.cascadeSplits, uniforms.shadowExtraParams.x);
@@ -328,27 +351,55 @@ fn fs_main(
   let blendFactor = clamp(blendWeight, 0.0, 1.0);
   let neighborBlend = select(0.0, blendFactor, neighborValid);
   let shadowVal = mix(shadowBase, neighborShadow, neighborBlend);
-  var direct = lambert(baseColor) * uniforms.directionalLightColor * (NdotL_dir * 0.25) * shadowVal;
+  
+  // Cook-Torrance BRDF
+  let D = distribution_ggx(N, H, roughness);
+  let G = geometry_smith(N, V, L, roughness);
+  let F = fresnel_schlick(max(dot(H, V), 0.0), F0);
+  
+  let specular = (D * G * F) / max(4.0 * max(dot(N, V), 0.0) * NdotL, 1e-4);
+  let diffuse = lambert(baseColor) * (1.0 - metallic);
+  
+  let kS = F;
+  let kD = (1.0 - kS) * (1.0 - metallic);
+  
+  var direct = (kD * diffuse + kS * specular) * uniforms.directionalLightColor * NdotL * shadowVal;
 
-  // Point lights - Lambert only (also subtle)
+  // Point lights - Full Cook-Torrance PBR
   for (var i = 0u; i < uniforms.pointLightCount && i < MAX_POINT_LIGHTS; i++) {
     let Lpos = uniforms.pointLights[i].positionOrDirection;
     let toL = Lpos - worldPos;
     let dist = length(toL);
     if (dist <= uniforms.pointLights[i].range) {
       let L = toL / max(dist, 1e-4);
-      let attenuation = 1.0 / (1.0 + (dist * dist) / (uniforms.pointLights[i].range * uniforms.pointLights[i].range));
+      let H = normalize(V + L);
       let NdotL = max(dot(N, L), 0.0);
-      direct += lambert(baseColor) * uniforms.pointLights[i].color * (NdotL * mix(0.3, 0.5, metallic)) * attenuation;
+      let attenuation = 1.0 / (1.0 + (dist * dist) / (uniforms.pointLights[i].range * uniforms.pointLights[i].range));
+      
+      // Cook-Torrance BRDF
+      let D = distribution_ggx(N, H, roughness);
+      let G = geometry_smith(N, V, L, roughness);
+      let F = fresnel_schlick(max(dot(H, V), 0.0), F0);
+      
+      let specular = (D * G * F) / max(4.0 * max(dot(N, V), 0.0) * NdotL, 1e-4);
+      let diffuse = lambert(baseColor) * (1.0 - metallic);
+      
+      let kS = F;
+      let kD = (1.0 - kS) * (1.0 - metallic);
+      
+      direct += (kD * diffuse + kS * specular) * uniforms.pointLights[i].color * NdotL * attenuation;
     }
   }
 
-  // Apply vertex AO with moderate strength
+  // Apply vertex AO
   let ao = mix(1.0, clamp(vAO, 0.0, 1.0), 0.4);
 
-  var color = (ambient + direct) * tone * ao;
+  // Combine all lighting contributions
+  var color = (ambient * ao + direct) * tone;
   color += emissiveColor.rgb * emissiveColor.w;
-  color = clamp(color, vec3<f32>(0.0), vec3<f32>(1.0));
+  
+  // Ensure HDR values are preserved (for HDR pipeline)
+  color = max(color, vec3<f32>(0.0));
   let alpha = clamp(primaryColor.a, 0.0, 1.0);
   return vec4<f32>(color, alpha);
 }

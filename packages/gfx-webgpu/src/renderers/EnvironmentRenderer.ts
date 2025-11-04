@@ -1231,5 +1231,19 @@ ${ATMOSPHERIC_SCATTERING_FUNCTION}
 
     return result;
   }
+
+  /**
+   * Gets the BRDF LUT texture (if generated).
+   */
+  getBrdfLutTexture(): GPUTexture | null {
+    return this.brdfLut;
+  }
+
+  /**
+   * Gets the environment cubemap texture (if generated).
+   */
+  getEnvCubeTexture(): GPUTexture | null {
+    return this.envCube;
+  }
 }
 

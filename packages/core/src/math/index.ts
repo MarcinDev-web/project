@@ -985,3 +985,130 @@ export function quatSlerpOut(out: Quat, a: Quat, b: Quat, t: number): Quat {
   glmQuat.slerp(out as unknown as glmQuat, a as unknown as glmQuat, b as unknown as glmQuat, t);
   return out;
 }
+
+// ========== Frustum utilities ==========
+
+/**
+ * Frustum plane in Hessian normal form: n·p + d = 0
+ */
+export interface FrustumPlane {
+  /** Plane normal (nx, ny, nz) */
+  normal: Vec3;
+  /** Plane distance from origin */
+  d: number;
+}
+
+/**
+ * Extracts frustum planes from a view-projection matrix.
+ * @param out - Output array of 6 frustum planes (must have length >= 6)
+ * @param vp - View-projection matrix (column-major)
+ * @returns Array of 6 frustum planes [left, right, bottom, top, near, far]
+ */
+export function extractFrustumPlanes(out: FrustumPlane[], vp: Mat4): FrustumPlane[] {
+  assertMat4('vp', vp);
+  if (out.length < 6) {
+    throw new RangeError('out array must have length >= 6');
+  }
+
+  // Matrix is column-major
+  // Left: row3 + row0
+  const left = normalizeVec3Out(
+    [0, 0, 0],
+    [vp[3]! + vp[0]!, vp[7]! + vp[4]!, vp[11]! + vp[8]!]
+  );
+  const leftD = -(vp[15]! + vp[12]!);
+  const leftLen = Math.hypot(left[0], left[1], left[2]);
+  out[0] = {
+    normal: [left[0] / leftLen, left[1] / leftLen, left[2] / leftLen],
+    d: leftD / leftLen,
+  };
+
+  // Right: row3 - row0
+  const right = normalizeVec3Out(
+    [0, 0, 0],
+    [vp[3]! - vp[0]!, vp[7]! - vp[4]!, vp[11]! - vp[8]!]
+  );
+  const rightD = -(vp[15]! - vp[12]!);
+  const rightLen = Math.hypot(right[0], right[1], right[2]);
+  out[1] = {
+    normal: [right[0] / rightLen, right[1] / rightLen, right[2] / rightLen],
+    d: rightD / rightLen,
+  };
+
+  // Bottom: row3 + row1
+  const bottom = normalizeVec3Out(
+    [0, 0, 0],
+    [vp[3]! + vp[1]!, vp[7]! + vp[5]!, vp[11]! + vp[9]!]
+  );
+  const bottomD = -(vp[15]! + vp[13]!);
+  const bottomLen = Math.hypot(bottom[0], bottom[1], bottom[2]);
+  out[2] = {
+    normal: [bottom[0] / bottomLen, bottom[1] / bottomLen, bottom[2] / bottomLen],
+    d: bottomD / bottomLen,
+  };
+
+  // Top: row3 - row1
+  const top = normalizeVec3Out(
+    [0, 0, 0],
+    [vp[3]! - vp[1]!, vp[7]! - vp[5]!, vp[11]! - vp[9]!]
+  );
+  const topD = -(vp[15]! - vp[13]!);
+  const topLen = Math.hypot(top[0], top[1], top[2]);
+  out[3] = {
+    normal: [top[0] / topLen, top[1] / topLen, top[2] / topLen],
+    d: topD / topLen,
+  };
+
+  // Near: row3 + row2
+  const near = normalizeVec3Out(
+    [0, 0, 0],
+    [vp[3]! + vp[2]!, vp[7]! + vp[6]!, vp[11]! + vp[10]!]
+  );
+  const nearD = -(vp[15]! + vp[14]!);
+  const nearLen = Math.hypot(near[0], near[1], near[2]);
+  out[4] = {
+    normal: [near[0] / nearLen, near[1] / nearLen, near[2] / nearLen],
+    d: nearD / nearLen,
+  };
+
+  // Far: row3 - row2
+  const far = normalizeVec3Out(
+    [0, 0, 0],
+    [vp[3]! - vp[2]!, vp[7]! - vp[6]!, vp[11]! - vp[10]!]
+  );
+  const farD = -(vp[15]! - vp[14]!);
+  const farLen = Math.hypot(far[0], far[1], far[2]);
+  out[5] = {
+    normal: [far[0] / farLen, far[1] / farLen, far[2] / farLen],
+    d: farD / farLen,
+  };
+
+  return out;
+}
+
+/**
+ * Tests if an AABB intersects with a frustum plane.
+ * @param aabbMin - AABB minimum corner
+ * @param aabbMax - AABB maximum corner
+ * @param plane - Frustum plane
+ * @returns Positive distance if AABB is in front of plane, negative if behind
+ */
+export function frustumPlaneTestAABB(
+  aabbMin: Vec3,
+  aabbMax: Vec3,
+  plane: FrustumPlane
+): number {
+  assertVec3('aabbMin', aabbMin);
+  assertVec3('aabbMax', aabbMax);
+  const [nx, ny, nz] = plane.normal;
+  const [minX, minY, minZ] = aabbMin;
+  const [maxX, maxY, maxZ] = aabbMax;
+
+  // Find the AABB corner farthest in the positive normal direction
+  const px = nx >= 0 ? maxX : minX;
+  const py = ny >= 0 ? maxY : minY;
+  const pz = nz >= 0 ? maxZ : minZ;
+
+  // Distance from plane to farthest positive corner
+  return nx * px + ny * py + nz * pz + plane.d;
+}

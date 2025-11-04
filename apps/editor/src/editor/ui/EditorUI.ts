@@ -202,13 +202,23 @@ export class EditorUI {
       this.disposables.add(easyPlaceCleanup);
     }
 
-    // Hook renderer GPU timings if supported
+    // Hook renderer GPU and CPU timings if supported
     const renderer = this.config.getRenderer();
-    if (renderer && this.state?.capabilities.value?.features.timestampQuery) {
+    if (renderer) {
       try {
-        renderer.onGpuTimings((timings) => this.buildStats?.updateGpuTimings(timings));
+        if (this.state?.capabilities.value?.features.timestampQuery) {
+          renderer.onGpuTimings((timings) => this.buildStats?.updateGpuTimings(timings));
+        }
+        // CPU timings are always available (performance.now)
+        renderer.onCpuTimings((timings) => this.buildStats?.updateCpuTimings(timings));
+        // Shadow metrics (if available)
+        if (typeof (renderer as any).onShadowMetrics === 'function') {
+          (renderer as any).onShadowMetrics((metrics: readonly [number, number, number, number]) => {
+            this.buildStats?.updateShadowMetrics(metrics);
+          });
+        }
       } catch (err) {
-        console.warn('Failed to hook GPU timings', err);
+        console.warn('Failed to hook renderer timings', err);
       }
     }
   }
@@ -700,6 +710,7 @@ export class EditorUI {
           return null;
         }
       },
+      getRenderer: () => this.config.getRenderer(),
     });
     this.panelManager.mount(containers.sidebar, containers.inspector);
     this.disposables.add(() => this.panelManager?.dispose());

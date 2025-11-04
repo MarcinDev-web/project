@@ -22,7 +22,7 @@ export function registerSessionRoutes(app: FastifyInstance, prisma: any): void {
     try {
       const body = createSessionSchema.parse(req.body);
       const sessionId = body.sessionId ?? randomUUID();
-      
+
       // Create session and ensure membership in transaction
       await prisma.$transaction(async (tx: any) => {
         await tx.session.upsert({
@@ -34,7 +34,7 @@ export function registerSessionRoutes(app: FastifyInstance, prisma: any): void {
             createdBy: auth.userId,
           },
         });
-        
+
         // Ensure membership
         await tx.projectMember.upsert({
           where: {
@@ -51,7 +51,7 @@ export function registerSessionRoutes(app: FastifyInstance, prisma: any): void {
           },
         });
       });
-      
+
       return reply.send({ sessionId });
     } catch {
       return reply.status(400).send({ error: 'Invalid request' });
@@ -65,7 +65,7 @@ export function registerSessionRoutes(app: FastifyInstance, prisma: any): void {
       const body = saveSchema.parse(req.body);
       const snapshotId = randomUUID();
       const payloadBuffer = Buffer.from(JSON.stringify(body.payload), 'utf-8');
-      
+
       await prisma.sceneSnapshot.create({
         data: {
           id: snapshotId,
@@ -75,7 +75,7 @@ export function registerSessionRoutes(app: FastifyInstance, prisma: any): void {
           payload: payloadBuffer,
         },
       });
-      
+
       // Notify collaborators in session
       broadcastToSession(body.sessionId, {
         type: 'checkpoint:saved',
@@ -98,18 +98,16 @@ export function registerSessionRoutes(app: FastifyInstance, prisma: any): void {
       const q = req.query as { projectId?: string };
       const projectId = q.projectId ?? '';
       if (!projectId) return reply.status(400).send({ error: 'projectId required' });
-      
+
       const snapshot = await prisma.sceneSnapshot.findFirst({
         where: { projectId },
         orderBy: { createdAt: 'desc' },
         select: { payload: true },
       });
-      
+
       if (!snapshot) return reply.status(404).send({ error: 'Not found' });
-      
-      const payload = JSON.parse(
-        Buffer.from(snapshot.payload).toString('utf-8')
-      ) as unknown;
+
+      const payload = JSON.parse(Buffer.from(snapshot.payload).toString('utf-8')) as unknown;
       return reply.send({ payload });
     } catch {
       return reply.status(500).send({ error: 'Failed to load snapshot' });

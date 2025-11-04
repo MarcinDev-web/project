@@ -101,17 +101,47 @@ struct VSOut { @builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32> };
 @group(0) @binding(2) var lut3d : texture_3d<f32>;
 @group(0) @binding(3) var bloomTex : texture_2d<f32>;
 @group(0) @binding(4) var ssaoTex : texture_2d<f32>;
-@fragment fn fs_main(@location(0) v_uv:vec2<f32>) -> @location(0) vec4<f32> {
+
+// Dithering function (blue noise approximation)
+fn dither(uv: vec2<f32>) -> f32 {
+  let x = fract(uv.x * 37.0 + uv.y * 17.0);
+  let y = fract(uv.x * 19.0 + uv.y * 23.0);
+  return (x + y) * 0.5 - 0.5;
+}
+
+// ACES Filmic Tone Mapping (Reference Implementation)
+fn ACESFilm(x: vec3<f32>) -> vec3<f32> {
+  let a = 2.51;
+  let b = 0.03;
+  let c = 2.43;
+  let d = 0.59;
+  let e = 0.14;
+  return clamp((x * (a * x + b)) / (x * (c * x + d) + e), vec3<f32>(0.0), vec3<f32>(1.0));
+}
+
+@fragment fn fs_main(@builtin(position) pos: vec4<f32>, @location(0) v_uv:vec2<f32>) -> @location(0) vec4<f32> {
+  // Sample HDR color (FP16 format)
   var hdr = vec3<f32>(textureSample(srcTex, srcSmp, v_uv).xyz);
+  
+  // Add bloom (already in HDR)
   let bloom = vec3<f32>(textureSample(bloomTex, srcSmp, v_uv).xyz);
   hdr += bloom;
+  
   // Apply SSAO (multiply ambient occlusion)
   let ssao = textureSample(ssaoTex, srcSmp, v_uv).r;
-  hdr *= mix(1.0, ssao, 0.5); // Blend between no occlusion and full occlusion
-  let lutc = textureSampleLevel(lut3d, srcSmp, clamp(hdr, vec3(0.0), vec3(1.0)), 0.0).xyz;
-  let a=2.51; let b=0.03; let c=2.43; let d=0.59; let e=0.14;
-  let aces = clamp((lutc*(a*lutc+b))/(lutc*(c*lutc+d)+e), vec3(0.0), vec3(1.0));
-  return vec4<f32>(pow(aces, vec3(1.0/2.2)), 1.0);
+  hdr *= mix(1.0, ssao, 0.5);
+  
+  // Apply ACES tonemapping (handles HDR -> LDR conversion)
+  let aces = ACESFilm(hdr);
+  
+  // Gamma correction (sRGB)
+  let ldr = pow(aces, vec3<f32>(1.0/2.2));
+  
+  // Apply dithering to reduce banding (subtle)
+  let ditherValue = dither(pos.xy * 0.25) * 0.01;
+  let final = clamp(ldr + vec3<f32>(ditherValue), vec3<f32>(0.0), vec3<f32>(1.0));
+  
+  return vec4<f32>(final, 1.0);
 }
 `,
           }),

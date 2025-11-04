@@ -29,6 +29,9 @@ import { Logger } from '@engine/core/utils';
 import { CLEAR_COLOR, MSAA_SAMPLE_COUNT, TIMESTAMP_QUERY_COUNT, TIMESTAMP_BUFFER_SIZE, GPU_TIMESTAMP_PAIRS, TIMESTAMP_INDICES } from '../config';
 import { TonemapLutPass } from '../postprocess/TonemapLut';
 import { BloomPass } from '../postprocess/Bloom';
+import { FXAAPass } from '../postprocess/FXAAPass';
+import { ForwardPlus, type PointLight } from '../lighting/ForwardPlus';
+import { ScreenSpaceLOD } from './ScreenSpaceLOD';
 import { SSAOPass } from '../postprocess/SSAO';
 import { UniformManager } from './UniformManager';
 import { ShadowPass } from '../shadows/ShadowPass';
@@ -47,6 +50,11 @@ export interface FrameRenderContext {
   gridRenderer: { render?: (p: GPURenderPassEncoder, vp: Mat4) => void } | null;
   logicConnectionRenderer: LogicConnectionRenderer | null;
   onGpuTimings?: (timings: { label: string; timeMs: number }[]) => void;
+  onCpuTimings?: (timings: {
+    cullingTime: number;
+    instanceUpdateTime: number;
+    totalCPUTime: number;
+  }) => void;
   uniformManager: UniformManager;
   lightingData?: import('../lighting/LightManager').LightingData;
   onShadowMetrics?: (counts: readonly [number, number, number, number]) => void;
@@ -57,6 +65,9 @@ export interface FrameRenderContext {
     enableBloom?: boolean;
     enableHDR?: boolean; // reserved for HDR toggle path (later todo)
     enableSSAO?: boolean; // Screen Space Ambient Occlusion
+    enableFXAA?: boolean; // Fast Approximate Anti-Aliasing
+    enableForwardPlus?: boolean; // Forward+ tiled light culling
+    enableScreenLOD?: boolean; // Screen-space LOD selection
   };
   shadowQuality?: 'low' | 'med' | 'high' | 'ultra';
   msaaSampleCount?: number;
@@ -102,9 +113,14 @@ export class FrameRenderer {
   private ssaoTextureView: GPUTextureView | null = null;
   private tonemapPass: TonemapLutPass | null = null;
   private bloomPass: BloomPass | null = null;
+  private fxaaPass: FXAAPass | null = null;
   private ssaoPass: SSAOPass | null = null;
+  private forwardPlus: ForwardPlus | null = null;
+  private screenSpaceLOD: ScreenSpaceLOD | null = null;
   private shadowPass: ShadowPass | null = null;
   private normalRenderPass: NormalRenderPass | null = null;
+  private tonemapOutputTexture: GPUTexture | null = null;
+  private tonemapOutputView: GPUTextureView | null = null;
   // Depth resolve for converting multisampled depth to single-sampled
   private depthResolvePipeline: GPURenderPipeline | null = null;
   private depthResolveLayout: GPUBindGroupLayout | null = null;
@@ -140,8 +156,10 @@ export class FrameRenderer {
       this.normalTexture?.destroy();
       this.ssaoTexture?.destroy();
       this.resolvedDepthTexture?.destroy();
+      this.tonemapOutputTexture?.destroy();
       this.hdrColorView = null;
       this.bloomTextureView = null;
+      this.tonemapOutputView = null;
       this.normalTextureView = null;
       this.ssaoTextureView = null;
       this.resolvedDepthView = null;
@@ -271,16 +289,23 @@ export class FrameRenderer {
     }
 
     // Per-frame frustum culling and dynamic instance buffer updates (before shadow pass to avoid destroy-use hazards)
+    let cullingTime = 0;
+    let instanceUpdateTime = 0;
     if (scene) {
       try {
+        // Time culling
+        const cullStart = performance.now();
         const frustum = this.frustumCuller.extractFrustumFromVP(viewProjectionMatrix);
         const allEntities = scene.getActiveEntities();
         this.frustumCuller.cullEntitiesToArray(allEntities, frustum, this.visibleEntitiesCache);
+        cullingTime = performance.now() - cullStart;
         
         // Separate entities with custom geometry (meshData) from default geometry
         const { defaultGeometry, customGeometry } = this.instanceBuilder.separateCustomGeometry(this.visibleEntitiesCache);
         this.customGeometryEntitiesCache = customGeometry;
         
+        // Time instance update
+        const instanceStart = performance.now();
         // Build instance data only for default geometry entities
         const sceneData = this.instanceBuilder.build(defaultGeometry);
 
@@ -291,12 +316,55 @@ export class FrameRenderer {
           // Different count: reallocate
           this.reallocateInstanceBuffers(device, frameResources, sceneData);
         }
+        instanceUpdateTime = performance.now() - instanceStart;
         geometry = { ...geometry, ...sceneData };
         
         // Update geometry cache frame counter (for LRU)
         this.geometryCache.tick();
+
+        // Report CPU timings if callback provided
+        if (ctx.onCpuTimings) {
+          const totalCPUTime = cullingTime + instanceUpdateTime;
+          ctx.onCpuTimings({
+            cullingTime,
+            instanceUpdateTime,
+            totalCPUTime,
+          });
+        }
       } catch (err) {
         Logger.warn('Frustum culling/update failed:', err);
+      }
+    }
+
+    // Screen-space LOD selection (runs after instance buffer updates)
+    const enableScreenLOD = ctx.featureFlags?.enableScreenLOD !== false;
+    if (enableScreenLOD && scene && viewMatrix && projectionMatrix && geometry.instanceCount > 0) {
+      try {
+        if (!this.screenSpaceLOD) {
+          this.screenSpaceLOD = new ScreenSpaceLOD(device);
+        }
+        
+        // Extract instance positions and scales from geometry
+        const instancePositions = frameResources.instanceOffsetBuffer;
+        // Create scale buffer from instance data (scale is in instanceColorScale.w)
+        const instanceScales = this.extractInstanceScales(device, frameResources, geometry.instanceCount);
+        
+        // Perform LOD selection
+        const lodBuffer = this.screenSpaceLOD.selectLOD(
+          encoder,
+          viewProjectionMatrix,
+          eyePosition,
+          canvas.width,
+          canvas.height,
+          instancePositions,
+          instanceScales,
+          geometry.instanceCount
+        );
+        
+        // Store LOD buffer for use in rendering (can be bound as uniform or used to filter instances)
+        // This would be used to select which geometry to render per instance
+      } catch (err) {
+        Logger.warn('Screen-space LOD selection failed:', err);
       }
     }
 
@@ -334,6 +402,47 @@ export class FrameRenderer {
         }
       } catch (err) {
         Logger.warn('Shadow pass failed:', err);
+      }
+    }
+
+    // Forward+ light culling (runs before render pass)
+    const enableForwardPlus = ctx.featureFlags?.enableForwardPlus !== false;
+    if (enableForwardPlus && ctx.lightingData && viewMatrix && projectionMatrix) {
+      try {
+        if (!this.forwardPlus) {
+          this.forwardPlus = new ForwardPlus(device);
+        }
+        
+        // Extract point lights from lighting data
+        const pointLights: PointLight[] = [];
+        if (ctx.lightingData.pointLights) {
+          for (const light of ctx.lightingData.pointLights) {
+            if (light) {
+              pointLights.push({
+                position: light.position,
+                color: light.color,
+                range: light.range ?? 10.0,
+                intensity: light.intensity ?? 1.0,
+              });
+            }
+          }
+        }
+        
+        // Update lights and perform culling
+        if (pointLights.length > 0) {
+          this.forwardPlus.updateLights(pointLights);
+          this.forwardPlus.cullLights(
+            encoder,
+            viewProjectionMatrix,
+            viewMatrix,
+            eyePosition,
+            canvas.width,
+            canvas.height,
+            pointLights.length
+          );
+        }
+      } catch (err) {
+        Logger.warn('Forward+ light culling failed:', err);
       }
     }
 
@@ -704,17 +813,49 @@ export class FrameRenderer {
       );
     }
     // Tonemap pass with timestamps (only when HDR path is enabled)
+    // Create intermediate texture for FXAA if needed
+    const enableFXAA = ctx.featureFlags?.enableFXAA === true; // Default to false for FXAA
+    let tonemapOutputView: GPUTextureView | null = null;
+    let tonemapOutputTexture: GPUTexture | null = null;
+    
     if (enableHDR && hdrView && bloomView && this.tonemapPass) {
+      // If FXAA is enabled, render to intermediate texture first
+      if (enableFXAA) {
+        // Store texture reference for cleanup
+        if (!this.tonemapOutputTexture || 
+            this.tonemapOutputTexture.width !== canvas.width || 
+            this.tonemapOutputTexture.height !== canvas.height) {
+          try { this.tonemapOutputTexture?.destroy(); } catch {}
+          this.tonemapOutputTexture = device.createTexture({
+            label: 'tonemap-output',
+            size: { width: canvas.width, height: canvas.height, depthOrArrayLayers: 1 },
+            format: 'bgra8unorm',
+            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+          });
+          this.tonemapOutputView = this.tonemapOutputTexture.createView();
+        }
+        tonemapOutputTexture = this.tonemapOutputTexture;
+        tonemapOutputView = this.tonemapOutputView;
+      }
+      
       this.tonemapPass.render(
         encoder,
         hdrView,
         bloomView,
-        swapChainView,
+        enableFXAA ? (tonemapOutputView ?? swapChainView) : swapChainView,
         ssaoView, // Pass SSAO texture (can be null)
         frameResources.timestampQuerySet
           ? { querySet: frameResources.timestampQuerySet, begin: TIMESTAMP_INDICES.TONEMAP_BEGIN, end: TIMESTAMP_INDICES.TONEMAP_END }
           : undefined
       );
+    }
+    
+    // FXAA pass (after tonemap if enabled)
+    if (enableFXAA && tonemapOutputView && swapChainView && !this.fxaaPass) {
+      this.fxaaPass = new FXAAPass(device);
+    }
+    if (enableFXAA && tonemapOutputView && swapChainView && this.fxaaPass) {
+      this.fxaaPass.apply(encoder, tonemapOutputView, swapChainView);
     }
 
     // Frame end timestamp (after all passes; before resolve/copy)
@@ -814,6 +955,20 @@ export class FrameRenderer {
   }
 
   /**
+   * Extracts instance scales from instance color scale buffer.
+   * Scale is stored in instanceColorScale.w component.
+   */
+  private extractInstanceScales(device: GPUDevice, frameResources: FrameResources, instanceCount: number): GPUBuffer | null {
+    // For now, return null to use default scales (1.0) in ScreenSpaceLOD
+    // In a full implementation, you would:
+    // 1. Read the instanceColorScale buffer
+    // 2. Extract the w component (scale) for each instance
+    // 3. Create a new buffer with just the scales
+    // This is a performance optimization - avoiding the readback for now
+    return null; // Will use default scales in ScreenSpaceLOD
+  }
+
+  /**
    * Releases resources owned by the FrameRenderer
    */
   dispose(): void {
@@ -829,11 +984,18 @@ export class FrameRenderer {
     try { this.bloomTexture?.destroy(); } catch {}
     try { this.normalTexture?.destroy(); } catch {}
     try { this.ssaoTexture?.destroy(); } catch {}
+    try { this.resolvedDepthTexture?.destroy(); } catch {}
     try { this.ssaoPass?.dispose(); } catch {}
     try { this.normalRenderPass?.dispose(); } catch {}
+    try { this.forwardPlus?.dispose(); } catch {}
+    try { this.fxaaPass?.dispose(); } catch {}
+    try { this.screenSpaceLOD?.dispose(); } catch {}
     this.hdrColorTexture = null;
     this.bloomTexture = null;
     this.normalTexture = null;
+    this.forwardPlus = null;
+    this.fxaaPass = null;
+    this.screenSpaceLOD = null;
     this.ssaoTexture = null;
     this.ssaoPass = null;
     this.normalRenderPass = null;

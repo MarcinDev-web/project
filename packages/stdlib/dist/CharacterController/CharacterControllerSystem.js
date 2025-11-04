@@ -111,10 +111,11 @@ export class CharacterControllerSystem {
         const originCopy = [origin[0], origin[1], origin[2]];
         const cache = this.groundDetectionCache.get(controller);
         // Check cache if position hasn't changed significantly
+        // Note: Only use cache if character was NOT grounded last frame, to avoid issues with moving platforms
         if (cache) {
             const distance = distanceVec3(originCopy, cache.lastPosition);
-            if (distance < 0.01) {
-                // Use cached result
+            if (distance < 0.01 && !cache.lastIsGrounded) {
+                // Use cached result only if character was in air (not on potentially moving platform)
                 controller.isGrounded = cache.lastIsGrounded;
                 controller.groundNormal = [...cache.lastGroundNormal];
                 return;
@@ -169,6 +170,8 @@ export class CharacterControllerSystem {
      * - Jumping → "jump" animation
      * - Falling → "fall" animation
      * - Landing → "land" animation
+     *
+     * Public for testing purposes.
      */
     syncAnimation(controller) {
         if (!controller.entity)

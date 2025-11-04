@@ -59,8 +59,33 @@ export type {
 
 // Post-Processing & Environment
 export { BrdfLutPass } from './postprocess/BrdfLut';
+export { PrefilterEnvPass } from './postprocess/PrefilterEnv';
+export { BloomPass } from './postprocess/BloomPass';
+export { FXAAPass } from './postprocess/FXAAPass';
 export { EnvironmentRenderer } from './renderers/EnvironmentRenderer';
+
+// Lighting
+export { ForwardPlus } from './lighting/ForwardPlus';
+export type { PointLight } from './lighting/ForwardPlus';
 export { WaterRenderer } from './renderers/WaterRenderer';
 export { VegetationRenderer } from './renderers/VegetationRenderer';
 export type { VegetationRendererConfig } from './renderers/VegetationRenderer';
+
+// Benchmarking
+export { generateBenchmarkScene } from './core/BenchmarkScene';
+export type { BenchmarkConfig } from './core/BenchmarkScene';
+
+// Render Graph
+export { RenderGraph } from './renderer/RenderGraph';
+export type { RenderTexture, RenderPassNode } from './renderer/RenderGraph';
+
+// Pipeline Cache
+export { PipelineCache } from './pipeline/PipelineCache';
+
+// GPU Culling
+export { GPUFrustumCuller } from './core/GPUFrustumCuller';
+
+// Screen-Space LOD
+export { ScreenSpaceLOD } from './core/ScreenSpaceLOD';
+export type { LODSelection, LODLevelConfig } from './core/ScreenSpaceLOD';
 

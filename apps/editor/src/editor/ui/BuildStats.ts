@@ -35,6 +35,12 @@ export class BuildStats {
   private fps = 0;
   private frameTime = 0;
   private gpuTimings: { label: string; timeMs: number }[] = [];
+  private cpuTimings: {
+    cullingTime: number;
+    instanceUpdateTime: number;
+    totalCPUTime: number;
+  } = { cullingTime: 0, instanceUpdateTime: 0, totalCPUTime: 0 };
+  private shadowMetrics: readonly [number, number, number, number] | null = null;
   private capabilities: RendererCapabilities;
   
   private updateInterval: number | null = null;
@@ -140,6 +146,20 @@ export class BuildStats {
           <span class="build-stats-key">Frame Time</span>
           <span class="build-stats-value">${this.frameTime.toFixed(1)}ms</span>
         </div>
+        ${this.cpuTimings.totalCPUTime > 0 ? `
+          <div class="build-stats-item">
+            <span class="build-stats-key">CPU Total</span>
+            <span class="build-stats-value">${this.cpuTimings.totalCPUTime.toFixed(2)}ms</span>
+          </div>
+          <div class="build-stats-item">
+            <span class="build-stats-key">CPU Culling</span>
+            <span class="build-stats-value">${this.cpuTimings.cullingTime.toFixed(2)}ms</span>
+          </div>
+          <div class="build-stats-item">
+            <span class="build-stats-key">CPU Instance Update</span>
+            <span class="build-stats-value">${this.cpuTimings.instanceUpdateTime.toFixed(2)}ms</span>
+          </div>
+        ` : ''}
       </div>
 
       <div class="build-stats-section">
@@ -205,6 +225,28 @@ export class BuildStats {
         </div>
       `
         : ''}
+
+      ${this.shadowMetrics ? `
+        <div class="build-stats-section">
+          <div class="build-stats-label">Shadow Cascades</div>
+          <div class="build-stats-item">
+            <span class="build-stats-key">Cascade 0</span>
+            <span class="build-stats-value">${this.shadowMetrics[0]}</span>
+          </div>
+          <div class="build-stats-item">
+            <span class="build-stats-key">Cascade 1</span>
+            <span class="build-stats-value">${this.shadowMetrics[1]}</span>
+          </div>
+          <div class="build-stats-item">
+            <span class="build-stats-key">Cascade 2</span>
+            <span class="build-stats-value">${this.shadowMetrics[2]}</span>
+          </div>
+          <div class="build-stats-item">
+            <span class="build-stats-key">Cascade 3</span>
+            <span class="build-stats-value">${this.shadowMetrics[3]}</span>
+          </div>
+        </div>
+      ` : ''}
     `;
 
     this.container.innerHTML = html;
@@ -212,6 +254,26 @@ export class BuildStats {
 
   public updateGpuTimings(timings: { label: string; timeMs: number }[]): void {
     this.gpuTimings = timings;
+    this.updateUI();
+  }
+
+  /**
+   * Updates CPU timing metrics.
+   */
+  public updateCpuTimings(timings: {
+    cullingTime: number;
+    instanceUpdateTime: number;
+    totalCPUTime: number;
+  }): void {
+    this.cpuTimings = timings;
+    this.updateUI();
+  }
+
+  /**
+   * Updates shadow cascade metrics.
+   */
+  public updateShadowMetrics(metrics: readonly [number, number, number, number]): void {
+    this.shadowMetrics = metrics;
     this.updateUI();
   }
 
