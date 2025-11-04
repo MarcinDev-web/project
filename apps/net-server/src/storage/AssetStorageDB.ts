@@ -2,9 +2,7 @@
  * Asset Storage DB - PostgreSQL implementation using Prisma
  */
 
-// @ts-expect-error - Prisma client is generated at build time
 import type { PrismaClient as PrismaClientType } from '../../node_modules/.prisma/net-client';
-// @ts-expect-error - Prisma client is generated at build time
 import { Prisma } from '../../node_modules/.prisma/net-client';
 import type { Asset, AssetFilter, AssetMetadata } from './AssetStorage';
 
@@ -90,25 +88,30 @@ export class AssetStorageDB {
       skip: offset,
     });
 
-    return assets.map((asset: {
-      id: string;
-      name: string;
-      description: string | null;
-      type: string;
-      category: string | null;
-      priceCurrency: string;
-      priceAmount: Prisma.Decimal;
-      previewUrl: string | null;
-      fileUrl: string;
-      metadata: Prisma.JsonValue;
-      authorId: string;
-      available: boolean;
-      createdAt: Date;
-      updatedAt: Date;
-    }) => this.mapPrismaToAsset(asset));
+    return assets.map(
+      (asset: {
+        id: string;
+        name: string;
+        description: string | null;
+        type: string;
+        category: string | null;
+        priceCurrency: string;
+        priceAmount: Prisma.Decimal;
+        previewUrl: string | null;
+        fileUrl: string;
+        metadata: Prisma.JsonValue;
+        authorId: string;
+        available: boolean;
+        createdAt: Date;
+        updatedAt: Date;
+      }) => this.mapPrismaToAsset(asset)
+    );
   }
 
-  async updateAsset(id: string, updates: Partial<Omit<Asset, 'id' | 'createdAt'>>): Promise<Asset | null> {
+  async updateAsset(
+    id: string,
+    updates: Partial<Omit<Asset, 'id' | 'createdAt'>>
+  ): Promise<Asset | null> {
     const updateData: Prisma.ShopAssetUpdateInput = {};
 
     if (updates.name !== undefined) {

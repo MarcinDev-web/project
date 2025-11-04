@@ -1,30 +1,30 @@
-import { Router } from 'express';
-import type { Response } from 'express';
+import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { RouteDependencies } from './index';
-import type { AuthRequest } from '../auth/middleware';
 
 /**
- * Create settings routes
+ * Create settings routes for Fastify
  */
-export function createSettingsRoutes(deps: RouteDependencies): ReturnType<typeof Router> {
-  const router = Router();
-  const { authMiddleware, userSettingsStorage } = deps;
+export async function createSettingsRoutes(
+  app: FastifyInstance,
+  opts: { dependencies: RouteDependencies }
+): Promise<void> {
+  const { authMiddleware, userSettingsStorage } = opts.dependencies;
 
   /**
    * GET /api/settings
    * Get user settings.
    */
-  router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
+  app.get('/', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const settings = await userSettingsStorage.getSettings(req.user.id);
-      res.json(settings);
+      const settings = await userSettingsStorage.getSettings(request.user.id);
+      reply.send(settings);
     } catch (error) {
       console.error('Get settings error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to get settings',
         message: error instanceof Error ? error.message : String(error),
       });
@@ -35,37 +35,51 @@ export function createSettingsRoutes(deps: RouteDependencies): ReturnType<typeof
    * PUT /api/settings
    * Update user settings.
    */
-  router.put('/', authMiddleware, async (req: AuthRequest, res: Response) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
+  app.put(
+    '/',
+    {
+      preHandler: [authMiddleware],
+      schema: {
+        body: {
+          type: 'object',
+          properties: {
+            notificationPreferences: {
+              type: 'object',
+            },
+          },
+        },
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
+        }
 
-      const updates = req.body as {
-        notificationPreferences?: Partial<
-          import('../storage/UserSettingsStorage').NotificationPreferences
-        >;
-      };
-
-      // Convert Partial<NotificationPreferences> to proper format for updateSettings
-      const settingsUpdate: Partial<import('../storage/UserSettingsStorage').UserSettings> = {};
-      if (updates.notificationPreferences) {
-        settingsUpdate.notificationPreferences = {
-          ...(await userSettingsStorage.getSettings(req.user.id)).notificationPreferences,
-          ...updates.notificationPreferences,
+        const updates = request.body as {
+          notificationPreferences?: Partial<
+            import('../storage/UserSettingsStorage').NotificationPreferences
+          >;
         };
+
+        // Convert Partial<NotificationPreferences> to proper format for updateSettings
+        const settingsUpdate: Partial<import('../storage/UserSettingsStorage').UserSettings> = {};
+        if (updates.notificationPreferences) {
+          settingsUpdate.notificationPreferences = {
+            ...(await userSettingsStorage.getSettings(request.user.id)).notificationPreferences,
+            ...updates.notificationPreferences,
+          };
+        }
+
+        const settings = await userSettingsStorage.updateSettings(request.user.id, settingsUpdate);
+        reply.send(settings);
+      } catch (error) {
+        console.error('Update settings error:', error);
+        reply.code(500).send({
+          error: 'Failed to update settings',
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
-
-      const settings = await userSettingsStorage.updateSettings(req.user.id, settingsUpdate);
-      res.json(settings);
-    } catch (error) {
-      console.error('Update settings error:', error);
-      res.status(500).json({
-        error: 'Failed to update settings',
-        message: error instanceof Error ? error.message : String(error),
-      });
     }
-  });
-
-  return router;
+  );
 }

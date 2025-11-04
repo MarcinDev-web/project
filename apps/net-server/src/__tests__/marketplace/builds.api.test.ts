@@ -2,12 +2,14 @@
  * Integration tests for GET /api/marketplace/builds
  */
 
-import { describe, it, expect } from 'vitest';
-import request from 'supertest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { app, marketplaceStorage, gameSessionTracker } from '../../server';
 import { createTestMarketplaceItem, createMultipleTestItems, waitForItem } from '../helpers/testHelpers';
 
-describe.skip('GET /api/marketplace/builds', () => {
+describe('GET /api/marketplace/builds', () => {
+  beforeAll(async () => {
+    await app.ready();
+  });
   // Use server's shared marketplaceStorage to ensure items are valid
   // Note: gameSessionTracker is managed by the server
 
@@ -36,16 +38,19 @@ describe.skip('GET /api/marketplace/builds', () => {
       waitForItem(marketplaceStorage, item3.id),
     ]);
 
-    const response = await request(app)
-      .get('/api/marketplace/builds')
-      .expect(200);
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/marketplace/builds',
+    });
 
-    expect(response.body).toHaveProperty('items');
-    expect(response.body).toHaveProperty('total');
-    expect(response.body).toHaveProperty('page');
-    expect(response.body).toHaveProperty('pageSize');
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body).toHaveProperty('items');
+    expect(body).toHaveProperty('total');
+    expect(body).toHaveProperty('page');
+    expect(body).toHaveProperty('pageSize');
 
-    const builds = response.body.items;
+    const builds = body.items;
     expect(builds.length).toBeGreaterThanOrEqual(2);
     expect(builds.every((item: { type: string }) => item.type === 'build')).toBe(true);
   });
@@ -57,13 +62,16 @@ describe.skip('GET /api/marketplace/builds', () => {
       type: 'build',
     });
 
-    const response = await request(app)
-      .get('/api/marketplace/builds')
-      .query({ limit: 2 })
-      .expect(200);
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/marketplace/builds',
+      query: { limit: '2' },
+    });
 
-    expect(response.body.items.length).toBeLessThanOrEqual(2);
-    expect(response.body.pageSize).toBe(2);
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.items.length).toBeLessThanOrEqual(2);
+    expect(body.pageSize).toBe(2);
   });
 
   it('supports pagination with offset', async () => {
@@ -72,22 +80,30 @@ describe.skip('GET /api/marketplace/builds', () => {
       type: 'build',
     });
 
-    const firstPage = await request(app)
-      .get('/api/marketplace/builds')
-      .query({ limit: 2, offset: 0 })
-      .expect(200);
+    const firstPage = await app.inject({
+      method: 'GET',
+      url: '/api/marketplace/builds',
+      query: { limit: '2', offset: '0' },
+    });
 
-    const secondPage = await request(app)
-      .get('/api/marketplace/builds')
-      .query({ limit: 2, offset: 2 })
-      .expect(200);
+    expect(firstPage.statusCode).toBe(200);
+    const firstPageBody = JSON.parse(firstPage.body);
 
-    expect(firstPage.body.items.length).toBeLessThanOrEqual(2);
-    expect(secondPage.body.items.length).toBeLessThanOrEqual(2);
+    const secondPage = await app.inject({
+      method: 'GET',
+      url: '/api/marketplace/builds',
+      query: { limit: '2', offset: '2' },
+    });
+
+    expect(secondPage.statusCode).toBe(200);
+    const secondPageBody = JSON.parse(secondPage.body);
+
+    expect(firstPageBody.items.length).toBeLessThanOrEqual(2);
+    expect(secondPageBody.items.length).toBeLessThanOrEqual(2);
 
     // Items should be different
-    if (firstPage.body.items.length > 0 && secondPage.body.items.length > 0) {
-      expect(firstPage.body.items[0]?.id).not.toBe(secondPage.body.items[0]?.id);
+    if (firstPageBody.items.length > 0 && secondPageBody.items.length > 0) {
+      expect(firstPageBody.items[0]?.id).not.toBe(secondPageBody.items[0]?.id);
     }
   });
 
@@ -105,12 +121,15 @@ describe.skip('GET /api/marketplace/builds', () => {
       tags: ['puzzle', 'brain'],
     });
 
-    const response = await request(app)
-      .get('/api/marketplace/builds')
-      .query({ tags: 'building' })
-      .expect(200);
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/marketplace/builds',
+      query: { tags: 'building' },
+    });
 
-    expect(response.body.items.every((item: { tags: string[] }) => 
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.items.every((item: { tags: string[] }) => 
       item.tags.includes('building')
     )).toBe(true);
   });
@@ -127,12 +146,15 @@ describe.skip('GET /api/marketplace/builds', () => {
       title: 'Avatar Item',
     });
 
-    const response = await request(app)
-      .get('/api/marketplace/builds')
-      .query({ type: 'build' })
-      .expect(200);
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/marketplace/builds',
+      query: { type: 'build' },
+    });
 
-    expect(response.body.items.every((item: { type: string }) => 
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.items.every((item: { type: string }) => 
       item.type === 'build'
     )).toBe(true);
   });
@@ -148,11 +170,14 @@ describe.skip('GET /api/marketplace/builds', () => {
     gameSessionTracker.joinGame(item.id, 'player1');
     gameSessionTracker.joinGame(item.id, 'player2');
 
-    const response = await request(app)
-      .get('/api/marketplace/builds')
-      .expect(200);
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/marketplace/builds',
+    });
 
-    const foundItem = response.body.items.find((i: { id: string }) => i.id === item.id);
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    const foundItem = body.items.find((i: { id: string }) => i.id === item.id);
     expect(foundItem).toBeDefined();
     // Note: In real app, gameSessionTracker would be shared, but in tests it's separate
     // This test verifies the structure exists
@@ -160,31 +185,40 @@ describe.skip('GET /api/marketplace/builds', () => {
   });
 
   it('handles invalid limit parameter gracefully', async () => {
-    const response = await request(app)
-      .get('/api/marketplace/builds')
-      .query({ limit: 'invalid' })
-      .expect(200); // Should still work, using default
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/marketplace/builds',
+      query: { limit: 'invalid' },
+    });
 
-    expect(response.body.pageSize).toBeDefined();
+    expect(response.statusCode).toBe(200); // Should still work, using default
+    const body = JSON.parse(response.body);
+    expect(body.pageSize).toBeDefined();
   });
 
   it('handles invalid offset parameter gracefully', async () => {
-    const response = await request(app)
-      .get('/api/marketplace/builds')
-      .query({ offset: 'invalid' })
-      .expect(200); // Should still work, using default
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/marketplace/builds',
+      query: { offset: 'invalid' },
+    });
 
-    expect(response.body).toHaveProperty('items');
+    expect(response.statusCode).toBe(200); // Should still work, using default
+    const body = JSON.parse(response.body);
+    expect(body).toHaveProperty('items');
   });
 
   it('returns empty array when no builds exist', async () => {
-    const response = await request(app)
-      .get('/api/marketplace/builds')
-      .expect(200);
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/marketplace/builds',
+    });
 
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
     // May have items from other tests, but structure should be correct
-    expect(response.body).toHaveProperty('items');
-    expect(Array.isArray(response.body.items)).toBe(true);
+    expect(body).toHaveProperty('items');
+    expect(Array.isArray(body.items)).toBe(true);
   });
 });
 

@@ -4,7 +4,6 @@
 
 import { promises as fs } from 'fs';
 import path from 'path';
-// @ts-expect-error - Prisma client is generated at build time
 import type { PrismaClient } from '../../node_modules/.prisma/net-client';
 import type { MarketplaceStorage } from './MarketplaceStorage';
 
@@ -85,14 +84,16 @@ export class LikesStorage {
         update: {},
       });
       // Update like count in marketplace_items
-      await this.prisma.marketplaceItem.update({
-        where: { id: itemId },
-        data: {
-          likes: { increment: 1 },
-        },
-      }).catch(() => {
-        // Ignore if item doesn't exist
-      });
+      await this.prisma.marketplaceItem
+        .update({
+          where: { id: itemId },
+          data: {
+            likes: { increment: 1 },
+          },
+        })
+        .catch(() => {
+          // Ignore if item doesn't exist
+        });
     } else {
       // JSON file
       const likes = await this.readLikes();
@@ -102,7 +103,7 @@ export class LikesStorage {
       }
       likes[itemId].add(userId);
       await this.writeLikes(likes);
-      
+
       // Update like count in marketplace item (only if it wasn't already liked)
       if (!wasLiked && this.marketplaceStorage) {
         const item = await this.marketplaceStorage.getItem(itemId);
@@ -126,14 +127,16 @@ export class LikesStorage {
       });
       // Update like count if a like was actually removed
       if (deleted.count > 0) {
-        await this.prisma.marketplaceItem.update({
-          where: { id: itemId },
-          data: {
-            likes: { decrement: 1 },
-          },
-        }).catch(() => {
-          // Ignore if item doesn't exist
-        });
+        await this.prisma.marketplaceItem
+          .update({
+            where: { id: itemId },
+            data: {
+              likes: { decrement: 1 },
+            },
+          })
+          .catch(() => {
+            // Ignore if item doesn't exist
+          });
       }
     } else {
       // JSON file
@@ -146,7 +149,7 @@ export class LikesStorage {
         }
         await this.writeLikes(likes);
       }
-      
+
       // Update like count in marketplace item (only if it was actually liked)
       if (wasLiked && this.marketplaceStorage) {
         const item = await this.marketplaceStorage.getItem(itemId);

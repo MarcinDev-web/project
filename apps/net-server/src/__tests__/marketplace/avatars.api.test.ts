@@ -2,12 +2,14 @@
  * Integration tests for GET /api/marketplace/avatars
  */
 
-import { describe, it, expect } from 'vitest';
-import request from 'supertest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { app, marketplaceStorage } from '../../server';
 import { createTestMarketplaceItem, createMultipleTestItems, waitForItem } from '../helpers/testHelpers';
 
-describe.skip('GET /api/marketplace/avatars', () => {
+describe('GET /api/marketplace/avatars', () => {
+  beforeAll(async () => {
+    await app.ready();
+  });
   // Use server's shared marketplaceStorage to ensure items are valid
 
   it('returns list of avatars', async () => {
@@ -34,16 +36,19 @@ describe.skip('GET /api/marketplace/avatars', () => {
       waitForItem(marketplaceStorage, item3.id),
     ]);
 
-    const response = await request(app)
-      .get('/api/marketplace/avatars')
-      .expect(200);
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/marketplace/avatars',
+    });
 
-    expect(response.body).toHaveProperty('items');
-    expect(response.body).toHaveProperty('total');
-    expect(response.body).toHaveProperty('page');
-    expect(response.body).toHaveProperty('pageSize');
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body).toHaveProperty('items');
+    expect(body).toHaveProperty('total');
+    expect(body).toHaveProperty('page');
+    expect(body).toHaveProperty('pageSize');
 
-    const avatars = response.body.items;
+    const avatars = body.items;
     expect(avatars.length).toBeGreaterThanOrEqual(2);
     expect(avatars.every((item: { type: string }) => item.type === 'avatar')).toBe(true);
   });
@@ -54,13 +59,16 @@ describe.skip('GET /api/marketplace/avatars', () => {
       type: 'avatar',
     });
 
-    const response = await request(app)
-      .get('/api/marketplace/avatars')
-      .query({ limit: 2, offset: 0 })
-      .expect(200);
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/marketplace/avatars',
+      query: { limit: '2', offset: '0' },
+    });
 
-    expect(response.body.items.length).toBeLessThanOrEqual(2);
-    expect(response.body.pageSize).toBe(2);
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.items.length).toBeLessThanOrEqual(2);
+    expect(body.pageSize).toBe(2);
   });
 
   it('returns playersOnline count (should be 0 for avatars)', async () => {
@@ -73,11 +81,14 @@ describe.skip('GET /api/marketplace/avatars', () => {
     // Wait for item to be available (handles database transaction timing)
     await waitForItem(marketplaceStorage, item.id);
 
-    const response = await request(app)
-      .get('/api/marketplace/avatars')
-      .expect(200);
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/marketplace/avatars',
+    });
 
-    const foundItem = response.body.items.find((i: { id: string }) => i.id === item.id);
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    const foundItem = body.items.find((i: { id: string }) => i.id === item.id);
     expect(foundItem).toBeDefined();
     expect(foundItem).toHaveProperty('playersOnline');
   });

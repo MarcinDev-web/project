@@ -5,7 +5,6 @@ import { UserStorage } from './UserStorage';
 import { TokenBlacklistService } from './TokenBlacklistService';
 import { securityLogger } from '../logging/SecurityLogger';
 import type { User, PublicUser, Session, JWTPayload, AuthResponse } from '../types/auth';
-// @ts-expect-error - Prisma client is generated at build time
 import type { PrismaClient } from '../../node_modules/.prisma/net-client';
 
 // Validate JWT_SECRET in production

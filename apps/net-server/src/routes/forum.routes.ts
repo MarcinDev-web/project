@@ -1,12 +1,13 @@
-import { Router, type Request, type Response } from 'express';
+import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { RouteDependencies } from './index';
-import type { AuthRequest } from '../auth/middleware';
 
 /**
- * Create forum routes
+ * Create forum routes for Fastify
  */
-export function createForumRoutes(deps: RouteDependencies): Router {
-  const router = Router();
+export async function createForumRoutes(
+  app: FastifyInstance,
+  opts: { dependencies: RouteDependencies }
+): Promise<void> {
   const {
     authMiddleware,
     requireAdmin,
@@ -16,60 +17,96 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     marketplaceStorage,
     storage,
     getUserIdFromToken,
-  } = deps;
+  } = opts.dependencies;
 
   // CATEGORIES
-  router.get('/categories', async (_req: Request, res: Response) => {
+  app.get('/categories', async (_request: FastifyRequest, reply: FastifyReply) => {
     try {
       const categories = await forumStorage.getCategories();
-      res.json(categories);
+      reply.send(categories);
     } catch (error) {
       console.error('Get categories error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to get categories',
         message: error instanceof Error ? error.message : String(error),
       });
     }
   });
 
-  router.get('/categories/:id', async (req: Request, res: Response) => {
-    try {
-      const { id } = req.params;
-      if (!id) {
-        return res.status(400).json({ error: 'Category ID required' });
-      }
+  app.get(
+    '/categories/:id',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: { type: 'string' },
+          },
+        },
+        querystring: {
+          type: 'object',
+          properties: {
+            sort: { type: 'string', enum: ['hot', 'new', 'top'] },
+          },
+        },
+      },
+    },
+    async (request: FastifyRequest<{ Params: { id: string }; Querystring: { sort?: 'hot' | 'new' | 'top' } }>, reply: FastifyReply) => {
+      try {
+        const { id } = request.params;
       const category = await forumStorage.getCategory(id);
       if (!category) {
-        return res.status(404).json({ error: 'Category not found' });
+          return reply.code(404).send({ error: 'Category not found' });
       }
-      const threads = await forumStorage.getThreads(
-        id,
-        (req.query.sort as 'hot' | 'new' | 'top') || 'hot'
-      );
-      res.json({ category, threads });
+        const threads = await forumStorage.getThreads(id, request.query.sort || 'hot');
+        reply.send({ category, threads });
     } catch (error) {
       console.error('Get category error:', error);
-      res.status(500).json({
+        reply.code(500).send({
         error: 'Failed to get category',
         message: error instanceof Error ? error.message : String(error),
       });
     }
-  });
+    }
+  );
 
-  router.post(
+  app.post(
     '/categories',
-    authMiddleware,
-    requireAdmin(),
-    async (req: AuthRequest, res: Response) => {
+    {
+      preHandler: [authMiddleware, requireAdmin()],
+      schema: {
+        body: {
+          type: 'object',
+          required: ['name'],
+          properties: {
+            name: { type: 'string' },
+            description: { type: 'string' },
+            icon: { type: 'string' },
+            color: { type: 'string' },
+            order: { type: 'number' },
+            isLocked: { type: 'boolean' },
+          },
+        },
+      },
+    },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { name, description, icon, color, order, isLocked } = req.body;
+        const { name, description, icon, color, order, isLocked } = request.body as {
+          name: string;
+          description?: string;
+          icon?: string;
+          color?: string;
+          order?: number;
+          isLocked?: boolean;
+        };
 
         if (!name || typeof name !== 'string') {
-          return res.status(400).json({ error: 'Category name is required' });
+          return reply.code(400).send({ error: 'Category name is required' });
         }
 
         const category = await forumStorage.createCategory({
@@ -82,10 +119,10 @@ export function createForumRoutes(deps: RouteDependencies): Router {
           isLocked: isLocked || false,
         });
 
-        res.status(201).json(category);
+        reply.code(201).send(category);
       } catch (error) {
         console.error('Create category error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to create category',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -94,56 +131,78 @@ export function createForumRoutes(deps: RouteDependencies): Router {
   );
 
   // THREADS
-  router.get('/threads/:id', async (req: Request, res: Response) => {
-    try {
-      const { id } = req.params;
-      if (!id) {
-        return res.status(400).json({ error: 'Thread ID required' });
-      }
+  app.get(
+    '/threads/:id',
+    {
+      schema: {
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: { type: 'string' },
+          },
+        },
+        querystring: {
+          type: 'object',
+          properties: {
+            sort: { type: 'string', enum: ['new', 'top'] },
+          },
+        },
+      },
+    },
+    async (request: FastifyRequest<{ Params: { id: string }; Querystring: { sort?: 'new' | 'top' } }>, reply: FastifyReply) => {
+      try {
+        const { id } = request.params;
       const thread = await forumStorage.getThread(id);
       if (!thread) {
-        return res.status(404).json({ error: 'Thread not found' });
+          return reply.code(404).send({ error: 'Thread not found' });
       }
-      const sortBy = (req.query.sort as 'new' | 'top') || 'new';
+        const sortBy = request.query.sort || 'new';
       const posts = await forumStorage.getPosts(id, sortBy);
 
-      const userId = await getUserIdFromToken(req.headers.authorization);
+        const userId = await getUserIdFromToken(request.headers.authorization);
       let userVote: 'up' | 'down' | null = null;
       if (userId) {
         userVote = await forumStorage.getThreadVote(id, userId);
       }
 
-      res.json({ thread, posts, userVote });
+        reply.send({ thread, posts, userVote });
     } catch (error) {
       console.error('Get thread error:', error);
-      res.status(500).json({
+        reply.code(500).send({
         error: 'Failed to get thread',
         message: error instanceof Error ? error.message : String(error),
       });
     }
-  });
+    }
+  );
 
-  router.post('/threads', authMiddleware, async (req: AuthRequest, res: Response) => {
+  app.post('/threads', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const { categoryId, title, content, tags } = req.body;
+      const { categoryId, title, content, tags } = request.body as {
+        categoryId: string;
+        title: string;
+        content: string;
+        tags?: string[];
+      };
 
       if (!categoryId || typeof categoryId !== 'string') {
-        return res.status(400).json({ error: 'Category ID is required' });
+        return reply.code(400).send({ error: 'Category ID is required' });
       }
       if (!title || typeof title !== 'string' || title.trim().length === 0) {
-        return res.status(400).json({ error: 'Thread title is required' });
+        return reply.code(400).send({ error: 'Thread title is required' });
       }
       if (!content || typeof content !== 'string' || content.trim().length === 0) {
-        return res.status(400).json({ error: 'Thread content is required' });
+        return reply.code(400).send({ error: 'Thread content is required' });
       }
 
       const thread = await forumStorage.createThread({
         categoryId,
-        authorId: req.user.id,
+        authorId: request.user.id,
         title: title.trim(),
         content: content.trim(),
         isPinned: false,
@@ -151,36 +210,36 @@ export function createForumRoutes(deps: RouteDependencies): Router {
         tags: Array.isArray(tags) ? tags : [],
       });
 
-      res.status(201).json(thread);
+      reply.code(201).send(thread);
     } catch (error) {
       console.error('Create thread error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to create thread',
         message: error instanceof Error ? error.message : String(error),
       });
     }
   });
 
-  router.put('/threads/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  app.put('/threads/:id', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const { id } = req.params;
+      const { id } = request.params;
       if (!id) {
-        return res.status(400).json({ error: 'Thread ID required' });
+        return reply.code(400).send({ error: 'Thread ID required' });
       }
-      const { title, content, tags } = req.body;
+      const { title, content, tags } = request.body;
 
       const thread = await forumStorage.getThread(id);
       if (!thread) {
-        return res.status(404).json({ error: 'Thread not found' });
+        return reply.code(404).send({ error: 'Thread not found' });
       }
 
-      const isModerator = req.user.role === 'admin' || req.user.role === 'moderator';
-      if (thread.authorId !== req.user.id && !isModerator) {
-        return res.status(403).json({ error: 'Forbidden' });
+      const isModerator = request.user.role === 'admin' || request.user.role === 'moderator';
+      if (thread.authorId !== request.user.id && !isModerator) {
+        return reply.code(403).send({ error: 'Forbidden' });
       }
 
       const updates: Partial<typeof thread> = {};
@@ -188,56 +247,56 @@ export function createForumRoutes(deps: RouteDependencies): Router {
       if (content !== undefined) updates.content = content.trim();
       if (tags !== undefined) updates.tags = Array.isArray(tags) ? tags : [];
 
-      const updated = await forumStorage.updateThread(id, updates, req.user.id);
+      const updated = await forumStorage.updateThread(id, updates, request.user.id);
       if (!updated) {
-        return res.status(404).json({ error: 'Thread not found' });
+        return reply.code(404).send({ error: 'Thread not found' });
       }
 
-      await forumHandler.handleThreadUpdated(updated, req.user.id);
+      await forumHandler.handleThreadUpdated(updated, request.user.id);
 
-      res.json(updated);
+      reply.send(updated);
     } catch (error) {
       console.error('Update thread error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to update thread',
         message: error instanceof Error ? error.message : String(error),
       });
     }
   });
 
-  router.delete('/threads/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  app.delete('/threads/:id', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const { id } = req.params;
+      const { id } = request.params;
       if (!id) {
-        return res.status(400).json({ error: 'Thread ID required' });
+        return reply.code(400).send({ error: 'Thread ID required' });
       }
       const thread = await forumStorage.getThread(id);
       if (!thread) {
-        return res.status(404).json({ error: 'Thread not found' });
+        return reply.code(404).send({ error: 'Thread not found' });
       }
 
-      const isModerator = req.user.role === 'admin' || req.user.role === 'moderator';
-      if (thread.authorId !== req.user.id && !isModerator) {
-        return res.status(403).json({ error: 'Forbidden' });
+      const isModerator = request.user.role === 'admin' || request.user.role === 'moderator';
+      if (thread.authorId !== request.user.id && !isModerator) {
+        return reply.code(403).send({ error: 'Forbidden' });
       }
 
-      const deleted = await forumStorage.deleteThread(id, req.user.id, isModerator);
+      const deleted = await forumStorage.deleteThread(id, request.user.id, isModerator);
       if (!deleted) {
-        return res.status(404).json({ error: 'Thread not found' });
+        return reply.code(404).send({ error: 'Thread not found' });
       }
 
       if (thread.categoryId) {
         await forumHandler.handleThreadDeleted(id, thread.categoryId);
       }
 
-      res.status(204).send();
+      reply.code(204).send();
     } catch (error) {
       console.error('Delete thread error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to delete thread',
         message: error instanceof Error ? error.message : String(error),
       });
@@ -245,81 +304,77 @@ export function createForumRoutes(deps: RouteDependencies): Router {
   });
 
   // POSTS
-  router.post(
-    '/threads/:id/posts',
-    authMiddleware,
-    async (req: AuthRequest, res: Response) => {
-      try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const { id: threadId } = req.params;
-        if (!threadId) {
-          return res.status(400).json({ error: 'Thread ID required' });
-        }
-        const { content } = req.body;
-
-        if (!content || typeof content !== 'string' || content.trim().length === 0) {
-          return res.status(400).json({ error: 'Post content is required' });
-        }
-
-        const mentionPattern = /@(\w+)/g;
-        const mentions: string[] = [];
-        let match;
-        while ((match = mentionPattern.exec(content)) !== null) {
-          if (match[1]) {
-            mentions.push(match[1]);
-          }
-        }
-
-        const post = await forumStorage.createPost({
-          threadId,
-          authorId: req.user.id,
-          content: content.trim(),
-          reactions: [],
-          mentions: mentions,
-          createdAt: Date.now(),
-        });
-
-        await forumHandler.handlePostCreated(post, threadId, req.user.id);
-
-        res.status(201).json(post);
-      } catch (error) {
-        console.error('Create post error:', error);
-        const status = error instanceof Error && error.message.includes('locked') ? 403 : 500;
-        res.status(status).json({
-          error: 'Failed to create post',
-          message: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-  );
-
-  router.put('/posts/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  app.post('/threads/:id/posts', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const { id } = req.params;
-      if (!id) {
-        return res.status(400).json({ error: 'Post ID required' });
+      const { id: threadId } = request.params;
+      if (!threadId) {
+        return reply.code(400).send({ error: 'Thread ID required' });
       }
-      const { content } = req.body;
+      const { content } = request.body;
+
+      if (!content || typeof content !== 'string' || content.trim().length === 0) {
+        return reply.code(400).send({ error: 'Post content is required' });
+      }
+
+      const mentionPattern = /@(\w+)/g;
+      const mentions: string[] = [];
+      let match;
+      while ((match = mentionPattern.exec(content)) !== null) {
+        if (match[1]) {
+          mentions.push(match[1]);
+        }
+      }
+
+      const post = await forumStorage.createPost({
+        threadId,
+        authorId: request.user.id,
+        content: content.trim(),
+        reactions: [],
+        mentions: mentions,
+        createdAt: Date.now(),
+      });
+
+      await forumHandler.handlePostCreated(post, threadId, request.user.id);
+
+      reply.code(201).send(post);
+    } catch (error) {
+      console.error('Create post error:', error);
+      const status = error instanceof Error && error.message.includes('locked') ? 403 : 500;
+      res.status(status).json({
+        error: 'Failed to create post',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  app.put('/posts/:id', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
+      }
+
+      const { id } = request.params;
+      if (!id) {
+        return reply.code(400).send({ error: 'Post ID required' });
+      }
+      const { content } = request.body;
 
       const post = await forumStorage.getPost(id);
       if (!post) {
-        return res.status(404).json({ error: 'Post not found' });
+        return reply.code(404).send({ error: 'Post not found' });
       }
 
-      const isModerator = req.user.role === 'admin' || req.user.role === 'moderator';
-      if (post.authorId !== req.user.id && !isModerator) {
-        return res.status(403).json({ error: 'Forbidden' });
+      const isModerator = request.user.role === 'admin' || request.user.role === 'moderator';
+      if (post.authorId !== request.user.id && !isModerator) {
+        return reply.code(403).send({ error: 'Forbidden' });
       }
 
       if (!content || typeof content !== 'string' || content.trim().length === 0) {
-        return res.status(400).json({ error: 'Post content is required' });
+        return reply.code(400).send({ error: 'Post content is required' });
       }
 
       const mentionPattern = /@(\w+)/g;
@@ -334,58 +389,58 @@ export function createForumRoutes(deps: RouteDependencies): Router {
       const updated = await forumStorage.updatePost(
         id,
         { content: content.trim(), mentions },
-        req.user.id
+        request.user.id
       );
       if (!updated) {
-        return res.status(404).json({ error: 'Post not found' });
+        return reply.code(404).send({ error: 'Post not found' });
       }
 
-      await forumHandler.handlePostUpdated(updated, updated.threadId, req.user.id);
+      await forumHandler.handlePostUpdated(updated, updated.threadId, request.user.id);
 
-      res.json(updated);
+      reply.send(updated);
     } catch (error) {
       console.error('Update post error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to update post',
         message: error instanceof Error ? error.message : String(error),
       });
     }
   });
 
-  router.delete('/posts/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  app.delete('/posts/:id', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const { id } = req.params;
+      const { id } = request.params;
       if (!id) {
-        return res.status(400).json({ error: 'Missing id parameter' });
+        return reply.code(400).send({ error: 'Missing id parameter' });
       }
       const post = await forumStorage.getPost(id);
       if (!post) {
-        return res.status(404).json({ error: 'Post not found' });
+        return reply.code(404).send({ error: 'Post not found' });
       }
 
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
-      const isModerator = req.user.role === 'admin' || req.user.role === 'moderator';
-      if (post.authorId !== req.user.id && !isModerator) {
-        return res.status(403).json({ error: 'Forbidden' });
+      const isModerator = request.user.role === 'admin' || request.user.role === 'moderator';
+      if (post.authorId !== request.user.id && !isModerator) {
+        return reply.code(403).send({ error: 'Forbidden' });
       }
 
-      const deleted = await forumStorage.deletePost(id, req.user.id, isModerator);
+      const deleted = await forumStorage.deletePost(id, request.user.id, isModerator);
       if (!deleted) {
-        return res.status(404).json({ error: 'Post not found' });
+        return reply.code(404).send({ error: 'Post not found' });
       }
 
       await forumHandler.handlePostDeleted(id, post.threadId);
 
-      res.status(204).send();
+      reply.code(204).send();
     } catch (error) {
       console.error('Delete post error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to delete post',
         message: error instanceof Error ? error.message : String(error),
       });
@@ -393,87 +448,83 @@ export function createForumRoutes(deps: RouteDependencies): Router {
   });
 
   // REACTIONS
-  router.post(
-    '/threads/:id/reactions',
-    authMiddleware,
-    async (req: AuthRequest, res: Response) => {
-      try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const { id } = req.params;
-        const { emoji } = req.body;
-
-        if (!emoji || typeof emoji !== 'string') {
-          return res.status(400).json({ error: 'Emoji is required' });
-        }
-
-        if (!id || typeof id !== 'string') {
-          return res.status(400).json({ error: 'Thread ID is required' });
-        }
-
-        const thread = await forumStorage.getThread(id);
-        if (!thread) {
-          return res.status(404).json({ error: 'Thread not found' });
-        }
-
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const success = await forumStorage.addReaction(id, null, emoji, req.user.id);
-        if (!success) {
-          return res.status(404).json({ error: 'Thread not found' });
-        }
-
-        const updatedThread = await forumStorage.getThread(id);
-        if (updatedThread) {
-          const reaction = updatedThread.reactions.find(
-            (r) => r.userId === req.user!.id && r.emoji === emoji
-          );
-          if (reaction) {
-            await forumHandler.handleReactionAdded(id, null, reaction, req.user.id);
-          }
-        }
-
-        res.status(201).json({ success: true });
-      } catch (error) {
-        console.error('Add reaction error:', error);
-        res.status(500).json({
-          error: 'Failed to add reaction',
-          message: error instanceof Error ? error.message : String(error),
-        });
+  app.post('/threads/:id/reactions', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
-    }
-  );
 
-  router.delete(
+      const { id } = request.params;
+      const { emoji } = request.body;
+
+      if (!emoji || typeof emoji !== 'string') {
+        return reply.code(400).send({ error: 'Emoji is required' });
+      }
+
+      if (!id || typeof id !== 'string') {
+        return reply.code(400).send({ error: 'Thread ID is required' });
+      }
+
+      const thread = await forumStorage.getThread(id);
+      if (!thread) {
+        return reply.code(404).send({ error: 'Thread not found' });
+      }
+
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
+      }
+
+      const success = await forumStorage.addReaction(id, null, emoji, request.user.id);
+      if (!success) {
+        return reply.code(404).send({ error: 'Thread not found' });
+      }
+
+      const updatedThread = await forumStorage.getThread(id);
+      if (updatedThread) {
+        const reaction = updatedThread.reactions.find(
+          (r) => r.userId === request.user!.id && r.emoji === emoji
+        );
+        if (reaction) {
+          await forumHandler.handleReactionAdded(id, null, reaction, request.user.id);
+        }
+      }
+
+      reply.code(201).send({ success: true });
+    } catch (error) {
+      console.error('Add reaction error:', error);
+      reply.code(500).send({
+        error: 'Failed to add reaction',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  app.delete(
     '/threads/:id/reactions/:emoji',
-    authMiddleware,
-    async (req: AuthRequest, res: Response) => {
+    { preHandler: [authMiddleware] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id, emoji } = req.params;
+        const { id, emoji } = request.params;
 
         if (!id || typeof id !== 'string' || !emoji || typeof emoji !== 'string') {
-          return res.status(400).json({ error: 'Thread ID and emoji are required' });
+          return reply.code(400).send({ error: 'Thread ID and emoji are required' });
         }
 
-        const success = await forumStorage.removeReaction(id, null, emoji, req.user.id);
+        const success = await forumStorage.removeReaction(id, null, emoji, request.user.id);
         if (!success) {
-          return res.status(404).json({ error: 'Thread or reaction not found' });
+          return reply.code(404).send({ error: 'Thread or reaction not found' });
         }
 
-        await forumHandler.handleReactionRemoved(id, null, emoji, req.user.id);
+        await forumHandler.handleReactionRemoved(id, null, emoji, request.user.id);
 
-        res.status(204).send();
+        reply.code(204).send();
       } catch (error) {
         console.error('Remove reaction error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to remove reaction',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -481,83 +532,79 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.post(
-    '/posts/:id/reactions',
-    authMiddleware,
-    async (req: AuthRequest, res: Response) => {
-      try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const { id } = req.params;
-        const { emoji } = req.body;
-
-        if (!emoji || typeof emoji !== 'string') {
-          return res.status(400).json({ error: 'Emoji is required' });
-        }
-
-        if (!id || typeof id !== 'string') {
-          return res.status(400).json({ error: 'Post ID is required' });
-        }
-
-        const post = await forumStorage.getPost(id);
-        if (!post) {
-          return res.status(404).json({ error: 'Post not found' });
-        }
-
-        const success = await forumStorage.addReaction(null, id, emoji, req.user.id);
-        if (!success) {
-          return res.status(404).json({ error: 'Post not found' });
-        }
-
-        const updatedPost = await forumStorage.getPost(id);
-        if (updatedPost && req.user) {
-          const reaction = updatedPost.reactions.find(
-            (r) => r.userId === req.user!.id && r.emoji === emoji
-          );
-          if (reaction) {
-            await forumHandler.handleReactionAdded(null, id, reaction, req.user.id);
-          }
-        }
-
-        res.status(201).json({ success: true });
-      } catch (error) {
-        console.error('Add reaction error:', error);
-        res.status(500).json({
-          error: 'Failed to add reaction',
-          message: error instanceof Error ? error.message : String(error),
-        });
+  app.post('/posts/:id/reactions', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
-    }
-  );
 
-  router.delete(
+      const { id } = request.params;
+      const { emoji } = request.body;
+
+      if (!emoji || typeof emoji !== 'string') {
+        return reply.code(400).send({ error: 'Emoji is required' });
+      }
+
+      if (!id || typeof id !== 'string') {
+        return reply.code(400).send({ error: 'Post ID is required' });
+      }
+
+      const post = await forumStorage.getPost(id);
+      if (!post) {
+        return reply.code(404).send({ error: 'Post not found' });
+      }
+
+      const success = await forumStorage.addReaction(null, id, emoji, request.user.id);
+      if (!success) {
+        return reply.code(404).send({ error: 'Post not found' });
+      }
+
+      const updatedPost = await forumStorage.getPost(id);
+      if (updatedPost && request.user) {
+        const reaction = updatedPost.reactions.find(
+          (r) => r.userId === request.user!.id && r.emoji === emoji
+        );
+        if (reaction) {
+          await forumHandler.handleReactionAdded(null, id, reaction, request.user.id);
+        }
+      }
+
+      reply.code(201).send({ success: true });
+    } catch (error) {
+      console.error('Add reaction error:', error);
+      reply.code(500).send({
+        error: 'Failed to add reaction',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  app.delete(
     '/posts/:id/reactions/:emoji',
-    authMiddleware,
-    async (req: AuthRequest, res: Response) => {
+    { preHandler: [authMiddleware] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id, emoji } = req.params;
+        const { id, emoji } = request.params;
 
         if (!id || typeof id !== 'string' || !emoji || typeof emoji !== 'string') {
-          return res.status(400).json({ error: 'Post ID and emoji are required' });
+          return reply.code(400).send({ error: 'Post ID and emoji are required' });
         }
 
-        const success = await forumStorage.removeReaction(null, id, emoji, req.user.id);
+        const success = await forumStorage.removeReaction(null, id, emoji, request.user.id);
         if (!success) {
-          return res.status(404).json({ error: 'Post or reaction not found' });
+          return reply.code(404).send({ error: 'Post or reaction not found' });
         }
 
-        await forumHandler.handleReactionRemoved(null, id, emoji, req.user.id);
+        await forumHandler.handleReactionRemoved(null, id, emoji, request.user.id);
 
-        res.status(204).send();
+        reply.code(204).send();
       } catch (error) {
         console.error('Remove reaction error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to remove reaction',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -566,101 +613,93 @@ export function createForumRoutes(deps: RouteDependencies): Router {
   );
 
   // VOTES
-  router.post(
-    '/threads/:id/vote',
-    authMiddleware,
-    async (req: AuthRequest, res: Response) => {
-      try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const { id } = req.params;
-        const { vote } = req.body;
-
-        if (!id || typeof id !== 'string') {
-          return res.status(400).json({ error: 'Thread ID is required' });
-        }
-
-        if (!vote || (vote !== 'up' && vote !== 'down')) {
-          return res.status(400).json({ error: 'Vote must be "up" or "down"' });
-        }
-
-        const result = await forumStorage.voteThread(id, req.user.id, vote);
-
-        await forumHandler.handleVoteChanged(
-          id,
-          null,
-          result.score,
-          result.upvotes,
-          result.downvotes
-        );
-
-        res.json(result);
-      } catch (error) {
-        console.error('Vote thread error:', error);
-        res.status(500).json({
-          error: 'Failed to vote on thread',
-          message: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-  );
-
-  router.delete(
-    '/threads/:id/vote',
-    authMiddleware,
-    async (req: AuthRequest, res: Response) => {
-      try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const { id } = req.params;
-
-        if (!id || typeof id !== 'string') {
-          return res.status(400).json({ error: 'Thread ID is required' });
-        }
-
-        const result = await forumStorage.removeThreadVote(id, req.user.id);
-
-        await forumHandler.handleVoteChanged(
-          id,
-          null,
-          result.score,
-          result.upvotes,
-          result.downvotes
-        );
-
-        res.json(result);
-      } catch (error) {
-        console.error('Remove vote error:', error);
-        res.status(500).json({
-          error: 'Failed to remove vote',
-          message: error instanceof Error ? error.message : String(error),
-        });
-      }
-    }
-  );
-
-  router.post('/posts/:id/vote', authMiddleware, async (req: AuthRequest, res: Response) => {
+  app.post('/threads/:id/vote', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const { id } = req.params;
-      const { vote } = req.body;
+      const { id } = request.params;
+      const { vote } = request.body;
 
       if (!id || typeof id !== 'string') {
-        return res.status(400).json({ error: 'Post ID is required' });
+        return reply.code(400).send({ error: 'Thread ID is required' });
       }
 
       if (!vote || (vote !== 'up' && vote !== 'down')) {
-        return res.status(400).json({ error: 'Vote must be "up" or "down"' });
+        return reply.code(400).send({ error: 'Vote must be "up" or "down"' });
       }
 
-      const result = await forumStorage.votePost(id, req.user.id, vote);
+      const result = await forumStorage.voteThread(id, request.user.id, vote);
+
+      await forumHandler.handleVoteChanged(
+        id,
+        null,
+        result.score,
+        result.upvotes,
+        result.downvotes
+      );
+
+      reply.send(result);
+    } catch (error) {
+      console.error('Vote thread error:', error);
+      reply.code(500).send({
+        error: 'Failed to vote on thread',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  app.delete('/threads/:id/vote', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
+      }
+
+      const { id } = request.params;
+
+      if (!id || typeof id !== 'string') {
+        return reply.code(400).send({ error: 'Thread ID is required' });
+      }
+
+      const result = await forumStorage.removeThreadVote(id, request.user.id);
+
+      await forumHandler.handleVoteChanged(
+        id,
+        null,
+        result.score,
+        result.upvotes,
+        result.downvotes
+      );
+
+      reply.send(result);
+    } catch (error) {
+      console.error('Remove vote error:', error);
+      reply.code(500).send({
+        error: 'Failed to remove vote',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  app.post('/posts/:id/vote', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
+      }
+
+      const { id } = request.params;
+      const { vote } = request.body;
+
+      if (!id || typeof id !== 'string') {
+        return reply.code(400).send({ error: 'Post ID is required' });
+      }
+
+      if (!vote || (vote !== 'up' && vote !== 'down')) {
+        return reply.code(400).send({ error: 'Vote must be "up" or "down"' });
+      }
+
+      const result = await forumStorage.votePost(id, request.user.id, vote);
 
       await forumHandler.handleVoteChanged(
         null,
@@ -670,78 +709,73 @@ export function createForumRoutes(deps: RouteDependencies): Router {
         result.downvotes
       );
 
-      res.json(result);
+      reply.send(result);
     } catch (error) {
       console.error('Vote post error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to vote on post',
         message: error instanceof Error ? error.message : String(error),
       });
     }
   });
 
-  router.delete(
-    '/posts/:id/vote',
-    authMiddleware,
-    async (req: AuthRequest, res: Response) => {
-      try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
-        }
-
-        const { id } = req.params;
-
-        if (!id || typeof id !== 'string') {
-          return res.status(400).json({ error: 'Post ID is required' });
-        }
-
-        const result = await forumStorage.removePostVote(id, req.user.id);
-
-        await forumHandler.handleVoteChanged(
-          null,
-          id,
-          result.score,
-          result.upvotes,
-          result.downvotes
-        );
-
-        res.json(result);
-      } catch (error) {
-        console.error('Remove vote error:', error);
-        res.status(500).json({
-          error: 'Failed to remove vote',
-          message: error instanceof Error ? error.message : String(error),
-        });
+  app.delete('/posts/:id/vote', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
+
+      const { id } = request.params;
+
+      if (!id || typeof id !== 'string') {
+        return reply.code(400).send({ error: 'Post ID is required' });
+      }
+
+      const result = await forumStorage.removePostVote(id, request.user.id);
+
+      await forumHandler.handleVoteChanged(
+        null,
+        id,
+        result.score,
+        result.upvotes,
+        result.downvotes
+      );
+
+      reply.send(result);
+    } catch (error) {
+      console.error('Remove vote error:', error);
+      reply.code(500).send({
+        error: 'Failed to remove vote',
+        message: error instanceof Error ? error.message : String(error),
+      });
     }
-  );
+  });
 
   // MODERATOR ACTIONS
-  router.post(
+  app.post(
     '/threads/:id/pin',
-    authMiddleware,
-    requireModerator(),
-    async (req: AuthRequest, res: Response) => {
+    { preHandler: [authMiddleware, requireModerator()] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = req.params;
+        const { id } = request.params;
 
         if (!id || typeof id !== 'string') {
-          return res.status(400).json({ error: 'Thread ID is required' });
+          return reply.code(400).send({ error: 'Thread ID is required' });
         }
 
         const success = await forumStorage.pinThread(id);
         if (!success) {
-          return res.status(404).json({ error: 'Thread not found' });
+          return reply.code(404).send({ error: 'Thread not found' });
         }
 
-        res.json({ success: true });
+        reply.send({ success: true });
       } catch (error) {
         console.error('Pin thread error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to pin thread',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -749,31 +783,30 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.delete(
+  app.delete(
     '/threads/:id/pin',
-    authMiddleware,
-    requireModerator(),
-    async (req: AuthRequest, res: Response) => {
+    { preHandler: [authMiddleware, requireModerator()] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = req.params;
+        const { id } = request.params;
 
         if (!id || typeof id !== 'string') {
-          return res.status(400).json({ error: 'Thread ID is required' });
+          return reply.code(400).send({ error: 'Thread ID is required' });
         }
 
         const success = await forumStorage.unpinThread(id);
         if (!success) {
-          return res.status(404).json({ error: 'Thread not found' });
+          return reply.code(404).send({ error: 'Thread not found' });
         }
 
-        res.json({ success: true });
+        reply.send({ success: true });
       } catch (error) {
         console.error('Unpin thread error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to unpin thread',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -781,31 +814,30 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.post(
+  app.post(
     '/threads/:id/lock',
-    authMiddleware,
-    requireModerator(),
-    async (req: AuthRequest, res: Response) => {
+    { preHandler: [authMiddleware, requireModerator()] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = req.params;
+        const { id } = request.params;
 
         if (!id || typeof id !== 'string') {
-          return res.status(400).json({ error: 'Thread ID is required' });
+          return reply.code(400).send({ error: 'Thread ID is required' });
         }
 
         const success = await forumStorage.lockThread(id);
         if (!success) {
-          return res.status(404).json({ error: 'Thread not found' });
+          return reply.code(404).send({ error: 'Thread not found' });
         }
 
-        res.json({ success: true });
+        reply.send({ success: true });
       } catch (error) {
         console.error('Lock thread error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to lock thread',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -813,31 +845,30 @@ export function createForumRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.delete(
+  app.delete(
     '/threads/:id/lock',
-    authMiddleware,
-    requireModerator(),
-    async (req: AuthRequest, res: Response) => {
+    { preHandler: [authMiddleware, requireModerator()] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = req.params;
+        const { id } = request.params;
 
         if (!id || typeof id !== 'string') {
-          return res.status(400).json({ error: 'Thread ID is required' });
+          return reply.code(400).send({ error: 'Thread ID is required' });
         }
 
         const success = await forumStorage.unlockThread(id);
         if (!success) {
-          return res.status(404).json({ error: 'Thread not found' });
+          return reply.code(404).send({ error: 'Thread not found' });
         }
 
-        res.json({ success: true });
+        reply.send({ success: true });
       } catch (error) {
         console.error('Unlock thread error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to unlock thread',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -846,40 +877,40 @@ export function createForumRoutes(deps: RouteDependencies): Router {
   );
 
   // SEARCH & UTILITIES
-  router.get('/search', async (req: Request, res: Response) => {
+  app.get('/search', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const query = req.query.q as string | undefined;
+      const query = request.query.q as string | undefined;
 
       if (!query || typeof query !== 'string' || query.trim().length === 0) {
-        return res.status(400).json({ error: 'Search query is required' });
+        return reply.code(400).send({ error: 'Search query is required' });
       }
 
       const threads = await forumStorage.searchThreads(query.trim());
       const posts = await forumStorage.searchPosts(query.trim());
 
-      res.json({ threads, posts });
+      reply.send({ threads, posts });
     } catch (error) {
       console.error('Search error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to search',
         message: error instanceof Error ? error.message : String(error),
       });
     }
   });
 
-  router.get('/preview-marketplace/:id', async (req: Request, res: Response) => {
+  app.get('/preview-marketplace/:id', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const { id } = req.params;
+      const { id } = request.params;
       if (!id || typeof id !== 'string') {
-        return res.status(400).json({ error: 'Item ID is required' });
+        return reply.code(400).send({ error: 'Item ID is required' });
       }
       const item = await marketplaceStorage.getItem(id);
 
       if (!item) {
-        return res.status(404).json({ error: 'Marketplace item not found' });
+        return reply.code(404).send({ error: 'Marketplace item not found' });
       }
 
-      res.json({
+      reply.send({
         id: item.id,
         title: item.title,
         description: item.description,
@@ -891,20 +922,20 @@ export function createForumRoutes(deps: RouteDependencies): Router {
       });
     } catch (error) {
       console.error('Get marketplace preview error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to get marketplace preview',
         message: error instanceof Error ? error.message : String(error),
       });
     }
   });
 
-  router.post('/share-project', authMiddleware, async (req: AuthRequest, res: Response) => {
+  app.post('/share-project', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const body = req.body as {
+      const body = request.body as {
         projectToken: string;
         categoryId?: string;
         title?: string;
@@ -912,18 +943,18 @@ export function createForumRoutes(deps: RouteDependencies): Router {
       };
 
       if (!body.projectToken) {
-        return res.status(400).json({ error: 'projectToken is required' });
+        return reply.code(400).send({ error: 'projectToken is required' });
       }
 
       const share = await storage.load(body.projectToken);
       if (!share) {
-        return res.status(404).json({ error: 'Project not found' });
+        return reply.code(404).send({ error: 'Project not found' });
       }
 
       const categoryId = body.categoryId || 'cat_showcase';
       const category = await forumStorage.getCategory(categoryId);
       if (!category || category.isLocked) {
-        return res.status(400).json({ error: 'Invalid or locked category' });
+        return reply.code(400).send({ error: 'Invalid or locked category' });
       }
 
       const threadTitle = body.title || 'Shared Project';
@@ -931,7 +962,7 @@ export function createForumRoutes(deps: RouteDependencies): Router {
 
       const forumThread = await forumStorage.createThread({
         categoryId,
-        authorId: req.user.id,
+        authorId: request.user.id,
         title: threadTitle,
         content: threadContent,
         isPinned: false,
@@ -940,17 +971,16 @@ export function createForumRoutes(deps: RouteDependencies): Router {
         projectToken: body.projectToken,
       });
 
-      await forumHandler.handleThreadCreated(forumThread, categoryId, req.user.id);
+      await forumHandler.handleThreadCreated(forumThread, categoryId, request.user.id);
 
-      res.status(201).json(forumThread);
+      reply.code(201).send(forumThread);
     } catch (error) {
       console.error('Share project to forum error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to share project to forum',
         message: error instanceof Error ? error.message : String(error),
       });
     }
   });
 
-  return router;
 }

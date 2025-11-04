@@ -1,16 +1,17 @@
-import { Router, type Request, type Response } from 'express';
+import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { RouteDependencies } from './index';
-import type { AuthRequest } from '../auth/middleware';
 import type { StudioProject } from '../storage/StudioProjectsStorage';
 import type { ProjectTeamAccess } from '../storage/StudioTeamStorage';
 import type { MarketplaceItem } from '../storage/MarketplaceStorage';
 import type { ProjectData } from '../types';
 
 /**
- * Create studio routes
+ * Create studio routes for Fastify
  */
-export function createStudioRoutes(deps: RouteDependencies): Router {
-  const router = Router();
+export async function createStudioRoutes(
+  app: FastifyInstance,
+  opts: { dependencies: RouteDependencies }
+): Promise<void> {
   const {
     authMiddleware,
     studioProjectsStorage,
@@ -26,7 +27,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     cacheGet,
     cacheSet,
     dbPool,
-  } = deps;
+  } = opts.dependencies;
 
   // Helper function: periodToDays
   function periodToDays(period: string | undefined): number {
@@ -144,59 +145,59 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
   }
 
   // STUDIO PROJECTS ROUTES
-  router.get('/projects', authMiddleware, async (req: AuthRequest, res: Response) => {
+  app.get('/projects', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 50;
-      const offset = req.query.offset ? parseInt(String(req.query.offset), 10) : 0;
+      const limit = request.query.limit ? parseInt(String(request.query.limit), 10) : 50;
+      const offset = request.query.offset ? parseInt(String(request.query.offset), 10) : 0;
 
-      const projects = await studioProjectsStorage.listProjects(req.user.id, { limit, offset });
-      res.json({ projects });
+      const projects = await studioProjectsStorage.listProjects(request.user.id, { limit, offset });
+      reply.send({ projects });
     } catch (error) {
       console.error('List studio projects error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to list projects',
         message: error instanceof Error ? error.message : String(error),
       });
     }
   });
 
-  router.get('/projects/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  app.get('/projects/:id', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const { id } = req.params;
+      const { id } = request.params;
       if (!id) {
-        return res.status(400).json({ error: 'Project ID required' });
+        return reply.code(400).send({ error: 'Project ID required' });
       }
 
-      const project = await studioProjectsStorage.getProject(req.user.id, id);
+      const project = await studioProjectsStorage.getProject(request.user.id, id);
       if (!project) {
-        return res.status(404).json({ error: 'Project not found' });
+        return reply.code(404).send({ error: 'Project not found' });
       }
 
-      res.json(project);
+      reply.send(project);
     } catch (error) {
       console.error('Get studio project error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to get project',
         message: error instanceof Error ? error.message : String(error),
       });
     }
   });
 
-  router.post('/projects', authMiddleware, async (req: AuthRequest, res: Response) => {
+  app.post('/projects', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const body = req.body as {
+      const body = request.body as {
         name: string;
         description?: string;
         projectData: ProjectData;
@@ -205,14 +206,14 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
       };
 
       if (!body.name || typeof body.name !== 'string') {
-        return res.status(400).json({ error: 'Project name is required' });
+        return reply.code(400).send({ error: 'Project name is required' });
       }
 
       if (!body.projectData || typeof body.projectData !== 'object') {
-        return res.status(400).json({ error: 'Project data is required' });
+        return reply.code(400).send({ error: 'Project data is required' });
       }
 
-      const project = await studioProjectsStorage.createProject(req.user.id, {
+      const project = await studioProjectsStorage.createProject(request.user.id, {
         name: body.name,
         ...(body.description && { description: body.description }),
         projectData: body.projectData,
@@ -220,28 +221,28 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
         ...(body.tags && { tags: body.tags }),
       });
 
-      res.status(201).json(project);
+      reply.code(201).send(project);
     } catch (error) {
       console.error('Create studio project error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to create project',
         message: error instanceof Error ? error.message : String(error),
       });
     }
   });
 
-  router.put('/projects/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  app.put('/projects/:id', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const { id } = req.params;
+      const { id } = request.params;
       if (!id) {
-        return res.status(400).json({ error: 'Project ID required' });
+        return reply.code(400).send({ error: 'Project ID required' });
       }
 
-      const body = req.body as {
+      const body = request.body as {
         name?: string;
         description?: string;
         projectData?: ProjectData;
@@ -250,61 +251,61 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
         isPublished?: boolean;
       };
 
-      const project = await studioProjectsStorage.updateProject(req.user.id, id, body);
-      res.json(project);
+      const project = await studioProjectsStorage.updateProject(request.user.id, id, body);
+      reply.send(project);
     } catch (error) {
       console.error('Update studio project error:', error);
       if (error instanceof Error && error.message.includes('not found')) {
-        return res.status(404).json({ error: error.message });
+        return reply.code(404).send({ error: error.message });
       }
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to update project',
         message: error instanceof Error ? error.message : String(error),
       });
     }
   });
 
-  router.delete('/projects/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  app.delete('/projects/:id', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const { id } = req.params;
+      const { id } = request.params;
       if (!id) {
-        return res.status(400).json({ error: 'Project ID required' });
+        return reply.code(400).send({ error: 'Project ID required' });
       }
 
-      const deleted = await studioProjectsStorage.deleteProject(req.user.id, id);
+      const deleted = await studioProjectsStorage.deleteProject(request.user.id, id);
       if (!deleted) {
-        return res.status(404).json({ error: 'Project not found' });
+        return reply.code(404).send({ error: 'Project not found' });
       }
 
-      res.status(204).send();
+      reply.code(204).send();
     } catch (error) {
       console.error('Delete studio project error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to delete project',
         message: error instanceof Error ? error.message : String(error),
       });
     }
   });
 
-  router.post(
+  app.post(
     '/studio/projects/:id/publish',
-    authMiddleware,
-    async (req: AuthRequest, res: Response) => {
+    { preHandler: [authMiddleware] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = req.params;
+        const { id } = request.params;
         if (!id) {
-          return res.status(400).json({ error: 'Project ID required' });
+          return reply.code(400).send({ error: 'Project ID required' });
         }
 
-        const body = req.body as {
+        const body = request.body as {
           title: string;
           description?: string;
           tags?: string[];
@@ -312,16 +313,16 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
         };
 
         if (!body.title || typeof body.title !== 'string') {
-          return res.status(400).json({ error: 'Title is required for publishing' });
+          return reply.code(400).send({ error: 'Title is required for publishing' });
         }
 
-        const project = await studioProjectsStorage.getProject(req.user.id, id);
+        const project = await studioProjectsStorage.getProject(request.user.id, id);
         if (!project) {
-          return res.status(404).json({ error: 'Project not found' });
+          return reply.code(404).send({ error: 'Project not found' });
         }
 
-        const profile = await profileStorage.getProfile(req.user.id);
-        const authorName = profile?.displayName || req.user.email;
+        const profile = await profileStorage.getProfile(request.user.id);
+        const authorName = profile?.displayName || request.user.email;
 
         const marketplaceId = `build_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
         const marketplaceItem: Omit<
@@ -332,7 +333,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
           title: body.title,
           ...(body.description && { description: body.description }),
           ...(project.description && !body.description && { description: project.description }),
-          authorId: req.user.id,
+          authorId: request.user.id,
           ...(authorName && { authorName }),
           ...(project.thumbnailUrl && { thumbnailUrl: project.thumbnailUrl }),
           fileUrl: '',
@@ -347,15 +348,15 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
           await buildStorage.saveBuild(marketplaceId, project.projectData);
         }
 
-        await studioProjectsStorage.updateProject(req.user.id, id, { isPublished: true });
+        await studioProjectsStorage.updateProject(request.user.id, id, { isPublished: true });
 
-        res.status(201).json({
+        reply.code(201).send({
           marketplaceItem,
           project,
         });
       } catch (error) {
         console.error('Publish studio project error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to publish project',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -363,15 +364,15 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.get('/stats', authMiddleware, async (req: AuthRequest, res: Response) => {
+  app.get('/stats', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const counts = await studioProjectsStorage.countProjects(req.user.id);
+      const counts = await studioProjectsStorage.countProjects(request.user.id);
       const userBuilds = await marketplaceStorage.getItems({
-        authorId: req.user.id,
+        authorId: request.user.id,
         type: 'build',
       });
       let totalViews = 0;
@@ -385,7 +386,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
       }
 
       const stats = {
-        userId: req.user.id,
+        userId: request.user.id,
         totalProjects: counts.total,
         publishedProjects: counts.published,
         totalViews,
@@ -394,7 +395,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
         lastUpdated: Date.now(),
       };
 
-      const revCached = cacheGet<any>(`rev:${req.user.id}:30`);
+      const revCached = cacheGet<any>(`rev:${request.user.id}:30`);
       let netRevenue30d = revCached?.net ?? 0;
       if (revCached == null) {
         const allPurchases = await purchaseStorage.getPurchases({
@@ -407,27 +408,27 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
           for (const it of p.items) {
             if (it.type !== 'marketplace-item') continue;
             const mp = await marketplaceStorage.getItem(it.itemId);
-            if (!mp || mp.authorId !== req.user.id) continue;
+            if (!mp || mp.authorId !== request.user.id) continue;
             netRevenue30d += Number(it.price.amount) * 0.9;
           }
         }
       }
-      const { score } = await computeStudioScore(req.user.id);
+      const { score } = await computeStudioScore(request.user.id);
 
-      res.json({ ...stats, netRevenue30d, studioScore: score });
+      reply.send({ ...stats, netRevenue30d, studioScore: score });
     } catch (error) {
       console.error('Get studio stats error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to get studio stats',
         message: error instanceof Error ? error.message : String(error),
       });
     }
   });
 
-  router.get('/leaderboard', async (req: Request, res: Response) => {
+  app.get('/leaderboard', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
       const metric =
-        (req.query.metric as
+        (request.query.metric as
           | 'views'
           | 'downloads'
           | 'likes'
@@ -435,8 +436,8 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
           | 'revenue'
           | 'score'
           | 'growth') || 'views';
-      const period = (req.query.period as 'all' | 'week' | 'month') || 'all';
-      const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 100;
+      const period = (request.query.period as 'all' | 'week' | 'month') || 'all';
+      const limit = request.query.limit ? parseInt(String(request.query.limit), 10) : 100;
 
       const allBuilds = await marketplaceStorage.getItems({ type: 'build' });
 
@@ -486,14 +487,14 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
 
         const revenueByAuthor = new Map<string, number>();
         if (dbPool) {
-          const rows = (await dbPool.$queryRaw<Array<{ author_id: string; gross: string }>>`
+          const rows = await dbPool.$queryRaw<Array<{ author_id: string; gross: string }>>`
             SELECT mi.author_id, SUM(pi.price_amount) AS gross
             FROM purchases p
             JOIN purchase_items pi ON pi.purchase_id = p.id
             JOIN marketplace_items mi ON mi.id = pi.item_id AND pi.item_type = 'marketplace-item'
             WHERE p.status = 'completed' AND p.created_at >= NOW() - INTERVAL '${String(days)} days'
             GROUP BY mi.author_id
-          `);
+          `;
           for (const r of rows) revenueByAuthor.set(r.author_id, Number(r.gross) * 0.9);
         } else {
           const allPurchases = await purchaseStorage.getPurchases({
@@ -516,7 +517,9 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
         let growthByAuthor = new Map<string, number>();
         if (metric === 'growth') {
           if (dbPool) {
-            const rows = (await dbPool.$queryRaw<Array<{ author_id: string; period: string; gross: string }>>`
+            const rows = await dbPool.$queryRaw<
+              Array<{ author_id: string; period: string; gross: string }>
+            >`
               WITH r AS (
                 SELECT mi.author_id, CASE WHEN p.created_at >= NOW() - INTERVAL '7 days' THEN 'cur' ELSE 'prev' END AS period,
                        SUM(pi.price_amount) AS gross
@@ -527,7 +530,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
                 GROUP BY mi.author_id, CASE WHEN p.created_at >= NOW() - INTERVAL '7 days' THEN 'cur' ELSE 'prev' END
               )
               SELECT author_id, period, gross FROM r
-            `);
+            `;
             const map = new Map<string, { cur: number; prev: number }>();
             for (const r of rows) {
               const m = map.get(r.author_id) || { cur: 0, prev: 0 };
@@ -619,34 +622,34 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
           rank: index + 1,
         }));
 
-      res.json({ leaderboard, metric, period });
+      reply.send({ leaderboard, metric, period });
     } catch (error) {
       console.error('Get studio leaderboard error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to get leaderboard',
         message: error instanceof Error ? error.message : String(error),
       });
     }
   });
 
-  router.get('/compare/:userId', authMiddleware, async (req: AuthRequest, res: Response) => {
+  app.get('/compare/:userId', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const { userId } = req.params;
+      const { userId } = request.params;
       if (!userId) {
-        return res.status(400).json({ error: 'User ID required' });
+        return reply.code(400).send({ error: 'User ID required' });
       }
 
-      const currentUserCounts = await studioProjectsStorage.countProjects(req.user.id);
+      const currentUserCounts = await studioProjectsStorage.countProjects(request.user.id);
       const currentUserBuilds = await marketplaceStorage.getItems({
-        authorId: req.user.id,
+        authorId: request.user.id,
         type: 'build',
       });
       const currentUserStats = {
-        userId: req.user.id,
+        userId: request.user.id,
         totalProjects: currentUserCounts.total,
         publishedProjects: currentUserCounts.published,
         totalViews: currentUserBuilds.reduce((sum, b) => sum + b.downloads, 0),
@@ -673,13 +676,13 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
         totalLikes: comparedUserBuilds.reduce((sum, b) => sum + b.likes, 0),
       };
 
-      res.json({
+      reply.send({
         currentUser: currentUserStats,
         comparedUser: comparedUserStats,
       });
     } catch (error) {
       console.error('Compare studio stats error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to compare studio stats',
         message: error instanceof Error ? error.message : String(error),
       });
@@ -687,132 +690,132 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
   });
 
   // STUDIO TEAM ROUTES (continuing in next part due to size...)
-  router.post('/team', authMiddleware, async (req: AuthRequest, res: Response) => {
+  app.post('/team', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const body = req.body as { name: string; description?: string };
+      const body = request.body as { name: string; description?: string };
 
       if (!body.name || typeof body.name !== 'string') {
-        return res.status(400).json({ error: 'Team name is required' });
+        return reply.code(400).send({ error: 'Team name is required' });
       }
 
-      const team = await studioTeamStorage.createTeam(req.user.id, {
+      const team = await studioTeamStorage.createTeam(request.user.id, {
         name: body.name.trim(),
         ...(body.description && { description: body.description.trim() }),
       });
 
-      res.status(201).json(team);
+      reply.code(201).send(team);
     } catch (error) {
       console.error('Create team error:', error);
       if (error instanceof Error && error.message.includes('already exists')) {
         return res.status(409).json({ error: error.message });
       }
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to create team',
         message: error instanceof Error ? error.message : String(error),
       });
     }
   });
 
-  router.get('/team', authMiddleware, async (req: AuthRequest, res: Response) => {
+  app.get('/team', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const team = await studioTeamStorage.getTeamByStudioOwner(req.user.id);
+      const team = await studioTeamStorage.getTeamByStudioOwner(request.user.id);
       if (!team) {
-        return res.status(404).json({ error: 'Team not found' });
+        return reply.code(404).send({ error: 'Team not found' });
       }
 
-      res.json(team);
+      reply.send(team);
     } catch (error) {
       console.error('Get team error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to get team',
         message: error instanceof Error ? error.message : String(error),
       });
     }
   });
 
-  router.put('/team/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  app.put('/team/:id', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const { id } = req.params;
+      const { id } = request.params;
       if (!id) {
-        return res.status(400).json({ error: 'Team ID required' });
+        return reply.code(400).send({ error: 'Team ID required' });
       }
       const team = await studioTeamStorage.getTeam(id);
       if (!team) {
-        return res.status(404).json({ error: 'Team not found' });
+        return reply.code(404).send({ error: 'Team not found' });
       }
 
-      if (team.studioOwnerId !== req.user.id) {
-        return res.status(403).json({ error: 'Only team owner can update team' });
+      if (team.studioOwnerId !== request.user.id) {
+        return reply.code(403).send({ error: 'Only team owner can update team' });
       }
 
-      const body = req.body as { name?: string; description?: string };
+      const body = request.body as { name?: string; description?: string };
       const updated = await studioTeamStorage.updateTeam(id, body);
-      res.json(updated);
+      reply.send(updated);
     } catch (error) {
       console.error('Update team error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to update team',
         message: error instanceof Error ? error.message : String(error),
       });
     }
   });
 
-  router.delete('/team/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
+  app.delete('/team/:id', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const { id } = req.params;
+      const { id } = request.params;
       if (!id) {
-        return res.status(400).json({ error: 'Team ID required' });
+        return reply.code(400).send({ error: 'Team ID required' });
       }
       const team = await studioTeamStorage.getTeam(id);
       if (!team) {
-        return res.status(404).json({ error: 'Team not found' });
+        return reply.code(404).send({ error: 'Team not found' });
       }
 
-      if (team.studioOwnerId !== req.user.id) {
-        return res.status(403).json({ error: 'Only team owner can delete team' });
+      if (team.studioOwnerId !== request.user.id) {
+        return reply.code(403).send({ error: 'Only team owner can delete team' });
       }
 
       await studioTeamStorage.deleteTeam(id);
-      res.status(204).send();
+      reply.code(204).send();
     } catch (error) {
       console.error('Delete team error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to delete team',
         message: error instanceof Error ? error.message : String(error),
       });
     }
   });
 
-  router.get('/team/members', authMiddleware, async (req: AuthRequest, res: Response) => {
+  app.get('/team/members', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const team = await studioTeamStorage.getTeamByStudioOwner(req.user.id);
+      const team = await studioTeamStorage.getTeamByStudioOwner(request.user.id);
       if (!team) {
-        return res.status(404).json({ error: 'Team not found' });
+        return reply.code(404).send({ error: 'Team not found' });
       }
 
-      const member = await studioTeamStorage.getMember(team.id, req.user.id);
+      const member = await studioTeamStorage.getMember(team.id, request.user.id);
       if (!member) {
-        return res.status(403).json({ error: 'Not a team member' });
+        return reply.code(403).send({ error: 'Not a team member' });
       }
 
       const members = await studioTeamStorage.getMembers(team.id);
@@ -829,43 +832,43 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
         })
       );
 
-      res.json({ members: enrichedMembers });
+      reply.send({ members: enrichedMembers });
     } catch (error) {
       console.error('Get team members error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to get team members',
         message: error instanceof Error ? error.message : String(error),
       });
     }
   });
 
-  router.post('/team/invite', authMiddleware, async (req: AuthRequest, res: Response) => {
+  app.post('/team/invite', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const team = await studioTeamStorage.getTeamByStudioOwner(req.user.id);
+      const team = await studioTeamStorage.getTeamByStudioOwner(request.user.id);
       if (!team) {
-        return res.status(404).json({ error: 'Team not found' });
+        return reply.code(404).send({ error: 'Team not found' });
       }
 
-      const member = await studioTeamStorage.getMember(team.id, req.user.id);
+      const member = await studioTeamStorage.getMember(team.id, request.user.id);
       if (!member || member.role !== 'owner') {
-        return res.status(403).json({ error: 'Only team owner can invite members' });
+        return reply.code(403).send({ error: 'Only team owner can invite members' });
       }
 
-      const body = req.body as { userId?: string; username?: string; email?: string };
+      const body = request.body as { userId?: string; username?: string; email?: string };
       let inviteeUserId: string | undefined;
 
       if (body.userId) {
         const user = await authManager.getUserById(body.userId);
         if (!user) {
-          return res.status(404).json({ error: 'User not found' });
+          return reply.code(404).send({ error: 'User not found' });
         }
         inviteeUserId = user.id;
       } else if (body.username) {
-        const friends = await friendsStorage.getFriends(req.user.id);
+        const friends = await friendsStorage.getFriends(request.user.id);
         for (const friendId of friends) {
           const profile = await profileStorage.getProfile(friendId);
           if (profile?.displayName?.toLowerCase() === body.username.toLowerCase()) {
@@ -874,20 +877,20 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
           }
         }
         if (!inviteeUserId) {
-          return res.status(404).json({ error: 'User not found by username' });
+          return reply.code(404).send({ error: 'User not found by username' });
         }
       } else if (body.email) {
         const user = await authManager['userStorage'].findUserByEmail(body.email);
         if (!user) {
-          return res.status(404).json({ error: 'User not found by email' });
+          return reply.code(404).send({ error: 'User not found by email' });
         }
         inviteeUserId = user.id;
       } else {
-        return res.status(400).json({ error: 'userId, username, or email is required' });
+        return reply.code(400).send({ error: 'userId, username, or email is required' });
       }
 
       if (!inviteeUserId) {
-        return res.status(404).json({ error: 'User not found' });
+        return reply.code(404).send({ error: 'User not found' });
       }
 
       const existingMember = await studioTeamStorage.getMember(team.id, inviteeUserId);
@@ -904,7 +907,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
       const inviteeProfile = await profileStorage.getProfile(inviteeUserId);
       const inviteeUser = await authManager.getUserById(inviteeUserId);
 
-      const invitation = await studioTeamStorage.createInvitation(team.id, req.user.id, {
+      const invitation = await studioTeamStorage.createInvitation(team.id, request.user.id, {
         userId: inviteeUserId,
         ...(inviteeProfile?.displayName && { username: inviteeProfile.displayName }),
         ...(inviteeUser?.email && { email: inviteeUser.email }),
@@ -922,55 +925,55 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
         console.error('Failed to create notification:', notificationError);
       }
 
-      res.status(201).json(invitation);
+      reply.code(201).send(invitation);
     } catch (error) {
       console.error('Invite member error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to invite member',
         message: error instanceof Error ? error.message : String(error),
       });
     }
   });
 
-  router.put(
+  app.put(
     '/studio/team/invitations/:id',
-    authMiddleware,
-    async (req: AuthRequest, res: Response) => {
+    { preHandler: [authMiddleware] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = req.params;
+        const { id } = request.params;
         if (!id) {
-          return res.status(400).json({ error: 'Invitation ID required' });
+          return reply.code(400).send({ error: 'Invitation ID required' });
         }
-        const body = req.body as { action: 'accept' | 'decline' };
+        const body = request.body as { action: 'accept' | 'decline' };
 
         if (!body.action || (body.action !== 'accept' && body.action !== 'decline')) {
-          return res.status(400).json({ error: 'action must be "accept" or "decline"' });
+          return reply.code(400).send({ error: 'action must be "accept" or "decline"' });
         }
 
         const invitation = await studioTeamStorage.getInvitation(id);
         if (!invitation) {
-          return res.status(404).json({ error: 'Invitation not found' });
+          return reply.code(404).send({ error: 'Invitation not found' });
         }
 
-        if (invitation.inviteeUserId !== req.user.id) {
-          return res.status(403).json({ error: 'This invitation is not for you' });
+        if (invitation.inviteeUserId !== request.user.id) {
+          return reply.code(403).send({ error: 'This invitation is not for you' });
         }
 
         if (invitation.status !== 'pending') {
-          return res.status(400).json({ error: 'Invitation is no longer pending' });
+          return reply.code(400).send({ error: 'Invitation is no longer pending' });
         }
 
         if (invitation.expiresAt < Date.now()) {
           await studioTeamStorage.updateInvitation(id, 'expired');
-          return res.status(400).json({ error: 'Invitation has expired' });
+          return reply.code(400).send({ error: 'Invitation has expired' });
         }
 
         if (body.action === 'accept') {
-          await studioTeamStorage.addMember(invitation.teamId, req.user.id, invitation.inviterId);
+          await studioTeamStorage.addMember(invitation.teamId, request.user.id, invitation.inviterId);
           await studioTeamStorage.updateInvitation(id, 'accepted');
 
           try {
@@ -978,7 +981,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
               userId: invitation.inviterId,
               type: 'team_invitation_accepted',
               title: 'Team Invitation Accepted',
-              message: `${req.user.email} accepted your team invitation`,
+              message: `${request.user.email} accepted your team invitation`,
               metadata: { teamId: invitation.teamId },
             });
           } catch (notificationError) {
@@ -991,10 +994,10 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
         }
 
         const updated = id ? await studioTeamStorage.getInvitation(id) : null;
-        res.json(updated);
+        reply.send(updated);
       } catch (error) {
         console.error('Update invitation error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to update invitation',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -1002,36 +1005,36 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.get(
+  app.get(
     '/studio/team/invitations',
-    authMiddleware,
-    async (req: AuthRequest, res: Response) => {
+    { preHandler: [authMiddleware] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const team = req.query.teamId
-          ? await studioTeamStorage.getTeam(String(req.query.teamId))
+        const team = request.query.teamId
+          ? await studioTeamStorage.getTeam(String(request.query.teamId))
           : null;
 
         if (team) {
-          const member = await studioTeamStorage.getMember(team.id, req.user.id);
+          const member = await studioTeamStorage.getMember(team.id, request.user.id);
           if (!member || member.role !== 'owner') {
-            return res.status(403).json({ error: 'Only team owner can view team invitations' });
+            return reply.code(403).send({ error: 'Only team owner can view team invitations' });
           }
         }
 
         const invitations = team
           ? await studioTeamStorage.getInvitations(team.id)
-          : await studioTeamStorage.getInvitations(undefined, req.user.id);
+          : await studioTeamStorage.getInvitations(undefined, request.user.id);
 
         await studioTeamStorage.cleanupExpiredInvitations();
 
-        res.json({ invitations });
+        reply.send({ invitations });
       } catch (error) {
         console.error('Get invitations error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to get invitations',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -1039,45 +1042,45 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.delete(
+  app.delete(
     '/studio/team/members/:userId',
-    authMiddleware,
-    async (req: AuthRequest, res: Response) => {
+    { preHandler: [authMiddleware] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { userId } = req.params;
+        const { userId } = request.params;
         if (!userId) {
-          return res.status(400).json({ error: 'User ID required' });
+          return reply.code(400).send({ error: 'User ID required' });
         }
-        const team = await studioTeamStorage.getTeamByStudioOwner(req.user.id);
+        const team = await studioTeamStorage.getTeamByStudioOwner(request.user.id);
         if (!team) {
-          return res.status(404).json({ error: 'Team not found' });
+          return reply.code(404).send({ error: 'Team not found' });
         }
 
-        const member = await studioTeamStorage.getMember(team.id, req.user.id);
+        const member = await studioTeamStorage.getMember(team.id, request.user.id);
         if (!member || member.role !== 'owner') {
-          return res.status(403).json({ error: 'Only team owner can remove members' });
+          return reply.code(403).send({ error: 'Only team owner can remove members' });
         }
 
-        if (userId === req.user.id) {
-          return res.status(400).json({ error: 'Cannot remove yourself' });
+        if (userId === request.user.id) {
+          return reply.code(400).send({ error: 'Cannot remove yourself' });
         }
 
         const removed = await studioTeamStorage.removeMember(team.id, userId);
         if (!removed) {
-          return res.status(404).json({ error: 'Member not found' });
+          return reply.code(404).send({ error: 'Member not found' });
         }
 
-        res.status(204).send();
+        reply.code(204).send();
       } catch (error) {
         console.error('Remove member error:', error);
         if (error instanceof Error && error.message.includes('Cannot remove team owner')) {
-          return res.status(400).json({ error: error.message });
+          return reply.code(400).send({ error: error.message });
         }
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to remove member',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -1085,44 +1088,44 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.post(
+  app.post(
     '/studio/projects/:id/share-team',
-    authMiddleware,
-    async (req: AuthRequest, res: Response) => {
+    { preHandler: [authMiddleware] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = req.params;
+        const { id } = request.params;
         if (!id) {
-          return res.status(400).json({ error: 'Project ID required' });
+          return reply.code(400).send({ error: 'Project ID required' });
         }
-        const body = req.body as { accessLevel: 'read' | 'write'; userId?: string };
+        const body = request.body as { accessLevel: 'read' | 'write'; userId?: string };
 
         if (!body.accessLevel || !['read', 'write'].includes(body.accessLevel)) {
-          return res.status(400).json({ error: 'accessLevel must be "read" or "write"' });
+          return reply.code(400).send({ error: 'accessLevel must be "read" or "write"' });
         }
 
-        const project = await studioProjectsStorage.getProject(req.user.id, id);
+        const project = await studioProjectsStorage.getProject(request.user.id, id);
         if (!project) {
-          return res.status(404).json({ error: 'Project not found' });
+          return reply.code(404).send({ error: 'Project not found' });
         }
 
-        const team = await studioTeamStorage.getTeamByStudioOwner(req.user.id);
+        const team = await studioTeamStorage.getTeamByStudioOwner(request.user.id);
         if (!team) {
-          return res.status(404).json({ error: 'Team not found' });
+          return reply.code(404).send({ error: 'Team not found' });
         }
 
-        const member = await studioTeamStorage.getMember(team.id, req.user.id);
+        const member = await studioTeamStorage.getMember(team.id, request.user.id);
         if (!member || member.role !== 'owner') {
-          return res.status(403).json({ error: 'Only team owner can share projects' });
+          return reply.code(403).send({ error: 'Only team owner can share projects' });
         }
 
         if (body.userId) {
           const assignedMember = await studioTeamStorage.getMember(team.id, body.userId);
           if (!assignedMember) {
-            return res.status(404).json({ error: 'User is not a team member' });
+            return reply.code(404).send({ error: 'User is not a team member' });
           }
         }
 
@@ -1136,7 +1139,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
         const members = await studioTeamStorage.getMembers(team.id);
         for (const teamMember of members) {
           if (
-            teamMember.userId !== req.user.id &&
+            teamMember.userId !== request.user.id &&
             (!body.userId || teamMember.userId === body.userId)
           ) {
             try {
@@ -1153,10 +1156,10 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
           }
         }
 
-        res.status(201).json(access);
+        reply.code(201).send(access);
       } catch (error) {
         console.error('Share project with team error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to share project',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -1164,35 +1167,35 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.get(
+  app.get(
     '/studio/projects/:id/team-access',
-    authMiddleware,
-    async (req: AuthRequest, res: Response) => {
+    { preHandler: [authMiddleware] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = req.params;
+        const { id } = request.params;
         if (!id) {
-          return res.status(400).json({ error: 'Project ID required' });
+          return reply.code(400).send({ error: 'Project ID required' });
         }
 
-        const project = await studioProjectsStorage.getProject(req.user.id, id);
+        const project = await studioProjectsStorage.getProject(request.user.id, id);
         if (!project) {
-          return res.status(404).json({ error: 'Project not found' });
+          return reply.code(404).send({ error: 'Project not found' });
         }
 
-        const team = await studioTeamStorage.getTeamByStudioOwner(req.user.id);
+        const team = await studioTeamStorage.getTeamByStudioOwner(request.user.id);
         if (!team) {
-          return res.status(404).json({ error: 'No team found' });
+          return reply.code(404).send({ error: 'No team found' });
         }
 
         const access = await studioTeamStorage.getProjectTeamAccess(id, team.id);
-        res.json({ access: access || null });
+        reply.send({ access: access || null });
       } catch (error) {
         console.error('Get project team access error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to get project team access',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -1200,40 +1203,40 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.delete(
+  app.delete(
     '/studio/projects/:id/share-team',
-    authMiddleware,
-    async (req: AuthRequest, res: Response) => {
+    { preHandler: [authMiddleware] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = req.params;
+        const { id } = request.params;
         if (!id) {
-          return res.status(400).json({ error: 'Project ID required' });
+          return reply.code(400).send({ error: 'Project ID required' });
         }
 
-        const project = await studioProjectsStorage.getProject(req.user.id, id);
+        const project = await studioProjectsStorage.getProject(request.user.id, id);
         if (!project) {
-          return res.status(404).json({ error: 'Project not found' });
+          return reply.code(404).send({ error: 'Project not found' });
         }
 
-        const team = await studioTeamStorage.getTeamByStudioOwner(req.user.id);
+        const team = await studioTeamStorage.getTeamByStudioOwner(request.user.id);
         if (!team) {
-          return res.status(404).json({ error: 'Team not found' });
+          return reply.code(404).send({ error: 'Team not found' });
         }
 
-        const member = await studioTeamStorage.getMember(team.id, req.user.id);
+        const member = await studioTeamStorage.getMember(team.id, request.user.id);
         if (!member || member.role !== 'owner') {
-          return res.status(403).json({ error: 'Only team owner can remove project access' });
+          return reply.code(403).send({ error: 'Only team owner can remove project access' });
         }
 
         await studioTeamStorage.removeProjectTeamAccess(id, team.id);
-        res.status(204).send();
+        reply.code(204).send();
       } catch (error) {
         console.error('Remove project team access error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to remove project team access',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -1241,13 +1244,13 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.get('/shared-projects', authMiddleware, async (req: AuthRequest, res: Response) => {
+  app.get('/shared-projects', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const sharedProjects = await studioTeamStorage.getProjectsForUser(req.user.id);
+      const sharedProjects = await studioTeamStorage.getProjectsForUser(request.user.id);
       const projects = await Promise.all(
         sharedProjects.map(async (access) => {
           const team = await studioTeamStorage.getTeam(access.teamId);
@@ -1262,14 +1265,14 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
         })
       );
 
-      res.json({
+      reply.send({
         projects: projects.filter(
           (p): p is { project: StudioProject; access: ProjectTeamAccess } => p !== null
         ),
       });
     } catch (error) {
       console.error('Get shared projects error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to get shared projects',
         message: error instanceof Error ? error.message : String(error),
       });
@@ -1277,17 +1280,17 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
   });
 
   // STUDIO SETTINGS ROUTES
-  router.get('/settings', authMiddleware, async (req: AuthRequest, res: Response) => {
+  app.get('/settings', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const settings = await studioSettingsStorage.get(req.user.id);
+      const settings = await studioSettingsStorage.get(request.user.id);
       const result =
         settings ||
         ({
-          userId: req.user.id,
+          userId: request.user.id,
           focus: 'balanced',
           goals: {},
           cadenceTarget: 2,
@@ -1297,23 +1300,23 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
           updatedAt: Date.now(),
         } as const);
 
-      res.json(result);
+      reply.send(result);
     } catch (error) {
       console.error('Get studio settings error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to get studio settings',
         message: error instanceof Error ? error.message : String(error),
       });
     }
   });
 
-  router.put('/settings', authMiddleware, async (req: AuthRequest, res: Response) => {
+  app.put('/settings', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const body = req.body as {
+      const body = request.body as {
         focus?: 'games' | 'assets' | 'balanced';
         goals?: {
           monthlyRevenueTarget?: number;
@@ -1326,21 +1329,21 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
       };
 
       if (body.focus && !['games', 'assets', 'balanced'].includes(body.focus)) {
-        return res.status(400).json({ error: 'Invalid focus' });
+        return reply.code(400).send({ error: 'Invalid focus' });
       }
 
       if (
         body.cadenceTarget !== undefined &&
         (typeof body.cadenceTarget !== 'number' || body.cadenceTarget < 0)
       ) {
-        return res.status(400).json({ error: 'Invalid cadenceTarget' });
+        return reply.code(400).send({ error: 'Invalid cadenceTarget' });
       }
 
-      const updated = await studioSettingsStorage.upsert(req.user.id, body);
-      res.json(updated);
+      const updated = await studioSettingsStorage.upsert(request.user.id, body);
+      reply.send(updated);
     } catch (error) {
       console.error('Update studio settings error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to update studio settings',
         message: error instanceof Error ? error.message : String(error),
       });
@@ -1348,19 +1351,19 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
   });
 
   // STUDIO REVENUE ROUTE
-  router.get('/revenue', authMiddleware, async (req: AuthRequest, res: Response) => {
+  app.get('/revenue', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const period = String(req.query.period || 'month');
+      const period = String(request.query.period || 'month');
       const days = periodToDays(period);
-      const cacheKey = `rev:${req.user.id}:${days}`;
+      const cacheKey = `rev:${request.user.id}:${days}`;
 
       const cached = cacheGet<typeof result>(cacheKey);
       if (cached) {
-        return res.json(cached);
+        return reply.send(cached);
       }
 
       const since = Date.now() - days * 24 * 60 * 60 * 1000;
@@ -1370,11 +1373,13 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
       const byItem = new Map<string, { title?: string; gross: number }>();
 
       if (dbPool) {
-        const userId = req.user.id;
-        const dayRows = (await dbPool.$queryRaw<Array<{
-          day: Date;
-          gross: string;
-        }>>`
+        const userId = request.user.id;
+        const dayRows = await dbPool.$queryRaw<
+          Array<{
+            day: Date;
+            gross: string;
+          }>
+        >`
           SELECT DATE_TRUNC('day', p.created_at) AS day, SUM(pi.price_amount) AS gross
           FROM purchases p
           JOIN purchase_items pi ON pi.purchase_id = p.id
@@ -1382,7 +1387,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
           WHERE mi.author_id = ${userId} AND p.status = 'completed' AND p.created_at >= NOW() - INTERVAL '${String(days)} days'
           GROUP BY 1
           ORDER BY 1
-        `);
+        `;
         for (const row of dayRows) {
           const dayKey = row.day.toISOString().slice(0, 10);
           const val = Number(row.gross) || 0;
@@ -1390,11 +1395,13 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
           gross += val;
         }
 
-        const topRows = (await dbPool.$queryRaw<Array<{
-          item_id: string;
-          title: string | null;
-          gross: string;
-        }>>`
+        const topRows = await dbPool.$queryRaw<
+          Array<{
+            item_id: string;
+            title: string | null;
+            gross: string;
+          }>
+        >`
           SELECT pi.item_id, mi.title, SUM(pi.price_amount) AS gross
           FROM purchases p
           JOIN purchase_items pi ON pi.purchase_id = p.id
@@ -1403,7 +1410,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
           GROUP BY pi.item_id, mi.title
           ORDER BY SUM(pi.price_amount) DESC
           LIMIT 10
-        `);
+        `;
         for (const row of topRows) {
           const item: { gross: number; title?: string } = { gross: Number(row.gross) || 0 };
           if (row.title) {
@@ -1422,7 +1429,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
           for (const it of p.items) {
             if (it.type !== 'marketplace-item') continue;
             const mp = await marketplaceStorage.getItem(it.itemId);
-            if (!mp || mp.authorId !== req.user.id) continue;
+            if (!mp || mp.authorId !== request.user.id) continue;
             const amount = Number(it.price.amount) || 0;
             gross += amount;
             byDay.set(dayKey, (byDay.get(dayKey) || 0) + amount);
@@ -1448,10 +1455,10 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
 
       const result = { gross, platformFee, net, topItems, trend, period };
       cacheSet(cacheKey, result);
-      res.json(result);
+      reply.send(result);
     } catch (error) {
       console.error('Get studio revenue error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to get studio revenue',
         message: error instanceof Error ? error.message : String(error),
       });
@@ -1459,18 +1466,18 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
   });
 
   // STUDIO SCORE ROUTE
-  router.get('/score', authMiddleware, async (req: AuthRequest, res: Response) => {
+  app.get('/score', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
-      const cacheKey = `score:${req.user.id}`;
+      if (!request.user) return reply.code(401).send({ error: 'Unauthorized' });
+      const cacheKey = `score:${request.user.id}`;
       const cached = cacheGet<typeof result>(cacheKey);
-      if (cached) return res.json(cached);
-      const result = await computeStudioScore(req.user.id);
+      if (cached) return reply.send(cached);
+      const result = await computeStudioScore(request.user.id);
       cacheSet(cacheKey, result);
-      res.json(result);
+      reply.send(result);
     } catch (error) {
       console.error('Get studio score error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to get studio score',
         message: error instanceof Error ? error.message : String(error),
       });
@@ -1478,27 +1485,27 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
   });
 
   // STUDIO INSIGHTS ROUTE
-  router.get('/insights', authMiddleware, async (req: AuthRequest, res: Response) => {
+  app.get('/insights', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) return reply.code(401).send({ error: 'Unauthorized' });
 
       const [settings, score] = await Promise.all([
-        studioSettingsStorage.get(req.user.id),
-        computeStudioScore(req.user.id),
+        studioSettingsStorage.get(request.user.id),
+        computeStudioScore(request.user.id),
       ]);
 
       const days = 30;
       const since30 = Date.now() - days * 24 * 60 * 60 * 1000;
       const since14 = Date.now() - 14 * 24 * 60 * 60 * 1000;
-      const projects = await studioProjectsStorage.listProjects(req.user.id, {
+      const projects = await studioProjectsStorage.listProjects(request.user.id, {
         limit: 10000,
         offset: 0,
       });
       const updatedRecently = projects.some((p) => p.updatedAt >= since14);
 
       const rev = await (async () => {
-        if (!req.user) return null;
-        const cached = cacheGet<any>(`rev:${req.user.id}:30`);
+        if (!request.user) return null;
+        const cached = cacheGet<any>(`rev:${request.user.id}:30`);
         return cached || null;
       })();
 
@@ -1531,7 +1538,7 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
         }
       }
 
-      const items = await marketplaceStorage.getItems({ authorId: req.user.id });
+      const items = await marketplaceStorage.getItems({ authorId: request.user.id });
       const assetsLast30 = items.filter(
         (i) => i.type !== 'build' && i.createdAt && i.createdAt >= since30
       ).length;
@@ -1564,15 +1571,14 @@ export function createStudioRoutes(deps: RouteDependencies): Router {
         });
       }
 
-      res.json({ insights });
+      reply.send({ insights });
     } catch (error) {
       console.error('Get studio insights error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to get insights',
         message: error instanceof Error ? error.message : String(error),
       });
     }
   });
 
-  return router;
 }

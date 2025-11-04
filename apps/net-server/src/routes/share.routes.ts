@@ -1,33 +1,31 @@
-import { Router, type Request, type Response } from 'express';
+import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { RouteDependencies } from './index';
-import type {
-  ShareProjectRequest,
-  ShareProjectResponse,
-  ShareMetadataResponse,
-} from '../types';
+import type { ShareProjectRequest, ShareProjectResponse, ShareMetadataResponse } from '../types';
 
 /**
- * Create share routes
+ * Create share routes for Fastify
  */
-export function createShareRoutes(deps: RouteDependencies): Router {
-  const router = Router();
-  const { storage, FRONTEND_URL } = deps;
+export async function createShareRoutes(
+  app: FastifyInstance,
+  opts: { dependencies: RouteDependencies }
+): Promise<void> {
+  const { storage, FRONTEND_URL } = opts.dependencies;
 
   /**
    * POST /api/share
    * Share a project and get a shareable link.
    */
-  router.post('/', async (req: Request, res: Response) => {
+  app.post('/', async (request: FastifyRequest<{ Body: ShareProjectRequest }>, reply: FastifyReply) => {
     try {
-      const body = req.body as ShareProjectRequest;
+      const body = request.body;
 
       // Validate request
       if (!body.projectId || typeof body.projectId !== 'string') {
-        return res.status(400).json({ error: 'Invalid projectId' });
+        return reply.code(400).send({ error: 'Invalid projectId' });
       }
 
       if (!body.projectData || typeof body.projectData !== 'object') {
-        return res.status(400).json({ error: 'Invalid projectData' });
+        return reply.code(400).send({ error: 'Invalid projectData' });
       }
 
       const projectData = body.projectData;
@@ -39,7 +37,7 @@ export function createShareRoutes(deps: RouteDependencies): Router {
         typeof projectData.metadata.id !== 'string' ||
         typeof projectData.metadata.name !== 'string'
       ) {
-        return res.status(400).json({ error: 'Invalid project data structure' });
+        return reply.code(400).send({ error: 'Invalid project data structure' });
       }
 
       // Save to storage (no expiry for now)
@@ -53,10 +51,10 @@ export function createShareRoutes(deps: RouteDependencies): Router {
         url: shareUrl,
       };
 
-      res.json(response);
+      reply.send(response);
     } catch (error) {
       console.error('Error sharing project:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to share project',
         message: error instanceof Error ? error.message : String(error),
       });
@@ -67,24 +65,24 @@ export function createShareRoutes(deps: RouteDependencies): Router {
    * GET /api/share/:token
    * Load a shared project by token.
    */
-  router.get('/:token', async (req: Request, res: Response) => {
+  app.get('/:token', async (request: FastifyRequest<{ Params: { token: string } }>, reply: FastifyReply) => {
     try {
-      const { token } = req.params;
+      const { token } = request.params;
 
       if (!token || typeof token !== 'string') {
-        return res.status(400).json({ error: 'Invalid token' });
+        return reply.code(400).send({ error: 'Invalid token' });
       }
 
       const share = await storage.load(token);
 
       if (!share) {
-        return res.status(404).json({ error: 'Shared project not found' });
+        return reply.code(404).send({ error: 'Shared project not found' });
       }
 
-      res.json(share.projectData);
+      reply.send(share.projectData);
     } catch (error) {
       console.error('Error loading shared project:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to load shared project',
         message: error instanceof Error ? error.message : String(error),
       });
@@ -95,65 +93,69 @@ export function createShareRoutes(deps: RouteDependencies): Router {
    * GET /api/share/:token/metadata
    * Get metadata for a shared project (without loading full data).
    */
-  router.get('/:token/metadata', async (req: Request, res: Response) => {
-    try {
-      const { token } = req.params;
+  app.get(
+    '/:token/metadata',
+    async (request: FastifyRequest<{ Params: { token: string } }>, reply: FastifyReply) => {
+      try {
+        const { token } = request.params;
 
-      if (!token || typeof token !== 'string') {
-        return res.status(400).json({ error: 'Invalid token' });
+        if (!token || typeof token !== 'string') {
+          return reply.code(400).send({ error: 'Invalid token' });
+        }
+
+        const share = await storage.load(token);
+
+        if (!share) {
+          return reply.code(404).send({ error: 'Shared project not found' });
+        }
+
+        const response: ShareMetadataResponse = {
+          token,
+          projectId: share.projectData.metadata.id,
+          name: share.projectData.metadata.name,
+          createdAt: share.createdAt,
+          ...(share.expiresAt !== undefined && { expiresAt: share.expiresAt }),
+        };
+
+        reply.send(response);
+      } catch (error) {
+        console.error('Error loading shared project metadata:', error);
+        reply.code(500).send({
+          error: 'Failed to load shared project metadata',
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
-
-      const share = await storage.load(token);
-
-      if (!share) {
-        return res.status(404).json({ error: 'Shared project not found' });
-      }
-
-      const response: ShareMetadataResponse = {
-        token,
-        projectId: share.projectData.metadata.id,
-        name: share.projectData.metadata.name,
-        createdAt: share.createdAt,
-        ...(share.expiresAt !== undefined && { expiresAt: share.expiresAt }),
-      };
-
-      res.json(response);
-    } catch (error) {
-      console.error('Error loading shared project metadata:', error);
-      res.status(500).json({
-        error: 'Failed to load shared project metadata',
-        message: error instanceof Error ? error.message : String(error),
-      });
     }
-  });
+  );
 
   /**
    * DELETE /api/share/:token
    * Revoke (delete) a share link.
    */
-  router.delete('/:token', async (req: Request, res: Response) => {
-    try {
-      const { token } = req.params;
+  app.delete(
+    '/:token',
+    async (request: FastifyRequest<{ Params: { token: string } }>, reply: FastifyReply) => {
+      try {
+        const { token } = request.params;
 
-      if (!token || typeof token !== 'string') {
-        return res.status(400).json({ error: 'Invalid token' });
+        if (!token || typeof token !== 'string') {
+          return reply.code(400).send({ error: 'Invalid token' });
+        }
+
+        const deleted = await storage.delete(token);
+
+        if (!deleted) {
+          return reply.code(404).send({ error: 'Shared project not found' });
+        }
+
+        reply.code(204).send();
+      } catch (error) {
+        console.error('Error revoking share:', error);
+        reply.code(500).send({
+          error: 'Failed to revoke share',
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
-
-      const deleted = await storage.delete(token);
-
-      if (!deleted) {
-        return res.status(404).json({ error: 'Shared project not found' });
-      }
-
-      res.status(204).send();
-    } catch (error) {
-      console.error('Error revoking share:', error);
-      res.status(500).json({
-        error: 'Failed to revoke share',
-        message: error instanceof Error ? error.message : String(error),
-      });
     }
-  });
-
-  return router;
+  );
 }

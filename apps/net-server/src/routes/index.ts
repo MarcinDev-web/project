@@ -24,10 +24,8 @@ import type { StudioSettingsStorage } from '../storage/StudioSettingsStorage';
 import type { CurrencyService } from '../services/CurrencyService';
 import type { PurchaseService } from '../services/PurchaseService';
 import type { LedgerService } from '../services/LedgerService';
-import type { Request, Response, NextFunction } from 'express';
-import type { RateLimitRequestHandler } from 'express-rate-limit';
+import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { CurrencyAmount } from '@engine/economy';
-// @ts-expect-error - Prisma client is generated at build time
 import type { PrismaClient } from '../../node_modules/.prisma/net-client';
 
 /**
@@ -36,9 +34,9 @@ import type { PrismaClient } from '../../node_modules/.prisma/net-client';
 export interface RouteDependencies {
   // Auth & Session
   authManager: AuthManager;
-  authMiddleware: (req: Request, res: Response, next: NextFunction) => Promise<void>;
-  requireAdmin: () => (req: Request, res: Response, next: NextFunction) => void;
-  requireModerator: () => (req: Request, res: Response, next: NextFunction) => void;
+  authMiddleware: (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+  requireAdmin: () => (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
+  requireModerator: () => (request: FastifyRequest, reply: FastifyReply) => Promise<void>;
   sessionManager: SessionManager;
   gameSessionTracker: GameSessionTracker;
   messageHandler: MessageHandler;
@@ -93,10 +91,22 @@ export interface RouteDependencies {
   >;
   resaleListings: Map<string, { sellerId: string; price: CurrencyAmount; createdAt: number }[]>;
 
-  // Rate limiters
-  authLimiter: RateLimitRequestHandler;
-  economyLimiter: RateLimitRequestHandler;
-  publishLimiter: RateLimitRequestHandler;
+  // Rate limiters (Fastify rate limit configs)
+  authLimiter: {
+    max: number;
+    timeWindow: string;
+    errorResponseBuilder: (request: FastifyRequest) => { error: string };
+  };
+  economyLimiter: {
+    max: number;
+    timeWindow: string;
+    errorResponseBuilder: (request: FastifyRequest) => { error: string };
+  };
+  publishLimiter: {
+    max: number;
+    timeWindow: string;
+    errorResponseBuilder: () => { error: string };
+  };
 
   // Security
   securityLogger: {
@@ -135,10 +145,7 @@ export interface RouteDependencies {
   marketplaceItemIdParamSchema: typeof import('../validation/schemas/marketplace').marketplaceItemIdParamSchema;
   validateQuery: typeof import('../validation/middleware').validateQuery;
 
-  // Async handler wrapper (for routes that don't catch errors)
-  asyncHandler: (
-    fn: (req: Request, res: Response, next: NextFunction) => Promise<unknown>
-  ) => (req: Request, res: Response, next: NextFunction) => void;
+  // Note: Fastify handles async errors natively, asyncHandler not needed
 
   // Economy config
   ECONOMY_MIN_PRICE: Record<string, number>;

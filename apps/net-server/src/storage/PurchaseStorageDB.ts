@@ -2,16 +2,9 @@
  * Purchase Storage DB - PostgreSQL implementation using Prisma
  */
 
-// @ts-expect-error - Prisma client is generated at build time
 import type { PrismaClient as PrismaClientType } from '../../node_modules/.prisma/net-client';
-// @ts-expect-error - Prisma client is generated at build time
 import { Prisma } from '../../node_modules/.prisma/net-client';
-import type {
-  Purchase,
-  PurchaseFilter,
-  PurchaseItemType,
-  PurchaseStatus,
-} from './PurchaseStorage';
+import type { Purchase, PurchaseFilter, PurchaseItemType, PurchaseStatus } from './PurchaseStorage';
 
 export class PurchaseStorageDB {
   constructor(private readonly prisma: PrismaClientType) {}
@@ -25,53 +18,55 @@ export class PurchaseStorageDB {
     const id = `purchase_${Date.now()}_${Math.random().toString(36).substring(7)}`;
     const now = new Date();
 
-    return this.prisma.$transaction(async (tx: Parameters<Parameters<PrismaClientType['$transaction']>[0]>[0]) => {
-      // Insert purchase
-      await tx.purchase.create({
-        data: {
-          id,
-          userId: purchase.userId,
-          totalCurrency: purchase.totalCost.currency,
-          totalAmount: purchase.totalCost.amount,
-          status: purchase.status,
-        items: {
-          create: purchase.items.map((item: Purchase['items'][0]) => ({
-              itemId: item.itemId,
-              itemType: item.type,
-              name: item.name,
-              priceCurrency: item.price.currency,
-              priceAmount: item.price.amount,
-            })),
+    return this.prisma.$transaction(
+      async (tx: Parameters<Parameters<PrismaClientType['$transaction']>[0]>[0]) => {
+        // Insert purchase
+        await tx.purchase.create({
+          data: {
+            id,
+            userId: purchase.userId,
+            totalCurrency: purchase.totalCost.currency,
+            totalAmount: purchase.totalCost.amount,
+            status: purchase.status,
+            items: {
+              create: purchase.items.map((item: Purchase['items'][0]) => ({
+                itemId: item.itemId,
+                itemType: item.type,
+                name: item.name,
+                priceCurrency: item.price.currency,
+                priceAmount: item.price.amount,
+              })),
+            },
           },
-        },
-      });
+        });
 
-      // Update owned items (upsert to handle conflicts)
-      for (const item of purchase.items) {
-        await tx.userOwnedItem.upsert({
-          where: {
-            userId_itemId_itemType: {
+        // Update owned items (upsert to handle conflicts)
+        for (const item of purchase.items) {
+          await tx.userOwnedItem.upsert({
+            where: {
+              userId_itemId_itemType: {
+                userId: purchase.userId,
+                itemId: item.itemId,
+                itemType: item.type,
+              },
+            },
+            update: {},
+            create: {
               userId: purchase.userId,
               itemId: item.itemId,
               itemType: item.type,
+              purchasedAt: now,
             },
-          },
-          update: {},
-          create: {
-            userId: purchase.userId,
-            itemId: item.itemId,
-            itemType: item.type,
-            purchasedAt: now,
-          },
-        });
-      }
+          });
+        }
 
-      return {
-        ...purchase,
-        id,
-        createdAt: now.getTime(),
-      };
-    });
+        return {
+          ...purchase,
+          id,
+          createdAt: now.getTime(),
+        };
+      }
+    );
   }
 
   async getPurchase(id: string): Promise<Purchase | null> {
@@ -113,7 +108,9 @@ export class PurchaseStorageDB {
       skip: offset,
     });
 
-    return purchases.map((p: Parameters<typeof this.mapPrismaToPurchase>[0]) => this.mapPrismaToPurchase(p));
+    return purchases.map((p: Parameters<typeof this.mapPrismaToPurchase>[0]) =>
+      this.mapPrismaToPurchase(p)
+    );
   }
 
   async updatePurchaseStatus(id: string, status: PurchaseStatus): Promise<Purchase | null> {
@@ -178,51 +175,53 @@ export class PurchaseStorageDB {
     fromUserId: string,
     toUserId: string
   ): Promise<boolean> {
-    return this.prisma.$transaction(async (tx: Parameters<Parameters<PrismaClientType['$transaction']>[0]>[0]) => {
-      // Verify source owns the item
-      const count = await tx.userOwnedItem.count({
-        where: {
-          userId: fromUserId,
-          itemId,
-          itemType,
-        },
-      });
-
-      if (count === 0) {
-        return false;
-      }
-
-      // Remove from seller
-      await tx.userOwnedItem.delete({
-        where: {
-          userId_itemId_itemType: {
+    return this.prisma.$transaction(
+      async (tx: Parameters<Parameters<PrismaClientType['$transaction']>[0]>[0]) => {
+        // Verify source owns the item
+        const count = await tx.userOwnedItem.count({
+          where: {
             userId: fromUserId,
             itemId,
             itemType,
           },
-        },
-      });
+        });
 
-      // Add to buyer (upsert to handle conflicts)
-      await tx.userOwnedItem.upsert({
-        where: {
-          userId_itemId_itemType: {
+        if (count === 0) {
+          return false;
+        }
+
+        // Remove from seller
+        await tx.userOwnedItem.delete({
+          where: {
+            userId_itemId_itemType: {
+              userId: fromUserId,
+              itemId,
+              itemType,
+            },
+          },
+        });
+
+        // Add to buyer (upsert to handle conflicts)
+        await tx.userOwnedItem.upsert({
+          where: {
+            userId_itemId_itemType: {
+              userId: toUserId,
+              itemId,
+              itemType,
+            },
+          },
+          update: {},
+          create: {
             userId: toUserId,
             itemId,
             itemType,
+            purchasedAt: new Date(),
           },
-        },
-        update: {},
-        create: {
-          userId: toUserId,
-          itemId,
-          itemType,
-          purchasedAt: new Date(),
-        },
-      });
+        });
 
-      return true;
-    });
+        return true;
+      }
+    );
   }
 
   private mapPrismaToPurchase(purchase: {
@@ -243,15 +242,23 @@ export class PurchaseStorageDB {
     return {
       id: purchase.id,
       userId: purchase.userId,
-      items: purchase.items.map((item: { itemId: string; itemType: string; name: string; priceCurrency: string; priceAmount: Prisma.Decimal }) => ({
-        itemId: item.itemId,
-        type: item.itemType as PurchaseItemType,
-        name: item.name,
-        price: {
-          currency: item.priceCurrency,
-          amount: Number(item.priceAmount),
-        },
-      })),
+      items: purchase.items.map(
+        (item: {
+          itemId: string;
+          itemType: string;
+          name: string;
+          priceCurrency: string;
+          priceAmount: Prisma.Decimal;
+        }) => ({
+          itemId: item.itemId,
+          type: item.itemType as PurchaseItemType,
+          name: item.name,
+          price: {
+            currency: item.priceCurrency,
+            amount: Number(item.priceAmount),
+          },
+        })
+      ),
       totalCost: {
         currency: purchase.totalCurrency,
         amount: Number(purchase.totalAmount),

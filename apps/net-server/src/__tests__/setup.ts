@@ -3,10 +3,9 @@
  */
 
 import { afterEach, beforeEach } from 'vitest';
-import type { Express } from 'express';
+import type { FastifyInstance } from 'fastify';
 import { app } from '../server';
 import { createDbPool, ensureSchema } from '../lib/db';
-// @ts-expect-error - Prisma client is generated at build time
 import type { PrismaClient } from '../../node_modules/.prisma/net-client';
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -19,7 +18,7 @@ let testDataDir: string | null = null;
  * Setup test environment before each test
  */
 export async function setupTestEnvironment(): Promise<{
-  app: Express;
+  app: FastifyInstance;
   dbPool: PrismaClient | null;
   dataDir: string;
 }> {

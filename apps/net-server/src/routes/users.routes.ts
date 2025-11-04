@@ -1,60 +1,70 @@
-import { Router, type Request, type Response } from 'express';
+import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import type { RouteDependencies } from './index';
-import type { AuthRequest } from '../auth/middleware';
-import { validateBody, validateParams } from '../validation/middleware';
 import { updateProfileSchema, userIdParamSchema } from '../validation/schemas/user';
+import { validateBody, validateParams } from '../validation/middleware';
 
 /**
- * Create users routes
+ * Create users routes for Fastify
  */
-export function createUsersRoutes(deps: RouteDependencies): Router {
-  const router = Router();
-  const { authMiddleware, profileStorage, marketplaceStorage } = deps;
+export async function createUsersRoutes(
+  app: FastifyInstance,
+  opts: { dependencies: RouteDependencies }
+): Promise<void> {
+  const { authMiddleware, profileStorage, marketplaceStorage } = opts.dependencies;
 
   /**
    * GET /api/users/:id
    * Get user profile by ID.
    */
-  router.get('/:id', async (req: Request, res: Response) => {
-    try {
-      const { id } = req.params;
-      if (!id) {
-        return res.status(400).json({ error: 'User ID required' });
-      }
-      const profile = await profileStorage.getProfile(id);
+  app.get(
+    '/:id',
+    {
+      preHandler: [validateParams(userIdParamSchema)],
+    },
+    async (request: FastifyRequest<{ Params: z.infer<typeof userIdParamSchema> }>, reply: FastifyReply) => {
+      try {
+        const { id } = request.params;
+        const profile = await profileStorage.getProfile(id);
 
-      if (!profile) {
-        return res.status(404).json({ error: 'User not found' });
-      }
+        if (!profile) {
+          return reply.code(404).send({ error: 'User not found' });
+        }
 
-      res.json(profile);
-    } catch (error) {
-      console.error('Get user profile error:', error);
-      res.status(500).json({
-        error: 'Failed to get user profile',
-        message: error instanceof Error ? error.message : String(error),
-      });
+        reply.send(profile);
+      } catch (error) {
+        console.error('Get user profile error:', error);
+        reply.code(500).send({
+          error: 'Failed to get user profile',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
-  });
+  );
 
   /**
    * PUT /api/users/:id
    * Update user profile (own profile only).
    */
-  router.put(
+  app.put(
     '/:id',
-    authMiddleware,
-    validateParams(userIdParamSchema),
-    validateBody(updateProfileSchema),
-    async (req: AuthRequest, res: Response) => {
+    {
+      preHandler: [validateParams(userIdParamSchema), validateBody(updateProfileSchema), authMiddleware],
+    },
+    async (
+      request: FastifyRequest<{
+        Params: z.infer<typeof userIdParamSchema>;
+        Body: z.infer<typeof updateProfileSchema>;
+      }>,
+      reply: FastifyReply
+    ) => {
       try {
-        const { id } = req.params;
-        if (!req.user || req.user.id !== id) {
-          return res.status(403).json({ error: 'Forbidden' });
+        const { id } = request.params;
+        if (!request.user || request.user.id !== id) {
+          return reply.code(403).send({ error: 'Forbidden' });
         }
 
-        const updates = req.body as z.infer<typeof updateProfileSchema>;
+        const updates = request.body;
         // Filter out undefined values to match exactOptionalPropertyTypes
         const cleanUpdates: {
           displayName?: string;
@@ -75,21 +85,21 @@ export function createUsersRoutes(deps: RouteDependencies): Router {
           cleanUpdates.socialLinks = socialLinks;
         }
 
-        const profile = await profileStorage.updateProfile(req.user.id, cleanUpdates);
+        const profile = await profileStorage.updateProfile(request.user.id, cleanUpdates);
 
-        res.json(profile);
+        reply.send(profile);
       } catch (error) {
         console.error('Update profile error:', error);
 
         // Handle profile not found error
         if (error instanceof Error && error.message.includes('Profile not found')) {
-          return res.status(404).json({
+          return reply.code(404).send({
             error: 'Profile not found',
             message: error.message,
           });
         }
 
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to update profile',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -101,131 +111,144 @@ export function createUsersRoutes(deps: RouteDependencies): Router {
    * GET /api/users/:id/builds
    * Get user's published builds.
    */
-  router.get('/:id/builds', async (req: Request, res: Response) => {
-    try {
-      const { id } = req.params;
-      if (!id) {
-        return res.status(400).json({ error: 'User ID required' });
-      }
-      const items = await marketplaceStorage.getItems({
-        authorId: id,
-        type: 'build',
-        public: true,
-      });
+  app.get(
+    '/:id/builds',
+    {
+      preHandler: [validateParams(userIdParamSchema)],
+    },
+    async (request: FastifyRequest<{ Params: z.infer<typeof userIdParamSchema> }>, reply: FastifyReply) => {
+      try {
+        const { id } = request.params;
+        const items = await marketplaceStorage.getItems({
+          authorId: id,
+          type: 'build',
+          public: true,
+        });
 
-      res.json(items);
-    } catch (error) {
-      console.error('Get user builds error:', error);
-      res.status(500).json({
-        error: 'Failed to get builds',
-        message: error instanceof Error ? error.message : String(error),
-      });
+        reply.send(items);
+      } catch (error) {
+        console.error('Get user builds error:', error);
+        reply.code(500).send({
+          error: 'Failed to get builds',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
-  });
+  );
 
   /**
    * GET /api/users/:id/avatar-loadout
    * Get user's avatar loadout.
    */
-  router.get('/:id/avatar-loadout', async (req: Request, res: Response) => {
-    try {
-      const { id } = req.params;
-      if (!id) {
-        return res.status(400).json({ error: 'User ID required' });
+  app.get(
+    '/:id/avatar-loadout',
+    {
+      preHandler: [validateParams(userIdParamSchema)],
+    },
+    async (request: FastifyRequest<{ Params: z.infer<typeof userIdParamSchema> }>, reply: FastifyReply) => {
+      try {
+        const { id } = request.params;
+
+        const profile = await profileStorage.getProfile(id);
+
+        if (!profile) {
+          return reply.code(404).send({ error: 'User not found' });
+        }
+
+        if (!profile.avatarLoadout) {
+          return reply.code(404).send({ error: 'Avatar loadout not found' });
+        }
+
+        reply.send(profile.avatarLoadout);
+      } catch (error) {
+        console.error('Get avatar loadout error:', error);
+        reply.code(500).send({
+          error: 'Failed to get avatar loadout',
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
-
-      const profile = await profileStorage.getProfile(id);
-
-      if (!profile) {
-        return res.status(404).json({ error: 'User not found' });
-      }
-
-      if (!profile.avatarLoadout) {
-        return res.status(404).json({ error: 'Avatar loadout not found' });
-      }
-
-      res.json(profile.avatarLoadout);
-    } catch (error) {
-      console.error('Get avatar loadout error:', error);
-      res.status(500).json({
-        error: 'Failed to get avatar loadout',
-        message: error instanceof Error ? error.message : String(error),
-      });
     }
-  });
+  );
 
   /**
    * PUT /api/users/:id/avatar-loadout
    * Save user's avatar loadout (own profile only).
    */
-  router.put('/:id/avatar-loadout', authMiddleware, async (req: AuthRequest, res: Response) => {
-    try {
-      const { id } = req.params;
-      if (!id) {
-        return res.status(400).json({ error: 'User ID required' });
-      }
-      if (!req.user || req.user.id !== id) {
-        return res.status(403).json({ error: 'Forbidden' });
-      }
+  app.put(
+    '/:id/avatar-loadout',
+    {
+      preHandler: [validateParams(userIdParamSchema), authMiddleware],
+    },
+    async (
+      request: FastifyRequest<{
+        Params: z.infer<typeof userIdParamSchema>;
+        Body: { version: number; parts: Record<string, unknown> };
+      }>,
+      reply: FastifyReply
+    ) => {
+      try {
+        const { id } = request.params;
+        if (!request.user || request.user.id !== id) {
+          return reply.code(403).send({ error: 'Forbidden' });
+        }
 
-      const loadout = req.body as { version: number; parts: Record<string, unknown> };
+        const loadout = request.body;
 
-      // Basic validation
-      if (!loadout || typeof loadout !== 'object' || typeof loadout.version !== 'number') {
-        return res.status(400).json({ error: 'Invalid loadout format' });
-      }
+        // Basic validation
+        if (!loadout || typeof loadout !== 'object' || typeof loadout.version !== 'number') {
+          return reply.code(400).send({ error: 'Invalid loadout format' });
+        }
 
-      // Convert parts to proper type structure
-      const typedLoadout: {
-        version: number;
-        parts: Record<
-          string,
-          {
-            mesh: string;
-            mat?: string;
-            material?: string;
-            colors?: Record<string, [number, number, number, number]>;
-          }
-        >;
-      } = {
-        version: loadout.version,
-        parts: Object.fromEntries(
-          Object.entries(loadout.parts).map(([key, value]) => [
-            key,
-            typeof value === 'object' && value !== null && 'mesh' in value
-              ? (value as {
-                  mesh: string;
-                  mat?: string;
-                  material?: string;
-                  colors?: Record<string, [number, number, number, number]>;
-                })
-              : { mesh: String(value) },
-          ])
-        ),
-      };
+        // Convert parts to proper type structure
+        const typedLoadout: {
+          version: number;
+          parts: Record<
+            string,
+            {
+              mesh: string;
+              mat?: string;
+              material?: string;
+              colors?: Record<string, [number, number, number, number]>;
+            }
+          >;
+        } = {
+          version: loadout.version,
+          parts: Object.fromEntries(
+            Object.entries(loadout.parts).map(([key, value]) => [
+              key,
+              typeof value === 'object' && value !== null && 'mesh' in value
+                ? (value as {
+                    mesh: string;
+                    mat?: string;
+                    material?: string;
+                    colors?: Record<string, [number, number, number, number]>;
+                  })
+                : { mesh: String(value) },
+            ])
+          ),
+        };
 
-      const profile = await profileStorage.updateProfile(req.user.id, {
-        avatarLoadout: typedLoadout,
-      });
+        const profile = await profileStorage.updateProfile(request.user.id, {
+          avatarLoadout: typedLoadout,
+        });
 
-      res.json(profile.avatarLoadout);
-    } catch (error) {
-      console.error('Save avatar loadout error:', error);
+        reply.send(profile.avatarLoadout);
+      } catch (error) {
+        console.error('Save avatar loadout error:', error);
 
-      // Handle profile not found error
-      if (error instanceof Error && error.message.includes('Profile not found')) {
-        return res.status(404).json({
-          error: 'Profile not found',
-          message: error.message,
+        // Handle profile not found error
+        if (error instanceof Error && error.message.includes('Profile not found')) {
+          return reply.code(404).send({
+            error: 'Profile not found',
+            message: error.message,
+          });
+        }
+
+        reply.code(500).send({
+          error: 'Failed to save avatar loadout',
+          message: error instanceof Error ? error.message : String(error),
         });
       }
-
-      res.status(500).json({
-        error: 'Failed to save avatar loadout',
-        message: error instanceof Error ? error.message : String(error),
-      });
     }
-  });
-
-  return router;
+  );
 }

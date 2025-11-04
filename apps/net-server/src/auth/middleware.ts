@@ -1,28 +1,30 @@
-import type { Request, Response, NextFunction } from 'express';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 import type { AuthManager } from './AuthManager';
 import type { UserRole } from '../types/auth';
 
 /**
- * Extend Express Request to include user.
+ * Extend FastifyRequest to include user.
  */
-export interface AuthRequest extends Request {
-  user?: {
-    id: string;
-    email: string;
-    role?: UserRole;
-  };
+declare module 'fastify' {
+  interface FastifyRequest {
+    user?: {
+      id: string;
+      email: string;
+      role?: UserRole;
+    };
+  }
 }
 
 /**
- * Authentication middleware - verifies JWT token and attaches user to request.
+ * Authentication hook for Fastify - verifies JWT token and attaches user to request.
  */
 export function createAuthMiddleware(authManager: AuthManager) {
-  return async (req: AuthRequest, res: Response, next: NextFunction): Promise<void> => {
+  return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     try {
-      const authHeader = req.headers.authorization;
+      const authHeader = request.headers.authorization;
 
       if (!authHeader || !authHeader.startsWith('Bearer ')) {
-        res.status(401).json({ error: 'Missing or invalid authorization header' });
+        reply.code(401).send({ error: 'Missing or invalid authorization header' });
         return;
       }
 
@@ -30,20 +32,18 @@ export function createAuthMiddleware(authManager: AuthManager) {
       const user = await authManager.verifyToken(token);
 
       if (!user) {
-        res.status(401).json({ error: 'Invalid or expired token' });
+        reply.code(401).send({ error: 'Invalid or expired token' });
         return;
       }
 
       // Attach user to request
-      req.user = {
+      request.user = {
         id: user.id,
         email: user.email,
         role: user.role ?? 'user',
       };
-
-      next();
     } catch (error) {
-      res.status(401).json({
+      reply.code(401).send({
         error: 'Authentication failed',
         message: error instanceof Error ? error.message : String(error),
       });
@@ -52,64 +52,57 @@ export function createAuthMiddleware(authManager: AuthManager) {
 }
 
 /**
- * Require admin role middleware.
+ * Require admin role hook for Fastify.
  */
 export function requireAdmin() {
-  return (req: AuthRequest, res: Response, next: NextFunction): void => {
-    if (!req.user) {
-      res.status(401).json({ error: 'Unauthorized' });
+  return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    if (!request.user) {
+      reply.code(401).send({ error: 'Unauthorized' });
       return;
     }
 
-    if (req.user.role !== 'admin') {
-      res.status(403).json({ error: 'Forbidden: Admin access required' });
+    if (request.user.role !== 'admin') {
+      reply.code(403).send({ error: 'Forbidden: Admin access required' });
       return;
     }
-
-    next();
   };
 }
 
 /**
- * Require moderator or admin role middleware.
+ * Require moderator or admin role hook for Fastify.
  */
 export function requireModerator() {
-  return (req: AuthRequest, res: Response, next: NextFunction): void => {
-    if (!req.user) {
-      res.status(401).json({ error: 'Unauthorized' });
+  return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    if (!request.user) {
+      reply.code(401).send({ error: 'Unauthorized' });
       return;
     }
 
-    if (req.user.role !== 'admin' && req.user.role !== 'moderator') {
-      res.status(403).json({ error: 'Forbidden: Moderator access required' });
+    if (request.user.role !== 'admin' && request.user.role !== 'moderator') {
+      reply.code(403).send({ error: 'Forbidden: Moderator access required' });
       return;
     }
-
-    next();
   };
 }
 
 /**
- * Require specific role middleware.
+ * Require specific role hook for Fastify.
  */
 export function requireRole(role: UserRole) {
-  return (req: AuthRequest, res: Response, next: NextFunction): void => {
-    if (!req.user) {
-      res.status(401).json({ error: 'Unauthorized' });
+  return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
+    if (!request.user) {
+      reply.code(401).send({ error: 'Unauthorized' });
       return;
     }
 
-    if (req.user.role !== role) {
+    if (request.user.role !== role) {
       // Admin can access everything
-      if (req.user.role === 'admin') {
-        next();
+      if (request.user.role === 'admin') {
         return;
       }
 
-      res.status(403).json({ error: `Forbidden: ${role} access required` });
+      reply.code(403).send({ error: `Forbidden: ${role} access required` });
       return;
     }
-
-    next();
   };
 }

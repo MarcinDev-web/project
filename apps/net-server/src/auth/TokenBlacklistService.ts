@@ -6,7 +6,6 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-// @ts-expect-error - Prisma client is generated at build time
 import type { PrismaClient } from '../../node_modules/.prisma/net-client';
 
 /**

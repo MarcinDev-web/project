@@ -281,9 +281,10 @@ export async function seedMarketplace(tracker?: GameSessionTracker): Promise<voi
       console.log(`✓ Created: ${item.title} (${item.type})`);
 
       // Set fileUrl based on item type
-      const fileUrl = item.type === 'build'
-        ? `/api/marketplace/${item.id}/build`
-        : `/api/marketplace/${item.id}/avatar`;
+      const fileUrl =
+        item.type === 'build'
+          ? `/api/marketplace/${item.id}/build`
+          : `/api/marketplace/${item.id}/avatar`;
 
       // Generate thumbnail (with error handling)
       let thumbnailUrl: string | undefined;
@@ -397,7 +398,9 @@ export async function seedMarketplace(tracker?: GameSessionTracker): Promise<voi
       await dbPool.$disconnect();
     }
 
-    console.log(`✓ Successfully seeded ${mockBuilds.length} mock builds and ${mockAvatars.length} mock avatars!`);
+    console.log(
+      `✓ Successfully seeded ${mockBuilds.length} mock builds and ${mockAvatars.length} mock avatars!`
+    );
   } catch (error) {
     console.error('Error seeding marketplace:', error);
     throw error;

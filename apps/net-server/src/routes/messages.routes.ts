@@ -1,12 +1,13 @@
-import { Router, type Response } from 'express';
+import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { RouteDependencies } from './index';
-import type { AuthRequest } from '../auth/middleware';
 
 /**
- * Create messages routes
+ * Create messages routes for Fastify
  */
-export function createMessagesRoutes(deps: RouteDependencies): Router {
-  const router = Router();
+export async function createMessagesRoutes(
+  app: FastifyInstance,
+  opts: { dependencies: RouteDependencies }
+): Promise<void> {
   const {
     authMiddleware,
     messagesStorage,
@@ -16,23 +17,23 @@ export function createMessagesRoutes(deps: RouteDependencies): Router {
     authManager,
     userSettingsStorage,
     notificationsStorage,
-  } = deps;
+  } = opts.dependencies;
 
   /**
    * GET /api/messages
    * Get user's conversations.
    */
-  router.get('/', authMiddleware, async (req: AuthRequest, res: Response) => {
+  app.get('/', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const conversations = await messagesStorage.getConversations(req.user.id);
-      res.json(conversations);
+      const conversations = await messagesStorage.getConversations(request.user.id);
+      reply.send(conversations);
     } catch (error) {
       console.error('Get conversations error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to get conversations',
         message: error instanceof Error ? error.message : String(error),
       });
@@ -43,255 +44,297 @@ export function createMessagesRoutes(deps: RouteDependencies): Router {
    * GET /api/messages/:conversationId
    * Get messages in a conversation.
    */
-  router.get('/:conversationId', authMiddleware, async (req: AuthRequest, res: Response) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
+  app.get(
+    '/:conversationId',
+    {
+      preHandler: [authMiddleware],
+      schema: {
+        params: {
+          type: 'object',
+          required: ['conversationId'],
+          properties: {
+            conversationId: { type: 'string' },
+          },
+        },
+        querystring: {
+          type: 'object',
+          properties: {
+            limit: { type: 'number' },
+          },
+        },
+      },
+    },
+    async (request: FastifyRequest<{ Params: { conversationId: string }; Querystring: { limit?: number } }>, reply: FastifyReply) => {
+      try {
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
+        }
 
-      const { conversationId } = req.params;
-      if (!conversationId) {
-        return res.status(400).json({ error: 'Conversation ID required' });
-      }
-      const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 100;
+        const { conversationId } = request.params;
+        const limit = request.query.limit || 100;
 
-      const messages = await messagesStorage.getMessages(conversationId, limit);
-      res.json(messages);
-    } catch (error) {
-      console.error('Get messages error:', error);
-      res.status(500).json({
-        error: 'Failed to get messages',
-        message: error instanceof Error ? error.message : String(error),
-      });
+        const messages = await messagesStorage.getMessages(conversationId, limit);
+        reply.send(messages);
+      } catch (error) {
+        console.error('Get messages error:', error);
+        reply.code(500).send({
+          error: 'Failed to get messages',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
-  });
+  );
 
   /**
    * POST /api/messages
    * Send a message.
    */
-  router.post('/', authMiddleware, async (req: AuthRequest, res: Response) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-
-      const { toUserId, conversationId, content } = req.body as {
-        toUserId?: string;
-        conversationId?: string;
-        content?: string;
-      };
-
-      if (!content) {
-        return res.status(400).json({ error: 'Missing content' });
-      }
-
-      let message;
-
-      // Check if this is a group message
-      if (conversationId) {
-        const conversation = await messagesStorage.getConversation(conversationId);
-        if (!conversation) {
-          return res.status(404).json({ error: 'Conversation not found' });
+  app.post(
+    '/',
+    {
+      preHandler: [authMiddleware],
+      schema: {
+        body: {
+          type: 'object',
+          required: ['content'],
+          properties: {
+            toUserId: { type: 'string' },
+            conversationId: { type: 'string' },
+            content: { type: 'string' },
+          },
+        },
+      },
+    },
+    async (
+      request: FastifyRequest<{
+        Body: { toUserId?: string; conversationId?: string; content: string };
+      }>,
+      reply: FastifyReply
+    ) => {
+      try {
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        if (conversation.type === 'group') {
-          // Group message
-          if (!conversation.participants.includes(req.user.id)) {
-            return res.status(403).json({ error: 'Not a member of this group' });
-          }
-          message = await messagesStorage.createMessage(req.user.id, conversationId, content, true);
-        } else {
-          // Direct message with conversation ID
-          if (!toUserId) {
-            return res.status(400).json({ error: 'Missing toUserId for direct message' });
+        const { toUserId, conversationId, content } = request.body;
+
+        let message;
+
+        // Check if this is a group message
+        if (conversationId) {
+          const conversation = await messagesStorage.getConversation(conversationId);
+          if (!conversation) {
+            return reply.code(404).send({ error: 'Conversation not found' });
           }
 
+          if (conversation.type === 'group') {
+            // Group message
+            if (!conversation.participants.includes(request.user.id)) {
+              return reply.code(403).send({ error: 'Not a member of this group' });
+            }
+            message = await messagesStorage.createMessage(request.user.id, conversationId, content, true);
+          } else {
+            // Direct message with conversation ID
+            if (!toUserId) {
+              return reply.code(400).send({ error: 'Missing toUserId for direct message' });
+            }
+
+            // Check if user is blocked
+            const isBlocked = await blockedUsersStorage.isBlocked(request.user.id, toUserId);
+            const isBlockedBy = await blockedUsersStorage.isBlockedBy(request.user.id, toUserId);
+
+            if (isBlocked) {
+              return reply.code(403).send({ error: 'Cannot send message to blocked user' });
+            }
+
+            if (isBlockedBy) {
+              return reply.code(403).send({ error: 'You are blocked by this user' });
+            }
+
+            message = await messagesStorage.createMessage(request.user.id, toUserId, content);
+          }
+        } else if (toUserId) {
+          // Direct message
           // Check if user is blocked
-          const isBlocked = await blockedUsersStorage.isBlocked(req.user.id, toUserId);
-          const isBlockedBy = await blockedUsersStorage.isBlockedBy(req.user.id, toUserId);
+          const isBlocked = await blockedUsersStorage.isBlocked(request.user.id, toUserId);
+          const isBlockedBy = await blockedUsersStorage.isBlockedBy(request.user.id, toUserId);
 
           if (isBlocked) {
-            return res.status(403).json({ error: 'Cannot send message to blocked user' });
+            return reply.code(403).send({ error: 'Cannot send message to blocked user' });
           }
 
           if (isBlockedBy) {
-            return res.status(403).json({ error: 'You are blocked by this user' });
+            return reply.code(403).send({ error: 'You are blocked by this user' });
           }
 
-          message = await messagesStorage.createMessage(req.user.id, toUserId, content);
-        }
-      } else if (toUserId) {
-        // Direct message
-        // Check if user is blocked
-        const isBlocked = await blockedUsersStorage.isBlocked(req.user.id, toUserId);
-        const isBlockedBy = await blockedUsersStorage.isBlockedBy(req.user.id, toUserId);
-
-        if (isBlocked) {
-          return res.status(403).json({ error: 'Cannot send message to blocked user' });
+          message = await messagesStorage.createMessage(request.user.id, toUserId, content);
+        } else {
+          return reply.code(400).send({ error: 'Missing toUserId or conversationId' });
         }
 
-        if (isBlockedBy) {
-          return res.status(403).json({ error: 'You are blocked by this user' });
-        }
+        // Create notification for recipient(s) (only if conversation is not currently open)
+        const fromUser = await authManager.getUserById(request.user.id);
+        const conversation = await messagesStorage.getConversation(message.conversationId);
 
-        message = await messagesStorage.createMessage(req.user.id, toUserId, content);
-      } else {
-        return res.status(400).json({ error: 'Missing toUserId or conversationId' });
-      }
+        if (conversation?.type === 'group') {
+          // Group message - create notifications for all members except sender
+          for (const memberId of conversation.participants) {
+            if (memberId !== request.user.id) {
+              const wantsNotifications = await userSettingsStorage.getNotificationPreference(
+                memberId,
+                'messages'
+              );
 
-      // Create notification for recipient(s) (only if conversation is not currently open)
-      const fromUser = await authManager.getUserById(req.user.id);
-      const conversation = await messagesStorage.getConversation(message.conversationId);
-
-      if (conversation?.type === 'group') {
-        // Group message - create notifications for all members except sender
-        for (const memberId of conversation.participants) {
-          if (memberId !== req.user.id) {
-            const wantsNotifications = await userSettingsStorage.getNotificationPreference(
-              memberId,
-              'messages'
-            );
-
-            if (wantsNotifications) {
-              await notificationsStorage.createNotification({
-                userId: memberId,
-                type: 'message',
-                title: `New message in ${conversation.groupName ?? 'group'}`,
-                message: `${fromUser?.email ?? 'Someone'}: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
-                link: `/messages`,
-                metadata: { conversationId: message.conversationId, messageId: message.id },
-              });
-
-              // Send notification via WebSocket
-              const notification = await notificationsStorage
-                .getNotifications(memberId, 1)
-                .then((n) => n[0]);
-              if (notification) {
-                sessionManager.sendToUser(memberId, {
-                  type: 'notification:new',
-                  timestamp: Date.now(),
-                  notification: {
-                    id: notification.id,
-                    type: notification.type,
-                    title: notification.title,
-                    message: notification.message,
-                    createdAt: notification.createdAt,
-                    link: notification.link,
-                  },
+              if (wantsNotifications) {
+                await notificationsStorage.createNotification({
+                  userId: memberId,
+                  type: 'message',
+                  title: `New message in ${conversation.groupName ?? 'group'}`,
+                  message: `${fromUser?.email ?? 'Someone'}: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
+                  link: `/messages`,
+                  metadata: { conversationId: message.conversationId, messageId: message.id },
                 });
+
+                // Send notification via WebSocket
+                const notification = await notificationsStorage
+                  .getNotifications(memberId, 1)
+                  .then((n) => n[0]);
+                if (notification) {
+                  sessionManager.sendToUser(memberId, {
+                    type: 'notification:new',
+                    timestamp: Date.now(),
+                    notification: {
+                      id: notification.id,
+                      type: notification.type,
+                      title: notification.title,
+                      message: notification.message,
+                      createdAt: notification.createdAt,
+                      link: notification.link,
+                    },
+                  });
+                }
               }
             }
           }
-        }
-      } else if (toUserId) {
-        // Direct message (toUserId is guaranteed here due to earlier checks)
-        const wantsNotifications = await userSettingsStorage.getNotificationPreference(
-          toUserId,
-          'messages'
-        );
+        } else if (toUserId) {
+          // Direct message (toUserId is guaranteed here due to earlier checks)
+          const wantsNotifications = await userSettingsStorage.getNotificationPreference(toUserId, 'messages');
 
-        if (wantsNotifications) {
-          await notificationsStorage.createNotification({
-            userId: toUserId,
-            type: 'message',
-            title: 'New Message',
-            message: `${fromUser?.email ?? 'Someone'}: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
-            link: `/messages`,
-            metadata: { conversationId: message.conversationId, messageId: message.id },
-          });
-
-          // Send notification via WebSocket
-          const notification = await notificationsStorage
-            .getNotifications(toUserId, 1)
-            .then((n) => n[0]);
-          if (notification) {
-            sessionManager.sendToUser(toUserId, {
-              type: 'notification:new',
-              timestamp: Date.now(),
-              notification: {
-                id: notification.id,
-                type: notification.type,
-                title: notification.title,
-                message: notification.message,
-                createdAt: notification.createdAt,
-                link: notification.link,
-              },
+          if (wantsNotifications) {
+            await notificationsStorage.createNotification({
+              userId: toUserId,
+              type: 'message',
+              title: 'New Message',
+              message: `${fromUser?.email ?? 'Someone'}: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
+              link: `/messages`,
+              metadata: { conversationId: message.conversationId, messageId: message.id },
             });
+
+            // Send notification via WebSocket
+            const notification = await notificationsStorage.getNotifications(toUserId, 1).then((n) => n[0]);
+            if (notification) {
+              sessionManager.sendToUser(toUserId, {
+                type: 'notification:new',
+                timestamp: Date.now(),
+                notification: {
+                  id: notification.id,
+                  type: notification.type,
+                  title: notification.title,
+                  message: notification.message,
+                  createdAt: notification.createdAt,
+                  link: notification.link,
+                },
+              });
+            }
           }
         }
+
+        // Notify recipient(s) via WebSocket if they're online (always send real-time message)
+        await messageHandler.handleNewMessage(message);
+
+        reply.code(201).send(message);
+      } catch (error) {
+        console.error('Send message error:', error);
+        reply.code(500).send({
+          error: 'Failed to send message',
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
-
-      // Notify recipient(s) via WebSocket if they're online (always send real-time message)
-      await messageHandler.handleNewMessage(message);
-
-      res.status(201).json(message);
-    } catch (error) {
-      console.error('Send message error:', error);
-      res.status(500).json({
-        error: 'Failed to send message',
-        message: error instanceof Error ? error.message : String(error),
-      });
     }
-  });
+  );
 
   /**
    * POST /api/messages/groups
    * Create a group conversation.
    */
-  router.post('/groups', authMiddleware, async (req: AuthRequest, res: Response) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+  app.post(
+    '/groups',
+    {
+      preHandler: [authMiddleware],
+      schema: {
+        body: {
+          type: 'object',
+          required: ['groupName', 'memberIds'],
+          properties: {
+            groupName: { type: 'string' },
+            memberIds: { type: 'array', items: { type: 'string' } },
+            groupAvatar: { type: 'string' },
+          },
+        },
+      },
+    },
+    async (
+      request: FastifyRequest<{
+        Body: { groupName: string; memberIds: string[]; groupAvatar?: string };
+      }>,
+      reply: FastifyReply
+    ) => {
+      try {
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
+        }
+
+        const { groupName, memberIds, groupAvatar } = request.body;
+
+        if (!groupName || !Array.isArray(memberIds) || memberIds.length === 0) {
+          return reply.code(400).send({ error: 'Missing groupName or memberIds' });
+        }
+
+        const conversation = await messagesStorage.createGroupConversation(
+          request.user.id,
+          groupName,
+          memberIds,
+          groupAvatar
+        );
+
+        reply.code(201).send(conversation);
+      } catch (error) {
+        console.error('Create group error:', error);
+        reply.code(500).send({
+          error: 'Failed to create group',
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
-
-      const { groupName, memberIds, groupAvatar } = req.body as {
-        groupName?: string;
-        memberIds?: string[];
-        groupAvatar?: string;
-      };
-
-      if (!groupName || !Array.isArray(memberIds) || memberIds.length === 0) {
-        return res.status(400).json({ error: 'Missing groupName or memberIds' });
-      }
-
-      const conversation = await messagesStorage.createGroupConversation(
-        req.user.id,
-        groupName,
-        memberIds,
-        groupAvatar
-      );
-
-      res.status(201).json(conversation);
-    } catch (error) {
-      console.error('Create group error:', error);
-      res.status(500).json({
-        error: 'Failed to create group',
-        message: error instanceof Error ? error.message : String(error),
-      });
     }
-  });
+  );
 
   /**
    * GET /api/messages/groups
    * Get user's group conversations.
    */
-  router.get('/groups', authMiddleware, async (req: AuthRequest, res: Response) => {
+  app.get('/groups', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const conversations = await messagesStorage.getConversations(req.user.id);
+      const conversations = await messagesStorage.getConversations(request.user.id);
       const groups = conversations.filter((c) => c.type === 'group');
 
       // Add unread count for each group
       const groupsWithUnread = await Promise.all(
         groups.map(async (conv) => {
-          const unreadCount = await messagesStorage.getUnreadCountForConversation(
-            conv.id,
-            req.user!.id
-          );
+          const unreadCount = await messagesStorage.getUnreadCountForConversation(conv.id, request.user!.id);
           return {
             ...conv,
             unreadCount,
@@ -299,10 +342,10 @@ export function createMessagesRoutes(deps: RouteDependencies): Router {
         })
       );
 
-      res.json(groupsWithUnread);
+      reply.send(groupsWithUnread);
     } catch (error) {
       console.error('Get groups error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to get groups',
         message: error instanceof Error ? error.message : String(error),
       });
@@ -313,192 +356,250 @@ export function createMessagesRoutes(deps: RouteDependencies): Router {
    * PUT /api/messages/groups/:id
    * Update group conversation (name, avatar).
    */
-  router.put('/groups/:id', authMiddleware, async (req: AuthRequest, res: Response) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+  app.put(
+    '/groups/:id',
+    {
+      preHandler: [authMiddleware],
+      schema: {
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: { type: 'string' },
+          },
+        },
+        body: {
+          type: 'object',
+          properties: {
+            groupName: { type: 'string' },
+            groupAvatar: { type: 'string' },
+          },
+        },
+      },
+    },
+    async (
+      request: FastifyRequest<{
+        Params: { id: string };
+        Body: { groupName?: string; groupAvatar?: string };
+      }>,
+      reply: FastifyReply
+    ) => {
+      try {
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
+        }
+
+        const { id } = request.params;
+        const { groupName, groupAvatar } = request.body;
+
+        const conversation = await messagesStorage.getConversation(id);
+        if (!conversation || conversation.type !== 'group') {
+          return reply.code(404).send({ error: 'Group not found' });
+        }
+
+        if (conversation.ownerId !== request.user.id) {
+          return reply.code(403).send({ error: 'Only owner can update group' });
+        }
+
+        const updateData: { groupName?: string; groupAvatar?: string } = {};
+        if (groupName !== undefined) updateData.groupName = groupName;
+        if (groupAvatar !== undefined) updateData.groupAvatar = groupAvatar;
+
+        const updated = await messagesStorage.updateGroupConversation(id, updateData);
+        if (!updated) {
+          return reply.code(404).send({ error: 'Group not found' });
+        }
+
+        reply.send(updated);
+      } catch (error) {
+        console.error('Update group error:', error);
+        reply.code(500).send({
+          error: 'Failed to update group',
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
-
-      const { id } = req.params;
-      if (!id) {
-        return res.status(400).json({ error: 'Group ID required' });
-      }
-
-      const { groupName, groupAvatar } = req.body as { groupName?: string; groupAvatar?: string };
-
-      const conversation = await messagesStorage.getConversation(id);
-      if (!conversation || conversation.type !== 'group') {
-        return res.status(404).json({ error: 'Group not found' });
-      }
-
-      if (conversation.ownerId !== req.user.id) {
-        return res.status(403).json({ error: 'Only owner can update group' });
-      }
-
-      const updateData: { groupName?: string; groupAvatar?: string } = {};
-      if (groupName !== undefined) updateData.groupName = groupName;
-      if (groupAvatar !== undefined) updateData.groupAvatar = groupAvatar;
-
-      const updated = await messagesStorage.updateGroupConversation(id, updateData);
-      if (!updated) {
-        return res.status(404).json({ error: 'Group not found' });
-      }
-
-      res.json(updated);
-    } catch (error) {
-      console.error('Update group error:', error);
-      res.status(500).json({
-        error: 'Failed to update group',
-        message: error instanceof Error ? error.message : String(error),
-      });
     }
-  });
+  );
 
   /**
    * PUT /api/messages/groups/:id/members
    * Add or remove group members.
    */
-  router.put('/groups/:id/members', authMiddleware, async (req: AuthRequest, res: Response) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+  app.put(
+    '/groups/:id/members',
+    {
+      preHandler: [authMiddleware],
+      schema: {
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: { type: 'string' },
+          },
+        },
+        body: {
+          type: 'object',
+          required: ['action'],
+          properties: {
+            memberIds: { type: 'array', items: { type: 'string' } },
+            memberId: { type: 'string' },
+            action: { type: 'string', enum: ['add', 'remove'] },
+          },
+        },
+      },
+    },
+    async (
+      request: FastifyRequest<{
+        Params: { id: string };
+        Body: { memberIds?: string[]; memberId?: string; action: 'add' | 'remove' };
+      }>,
+      reply: FastifyReply
+    ) => {
+      try {
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
+        }
+
+        const { id } = request.params;
+        const { memberIds, memberId, action } = request.body;
+
+        const conversation = await messagesStorage.getConversation(id);
+        if (!conversation || conversation.type !== 'group') {
+          return reply.code(404).send({ error: 'Group not found' });
+        }
+
+        if (action === 'add') {
+          if (!memberIds || !Array.isArray(memberIds)) {
+            return reply.code(400).send({ error: 'memberIds required for add action' });
+          }
+
+          // Only owner can add members
+          if (conversation.ownerId !== request.user.id) {
+            return reply.code(403).send({ error: 'Only owner can add members' });
+          }
+
+          const added = await messagesStorage.addGroupMembers(id, memberIds);
+          if (!added) {
+            return reply.code(400).send({ error: 'No new members to add' });
+          }
+        } else if (action === 'remove') {
+          if (!memberId) {
+            return reply.code(400).send({ error: 'memberId required for remove action' });
+          }
+
+          // Owner can remove anyone, members can only remove themselves
+          if (conversation.ownerId !== request.user.id && memberId !== request.user.id) {
+            return reply.code(403).send({ error: 'Cannot remove other members' });
+          }
+
+          const removed = await messagesStorage.removeGroupMember(id, memberId);
+          if (!removed) {
+            return reply.code(404).send({ error: 'Member not found' });
+          }
+        } else {
+          return reply.code(400).send({ error: 'Invalid action' });
+        }
+
+        const updated = await messagesStorage.getConversation(id);
+        reply.send(updated);
+      } catch (error) {
+        console.error('Update group members error:', error);
+        reply.code(500).send({
+          error: 'Failed to update group members',
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
-
-      const { id } = req.params;
-      if (!id) {
-        return res.status(400).json({ error: 'Group ID required' });
-      }
-
-      const { memberIds, memberId, action } = req.body as {
-        memberIds?: string[];
-        memberId?: string;
-        action?: 'add' | 'remove';
-      };
-
-      const conversation = await messagesStorage.getConversation(id);
-      if (!conversation || conversation.type !== 'group') {
-        return res.status(404).json({ error: 'Group not found' });
-      }
-
-      if (action === 'add') {
-        if (!memberIds || !Array.isArray(memberIds)) {
-          return res.status(400).json({ error: 'memberIds required for add action' });
-        }
-
-        // Only owner can add members
-        if (conversation.ownerId !== req.user.id) {
-          return res.status(403).json({ error: 'Only owner can add members' });
-        }
-
-        const added = await messagesStorage.addGroupMembers(id, memberIds);
-        if (!added) {
-          return res.status(400).json({ error: 'No new members to add' });
-        }
-      } else if (action === 'remove') {
-        if (!memberId) {
-          return res.status(400).json({ error: 'memberId required for remove action' });
-        }
-
-        // Owner can remove anyone, members can only remove themselves
-        if (conversation.ownerId !== req.user.id && memberId !== req.user.id) {
-          return res.status(403).json({ error: 'Cannot remove other members' });
-        }
-
-        const removed = await messagesStorage.removeGroupMember(id, memberId);
-        if (!removed) {
-          return res.status(404).json({ error: 'Member not found' });
-        }
-      } else {
-        return res.status(400).json({ error: 'Invalid action' });
-      }
-
-      const updated = await messagesStorage.getConversation(id);
-      res.json(updated);
-    } catch (error) {
-      console.error('Update group members error:', error);
-      res.status(500).json({
-        error: 'Failed to update group members',
-        message: error instanceof Error ? error.message : String(error),
-      });
     }
-  });
+  );
 
   /**
    * DELETE /api/messages/groups/:id/leave
    * Leave a group conversation.
    */
-  router.delete('/groups/:id/leave', authMiddleware, async (req: AuthRequest, res: Response) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+  app.delete(
+    '/groups/:id/leave',
+    {
+      preHandler: [authMiddleware],
+      schema: {
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: { type: 'string' },
+          },
+        },
+      },
+    },
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+      try {
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
+        }
+
+        const { id } = request.params;
+        const removed = await messagesStorage.removeGroupMember(id, request.user.id);
+
+        if (!removed) {
+          return reply.code(404).send({ error: 'Not a member of this group' });
+        }
+
+        reply.code(204).send();
+      } catch (error) {
+        console.error('Leave group error:', error);
+        reply.code(500).send({
+          error: 'Failed to leave group',
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
-
-      const { id } = req.params;
-      if (!id) {
-        return res.status(400).json({ error: 'Group ID required' });
-      }
-
-      if (!req.user.id) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-
-      const removed = await messagesStorage.removeGroupMember(id, req.user.id);
-
-      if (!removed) {
-        return res.status(404).json({ error: 'Not a member of this group' });
-      }
-
-      res.status(204).send();
-    } catch (error) {
-      console.error('Leave group error:', error);
-      res.status(500).json({
-        error: 'Failed to leave group',
-        message: error instanceof Error ? error.message : String(error),
-      });
     }
-  });
+  );
 
   /**
    * PUT /api/messages/:id/read
    * Mark message as read.
    */
-  router.put('/:id/read', authMiddleware, async (req: AuthRequest, res: Response) => {
-    try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+  app.put(
+    '/:id/read',
+    {
+      preHandler: [authMiddleware],
+      schema: {
+        params: {
+          type: 'object',
+          required: ['id'],
+          properties: {
+            id: { type: 'string' },
+          },
+        },
+      },
+    },
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+      try {
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
+        }
+
+        const { id } = request.params;
+        const marked = await messagesStorage.markAsRead(id, request.user.id);
+
+        if (!marked) {
+          return reply.code(404).send({ error: 'Message not found' });
+        }
+
+        // Get conversation ID from message
+        const message = await messagesStorage.getMessageById(id);
+
+        if (message) {
+          await messageHandler.handleMessageRead(id, message.conversationId, request.user.id);
+        }
+
+        reply.send({ success: true });
+      } catch (error) {
+        console.error('Mark message read error:', error);
+        reply.code(500).send({
+          error: 'Failed to mark message as read',
+          message: error instanceof Error ? error.message : String(error),
+        });
       }
-
-      const { id } = req.params;
-      if (!id) {
-        return res.status(400).json({ error: 'Message ID required' });
-      }
-
-      if (!req.user.id) {
-        return res.status(401).json({ error: 'Unauthorized' });
-      }
-
-      const marked = await messagesStorage.markAsRead(id, req.user.id);
-
-      if (!marked) {
-        return res.status(404).json({ error: 'Message not found' });
-      }
-
-      // Get conversation ID from message
-      const message = await messagesStorage.getMessageById(id);
-
-      if (message) {
-        await messageHandler.handleMessageRead(id, message.conversationId, req.user.id);
-      }
-
-      res.json({ success: true });
-    } catch (error) {
-      console.error('Mark message read error:', error);
-      res.status(500).json({
-        error: 'Failed to mark message as read',
-        message: error instanceof Error ? error.message : String(error),
-      });
     }
-  });
-
-  return router;
+  );
 }

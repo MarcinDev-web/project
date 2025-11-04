@@ -3,7 +3,6 @@
  * Supports both PostgreSQL (preferred) and JSON file storage (fallback)
  */
 
-// @ts-expect-error - Prisma client is generated at build time
 import type { PrismaClient } from '../../node_modules/.prisma/net-client';
 import { randomBytes } from 'node:crypto';
 import { promises as fs } from 'fs';
@@ -82,29 +81,31 @@ export class StudioTeamStorageDB {
     const id = `team_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
 
     // Use Prisma transaction
-    const team = await this.prisma.$transaction(async (tx: Parameters<Parameters<typeof this.prisma.$transaction>[0]>[0]) => {
-      // Create team
-      const createdTeam = await tx.studioTeam.create({
-        data: {
-          id,
-          studioOwnerId,
-          name: data.name,
-          description: data.description ?? null,
-        },
-      });
+    const team = await this.prisma.$transaction(
+      async (tx: Parameters<Parameters<typeof this.prisma.$transaction>[0]>[0]) => {
+        // Create team
+        const createdTeam = await tx.studioTeam.create({
+          data: {
+            id,
+            studioOwnerId,
+            name: data.name,
+            description: data.description ?? null,
+          },
+        });
 
-      // Add owner as member
-      await tx.teamMember.create({
-        data: {
-          teamId: id,
-          userId: studioOwnerId,
-          role: 'owner',
-          invitedBy: studioOwnerId,
-        },
-      });
+        // Add owner as member
+        await tx.teamMember.create({
+          data: {
+            teamId: id,
+            userId: studioOwnerId,
+            role: 'owner',
+            invitedBy: studioOwnerId,
+          },
+        });
 
-      return createdTeam;
-    });
+        return createdTeam;
+      }
+    );
 
     return {
       id: team.id,
@@ -210,13 +211,21 @@ export class StudioTeamStorageDB {
       orderBy: { joinedAt: 'asc' },
     });
 
-    return members.map((member: { teamId: string; userId: string; role: string; joinedAt: Date; invitedBy: string | null }) => ({
-      teamId: member.teamId,
-      userId: member.userId,
-      role: member.role as 'owner' | 'member',
-      joinedAt: member.joinedAt.getTime(),
-      invitedBy: member.invitedBy ?? '',
-    }));
+    return members.map(
+      (member: {
+        teamId: string;
+        userId: string;
+        role: string;
+        joinedAt: Date;
+        invitedBy: string | null;
+      }) => ({
+        teamId: member.teamId,
+        userId: member.userId,
+        role: member.role as 'owner' | 'member',
+        joinedAt: member.joinedAt.getTime(),
+        invitedBy: member.invitedBy ?? '',
+      })
+    );
   }
 
   async addMember(teamId: string, userId: string, invitedBy: string): Promise<TeamMember> {
@@ -384,10 +393,7 @@ export class StudioTeamStorageDB {
     }
 
     if (userId) {
-      where.OR = [
-        { inviteeUserId: userId },
-        { inviterId: userId },
-      ];
+      where.OR = [{ inviteeUserId: userId }, { inviterId: userId }];
     }
 
     const invitations = await this.prisma.teamInvitation.findMany({
@@ -395,18 +401,31 @@ export class StudioTeamStorageDB {
       orderBy: { createdAt: 'desc' },
     });
 
-    return invitations.map((invitation: { id: string; teamId: string; inviterId: string; inviteeUserId: string | null; inviteeEmail: string | null; inviteeUsername: string | null; token: string; status: string; expiresAt: Date; createdAt: Date }) => ({
-      id: invitation.id,
-      teamId: invitation.teamId,
-      inviterId: invitation.inviterId,
-      ...(invitation.inviteeUserId && { inviteeUserId: invitation.inviteeUserId }),
-      ...(invitation.inviteeEmail && { inviteeEmail: invitation.inviteeEmail }),
-      ...(invitation.inviteeUsername && { inviteeUsername: invitation.inviteeUsername }),
-      token: invitation.token,
-      status: invitation.status as TeamInvitation['status'],
-      expiresAt: invitation.expiresAt.getTime(),
-      createdAt: invitation.createdAt.getTime(),
-    }));
+    return invitations.map(
+      (invitation: {
+        id: string;
+        teamId: string;
+        inviterId: string;
+        inviteeUserId: string | null;
+        inviteeEmail: string | null;
+        inviteeUsername: string | null;
+        token: string;
+        status: string;
+        expiresAt: Date;
+        createdAt: Date;
+      }) => ({
+        id: invitation.id,
+        teamId: invitation.teamId,
+        inviterId: invitation.inviterId,
+        ...(invitation.inviteeUserId && { inviteeUserId: invitation.inviteeUserId }),
+        ...(invitation.inviteeEmail && { inviteeEmail: invitation.inviteeEmail }),
+        ...(invitation.inviteeUsername && { inviteeUsername: invitation.inviteeUsername }),
+        token: invitation.token,
+        status: invitation.status as TeamInvitation['status'],
+        expiresAt: invitation.expiresAt.getTime(),
+        createdAt: invitation.createdAt.getTime(),
+      })
+    );
   }
 
   async updateInvitation(
@@ -517,12 +536,19 @@ export class StudioTeamStorageDB {
       where: { teamId },
     });
 
-    return accesses.map((access: { projectId: string; teamId: string; accessLevel: string; userId: string | null }) => ({
-      projectId: access.projectId,
-      teamId: access.teamId,
-      accessLevel: access.accessLevel as 'read' | 'write',
-      ...(access.userId && { userId: access.userId }),
-    }));
+    return accesses.map(
+      (access: {
+        projectId: string;
+        teamId: string;
+        accessLevel: string;
+        userId: string | null;
+      }) => ({
+        projectId: access.projectId,
+        teamId: access.teamId,
+        accessLevel: access.accessLevel as 'read' | 'write',
+        ...(access.userId && { userId: access.userId }),
+      })
+    );
   }
 
   async getProjectsForUser(userId: string): Promise<ProjectTeamAccess[]> {
@@ -542,19 +568,23 @@ export class StudioTeamStorageDB {
         teamId: {
           in: teamIds,
         },
-        OR: [
-          { userId: null },
-          { userId },
-        ],
+        OR: [{ userId: null }, { userId }],
       },
     });
 
-    return accesses.map((access: { projectId: string; teamId: string; accessLevel: string; userId: string | null }) => ({
-      projectId: access.projectId,
-      teamId: access.teamId,
-      accessLevel: access.accessLevel as 'read' | 'write',
-      ...(access.userId && { userId: access.userId }),
-    }));
+    return accesses.map(
+      (access: {
+        projectId: string;
+        teamId: string;
+        accessLevel: string;
+        userId: string | null;
+      }) => ({
+        projectId: access.projectId,
+        teamId: access.teamId,
+        accessLevel: access.accessLevel as 'read' | 'write',
+        ...(access.userId && { userId: access.userId }),
+      })
+    );
   }
 
   async removeProjectTeamAccess(projectId: string, teamId: string): Promise<boolean> {

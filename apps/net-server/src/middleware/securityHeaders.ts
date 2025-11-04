@@ -3,7 +3,7 @@
  * Implements comprehensive security headers for defense-in-depth.
  */
 
-import type { Request, Response, NextFunction } from 'express';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 
 const isProduction = process.env.NODE_ENV === 'production';
 const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
@@ -46,24 +46,27 @@ function getCSP(): string {
 }
 
 /**
- * Security headers middleware.
+ * Security headers hook for Fastify.
  * Sets comprehensive security headers for all responses.
  */
-export function securityHeadersMiddleware(_req: Request, res: Response, next: NextFunction): void {
+export async function securityHeadersHook(
+  _request: FastifyRequest,
+  reply: FastifyReply
+): Promise<void> {
   // Content Security Policy - prevent XSS attacks
-  res.setHeader('Content-Security-Policy', getCSP());
+  reply.header('Content-Security-Policy', getCSP());
 
   // Prevent clickjacking
-  res.setHeader('X-Frame-Options', 'DENY');
+  reply.header('X-Frame-Options', 'DENY');
 
   // Prevent MIME type sniffing
-  res.setHeader('X-Content-Type-Options', 'nosniff');
+  reply.header('X-Content-Type-Options', 'nosniff');
 
   // Referrer policy - limit referrer information
-  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  reply.header('Referrer-Policy', 'strict-origin-when-cross-origin');
 
   // Permissions Policy (formerly Feature-Policy) - restrict browser features
-  res.setHeader(
+  reply.header(
     'Permissions-Policy',
     [
       'accelerometer=()',
@@ -98,18 +101,16 @@ export function securityHeadersMiddleware(_req: Request, res: Response, next: Ne
 
   // HSTS - Force HTTPS in production
   if (isProduction) {
-    res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
+    reply.header('Strict-Transport-Security', 'max-age=31536000; includeSubDomains; preload');
   }
 
   // XSS Protection (legacy, but still useful)
-  res.setHeader('X-XSS-Protection', '1; mode=block');
+  reply.header('X-XSS-Protection', '1; mode=block');
 
   // Don't cache sensitive responses by default
-  if (!res.getHeader('Cache-Control')) {
-    res.setHeader('Cache-Control', 'no-store, no-cache, must-revalidate, private');
-    res.setHeader('Pragma', 'no-cache');
-    res.setHeader('Expires', '0');
+  if (!reply.getHeader('Cache-Control')) {
+    reply.header('Cache-Control', 'no-store, no-cache, must-revalidate, private');
+    reply.header('Pragma', 'no-cache');
+    reply.header('Expires', '0');
   }
-
-  next();
 }

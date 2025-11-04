@@ -3,7 +3,6 @@
  * Supports PostgreSQL (preferred) and JSON file fallback
  */
 
-// @ts-expect-error - Prisma client is generated at build time
 import type { PrismaClient } from '../../node_modules/.prisma/net-client';
 import { promises as fs } from 'fs';
 import path from 'path';
@@ -46,9 +45,9 @@ export class StudioSettingsStorageDB {
     const settings = await this.prisma.studioSetting.findUnique({
       where: { userId },
     });
-    
+
     if (!settings) return null;
-    
+
     return {
       userId: settings.userId,
       focus: (settings.focus as StudioFocus) ?? 'balanced',
@@ -63,7 +62,7 @@ export class StudioSettingsStorageDB {
 
   async upsert(userId: string, updates: UpdateStudioSettingsRequest): Promise<StudioSettings> {
     const existing = await this.get(userId);
-    
+
     const merged = {
       focus: updates.focus ?? existing?.focus ?? 'balanced',
       goals: updates.goals ?? existing?.goals ?? {},

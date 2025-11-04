@@ -1,9 +1,9 @@
 /**
- * Body size limit middleware factory.
- * Creates middleware to limit request body size per endpoint.
+ * Body size limit hook factory for Fastify.
+ * Creates hook to limit request body size per endpoint.
  */
 
-import type { Request, Response, NextFunction } from 'express';
+import type { FastifyReply, FastifyRequest } from 'fastify';
 
 /**
  * Body size limit in bytes.
@@ -38,28 +38,24 @@ function parseSize(size: BodySizeLimit): number {
 }
 
 /**
- * Create body size limit middleware.
+ * Create body size limit hook for Fastify.
  */
 export function bodySizeLimit(limit: BodySizeLimit) {
   const limitBytes = parseSize(limit);
 
-  return (req: Request, res: Response, next: NextFunction): void => {
+  return async (request: FastifyRequest, reply: FastifyReply): Promise<void> => {
     // Set content length limit
-    const contentLength = req.get('content-length');
+    const contentLength = request.headers['content-length'];
     if (contentLength) {
       const length = parseInt(contentLength, 10);
       if (length > limitBytes) {
-        res.status(413).json({
+        reply.code(413).send({
           error: 'Request entity too large',
           message: `Request body exceeds maximum size of ${limit} (${length} bytes provided)`,
         });
         return;
       }
     }
-
-    // Store limit in request for express.json middleware
-    (req as any).bodySizeLimit = limitBytes;
-    next();
   };
 }
 

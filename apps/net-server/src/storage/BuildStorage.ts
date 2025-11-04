@@ -2,7 +2,6 @@
  * Build Storage - stores actual project/scene data for marketplace builds
  */
 
-// @ts-expect-error - Prisma client is generated at build time
 import type { PrismaClient } from '../../node_modules/.prisma/net-client';
 import type { ProjectData } from '../types';
 
@@ -17,10 +16,7 @@ export class BuildStorage {
   /**
    * Save build data for a marketplace item
    */
-  async saveBuild(
-    marketplaceId: string,
-    projectData: ProjectData
-  ): Promise<void> {
+  async saveBuild(marketplaceId: string, projectData: ProjectData): Promise<void> {
     // Serialize ProjectData to JSON
     const jsonData = JSON.stringify(projectData);
     const buffer = Buffer.from(jsonData, 'utf-8');
@@ -66,11 +62,13 @@ export class BuildStorage {
    * Delete build data for a marketplace item
    */
   async deleteBuild(marketplaceId: string): Promise<void> {
-    await this.prisma.marketplaceBuild.delete({
-      where: { marketplaceId },
-    }).catch(() => {
-      // Ignore errors if build doesn't exist
-    });
+    await this.prisma.marketplaceBuild
+      .delete({
+        where: { marketplaceId },
+      })
+      .catch(() => {
+        // Ignore errors if build doesn't exist
+      });
   }
 
   /**

@@ -5,7 +5,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { getPrismaClient, ensureSchema } from '../../lib/db';
 import { BuildStorage } from '../BuildStorage';
-// @ts-expect-error - Prisma client is generated at build time
 import type { PrismaClient } from '../../../node_modules/.prisma/net-client';
 import type { ProjectData } from '../../types';
 

@@ -2,9 +2,7 @@
  * Shop Storage DB - PostgreSQL implementation using Prisma
  */
 
-// @ts-expect-error - Prisma client is generated at build time
 import type { PrismaClient as PrismaClientType } from '../../node_modules/.prisma/net-client';
-// @ts-expect-error - Prisma client is generated at build time
 import { Prisma } from '../../node_modules/.prisma/net-client';
 import type { ShopItem, ShopItemsFilter } from './ShopStorage';
 
@@ -84,7 +82,9 @@ export class ShopStorageDB {
       skip: offset,
     });
 
-    return items.map((item: Parameters<typeof this.mapPrismaToItem>[0]) => this.mapPrismaToItem(item));
+    return items.map((item: Parameters<typeof this.mapPrismaToItem>[0]) =>
+      this.mapPrismaToItem(item)
+    );
   }
 
   async updateItem(

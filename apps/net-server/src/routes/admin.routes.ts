@@ -1,12 +1,13 @@
-import { Router } from 'express';
+import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { RouteDependencies } from './index';
-import type { AuthRequest } from '../auth/middleware';
 
 /**
- * Create admin and moderator routes
+ * Create admin and moderator routes for Fastify
  */
-export function createAdminRoutes(deps: RouteDependencies): Router {
-  const router = Router();
+export async function createAdminRoutes(
+  app: FastifyInstance,
+  opts: { dependencies: RouteDependencies }
+): Promise<void> {
   const {
     authMiddleware,
     requireAdmin,
@@ -22,24 +23,31 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     shopStorage,
     assetStorage,
     purchaseStorage,
-  } = deps;
+  } = opts.dependencies;
 
   // ========================================
   // ADMIN API ENDPOINTS
   // ========================================
 
   // ADMIN USERS
-  router.get('/admin/users', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
+  app.get('/admin/users', { preHandler: [authMiddleware, requireAdmin()] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 50;
-      const offset = req.query.offset ? parseInt(String(req.query.offset), 10) : 0;
-      const search = req.query.search as string | undefined;
-      const role = req.query.role as string | undefined;
-      const active = req.query.active === undefined ? undefined : req.query.active === 'true';
+      const query = request.query as {
+        limit?: string | number;
+        offset?: string | number;
+        search?: string;
+        role?: string;
+        active?: string;
+      };
+      const limit = query.limit ? parseInt(String(query.limit), 10) : 50;
+      const offset = query.offset ? parseInt(String(query.offset), 10) : 0;
+      const search = query.search;
+      const role = query.role;
+      const active = query.active === undefined ? undefined : query.active === 'true';
 
       const allUsers = await authManager['userStorage'].getAllUsers();
       let filtered = allUsers;
@@ -71,7 +79,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
         role: u.role ?? 'user',
       }));
 
-      res.json({
+      reply.send({
         users,
         total,
         page: Math.floor(offset / limit) + 1,
@@ -79,33 +87,33 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
       });
     } catch (error) {
       console.error('Get admin users error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to get users',
         message: error instanceof Error ? error.message : String(error),
       });
     }
   });
 
-  router.get('/admin/users/:id', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
+  app.get(
+    '/admin/users/:id',
+    { preHandler: [authMiddleware, requireAdmin()] },
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const { id } = req.params;
-      if (!id) {
-        return res.status(400).json({ error: 'User ID required' });
-      }
+        const { id } = request.params;
 
       const user = await authManager['userStorage'].findUserById(id);
 
       if (!user) {
-        return res.status(404).json({ error: 'User not found' });
+        return reply.code(404).send({ error: 'User not found' });
       }
 
       const profile = await profileStorage.getProfile(id);
 
-      res.json({
+      reply.send({
         id: user.id,
         email: user.email,
         createdAt: user.createdAt,
@@ -116,28 +124,31 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
       });
     } catch (error) {
       console.error('Get admin user error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to get user',
         message: error instanceof Error ? error.message : String(error),
       });
     }
   });
 
-  router.put('/admin/users/:id', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
+  app.put(
+    '/admin/users/:id',
+    { preHandler: [authMiddleware, requireAdmin()] },
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const { id } = req.params;
+      const { id } = request.params;
       if (!id) {
-        return res.status(400).json({ error: 'User ID required' });
+        return reply.code(400).send({ error: 'User ID required' });
       }
 
-      const { active, role } = req.body as { active?: boolean; role?: string };
+      const { active, role } = request.body as { active?: boolean; role?: string };
 
-      if (role && id === req.user.id && role !== req.user.role) {
-        return res.status(400).json({ error: 'Cannot change your own role' });
+      if (role && id === request.user.id && role !== request.user.role) {
+        return reply.code(400).send({ error: 'Cannot change your own role' });
       }
 
       const updates: { active?: boolean; role?: 'user' | 'moderator' | 'admin' } = {};
@@ -148,7 +159,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
 
       const updated = await authManager['userStorage'].updateUserById(id, updates);
 
-      res.json({
+      reply.send({
         id: updated.id,
         email: updated.email,
         createdAt: updated.createdAt,
@@ -158,7 +169,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
       });
     } catch (error) {
       console.error('Update admin user error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to update user',
         message: error instanceof Error ? error.message : String(error),
       });
@@ -166,10 +177,10 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
   });
 
   // ADMIN STATS
-  router.get('/admin/stats', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
+  app.get('/admin/stats', { preHandler: [authMiddleware, requireAdmin()] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
       const allUsers = await authManager['userStorage'].getAllUsers();
@@ -205,10 +216,10 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
         },
       };
 
-      res.json(stats);
+      reply.send(stats);
     } catch (error) {
       console.error('Get admin stats error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to get stats',
         message: error instanceof Error ? error.message : String(error),
       });
@@ -216,19 +227,19 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
   });
 
   // ADMIN MARKETPLACE
-  router.get(
+  app.get(
     '/admin/marketplace',
-    authMiddleware,
-    requireAdmin(),
-    async (req: AuthRequest, res) => {
+    { preHandler: [authMiddleware, requireAdmin()] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 50;
-        const offset = req.query.offset ? parseInt(String(req.query.offset), 10) : 0;
-        const type = req.query.type as 'build' | 'avatar' | undefined;
+        const query = request.query as { limit?: string | number; offset?: string | number; type?: string };
+        const limit = query.limit ? parseInt(String(query.limit), 10) : 50;
+        const offset = query.offset ? parseInt(String(query.offset), 10) : 0;
+        const type = query.type as 'build' | 'avatar' | undefined;
 
         const items = await marketplaceStorage.getItems({
           ...(type && { type }),
@@ -238,7 +249,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
         const total = items.length;
         const paginated = items.slice(offset, offset + limit);
 
-        res.json({
+        reply.send({
           items: paginated,
           total,
           page: Math.floor(offset / limit) + 1,
@@ -246,7 +257,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
         });
       } catch (error) {
         console.error('Get admin marketplace error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to get marketplace items',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -254,36 +265,32 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.delete(
+  app.delete(
     '/admin/marketplace/:id',
-    authMiddleware,
-    requireAdmin(),
-    async (req: AuthRequest, res) => {
+    { preHandler: [authMiddleware, requireAdmin()] },
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = req.params;
-        if (!id) {
-          return res.status(400).json({ error: 'Item ID required' });
-        }
+        const { id } = request.params;
 
         const item = await marketplaceStorage.getItem(id);
         if (!item) {
-          return res.status(404).json({ error: 'Item not found' });
+          return reply.code(404).send({ error: 'Item not found' });
         }
 
         const deleted = await marketplaceStorage.deleteItem(id, item.authorId);
 
         if (!deleted) {
-          return res.status(404).json({ error: 'Failed to delete item' });
+          return reply.code(404).send({ error: 'Failed to delete item' });
         }
 
-        res.status(204).send();
+        reply.code(204).send();
       } catch (error) {
         console.error('Delete admin marketplace item error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to delete item',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -292,15 +299,15 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
   );
 
   // ADMIN PROJECTS
-  router.get('/admin/projects', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
+  app.get('/admin/projects', { preHandler: [authMiddleware, requireAdmin()] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
       const allProjects = storage['storage'] ? Array.from(storage['storage'].values()) : [];
 
-      res.json({
+      reply.send({
         projects: allProjects.map((p) => ({
           token: p.token,
           createdAt: p.createdAt,
@@ -312,38 +319,34 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
       });
     } catch (error) {
       console.error('Get admin projects error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to get projects',
         message: error instanceof Error ? error.message : String(error),
       });
     }
   });
 
-  router.delete(
+  app.delete(
     '/admin/projects/:token',
-    authMiddleware,
-    requireAdmin(),
-    async (req: AuthRequest, res) => {
+    { preHandler: [authMiddleware, requireAdmin()] },
+    async (request: FastifyRequest<{ Params: { token: string } }>, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { token } = req.params;
-        if (!token) {
-          return res.status(400).json({ error: 'Token required' });
-        }
+        const { token } = request.params;
 
         const deleted = await storage.delete(token);
 
         if (!deleted) {
-          return res.status(404).json({ error: 'Project not found' });
+          return reply.code(404).send({ error: 'Project not found' });
         }
 
-        res.status(204).send();
+        reply.code(204).send();
       } catch (error) {
         console.error('Delete admin project error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to delete project',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -356,25 +359,24 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
   // ========================================
 
   // MODERATOR MARKETPLACE
-  router.get(
+  app.get(
     '/api/moderator/marketplace/pending',
-    authMiddleware,
-    requireModerator(),
-    async (req: AuthRequest, res) => {
+    { preHandler: [authMiddleware, requireModerator()] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
         const items = await marketplaceStorage.getItems({ limit: 100 });
 
-        res.json({
+        reply.send({
           items,
           total: items.length,
         });
       } catch (error) {
         console.error('Get moderator pending items error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to get pending items',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -382,35 +384,31 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.post(
+  app.post(
     '/api/moderator/marketplace/:id/approve',
-    authMiddleware,
-    requireModerator(),
-    async (req: AuthRequest, res) => {
+    { preHandler: [authMiddleware, requireModerator()] },
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = req.params;
-        if (!id) {
-          return res.status(400).json({ error: 'Item ID required' });
-        }
+        const { id } = request.params;
 
         const item = await marketplaceStorage.getItem(id);
 
         if (!item) {
-          return res.status(404).json({ error: 'Item not found' });
+          return reply.code(404).send({ error: 'Item not found' });
         }
 
         if (!item.public) {
           await marketplaceStorage.updateItem(id, { public: true });
         }
 
-        res.json({ success: true, message: 'Item approved' });
+        reply.send({ success: true, message: 'Item approved' });
       } catch (error) {
         console.error('Approve marketplace item error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to approve item',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -418,35 +416,31 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.post(
+  app.post(
     '/api/moderator/marketplace/:id/reject',
-    authMiddleware,
-    requireModerator(),
-    async (req: AuthRequest, res) => {
+    { preHandler: [authMiddleware, requireModerator()] },
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = req.params;
-        if (!id) {
-          return res.status(400).json({ error: 'Item ID required' });
-        }
+        const { id } = request.params;
 
-        const { reason } = req.body as { reason?: string };
+        const { reason } = request.body as { reason?: string };
 
         const item = await marketplaceStorage.getItem(id);
 
         if (!item) {
-          return res.status(404).json({ error: 'Item not found' });
+          return reply.code(404).send({ error: 'Item not found' });
         }
 
         await marketplaceStorage.updateItem(id, { public: false });
 
-        res.json({ success: true, message: 'Item rejected', reason });
+        reply.send({ success: true, message: 'Item rejected', reason });
       } catch (error) {
         console.error('Reject marketplace item error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to reject item',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -454,36 +448,32 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.delete(
+  app.delete(
     '/api/moderator/marketplace/:id',
-    authMiddleware,
-    requireModerator(),
-    async (req: AuthRequest, res) => {
+    { preHandler: [authMiddleware, requireModerator()] },
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = req.params;
-        if (!id) {
-          return res.status(400).json({ error: 'Item ID required' });
-        }
+        const { id } = request.params;
 
         const item = await marketplaceStorage.getItem(id);
         if (!item) {
-          return res.status(404).json({ error: 'Item not found' });
+          return reply.code(404).send({ error: 'Item not found' });
         }
 
         const deleted = await marketplaceStorage.deleteItem(id, item.authorId);
 
         if (!deleted) {
-          return res.status(404).json({ error: 'Failed to delete item' });
+          return reply.code(404).send({ error: 'Failed to delete item' });
         }
 
-        res.status(204).send();
+        reply.code(204).send();
       } catch (error) {
         console.error('Delete moderator marketplace item error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to delete item',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -492,23 +482,22 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
   );
 
   // MODERATOR USERS
-  router.get(
+  app.get(
     '/api/moderator/users/reported',
-    authMiddleware,
-    requireModerator(),
-    async (req: AuthRequest, res) => {
+    { preHandler: [authMiddleware, requireModerator()] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        res.json({
+        reply.send({
           users: [],
           total: 0,
         });
       } catch (error) {
         console.error('Get reported users error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to get reported users',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -516,31 +505,27 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.put(
+  app.put(
     '/api/moderator/users/:id/ban',
-    authMiddleware,
-    requireModerator(),
-    async (req: AuthRequest, res) => {
+    { preHandler: [authMiddleware, requireModerator()] },
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = req.params;
-        if (!id) {
-          return res.status(400).json({ error: 'User ID required' });
-        }
+        const { id } = request.params;
 
-        const { reason } = req.body as { reason?: string };
+        const { reason } = request.body as { reason?: string };
 
         const user = await authManager['userStorage'].findUserById(id);
         if (user && user.role === 'admin') {
-          return res.status(403).json({ error: 'Cannot ban admin users' });
+          return reply.code(403).send({ error: 'Cannot ban admin users' });
         }
 
         const updated = await authManager['userStorage'].updateUserById(id, { active: false });
 
-        res.json({
+        reply.send({
           id: updated.id,
           email: updated.email,
           active: false,
@@ -549,7 +534,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
         });
       } catch (error) {
         console.error('Ban user error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to ban user',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -557,31 +542,27 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.put(
+  app.put(
     '/api/moderator/users/:id/warn',
-    authMiddleware,
-    requireModerator(),
-    async (req: AuthRequest, res) => {
+    { preHandler: [authMiddleware, requireModerator()] },
+    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = req.params;
-        if (!id) {
-          return res.status(400).json({ error: 'User ID required' });
-        }
+        const { id } = request.params;
 
-        const { reason } = req.body as { reason?: string };
+        const { reason } = request.body as { reason?: string };
 
-        res.json({
+        reply.send({
           success: true,
           message: 'User warned',
           reason,
         });
       } catch (error) {
         console.error('Warn user error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to warn user',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -590,29 +571,26 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
   );
 
   // MODERATOR MESSAGES
-  router.get(
+  app.get(
     '/api/moderator/messages/:conversationId',
-    authMiddleware,
-    requireModerator(),
-    async (req: AuthRequest, res) => {
+    { preHandler: [authMiddleware, requireModerator()] },
+    async (request: FastifyRequest<{ Params: { conversationId: string } }>, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { conversationId } = req.params;
-        if (!conversationId) {
-          return res.status(400).json({ error: 'Conversation ID required' });
-        }
+        const { conversationId } = request.params;
 
-        const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 100;
+        const query = request.query as { limit?: string | number };
+        const limit = query.limit ? parseInt(String(query.limit), 10) : 100;
 
         const messages = await messagesStorage.getMessages(conversationId, limit);
 
-        res.json(messages);
+        reply.send(messages);
       } catch (error) {
         console.error('Get moderator messages error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to get messages',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -621,21 +599,27 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
   );
 
   // MODERATOR FORUM
-  router.get(
+  app.get(
     '/api/moderator/forum/threads',
-    authMiddleware,
-    requireModerator(),
-    async (req: AuthRequest, res) => {
+    { preHandler: [authMiddleware, requireModerator()] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 50;
-        const offset = req.query.offset ? parseInt(String(req.query.offset), 10) : 0;
-        const categoryId = req.query.categoryId as string | undefined;
-        const authorId = req.query.authorId as string | undefined;
-        const search = req.query.search as string | undefined;
+        const query = request.query as {
+          limit?: string | number;
+          offset?: string | number;
+          categoryId?: string;
+          authorId?: string;
+          search?: string;
+        };
+        const limit = query.limit ? parseInt(String(query.limit), 10) : 50;
+        const offset = query.offset ? parseInt(String(query.offset), 10) : 0;
+        const categoryId = query.categoryId;
+        const authorId = query.authorId;
+        const search = query.search;
 
         const filter: {
           limit?: number;
@@ -650,7 +634,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
 
         const result = await forumStorage.getAllThreads(filter);
 
-        res.json({
+        reply.send({
           threads: result.threads,
           total: result.total,
           page: Math.floor(offset / limit) + 1,
@@ -658,7 +642,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
         });
       } catch (error) {
         console.error('Get moderator forum threads error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to get forum threads',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -666,35 +650,34 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.delete(
+  app.delete(
     '/api/moderator/forum/threads/:id',
-    authMiddleware,
-    requireModerator(),
-    async (req: AuthRequest, res) => {
+    { preHandler: [authMiddleware, requireModerator()] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = req.params;
+        const { id } = request.params;
         if (!id || typeof id !== 'string') {
-          return res.status(400).json({ error: 'Thread ID is required' });
+          return reply.code(400).send({ error: 'Thread ID is required' });
         }
         const thread = await forumStorage.getThread(id);
         if (!thread) {
-          return res.status(404).json({ error: 'Thread not found' });
+          return reply.code(404).send({ error: 'Thread not found' });
         }
 
-        const deleted = await forumStorage.deleteThread(id, req.user.id, true);
+        const deleted = await forumStorage.deleteThread(id, request.user.id, true);
         if (!deleted) {
-          return res.status(404).json({ error: 'Thread not found' });
+          return reply.code(404).send({ error: 'Thread not found' });
         }
 
         await forumHandler.handleThreadDeleted(id, thread.categoryId);
-        res.status(204).send();
+        reply.code(204).send();
       } catch (error) {
         console.error('Moderator delete forum thread error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to delete forum thread',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -702,29 +685,28 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.post(
+  app.post(
     '/api/moderator/forum/threads/:id/approve',
-    authMiddleware,
-    requireModerator(),
-    async (req: AuthRequest, res) => {
+    { preHandler: [authMiddleware, requireModerator()] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = req.params;
+        const { id } = request.params;
         if (!id) {
-          return res.status(400).json({ error: 'Missing id parameter' });
+          return reply.code(400).send({ error: 'Missing id parameter' });
         }
         const thread = await forumStorage.getThread(id);
         if (!thread) {
-          return res.status(404).json({ error: 'Thread not found' });
+          return reply.code(404).send({ error: 'Thread not found' });
         }
 
-        res.json({ success: true, message: 'Thread approved' });
+        reply.send({ success: true, message: 'Thread approved' });
       } catch (error) {
         console.error('Approve forum thread error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to approve forum thread',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -732,38 +714,37 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.post(
+  app.post(
     '/api/moderator/forum/threads/:id/reject',
-    authMiddleware,
-    requireModerator(),
-    async (req: AuthRequest, res) => {
+    { preHandler: [authMiddleware, requireModerator()] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = req.params;
-        const { reason } = req.body;
+        const { id } = request.params;
+        const { reason } = request.body;
 
         if (!id || typeof id !== 'string') {
-          return res.status(400).json({ error: 'Thread ID is required' });
+          return reply.code(400).send({ error: 'Thread ID is required' });
         }
 
         const thread = await forumStorage.getThread(id);
         if (!thread) {
-          return res.status(404).json({ error: 'Thread not found' });
+          return reply.code(404).send({ error: 'Thread not found' });
         }
 
-        const deleted = await forumStorage.deleteThread(id, req.user.id, true);
+        const deleted = await forumStorage.deleteThread(id, request.user.id, true);
         if (!deleted) {
-          return res.status(404).json({ error: 'Thread not found' });
+          return reply.code(404).send({ error: 'Thread not found' });
         }
 
         await forumHandler.handleThreadDeleted(id, thread.categoryId);
-        res.json({ success: true, message: 'Thread rejected and deleted', reason });
+        reply.send({ success: true, message: 'Thread rejected and deleted', reason });
       } catch (error) {
         console.error('Reject forum thread error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to reject forum thread',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -771,32 +752,31 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.post(
+  app.post(
     '/api/moderator/forum/threads/:id/warn',
-    authMiddleware,
-    requireModerator(),
-    async (req: AuthRequest, res) => {
+    { preHandler: [authMiddleware, requireModerator()] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = req.params;
-        const { reason } = req.body;
+        const { id } = request.params;
+        const { reason } = request.body;
 
         if (!id || typeof id !== 'string') {
-          return res.status(400).json({ error: 'Thread ID is required' });
+          return reply.code(400).send({ error: 'Thread ID is required' });
         }
 
         const thread = await forumStorage.getThread(id);
         if (!thread) {
-          return res.status(404).json({ error: 'Thread not found' });
+          return reply.code(404).send({ error: 'Thread not found' });
         }
 
-        res.json({ success: true, message: 'Author warned', reason, authorId: thread.authorId });
+        reply.send({ success: true, message: 'Author warned', reason, authorId: thread.authorId });
       } catch (error) {
         console.error('Warn thread author error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to warn thread author',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -804,21 +784,27 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.get(
+  app.get(
     '/api/moderator/forum/posts',
-    authMiddleware,
-    requireModerator(),
-    async (req: AuthRequest, res) => {
+    { preHandler: [authMiddleware, requireModerator()] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 50;
-        const offset = req.query.offset ? parseInt(String(req.query.offset), 10) : 0;
-        const threadId = req.query.threadId as string | undefined;
-        const authorId = req.query.authorId as string | undefined;
-        const search = req.query.search as string | undefined;
+        const query = request.query as {
+          limit?: string | number;
+          offset?: string | number;
+          threadId?: string;
+          authorId?: string;
+          search?: string;
+        };
+        const limit = query.limit ? parseInt(String(query.limit), 10) : 50;
+        const offset = query.offset ? parseInt(String(query.offset), 10) : 0;
+        const threadId = query.threadId;
+        const authorId = query.authorId;
+        const search = query.search;
 
         const result = await forumStorage.getAllPosts({
           limit,
@@ -828,7 +814,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
           ...(search !== undefined && { search }),
         });
 
-        res.json({
+        reply.send({
           posts: result.posts,
           total: result.total,
           page: Math.floor(offset / limit) + 1,
@@ -836,7 +822,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
         });
       } catch (error) {
         console.error('Get moderator forum posts error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to get forum posts',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -844,37 +830,36 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.delete(
+  app.delete(
     '/api/moderator/forum/posts/:id',
-    authMiddleware,
-    requireModerator(),
-    async (req: AuthRequest, res) => {
+    { preHandler: [authMiddleware, requireModerator()] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = req.params;
+        const { id } = request.params;
 
         if (!id || typeof id !== 'string') {
-          return res.status(400).json({ error: 'Post ID is required' });
+          return reply.code(400).send({ error: 'Post ID is required' });
         }
 
         const post = await forumStorage.getPost(id);
         if (!post) {
-          return res.status(404).json({ error: 'Post not found' });
+          return reply.code(404).send({ error: 'Post not found' });
         }
 
-        const deleted = await forumStorage.deletePost(id, req.user.id, true);
+        const deleted = await forumStorage.deletePost(id, request.user.id, true);
         if (!deleted) {
-          return res.status(404).json({ error: 'Post not found' });
+          return reply.code(404).send({ error: 'Post not found' });
         }
 
         await forumHandler.handlePostDeleted(id, post.threadId);
-        res.status(204).send();
+        reply.code(204).send();
       } catch (error) {
         console.error('Moderator delete forum post error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to delete forum post',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -882,32 +867,31 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.post(
+  app.post(
     '/api/moderator/forum/posts/:id/warn',
-    authMiddleware,
-    requireModerator(),
-    async (req: AuthRequest, res) => {
+    { preHandler: [authMiddleware, requireModerator()] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = req.params;
-        const { reason } = req.body;
+        const { id } = request.params;
+        const { reason } = request.body;
 
         if (!id || typeof id !== 'string') {
-          return res.status(400).json({ error: 'Post ID is required' });
+          return reply.code(400).send({ error: 'Post ID is required' });
         }
 
         const post = await forumStorage.getPost(id);
         if (!post) {
-          return res.status(404).json({ error: 'Post not found' });
+          return reply.code(404).send({ error: 'Post not found' });
         }
 
-        res.json({ success: true, message: 'Author warned', reason, authorId: post.authorId });
+        reply.send({ success: true, message: 'Author warned', reason, authorId: post.authorId });
       } catch (error) {
         console.error('Warn post author error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to warn post author',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -919,10 +903,10 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
   // ADMIN SHOP & FORUM ENDPOINTS
   // ========================================
 
-  router.get('/admin/shop/stats', authMiddleware, requireAdmin(), async (req: AuthRequest, res) => {
+  app.get('/admin/shop/stats', { preHandler: [authMiddleware, requireAdmin()] }, async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      if (!req.user) {
-        return res.status(401).json({ error: 'Unauthorized' });
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
       }
 
       const allItems = await shopStorage.getItems({ limit: 10000 });
@@ -949,7 +933,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
         amount,
       }));
 
-      res.json({
+      reply.send({
         shopItems: {
           total: allItems.length,
           available: availableItems.length,
@@ -967,28 +951,27 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
       });
     } catch (error) {
       console.error('Get shop stats error:', error);
-      res.status(500).json({
+      reply.code(500).send({
         error: 'Failed to get shop stats',
         message: error instanceof Error ? error.message : String(error),
       });
     }
   });
 
-  router.get(
+  app.get(
     '/admin/forum/stats',
-    authMiddleware,
-    requireAdmin(),
-    async (req: AuthRequest, res) => {
+    { preHandler: [authMiddleware, requireAdmin()] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
         const stats = await forumStorage.getForumStats();
-        res.json(stats);
+        reply.send(stats);
       } catch (error) {
         console.error('Get forum stats error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to get forum stats',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -996,21 +979,20 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.get(
+  app.get(
     '/admin/forum/categories',
-    authMiddleware,
-    requireAdmin(),
-    async (req: AuthRequest, res) => {
+    { preHandler: [authMiddleware, requireAdmin()] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
         const categories = await forumStorage.getCategories();
-        res.json(categories);
+        reply.send(categories);
       } catch (error) {
         console.error('Get forum categories error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to get forum categories',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -1018,31 +1000,30 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.put(
+  app.put(
     '/admin/forum/categories/:id',
-    authMiddleware,
-    requireAdmin(),
-    async (req: AuthRequest, res) => {
+    { preHandler: [authMiddleware, requireAdmin()] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = req.params;
+        const { id } = request.params;
         if (!id || typeof id !== 'string') {
-          return res.status(400).json({ error: 'Category ID is required' });
+          return reply.code(400).send({ error: 'Category ID is required' });
         }
-        const updates = req.body;
+        const updates = request.body;
 
         const updated = await forumStorage.updateCategory(id, updates);
         if (!updated) {
-          return res.status(404).json({ error: 'Category not found' });
+          return reply.code(404).send({ error: 'Category not found' });
         }
 
-        res.json(updated);
+        reply.send(updated);
       } catch (error) {
         console.error('Update forum category error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to update forum category',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -1050,36 +1031,35 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.delete(
+  app.delete(
     '/admin/forum/categories/:id',
-    authMiddleware,
-    requireAdmin(),
-    async (req: AuthRequest, res) => {
+    { preHandler: [authMiddleware, requireAdmin()] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = req.params;
+        const { id } = request.params;
 
         if (!id || typeof id !== 'string') {
-          return res.status(400).json({ error: 'Category ID is required' });
+          return reply.code(400).send({ error: 'Category ID is required' });
         }
 
         const deleted = await forumStorage.deleteCategory(id);
         if (!deleted) {
-          return res.status(404).json({ error: 'Category not found' });
+          return reply.code(404).send({ error: 'Category not found' });
         }
 
-        res.status(204).send();
+        reply.code(204).send();
       } catch (error) {
         console.error('Delete forum category error:', error);
         if (error instanceof Error && error.message.includes('Cannot delete')) {
-          return res.status(400).json({
+          return reply.code(400).send({
             error: error.message,
           });
         }
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to delete forum category',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -1087,21 +1067,27 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.get(
+  app.get(
     '/admin/forum/threads',
-    authMiddleware,
-    requireAdmin(),
-    async (req: AuthRequest, res) => {
+    { preHandler: [authMiddleware, requireAdmin()] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 50;
-        const offset = req.query.offset ? parseInt(String(req.query.offset), 10) : 0;
-        const categoryId = req.query.categoryId as string | undefined;
-        const authorId = req.query.authorId as string | undefined;
-        const search = req.query.search as string | undefined;
+        const query = request.query as {
+          limit?: string | number;
+          offset?: string | number;
+          categoryId?: string;
+          authorId?: string;
+          search?: string;
+        };
+        const limit = query.limit ? parseInt(String(query.limit), 10) : 50;
+        const offset = query.offset ? parseInt(String(query.offset), 10) : 0;
+        const categoryId = query.categoryId;
+        const authorId = query.authorId;
+        const search = query.search;
 
         const filter: {
           limit?: number;
@@ -1116,7 +1102,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
 
         const result = await forumStorage.getAllThreads(filter);
 
-        res.json({
+        reply.send({
           threads: result.threads,
           total: result.total,
           page: Math.floor(offset / limit) + 1,
@@ -1124,7 +1110,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
         });
       } catch (error) {
         console.error('Get forum threads error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to get forum threads',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -1132,35 +1118,34 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.delete(
+  app.delete(
     '/admin/forum/threads/:id',
-    authMiddleware,
-    requireAdmin(),
-    async (req: AuthRequest, res) => {
+    { preHandler: [authMiddleware, requireAdmin()] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = req.params;
+        const { id } = request.params;
         if (!id) {
-          return res.status(400).json({ error: 'Missing id parameter' });
+          return reply.code(400).send({ error: 'Missing id parameter' });
         }
         const thread = await forumStorage.getThread(id);
         if (!thread) {
-          return res.status(404).json({ error: 'Thread not found' });
+          return reply.code(404).send({ error: 'Thread not found' });
         }
 
-        const deleted = await forumStorage.deleteThread(id, req.user.id, true);
+        const deleted = await forumStorage.deleteThread(id, request.user.id, true);
         if (!deleted) {
-          return res.status(404).json({ error: 'Thread not found' });
+          return reply.code(404).send({ error: 'Thread not found' });
         }
 
         await forumHandler.handleThreadDeleted(id, thread.categoryId);
-        res.status(204).send();
+        reply.code(204).send();
       } catch (error) {
         console.error('Admin delete forum thread error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to delete forum thread',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -1168,21 +1153,27 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.get(
+  app.get(
     '/admin/forum/posts',
-    authMiddleware,
-    requireAdmin(),
-    async (req: AuthRequest, res) => {
+    { preHandler: [authMiddleware, requireAdmin()] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const limit = req.query.limit ? parseInt(String(req.query.limit), 10) : 50;
-        const offset = req.query.offset ? parseInt(String(req.query.offset), 10) : 0;
-        const threadId = req.query.threadId as string | undefined;
-        const authorId = req.query.authorId as string | undefined;
-        const search = req.query.search as string | undefined;
+        const query = request.query as {
+          limit?: string | number;
+          offset?: string | number;
+          threadId?: string;
+          authorId?: string;
+          search?: string;
+        };
+        const limit = query.limit ? parseInt(String(query.limit), 10) : 50;
+        const offset = query.offset ? parseInt(String(query.offset), 10) : 0;
+        const threadId = query.threadId;
+        const authorId = query.authorId;
+        const search = query.search;
 
         const result = await forumStorage.getAllPosts({
           limit,
@@ -1192,7 +1183,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
           ...(search !== undefined && { search }),
         });
 
-        res.json({
+        reply.send({
           posts: result.posts,
           total: result.total,
           page: Math.floor(offset / limit) + 1,
@@ -1200,7 +1191,7 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
         });
       } catch (error) {
         console.error('Get forum posts error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to get forum posts',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -1208,37 +1199,36 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  router.delete(
+  app.delete(
     '/admin/forum/posts/:id',
-    authMiddleware,
-    requireAdmin(),
-    async (req: AuthRequest, res) => {
+    { preHandler: [authMiddleware, requireAdmin()] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        if (!req.user) {
-          return res.status(401).json({ error: 'Unauthorized' });
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = req.params;
+        const { id } = request.params;
 
         if (!id || typeof id !== 'string') {
-          return res.status(400).json({ error: 'Post ID is required' });
+          return reply.code(400).send({ error: 'Post ID is required' });
         }
 
         const post = await forumStorage.getPost(id);
         if (!post) {
-          return res.status(404).json({ error: 'Post not found' });
+          return reply.code(404).send({ error: 'Post not found' });
         }
 
-        const deleted = await forumStorage.deletePost(id, req.user.id, true);
+        const deleted = await forumStorage.deletePost(id, request.user.id, true);
         if (!deleted) {
-          return res.status(404).json({ error: 'Post not found' });
+          return reply.code(404).send({ error: 'Post not found' });
         }
 
         await forumHandler.handlePostDeleted(id, post.threadId);
-        res.status(204).send();
+        reply.code(204).send();
       } catch (error) {
         console.error('Admin delete forum post error:', error);
-        res.status(500).json({
+        reply.code(500).send({
           error: 'Failed to delete forum post',
           message: error instanceof Error ? error.message : String(error),
         });
@@ -1246,5 +1236,4 @@ export function createAdminRoutes(deps: RouteDependencies): Router {
     }
   );
 
-  return router;
 }

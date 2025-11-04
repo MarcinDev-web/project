@@ -2,12 +2,14 @@
  * Integration tests for GET /api/marketplace/search
  */
 
-import { describe, it, expect } from 'vitest';
-import request from 'supertest';
+import { describe, it, expect, beforeAll } from 'vitest';
 import { app, marketplaceStorage } from '../../server';
 import { createTestMarketplaceItem, waitForItem } from '../helpers/testHelpers';
 
-describe.skip('GET /api/marketplace/search', () => {
+describe('GET /api/marketplace/search', () => {
+  beforeAll(async () => {
+    await app.ready();
+  });
   // Use server's shared marketplaceStorage to ensure items are valid
 
   it('searches by title', async () => {
@@ -30,16 +32,19 @@ describe.skip('GET /api/marketplace/search', () => {
     await waitForItem(marketplaceStorage, item1.id);
     await waitForItem(marketplaceStorage, item2.id);
 
-    const response = await request(app)
-      .get('/api/marketplace/search')
-      .query({ q: 'Dungeon' })
-      .expect(200);
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/marketplace/search',
+      query: { q: 'Dungeon' },
+    });
 
-    expect(response.body.items.length).toBeGreaterThanOrEqual(1);
-    expect(response.body.items.some((item: { title: string }) => 
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.items.length).toBeGreaterThanOrEqual(1);
+    expect(body.items.some((item: { title: string }) => 
       item.title.toLowerCase().includes('dungeon')
     )).toBe(true);
-    expect(response.body).toHaveProperty('query', 'Dungeon');
+    expect(body).toHaveProperty('query', 'Dungeon');
   });
 
   it('searches by description', async () => {
@@ -54,12 +59,15 @@ describe.skip('GET /api/marketplace/search', () => {
     // Wait for item to be available (handles database transaction timing)
     await waitForItem(marketplaceStorage, item.id);
 
-    const response = await request(app)
-      .get('/api/marketplace/search')
-      .query({ q: 'caves' })
-      .expect(200);
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/marketplace/search',
+      query: { q: 'caves' },
+    });
 
-    expect(response.body.items.length).toBeGreaterThanOrEqual(1);
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.items.length).toBeGreaterThanOrEqual(1);
   });
 
   it('searches by tags', async () => {
@@ -73,12 +81,15 @@ describe.skip('GET /api/marketplace/search', () => {
     // Wait for item to be available (handles database transaction timing)
     await waitForItem(marketplaceStorage, item.id);
 
-    const response = await request(app)
-      .get('/api/marketplace/search')
-      .query({ q: 'action' })
-      .expect(200);
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/marketplace/search',
+      query: { q: 'action' },
+    });
 
-    expect(response.body.items.length).toBeGreaterThanOrEqual(1);
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.items.length).toBeGreaterThanOrEqual(1);
   });
 
   it('combines search with type filter', async () => {
@@ -102,12 +113,15 @@ describe.skip('GET /api/marketplace/search', () => {
     // Wait a bit more for search indexing (especially for PostgreSQL full-text search)
     await new Promise(resolve => setTimeout(resolve, 100));
 
-    const response = await request(app)
-      .get('/api/marketplace/search')
-      .query({ q: 'game', type: 'build' })
-      .expect(200);
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/marketplace/search',
+      query: { q: 'game', type: 'build' },
+    });
 
-    expect(response.body.items.every((item: { type: string }) => 
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.items.every((item: { type: string }) => 
       item.type === 'build'
     )).toBe(true);
   }, 10000); // Increase timeout for this test
@@ -130,12 +144,15 @@ describe.skip('GET /api/marketplace/search', () => {
     await waitForItem(marketplaceStorage, item1.id);
     await waitForItem(marketplaceStorage, item2.id);
 
-    const response = await request(app)
-      .get('/api/marketplace/search')
-      .query({ q: 'action', tags: 'rpg' })
-      .expect(200);
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/marketplace/search',
+      query: { q: 'action', tags: 'rpg' },
+    });
 
-    expect(response.body.items.length).toBeGreaterThanOrEqual(1);
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.items.length).toBeGreaterThanOrEqual(1);
   });
 
   it('supports pagination with search', async () => {
@@ -154,26 +171,33 @@ describe.skip('GET /api/marketplace/search', () => {
     // Wait for all items to be available (handles database transaction timing)
     await Promise.all(itemIds.map((id) => waitForItem(marketplaceStorage, id)));
 
-    const response = await request(app)
-      .get('/api/marketplace/search')
-      .query({ q: 'test', limit: 2, offset: 0 })
-      .expect(200);
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/marketplace/search',
+      query: { q: 'test', limit: '2', offset: '0' },
+    });
 
-    expect(response.body.items.length).toBeLessThanOrEqual(2);
-    expect(response.body.pageSize).toBe(2);
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
+    expect(body.items.length).toBeLessThanOrEqual(2);
+    expect(body.pageSize).toBe(2);
   });
 
   it('returns 400 for empty query', async () => {
-    await request(app)
-      .get('/api/marketplace/search')
-      .query({ q: '' })
-      .expect(400);
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/marketplace/search',
+      query: { q: '' },
+    });
+    expect(response.statusCode).toBe(400);
   });
 
   it('returns 400 for missing query parameter', async () => {
-    await request(app)
-      .get('/api/marketplace/search')
-      .expect(400);
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/marketplace/search',
+    });
+    expect(response.statusCode).toBe(400);
   });
 
   it('handles special characters in search', async () => {
@@ -184,13 +208,16 @@ describe.skip('GET /api/marketplace/search', () => {
       tags: ['building'],
     });
 
-    const response = await request(app)
-      .get('/api/marketplace/search')
-      .query({ q: 'Adventure' })
-      .expect(200);
+    const response = await app.inject({
+      method: 'GET',
+      url: '/api/marketplace/search',
+      query: { q: 'Adventure' },
+    });
 
+    expect(response.statusCode).toBe(200);
+    const body = JSON.parse(response.body);
     // Should not crash and should return results
-    expect(response.body).toHaveProperty('items');
+    expect(body).toHaveProperty('items');
   });
 
   it('is case-insensitive', async () => {
@@ -201,17 +228,23 @@ describe.skip('GET /api/marketplace/search', () => {
       tags: ['building'],
     });
 
-    const lower = await request(app)
-      .get('/api/marketplace/search')
-      .query({ q: 'dungeon' })
-      .expect(200);
+    const lower = await app.inject({
+      method: 'GET',
+      url: '/api/marketplace/search',
+      query: { q: 'dungeon' },
+    });
 
-    const upper = await request(app)
-      .get('/api/marketplace/search')
-      .query({ q: 'DUNGEON' })
-      .expect(200);
+    const upper = await app.inject({
+      method: 'GET',
+      url: '/api/marketplace/search',
+      query: { q: 'DUNGEON' },
+    });
 
-    expect(lower.body.items.length).toBe(upper.body.items.length);
+    expect(lower.statusCode).toBe(200);
+    expect(upper.statusCode).toBe(200);
+    const lowerBody = JSON.parse(lower.body);
+    const upperBody = JSON.parse(upper.body);
+    expect(lowerBody.items.length).toBe(upperBody.items.length);
   });
 });
 

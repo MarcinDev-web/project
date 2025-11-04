@@ -1,10 +1,11 @@
-import express, { type Express, type Request, type Response } from 'express';
-import cors from 'cors';
-import rateLimit from 'express-rate-limit';
+import Fastify, { type FastifyInstance } from 'fastify';
+import cors from '@fastify/cors';
+import rateLimit from '@fastify/rate-limit';
+import cookie from '@fastify/cookie';
 import { ProjectStorage } from './storage/ProjectStorage';
 import { AuthManager } from './auth/AuthManager';
 import { createAuthMiddleware, requireAdmin, requireModerator } from './auth/middleware';
-import { securityHeadersMiddleware } from './middleware/securityHeaders';
+import { securityHeadersHook } from './middleware/securityHeaders';
 import { assertConfigValid } from './config/validateConfig';
 import { securityLogger } from './logging/SecurityLogger';
 import { validateQuery } from './validation/middleware';
@@ -70,14 +71,7 @@ import { CurrencyEventNames, type CurrencyAmount } from '@engine/economy';
 import { generateAndSaveThumbnail } from './utils/thumbnailGenerator';
 import { createDbPool, ensureSchema, getPrismaClient, disconnectPrisma } from './lib/db';
 
-// Helper to wrap async route handlers and catch errors
-function asyncHandler(
-  fn: (req: Request, res: Response, next: express.NextFunction) => Promise<unknown>
-) {
-  return (req: Request, res: Response, next: express.NextFunction) => {
-    Promise.resolve(fn(req, res, next)).catch(next);
-  };
-}
+// Note: Fastify handles async errors natively, no need for asyncHandler
 
 // Import route modules
 import { createAuthRoutes } from './routes/auth.routes';
@@ -108,9 +102,11 @@ const getTestPort = (basePort: number): number => {
   }
   return basePort + (process.pid % 100); // Use PID modulo for uniqueness
 };
-const WS_PORT = process.env.WS_PORT 
-  ? parseInt(process.env.WS_PORT, 10) 
-  : (process.env.NODE_ENV === 'test' || process.env.VITEST ? getTestPort(3001) : 3001);
+const WS_PORT = process.env.WS_PORT
+  ? parseInt(process.env.WS_PORT, 10)
+  : process.env.NODE_ENV === 'test' || process.env.VITEST
+    ? getTestPort(3001)
+    : 3001;
 const DATA_DIR = process.env.DATA_DIR || './data';
 const THUMBNAIL_DIR = path.join(DATA_DIR, 'thumbnails');
 // Default frontend URLs: editor (5173) and platform (5174)
@@ -145,7 +141,11 @@ const ECONOMY_PLATFORM_FEE_BPS = parseInt(
 // Validate configuration on startup
 assertConfigValid();
 
-const app: Express = express();
+const app: FastifyInstance = Fastify({
+  logger: true,
+  bodyLimit: 10 * 1024 * 1024, // 10MB default
+  trustProxy: true, // Trust proxy for correct IP detection
+});
 
 // Database connection (optional) - using Prisma Client
 let dbPool: Awaited<ReturnType<typeof getPrismaClient>> | null = null;
@@ -286,93 +286,78 @@ const userCarts = new Map<
 type ResaleListing = { sellerId: string; price: CurrencyAmount; createdAt: number };
 const resaleListings = new Map<string, ResaleListing[]>();
 
-// Trust proxy for correct IP and protocol detection behind reverse proxy
-app.set('trust proxy', 1);
+// Register plugins
+await app.register(cookie);
+await app.register(cors, {
+  origin: (origin, cb) => {
+    // Allow requests with no origin (like mobile apps, curl, Postman)
+    if (!origin) {
+      return cb(null, true);
+    }
+    const allowedOrigins = FRONTEND_URL.split(',').map((origin) => origin.trim());
+    // Check if origin is in allowed list
+    if (allowedOrigins.includes(origin)) {
+      return cb(null, true);
+    }
+    cb(new Error('Not allowed by CORS'), false);
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  maxAge: 86400, // 24 hours
+});
 
-// Security headers middleware (must be early in the chain)
-app.use(securityHeadersMiddleware);
+// Security headers hook (must be early in the chain)
+app.addHook('onSend', securityHeadersHook);
 
 // HTTPS enforcement in production
 if (isProduction) {
-  app.use((req: Request, res: Response, next) => {
-    if (req.header('x-forwarded-proto') !== 'https') {
-      return res.redirect(`https://${req.header('host')}${req.url}`);
+  app.addHook('onRequest', async (request, reply) => {
+    if (request.headers['x-forwarded-proto'] !== 'https') {
+      return reply.redirect(301, `https://${request.headers.host}${request.url}`);
     }
-    next();
   });
 }
 
-// CORS configuration - hardened
-const allowedOrigins = FRONTEND_URL.split(',').map((origin) => origin.trim());
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      // Allow requests with no origin (like mobile apps, curl, Postman)
-      if (!origin) {
-        return callback(null, true);
-      }
-      // Check if origin is in allowed list
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-      callback(new Error('Not allowed by CORS'));
-    },
-    credentials: true,
-    methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    maxAge: 86400, // 24 hours
-  })
-);
-
-// Body parser with default limit (can be overridden per route)
-app.use(express.json({ limit: '10mb' })); // Default limit, increased per endpoint as needed
-
-// Rate limiting for auth endpoints with security logging
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.AUTH_RATE_LIMIT_MAX || '5', 10), // Configurable, default 5
-  message: {
-    error: 'Too many authentication attempts, please try again later.',
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (req, res) => {
-    const ip = req.ip || req.socket.remoteAddress || 'unknown';
+// Rate limiting configuration for auth endpoints
+const authLimiterConfig = {
+  max: parseInt(process.env.AUTH_RATE_LIMIT_MAX || '5', 10),
+  timeWindow: '15 minutes',
+  errorResponseBuilder: (request: any) => {
+    const ip = request.ip || 'unknown';
     securityLogger.logRateLimitViolation(ip, '/api/auth/*', 5);
-    res.status(429).json({
+    return {
       error: 'Too many authentication attempts, please try again later.',
-    });
+    };
   },
-});
+};
 
-// Rate limiting for economy endpoints (anti-abuse) with security logging
-const economyLimiter = rateLimit({
-  windowMs: 60 * 1000, // 1 minute
-  max: parseInt(process.env.ECONOMY_RATE_LIMIT_MAX || '20', 10), // Configurable, default 20
-  message: {
-    error: 'Too many economy requests, slow down.',
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-  handler: (req, res) => {
-    const ip = req.ip || req.socket.remoteAddress || 'unknown';
-    securityLogger.logRateLimitViolation(ip, req.path, 20);
-    res.status(429).json({
+// Rate limiting configuration for economy endpoints
+const economyLimiterConfig = {
+  max: parseInt(process.env.ECONOMY_RATE_LIMIT_MAX || '20', 10),
+  timeWindow: '1 minute',
+  errorResponseBuilder: (request: any) => {
+    const ip = request.ip || 'unknown';
+    securityLogger.logRateLimitViolation(ip, request.url, 20);
+    return {
       error: 'Too many economy requests, slow down.',
-    });
+    };
   },
-});
+};
 
-// Rate limiting for marketplace publishing (anti-spam)
-const publishLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 5, // Max 5 publishes per window
-  message: {
+// Rate limiting configuration for marketplace publishing
+const publishLimiterConfig = {
+  max: 5,
+  timeWindow: '15 minutes',
+  errorResponseBuilder: () => ({
     error: 'Too many publications, please try again later.',
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+  }),
+};
+
+// Export rate limiter configs for use in routes
+export const authLimiter = authLimiterConfig;
+export const economyLimiter = economyLimiterConfig;
+export const publishLimiter = publishLimiterConfig;
 
 // Initialize storage on startup
 void storage.initialize().then(() => {
@@ -553,9 +538,6 @@ const routeDeps: RouteDependencies = {
   marketplaceItemIdParamSchema,
   validateQuery,
 
-  // Async handler wrapper (for routes that don't catch errors)
-  asyncHandler,
-
   // Economy config
   ECONOMY_MIN_PRICE,
   ECONOMY_PRICE_CHANGE_COOLDOWN_SEC,
@@ -564,43 +546,46 @@ const routeDeps: RouteDependencies = {
 };
 
 // Register all route modules under /api prefix
-app.use('/api/auth', createAuthRoutes(routeDeps));
-app.use('/api/users', createUsersRoutes(routeDeps));
-app.use('/api/marketplace', createMarketplaceRoutes(routeDeps));
-app.use('/api/friends', createFriendsRoutes(routeDeps));
-app.use('/api/messages', createMessagesRoutes(routeDeps));
-app.use('/api/share', createShareRoutes(routeDeps));
-app.use('/api/notifications', createNotificationsRoutes(routeDeps));
-app.use('/api/settings', createSettingsRoutes(routeDeps));
-app.use('/api/shop', createShopRoutes(routeDeps));
-app.use('/api/studio', createStudioRoutes(routeDeps));
-app.use('/api/forum', createForumRoutes(routeDeps));
-app.use('/api/admin', createAdminRoutes(routeDeps));
+await app.register(createAuthRoutes, { prefix: '/api/auth', dependencies: routeDeps });
+await app.register(createUsersRoutes, { prefix: '/api/users', dependencies: routeDeps });
+await app.register(createMarketplaceRoutes, { prefix: '/api/marketplace', dependencies: routeDeps });
+await app.register(createFriendsRoutes, { prefix: '/api/friends', dependencies: routeDeps });
+await app.register(createMessagesRoutes, { prefix: '/api/messages', dependencies: routeDeps });
+await app.register(createShareRoutes, { prefix: '/api/share', dependencies: routeDeps });
+await app.register(createNotificationsRoutes, {
+  prefix: '/api/notifications',
+  dependencies: routeDeps,
+});
+await app.register(createSettingsRoutes, { prefix: '/api/settings', dependencies: routeDeps });
+await app.register(createShopRoutes, { prefix: '/api/shop', dependencies: routeDeps });
+await app.register(createStudioRoutes, { prefix: '/api/studio', dependencies: routeDeps });
+await app.register(createForumRoutes, { prefix: '/api/forum', dependencies: routeDeps });
+await app.register(createAdminRoutes, { prefix: '/api/admin', dependencies: routeDeps });
 
 /**
  * GET /api/projects/:token/preview
  * Get preview information for a shared project (used in forum link previews).
  */
-app.get('/api/projects/:token/preview', async (req: Request, res: Response) => {
+app.get('/api/projects/:token/preview', async (request, reply) => {
   try {
-    const { token } = req.params;
+    const { token } = request.params as { token?: string };
     if (!token || typeof token !== 'string') {
-      return res.status(400).json({ error: 'Token is required' });
+      return reply.code(400).send({ error: 'Token is required' });
     }
     const share = await storage.load(token);
 
     if (!share) {
-      return res.status(404).json({ error: 'Project not found' });
+      return reply.code(404).send({ error: 'Project not found' });
     }
 
-    res.json({
+    reply.send({
       token,
       createdAt: share.createdAt,
       title: (share.projectData as { title?: string } | undefined)?.title || 'Shared Project',
     });
   } catch (error) {
     console.error('Get project preview error:', error);
-    res.status(500).json({
+    reply.code(500).send({
       error: 'Failed to get project preview',
       message: error instanceof Error ? error.message : String(error),
     });
@@ -610,78 +595,78 @@ app.get('/api/projects/:token/preview', async (req: Request, res: Response) => {
 /**
  * Health check endpoint.
  */
-app.get('/health', (_req: Request, res: Response) => {
-  res.json({ status: 'ok' });
+app.get('/health', async () => {
+  return { status: 'ok' };
 });
 
 /**
- * Global error handler middleware (must be after all routes).
+ * Global error handler for Fastify.
  * Catches unhandled errors and returns proper error responses.
  */
-app.use((err: unknown, _req: Request, res: Response, _next: express.NextFunction) => {
-  console.error('Unhandled error:', err);
+app.setErrorHandler((error, request, reply) => {
+  console.error('Unhandled error:', error);
 
   // Handle known error types
-  if (err instanceof ValidationError) {
-    return res.status(400).json({
+  if (error instanceof ValidationError) {
+    return reply.code(400).send({
       error: 'Validation failed',
-      message: err.message,
-      errors: err.errors,
+      message: error.message,
+      errors: error.errors,
     });
   }
 
-  if (err instanceof BuildDataError) {
-    return res.status(400).json({
+  if (error instanceof BuildDataError) {
+    return reply.code(400).send({
       error: 'Build data error',
-      message: err.message,
+      message: error.message,
     });
   }
 
-  if (err instanceof PayloadTooLargeError) {
-    return res.status(413).json({
+  if (error instanceof PayloadTooLargeError) {
+    return reply.code(413).send({
       error: 'Payload too large',
-      message: err.message,
+      message: error.message,
     });
   }
 
-  if (err instanceof DatabaseError) {
-    return res.status(500).json({
+  if (error instanceof DatabaseError) {
+    return reply.code(500).send({
       error: 'Database error',
-      message: isProduction ? 'Database operation failed' : err.message,
+      message: isProduction ? 'Database operation failed' : error.message,
     });
   }
 
   // Handle JWT errors
-  if (err instanceof jwt.JsonWebTokenError) {
-    return res.status(401).json({
+  if (error instanceof jwt.JsonWebTokenError) {
+    return reply.code(401).send({
       error: 'Invalid token',
       message: 'Authentication token is invalid',
     });
   }
 
-  if (err instanceof jwt.TokenExpiredError) {
-    return res.status(401).json({
+  if (error instanceof jwt.TokenExpiredError) {
+    return reply.code(401).send({
       error: 'Token expired',
       message: 'Authentication token has expired',
     });
   }
 
   // Generic error handler
-  const message = err instanceof Error ? err.message : 'Internal server error';
-  const status = (err as { statusCode?: number })?.statusCode || 500;
+  const message = error instanceof Error ? error.message : 'Internal server error';
+  const statusCode = (error as { statusCode?: number })?.statusCode || 500;
 
-  res.status(status).json({
+  reply.code(statusCode).send({
     error: 'Internal server error',
-    message: isProduction && status === 500 ? 'An unexpected error occurred' : message,
-    ...(isProduction ? {} : { stack: err instanceof Error ? err.stack : undefined }),
+    message: isProduction && statusCode === 500 ? 'An unexpected error occurred' : message,
+    ...(isProduction ? {} : { stack: error instanceof Error ? error.stack : undefined }),
   });
 });
 
 /**
  * 404 handler (must be after all routes and error handler).
  */
-app.use((_req: Request, res: Response) => {
-  res.status(404).json({
+app.setNotFoundHandler((request, reply) => {
+  reply.code(404).send({
     error: 'Not found',
     message: 'The requested resource was not found',
   });
@@ -700,8 +685,7 @@ export {
 
 // Start server (only if not in test environment)
 if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
-  app.listen(PORT, () => {
-    console.log(`Net server listening on http://localhost:${PORT}`);
-    console.log(`Data directory: ${DATA_DIR}`);
-  });
+  await app.listen({ port: PORT, host: '0.0.0.0' });
+  console.log(`Net server listening on http://localhost:${PORT}`);
+  console.log(`Data directory: ${DATA_DIR}`);
 }
