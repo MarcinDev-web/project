@@ -1,5 +1,5 @@
 import { EditScope, type ZoneRole } from '@engine/net-protocol';
-import type { Scene } from '@engine/world';
+import { Scene, Entity } from '@engine/world';
 import type { EcsReplicator } from '../replication/EcsReplicator.js';
 import { SnapshotScheduler } from '../replication/SnapshotScheduler.js';
 import type { ClientBaselineState } from '../replication/types.js';
@@ -91,7 +91,7 @@ export class ZoneServer {
       void clientState;
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       // entities will be used when AoI filtering is implemented
-      const entities = this.scene.rootEntities.map((e) => {
+      const entities = this.scene.rootEntities.map((e: Entity) => {
         // Convert entity ID to bigint (simple parsing)
         const numId = parseInt(e.id.replace('entity_', '')) || 0;
         return { id: BigInt(numId) };
@@ -99,7 +99,7 @@ export class ZoneServer {
       void entities;
 
       const snapshot = this.snapshotScheduler.scheduleForClient(
-        context as any,
+        context,
         clientState as ClientBaselineState
       );
 

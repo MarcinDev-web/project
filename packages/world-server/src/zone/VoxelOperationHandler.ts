@@ -38,7 +38,7 @@ export class VoxelOperationHandler {
   processBatch(clientId: string, batch: VoxelOpBatch): VoxelOpResult[] {
     // Check permissions
     if (!this.zoneServer.canPerformVoxelOp(clientId)) {
-      return batch.operations.map((op) => ({
+      return batch.operations.map((op: VoxelOp) => ({
         success: false,
         operation: op,
         error: 'Permission denied or rate limit exceeded',

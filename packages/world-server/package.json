@@ -17,7 +17,9 @@
   },
   "dependencies": {
     "@engine/world": "workspace:*",
-    "@engine/net-protocol": "workspace:*"
+    "@engine/net-protocol": "workspace:*",
+    "@engine/economy": "workspace:*",
+    "@engine/voxel": "workspace:*"
   },
   "devDependencies": {
     "typescript": "^5.9.3",

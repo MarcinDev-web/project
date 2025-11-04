@@ -3,7 +3,26 @@
  */
 
 import { CurrencyManager, CurrencyWallet } from '../index.js';
-import type { TelemetryCollector, TelemetryGameEvent } from '@engine/world-server';
+
+/**
+ * Telemetry event types (duplicated from @engine/world-server to avoid circular dependency)
+ */
+export interface TelemetryGameEvent {
+  type: string;
+  timestamp: number;
+  userId: string;
+  zoneId: string;
+  duration?: number;
+}
+
+/**
+ * Telemetry collector interface (duplicated from @engine/world-server to avoid circular dependency)
+ */
+export interface TelemetryCollector {
+  on(handler: (event: TelemetryGameEvent) => void): void;
+  emit(event: TelemetryGameEvent): void;
+  dispose(): void;
+}
 
 /**
  * Creator reward configuration
