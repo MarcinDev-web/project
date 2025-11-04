@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import type { RouteDependencies } from './index';
 
 /**
@@ -10,17 +10,21 @@ export async function createNotificationsRoutes(
 ): Promise<void> {
   const { authMiddleware, notificationsStorage } = opts.dependencies;
 
+  type ListQuery = { limit?: number | string };
+  type NotificationParams = { id: string };
+
   /**
    * GET /api/notifications
    * Get user's notifications.
    */
-  app.get('/', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const limit = request.query.limit ? parseInt(String(request.query.limit), 10) : 50;
+      const query = request.query as ListQuery;
+      const limit = query.limit ? parseInt(String(query.limit), 10) : 50;
       const notifications = await notificationsStorage.getNotifications(request.user.id, limit);
       reply.send(notifications);
     } catch (error) {
@@ -36,7 +40,7 @@ export async function createNotificationsRoutes(
    * GET /api/notifications/unread-count
    * Get unread notification count.
    */
-  app.get('/unread-count', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/unread-count', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
@@ -71,13 +75,13 @@ export async function createNotificationsRoutes(
         },
       },
     },
-    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = request.params;
+        const { id } = request.params as NotificationParams;
         const marked = await notificationsStorage.markAsRead(id, request.user.id);
 
         if (!marked) {
@@ -99,7 +103,7 @@ export async function createNotificationsRoutes(
    * PUT /api/notifications/read-all
    * Mark all notifications as read.
    */
-  app.put('/read-all', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.put('/read-all', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
@@ -134,13 +138,13 @@ export async function createNotificationsRoutes(
         },
       },
     },
-    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = request.params;
+        const { id } = request.params as NotificationParams;
         const deleted = await notificationsStorage.deleteNotification(id, request.user.id);
 
         if (!deleted) {

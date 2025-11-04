@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
 import type { RouteDependencies } from './index';
 import { updateProfileSchema, userIdParamSchema } from '../validation/schemas/user';
@@ -13,6 +13,9 @@ export async function createUsersRoutes(
 ): Promise<void> {
   const { authMiddleware, profileStorage, marketplaceStorage } = opts.dependencies;
 
+  type UserIdParams = z.infer<typeof userIdParamSchema>;
+  type UpdateProfileBody = z.infer<typeof updateProfileSchema>;
+
   /**
    * GET /api/users/:id
    * Get user profile by ID.
@@ -22,9 +25,9 @@ export async function createUsersRoutes(
     {
       preHandler: [validateParams(userIdParamSchema)],
     },
-    async (request: FastifyRequest<{ Params: z.infer<typeof userIdParamSchema> }>, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
-        const { id } = request.params;
+        const { id } = (request.params as UserIdParams);
         const profile = await profileStorage.getProfile(id);
 
         if (!profile) {
@@ -51,20 +54,14 @@ export async function createUsersRoutes(
     {
       preHandler: [validateParams(userIdParamSchema), validateBody(updateProfileSchema), authMiddleware],
     },
-    async (
-      request: FastifyRequest<{
-        Params: z.infer<typeof userIdParamSchema>;
-        Body: z.infer<typeof updateProfileSchema>;
-      }>,
-      reply: FastifyReply
-    ) => {
+    async (request, reply) => {
       try {
-        const { id } = request.params;
+        const { id } = (request.params as UserIdParams);
         if (!request.user || request.user.id !== id) {
           return reply.code(403).send({ error: 'Forbidden' });
         }
 
-        const updates = request.body;
+        const updates = request.body as UpdateProfileBody;
         // Filter out undefined values to match exactOptionalPropertyTypes
         const cleanUpdates: {
           displayName?: string;
@@ -116,9 +113,9 @@ export async function createUsersRoutes(
     {
       preHandler: [validateParams(userIdParamSchema)],
     },
-    async (request: FastifyRequest<{ Params: z.infer<typeof userIdParamSchema> }>, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
-        const { id } = request.params;
+        const { id } = (request.params as UserIdParams);
         const items = await marketplaceStorage.getItems({
           authorId: id,
           type: 'build',
@@ -145,9 +142,9 @@ export async function createUsersRoutes(
     {
       preHandler: [validateParams(userIdParamSchema)],
     },
-    async (request: FastifyRequest<{ Params: z.infer<typeof userIdParamSchema> }>, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
-        const { id } = request.params;
+        const { id } = (request.params as UserIdParams);
 
         const profile = await profileStorage.getProfile(id);
 
@@ -179,20 +176,14 @@ export async function createUsersRoutes(
     {
       preHandler: [validateParams(userIdParamSchema), authMiddleware],
     },
-    async (
-      request: FastifyRequest<{
-        Params: z.infer<typeof userIdParamSchema>;
-        Body: { version: number; parts: Record<string, unknown> };
-      }>,
-      reply: FastifyReply
-    ) => {
+    async (request, reply) => {
       try {
-        const { id } = request.params;
+        const { id } = (request.params as UserIdParams);
         if (!request.user || request.user.id !== id) {
           return reply.code(403).send({ error: 'Forbidden' });
         }
 
-        const loadout = request.body;
+        const loadout = request.body as { version: number; parts: Record<string, unknown> };
 
         // Basic validation
         if (!loadout || typeof loadout !== 'object' || typeof loadout.version !== 'number') {
@@ -252,3 +243,8 @@ export async function createUsersRoutes(
     }
   );
 }
+
+
+
+
+

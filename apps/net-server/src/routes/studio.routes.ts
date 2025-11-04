@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import type { RouteDependencies } from './index';
 import type { StudioProject } from '../storage/StudioProjectsStorage';
 import type { ProjectTeamAccess } from '../storage/StudioTeamStorage';
@@ -145,14 +145,15 @@ export async function createStudioRoutes(
   }
 
   // STUDIO PROJECTS ROUTES
-  app.get('/projects', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/projects', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const limit = request.query.limit ? parseInt(String(request.query.limit), 10) : 50;
-      const offset = request.query.offset ? parseInt(String(request.query.offset), 10) : 0;
+      const query = request.query as { limit?: number | string; offset?: number | string };
+      const limit = query.limit ? parseInt(String(query.limit), 10) : 50;
+      const offset = query.offset ? parseInt(String(query.offset), 10) : 0;
 
       const projects = await studioProjectsStorage.listProjects(request.user.id, { limit, offset });
       reply.send({ projects });
@@ -165,13 +166,13 @@ export async function createStudioRoutes(
     }
   });
 
-  app.get('/projects/:id', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/projects/:id', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const { id } = request.params;
+      const { id } = request.params as { id?: string };
       if (!id) {
         return reply.code(400).send({ error: 'Project ID required' });
       }
@@ -191,7 +192,7 @@ export async function createStudioRoutes(
     }
   });
 
-  app.post('/projects', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.post('/projects', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
@@ -231,13 +232,13 @@ export async function createStudioRoutes(
     }
   });
 
-  app.put('/projects/:id', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.put('/projects/:id', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const { id } = request.params;
+      const { id } = (request.params as Record<string, string>);
       if (!id) {
         return reply.code(400).send({ error: 'Project ID required' });
       }
@@ -265,13 +266,13 @@ export async function createStudioRoutes(
     }
   });
 
-  app.delete('/projects/:id', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.delete('/projects/:id', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const { id } = request.params;
+      const { id } = (request.params as Record<string, string>);
       if (!id) {
         return reply.code(400).send({ error: 'Project ID required' });
       }
@@ -294,13 +295,13 @@ export async function createStudioRoutes(
   app.post(
     '/studio/projects/:id/publish',
     { preHandler: [authMiddleware] },
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = request.params;
+        const { id } = (request.params as Record<string, string>);
         if (!id) {
           return reply.code(400).send({ error: 'Project ID required' });
         }
@@ -364,7 +365,7 @@ export async function createStudioRoutes(
     }
   );
 
-  app.get('/stats', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/stats', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
@@ -425,19 +426,23 @@ export async function createStudioRoutes(
     }
   });
 
-  app.get('/leaderboard', async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/leaderboard', async (request, reply) => {
     try {
-      const metric =
-        (request.query.metric as
+      const query = request.query as {
+        metric?:
           | 'views'
           | 'downloads'
           | 'likes'
           | 'projects'
           | 'revenue'
           | 'score'
-          | 'growth') || 'views';
-      const period = (request.query.period as 'all' | 'week' | 'month') || 'all';
-      const limit = request.query.limit ? parseInt(String(request.query.limit), 10) : 100;
+          | 'growth';
+        period?: 'all' | 'week' | 'month';
+        limit?: number | string;
+      };
+      const metric = query.metric || 'views';
+      const period = query.period || 'all';
+      const limit = query.limit ? parseInt(String(query.limit), 10) : 100;
 
       const allBuilds = await marketplaceStorage.getItems({ type: 'build' });
 
@@ -632,13 +637,13 @@ export async function createStudioRoutes(
     }
   });
 
-  app.get('/compare/:userId', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/compare/:userId', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const { userId } = request.params;
+      const { userId } = (request.params as Record<string, string>);
       if (!userId) {
         return reply.code(400).send({ error: 'User ID required' });
       }
@@ -690,7 +695,7 @@ export async function createStudioRoutes(
   });
 
   // STUDIO TEAM ROUTES (continuing in next part due to size...)
-  app.post('/team', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.post('/team', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
@@ -711,7 +716,7 @@ export async function createStudioRoutes(
     } catch (error) {
       console.error('Create team error:', error);
       if (error instanceof Error && error.message.includes('already exists')) {
-        return res.status(409).json({ error: error.message });
+        return reply.code(409).send({ error: error.message });
       }
       reply.code(500).send({
         error: 'Failed to create team',
@@ -720,7 +725,7 @@ export async function createStudioRoutes(
     }
   });
 
-  app.get('/team', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/team', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
@@ -741,13 +746,13 @@ export async function createStudioRoutes(
     }
   });
 
-  app.put('/team/:id', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.put('/team/:id', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const { id } = request.params;
+      const { id } = (request.params as Record<string, string>);
       if (!id) {
         return reply.code(400).send({ error: 'Team ID required' });
       }
@@ -772,13 +777,13 @@ export async function createStudioRoutes(
     }
   });
 
-  app.delete('/team/:id', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.delete('/team/:id', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const { id } = request.params;
+      const { id } = (request.params as Record<string, string>);
       if (!id) {
         return reply.code(400).send({ error: 'Team ID required' });
       }
@@ -802,7 +807,7 @@ export async function createStudioRoutes(
     }
   });
 
-  app.get('/team/members', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/team/members', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
@@ -842,7 +847,7 @@ export async function createStudioRoutes(
     }
   });
 
-  app.post('/team/invite', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.post('/team/invite', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
@@ -895,13 +900,13 @@ export async function createStudioRoutes(
 
       const existingMember = await studioTeamStorage.getMember(team.id, inviteeUserId);
       if (existingMember) {
-        return res.status(409).json({ error: 'User is already a team member' });
+        return reply.code(409).send({ error: 'User is already a team member' });
       }
 
       const existingInvitations = await studioTeamStorage.getInvitations(team.id, inviteeUserId);
       const pendingInvitation = existingInvitations.find((inv) => inv.status === 'pending');
       if (pendingInvitation) {
-        return res.status(409).json({ error: 'Invitation already sent' });
+        return reply.code(409).send({ error: 'Invitation already sent' });
       }
 
       const inviteeProfile = await profileStorage.getProfile(inviteeUserId);
@@ -938,13 +943,13 @@ export async function createStudioRoutes(
   app.put(
     '/studio/team/invitations/:id',
     { preHandler: [authMiddleware] },
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = request.params;
+        const { id } = (request.params as Record<string, string>);
         if (!id) {
           return reply.code(400).send({ error: 'Invitation ID required' });
         }
@@ -1008,14 +1013,15 @@ export async function createStudioRoutes(
   app.get(
     '/studio/team/invitations',
     { preHandler: [authMiddleware] },
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const team = request.query.teamId
-          ? await studioTeamStorage.getTeam(String(request.query.teamId))
+        const query = request.query as { teamId?: string | number };
+        const team = query.teamId
+          ? await studioTeamStorage.getTeam(String(query.teamId))
           : null;
 
         if (team) {
@@ -1045,13 +1051,13 @@ export async function createStudioRoutes(
   app.delete(
     '/studio/team/members/:userId',
     { preHandler: [authMiddleware] },
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { userId } = request.params;
+        const { userId } = (request.params as Record<string, string>);
         if (!userId) {
           return reply.code(400).send({ error: 'User ID required' });
         }
@@ -1091,13 +1097,13 @@ export async function createStudioRoutes(
   app.post(
     '/studio/projects/:id/share-team',
     { preHandler: [authMiddleware] },
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = request.params;
+        const { id } = (request.params as Record<string, string>);
         if (!id) {
           return reply.code(400).send({ error: 'Project ID required' });
         }
@@ -1170,13 +1176,13 @@ export async function createStudioRoutes(
   app.get(
     '/studio/projects/:id/team-access',
     { preHandler: [authMiddleware] },
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = request.params;
+        const { id } = (request.params as Record<string, string>);
         if (!id) {
           return reply.code(400).send({ error: 'Project ID required' });
         }
@@ -1206,13 +1212,13 @@ export async function createStudioRoutes(
   app.delete(
     '/studio/projects/:id/share-team',
     { preHandler: [authMiddleware] },
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = request.params;
+        const { id } = (request.params as Record<string, string>);
         if (!id) {
           return reply.code(400).send({ error: 'Project ID required' });
         }
@@ -1244,7 +1250,7 @@ export async function createStudioRoutes(
     }
   );
 
-  app.get('/shared-projects', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/shared-projects', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
@@ -1280,7 +1286,7 @@ export async function createStudioRoutes(
   });
 
   // STUDIO SETTINGS ROUTES
-  app.get('/settings', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/settings', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
@@ -1310,7 +1316,7 @@ export async function createStudioRoutes(
     }
   });
 
-  app.put('/settings', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.put('/settings', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
@@ -1351,13 +1357,14 @@ export async function createStudioRoutes(
   });
 
   // STUDIO REVENUE ROUTE
-  app.get('/revenue', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/revenue', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const period = String(request.query.period || 'month');
+      const { period: periodParam } = request.query as { period?: string };
+      const period = String(periodParam || 'month');
       const days = periodToDays(period);
       const cacheKey = `rev:${request.user.id}:${days}`;
 
@@ -1466,7 +1473,7 @@ export async function createStudioRoutes(
   });
 
   // STUDIO SCORE ROUTE
-  app.get('/score', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/score', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) return reply.code(401).send({ error: 'Unauthorized' });
       const cacheKey = `score:${request.user.id}`;
@@ -1485,7 +1492,7 @@ export async function createStudioRoutes(
   });
 
   // STUDIO INSIGHTS ROUTE
-  app.get('/insights', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/insights', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) return reply.code(401).send({ error: 'Unauthorized' });
 
@@ -1582,3 +1589,5 @@ export async function createStudioRoutes(
   });
 
 }
+
+

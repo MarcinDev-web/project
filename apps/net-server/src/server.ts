@@ -1,6 +1,5 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
-import rateLimit from '@fastify/rate-limit';
 import cookie from '@fastify/cookie';
 import { ProjectStorage } from './storage/ProjectStorage';
 import { AuthManager } from './auth/AuthManager';
@@ -314,7 +313,8 @@ app.addHook('onSend', securityHeadersHook);
 if (isProduction) {
   app.addHook('onRequest', async (request, reply) => {
     if (request.headers['x-forwarded-proto'] !== 'https') {
-      return reply.redirect(301, `https://${request.headers.host}${request.url}`);
+      const host = request.headers.host ?? '';
+      return reply.redirect(`https://${host}${request.url}`, 301);
     }
   });
 }
@@ -325,7 +325,7 @@ const authLimiterConfig = {
   timeWindow: '15 minutes',
   errorResponseBuilder: (request: any) => {
     const ip = request.ip || 'unknown';
-    securityLogger.logRateLimitViolation(ip, '/api/auth/*', 5);
+    securityLogger.logRateLimitViolation(ip, '/api/auth/*', authLimiterConfig.max);
     return {
       error: 'Too many authentication attempts, please try again later.',
     };
@@ -338,7 +338,7 @@ const economyLimiterConfig = {
   timeWindow: '1 minute',
   errorResponseBuilder: (request: any) => {
     const ip = request.ip || 'unknown';
-    securityLogger.logRateLimitViolation(ip, request.url, 20);
+    securityLogger.logRateLimitViolation(ip, request.url, economyLimiterConfig.max);
     return {
       error: 'Too many economy requests, slow down.',
     };
@@ -603,7 +603,7 @@ app.get('/health', async () => {
  * Global error handler for Fastify.
  * Catches unhandled errors and returns proper error responses.
  */
-app.setErrorHandler((error, request, reply) => {
+app.setErrorHandler((error, _request, reply) => {
   console.error('Unhandled error:', error);
 
   // Handle known error types
@@ -611,7 +611,7 @@ app.setErrorHandler((error, request, reply) => {
     return reply.code(400).send({
       error: 'Validation failed',
       message: error.message,
-      errors: error.errors,
+      errors: (error as ValidationError).errors,
     });
   }
 
@@ -665,7 +665,7 @@ app.setErrorHandler((error, request, reply) => {
 /**
  * 404 handler (must be after all routes and error handler).
  */
-app.setNotFoundHandler((request, reply) => {
+app.setNotFoundHandler((_request, reply) => {
   reply.code(404).send({
     error: 'Not found',
     message: 'The requested resource was not found',

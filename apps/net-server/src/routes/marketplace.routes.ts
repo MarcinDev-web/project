@@ -51,6 +51,10 @@ export async function createMarketplaceRoutes(
     DatabaseError: DatabaseErrorClass,
   } = opts.dependencies;
 
+  void rateLimit;
+  void economyLimiter;
+  void publishLimiter;
+
   // Register rate limiters as plugins for specific scopes
   // Note: Fastify rate limit plugin must be registered per route scope
   // For now, we'll use rate limiting in preHandler hooks
@@ -59,12 +63,19 @@ export async function createMarketplaceRoutes(
    * GET /api/marketplace/builds
    * List marketplace builds (paginated).
    */
-  app.get('/builds', async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/builds', async (request, reply) => {
     try {
-      const type = request.query.type as 'build' | 'avatar' | undefined;
-      const tags = request.query.tags ? String(request.query.tags).split(',') : undefined;
-      const limit = request.query.limit ? parseInt(String(request.query.limit), 10) : 50;
-      const offset = request.query.offset ? parseInt(String(request.query.offset), 10) : 0;
+      const query = request.query as {
+        type?: 'build' | 'avatar';
+        tags?: string;
+        limit?: number | string;
+        offset?: number | string;
+      };
+
+      const type = query.type;
+      const tags = query.tags ? String(query.tags).split(',') : undefined;
+      const limit = query.limit ? parseInt(String(query.limit), 10) : 50;
+      const offset = query.offset ? parseInt(String(query.offset), 10) : 0;
 
       const items = await marketplaceStorage.getItems({
         type: type ?? 'build',
@@ -110,11 +121,17 @@ export async function createMarketplaceRoutes(
    * GET /api/marketplace/paid
    * List paid marketplace items (with price).
    */
-  app.get('/paid', async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/paid', async (request, reply) => {
     try {
-      const type = request.query.type as 'build' | 'avatar' | undefined;
-      const limit = request.query.limit ? parseInt(String(request.query.limit), 10) : 50;
-      const offset = request.query.offset ? parseInt(String(request.query.offset), 10) : 0;
+      const query = request.query as {
+        type?: 'build' | 'avatar';
+        limit?: number | string;
+        offset?: number | string;
+      };
+
+      const type = query.type;
+      const limit = query.limit ? parseInt(String(query.limit), 10) : 50;
+      const offset = query.offset ? parseInt(String(query.offset), 10) : 0;
 
       // Get all items and filter for those with price
       const allItems = await marketplaceStorage.getItems({
@@ -148,13 +165,13 @@ export async function createMarketplaceRoutes(
    * PUT /api/marketplace/:id/price
    * Set or update price for marketplace item (author or admin only).
    */
-  app.put('/:id/price', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.put('/:id/price', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const { id } = request.params;
+      const { id } = (request.params as { id?: string });
       if (!id) {
         return reply.code(400).send({ error: 'Item ID required' });
       }
@@ -176,9 +193,9 @@ export async function createMarketplaceRoutes(
       if (body.price) {
         const min = ECONOMY_MIN_PRICE[body.price.currency] ?? 0;
         if (!(Number.isFinite(body.price.amount) && body.price.amount >= min)) {
-          return res
-            .status(400)
-            .json({ error: `Price below minimum for ${body.price.currency}: ${min}` });
+          return reply.code(400).send({
+            error: `Price below minimum for ${body.price.currency}: ${min}`,
+          });
         }
       }
 
@@ -196,7 +213,7 @@ export async function createMarketplaceRoutes(
       if (isPriceChange) {
         const diffSec = Math.floor((now - lastUpdateAt) / 1000);
         if (diffSec < ECONOMY_PRICE_CHANGE_COOLDOWN_SEC && request.user.role !== 'admin') {
-          return res.status(429).json({
+          return reply.code(429).send({
             error: `Price change cooldown active. Try again in ${ECONOMY_PRICE_CHANGE_COOLDOWN_SEC - diffSec}s`,
           });
         }
@@ -242,7 +259,7 @@ export async function createMarketplaceRoutes(
    */
   app.get('/:id/resale', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const { id } = request.params;
+      const { id } = (request.params as { id?: string });
       if (!id) {
         return reply.code(400).send({ error: 'Item ID required' });
       }
@@ -272,7 +289,7 @@ export async function createMarketplaceRoutes(
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
         if (!request.user) return reply.code(401).send({ error: 'Unauthorized' });
-        const { id } = request.params;
+        const { id } = (request.params as { id?: string });
         if (!id) {
           return reply.code(400).send({ error: 'Item ID required' });
         }
@@ -287,9 +304,9 @@ export async function createMarketplaceRoutes(
         // Price floor
         const min = ECONOMY_MIN_PRICE[body.price.currency] ?? 0;
         if (!(Number.isFinite(body.price.amount) && body.price.amount >= min)) {
-          return res
-            .status(400)
-            .json({ error: `Price below minimum for ${body.price.currency}: ${min}` });
+          return reply.code(400).send({
+            error: `Price below minimum for ${body.price.currency}: ${min}`,
+          });
         }
 
         const list = resaleListings.get(id) ?? [];
@@ -319,7 +336,7 @@ export async function createMarketplaceRoutes(
       try {
         if (!request.user) return reply.code(401).send({ error: 'Unauthorized' });
         const buyerId = request.user.id;
-        const { id } = request.params;
+        const { id } = (request.params as { id?: string });
         if (!id) {
           return reply.code(400).send({ error: 'Item ID required' });
         }
@@ -412,11 +429,16 @@ export async function createMarketplaceRoutes(
    * GET /api/marketplace/avatars
    * List marketplace avatars.
    */
-  app.get('/avatars', async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/avatars', async (request, reply) => {
     try {
-      const limit = request.query.limit ? parseInt(String(request.query.limit), 10) : 50;
-      const offset = request.query.offset ? parseInt(String(request.query.offset), 10) : 0;
-      const sortBy = request.query.sortBy as 'newest' | 'popular' | 'downloads' | 'likes' | undefined;
+      const query = request.query as {
+        limit?: number | string;
+        offset?: number | string;
+        sortBy?: 'newest' | 'popular' | 'downloads' | 'likes';
+      };
+      const limit = query.limit ? parseInt(String(query.limit), 10) : 50;
+      const offset = query.offset ? parseInt(String(query.offset), 10) : 0;
+      const sortBy = query.sortBy;
 
       const items = await marketplaceStorage.getItems({
         type: 'avatar',
@@ -548,7 +570,7 @@ export async function createMarketplaceRoutes(
    */
   app.get('/:id', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const { id } = request.params;
+      const { id } = (request.params as { id?: string });
       if (!id) {
         return reply.code(400).send({ error: 'Item ID required' });
       }
@@ -588,7 +610,7 @@ export async function createMarketplaceRoutes(
    */
   app.get('/:id/players-online', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const { id } = request.params;
+      const { id } = (request.params as { id?: string });
       if (!id) {
         return reply.code(400).send({ error: 'Item ID required' });
       }
@@ -611,7 +633,7 @@ export async function createMarketplaceRoutes(
    */
   app.get('/thumbnails/:id', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const { id } = request.params;
+      const { id } = (request.params as { id?: string });
       if (!id) {
         return reply.code(400).send({ error: 'Item ID required' });
       }
@@ -644,10 +666,10 @@ export async function createMarketplaceRoutes(
 
       if (thumbnailExists) {
         try {
-          res.setHeader('Content-Type', 'image/svg+xml');
-          res.setHeader('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
+          reply.header('Content-Type', 'image/svg+xml');
+          reply.header('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
           const svg = await fs.readFile(thumbnailPath, 'utf-8');
-          res.send(svg);
+          reply.send(svg);
         } catch (readError) {
           console.error(`Failed to read thumbnail ${id}:`, readError);
           reply.code(500).send({ error: 'Failed to read thumbnail' });
@@ -672,7 +694,7 @@ export async function createMarketplaceRoutes(
    */
   app.get('/:id/build', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const { id } = request.params;
+      const { id } = (request.params as { id?: string });
       if (!id) {
         return reply.code(400).send({ error: 'Item ID required' });
       }
@@ -731,7 +753,7 @@ export async function createMarketplaceRoutes(
         return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const { id } = request.params;
+      const { id } = (request.params as { id?: string });
       if (!id) {
         return reply.code(400).send({ error: 'Item ID required' });
       }
@@ -764,7 +786,7 @@ export async function createMarketplaceRoutes(
         return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const { id } = request.params;
+      const { id } = (request.params as { id?: string });
       if (!id) {
         return reply.code(400).send({ error: 'Item ID required' });
       }
@@ -971,7 +993,7 @@ export async function createMarketplaceRoutes(
         }
 
         if (error instanceof PayloadTooLargeErrorClass) {
-          return res.status(413).json({
+          return reply.code(413).send({
             error: 'Payload too large',
             message: error.message,
           });
@@ -1013,7 +1035,7 @@ export async function createMarketplaceRoutes(
         return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const { id } = request.params;
+      const { id } = (request.params as { id?: string });
       if (!id) {
         return reply.code(400).send({ error: 'Item ID required' });
       }
@@ -1054,7 +1076,7 @@ export async function createMarketplaceRoutes(
    */
   app.get('/:id/likes', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const { id } = request.params;
+      const { id } = (request.params as { id?: string });
       if (!id) {
         return reply.code(400).send({ error: 'Item ID required' });
       }
@@ -1092,7 +1114,7 @@ export async function createMarketplaceRoutes(
    */
   app.get('/:id/forum-thread', async (request: FastifyRequest, reply: FastifyReply) => {
     try {
-      const { id } = request.params;
+      const { id } = (request.params as { id?: string });
       if (!id) {
         return reply.code(400).send({ error: 'Item ID required' });
       }
@@ -1154,7 +1176,7 @@ export async function createMarketplaceRoutes(
         return reply.code(401).send({ error: 'Unauthorized' });
       }
 
-      const { id } = request.params;
+      const { id } = (request.params as { id?: string });
       if (!id) {
         return reply.code(400).send({ error: 'Item ID required' });
       }
@@ -1175,3 +1197,4 @@ export async function createMarketplaceRoutes(
   });
 
 }
+

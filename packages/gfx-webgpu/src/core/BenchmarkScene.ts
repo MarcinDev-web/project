@@ -105,7 +105,7 @@ export function generateBenchmarkScene(
   let entityCount = 0;
   for (const pos of positions) {
     const entity = scene.createEntity(`BenchmarkInstance_${entityCount}`);
-    entity.transform.setPosition(pos);
+    entity.transform.position = pos;
 
     // Add mesh component (cube by default)
     const mesh = new MeshComponent();

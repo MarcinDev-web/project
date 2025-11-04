@@ -20,7 +20,7 @@ describe.skip('POST /api/marketplace', () => {
   });
 
   it('publishes item successfully with auth', async () => {
-    const response = await request(app)
+    const response = await request(app.server)
       .post('/api/marketplace')
       .set('Authorization', `Bearer ${user.token}`)
       .send({
@@ -41,7 +41,7 @@ describe.skip('POST /api/marketplace', () => {
   });
 
   it('returns 401 without auth', async () => {
-    await request(app)
+    await request(app.server)
       .post('/api/marketplace')
       .send({
         type: 'build',
@@ -52,7 +52,7 @@ describe.skip('POST /api/marketplace', () => {
   });
 
   it('validates required fields', async () => {
-    await request(app)
+    await request(app.server)
       .post('/api/marketplace')
       .set('Authorization', `Bearer ${user.token}`)
       .send({
@@ -69,7 +69,7 @@ describe.skip('POST /api/marketplace', () => {
 
     const buildData = createTestBuild('test-id', 'Test Build');
 
-    const response = await request(app)
+    const response = await request(app.server)
       .post('/api/marketplace')
       .set('Authorization', `Bearer ${user.token}`)
       .send({
@@ -87,7 +87,7 @@ describe.skip('POST /api/marketplace', () => {
   });
 
   it('returns created item with all fields', async () => {
-    const response = await request(app)
+    const response = await request(app.server)
       .post('/api/marketplace')
       .set('Authorization', `Bearer ${user.token}`)
       .send({
@@ -111,7 +111,7 @@ describe.skip('POST /api/marketplace', () => {
   });
 
   it('handles invalid data gracefully', async () => {
-    await request(app)
+    await request(app.server)
       .post('/api/marketplace')
       .set('Authorization', `Bearer ${user.token}`)
       .send({
@@ -153,7 +153,7 @@ describe.skip('POST /api/marketplace', () => {
     };
 
     try {
-      await request(app)
+      await request(app.server)
         .post('/api/marketplace')
         .set('Authorization', `Bearer ${user.token}`)
         .send({
@@ -177,7 +177,7 @@ describe.skip('POST /api/marketplace', () => {
   it('validates title length limit', async () => {
     const longTitle = 'a'.repeat(201); // Exceeds 200 char limit
 
-    const response = await request(app)
+    const response = await request(app.server)
       .post('/api/marketplace')
       .set('Authorization', `Bearer ${user.token}`)
       .send({
@@ -197,7 +197,7 @@ describe.skip('POST /api/marketplace', () => {
   it('validates description length limit', async () => {
     const longDescription = 'a'.repeat(5001); // Exceeds 5000 char limit
 
-    const response = await request(app)
+    const response = await request(app.server)
       .post('/api/marketplace')
       .set('Authorization', `Bearer ${user.token}`)
       .send({
@@ -217,7 +217,7 @@ describe.skip('POST /api/marketplace', () => {
   it('validates tags count limit', async () => {
     const tooManyTags = Array.from({ length: 21 }, (_, i) => `tag${i}`); // Exceeds 20 tag limit
 
-    const response = await request(app)
+    const response = await request(app.server)
       .post('/api/marketplace')
       .set('Authorization', `Bearer ${user.token}`)
       .send({
@@ -241,7 +241,7 @@ describe.skip('POST /api/marketplace', () => {
       scene: null,
     };
 
-    const response = await request(app)
+    const response = await request(app.server)
       .post('/api/marketplace')
       .set('Authorization', `Bearer ${user.token}`)
       .send({
@@ -299,7 +299,7 @@ describe.skip('POST /api/marketplace', () => {
       },
     };
 
-    const response = await request(app)
+    const response = await request(app.server)
       .post('/api/marketplace')
       .set('Authorization', `Bearer ${user.token}`)
       .send({
@@ -316,7 +316,7 @@ describe.skip('POST /api/marketplace', () => {
   it('enforces rate limiting', async () => {
     // Make 6 requests rapidly (exceeds limit of 5)
     const requests = Array.from({ length: 6 }, () =>
-      request(app)
+      request(app.server)
         .post('/api/marketplace')
         .set('Authorization', `Bearer ${user.token}`)
         .send({
@@ -350,7 +350,7 @@ describe.skip('POST /api/marketplace', () => {
     };
 
     try {
-      const response = await request(app)
+      const response = await request(app.server)
         .post('/api/marketplace')
         .set('Authorization', `Bearer ${user.token}`)
         .send({

@@ -30,7 +30,7 @@ describe.skip('DELETE /api/marketplace/:id', () => {
       // Wait for item to be available (handles database transaction timing)
       await waitForItem(marketplaceStorage, item.id);
 
-      await request(app)
+      await request(app.server)
       .delete(`/api/marketplace/${item.id}`)
       .set('Authorization', `Bearer ${user1.token}`)
       .expect(204);
@@ -50,13 +50,13 @@ describe.skip('DELETE /api/marketplace/:id', () => {
       title: 'My Build',
     });
 
-    await request(app)
+    await request(app.server)
       .delete(`/api/marketplace/${item.id}`)
       .expect(401);
   });
 
   it('returns 404 for non-existent item', async () => {
-    await request(app)
+    await request(app.server)
       .delete('/api/marketplace/nonexistent_id')
       .set('Authorization', `Bearer ${user1.token}`)
       .expect(404);
@@ -69,7 +69,7 @@ describe.skip('DELETE /api/marketplace/:id', () => {
       title: 'User1 Build',
     });
 
-    await request(app)
+    await request(app.server)
       .delete(`/api/marketplace/${item.id}`)
       .set('Authorization', `Bearer ${user2.token}`)
       .expect(404);
@@ -86,13 +86,13 @@ describe.skip('DELETE /api/marketplace/:id', () => {
       title: 'My Build',
     });
 
-    await request(app)
+    await request(app.server)
       .delete(`/api/marketplace/${item.id}`)
       .set('Authorization', `Bearer ${user1.token}`)
       .expect(204);
 
     // Try to delete again
-    await request(app)
+    await request(app.server)
       .delete(`/api/marketplace/${item.id}`)
       .set('Authorization', `Bearer ${user1.token}`)
       .expect(404);

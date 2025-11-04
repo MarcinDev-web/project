@@ -28,7 +28,7 @@ describe.skip('GET /api/marketplace/:id/build', () => {
     // Wait for item to be available (handles database transaction timing)
     await waitForItem(marketplaceStorage, item.id);
 
-    const response = await request(app)
+    const response = await request(app.server)
       .get(`/api/marketplace/${item.id}/build`)
       .expect(200);
 
@@ -48,7 +48,7 @@ describe.skip('GET /api/marketplace/:id/build', () => {
     // Wait for item to be available (handles database transaction timing)
     await waitForItem(marketplaceStorage, item.id);
 
-    const response = await request(app)
+    const response = await request(app.server)
       .get(`/api/marketplace/${item.id}/build`)
       .expect(200);
 
@@ -69,13 +69,13 @@ describe.skip('GET /api/marketplace/:id/build', () => {
     // Wait for item to be available (handles database transaction timing)
     await waitForItem(marketplaceStorage, item.id);
 
-    await request(app)
+    await request(app.server)
       .get(`/api/marketplace/${item.id}/build`)
       .expect(400);
   });
 
   it('returns 404 if item not found', async () => {
-    await request(app)
+    await request(app.server)
       .get('/api/marketplace/nonexistent_id/build')
       .expect(404);
   });

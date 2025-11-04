@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import type { ForumCategory } from '../storage/ForumStorage';
 import type { RouteDependencies } from './index';
 
 /**
@@ -94,14 +95,14 @@ export async function createAdminRoutes(
     }
   });
 
-  app.get(
+  app.get<{ Params: { id: string } }>(
     '/admin/users/:id',
     { preHandler: [authMiddleware, requireAdmin()] },
-    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-    try {
+    async (request, reply) => {
+      try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
-      }
+        }
 
         const { id } = request.params;
 
@@ -122,42 +123,43 @@ export async function createAdminRoutes(
         role: user.role ?? 'user',
         profile: profile ?? null,
       });
-    } catch (error) {
-      console.error('Get admin user error:', error);
-      reply.code(500).send({
-        error: 'Failed to get user',
-        message: error instanceof Error ? error.message : String(error),
-      });
+      } catch (error) {
+        console.error('Get admin user error:', error);
+        reply.code(500).send({
+          error: 'Failed to get user',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
-  });
+  );
 
-  app.put(
+  app.put<{ Params: { id: string } }>(
     '/admin/users/:id',
     { preHandler: [authMiddleware, requireAdmin()] },
-    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
-    try {
-      if (!request.user) {
-        return reply.code(401).send({ error: 'Unauthorized' });
-      }
+    async (request, reply) => {
+      try {
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
+        }
 
-      const { id } = request.params;
-      if (!id) {
-        return reply.code(400).send({ error: 'User ID required' });
-      }
+        const { id } = request.params;
+        if (!id) {
+          return reply.code(400).send({ error: 'User ID required' });
+        }
 
-      const { active, role } = request.body as { active?: boolean; role?: string };
+        const { active, role } = request.body as { active?: boolean; role?: string };
 
-      if (role && id === request.user.id && role !== request.user.role) {
-        return reply.code(400).send({ error: 'Cannot change your own role' });
-      }
+        if (role && id === request.user.id && role !== request.user.role) {
+          return reply.code(400).send({ error: 'Cannot change your own role' });
+        }
 
-      const updates: { active?: boolean; role?: 'user' | 'moderator' | 'admin' } = {};
-      if (active !== undefined) updates.active = active;
-      if (role && ['user', 'moderator', 'admin'].includes(role)) {
-        updates.role = role as 'user' | 'moderator' | 'admin';
-      }
+        const updates: { active?: boolean; role?: 'user' | 'moderator' | 'admin' } = {};
+        if (active !== undefined) updates.active = active;
+        if (role && ['user', 'moderator', 'admin'].includes(role)) {
+          updates.role = role as 'user' | 'moderator' | 'admin';
+        }
 
-      const updated = await authManager['userStorage'].updateUserById(id, updates);
+        const updated = await authManager['userStorage'].updateUserById(id, updates);
 
       reply.send({
         id: updated.id,
@@ -167,14 +169,15 @@ export async function createAdminRoutes(
         active: updated.active ?? true,
         role: updated.role ?? 'user',
       });
-    } catch (error) {
-      console.error('Update admin user error:', error);
-      reply.code(500).send({
-        error: 'Failed to update user',
-        message: error instanceof Error ? error.message : String(error),
-      });
+      } catch (error) {
+        console.error('Update admin user error:', error);
+        reply.code(500).send({
+          error: 'Failed to update user',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
     }
-  });
+  );
 
   // ADMIN STATS
   app.get('/admin/stats', { preHandler: [authMiddleware, requireAdmin()] }, async (request: FastifyRequest, reply: FastifyReply) => {
@@ -265,10 +268,10 @@ export async function createAdminRoutes(
     }
   );
 
-  app.delete(
+  app.delete<{ Params: { id: string } }>(
     '/admin/marketplace/:id',
     { preHandler: [authMiddleware, requireAdmin()] },
-    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
@@ -326,10 +329,10 @@ export async function createAdminRoutes(
     }
   });
 
-  app.delete(
+  app.delete<{ Params: { token: string } }>(
     '/admin/projects/:token',
     { preHandler: [authMiddleware, requireAdmin()] },
-    async (request: FastifyRequest<{ Params: { token: string } }>, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
@@ -384,10 +387,10 @@ export async function createAdminRoutes(
     }
   );
 
-  app.post(
+  app.post<{ Params: { id: string } }>(
     '/api/moderator/marketplace/:id/approve',
     { preHandler: [authMiddleware, requireModerator()] },
-    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
@@ -416,10 +419,10 @@ export async function createAdminRoutes(
     }
   );
 
-  app.post(
+  app.post<{ Params: { id: string } }>(
     '/api/moderator/marketplace/:id/reject',
     { preHandler: [authMiddleware, requireModerator()] },
-    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
@@ -448,10 +451,10 @@ export async function createAdminRoutes(
     }
   );
 
-  app.delete(
+  app.delete<{ Params: { id: string } }>(
     '/api/moderator/marketplace/:id',
     { preHandler: [authMiddleware, requireModerator()] },
-    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
@@ -505,10 +508,10 @@ export async function createAdminRoutes(
     }
   );
 
-  app.put(
+  app.put<{ Params: { id: string } }>(
     '/api/moderator/users/:id/ban',
     { preHandler: [authMiddleware, requireModerator()] },
-    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
@@ -542,10 +545,10 @@ export async function createAdminRoutes(
     }
   );
 
-  app.put(
+  app.put<{ Params: { id: string } }>(
     '/api/moderator/users/:id/warn',
     { preHandler: [authMiddleware, requireModerator()] },
-    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
@@ -558,6 +561,7 @@ export async function createAdminRoutes(
         reply.send({
           success: true,
           message: 'User warned',
+          userId: id,
           reason,
         });
       } catch (error) {
@@ -571,10 +575,10 @@ export async function createAdminRoutes(
   );
 
   // MODERATOR MESSAGES
-  app.get(
+  app.get<{ Params: { conversationId: string } }>(
     '/api/moderator/messages/:conversationId',
     { preHandler: [authMiddleware, requireModerator()] },
-    async (request: FastifyRequest<{ Params: { conversationId: string } }>, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
@@ -650,10 +654,10 @@ export async function createAdminRoutes(
     }
   );
 
-  app.delete(
+  app.delete<{ Params: { id: string } }>(
     '/api/moderator/forum/threads/:id',
     { preHandler: [authMiddleware, requireModerator()] },
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
@@ -685,10 +689,10 @@ export async function createAdminRoutes(
     }
   );
 
-  app.post(
+  app.post<{ Params: { id: string } }>(
     '/api/moderator/forum/threads/:id/approve',
     { preHandler: [authMiddleware, requireModerator()] },
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
@@ -714,10 +718,10 @@ export async function createAdminRoutes(
     }
   );
 
-  app.post(
+  app.post<{ Params: { id: string }; Body: { reason?: string } }>(
     '/api/moderator/forum/threads/:id/reject',
     { preHandler: [authMiddleware, requireModerator()] },
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
@@ -752,10 +756,10 @@ export async function createAdminRoutes(
     }
   );
 
-  app.post(
+  app.post<{ Params: { id: string }; Body: { reason?: string } }>(
     '/api/moderator/forum/threads/:id/warn',
     { preHandler: [authMiddleware, requireModerator()] },
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
@@ -830,10 +834,10 @@ export async function createAdminRoutes(
     }
   );
 
-  app.delete(
+  app.delete<{ Params: { id: string } }>(
     '/api/moderator/forum/posts/:id',
     { preHandler: [authMiddleware, requireModerator()] },
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
@@ -867,10 +871,10 @@ export async function createAdminRoutes(
     }
   );
 
-  app.post(
+  app.post<{ Params: { id: string }; Body: { reason?: string } }>(
     '/api/moderator/forum/posts/:id/warn',
     { preHandler: [authMiddleware, requireModerator()] },
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
@@ -1000,10 +1004,10 @@ export async function createAdminRoutes(
     }
   );
 
-  app.put(
+  app.put<{ Params: { id: string }; Body: Partial<ForumCategory> }>(
     '/admin/forum/categories/:id',
     { preHandler: [authMiddleware, requireAdmin()] },
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
@@ -1031,10 +1035,10 @@ export async function createAdminRoutes(
     }
   );
 
-  app.delete(
+  app.delete<{ Params: { id: string } }>(
     '/admin/forum/categories/:id',
     { preHandler: [authMiddleware, requireAdmin()] },
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
@@ -1118,10 +1122,10 @@ export async function createAdminRoutes(
     }
   );
 
-  app.delete(
+  app.delete<{ Params: { id: string } }>(
     '/admin/forum/threads/:id',
     { preHandler: [authMiddleware, requireAdmin()] },
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
@@ -1199,10 +1203,10 @@ export async function createAdminRoutes(
     }
   );
 
-  app.delete(
+  app.delete<{ Params: { id: string } }>(
     '/admin/forum/posts/:id',
     { preHandler: [authMiddleware, requireAdmin()] },
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });

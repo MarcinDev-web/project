@@ -19,7 +19,7 @@ describe.skip('Studio Progress & Monetization API', () => {
   });
 
   it('GET /api/studio/settings returns defaults for new user', async () => {
-    const res = await request(app)
+    const res = await request(app.server)
       .get('/api/studio/settings')
       .set('Authorization', `Bearer ${user.token}`)
       .expect(200);
@@ -30,7 +30,7 @@ describe.skip('Studio Progress & Monetization API', () => {
   });
 
   it('PUT /api/studio/settings updates focus and goals', async () => {
-    const res = await request(app)
+    const res = await request(app.server)
       .put('/api/studio/settings')
       .set('Authorization', `Bearer ${user.token}`)
       .send({ focus: 'assets', goals: { monthlyRevenueTarget: 100 }, cadenceTarget: 3 })
@@ -42,11 +42,11 @@ describe.skip('Studio Progress & Monetization API', () => {
   });
 
   it('GET /api/studio/revenue requires auth', async () => {
-    await request(app).get('/api/studio/revenue').expect(401);
+    await request(app.server).get('/api/studio/revenue').expect(401);
   });
 
   it('GET /api/studio/revenue returns aggregates', async () => {
-    const res = await request(app)
+    const res = await request(app.server)
       .get('/api/studio/revenue?period=month')
       .set('Authorization', `Bearer ${user.token}`)
       .expect(200);
@@ -59,7 +59,7 @@ describe.skip('Studio Progress & Monetization API', () => {
   });
 
   it('GET /api/studio/score returns score and breakdown', async () => {
-    const res = await request(app)
+    const res = await request(app.server)
       .get('/api/studio/score')
       .set('Authorization', `Bearer ${user.token}`)
       .expect(200);
@@ -69,7 +69,7 @@ describe.skip('Studio Progress & Monetization API', () => {
   });
 
   it('GET /api/studio/insights returns an array', async () => {
-    const res = await request(app)
+    const res = await request(app.server)
       .get('/api/studio/insights')
       .set('Authorization', `Bearer ${user.token}`)
       .expect(200);

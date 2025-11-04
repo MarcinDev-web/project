@@ -37,7 +37,9 @@ export class PipelineCache {
   private createRenderKey(descriptor: GPURenderPipelineDescriptor): string {
     const vs = descriptor.vertex?.module?.label ?? 'unknown-vs';
     const fs = descriptor.fragment?.module?.label ?? 'unknown-fs';
-    const format = descriptor.fragment?.targets?.[0]?.format ?? 'unknown';
+    const targets = descriptor.fragment?.targets ? Array.from(descriptor.fragment.targets) : [];
+    const firstTarget = targets[0];
+    const format = firstTarget?.format ?? 'unknown';
     const sampleCount = descriptor.multisample?.count ?? 1;
 
     // Serialize key components
@@ -45,7 +47,7 @@ export class PipelineCache {
       vertexShader: vs,
       fragmentShader: fs,
       vertexBuffers: JSON.stringify(descriptor.vertex?.buffers ?? []),
-      blendState: JSON.stringify(descriptor.fragment?.targets?.[0]?.blend ?? {}),
+      blendState: JSON.stringify(firstTarget?.blend ?? {}),
       depthStencil: JSON.stringify(descriptor.depthStencil ?? {}),
       format,
       sampleCount,

@@ -1072,9 +1072,6 @@ fn fs(input: VSOut) -> @location(0) vec4<f32> {
     this.initialized = false;
   }
 
-  getBrdfLutTexture(): GPUTexture | null { return this.brdfLut; }
-  getEnvCubeTexture(): GPUTexture | null { return this.envCube; }
-
   /**
    * Gets cached IBL resources or generates new ones
    */
@@ -1246,4 +1243,3 @@ ${ATMOSPHERIC_SCATTERING_FUNCTION}
     return this.envCube;
   }
 }
-

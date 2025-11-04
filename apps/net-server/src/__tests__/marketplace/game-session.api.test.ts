@@ -33,7 +33,7 @@ describe.skip('Game Session API', () => {
       // Wait for item to be available (handles database transaction timing)
       await waitForItem(marketplaceStorage, item.id);
 
-      const response = await request(app)
+      const response = await request(app.server)
         .post(`/api/marketplace/${item.id}/join`)
         .set('Authorization', `Bearer ${user1.token}`)
         .expect(200);
@@ -50,7 +50,7 @@ describe.skip('Game Session API', () => {
         title: 'Game Build',
       });
 
-      await request(app)
+      await request(app.server)
         .post(`/api/marketplace/${item.id}/join`)
         .expect(401);
     });
@@ -65,12 +65,12 @@ describe.skip('Game Session API', () => {
       // Wait for item to be available (handles database transaction timing)
       await waitForItem(marketplaceStorage, item.id);
 
-      const response1 = await request(app)
+      const response1 = await request(app.server)
         .post(`/api/marketplace/${item.id}/join`)
         .set('Authorization', `Bearer ${user1.token}`)
         .expect(200);
 
-      const response2 = await request(app)
+      const response2 = await request(app.server)
         .post(`/api/marketplace/${item.id}/join`)
         .set('Authorization', `Bearer ${user2.token}`)
         .expect(200);
@@ -88,13 +88,13 @@ describe.skip('Game Session API', () => {
       });
 
       // Join first
-      await request(app)
+      await request(app.server)
         .post(`/api/marketplace/${item.id}/join`)
         .set('Authorization', `Bearer ${user1.token}`)
         .expect(200);
 
       // Then leave
-      const response = await request(app)
+      const response = await request(app.server)
         .post(`/api/marketplace/${item.id}/leave`)
         .set('Authorization', `Bearer ${user1.token}`)
         .expect(200);
@@ -110,7 +110,7 @@ describe.skip('Game Session API', () => {
         title: 'Game Build',
       });
 
-      await request(app)
+      await request(app.server)
         .post(`/api/marketplace/${item.id}/leave`)
         .expect(401);
     });
@@ -124,7 +124,7 @@ describe.skip('Game Session API', () => {
         title: 'Game Build',
       });
 
-      const response = await request(app)
+      const response = await request(app.server)
         .get(`/api/marketplace/${item.id}/players-online`)
         .expect(200);
 
@@ -140,7 +140,7 @@ describe.skip('Game Session API', () => {
         title: 'Empty Game',
       });
 
-      const response = await request(app)
+      const response = await request(app.server)
         .get(`/api/marketplace/${item.id}/players-online`)
         .expect(200);
 
@@ -154,16 +154,16 @@ describe.skip('Game Session API', () => {
         title: 'Game Build',
       });
 
-      const before = await request(app)
+      const before = await request(app.server)
         .get(`/api/marketplace/${item.id}/players-online`)
         .expect(200);
 
-      await request(app)
+      await request(app.server)
         .post(`/api/marketplace/${item.id}/join`)
         .set('Authorization', `Bearer ${user1.token}`)
         .expect(200);
 
-      const after = await request(app)
+      const after = await request(app.server)
         .get(`/api/marketplace/${item.id}/players-online`)
         .expect(200);
 

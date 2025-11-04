@@ -61,7 +61,8 @@ export class PrefilterEnvPass {
         const view = prefilteredEnv.createView({
           baseArrayLayer: face,
           arrayLayerCount: 1,
-          mipLevel: mip,
+          baseMipLevel: mip,
+          mipLevelCount: 1,
         });
 
         const pass = encoder.beginRenderPass({

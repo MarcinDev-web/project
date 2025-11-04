@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import type { RouteDependencies } from './index';
 
 /**
@@ -19,11 +19,15 @@ export async function createFriendsRoutes(
     sessionManager,
   } = opts.dependencies;
 
+  type FriendRequestBody = { toUserId: string };
+  type FriendRequestActionBody = { action: 'accept' | 'decline' };
+  type FriendIdParams = { id: string };
+
   /**
    * GET /api/friends
    * Get user's friends list.
    */
-  app.get('/', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
@@ -54,7 +58,7 @@ export async function createFriendsRoutes(
    * POST /api/friends/request
    * Send friend request.
    */
-  app.post(
+  app.post<{ Body: FriendRequestBody }>(
     '/request',
     {
       preHandler: [authMiddleware],
@@ -68,7 +72,7 @@ export async function createFriendsRoutes(
         },
       },
     },
-    async (request: FastifyRequest<{ Body: { toUserId: string } }>, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
@@ -144,7 +148,7 @@ export async function createFriendsRoutes(
    * GET /api/friends/requests
    * Get pending friend requests.
    */
-  app.get('/requests', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/requests', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
@@ -165,7 +169,7 @@ export async function createFriendsRoutes(
    * PUT /api/friends/request/:id
    * Accept or decline friend request.
    */
-  app.put(
+  app.put<{ Params: FriendIdParams; Body: FriendRequestActionBody }>(
     '/request/:id',
     {
       preHandler: [authMiddleware],
@@ -186,13 +190,7 @@ export async function createFriendsRoutes(
         },
       },
     },
-    async (
-      request: FastifyRequest<{
-        Params: { id: string };
-        Body: { action: 'accept' | 'decline' };
-      }>,
-      reply: FastifyReply
-    ) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
@@ -273,7 +271,7 @@ export async function createFriendsRoutes(
    * GET /api/friends/presence
    * Get online presence status for all friends.
    */
-  app.get('/presence', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/presence', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
@@ -302,7 +300,7 @@ export async function createFriendsRoutes(
    * GET /api/friends/suggestions
    * Get friend suggestions based on mutual friends and activity.
    */
-  app.get('/suggestions', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/suggestions', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
@@ -394,7 +392,7 @@ export async function createFriendsRoutes(
    * DELETE /api/friends/:id
    * Remove friend.
    */
-  app.delete(
+  app.delete<{ Params: FriendIdParams }>(
     '/:id',
     {
       preHandler: [authMiddleware],
@@ -408,7 +406,7 @@ export async function createFriendsRoutes(
         },
       },
     },
-    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });

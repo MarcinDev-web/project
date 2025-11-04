@@ -23,8 +23,8 @@
   "dependencies": {
     "@engine/economy": "workspace:*",
     "@engine/world": "workspace:*",
-    "@fastify/cors": "^11.0.0",
     "@fastify/cookie": "^11.0.0",
+    "@fastify/cors": "^11.0.0",
     "@fastify/multipart": "^9.0.0",
     "@fastify/rate-limit": "^10.0.0",
     "@prisma/client": "^5.22.0",
@@ -41,9 +41,11 @@
     "@types/jsonwebtoken": "^9.0.5",
     "@types/node": "^24.7.2",
     "@types/pg": "^8.11.6",
+    "@types/supertest": "^6.0.3",
     "@types/ws": "^8.5.10",
     "light-my-request": "^6.6.0",
     "prisma": "^5.22.0",
+    "supertest": "^7.1.4",
     "tsx": "^4.7.0",
     "typescript": "^5.9.3",
     "vitest": "^2.1.3"

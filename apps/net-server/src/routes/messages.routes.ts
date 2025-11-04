@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import type { RouteDependencies } from './index';
 
 /**
@@ -19,11 +19,23 @@ export async function createMessagesRoutes(
     notificationsStorage,
   } = opts.dependencies;
 
+  type ConversationParams = { conversationId: string };
+  type ConversationQuery = { limit?: number };
+  type SendMessageBody = { toUserId?: string; conversationId?: string; content: string };
+  type CreateGroupBody = { groupName: string; memberIds: string[]; groupAvatar?: string };
+  type GroupParams = { id: string };
+  type UpdateGroupBody = { groupName?: string; groupAvatar?: string };
+  type UpdateGroupMembersBody = {
+    memberIds?: string[];
+    memberId?: string;
+    action: 'add' | 'remove';
+  };
+
   /**
    * GET /api/messages
    * Get user's conversations.
    */
-  app.get('/', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
@@ -44,7 +56,7 @@ export async function createMessagesRoutes(
    * GET /api/messages/:conversationId
    * Get messages in a conversation.
    */
-  app.get(
+  app.get<{ Params: ConversationParams; Querystring: ConversationQuery }>(
     '/:conversationId',
     {
       preHandler: [authMiddleware],
@@ -64,7 +76,7 @@ export async function createMessagesRoutes(
         },
       },
     },
-    async (request: FastifyRequest<{ Params: { conversationId: string }; Querystring: { limit?: number } }>, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
@@ -89,7 +101,7 @@ export async function createMessagesRoutes(
    * POST /api/messages
    * Send a message.
    */
-  app.post(
+  app.post<{ Body: SendMessageBody }>(
     '/',
     {
       preHandler: [authMiddleware],
@@ -105,12 +117,7 @@ export async function createMessagesRoutes(
         },
       },
     },
-    async (
-      request: FastifyRequest<{
-        Body: { toUserId?: string; conversationId?: string; content: string };
-      }>,
-      reply: FastifyReply
-    ) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
@@ -267,7 +274,7 @@ export async function createMessagesRoutes(
    * POST /api/messages/groups
    * Create a group conversation.
    */
-  app.post(
+  app.post<{ Body: CreateGroupBody }>(
     '/groups',
     {
       preHandler: [authMiddleware],
@@ -283,12 +290,7 @@ export async function createMessagesRoutes(
         },
       },
     },
-    async (
-      request: FastifyRequest<{
-        Body: { groupName: string; memberIds: string[]; groupAvatar?: string };
-      }>,
-      reply: FastifyReply
-    ) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
@@ -322,7 +324,7 @@ export async function createMessagesRoutes(
    * GET /api/messages/groups
    * Get user's group conversations.
    */
-  app.get('/groups', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/groups', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
@@ -356,7 +358,7 @@ export async function createMessagesRoutes(
    * PUT /api/messages/groups/:id
    * Update group conversation (name, avatar).
    */
-  app.put(
+  app.put<{ Params: GroupParams; Body: UpdateGroupBody }>(
     '/groups/:id',
     {
       preHandler: [authMiddleware],
@@ -377,13 +379,7 @@ export async function createMessagesRoutes(
         },
       },
     },
-    async (
-      request: FastifyRequest<{
-        Params: { id: string };
-        Body: { groupName?: string; groupAvatar?: string };
-      }>,
-      reply: FastifyReply
-    ) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
@@ -425,7 +421,7 @@ export async function createMessagesRoutes(
    * PUT /api/messages/groups/:id/members
    * Add or remove group members.
    */
-  app.put(
+  app.put<{ Params: GroupParams; Body: UpdateGroupMembersBody }>(
     '/groups/:id/members',
     {
       preHandler: [authMiddleware],
@@ -448,13 +444,7 @@ export async function createMessagesRoutes(
         },
       },
     },
-    async (
-      request: FastifyRequest<{
-        Params: { id: string };
-        Body: { memberIds?: string[]; memberId?: string; action: 'add' | 'remove' };
-      }>,
-      reply: FastifyReply
-    ) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
@@ -516,7 +506,7 @@ export async function createMessagesRoutes(
    * DELETE /api/messages/groups/:id/leave
    * Leave a group conversation.
    */
-  app.delete(
+  app.delete<{ Params: GroupParams }>(
     '/groups/:id/leave',
     {
       preHandler: [authMiddleware],
@@ -530,7 +520,7 @@ export async function createMessagesRoutes(
         },
       },
     },
-    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
@@ -558,7 +548,7 @@ export async function createMessagesRoutes(
    * PUT /api/messages/:id/read
    * Mark message as read.
    */
-  app.put(
+  app.put<{ Params: GroupParams }>(
     '/:id/read',
     {
       preHandler: [authMiddleware],
@@ -572,7 +562,7 @@ export async function createMessagesRoutes(
         },
       },
     },
-    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });

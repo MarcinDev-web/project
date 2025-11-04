@@ -23,7 +23,7 @@ describe.skip('GET /api/marketplace/:id', () => {
     // Wait for item to be available (handles database transaction timing)
     await waitForItem(marketplaceStorage, item.id);
 
-    const response = await request(app)
+    const response = await request(app.server)
       .get(`/api/marketplace/${item.id}`)
       .expect(200);
 
@@ -35,7 +35,7 @@ describe.skip('GET /api/marketplace/:id', () => {
   });
 
   it('returns 404 for non-existent ID', async () => {
-    await request(app)
+    await request(app.server)
       .get('/api/marketplace/nonexistent_id_12345')
       .expect(404);
   });
@@ -53,7 +53,7 @@ describe.skip('GET /api/marketplace/:id', () => {
     // Additional small wait to ensure item is fully accessible
     await new Promise(resolve => setTimeout(resolve, 50));
 
-    const response = await request(app)
+    const response = await request(app.server)
       .get(`/api/marketplace/${item.id}`)
       .expect(200);
 
@@ -73,7 +73,7 @@ describe.skip('GET /api/marketplace/:id', () => {
     // Wait for item to be available (handles database transaction timing)
     await waitForItem(marketplaceStorage, item.id);
 
-    const response = await request(app)
+    const response = await request(app.server)
       .get(`/api/marketplace/${item.id}`)
       .expect(200);
 

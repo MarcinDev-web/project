@@ -1,5 +1,4 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import { z } from 'zod';
 import type { RouteDependencies } from './index';
 import {
   registerSchema,
@@ -38,7 +37,7 @@ export async function createAuthRoutes(
       const userAgent = request.headers['user-agent'] || 'unknown';
 
       try {
-        const body = request.body;
+        const body = request.body as { email: string; password: string };
 
         const result = await authManager.register(body.email, body.password);
 
@@ -87,7 +86,7 @@ export async function createAuthRoutes(
       const userAgent = request.headers['user-agent'] || 'unknown';
 
       try {
-        const body = request.body;
+        const body = request.body as { email: string; password: string };
 
         const result = await authManager.login(body.email, body.password);
 
@@ -176,7 +175,7 @@ export async function createAuthRoutes(
     },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
-        const { refreshToken } = request.body;
+        const { refreshToken } = request.body as { refreshToken: string };
 
         const session = await authManager.refreshSession(refreshToken);
         if (!session) {
@@ -219,7 +218,7 @@ export async function createAuthRoutes(
         }
 
         // Also revoke refresh token if provided
-        const { refreshToken } = request.body;
+        const { refreshToken } = request.body as { refreshToken?: string };
         if (refreshToken) {
           await authManager.revokeToken(refreshToken, userId);
         }

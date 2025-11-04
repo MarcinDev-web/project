@@ -1,4 +1,4 @@
-import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
+import type { FastifyInstance } from 'fastify';
 import type { RouteDependencies } from './index';
 
 /**
@@ -19,11 +19,20 @@ export async function createShopRoutes(
     userCarts,
   } = opts.dependencies;
 
+  type ShopItemsQuery = {
+    category?: string;
+    currency?: string;
+    available?: string;
+    limit?: number | string;
+    offset?: number | string;
+    search?: string;
+  };
+
   /**
    * GET /api/shop/items
    * Get list of shop items with optional filters
    */
-  app.get(
+  app.get<{ Querystring: ShopItemsQuery }>(
     '/items',
     {
       schema: {
@@ -40,14 +49,16 @@ export async function createShopRoutes(
         },
       },
     },
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
-        const category = request.query.category as string | undefined;
-        const currency = request.query.currency as string | undefined;
-        const available = request.query.available === undefined ? true : request.query.available === 'true';
-        const limit = request.query.limit ? Number(request.query.limit) : 50;
-        const offset = request.query.offset ? Number(request.query.offset) : 0;
-        const search = request.query.search as string | undefined;
+        const query = request.query as ShopItemsQuery;
+        const category = query.category;
+        const currency = query.currency;
+        const available =
+          query.available === undefined ? true : query.available === 'true' || query.available === '1';
+        const limit = query.limit ? Number(query.limit) : 50;
+        const offset = query.offset ? Number(query.offset) : 0;
+        const search = query.search;
 
         const filter: {
           category?: 'consumable' | 'cosmetic' | 'upgrade' | 'collectible';
@@ -97,7 +108,25 @@ export async function createShopRoutes(
    * GET /api/shop/items/:id
    * Get shop item details
    */
-  app.get(
+  type AssetQuery = {
+    type?: 'material' | 'model' | 'texture' | 'script';
+    category?: string;
+    authorId?: string;
+    available?: string;
+    limit?: number | string;
+    offset?: number | string;
+    search?: string;
+  };
+
+  type PurchasesQuery = {
+    limit?: number | string;
+    offset?: number | string;
+    status?: 'pending' | 'completed' | 'failed';
+  };
+
+  type IdParams = { id: string };
+
+  app.get<{ Params: IdParams }>(
     '/items/:id',
     {
       schema: {
@@ -110,9 +139,9 @@ export async function createShopRoutes(
         },
       },
     },
-    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
-        const { id } = request.params;
+        const { id } = request.params as IdParams;
         const item = await shopStorage.getItem(id);
 
         if (!item) {
@@ -161,7 +190,7 @@ export async function createShopRoutes(
         },
       },
     },
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
@@ -206,7 +235,7 @@ export async function createShopRoutes(
    * PUT /api/shop/items/:id
    * Update shop item (admin only)
    */
-  app.put(
+  app.put<{ Params: IdParams }>(
     '/items/:id',
     {
       preHandler: [authMiddleware, requireAdmin()],
@@ -238,13 +267,13 @@ export async function createShopRoutes(
         },
       },
     },
-    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = request.params;
+        const { id } = request.params as IdParams;
         const updates = request.body as Partial<{
           name: string;
           description: string;
@@ -276,7 +305,7 @@ export async function createShopRoutes(
    * DELETE /api/shop/items/:id
    * Delete shop item (admin only)
    */
-  app.delete(
+  app.delete<{ Params: IdParams }>(
     '/items/:id',
     {
       preHandler: [authMiddleware, requireAdmin()],
@@ -290,13 +319,13 @@ export async function createShopRoutes(
         },
       },
     },
-    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = request.params;
+        const { id } = (request.params as IdParams);
         const deleted = await shopStorage.deleteItem(id);
 
         if (!deleted) {
@@ -318,7 +347,7 @@ export async function createShopRoutes(
    * GET /api/shop/cart
    * Get user's cart
    */
-  app.get('/cart', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/cart', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
@@ -355,7 +384,7 @@ export async function createShopRoutes(
         },
       },
     },
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
@@ -422,20 +451,20 @@ export async function createShopRoutes(
         },
       },
     },
-    async (
-      request: FastifyRequest<{
-        Params: { itemId: string };
-        Querystring: { type: 'shop-item' | 'asset' | 'marketplace-item' };
-      }>,
-      reply: FastifyReply
-    ) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { itemId } = request.params;
-        const itemType = request.query.type;
+        const { itemId } = request.params as { itemId?: string };
+        const { type: itemType } = request.query as {
+          type?: 'shop-item' | 'asset' | 'marketplace-item';
+        };
+
+        if (!itemId || !itemType) {
+          return reply.code(400).send({ error: 'itemId and type are required' });
+        }
 
         const cart = userCarts.get(request.user.id) ?? [];
         const filtered = cart.filter((item) => !(item.itemId === itemId && item.type === itemType));
@@ -456,7 +485,7 @@ export async function createShopRoutes(
    * POST /api/shop/cart/clear
    * Clear cart
    */
-  app.post('/cart/clear', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.post('/cart/clear', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
@@ -477,7 +506,7 @@ export async function createShopRoutes(
    * POST /api/shop/checkout
    * Process checkout
    */
-  app.post('/checkout', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.post('/checkout', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
@@ -539,15 +568,14 @@ export async function createShopRoutes(
         },
       },
     },
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
-        const type = request.query.type as 'material' | 'model' | 'texture' | 'script' | undefined;
-        const category = request.query.category as string | undefined;
-        const authorId = request.query.authorId as string | undefined;
-        const available = request.query.available === undefined ? true : request.query.available === 'true';
-        const limit = request.query.limit ? Number(request.query.limit) : 50;
-        const offset = request.query.offset ? Number(request.query.offset) : 0;
-        const search = request.query.search as string | undefined;
+        const query = request.query as AssetQuery;
+        const { type, category, authorId, search } = query;
+        const available =
+          query.available === undefined ? true : query.available === 'true' || query.available === '1';
+        const limit = query.limit ? Number(query.limit) : 50;
+        const offset = query.offset ? Number(query.offset) : 0;
 
         const filter: {
           type?: 'material' | 'model' | 'texture' | 'script';
@@ -599,7 +627,7 @@ export async function createShopRoutes(
    * GET /api/shop/assets/:id
    * Get asset details
    */
-  app.get(
+  app.get<{ Params: IdParams }>(
     '/assets/:id',
     {
       schema: {
@@ -612,9 +640,9 @@ export async function createShopRoutes(
         },
       },
     },
-    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
-        const { id } = request.params;
+        const { id } = (request.params as IdParams);
         const asset = await assetStorage.getAsset(id);
 
         if (!asset) {
@@ -636,7 +664,7 @@ export async function createShopRoutes(
    * GET /api/shop/assets/:id/download
    * Download asset file (only if owned)
    */
-  app.get(
+  app.get<{ Params: IdParams }>(
     '/assets/:id/download',
     {
       preHandler: [authMiddleware],
@@ -650,13 +678,13 @@ export async function createShopRoutes(
         },
       },
     },
-    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = request.params;
+        const { id } = (request.params as IdParams);
         const asset = await assetStorage.getAsset(id);
 
         if (!asset) {
@@ -686,7 +714,7 @@ export async function createShopRoutes(
    * PUT /api/shop/assets/:id
    * Update asset (admin only)
    */
-  app.put(
+  app.put<{ Params: IdParams }>(
     '/assets/:id',
     {
       preHandler: [authMiddleware, requireAdmin()],
@@ -703,13 +731,13 @@ export async function createShopRoutes(
         },
       },
     },
-    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = request.params;
+        const { id } = (request.params as IdParams);
         const updates = request.body as Partial<
           Omit<import('../storage/AssetStorage').Asset, 'id' | 'createdAt' | 'authorId'>
         >;
@@ -735,7 +763,7 @@ export async function createShopRoutes(
    * DELETE /api/shop/assets/:id
    * Delete asset (admin only)
    */
-  app.delete(
+  app.delete<{ Params: IdParams }>(
     '/assets/:id',
     {
       preHandler: [authMiddleware, requireAdmin()],
@@ -749,13 +777,13 @@ export async function createShopRoutes(
         },
       },
     },
-    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = request.params;
+        const { id } = (request.params as IdParams);
         const deleted = await assetStorage.deleteAsset(id);
 
         if (!deleted) {
@@ -805,7 +833,7 @@ export async function createShopRoutes(
         },
       },
     },
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
@@ -869,15 +897,16 @@ export async function createShopRoutes(
         },
       },
     },
-    async (request: FastifyRequest, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const limit = request.query.limit ? Number(request.query.limit) : 50;
-        const offset = request.query.offset ? Number(request.query.offset) : 0;
-        const status = request.query.status as 'pending' | 'completed' | 'failed' | undefined;
+        const query = request.query as PurchasesQuery;
+        const limit = query.limit ? Number(query.limit) : 50;
+        const offset = query.offset ? Number(query.offset) : 0;
+        const status = query.status;
 
         const purchases = await purchaseStorage.getPurchases({
           userId: request.user.id,
@@ -901,7 +930,7 @@ export async function createShopRoutes(
    * GET /api/shop/purchases/:id
    * Get purchase details
    */
-  app.get(
+  app.get<{ Params: IdParams }>(
     '/purchases/:id',
     {
       preHandler: [authMiddleware],
@@ -915,13 +944,13 @@ export async function createShopRoutes(
         },
       },
     },
-    async (request: FastifyRequest<{ Params: { id: string } }>, reply: FastifyReply) => {
+    async (request, reply) => {
       try {
         if (!request.user) {
           return reply.code(401).send({ error: 'Unauthorized' });
         }
 
-        const { id } = request.params;
+        const { id } = (request.params as IdParams);
         const purchase = await purchaseStorage.getPurchase(id);
 
         if (!purchase) {
@@ -948,7 +977,7 @@ export async function createShopRoutes(
    * GET /api/shop/owned
    * Get user's owned items
    */
-  app.get('/owned', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/owned', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
@@ -969,7 +998,7 @@ export async function createShopRoutes(
    * GET /api/shop/wallet
    * Get user's wallet balance
    */
-  app.get('/wallet', { preHandler: [authMiddleware] }, async (request: FastifyRequest, reply: FastifyReply) => {
+  app.get('/wallet', { preHandler: [authMiddleware] }, async (request, reply) => {
     try {
       if (!request.user) {
         return reply.code(401).send({ error: 'Unauthorized' });
@@ -991,3 +1020,7 @@ export async function createShopRoutes(
     }
   });
 }
+
+
+
+

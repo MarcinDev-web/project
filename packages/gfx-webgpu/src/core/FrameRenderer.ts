@@ -412,22 +412,20 @@ export class FrameRenderer {
         if (!this.forwardPlus) {
           this.forwardPlus = new ForwardPlus(device);
         }
-        
-        // Extract point lights from lighting data
+        // Extract point lights from packed lighting data (type 1 = point)
         const pointLights: PointLight[] = [];
-        if (ctx.lightingData.pointLights) {
-          for (const light of ctx.lightingData.pointLights) {
-            if (light) {
+        if (ctx.lightingData?.lights) {
+          for (const light of ctx.lightingData.lights) {
+            if (light && light.type === 1) {
               pointLights.push({
                 position: light.position,
                 color: light.color,
                 range: light.range ?? 10.0,
-                intensity: light.intensity ?? 1.0,
+                intensity: 1.0,
               });
             }
           }
         }
-        
         // Update lights and perform culling
         if (pointLights.length > 0) {
           this.forwardPlus.updateLights(pointLights);
@@ -1638,4 +1636,6 @@ fn fs_main(@location(0) v_uv: vec2<f32>) -> @builtin(frag_depth) f32 {
     pass.end();
   }
 }
+
+
 

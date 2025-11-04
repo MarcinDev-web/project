@@ -41,8 +41,8 @@ export async function bootstrap(): Promise<void> {
     const scene = new Scene('Player Scene');
     const renderer = await initRenderer({
       canvas: dom.canvas,
-      statusEl: dom.statusEl ?? undefined,
-      getOrbitState: () => ({ position: [0, 0, 0], target: [0, 0, 0], pitch: 0, yaw: 0, zoom: 1 }),
+      statusEl: dom.statusEl,
+      getOrbitState: () => ({ yaw: 0, pitch: 0, distance: 10 }),
       scene,
       shouldSimulate: () => true, // Always simulate in player mode
       onFrameUpdate: () => {
