@@ -8,14 +8,14 @@
     "sourceMap": true,
     "skipLibCheck": true,
     "paths": {
-      "@engine/economy": ["../economy/src"],
-      "@engine/economy/*": ["../economy/src/*"],
-      "@engine/net-protocol": ["../net-protocol/src"],
-      "@engine/net-protocol/*": ["../net-protocol/src/*"],
-      "@engine/voxel": ["../voxel/src"],
-      "@engine/voxel/*": ["../voxel/src/*"],
-      "@engine/world": ["../world/src"],
-      "@engine/world/*": ["../world/src/*"]
+      "@engine/economy": ["../economy/dist/src"],
+      "@engine/economy/*": ["../economy/dist/src/*"],
+      "@engine/net-protocol": ["../net-protocol/dist"],
+      "@engine/net-protocol/*": ["../net-protocol/dist/*"],
+      "@engine/voxel": ["../voxel/dist"],
+      "@engine/voxel/*": ["../voxel/dist/*"],
+      "@engine/world": ["../world/dist"],
+      "@engine/world/*": ["../world/dist/*"]
     }
   },
   "include": ["src/**/*"],

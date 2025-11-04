@@ -3,11 +3,11 @@
   "version": "0.1.0",
   "description": "Currency and economy system for game players and marketplace transactions",
   "type": "module",
-  "main": "./dist/index.js",
-  "types": "./dist/index.d.ts",
+  "main": "./dist/src/index.js",
+  "types": "./dist/src/index.d.ts",
   "exports": {
-    ".": "./dist/index.js",
-    "./examples": "./dist/examples/CurrencySystemExample.js"
+    ".": "./dist/src/index.js",
+    "./examples": "./dist/src/examples/CurrencySystemExample.js"
   },
   "scripts": {
     "build": "tsc -b",

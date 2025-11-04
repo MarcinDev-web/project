@@ -11,7 +11,9 @@
       "@engine/core": ["../core/dist"],
       "@engine/core/*": ["../core/dist/*"],
       "@engine/world": ["../world/dist"],
-      "@engine/world/*": ["../world/dist/*"]
+      "@engine/world/*": ["../world/dist/*"],
+      "@engine/world/components": ["../world/dist/components"],
+      "@engine/world/components/*": ["../world/dist/components/*"]
     }
   },
   "include": ["src/**/*"],
