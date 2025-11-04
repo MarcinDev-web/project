@@ -496,9 +496,6 @@ importers:
       '@engine/core':
         specifier: workspace:*
         version: link:../core
-      '@engine/world-server':
-        specifier: workspace:*
-        version: link:../world-server
     devDependencies:
       '@types/node':
         specifier: ^24.7.2
@@ -789,9 +786,15 @@ importers:
 
   packages/world-server:
     dependencies:
+      '@engine/economy':
+        specifier: workspace:*
+        version: link:../economy
       '@engine/net-protocol':
         specifier: workspace:*
         version: link:../net-protocol
+      '@engine/voxel':
+        specifier: workspace:*
+        version: link:../voxel
       '@engine/world':
         specifier: workspace:*
         version: link:../world
