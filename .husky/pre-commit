@@ -1,6 +1,12 @@
 #!/usr/bin/env sh
 . "$(dirname -- "$0")/_/husky.sh"
 
+# Ensure lockfile is up-to-date (fail if stale)
+pnpm -w install --frozen-lockfile --ignore-scripts --prefer-offline || {
+  echo "Lockfile is stale. Run 'pnpm -w install' and commit updated pnpm-lock.yaml." >&2
+  exit 1
+}
+
 # Run lint-staged (linting + tests for changed files)
 pnpm precommit
 
