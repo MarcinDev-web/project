@@ -21,7 +21,6 @@
     "__tests__",
     "dist",
     "node_modules",
-    "../world-server/src",
     "../world/src",
     "../animation/src"
   ],
