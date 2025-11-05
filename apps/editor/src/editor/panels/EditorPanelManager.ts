@@ -366,6 +366,8 @@ export class EditorPanelManager {
       });
     }
 
+    const settingsPanel = this.createSettingsPanel();
+
     this.sidebarTabs.addTab({
       id: 'settings',
       label: 'Settings',

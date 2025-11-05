@@ -82,6 +82,9 @@ export interface FrameRenderContext {
  * FrameRenderer manages the per-frame rendering operations.
  */
 export class FrameRenderer {
+  private static readonly TEXTURE_CLEANUP_DELAY_MS = 100;
+  private static readonly TEXTURE_CLEANUP_FALLBACK_DELAY_MS = 200;
+
   private frustumCuller: FrustumCuller;
   private instanceBuilder: InstanceDataBuilder;
   private geometryCache: GeometryCache;
@@ -100,6 +103,7 @@ export class FrameRenderer {
   private bundleOverlayPipeline: GPURenderPipeline | null = null;
   private bundleUniformBindGroup: GPUBindGroup | null = null;
   private bundleTextureBindGroup: GPUBindGroup | null = null;
+  private pendingTextureCleanup: GPUTexture[] = [];
   // Postprocess resources
   private hdrColorTexture: GPUTexture | null = null;
   private bloomTexture: GPUTexture | null = null;
@@ -149,14 +153,20 @@ export class FrameRenderer {
 
     // Handle canvas resize (recreate depth/MSAA textures if needed)
     if (this.depthTextureSize.width !== canvas.width || this.depthTextureSize.height !== canvas.height) {
-      frameResources.depthTexture.destroy();
-      frameResources.msaaColorTexture.destroy();
-      this.hdrColorTexture?.destroy();
-      this.bloomTexture?.destroy();
-      this.normalTexture?.destroy();
-      this.ssaoTexture?.destroy();
-      this.resolvedDepthTexture?.destroy();
-      this.tonemapOutputTexture?.destroy();
+      this.enqueueTextureCleanup(frameResources.depthTexture);
+      this.enqueueTextureCleanup(frameResources.msaaColorTexture);
+      this.enqueueTextureCleanup(this.hdrColorTexture);
+      this.enqueueTextureCleanup(this.bloomTexture);
+      this.enqueueTextureCleanup(this.normalTexture);
+      this.enqueueTextureCleanup(this.ssaoTexture);
+      this.enqueueTextureCleanup(this.resolvedDepthTexture);
+      this.enqueueTextureCleanup(this.tonemapOutputTexture);
+      this.hdrColorTexture = null;
+      this.bloomTexture = null;
+      this.normalTexture = null;
+      this.ssaoTexture = null;
+      this.resolvedDepthTexture = null;
+      this.tonemapOutputTexture = null;
       this.hdrColorView = null;
       this.bloomTextureView = null;
       this.tonemapOutputView = null;
@@ -823,7 +833,9 @@ export class FrameRenderer {
         if (!this.tonemapOutputTexture || 
             this.tonemapOutputTexture.width !== canvas.width || 
             this.tonemapOutputTexture.height !== canvas.height) {
-          try { this.tonemapOutputTexture?.destroy(); } catch {}
+          this.enqueueTextureCleanup(this.tonemapOutputTexture);
+          this.tonemapOutputTexture = null;
+          this.tonemapOutputView = null;
           this.tonemapOutputTexture = device.createTexture({
             label: 'tonemap-output',
             size: { width: canvas.width, height: canvas.height, depthOrArrayLayers: 1 },
@@ -882,63 +894,18 @@ export class FrameRenderer {
     }
 
     const commandBuffer = encoder.finish();
-    
-    // Get bloom temp textures BEFORE submitting command buffer
-    // These textures are created in the bloom pass and must be destroyed after GPU processing completes
+
     const tempTextures = (encoder as any).__bloomTempTextures as GPUTexture[] | undefined;
-    
-    // Clear reference immediately to prevent accidental reuse
     if (tempTextures) {
       (encoder as any).__bloomTempTextures = undefined;
-    }
-    
-    // Submit command buffer (textures must remain valid until GPU finishes processing)
-    // Use configuredDevice.queue to ensure consistency
-    configuredDevice.queue.submit([commandBuffer]);
-
-    // Cleanup bloom temp textures after command buffer is fully processed by GPU
-    // CRITICAL: We defer destruction to avoid destroying textures while they're still in use.
-    // onSubmittedWorkDone() resolves when work is submitted, but we wait an extra frame
-    // to ensure the GPU has actually finished processing before destroying.
-    if (tempTextures && Array.isArray(tempTextures) && tempTextures.length > 0) {
-      // Capture textures array for cleanup
-      const texturesToCleanup = tempTextures;
-      
-       // CRITICAL: Bloom temp textures must remain valid until GPU fully processes the command buffer
-       // onSubmittedWorkDone() only indicates work was SUBMITTED, not COMPLETED
-       // We use a longer delay to ensure textures are safe to destroy
-       // Note: These are per-frame temporary textures, so delaying cleanup slightly is acceptable
-       configuredDevice.queue.onSubmittedWorkDone()
-         .then(() => {
-           // Use longer delay (100ms) to ensure GPU has fully processed the command buffer
-           // This is a conservative approach to avoid "destroyed texture used in submit" errors
-           setTimeout(() => {
-             cleanupTextures();
-           }, 100); // Increased from 50ms to 100ms for safety
-         })
-         .catch((err) => {
-           Logger.warn('Failed to wait for GPU work completion - using longer delay:', err);
-           // On error, use even longer delay to be extra safe
-           setTimeout(() => {
-             cleanupTextures();
-           }, 200);
-         });
-      
-      function cleanupTextures() {
-        // Cleanup textures - errors are caught and ignored since textures may already be destroyed
-        // or the device may have been lost/changed
-        for (const texture of texturesToCleanup) {
-          try {
-            if (texture && typeof texture.destroy === 'function') {
-              texture.destroy();
-            }
-          } catch (err) {
-            // Texture may already be destroyed or device lost, ignore silently
-            // These are temporary textures, so cleanup failures are acceptable
-          }
-        }
+      if (Array.isArray(tempTextures) && tempTextures.length > 0) {
+        this.enqueueTexturesForCleanup(tempTextures);
       }
     }
+
+    configuredDevice.queue.submit([commandBuffer]);
+
+    this.flushPendingTextureCleanup(configuredDevice.queue);
 
     if (
       frameResources.timestampQuerySet &&
@@ -950,6 +917,46 @@ export class FrameRenderer {
     }
 
     return geometry;
+  }
+
+  private enqueueTextureCleanup(texture: GPUTexture | null | undefined): void {
+    if (texture) {
+      this.pendingTextureCleanup.push(texture);
+    }
+  }
+
+  private enqueueTexturesForCleanup(textures: Iterable<GPUTexture | null | undefined>): void {
+    for (const texture of textures) {
+      this.enqueueTextureCleanup(texture);
+    }
+  }
+
+  private flushPendingTextureCleanup(queue: GPUQueue): void {
+    if (this.pendingTextureCleanup.length === 0) {
+      return;
+    }
+
+    const texturesToCleanup = this.pendingTextureCleanup.splice(0);
+
+    const cleanupTextures = () => {
+      for (const texture of texturesToCleanup) {
+        try {
+          texture.destroy();
+        } catch {
+          // Ignore - texture may already be destroyed or device lost
+        }
+      }
+    };
+
+    queue
+      .onSubmittedWorkDone()
+      .then(() => {
+        setTimeout(cleanupTextures, FrameRenderer.TEXTURE_CLEANUP_DELAY_MS);
+      })
+      .catch((err) => {
+        Logger.warn('Failed to wait for GPU work completion during texture cleanup:', err);
+        setTimeout(cleanupTextures, FrameRenderer.TEXTURE_CLEANUP_FALLBACK_DELAY_MS);
+      });
   }
 
   /**
