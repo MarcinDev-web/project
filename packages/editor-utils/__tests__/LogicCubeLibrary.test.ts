@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { Scene, Entity } from '@engine/world';
-import { LogicCubeLibrary } from '../LogicCubeLibrary';
+import { LogicCubeLibrary } from '../src/LogicCubeLibrary';
 import { LogicCubeRegistry, LogicCube } from '@engine/script';
 import type { LogicCubeConstructor } from '@engine/script';
 
@@ -118,6 +118,4 @@ describe('LogicCubeLibrary', () => {
     expect(scene.entityCount).toBe(beforeCount + 1);
   });
 });
-
-
 

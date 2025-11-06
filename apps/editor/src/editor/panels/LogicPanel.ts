@@ -5,7 +5,7 @@
 import type { Entity } from '@engine/world';
 import type { SelectionManager } from '@engine/world';
 import { LogicCubeComponent } from '@engine/script';
-import { LogicCubeLibrary } from '../managers/LogicCubeLibrary';
+import { LogicCubeLibrary } from '@engine/editor-utils';
 import type { LogicCubeCategory, LogicConnection } from '@engine/script';
 import { getLogicConnectionManager } from '@engine/script';
 

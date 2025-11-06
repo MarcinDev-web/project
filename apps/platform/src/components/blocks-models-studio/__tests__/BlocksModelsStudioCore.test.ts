@@ -133,5 +133,120 @@ describe('BlocksModelsStudioCore', () => {
     core.clearBlocks();
     // All blocks should be cleared
   });
+
+  it('should load blocks with positions and rotations', () => {
+    core = new BlocksModelsStudioCore({
+      canvas,
+    });
+
+    const block = {
+      id: 'test_block',
+      name: 'Test Block',
+      category: 'basic' as const,
+      material: 'plastic' as const,
+      textures: {
+        top: { color: [1, 0, 0, 1] as RgbaColor, pattern: 'smooth' as const, brightness: 1.0 },
+        bottom: { color: [1, 0, 0, 1] as RgbaColor, pattern: 'smooth' as const, brightness: 0.8 },
+        sides: { color: [1, 0, 0, 1] as RgbaColor, pattern: 'smooth' as const, brightness: 0.9 },
+      },
+      properties: {
+        solid: true,
+        transparent: false,
+        emissive: 0,
+        roughness: 0.5,
+        metallic: 0,
+      },
+    };
+
+    core.loadBlocks([
+      {
+        blockDefinition: block,
+        position: [1, 2, 3],
+        rotation: [0, 0, 0, 1],
+        scale: [1, 1, 1],
+      },
+      {
+        blockDefinition: block,
+        position: [4, 5, 6],
+        scale: [2, 2, 2],
+      },
+    ]);
+
+    const allBlocks = core.getAllBlocks();
+    expect(allBlocks.length).toBe(2);
+    expect(allBlocks[0]?.position).toEqual([1, 2, 3]);
+    expect(allBlocks[1]?.position).toEqual([4, 5, 6]);
+  });
+
+  it('should get all blocks with their data', () => {
+    core = new BlocksModelsStudioCore({
+      canvas,
+    });
+
+    const block = {
+      id: 'test_block',
+      name: 'Test Block',
+      category: 'basic' as const,
+      material: 'plastic' as const,
+      textures: {
+        top: { color: [1, 0, 0, 1] as RgbaColor, pattern: 'smooth' as const, brightness: 1.0 },
+        bottom: { color: [1, 0, 0, 1] as RgbaColor, pattern: 'smooth' as const, brightness: 0.8 },
+        sides: { color: [1, 0, 0, 1] as RgbaColor, pattern: 'smooth' as const, brightness: 0.9 },
+      },
+      properties: {
+        solid: true,
+        transparent: false,
+        emissive: 0,
+        roughness: 0.5,
+        metallic: 0,
+      },
+    };
+
+    core.addBlock(block, [1, 2, 3], [2, 2, 2], [0, 0, 0, 1]);
+    const allBlocks = core.getAllBlocks();
+
+    expect(allBlocks.length).toBe(1);
+    expect(allBlocks[0]?.blockDefinition).toBe(block);
+    expect(allBlocks[0]?.position).toEqual([1, 2, 3]);
+    expect(allBlocks[0]?.scale).toEqual([2, 2, 2]);
+    expect(allBlocks[0]?.rotation).toEqual([0, 0, 0, 1]);
+  });
+
+  it('should get block entity at ray position', () => {
+    core = new BlocksModelsStudioCore({
+      canvas,
+    });
+
+    const block = {
+      id: 'test_block',
+      name: 'Test Block',
+      category: 'basic' as const,
+      material: 'plastic' as const,
+      textures: {
+        top: { color: [1, 0, 0, 1] as RgbaColor, pattern: 'smooth' as const, brightness: 1.0 },
+        bottom: { color: [1, 0, 0, 1] as RgbaColor, pattern: 'smooth' as const, brightness: 0.8 },
+        sides: { color: [1, 0, 0, 1] as RgbaColor, pattern: 'smooth' as const, brightness: 0.9 },
+      },
+      properties: {
+        solid: true,
+        transparent: false,
+        emissive: 0,
+        roughness: 0.5,
+        metallic: 0,
+      },
+    };
+
+    const entity = core.addBlock(block, [0, 0, 0]);
+    
+    // Create a ray pointing at the block
+    const ray = {
+      origin: [0, 0, -5] as [number, number, number],
+      direction: [0, 0, 1] as [number, number, number],
+    };
+
+    const hitEntity = core.getBlockEntityAt(ray);
+    // Should find the entity (raycasting should work)
+    expect(hitEntity).toBeDefined();
+  });
 });
 

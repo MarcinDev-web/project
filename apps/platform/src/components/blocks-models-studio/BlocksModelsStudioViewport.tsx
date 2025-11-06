@@ -13,6 +13,7 @@ export interface BlocksModelsStudioViewportProps {
   selectedBlock?: BlockDefinition | null;
   onBlockPlaced?: (block: BlockDefinition, position: Vec3, scale: Vec3) => void;
   className?: string;
+  onCoreReady?: (core: BlocksModelsStudioCore) => void;
 }
 
 /**
@@ -23,6 +24,7 @@ export const BlocksModelsStudioViewport = forwardRef<HTMLCanvasElement, BlocksMo
   selectedBlock,
   onBlockPlaced,
   className,
+  onCoreReady,
 }, ref) => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const coreRef = useRef<BlocksModelsStudioCore | null>(null);
@@ -58,11 +60,17 @@ export const BlocksModelsStudioViewport = forwardRef<HTMLCanvasElement, BlocksMo
 
         await core.initialize();
 
+        // Notify parent that core is ready
+        if (onCoreReady) {
+          onCoreReady(core);
+        }
+
         // Initialize drag & drop controller
         const dragController = new DragDropController({
           canvas,
           controls: core.getControls(),
           scene: core.getScene(),
+          getBlockEntityAt: (ray) => core.getBlockEntityAt(ray),
           onBlockPlaced: (block, position, scale) => {
             // Add block to scene with scale
             core.addBlock(block, position, scale);
@@ -111,7 +119,7 @@ export const BlocksModelsStudioViewport = forwardRef<HTMLCanvasElement, BlocksMo
         coreRef.current = null;
       }
     };
-  }, [onBlockPlaced]); // Only run once on mount
+  }, [onBlockPlaced, onCoreReady]); // Only run once on mount
 
   // Start drag from palette
   const startBlockDrag = useCallback((block: BlockDefinition, scale: Vec3) => {

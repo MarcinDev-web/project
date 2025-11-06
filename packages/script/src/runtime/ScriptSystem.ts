@@ -17,6 +17,7 @@ export class ScriptSystem {
   private fixedAccumulator = 0;
   private fixedDeltaTime = 1 / 60; // default 60 Hz
   private maxFixedStepsPerUpdate = 10;
+  private enabled = true;
 
   constructor(scene: Scene) {
     this.scene = scene;
@@ -25,6 +26,7 @@ export class ScriptSystem {
       scheduler: new CoroutineScheduler(),
       behaviors: new Set<BehaviorInstance>(),
       contextBuilder,
+      scriptSystem: this, // Expose ScriptSystem instance for external control
     };
     this.scene.scriptRuntime = this.runtime;
   }
@@ -41,7 +43,18 @@ export class ScriptSystem {
     this.maxFixedStepsPerUpdate = Math.max(0, Math.floor(steps));
   }
 
+  /** Enable or disable script execution. When disabled, update() and lateUpdate() do nothing. */
+  setEnabled(enabled: boolean): void {
+    this.enabled = enabled;
+  }
+
+  /** Check if script execution is enabled. */
+  isEnabled(): boolean {
+    return this.enabled;
+  }
+
   update(deltaTime: number): void {
+    if (!this.enabled) return;
     if (!Number.isFinite(deltaTime) || deltaTime < 0) return;
 
     // Hot reload detection: if registry content changed, rebuild instances
@@ -109,6 +122,7 @@ export class ScriptSystem {
   }
 
   lateUpdate(deltaTime: number): void {
+    if (!this.enabled) return;
     if (!Number.isFinite(deltaTime) || deltaTime < 0) return;
     for (const behavior of this.runtime.behaviors) {
       if (!behavior.enabled) continue;

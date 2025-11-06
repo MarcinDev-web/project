@@ -4,10 +4,11 @@
  */
 
 import type { OrbitControls, CameraDirector } from '@engine/camera';
-import { Scene, Entity, Raycaster } from '@engine/world';
+import { Scene, Entity, Raycaster, type Ray } from '@engine/world';
 import { MeshComponent } from '@engine/world/components/MeshComponent';
 import { MaterialComponent } from '@engine/world/components/MaterialComponent';
-import type { Vec3, Quat } from '@engine/core/math';
+import type { Vec3, Quat, Mat4 } from '@engine/core/math';
+import { quatFromAxisAngle, quatMultiply, mat4LookAt, mat4Perspective } from '@engine/core/math';
 import type { BlockDefinition } from '@engine/blocks';
 
 export interface DragDropControllerConfig {
@@ -17,6 +18,7 @@ export interface DragDropControllerConfig {
   scene: Scene;
   onBlockPlaced?: (block: BlockDefinition, position: Vec3, scale: Vec3) => void;
   onStatusMessage?: (message: string, duration?: number) => void;
+  getBlockEntityAt?: (ray: Ray) => Entity | null;
 }
 
 interface DragState {
@@ -38,6 +40,8 @@ interface DragState {
   rotation: number; // Rotation in degrees around Y axis
   /** Whether current position is valid (no collision) */
   canPlace: boolean;
+  /** Whether this is an existing block being dragged (vs new block) */
+  isExistingBlock: boolean;
 }
 
 /**
@@ -121,10 +125,24 @@ export class DragDropController {
   private handlePointerDown(event: PointerEvent): void {
     if (event.button !== 0) return; // Only left mouse button
     if (event.target !== this.config.canvas) return;
+    if (this.isDragging) return; // Already dragging
 
-    // TODO: Check if clicking on existing block to drag it
-    // For now, we'll handle new block placement from palette
-    
+    // Create ray from pointer event
+    const ray = this.createRayFromPointerEvent(event);
+    if (!ray) return;
+
+    // Check if clicking on existing block
+    if (this.config.getBlockEntityAt) {
+      const hitEntity = this.config.getBlockEntityAt(ray);
+      if (hitEntity && hitEntity.userData.blockDefinition) {
+        // Start dragging existing block
+        this.startDragExistingBlock(hitEntity);
+        event.preventDefault();
+        return;
+      }
+    }
+
+    // If no existing block clicked, do nothing (new blocks come from palette drag)
     event.preventDefault();
   }
 
@@ -166,10 +184,53 @@ export class DragDropController {
       startMousePos: [0, 0],
       rotation: 0,
       canPlace: true,
+      isExistingBlock: false,
     };
 
     this.isDragging = true;
     this.config.onStatusMessage?.('Dragging block (R to rotate, Esc to cancel)');
+  }
+
+  /**
+   * Starts dragging an existing block
+   */
+  startDragExistingBlock(entity: Entity): void {
+    if (this.isDragging) {
+      this.cancelDrag();
+    }
+
+    const blockDefinition = entity.userData.blockDefinition as BlockDefinition;
+    if (!blockDefinition) {
+      return;
+    }
+
+    // Mark entity as being dragged
+    entity.userData.isDragging = true;
+
+    // Store original state
+    const originalPosition = [...entity.transform.position] as Vec3;
+    const originalRotation = [...entity.transform.rotation] as Quat;
+    const scale = [...entity.transform.scale] as Vec3;
+
+    // Visual feedback - make it slightly transparent and blue-ish
+    const originalColor = entity.color ? [...entity.color] : [1, 1, 1, 1];
+    entity.color = [0.2, 0.5, 1.0, 0.8]; // Blue with alpha
+
+    this.dragState = {
+      entity,
+      blockDefinition,
+      scale,
+      originalPosition,
+      originalRotation,
+      pointerId: -1,
+      startMousePos: [0, 0],
+      rotation: 0, // Will be calculated from current rotation if needed
+      canPlace: true,
+      isExistingBlock: true,
+    };
+
+    this.isDragging = true;
+    this.config.onStatusMessage?.('Dragging existing block (R to rotate, Esc to cancel)');
   }
 
   /**
@@ -202,15 +263,36 @@ export class DragDropController {
     const entity = this.dragState.entity;
     entity.transform.position = [...worldPosition];
 
-    // Apply rotation
+    // Apply rotation around Y axis (horizontal rotation)
     if (this.dragState.rotation !== 0) {
-      // TODO: Apply rotation to entity
+      const rotationRadians = (this.dragState.rotation * Math.PI) / 180;
+      const rotationQuat = quatFromAxisAngle([0, 1, 0], rotationRadians);
+      
+      if (this.dragState.isExistingBlock) {
+        // For existing blocks, combine with original rotation
+        // Start from original rotation and apply new rotation
+        const baseRotation = this.dragState.originalRotation;
+        // Multiply: newRotation = baseRotation * rotationQuat
+        entity.transform.rotation = quatMultiply(baseRotation, rotationQuat);
+      } else {
+        // For new blocks, just set the rotation
+        entity.transform.rotation = rotationQuat;
+      }
+    } else if (!this.dragState.isExistingBlock) {
+      // Reset to no rotation for new blocks
+      entity.transform.rotation = [0, 0, 0, 1];
     }
 
     // Visual feedback
-    entity.color = this.dragState.canPlace
-      ? [0.2, 1.0, 0.2, 0.6] // Green if valid
-      : [1.0, 0.2, 0.2, 0.6]; // Red if invalid
+    if (this.dragState.isExistingBlock) {
+      entity.color = this.dragState.canPlace
+        ? [0.2, 0.5, 1.0, 0.8] // Blue if valid
+        : [1.0, 0.2, 0.2, 0.8]; // Red if invalid
+    } else {
+      entity.color = this.dragState.canPlace
+        ? [0.2, 1.0, 0.2, 0.6] // Green if valid
+        : [1.0, 0.2, 0.2, 0.6]; // Red if invalid
+    }
   }
 
   /**
@@ -252,6 +334,10 @@ export class DragDropController {
       // Rotate 90 degrees
       this.dragState.rotation = (this.dragState.rotation + 90) % 360;
       this.config.onStatusMessage?.(`Rotation: ${this.dragState.rotation}°`);
+      // Update position to apply rotation
+      if (this.dragState.entity) {
+        this.updateDragPosition([...this.dragState.entity.transform.position] as Vec3);
+      }
       event.preventDefault();
     } else if (event.key === 'Escape') {
       this.cancelDrag();
@@ -268,13 +354,21 @@ export class DragDropController {
     const entity = this.dragState.entity;
     const position = [...entity.transform.position] as Vec3;
 
-    // Remove preview marker
-    entity.userData.isPreview = false;
-    entity.color = [1, 1, 1, 1]; // Reset color
+    if (this.dragState.isExistingBlock) {
+      // Existing block - just update position and remove drag marker
+      entity.userData.isDragging = false;
+      // Restore original color (or use block's default color)
+      const topColor = this.dragState.blockDefinition.textures.top.color;
+      entity.color = [...topColor] as [number, number, number, number];
+    } else {
+      // New block - remove preview marker
+      entity.userData.isPreview = false;
+      entity.color = [1, 1, 1, 1]; // Reset color
 
-    // Notify placement
-    if (this.config.onBlockPlaced) {
-      this.config.onBlockPlaced(this.dragState.blockDefinition, position, this.dragState.scale);
+      // Notify placement
+      if (this.config.onBlockPlaced) {
+        this.config.onBlockPlaced(this.dragState.blockDefinition, position, this.dragState.scale);
+      }
     }
 
     this.config.onStatusMessage?.('Block placed', 1000);
@@ -291,9 +385,21 @@ export class DragDropController {
     if (!this.dragState) return;
 
     if (this.isDragging) {
-      // Remove preview entity
-      this.config.scene.removeEntity(this.dragState.entity);
-      this.config.onStatusMessage?.('Drag cancelled', 1000);
+      if (this.dragState.isExistingBlock) {
+        // Restore original position and rotation
+        const entity = this.dragState.entity;
+        entity.transform.position = [...this.dragState.originalPosition];
+        entity.transform.rotation = [...this.dragState.originalRotation];
+        entity.userData.isDragging = false;
+        // Restore original color
+        const topColor = this.dragState.blockDefinition.textures.top.color;
+        entity.color = [...topColor] as [number, number, number, number];
+        this.config.onStatusMessage?.('Drag cancelled', 1000);
+      } else {
+        // Remove preview entity
+        this.config.scene.removeEntity(this.dragState.entity);
+        this.config.onStatusMessage?.('Drag cancelled', 1000);
+      }
     }
 
     this.dragState = null;
@@ -303,7 +409,7 @@ export class DragDropController {
   /**
    * Creates a world-space ray from a pointer event
    */
-  private createRayFromPointerEvent(event: PointerEvent): { origin: Vec3; direction: Vec3 } | null {
+  private createRayFromPointerEvent(event: PointerEvent): Ray | null {
     const rect = this.config.canvas.getBoundingClientRect();
     const mouseX = (event.clientX - rect.left) * (this.config.canvas.width / rect.width);
     const mouseY = (event.clientY - rect.top) * (this.config.canvas.height / rect.height);
@@ -322,15 +428,38 @@ export class DragDropController {
       );
     }
 
-    // Fallback to orbit controls
-    // TODO: Create ray from orbit controls state (yaw, pitch, distance)
-    return null;
+    // Fallback to orbit controls - create view/projection matrix from orbit state
+    const { yaw, pitch, distance } = this.config.controls.getState();
+    
+    // Calculate camera position (eye) from orbit controls
+    const eyeX = Math.cos(pitch) * Math.sin(yaw) * distance;
+    const eyeY = Math.sin(pitch) * distance;
+    const eyeZ = Math.cos(pitch) * Math.cos(yaw) * distance;
+    
+    // Create view matrix looking at origin
+    const viewMatrix = new Float32Array(16) as Mat4;
+    mat4LookAt(viewMatrix, [eyeX, eyeY, eyeZ], [0, 0, 0], [0, 1, 0]);
+    
+    // Create default perspective projection matrix
+    // Use typical values: 60deg FOV, aspect from canvas, near=0.1, far=100
+    const aspect = this.config.canvas.width / this.config.canvas.height;
+    const projectionMatrix = new Float32Array(16) as Mat4;
+    mat4Perspective(projectionMatrix, Math.PI / 3, aspect, 0.1, 100);
+    
+    return this.raycaster.createRayFromScreen(
+      mouseX,
+      mouseY,
+      this.config.canvas.width,
+      this.config.canvas.height,
+      viewMatrix,
+      projectionMatrix
+    );
   }
 
   /**
    * Raycasts to the ground plane (y = 0)
    */
-  private raycastToGroundPlane(ray: { origin: Vec3; direction: Vec3 }): Vec3 | null {
+  private raycastToGroundPlane(ray: Ray): Vec3 | null {
     const { origin, direction } = ray;
 
     if (!origin || !direction) {

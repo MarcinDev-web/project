@@ -3,6 +3,7 @@ import { Scene, Entity } from '@engine/world';
 import type { EcsReplicator } from '../replication/EcsReplicator.js';
 import { SnapshotScheduler } from '../replication/SnapshotScheduler.js';
 import type { ClientBaselineState } from '../replication/types.js';
+import { SpatialHashGrid, selectAoI, type Vec3 as AoIVec3 } from '../aoi/GridAoI.js';
 
 export interface ZoneServerOptions {
   tickRateHz: number;
@@ -23,6 +24,9 @@ interface ClientState {
   permissions?: ClientPermission;
   // Rate limiting for voxel operations
   voxelOpsHistory: number[]; // Timestamps of recent operations
+  // Area of Interest (AoI) - viewer position for entity filtering
+  viewerPosition?: AoIVec3;
+  viewRadius?: number; // Default view radius if not set
 }
 
 /**
@@ -48,6 +52,9 @@ export class ZoneServer {
   private readonly scene: Scene | null;
   private readonly replicator: EcsReplicator | null;
   private readonly snapshotScheduler: SnapshotScheduler | null;
+  // Area of Interest (AoI) spatial indexing
+  private readonly aoiGrid: SpatialHashGrid;
+  private readonly entityPositions = new Map<bigint, AoIVec3>(); // Track previous positions for move detection
   // seqCounter reserved for future sequence tracking
   // @ts-expect-error Reserved for future sequence tracking
   // eslint-disable-next-line @typescript-eslint/no-unused-vars
@@ -61,6 +68,8 @@ export class ZoneServer {
     this.snapshotScheduler = this.replicator
       ? new SnapshotScheduler(this.replicator, { maxBytesPerTick: 8192 })
       : null;
+    // Initialize AoI grid with 10-unit cells (good balance for most game scales)
+    this.aoiGrid = new SpatialHashGrid(10);
   }
 
   start(): void {
@@ -81,31 +90,93 @@ export class ZoneServer {
       return;
     }
 
+    // Update AoI grid with current entity positions
+    this.updateAoIGrid();
+
     // Build snapshot for each client
     const context = { scene: this.scene };
     
     for (const [clientId, clientState] of this.clients.entries()) {
-      // Get entities to replicate (simple: all root entities for now)
-      // TODO: Use AoI (Area of Interest) to filter entities per client
-      // Reserved for future per-client filtering
-      void clientState;
-      // eslint-disable-next-line @typescript-eslint/no-unused-vars
-      // entities will be used when AoI filtering is implemented
-      const entities = this.scene.rootEntities.map((e: Entity) => {
-        // Convert entity ID to bigint (simple parsing)
-        const numId = parseInt(e.id.replace('entity_', '')) || 0;
-        return { id: BigInt(numId) };
-      });
-      void entities;
+      // Get entities to replicate using AoI filtering per client
+      let entities: Array<{ id: bigint }>;
+      
+      if (clientState.viewerPosition && clientState.viewRadius !== undefined) {
+        // Use AoI filtering based on client's viewer position
+        const aoiResults = selectAoI(
+          this.aoiGrid,
+          clientState.viewerPosition,
+          clientState.viewRadius
+        );
+        entities = aoiResults.map((result) => ({ id: result.id }));
+      } else {
+        // Fallback: all root entities if client position not set
+        entities = this.scene.rootEntities.map((e: Entity) => {
+          // Convert entity ID to bigint (simple parsing)
+          const numId = parseInt(e.id.replace('entity_', '')) || 0;
+          return { id: BigInt(numId) };
+        });
+      }
 
       const snapshot = this.snapshotScheduler.scheduleForClient(
         context,
-        clientState as ClientBaselineState
+        clientState as ClientBaselineState,
+        entities
       );
 
       if (snapshot) {
         // Emit snapshot for transport layer
         this.onSnapshot?.(clientId, snapshot);
+      }
+    }
+  }
+
+  /**
+   * Update AoI spatial grid with current entity positions from scene
+   */
+  private updateAoIGrid(): void {
+    if (!this.scene) return;
+
+    const allEntities = this.scene.getAllEntities();
+    
+    for (const entity of allEntities) {
+      const numId = parseInt(entity.id.replace('entity_', '')) || 0;
+      const entityId = BigInt(numId);
+      const pos = entity.transform.position;
+      
+      // Convert Vec3 array to AoI Vec3 format
+      const aoiPos: AoIVec3 = { x: pos[0], y: pos[1], z: pos[2] };
+      
+      const prevPos = this.entityPositions.get(entityId);
+      if (prevPos) {
+        // Entity exists in grid - check if moved
+        const dx = Math.abs(aoiPos.x - prevPos.x);
+        const dy = Math.abs(aoiPos.y - prevPos.y);
+        const dz = Math.abs(aoiPos.z - prevPos.z);
+        
+        // Only update if position changed significantly (avoid micro-movements)
+        if (dx > 0.1 || dy > 0.1 || dz > 0.1) {
+          this.aoiGrid.move({ id: entityId, position: aoiPos }, prevPos);
+          this.entityPositions.set(entityId, aoiPos);
+        }
+      } else {
+        // New entity - insert into grid
+        this.aoiGrid.insert({ id: entityId, position: aoiPos });
+        this.entityPositions.set(entityId, aoiPos);
+      }
+    }
+    
+    // Remove entities that no longer exist in scene
+    const sceneEntityIds = new Set(
+      allEntities.map((e) => {
+        const numId = parseInt(e.id.replace('entity_', '')) || 0;
+        return BigInt(numId);
+      })
+    );
+    
+    for (const [entityId, pos] of this.entityPositions.entries()) {
+      if (!sceneEntityIds.has(entityId)) {
+        this.aoiGrid.remove({ id: entityId, position: pos });
+        this.entityPositions.delete(entityId);
       }
     }
   }
@@ -121,6 +192,7 @@ export class ZoneServer {
       lastBaselineSeq: 0,
       ...(permissions !== undefined && { permissions }),
       voxelOpsHistory: [],
+      viewRadius: 100, // Default view radius (100 units)
     });
   }
 
@@ -192,6 +264,34 @@ export class ZoneServer {
    */
   getClientRole(clientId: string): ZoneRole | null {
     return this.clients.get(clientId)?.permissions?.role ?? null;
+  }
+
+  /**
+   * Get client's userId from permissions
+   */
+  getClientUserId(clientId: string): string | null {
+    return this.clients.get(clientId)?.permissions?.userId ?? null;
+  }
+
+  /**
+   * Update client's viewer position for AoI filtering
+   * Call this when client position changes (e.g., from player input updates)
+   */
+  setClientViewerPosition(clientId: string, position: AoIVec3, viewRadius?: number): void {
+    const client = this.clients.get(clientId);
+    if (client) {
+      client.viewerPosition = position;
+      if (viewRadius !== undefined) {
+        client.viewRadius = viewRadius;
+      }
+    }
+  }
+
+  /**
+   * Get client's current viewer position
+   */
+  getClientViewerPosition(clientId: string): AoIVec3 | undefined {
+    return this.clients.get(clientId)?.viewerPosition;
   }
 }
 

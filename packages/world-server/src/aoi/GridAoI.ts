@@ -13,6 +13,8 @@ export interface AoISelectionResult {
 
 export class SpatialHashGrid {
   private readonly cells = new Map<string, Set<bigint>>();
+  private readonly entityPositions = new Map<bigint, Vec3>();
+  
   constructor(private readonly cellSize: number) {}
 
   private key(x: number, z: number): string {
@@ -26,12 +28,17 @@ export class SpatialHashGrid {
     let set = this.cells.get(k);
     if (!set) { set = new Set(); this.cells.set(k, set); }
     set.add(entity.id);
+    this.entityPositions.set(entity.id, { ...entity.position });
   }
 
   move(entity: AoIEntity, prev: Vec3): void {
     const k0 = this.key(prev.x, prev.z);
     const k1 = this.key(entity.position.x, entity.position.z);
-    if (k0 === k1) return;
+    if (k0 === k1) {
+      // Update position even if cell didn't change
+      this.entityPositions.set(entity.id, { ...entity.position });
+      return;
+    }
     const s0 = this.cells.get(k0); if (s0) s0.delete(entity.id);
     this.insert(entity);
   }
@@ -39,6 +46,11 @@ export class SpatialHashGrid {
   remove(entity: AoIEntity): void {
     const k = this.key(entity.position.x, entity.position.z);
     const s = this.cells.get(k); if (s) s.delete(entity.id);
+    this.entityPositions.delete(entity.id);
+  }
+
+  getPosition(id: bigint): Vec3 | undefined {
+    return this.entityPositions.get(id);
   }
 
   queryNear(pos: Vec3, radius: number): bigint[] {
@@ -73,13 +85,28 @@ export function adaptiveHz(distance: number): number {
 
 export function selectAoI(grid: SpatialHashGrid, viewerPos: Vec3, viewRadius: number): AoISelectionResult[] {
   const ids = grid.queryNear(viewerPos, viewRadius);
-  // Without entity positions map, approximate distance by cell distance
-  const results: AoISelectionResult[] = ids.map((id) => {
-    // Placeholder distance; refine with exact lookup later
-    const dx = 0, dz = 0; // unknown
-    const dist = Math.hypot(dx, dz);
-    return { id, priority: computePriority(dist), targetHz: adaptiveHz(dist) };
-  });
+  const results: AoISelectionResult[] = [];
+  
+  for (const id of ids) {
+    const entityPos = grid.getPosition(id);
+    if (!entityPos) continue;
+    
+    // Calculate actual distance
+    const dx = entityPos.x - viewerPos.x;
+    const dy = entityPos.y - viewerPos.y;
+    const dz = entityPos.z - viewerPos.z;
+    const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+    
+    // Only include entities within view radius
+    if (dist <= viewRadius) {
+      results.push({
+        id,
+        priority: computePriority(dist),
+        targetHz: adaptiveHz(dist),
+      });
+    }
+  }
+  
   results.sort((a, b) => b.priority - a.priority);
   return results;
 }

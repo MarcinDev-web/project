@@ -3,14 +3,14 @@
  * Handles Scene, Renderer (WebGPU), OrbitControls, Blocks, and Models
  */
 
-import { Scene, Entity, EnvironmentComponent } from '@engine/world';
+import { Scene, Entity, EnvironmentComponent, Raycaster, type Ray } from '@engine/world';
 import { initRenderer, type Renderer } from '@engine/gfx-webgpu';
 import { LightManager } from '@engine/gfx-webgpu/lighting/LightManager';
 import { createOrbitControls, type OrbitControls } from '@engine/camera';
 import type { BlockDefinition } from '@engine/blocks';
 import { MeshComponent } from '@engine/world/components/MeshComponent';
 import { MaterialComponent } from '@engine/world/components/MaterialComponent';
-import type { Vec3 } from '@engine/core/math';
+import type { Vec3, Quat } from '@engine/core/math';
 
 export interface BlocksModelsStudioCoreOptions {
   canvas: HTMLCanvasElement;
@@ -39,6 +39,7 @@ export class BlocksModelsStudioCore {
   private blockEntities: Map<string, Entity> = new Map();
   private previewEntity: Entity | null = null;
   private gridEnabled = true;
+  private raycaster: Raycaster;
 
   constructor(options: BlocksModelsStudioCoreOptions) {
     this.canvas = options.canvas;
@@ -51,6 +52,7 @@ export class BlocksModelsStudioCore {
       minDistance: 1,
       maxDistance: 20,
     });
+    this.raycaster = new Raycaster();
 
     // Grid will be rendered by renderer if needed
 
@@ -209,13 +211,16 @@ export class BlocksModelsStudioCore {
   }
 
   /**
-   * Add a block to the scene at position with optional scale
+   * Add a block to the scene at position with optional scale and rotation
    */
-  addBlock(block: BlockDefinition, position: Vec3, scale?: Vec3): Entity {
+  addBlock(block: BlockDefinition, position: Vec3, scale?: Vec3, rotation?: Quat): Entity {
     const entity = new Entity(`Block_${block.id}_${Date.now()}`);
     entity.transform.position = [...position];
     if (scale) {
       entity.transform.scale = [...scale];
+    }
+    if (rotation) {
+      entity.transform.rotation = [...rotation];
     }
     entity.userData.blockDefinition = block;
     
@@ -264,6 +269,94 @@ export class BlocksModelsStudioCore {
       this.scene.removeEntity(entity);
     }
     this.blockEntities.clear();
+  }
+
+  /**
+   * Load blocks into the scene
+   */
+  loadBlocks(blocks: Array<{
+    blockDefinition: BlockDefinition;
+    position: Vec3;
+    rotation?: Quat;
+    scale?: Vec3;
+  }>): void {
+    this.clearBlocks();
+    for (const blockData of blocks) {
+      this.addBlock(
+        blockData.blockDefinition,
+        blockData.position,
+        blockData.scale,
+        blockData.rotation
+      );
+    }
+  }
+
+  /**
+   * Get all blocks in the scene with their data
+   */
+  getAllBlocks(): Array<{
+    entity: Entity;
+    blockDefinition: BlockDefinition;
+    position: Vec3;
+    rotation: Quat;
+    scale: Vec3;
+  }> {
+    const result: Array<{
+      entity: Entity;
+      blockDefinition: BlockDefinition;
+      position: Vec3;
+      rotation: Quat;
+      scale: Vec3;
+    }> = [];
+
+    for (const entity of this.blockEntities.values()) {
+      // Skip preview entities
+      if (entity.userData.isPreview) {
+        continue;
+      }
+
+      const blockDefinition = entity.userData.blockDefinition as BlockDefinition;
+      if (!blockDefinition) {
+        continue;
+      }
+
+      result.push({
+        entity,
+        blockDefinition,
+        position: [...entity.transform.position] as Vec3,
+        rotation: [...entity.transform.rotation] as Quat,
+        scale: [...entity.transform.scale] as Vec3,
+      });
+    }
+
+    return result;
+  }
+
+  /**
+   * Get block entity at ray position (for raycasting)
+   */
+  getBlockEntityAt(ray: Ray): Entity | null {
+    // Get all block entities (excluding preview)
+    const entities: Entity[] = [];
+    for (const entity of this.blockEntities.values()) {
+      // Skip preview entities
+      if (entity.userData.isPreview || entity.userData.isDragging) {
+        continue;
+      }
+      entities.push(entity);
+    }
+
+    if (entities.length === 0) {
+      return null;
+    }
+
+    // Perform raycast
+    const hit = this.raycaster.raycastClosest(ray, entities);
+    if (hit) {
+      return hit.entity;
+    }
+
+    return null;
   }
 
   /**

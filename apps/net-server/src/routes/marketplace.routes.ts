@@ -565,6 +565,52 @@ export async function createMarketplaceRoutes(
   );
 
   /**
+   * GET /api/marketplace/:id/download
+   * Download free marketplace item (no price required).
+   * For paid items, use shop checkout API.
+   * NOTE: This route must be registered BEFORE /:id to avoid routing conflicts.
+   */
+  app.get('/:id/download', async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const { id } = (request.params as { id?: string });
+      if (!id) {
+        return reply.code(400).send({ error: 'Item ID required' });
+      }
+
+      const item = await marketplaceStorage.getItem(id);
+      if (!item) {
+        return reply.code(404).send({ error: 'Item not found' });
+      }
+
+      // Only allow download for free items (no price)
+      if (item.price) {
+        return reply.code(403).send({ 
+          error: 'This item is not free. Please purchase it through the shop.' 
+        });
+      }
+
+      // Increment download count
+      const currentDownloads = item.downloads ?? 0;
+      await marketplaceStorage.updateItem(id, {
+        downloads: currentDownloads + 1,
+      });
+
+      // Return file URL for download
+      reply.send({ 
+        fileUrl: item.fileUrl,
+        itemId: item.id,
+        title: item.title,
+      });
+    } catch (error) {
+      console.error('Download marketplace item error:', error);
+      reply.code(500).send({
+        error: 'Failed to download item',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  /**
    * GET /api/marketplace/:id
    * Get marketplace item details.
    */

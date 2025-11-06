@@ -6,17 +6,26 @@ export interface SignalingChannel {
   onMessage(handler: (msg: WebRTCSignalingMessage) => void): () => void;
 }
 
+export interface WebRTCClientAdapterOptions {
+  iceServers?: RTCIceServer[];
+}
+
 export class WebRTCClientAdapter implements ClientTransportAdapter {
   public readonly kind = 'webrtc' as const;
   private pc: RTCPeerConnection | null = null;
   private dc: RTCDataChannel | null = null;
-  private signalingChannel: SignalingChannel | null = null;
+  private ws: WebSocket | null = null;
   private clientId: string;
   private openResolve: (() => void) | null = null;
   private openReject: ((err: Error) => void) | null = null;
+  private connectionTimeout: ReturnType<typeof setTimeout> | null = null;
+  private readonly defaultIceServers: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
+  private readonly iceServers: RTCIceServer[];
+  private messageHandler: ((data: Uint8Array) => void) | null = null;
 
-  constructor(clientId: string) {
+  constructor(clientId: string, options?: WebRTCClientAdapterOptions) {
     this.clientId = clientId;
+    this.iceServers = options?.iceServers ?? this.defaultIceServers;
   }
 
   get isOpen(): boolean {
@@ -30,11 +39,29 @@ export class WebRTCClientAdapter implements ClientTransportAdapter {
 
     // Create signaling WebSocket first
     const wsUrl = url.replace(/^https?:/, 'wss:');
-    const ws = new WebSocket(wsUrl);
     
-    // Create peer connection
+    // Await WebSocket connection before proceeding (Problem 8)
+    const ws = await new Promise<WebSocket>((resolve, reject) => {
+      const websocket = new WebSocket(wsUrl);
+      this.ws = websocket;
+      
+      websocket.onopen = () => resolve(websocket);
+      websocket.onerror = (err) => {
+        reject(new Error(`WebSocket connection error: ${err}`));
+      };
+      websocket.onclose = () => {
+        // Cleanup on unexpected close
+        if (this.openReject) {
+          this.openReject(new Error('WebSocket closed unexpectedly'));
+          this.openReject = null;
+        }
+        this.ws = null;
+      };
+    });
+
+    // Create peer connection with configured ICE servers (Problem 12)
     this.pc = new RTCPeerConnection({
-      iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
+      iceServers: this.iceServers,
     });
 
     // Setup signaling
@@ -46,43 +73,84 @@ export class WebRTCClientAdapter implements ClientTransportAdapter {
       maxRetransmits: 3, // Partial reliability
     });
 
-    this.dc.onopen = () => {
-      if (this.openResolve) {
-        this.openResolve();
-        this.openResolve = null;
-      }
-    };
-
-    this.dc.onerror = (err) => {
-      if (this.openReject) {
-        this.openReject(new Error(`DataChannel error: ${err}`));
-        this.openReject = null;
-      }
-    };
-
-    // Create offer
-    const offer = await this.pc.createOffer();
-    await this.pc.setLocalDescription(offer);
-    
-    // Send offer via signaling
-    ws.send(JSON.stringify({
-      type: 'webrtc:offer',
-      offer: this.pc.localDescription?.toJSON(),
-      clientId: this.clientId,
-    }));
-
     // Wait for connection
     return new Promise<void>((resolve, reject) => {
       this.openResolve = resolve;
       this.openReject = reject;
       
-      // Timeout after 10s
-      setTimeout(() => {
+      // Timeout after 10s (Problem 2)
+      this.connectionTimeout = setTimeout(() => {
         if (this.openReject) {
           this.openReject(new Error('WebRTC connection timeout'));
           this.openReject = null;
+          this.cleanup();
         }
       }, 10000);
+
+      this.dc!.onopen = () => {
+        // Clear timeout on success (Problem 9)
+        if (this.connectionTimeout) {
+          clearTimeout(this.connectionTimeout);
+          this.connectionTimeout = null;
+        }
+        if (this.openResolve) {
+          this.openResolve();
+          this.openResolve = null;
+        }
+      };
+
+      // Setup message handler for data channel
+      this.dc!.onmessage = (event: MessageEvent) => {
+        if (this.messageHandler && event.data) {
+          let data: Uint8Array;
+          if (event.data instanceof ArrayBuffer) {
+            data = new Uint8Array(event.data);
+          } else if (event.data instanceof Blob) {
+            // Handle Blob asynchronously
+            event.data.arrayBuffer().then((buffer) => {
+              if (this.messageHandler) {
+                this.messageHandler(new Uint8Array(buffer));
+              }
+            });
+            return;
+          } else {
+            // Fallback: try to convert to string then encode
+            data = new TextEncoder().encode(String(event.data));
+          }
+          this.messageHandler(data);
+        }
+      };
+
+      this.dc!.onerror = (err) => {
+        if (this.openReject) {
+          this.openReject(new Error(`DataChannel error: ${err}`));
+          this.openReject = null;
+          this.cleanup();
+        }
+      };
+
+      // Create offer and send
+      this.pc!.createOffer()
+        .then((offer) => this.pc!.setLocalDescription(offer))
+        .then(() => {
+          // Send offer via signaling (now WebSocket is guaranteed to be open)
+          if (ws.readyState === WebSocket.OPEN && this.pc?.localDescription) {
+            ws.send(JSON.stringify({
+              type: 'webrtc:offer',
+              offer: this.pc.localDescription.toJSON(),
+              clientId: this.clientId,
+            }));
+          } else {
+            reject(new Error('WebSocket not ready or local description not set'));
+          }
+        })
+        .catch((err) => {
+          if (this.openReject) {
+            this.openReject(new Error(`Failed to create offer: ${err}`));
+            this.openReject = null;
+            this.cleanup();
+          }
+        });
     });
   }
 
@@ -99,19 +167,38 @@ export class WebRTCClientAdapter implements ClientTransportAdapter {
         switch (msg.type) {
           case 'webrtc:answer': {
             const answer = msg as WebRTCAnswer;
-            this.pc.setRemoteDescription(new RTCSessionDescription(answer.answer)).catch(console.error);
+            this.pc.setRemoteDescription(new RTCSessionDescription(answer.answer)).catch((err) => {
+              // Proper error handling (Problem 15)
+              if (this.openReject) {
+                this.openReject(new Error(`Failed to set remote description: ${err}`));
+                this.openReject = null;
+                this.cleanup();
+              }
+            });
             break;
           }
           case 'webrtc:ice': {
             const ice = msg as WebRTCIceCandidate;
             if (ice.candidate) {
-              this.pc.addIceCandidate(new RTCIceCandidate(ice.candidate)).catch(console.error);
+              this.pc.addIceCandidate(new RTCIceCandidate(ice.candidate)).catch((err) => {
+                // Proper error handling (Problem 15)
+                if (this.openReject) {
+                  this.openReject(new Error(`Failed to add ICE candidate: ${err}`));
+                  this.openReject = null;
+                  this.cleanup();
+                }
+              });
             }
             break;
           }
         }
       } catch (err) {
-        console.error('Signaling message error:', err);
+        // Proper error handling (Problem 15)
+        if (this.openReject) {
+          this.openReject(new Error(`Signaling message error: ${err}`));
+          this.openReject = null;
+          this.cleanup();
+        }
       }
     };
 
@@ -124,6 +211,38 @@ export class WebRTCClientAdapter implements ClientTransportAdapter {
         }));
       }
     };
+
+    // Add ICE connection state change handler (Problem 11)
+    pc.oniceconnectionstatechange = () => {
+      if (!pc) return;
+      
+      if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
+        if (this.openReject) {
+          this.openReject(new Error(`ICE connection failed: ${pc.iceConnectionState}`));
+          this.openReject = null;
+          this.cleanup();
+        }
+      }
+    };
+  }
+
+  private cleanup(): void {
+    if (this.connectionTimeout) {
+      clearTimeout(this.connectionTimeout);
+      this.connectionTimeout = null;
+    }
+    if (this.dc) {
+      this.dc.close();
+      this.dc = null;
+    }
+    if (this.pc) {
+      this.pc.close();
+      this.pc = null;
+    }
+    if (this.ws) {
+      this.ws.close();
+      this.ws = null;
+    }
   }
 
   send(bytes: Uint8Array): void {
@@ -134,16 +253,13 @@ export class WebRTCClientAdapter implements ClientTransportAdapter {
   }
 
   close(_code?: number, _reason?: string): void {
-    if (this.dc) {
-      this.dc.close();
-      this.dc = null;
-    }
-    if (this.pc) {
-      this.pc.close();
-      this.pc = null;
-    }
-    if (this.signalingChannel) {
-      this.signalingChannel = null;
-    }
+    this.cleanup();
+  }
+
+  onMessage(handler: (data: Uint8Array) => void): () => void {
+    this.messageHandler = handler;
+    return () => {
+      this.messageHandler = null;
+    };
   }
 }

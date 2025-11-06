@@ -2,7 +2,7 @@ import { EditorApp } from './app';
 import { requireEditorDom } from './utils/dom';
 import { Logger } from './utils/logger';
 import { registerBuiltInLogicCubes } from '@engine/script';
-import { LogicCubeLibrary } from './editor/managers/LogicCubeLibrary';
+import { LogicCubeLibrary } from '@engine/editor-utils';
 import { ensureWasmCollisionInit } from './wasm/collision';
 import { warmupCollisionWorker } from './wasm/collisionWorkerClient';
 import { login, createReplicationClient, createSession, saveSnapshot, loadLatestSnapshot } from './editor/net/collab';

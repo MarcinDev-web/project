@@ -12,8 +12,12 @@ import { getPrismaClient, ensureSchema, disconnectPrisma } from './lib/db.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerSessionRoutes } from './routes/session.js';
 import { createWsServer } from './ws/server.js';
+import { createWebRTCServer, stopWebRTCServer } from './webrtc/server.js';
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 4000;
+const WEBRTC_SIGNALING_PORT = process.env.WEBRTC_SIGNALING_PORT
+  ? parseInt(process.env.WEBRTC_SIGNALING_PORT, 10)
+  : 8080;
 
 async function main(): Promise<void> {
   const app = Fastify({ logger: true });
@@ -41,11 +45,15 @@ async function main(): Promise<void> {
   registerAuthRoutes(app, prisma);
   registerSessionRoutes(app, prisma);
   createWsServer(app, prisma, corsConfig);
+  
+  // Start WebRTC signaling server
+  await createWebRTCServer(WEBRTC_SIGNALING_PORT);
 
   app.get('/health', () => ({ status: 'ok' }));
 
   // Graceful shutdown
   app.addHook('onClose', async () => {
+    await stopWebRTCServer();
     await disconnectPrisma();
   });
 

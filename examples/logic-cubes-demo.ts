@@ -9,7 +9,7 @@ import { Scene } from '../src/scene/Scene';
 import { Entity } from '../src/scene/Entity';
 import { LogicCubeComponent } from '../src/scene/components/LogicCubeComponent';
 import { LogicCubeSystem } from '../src/logic/LogicCubeSystem';
-import { LogicCubeLibrary } from '../src/editor/managers/LogicCubeLibrary';
+import { LogicCubeLibrary } from '@engine/editor-utils';
 import { registerBuiltInLogicCubes } from '../src/logic/cubes';
 
 /**

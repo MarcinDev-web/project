@@ -12,7 +12,8 @@
                 },
     "dependencies":  {
                          "@engine/core":  "workspace:*",
-                         "@engine/world":  "workspace:*"
+                         "@engine/world":  "workspace:*",
+                         "@engine/script":  "workspace:*"
                      },
     "devDependencies":  {
                             "@types/node":  "^24.7.2",

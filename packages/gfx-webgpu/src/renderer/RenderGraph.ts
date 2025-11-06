@@ -172,15 +172,22 @@ export class RenderGraph {
 
     for (let i = 0; i < this.passes.length; i++) {
       const pass = this.passes[i];
+      if (!pass) continue;
       for (const inputId of pass.inputs) {
         const producers = textureProducers.get(inputId);
         if (producers) {
           for (const producer of producers) {
             const producerIndex = passIndex.get(producer.id);
-            if (producerIndex !== undefined && producerIndex !== i) {
+            if (producerIndex !== undefined && producerIndex !== i && i < inDegree.length) {
               // Pass i depends on producer
-              dependencies[producerIndex].push(i);
-              inDegree[i]++;
+              const deps = dependencies[producerIndex];
+              if (deps && i < inDegree.length) {
+                deps.push(i);
+                const current = inDegree[i];
+                if (current !== undefined) {
+                  inDegree[i] = current + 1;
+                }
+              }
             }
           }
         }
@@ -199,16 +206,26 @@ export class RenderGraph {
     let processedCount = 0;
 
     while (queue.length > 0) {
-      const currentIndex = queue.shift()!;
+      const currentIndex = queue.shift();
+      if (currentIndex === undefined) break;
       const currentPass = this.passes[currentIndex];
+      if (!currentPass) continue;
       sorted.push(currentPass);
       processedCount++;
 
       // Reduce in-degree of dependent passes
-      for (const dependentIndex of dependencies[currentIndex]) {
-        inDegree[dependentIndex]--;
-        if (inDegree[dependentIndex] === 0) {
-          queue.push(dependentIndex);
+      const deps = dependencies[currentIndex];
+      if (deps) {
+        for (const dependentIndex of deps) {
+          if (dependentIndex < inDegree.length) {
+            const current = inDegree[dependentIndex];
+            if (current !== undefined) {
+              inDegree[dependentIndex] = current - 1;
+              if (inDegree[dependentIndex] === 0) {
+                queue.push(dependentIndex);
+              }
+            }
+          }
         }
       }
     }

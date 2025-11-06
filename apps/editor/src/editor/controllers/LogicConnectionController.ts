@@ -7,7 +7,7 @@ import type { Entity } from '@engine/world';
 import type { LogicConnectionManager } from '@engine/script';
 import type { LogicPort } from '@engine/script';
 import { LogicCubeComponent } from '@engine/script';
-import { LogicCubeLibrary } from '../managers/LogicCubeLibrary';
+import { LogicCubeLibrary } from '@engine/editor-utils';
 import { Logger } from '../../utils/logger';
 import { showPortSelectionModal } from '../ui/PortSelectionModal';
 

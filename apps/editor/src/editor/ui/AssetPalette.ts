@@ -14,6 +14,7 @@ import { BLOCK_LIBRARY } from '@engine/blocks';
 import type { BlockAsset, AssetPreset } from '../types/BlockAssetTypes';
 import { blockToAsset } from '../types/BlockAssetTypes';
 import type { VegetationPresetManager } from '../managers/VegetationPresetManager';
+import type { NpcPresetManager } from '../managers/NpcPresetManager';
 
 export interface AssetPaletteConfig {
   scene: Scene;
@@ -22,6 +23,7 @@ export interface AssetPaletteConfig {
   onStartPlacement: (asset: BlockAsset) => void;
   onStartPlacementPreset?: (preset: AssetPreset) => void;
   vegetationPresetManager?: VegetationPresetManager | null;
+  npcPresetManager?: NpcPresetManager | null;
 }
 
 export class AssetPalette {
@@ -32,8 +34,10 @@ export class AssetPalette {
   private hotbarSlots: (BlockAsset | null)[] = new Array(9).fill(null);
   private allBlocks: BlockAsset[] = [];
   private vegetationAssets: BlockAsset[] = [];
+  private npcAssets: BlockAsset[] = [];
   private keyboardCleanup: (() => void) | null = null;
-  private presetManagerListener: (() => void) | null = null;
+  private vegetationPresetManagerListener: (() => void) | null = null;
+  private npcPresetManagerListener: (() => void) | null = null;
 
   constructor(private readonly config: AssetPaletteConfig) {
     // Convert all blocks to assets
@@ -42,13 +46,24 @@ export class AssetPalette {
     // Load vegetation presets
     this.loadVegetationPresets();
     
+    // Load NPC presets
+    this.loadNpcPresets();
+    
     // Initialize hotbar with first 9 blocks
     this.hotbarSlots = this.allBlocks.slice(0, 9);
 
     // Listen for vegetation preset changes
     if (this.config.vegetationPresetManager) {
-      this.presetManagerListener = this.config.vegetationPresetManager.addListener(() => {
+      this.vegetationPresetManagerListener = this.config.vegetationPresetManager.addListener(() => {
         this.loadVegetationPresets();
+        this.refresh();
+      });
+    }
+
+    // Listen for NPC preset changes
+    if (this.config.npcPresetManager) {
+      this.npcPresetManagerListener = this.config.npcPresetManager.addListener(() => {
+        this.loadNpcPresets();
         this.refresh();
       });
     }
@@ -168,6 +183,12 @@ export class AssetPalette {
       grid.appendChild(item);
     }
 
+    // Add NPC presets to grid
+    for (const asset of this.npcAssets) {
+      const item = this.createNpcItem(asset);
+      grid.appendChild(item);
+    }
+
     menu.appendChild(grid);
     return menu;
   }
@@ -243,6 +264,49 @@ export class AssetPalette {
   }
 
   /**
+   * Creates an NPC preset item for the grid
+   */
+  private createNpcItem(asset: BlockAsset): HTMLElement {
+    const item = document.createElement('div');
+    item.className = 'build-menu-item build-menu-item-npc';
+    item.title = asset.name;
+
+    const preview = document.createElement('div');
+    preview.className = 'build-menu-item-preview';
+    preview.style.backgroundColor = this.rgbaToString(asset.color);
+    // Add NPC icon indicator
+    preview.style.position = 'relative';
+    const icon = document.createElement('div');
+    icon.textContent = '👤';
+    icon.style.position = 'absolute';
+    icon.style.top = '2px';
+    icon.style.right = '2px';
+    icon.style.fontSize = '12px';
+    preview.appendChild(icon);
+    item.appendChild(preview);
+
+    const name = document.createElement('div');
+    name.className = 'build-menu-item-name';
+    name.textContent = asset.name;
+    item.appendChild(name);
+
+    // Click to place NPC preset
+    item.addEventListener('click', () => {
+      if (this.config.npcPresetManager && this.config.onStartPlacementPreset) {
+        // Find the preset by asset ID
+        const presetId = asset.id.replace('npc-', '');
+        const preset = this.config.npcPresetManager.getPreset(presetId);
+        if (preset) {
+          this.config.onStartPlacementPreset(preset);
+          this.toggleBuildMenu(); // Close menu after selection
+        }
+      }
+    });
+
+    return item;
+  }
+
+  /**
    * Loads vegetation presets as assets
    */
   private loadVegetationPresets(): void {
@@ -252,6 +316,18 @@ export class AssetPalette {
     }
 
     this.vegetationAssets = this.config.vegetationPresetManager.getAllPresetsAsAssets();
+  }
+
+  /**
+   * Loads NPC presets as assets
+   */
+  private loadNpcPresets(): void {
+    if (!this.config.npcPresetManager) {
+      this.npcAssets = [];
+      return;
+    }
+
+    this.npcAssets = this.config.npcPresetManager.getAllPresetsAsAssets();
   }
 
   /**
@@ -318,6 +394,9 @@ export class AssetPalette {
   public refresh(): void {
     // Reload vegetation presets
     this.loadVegetationPresets();
+    
+    // Reload NPC presets
+    this.loadNpcPresets();
 
     // Re-render hotbar if needed
     if (this.hotbar) {
@@ -343,9 +422,14 @@ export class AssetPalette {
       this.keyboardCleanup = null;
     }
 
-    if (this.presetManagerListener) {
-      this.presetManagerListener();
-      this.presetManagerListener = null;
+    if (this.vegetationPresetManagerListener) {
+      this.vegetationPresetManagerListener();
+      this.vegetationPresetManagerListener = null;
+    }
+
+    if (this.npcPresetManagerListener) {
+      this.npcPresetManagerListener();
+      this.npcPresetManagerListener = null;
     }
 
     if (this.container?.parentElement) {

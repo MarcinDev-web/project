@@ -7,7 +7,7 @@ import { SelectionManager } from '@engine/world';
 import { Scene } from '@engine/world';
 import { Entity } from '@engine/world';
 import { LogicCubeComponent } from '@engine/script';
-import { LogicCubeLibrary } from '../managers/LogicCubeLibrary';
+import { LogicCubeLibrary } from '@engine/editor-utils';
 import { getLogicConnectionManager } from '@engine/script';
 import { initBrowserPolyfills } from '../../test/setup';
 

@@ -7,9 +7,6 @@ import type { Mat4, Vec3 } from '@engine/core/math';
 import { createLineShaderCode } from './shaders/lineShader';
 import { LogicCubeComponent } from '@engine/script';
 import type { LogicConnectionManager, LogicConnection } from '@engine/script';
-// Note: LogicCubeLibrary is in apps/editor, which violates package boundaries
-// For now, using fallback colors when library is unavailable
-// TODO: Move LogicCubeLibrary to @engine/editor-utils or make this configurable
 
 interface LineVertex {
   position: Vec3;
@@ -208,24 +205,24 @@ export class LogicConnectionRenderer {
     if (sourceEntity) {
       const component = sourceEntity.getComponent(LogicCubeComponent);
       if (component) {
+        // Use default color based on cube type name
         const cubeType = component.getCubeType();
-        // Fallback: Use simple color mapping based on cube type name
-        // In production, this should use LogicCubeLibrary from @engine/editor-utils
-        if (cubeType.includes('trigger') || cubeType.includes('Trigger')) {
+        // Simple color mapping based on cube type name patterns
+        const typeLower = cubeType.toLowerCase();
+        if (typeLower.includes('trigger') || typeLower.includes('button')) {
           return [1, 0.8, 0.2]; // Yellow
-        }
-        if (cubeType.includes('action') || cubeType.includes('Action')) {
+        } else if (typeLower.includes('action') || typeLower.includes('move')) {
           return [0.8, 0.4, 1]; // Purple
-        }
-        if (cubeType.includes('condition') || cubeType.includes('Condition')) {
+        } else if (typeLower.includes('condition') || typeLower.includes('if')) {
           return [1, 1, 0.3]; // Yellow
-        }
-        if (cubeType.includes('data') || cubeType.includes('Data')) {
+        } else if (typeLower.includes('data') || typeLower.includes('variable')) {
           return [0.3, 0.8, 1]; // Blue
-        }
-        if (cubeType.includes('logic') || cubeType.includes('Logic')) {
+        } else if (typeLower.includes('logic') || typeLower.includes('and') || typeLower.includes('or')) {
           return [0.7, 0.7, 1]; // Light purple
         }
+        
+        // Default color for unknown types
+        return [0.5, 0.5, 0.5]; // Gray
       }
     }
 

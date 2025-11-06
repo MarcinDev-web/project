@@ -196,7 +196,10 @@ export class EditorModeManager {
       },
       stopPhysics: () => this.physicsWorld?.stop(),
       disableScripts: () => {
-        // TODO: Disable scripts when script system is ready
+        const runtime = this.config.scene.scriptRuntime;
+        if (runtime?.scriptSystem) {
+          runtime.scriptSystem.setEnabled(false);
+        }
       },
       enableHistory: () => config.state.enableHistory(),
       disableHistory: () => config.state.disableHistory(),
@@ -253,6 +256,12 @@ export class EditorModeManager {
       hasFpsCamera: () => this.getFPSCamera() !== null,
       initializeCheckpoints: (scene) => {
         this.checkpointSystem.initialize(scene);
+      },
+      enableScripts: () => {
+        const runtime = this.config.scene.scriptRuntime;
+        if (runtime?.scriptSystem) {
+          runtime.scriptSystem.setEnabled(true);
+        }
       },
       onFailure: () => {
         this.controls.setEnabled(false);
@@ -321,7 +330,10 @@ export class EditorModeManager {
       },
       stopPhysics: () => this.physicsWorld?.stop(),
       disableScripts: () => {
-        // TODO: Disable scripts when script system is ready
+        const runtime = this.config.scene.scriptRuntime;
+        if (runtime?.scriptSystem) {
+          runtime.scriptSystem.setEnabled(false);
+        }
       },
       disableCharacterInput: () => this.characterInput?.disable(),
       disableFPSCamera: () => this.getFPSCamera()?.disable(),

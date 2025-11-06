@@ -43,6 +43,8 @@ export interface PlayIntroStateDeps {
   onFailure?: () => void;
   /** Optional blend duration override */
   blendDuration?: number;
+  /** Enable script execution for play mode */
+  enableScripts?: () => void;
 }
 
 /**
@@ -138,6 +140,9 @@ export class PlayIntroState implements IPlayModeState {
       
       // Step 4: Enable character input
       this.deps.enableCharacterInput();
+      
+      // Step 5: Enable scripts for play mode
+      this.deps.enableScripts?.();
       
       Logger.info('Play intro started');
 

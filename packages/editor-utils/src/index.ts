@@ -5,4 +5,5 @@ export * from './HistoryHelpers';
 export * from './SnapSystem';
 export * from './SnapConfig';
 export * from './NpcRegistry';
+export * from './LogicCubeLibrary';
 

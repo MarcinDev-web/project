@@ -188,14 +188,6 @@ describe('StatusEffectComponent', () => {
         strength: 10,
       };
 
-      const dot2 = {
-        id: 'dot-2',
-        type: 'damage_over_time' as const,
-        startTime: 1,
-        duration: 2.0,
-        strength: 15,
-      };
-
       // Note: applyEffect replaces same type, so we need to manually add
       component.applyEffect(dot1);
       // Since applyEffect replaces, we'll test with different types

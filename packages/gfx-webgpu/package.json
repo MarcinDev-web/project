@@ -29,6 +29,7 @@
                          "@engine/world":  "workspace:*",
                          "@engine/avatar":  "workspace:*",
                          "@engine/blocks":  "workspace:*",
+                         "@engine/editor-utils":  "workspace:*",
                          "gl-matrix":  "^3.4.4"
                      },
     "devDependencies":  {

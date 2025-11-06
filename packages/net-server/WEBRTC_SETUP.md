@@ -46,6 +46,36 @@ await server.start();
 
 For production, configure a TURN server (e.g., coturn) for clients behind NAT/firewall.
 
+### Configuration
+
+TURN server is configured via environment variables in `collab-server`:
+
+```bash
+# Required for production
+TURN_URL=turn:turn.example.com:3478
+TURN_USERNAME=your-turn-username
+TURN_CREDENTIAL=your-turn-credential
+```
+
+If TURN is not configured in production, a warning will be logged. For development, STUN-only configuration is sufficient.
+
+### Setting up coturn
+
+Example coturn configuration (`/etc/turnserver.conf`):
+
+```
+listening-port=3478
+realm=your-domain.com
+user=username:password
+```
+
+Then configure in environment:
+```bash
+TURN_URL=turn:your-domain.com:3478
+TURN_USERNAME=username
+TURN_CREDENTIAL=password
+```
+
 ## Troubleshooting
 
 - If `wrtc` fails to build, ensure Python 3 and build tools are installed

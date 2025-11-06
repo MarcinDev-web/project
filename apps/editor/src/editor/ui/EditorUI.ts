@@ -76,6 +76,7 @@ import { PauseMenu } from './PauseMenu';
 import { TemplatePickerModal } from './TemplatePickerModal';
 import { CollaborationManager } from '../managers/CollaborationManager';
 import { VegetationPresetManager } from '../managers/VegetationPresetManager';
+import { NpcPresetManager } from '../managers/NpcPresetManager';
 import { BrandWatermark } from './BrandWatermark';
 import { PlayModeInviteDialog } from './PlayModeInviteDialog';
 import { showCustomProfileEditor } from './CustomProfileEditor';
@@ -147,6 +148,7 @@ export class EditorUI {
   private placementController: EditorPlacementController | null = null;
   private vegetationPaintController: VegetationPaintController | null = null;
   private vegetationPresetManager: VegetationPresetManager | null = null;
+  private npcPresetManager: NpcPresetManager | null = null;
   private terrainBuilderStudio: TerrainBuilderStudio | null = null;
   private dragController: BlockDragController | null = null;
   private easyPlaceController: EasyPlaceController | null = null;
@@ -348,6 +350,9 @@ export class EditorUI {
 
     // Initialize VegetationPresetManager
     this.vegetationPresetManager = new VegetationPresetManager();
+
+    // Initialize NpcPresetManager
+    this.npcPresetManager = new NpcPresetManager();
 
     this.placementController = new EditorPlacementController({
       canvas: this.config.canvas,
@@ -723,6 +728,7 @@ export class EditorUI {
       },
       getRenderer: () => this.config.getRenderer(),
       vegetationPresetManager: this.vegetationPresetManager,
+      npcPresetManager: this.npcPresetManager,
     });
     this.panelManager.mount(containers.sidebar, containers.inspector);
     this.disposables.add(() => this.panelManager?.dispose());

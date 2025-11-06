@@ -41,12 +41,19 @@ export interface WebRTCTransportServerOptions {
   signalingPort: number;
   iceServers?: RTCIceServer[];
   logger?: TransportLogger;
+  onDataChannelMessage?: (
+    clientId: string,
+    channelLabel: string,
+    data: ArrayBuffer
+  ) => void;
+  onConnectionClosed?: (clientId: string) => void;
 }
 
 interface PeerState {
   pc: RTCPeerConnection;
   dataChannels: Map<string, RTCDataChannel>;
   clientId: string;
+  connectionTimeout: ReturnType<typeof setTimeout> | null;
 }
 
 export class WebRTCTransportServer implements TransportServer {
@@ -56,9 +63,17 @@ export class WebRTCTransportServer implements TransportServer {
   private readonly signalingSockets = new Map<string, WebSocket>();
   private readonly defaultIceServers: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
   private readonly logger: ReturnType<typeof createTransportLogger>;
+  private readonly onDataChannelMessage: ((
+    clientId: string,
+    channelLabel: string,
+    data: ArrayBuffer
+  ) => void) | undefined;
+  private readonly onConnectionClosed: ((clientId: string) => void) | undefined;
 
   constructor(private readonly options: WebRTCTransportServerOptions) {
     this.logger = createTransportLogger(options.logger);
+    this.onDataChannelMessage = options.onDataChannelMessage ?? undefined;
+    this.onConnectionClosed = options.onConnectionClosed ?? undefined;
   }
 
   start(): Promise<void> {
@@ -66,9 +81,22 @@ export class WebRTCTransportServer implements TransportServer {
       return Promise.resolve();
     }
 
-    this.wss = new WebSocketServer({ port: this.options.signalingPort });
+    return new Promise<void>((resolve, reject) => {
+      try {
+        this.wss = new WebSocketServer({ port: this.options.signalingPort });
 
-    this.wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
+        // Handle server errors (Problem 1)
+        this.wss.on('error', (err: Error) => {
+          this.logger.error('WebSocketServer error:', err);
+          reject(err);
+        });
+
+        this.wss.on('listening', () => {
+          this.logger.info(`WebRTC signaling server listening on port ${this.options.signalingPort}`);
+          resolve();
+        });
+
+        this.wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
       const clientId = this.extractClientId(req.url ?? '') || randomUUID();
       this.signalingSockets.set(clientId, ws);
 
@@ -87,21 +115,18 @@ export class WebRTCTransportServer implements TransportServer {
         this.signalingSockets.delete(clientId);
         const peer = this.peers.get(clientId);
         if (peer) {
-          peer.pc.close();
-          for (const dc of peer.dataChannels.values()) {
-            dc.close();
-          }
-          this.peers.delete(clientId);
+          this.cleanupPeer(clientId, peer);
         }
       });
 
       ws.on('error', (err: Error) => {
         this.logger.error('WebSocket error for client', clientId, err);
       });
+      });
+      } catch (err) {
+        reject(err as Error);
+      }
     });
-
-    this.logger.info(`WebRTC signaling server listening on port ${this.options.signalingPort}`);
-    return Promise.resolve();
   }
 
   stop(): Promise<void> {
@@ -109,11 +134,8 @@ export class WebRTCTransportServer implements TransportServer {
       this.wss.close();
       this.wss = null;
     }
-    for (const peer of this.peers.values()) {
-      peer.pc.close();
-      for (const dc of peer.dataChannels.values()) {
-        dc.close();
-      }
+    for (const [clientId, peer] of this.peers.entries()) {
+      this.cleanupPeer(clientId, peer);
     }
     this.peers.clear();
     this.signalingSockets.clear();
@@ -188,13 +210,36 @@ export class WebRTCTransportServer implements TransportServer {
   }
 
   private async handleOffer(clientId: string, offer: WebRTCOffer): Promise<void> {
+    // Validate offer (Problem 5)
+    if (!offer.offer || !offer.offer.type || offer.offer.type !== 'offer') {
+      this.logger.error(`Invalid offer from client ${clientId}`);
+      return;
+    }
+
+    // Close existing peer connection if present (Problem 6)
+    const existingPeer = this.peers.get(clientId);
+    if (existingPeer) {
+      this.logger.debug(`Closing existing peer connection for client ${clientId}`);
+      this.cleanupPeer(clientId, existingPeer);
+    }
+
     const iceServers = this.options.iceServers ?? this.defaultIceServers;
     const pc = new RTCPeerConnectionImpl({ iceServers });
+
+    // Setup timeout for peer connection (Problem 2)
+    const connectionTimeout = setTimeout(() => {
+      const peer = this.peers.get(clientId);
+      if (peer && peer.pc === pc) {
+        this.logger.error(`Peer connection timeout for client ${clientId}`);
+        this.cleanupPeer(clientId, peer);
+      }
+    }, 30000);
 
     const peerState: PeerState = {
       pc,
       dataChannels: new Map(),
       clientId,
+      connectionTimeout,
     };
 
     this.peers.set(clientId, peerState);
@@ -218,8 +263,27 @@ export class WebRTCTransportServer implements TransportServer {
         peerState.dataChannels.delete(channelLabel);
       };
 
-      dc.onmessage = () => {
+      dc.onmessage = (event: MessageEvent) => {
         this.logger.debug(`Data channel "${channelLabel}" message from client ${clientId}`);
+        // Pass data to callback (Problem 4)
+        if (this.onDataChannelMessage && event.data) {
+          try {
+            const data = event.data instanceof ArrayBuffer
+              ? event.data
+              : event.data instanceof Blob
+              ? event.data.arrayBuffer()
+              : new TextEncoder().encode(String(event.data)).buffer;
+            
+            // Use setTimeout to avoid blocking
+            Promise.resolve(data).then((buffer) => {
+              this.onDataChannelMessage!(clientId, channelLabel, buffer);
+            }).catch((err) => {
+              this.logger.error(`Error processing data channel message: ${err}`);
+            });
+          } catch (err) {
+            this.logger.error(`Error handling data channel message: ${err}`);
+          }
+        }
       };
     };
 
@@ -238,7 +302,22 @@ export class WebRTCTransportServer implements TransportServer {
     pc.onconnectionstatechange = () => {
       this.logger.debug(`Client ${clientId} connection state: ${pc.connectionState}`);
       if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
-        this.peers.delete(clientId);
+        const peer = this.peers.get(clientId);
+        if (peer) {
+          this.cleanupPeer(clientId, peer);
+        }
+      }
+    };
+
+    // Add ICE connection state change handler (Problem 3)
+    pc.oniceconnectionstatechange = () => {
+      this.logger.debug(`Client ${clientId} ICE connection state: ${pc.iceConnectionState}`);
+      if (pc.iceConnectionState === 'failed' || pc.iceConnectionState === 'disconnected') {
+        const peer = this.peers.get(clientId);
+        if (peer) {
+          this.logger.warn(`ICE connection failed for client ${clientId}: ${pc.iceConnectionState}`);
+          this.cleanupPeer(clientId, peer);
+        }
       }
     };
 
@@ -261,8 +340,39 @@ export class WebRTCTransportServer implements TransportServer {
       }
     } catch (err) {
       this.logger.error('Error handling offer:', err);
-      pc.close();
-      this.peers.delete(clientId);
+      const peer = this.peers.get(clientId);
+      if (peer) {
+        this.cleanupPeer(clientId, peer);
+      }
+      // Cleanup signaling socket on error (Problem 7)
+      const ws = this.signalingSockets.get(clientId);
+      if (ws) {
+        ws.close();
+        this.signalingSockets.delete(clientId);
+      }
+    }
+  }
+
+  private cleanupPeer(clientId: string, peer: PeerState): void {
+    // Clear timeout
+    if (peer.connectionTimeout) {
+      clearTimeout(peer.connectionTimeout);
+    }
+    
+    // Close peer connection
+    peer.pc.close();
+    
+    // Close all data channels
+    for (const dc of peer.dataChannels.values()) {
+      dc.close();
+    }
+    
+    // Remove from peers map
+    this.peers.delete(clientId);
+    
+    // Notify about connection closure
+    if (this.onConnectionClosed) {
+      this.onConnectionClosed(clientId);
     }
   }
 }

@@ -14,6 +14,7 @@ import type { EditorState } from '../core/state';
 import type { AssetPreset, Asset } from '../types/BlockAssetTypes';
 import type { RgbaColor } from '../../utils/colors';
 import type { VegetationPresetManager } from '../managers/VegetationPresetManager';
+import type { NpcPresetManager } from '../managers/NpcPresetManager';
 import { PropertiesPanel } from './PropertiesPanel';
 import { LogicPanel } from './LogicPanel';
 import { LayersPanel } from './LayersPanel';
@@ -71,6 +72,7 @@ export interface EditorPanelManagerConfig {
   getTerrainBuilderStudio?: () => TerrainBuilderStudio | null;
   getRenderer?: () => import('@engine/gfx-webgpu').Renderer | null;
   vegetationPresetManager?: VegetationPresetManager | null;
+  npcPresetManager?: NpcPresetManager | null;
 }
 
 /**
@@ -258,8 +260,22 @@ export class EditorPanelManager {
       },
       onCreatePreset: (config) => {
         // Create new NPC preset
-        console.log('[NpcPanel] Create preset:', config);
-        // TODO: Integrate with asset system to create new NPC presets
+        if (this.config.npcPresetManager && config) {
+          // Prompt for preset name
+          const name = prompt('Enter preset name:');
+          if (name && name.trim()) {
+            try {
+              const preset = this.config.npcPresetManager.createPreset(name.trim(), config);
+              // Refresh asset palette to show new preset
+              this.refreshAssetBrowser();
+              console.log('[NpcPanel] Created preset:', preset.name);
+            } catch (error) {
+              console.error('[NpcPanel] Failed to create preset:', error);
+            }
+          }
+        } else {
+          console.warn('[NpcPanel] NpcPresetManager not available');
+        }
       },
       onStartPlacement: (preset) => {
         // Start placement with NPC preset
@@ -523,10 +539,11 @@ export class EditorPanelManager {
         this.config.onStartPlacement(preset);
       },
       onStartPlacementPreset: (preset: AssetPreset) => {
-        // Handle vegetation preset placement
+        // Handle preset placement (vegetation or NPC)
         this.config.onStartPlacement(preset);
       },
       vegetationPresetManager: this.config.vegetationPresetManager ?? null,
+      npcPresetManager: this.config.npcPresetManager ?? null,
     });
     this.assetPalette.mount();
     this.disposables.add(() => this.assetPalette?.dispose());

@@ -25,6 +25,12 @@ import type {
   PlayModeStartMessage,
   PlayModeEndMessage,
 } from './types/replication';
+import type { ClientTransportAdapter } from './transport/ClientTransportAdapter.js';
+import { WebSocketClientAdapter } from './transport/WebSocketClientAdapter.js';
+import { WebRTCClientAdapter } from './transport/WebRTCClientAdapter.js';
+import { WebTransportClientAdapter } from './transport/WebTransportClientAdapter.js';
+import { createHandshakeHello } from './transport/HandshakeClient.js';
+import type { TransportKind, HandshakeAccept, HandshakeReject } from '@engine/net-protocol';
 
 // Re-export PublicUser for external use
 export type { PublicUser };
@@ -48,9 +54,11 @@ export type OnPlayModeStartCallback = (message: PlayModeStartMessage) => void;
 /**
  * WebSocket client for real-time replication and collaboration.
  * Handles connection to replication server, session management, and message routing.
+ * Supports transport negotiation (WebRTC, WebTransport, WebSocket).
  */
 export class ReplicationClient {
-  private ws: WebSocket | null = null;
+  private transport: ClientTransportAdapter | null = null;
+  private ws: WebSocket | null = null; // Fallback for legacy servers
   private state: ReplicationState = ReplicationState.Disconnected;
   private currentSessionId: string | null = null;
   private currentUserId: string | null = null; // Local user ID from server
@@ -60,6 +68,9 @@ export class ReplicationClient {
   private pingInterval: number | null = null;
   private readonly pingIntervalMs = 30000; // 30 seconds
   private readonly wsUrl: string; // WebSocket URL (normalized)
+  private readonly enableTransportNegotiation: boolean;
+  private readonly clientId: string;
+  private readonly iceServers: RTCIceServer[] | undefined;
 
   // Event handlers
   private onOperationHandlers: OnOperationCallback[] = [];
@@ -77,16 +88,25 @@ export class ReplicationClient {
 
   constructor(
     wsUrl: string,
-    private readonly jwtToken: string
+    private readonly jwtToken: string,
+    options?: {
+      enableTransportNegotiation?: boolean;
+      clientId?: string;
+      iceServers?: RTCIceServer[];
+    }
   ) {
     // Convert HTTP URL to WebSocket URL if needed
     this.wsUrl = wsUrl.startsWith('ws://') || wsUrl.startsWith('wss://')
       ? wsUrl
       : wsUrl.replace(/^http/, 'ws');
+    this.enableTransportNegotiation = options?.enableTransportNegotiation ?? true;
+    this.clientId = options?.clientId || `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+    this.iceServers = options?.iceServers;
   }
 
   /**
-   * Connect to WebSocket server and join a collaboration session.
+   * Connect to server and join a collaboration session.
+   * Supports transport negotiation (WebRTC, WebTransport, WebSocket).
    */
   async connect(sessionId: string): Promise<void> {
     if (this.state === ReplicationState.Connecting || this.state === ReplicationState.Connected) {
@@ -96,6 +116,105 @@ export class ReplicationClient {
     this.currentSessionId = sessionId;
     this.setState(ReplicationState.Connecting);
 
+    try {
+      // Try transport negotiation if enabled
+      if (this.enableTransportNegotiation) {
+        try {
+          await this.connectWithTransportNegotiation(sessionId);
+          return;
+        } catch (err) {
+          console.warn('Transport negotiation failed, falling back to WebSocket:', err);
+          // Fall through to legacy WebSocket connection
+        }
+      }
+
+      // Fallback to legacy WebSocket connection
+      await this.connectWithWebSocket(sessionId);
+    } catch (error) {
+      this.setState(ReplicationState.Error);
+      throw error;
+    }
+  }
+
+  /**
+   * Connect using transport negotiation (WebRTC, WebTransport, or WebSocket).
+   */
+  private async connectWithTransportNegotiation(sessionId: string): Promise<void> {
+    // Step 1: Perform handshake via WebSocket
+    const handshakeWs = new WebSocket(this.wsUrl);
+    
+    const handshakeResult = await new Promise<HandshakeAccept | null>((resolve, reject) => {
+      const timeout = setTimeout(() => {
+        handshakeWs.close();
+        reject(new Error('Handshake timeout'));
+      }, 5000);
+
+      handshakeWs.onopen = () => {
+        // Send handshake hello
+        const hello = createHandshakeHello(this.jwtToken);
+        handshakeWs.send(JSON.stringify(hello));
+      };
+
+      handshakeWs.onmessage = (event) => {
+        try {
+          const message = JSON.parse(event.data as string);
+          if (message.kind === 'accept') {
+            clearTimeout(timeout);
+            handshakeWs.close();
+            resolve(message as HandshakeAccept);
+          } else if (message.kind === 'reject') {
+            clearTimeout(timeout);
+            handshakeWs.close();
+            reject(new Error((message as HandshakeReject).reason));
+          }
+        } catch (err) {
+          // Not a handshake message, ignore
+        }
+      };
+
+      handshakeWs.onerror = () => {
+        clearTimeout(timeout);
+        handshakeWs.close();
+        reject(new Error('Handshake WebSocket error'));
+      };
+    });
+
+    if (!handshakeResult) {
+      throw new Error('Handshake failed');
+    }
+
+    // Step 2: Create transport adapter based on selected transport
+    const selectedTransport = handshakeResult.selectedTransport;
+    const adapter = this.createTransportAdapter(selectedTransport);
+
+    // Step 3: Open transport connection
+    const transportUrl = this.getTransportUrl(selectedTransport);
+    await adapter.open(transportUrl);
+
+    this.transport = adapter;
+    this.setState(ReplicationState.Connected);
+    this.reconnectAttempts = 0;
+
+    // Step 4: Setup message handling for transport
+    this.setupTransportMessageHandling(adapter);
+
+    // Step 5: Send join session message
+    const joinMessage: JoinSessionMessage = {
+      type: 'join-session',
+      timestamp: Date.now(),
+      sessionId,
+      token: this.jwtToken,
+    };
+    this.send(joinMessage);
+
+    // Step 6: Start ping interval
+    this.startPingInterval();
+  }
+
+  /**
+   * Connect using legacy WebSocket (fallback).
+   */
+  private async connectWithWebSocket(sessionId: string): Promise<void> {
     return new Promise((resolve, reject) => {
       try {
         this.ws = new WebSocket(this.wsUrl);
@@ -145,7 +264,6 @@ export class ReplicationClient {
         };
 
         // Resolve after successful connection and join confirmation
-        // (will be set to Joined state when user-joined message is received)
         setTimeout(() => {
           if (this.state === ReplicationState.Connected || this.state === ReplicationState.Joined) {
             resolve();
@@ -161,7 +279,75 @@ export class ReplicationClient {
   }
 
   /**
-   * Disconnect from WebSocket server and leave session.
+   * Get ICE servers configuration.
+   * Uses provided iceServers from options, or defaults to STUN only.
+   * In production, TURN server should be configured server-side and provided via options.
+   */
+  private getIceServers(): RTCIceServer[] {
+    if (this.iceServers) {
+      return this.iceServers;
+    }
+
+    // Default: STUN only (sufficient for development and same-network connections)
+    return [
+      { urls: 'stun:stun.l.google.com:19302' },
+    ];
+  }
+
+  /**
+   * Create transport adapter based on transport kind.
+   */
+  private createTransportAdapter(kind: TransportKind): ClientTransportAdapter {
+    switch (kind) {
+      case 'webrtc':
+        return new WebRTCClientAdapter(this.clientId, {
+          iceServers: this.getIceServers(),
+        });
+      case 'webtransport':
+        return new WebTransportClientAdapter();
+      case 'websocket':
+      default:
+        return new WebSocketClientAdapter();
+    }
+  }
+
+  /**
+   * Get transport URL based on transport kind.
+   */
+  private getTransportUrl(kind: TransportKind): string {
+    switch (kind) {
+      case 'webrtc':
+        // WebRTC uses separate signaling endpoint
+        return `${this.wsUrl.replace(/\/ws$/, '')}/webrtc-signaling?clientId=${encodeURIComponent(this.clientId)}`;
+      case 'webtransport':
+        // WebTransport uses HTTP/3
+        return this.wsUrl.replace(/^ws/, 'https').replace(/\/ws$/, '');
+      case 'websocket':
+      default:
+        return this.wsUrl;
+    }
+  }
+
+  /**
+   * Setup message handling for transport adapter.
+   */
+  private setupTransportMessageHandling(adapter: ClientTransportAdapter): void {
+    // Setup message handler if adapter supports it
+    if (adapter.onMessage) {
+      adapter.onMessage((data: Uint8Array) => {
+        try {
+          // Convert Uint8Array to string and parse JSON
+          const text = new TextDecoder().decode(data);
+          this.handleMessage(text);
+        } catch (err) {
+          console.error('Error processing transport message:', err);
+        }
+      });
+    }
+  }
+
+  /**
+   * Disconnect from server and leave session.
    */
   disconnect(): void {
     if (this.state === ReplicationState.Disconnected) {
@@ -169,16 +355,30 @@ export class ReplicationClient {
     }
 
     // Send leave message if in a session
-    if (this.currentSessionId && this.ws && this.ws.readyState === WebSocket.OPEN) {
-      const leaveMessage: LeaveSessionMessage = {
-        type: 'leave-session',
-        timestamp: Date.now(),
-        sessionId: this.currentSessionId,
-      };
-      this.send(leaveMessage);
+    if (this.currentSessionId) {
+      if (this.transport?.isOpen) {
+        const leaveMessage: LeaveSessionMessage = {
+          type: 'leave-session',
+          timestamp: Date.now(),
+          sessionId: this.currentSessionId,
+        };
+        this.send(leaveMessage);
+      } else if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        const leaveMessage: LeaveSessionMessage = {
+          type: 'leave-session',
+          timestamp: Date.now(),
+          sessionId: this.currentSessionId,
+        };
+        this.send(leaveMessage);
+      }
     }
 
     this.stopPingInterval();
+
+    if (this.transport) {
+      this.transport.close();
+      this.transport = null;
+    }
 
     if (this.ws) {
       this.ws.close();
@@ -194,7 +394,7 @@ export class ReplicationClient {
    * Send an operation to the server (for replication).
    */
   sendOperation(operation: Operation): void {
-    if (this.ws?.readyState !== WebSocket.OPEN) {
+    if (!this.isConnected()) {
       console.warn('Cannot send operation: not connected');
       return;
     }
@@ -213,7 +413,7 @@ export class ReplicationClient {
    * Send input message (gameplay input events).
    */
   sendInput(message: Omit<InputMessage, 'type' | 'timestamp' | 'sessionId' | 'userId'>): void {
-    if (this.ws?.readyState !== WebSocket.OPEN) {
+    if (!this.isConnected()) {
       return;
     }
 
@@ -232,7 +432,7 @@ export class ReplicationClient {
    * Send physics state message.
    */
   sendPhysicsState(message: Omit<PhysicsStateMessage, 'type' | 'timestamp' | 'sessionId' | 'userId'>): void {
-    if (this.ws?.readyState !== WebSocket.OPEN) {
+    if (!this.isConnected()) {
       return;
     }
 
@@ -251,7 +451,7 @@ export class ReplicationClient {
    * Send player update (gameplay position/state).
    */
   sendPlayerUpdate(message: Omit<PlayerUpdateMessage, 'type' | 'timestamp' | 'sessionId' | 'userId'>): void {
-    if (this.ws?.readyState !== WebSocket.OPEN) {
+    if (!this.isConnected()) {
       return;
     }
 
@@ -270,7 +470,7 @@ export class ReplicationClient {
    * Send cursor update (camera position for visual indicators).
    */
   sendCursorUpdate(position: [number, number, number], rotation?: [number, number, number, number]): void {
-    if (this.ws?.readyState !== WebSocket.OPEN) {
+    if (!this.isConnected()) {
       return;
     }
 
@@ -289,7 +489,7 @@ export class ReplicationClient {
    * Send Play Mode request to invite other users to join Play Mode.
    */
   sendPlayModeRequest(requestId: string, fromUser: PublicUser): void {
-    if (this.ws?.readyState !== WebSocket.OPEN) {
+    if (!this.isConnected()) {
       console.warn('Cannot send Play Mode request: not connected');
       return;
     }
@@ -310,7 +510,7 @@ export class ReplicationClient {
    * Send response to a Play Mode request.
    */
   sendPlayModeResponse(requestId: string, accepted: boolean): void {
-    if (this.ws?.readyState !== WebSocket.OPEN) {
+    if (!this.isConnected()) {
       console.warn('Cannot send Play Mode response: not connected');
       return;
     }
@@ -331,7 +531,7 @@ export class ReplicationClient {
    * Send Play Mode end notification (when exiting Play Mode).
    */
   sendPlayModeEnd(): void {
-    if (this.ws?.readyState !== WebSocket.OPEN || !this.currentUserId) {
+    if (!this.isConnected() || !this.currentUserId) {
       return;
     }
 
@@ -349,7 +549,7 @@ export class ReplicationClient {
    * Request a full snapshot from the server.
    */
   requestSnapshot(): void {
-    if (this.ws?.readyState !== WebSocket.OPEN) {
+    if (!this.isConnected()) {
       return;
     }
 
@@ -377,7 +577,14 @@ export class ReplicationClient {
    * Check if connected and joined.
    */
   isConnected(): boolean {
-    return this.state === ReplicationState.Joined && this.ws?.readyState === WebSocket.OPEN;
+    if (this.state !== ReplicationState.Joined) {
+      return false;
+    }
+    // Check transport or WebSocket
+    if (this.transport) {
+      return this.transport.isOpen;
+    }
+    return this.ws?.readyState === WebSocket.OPEN;
   }
 
   /**
@@ -638,12 +845,19 @@ export class ReplicationClient {
    * Send message to server.
    */
   private send(message: unknown): void {
-    if (this.ws?.readyState === WebSocket.OPEN) {
-      try {
-        this.ws.send(JSON.stringify(message));
-      } catch (error) {
-        console.error('Failed to send WebSocket message:', error);
+    try {
+      const jsonString = JSON.stringify(message);
+      const bytes = new TextEncoder().encode(jsonString);
+
+      if (this.transport?.isOpen) {
+        this.transport.send(bytes);
+      } else if (this.ws?.readyState === WebSocket.OPEN) {
+        this.ws.send(jsonString);
+      } else {
+        console.warn('Cannot send message: not connected');
       }
+    } catch (error) {
+      console.error('Failed to send message:', error);
     }
   }
 
@@ -688,7 +902,7 @@ export class ReplicationClient {
   private startPingInterval(): void {
     this.stopPingInterval();
     this.pingInterval = window.setInterval(() => {
-      if (this.ws?.readyState === WebSocket.OPEN) {
+      if (this.isConnected()) {
         const ping: PingMessage = {
           type: 'ping',
           timestamp: Date.now(),

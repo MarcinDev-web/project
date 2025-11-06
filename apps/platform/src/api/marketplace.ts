@@ -198,5 +198,13 @@ export const marketplaceApi = {
   async setPrice(id: string, price?: { currency: string; amount: number } | null): Promise<MarketplaceItem> {
     return apiClient.put<MarketplaceItem>(`/marketplace/${id}/price`, { price });
   },
+
+  /**
+   * Download free marketplace item
+   * Returns file URL for download
+   */
+  async downloadFreeItem(id: string): Promise<{ fileUrl: string; itemId: string; title: string }> {
+    return apiClient.get<{ fileUrl: string; itemId: string; title: string }>(`/marketplace/${id}/download`);
+  },
 };
 

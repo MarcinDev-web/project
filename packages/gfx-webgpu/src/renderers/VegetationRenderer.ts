@@ -894,9 +894,13 @@ fn fragmentMain(
     const lodDistances = this.lodManager?.getConfig().lodDistances ?? [15, 30, 50, 80];
     const distance = instance.distance ?? 0;
     
-    if (distance <= lodDistances[0]) return 0;
-    if (distance <= lodDistances[1]) return 1;
-    if (distance <= lodDistances[2]) return 2;
+    const d0 = lodDistances[0] ?? 15;
+    const d1 = lodDistances[1] ?? 30;
+    const d2 = lodDistances[2] ?? 50;
+    
+    if (distance <= d0) return 0;
+    if (distance <= d1) return 1;
+    if (distance <= d2) return 2;
     return 3;
   }
 

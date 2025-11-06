@@ -4,6 +4,8 @@
 
 import { apiClient } from './client';
 import type { ProjectData } from '@engine/net';
+import type { BlockDefinition } from '@engine/blocks';
+import type { Vec3, Quat } from '@engine/core/math';
 
 export interface StudioProject {
   id: string;
@@ -163,6 +165,31 @@ export interface InviteMemberRequest {
 export interface ShareProjectRequest {
   accessLevel: 'read' | 'write';
   userId?: string;
+}
+
+/**
+ * Saved block data structure
+ */
+export interface SavedBlock {
+  id: string;
+  blockDefinition: BlockDefinition;
+  position: Vec3;
+  rotation: Quat;
+  scale: Vec3;
+  createdAt: number;
+  updatedAt: number;
+}
+
+/**
+ * Request to save blocks
+ */
+export interface SaveBlocksRequest {
+  blocks: Array<{
+    blockDefinition: BlockDefinition;
+    position: Vec3;
+    rotation: Quat;
+    scale: Vec3;
+  }>;
 }
 
 export const studioApi = {
@@ -379,6 +406,26 @@ export const studioApi = {
     return apiClient.get<{ projects: Array<{ project: StudioProject; access: ProjectTeamAccess }> }>(
       '/studio/shared-projects'
     );
+  },
+
+  /**
+   * ========================================
+   * BLOCKS API
+   * ========================================
+   */
+
+  /**
+   * Save blocks to API
+   */
+  async saveBlocks(data: SaveBlocksRequest): Promise<{ blocks: SavedBlock[] }> {
+    return apiClient.post<{ blocks: SavedBlock[] }>('/studio/blocks', data);
+  },
+
+  /**
+   * Get saved blocks from API
+   */
+  async getSavedBlocks(): Promise<{ blocks: SavedBlock[] }> {
+    return apiClient.get<{ blocks: SavedBlock[] }>('/studio/blocks');
   },
 };
 

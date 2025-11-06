@@ -6,6 +6,7 @@ export interface ClientTransportAdapter {
   send(bytes: Uint8Array): void;
   close(code?: number, reason?: string): void;
   readonly isOpen: boolean;
+  onMessage?(handler: (data: Uint8Array) => void): () => void;
 }
 
 

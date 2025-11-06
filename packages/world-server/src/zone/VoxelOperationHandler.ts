@@ -132,7 +132,8 @@ export class VoxelOperationHandler {
     const role = this.zoneServer.getClientRole(clientId);
     if (!role) return;
 
-    const userId = clientId; // TODO: Get actual userId from client state
+    const userId = this.zoneServer.getClientUserId(clientId);
+    if (!userId) return; // Skip telemetry if userId not available
 
     const event: TelemetryGameEvent = {
       type: op.type === 'place' ? 'voxel:place' : op.type === 'remove' ? 'voxel:remove' : 'voxel:paint',

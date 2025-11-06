@@ -195,8 +195,8 @@ export class StatusEffectSystem {
       startTime: this.currentTime,
       duration,
       strength,
-      sourceId,
-      metadata,
+      ...(sourceId !== undefined && { sourceId }),
+      ...(metadata !== undefined && { metadata }),
     };
 
     const applied = statusEffect.applyEffect(effect);

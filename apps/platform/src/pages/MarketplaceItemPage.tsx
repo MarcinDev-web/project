@@ -5,6 +5,7 @@ import { Card } from '../components/shared/Card';
 import { Button } from '../components/shared/Button';
 import { marketplaceApi, type MarketplaceItem } from '../api/marketplace';
 import { apiClient } from '../api/client';
+import { useToast } from '../contexts/ToastContext';
 
 function LikeButton({ item, onToggle }: { item: MarketplaceItem; onToggle: () => void }) {
   const [liked, setLiked] = useState(item.liked ?? false);
@@ -52,11 +53,13 @@ function LikeButton({ item, onToggle }: { item: MarketplaceItem; onToggle: () =>
 export function MarketplaceItemPage() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const { showToast } = useToast();
   const [item, setItem] = useState<MarketplaceItem | null>(null);
   const [loading, setLoading] = useState(true);
   const [forumThreadId, setForumThreadId] = useState<string | null>(null);
   const [loadingThread, setLoadingThread] = useState(false);
   const [purchasing, setPurchasing] = useState(false);
+  const [downloading, setDownloading] = useState(false);
 
   useEffect(() => {
     if (!id) return;
@@ -83,13 +86,42 @@ export function MarketplaceItemPage() {
     }
   };
 
+  const handleDownloadFree = async () => {
+    if (!item) return;
+
+    try {
+      setDownloading(true);
+      const result = await marketplaceApi.downloadFreeItem(item.id);
+      
+      // Trigger browser download
+      const link = document.createElement('a');
+      link.href = result.fileUrl.startsWith('http') || result.fileUrl.startsWith('/api') 
+        ? result.fileUrl 
+        : `/api${result.fileUrl}`;
+      link.download = `${result.title}.json`; // Adjust extension based on file type
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+
+      // Reload item to reflect updated download count
+      await loadItem();
+      
+      showToast('Item downloaded successfully!', 'success');
+    } catch (error) {
+      console.error('Failed to download item:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Failed to download item';
+      showToast(errorMessage, 'error');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
   const handlePurchase = async () => {
     if (!item) return;
     
     if (!item.price) {
-      // If no price, it's free - just download
-      // TODO: Handle free download
-      console.log('Free item - download functionality not implemented yet');
+      // If no price, it's free - download it
+      await handleDownloadFree();
       return;
     }
 
@@ -109,15 +141,15 @@ export function MarketplaceItemPage() {
       if (response.success) {
         // Reload item to reflect ownership
         await loadItem();
-        // TODO: Show success message
-        console.log('Purchase successful!');
+        showToast('Purchase successful!', 'success');
       } else {
-        // TODO: Show error message
-        console.error('Purchase failed:', response.error);
+        const errorMessage = response.error || 'Purchase failed';
+        showToast(errorMessage, 'error');
       }
     } catch (error) {
       console.error('Failed to purchase item:', error);
-      // TODO: Show error toast
+      const errorMessage = error instanceof Error ? error.message : 'Failed to purchase item';
+      showToast(errorMessage, 'error');
     } finally {
       setPurchasing(false);
     }
@@ -240,9 +272,9 @@ export function MarketplaceItemPage() {
                 <Button 
                   variant="secondary" 
                   onClick={handlePurchase}
-                  disabled={purchasing}
+                  disabled={purchasing || downloading}
                 >
-                  {purchasing ? 'Loading...' : 'Kup'}
+                  {purchasing ? 'Loading...' : downloading ? 'Downloading...' : item.price ? 'Kup' : 'Pobierz za darmo'}
                 </Button>
                 {forumThreadId && (
                   <Button 

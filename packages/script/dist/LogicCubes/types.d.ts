@@ -9,6 +9,8 @@ export interface ScriptRuntime {
     /** Tracking for all live behavior instances within the scene */
     behaviors: Set<BehaviorInstance>;
     contextBuilder: SceneScriptContextBuilder;
+    /** Reference to ScriptSystem instance for external control (e.g., enable/disable) */
+    scriptSystem?: import('../runtime/ScriptSystem.js').ScriptSystem;
     physicsWorld?: PhysicsWorld | null;
     animationSystem?: AnimationSystem | null;
     renderingPipeline?: Renderer | null;

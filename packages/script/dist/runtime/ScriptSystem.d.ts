@@ -10,11 +10,16 @@ export declare class ScriptSystem {
     private fixedAccumulator;
     private fixedDeltaTime;
     private maxFixedStepsPerUpdate;
+    private enabled;
     constructor(scene: Scene);
     /** Sets the fixed time step in seconds (<=0 disables fixed updates). */
     setFixedTimeStep(seconds: number): void;
     /** Limits the number of fixed steps processed per variable update. */
     setMaxFixedStepsPerUpdate(steps: number): void;
+    /** Enable or disable script execution. When disabled, update() and lateUpdate() do nothing. */
+    setEnabled(enabled: boolean): void;
+    /** Check if script execution is enabled. */
+    isEnabled(): boolean;
     update(deltaTime: number): void;
     lateUpdate(deltaTime: number): void;
     /** Resets cached services and coroutine state. */
