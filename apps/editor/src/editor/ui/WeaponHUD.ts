@@ -14,7 +14,7 @@ import { WeaponComponent } from '@engine/world/components/WeaponComponent';
 import { InventoryComponent } from '@engine/world/components/InventoryComponent';
 import { AttachmentComponent } from '@engine/world/components/AttachmentComponent';
 import type { WeaponFireEvent, WeaponReloadEvent, InventoryUpdatedEvent } from '@engine/world/types/weapon';
-import { getEffectiveWeaponStats } from '@engine/world/utils';
+import { getEffectiveWeaponStats } from '@engine/world';
 import { getAttachment } from '@engine/world/data/attachments';
 
 export interface WeaponHUDConfig {
