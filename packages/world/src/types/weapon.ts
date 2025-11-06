@@ -219,4 +219,3 @@ export interface InventoryUpdatedEvent {
   /** Weapon index (if applicable) */
   weaponIndex?: number;
 }
-

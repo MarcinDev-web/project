@@ -1,6 +1,6 @@
 /**
  * VegetationSystem - Manages vegetation gameplay interactions
- * 
+ *
  * Handles:
  * - Harvesting/interaction with vegetation
  * - Collision detection with player/entities
@@ -70,16 +70,19 @@ export class VegetationSystem {
   private readonly scene: Scene;
   private readonly physicsSystem: PhysicsSystem | null;
   private readonly config: VegetationSystemConfig;
-  
+
   /** Track vegetation entities being harvested */
-  private readonly harvestingEntities = new Map<Entity, {
-    startTime: number;
-    harvester: Entity | null;
-  }>();
-  
+  private readonly harvestingEntities = new Map<
+    Entity,
+    {
+      startTime: number;
+      harvester: Entity | null;
+    }
+  >();
+
   /** Current time tracking */
   private currentTime = 0;
-  
+
   /** Unsubscribe from physics collisions */
   private collisionUnsubscribe: (() => void) | null = null;
 
@@ -91,7 +94,7 @@ export class VegetationSystem {
     this.scene = scene;
     this.physicsSystem = physicsSystem;
     this.config = { ...DEFAULT_CONFIG, ...config };
-    
+
     // Subscribe to collision events if physics system available
     if (this.physicsSystem && this.config.enableCollisions) {
       this.subscribeToCollisions();
@@ -103,15 +106,15 @@ export class VegetationSystem {
    */
   update(deltaTime: number): void {
     this.currentTime += deltaTime;
-    
+
     // Process active harvesting
     this.updateHarvesting(deltaTime);
-    
+
     // Update growth/regrowth for all vegetation
     if (this.config.enableGrowth) {
       this.updateGrowth(deltaTime);
     }
-    
+
     // Clean up harvested entities that no longer exist
     for (const entity of this.harvestingEntities.keys()) {
       if (!this.scene.findEntityById(entity.id)) {
@@ -131,29 +134,29 @@ export class VegetationSystem {
     if (!vegetation) {
       return false;
     }
-    
+
     if (!vegetation.config.canBeHarvested) {
       return false;
     }
-    
+
     if (vegetation.isHarvested) {
       return false; // Already harvested
     }
-    
+
     const harvestTime = vegetation.config.harvestTime ?? 0;
-    
+
     // Instant harvest (harvestTime = 0 or undefined)
     if (harvestTime <= 0) {
       this.completeHarvest(vegetationEntity, harvesterEntity);
       return true;
     }
-    
+
     // Start timed harvest
     this.harvestingEntities.set(vegetationEntity, {
       startTime: this.currentTime,
       harvester: harvesterEntity,
     });
-    
+
     return true;
   }
 
@@ -162,26 +165,26 @@ export class VegetationSystem {
    */
   canInteractWith(_entity: Entity, position: Vec3): Entity | null {
     const allVegetation = this.scene.queryEntities(VegetationComponent);
-    
+
     let closest: Entity | null = null;
     let closestDistance = this.config.interactionRange;
-    
+
     for (const vegetationEntity of allVegetation) {
       const vegetation = vegetationEntity.getComponent(VegetationComponent);
       if (!vegetation || vegetation.isHarvested) {
         continue;
       }
-      
+
       const vegPos = vegetationEntity.transform.getWorldPosition();
       const distance = distanceVec3(position, vegPos);
-      
+
       // Check if within interaction range and closest
       if (distance <= this.config.interactionRange && distance < closestDistance) {
         closestDistance = distance;
         closest = vegetationEntity;
       }
     }
-    
+
     return closest;
   }
 
@@ -191,21 +194,21 @@ export class VegetationSystem {
   getVegetationInRange(position: Vec3, range: number): Entity[] {
     const result: Entity[] = [];
     const allVegetation = this.scene.queryEntities(VegetationComponent);
-    
+
     for (const vegetationEntity of allVegetation) {
       const vegetation = vegetationEntity.getComponent(VegetationComponent);
       if (!vegetation || vegetation.isHarvested) {
         continue;
       }
-      
+
       const vegPos = vegetationEntity.transform.getWorldPosition();
       const distance = distanceVec3(position, vegPos);
-      
+
       if (distance <= range) {
         result.push(vegetationEntity);
       }
     }
-    
+
     return result;
   }
 
@@ -232,12 +235,12 @@ export class VegetationSystem {
    */
   private subscribeToCollisions(): void {
     if (!this.physicsSystem) return;
-    
+
     this.collisionUnsubscribe = () => {
       // Collision listeners are stored in physicsSystem, we can't easily unsubscribe
       // This is a placeholder - in practice, physics system would need unsubscribe support
     };
-    
+
     // Subscribe to collision events
     this.physicsSystem.onCollision((event) => this.handleCollision(event));
   }
@@ -247,15 +250,15 @@ export class VegetationSystem {
    */
   private handleCollision(event: CollisionEvent): void {
     if (!this.config.enableCollisions) return;
-    
+
     // Check if either entity is vegetation
     const vegA = event.entityA.getComponent(VegetationComponent);
     const vegB = event.entityB.getComponent(VegetationComponent);
-    
+
     let vegetationEntity: Entity | null = null;
     let otherEntity: Entity | null = null;
     let vegetation: VegetationComponent | null = null;
-    
+
     if (vegA) {
       vegetationEntity = event.entityA;
       otherEntity = event.entityB;
@@ -265,11 +268,11 @@ export class VegetationSystem {
       otherEntity = event.entityA;
       vegetation = vegB;
     }
-    
+
     if (!vegetationEntity || !vegetation || !otherEntity) {
       return;
     }
-    
+
     // Check if other entity is dynamic (player, NPC, etc.)
     const otherPhysics = otherEntity.getComponent(PhysicsComponent);
     if (otherPhysics && otherPhysics.rigidbodyType === RigidbodyType.Dynamic) {
@@ -280,7 +283,7 @@ export class VegetationSystem {
         vegetation,
         contactPoint: event.contactPoint,
       } as VegetationCollisionEvent);
-      
+
       // Auto-harvest if enabled
       if (this.config.autoHarvestOnCollision && vegetation.config.canBeHarvested) {
         this.harvest(vegetationEntity, otherEntity);
@@ -293,22 +296,22 @@ export class VegetationSystem {
    */
   private updateHarvesting(_deltaTime: number): void {
     const completed: Entity[] = [];
-    
+
     for (const [entity, harvest] of this.harvestingEntities.entries()) {
       const vegetation = entity.getComponent(VegetationComponent);
       if (!vegetation) {
         completed.push(entity);
         continue;
       }
-      
+
       const harvestTime = vegetation.config.harvestTime ?? 0;
       const elapsed = this.currentTime - harvest.startTime;
-      
+
       if (elapsed >= harvestTime) {
         completed.push(entity);
       }
     }
-    
+
     // Complete harvesting for finished entities
     for (const entity of completed) {
       const harvest = this.harvestingEntities.get(entity);
@@ -327,19 +330,23 @@ export class VegetationSystem {
     if (!vegetation) {
       return;
     }
-    
+
     // Mark as harvested
     vegetation.harvest();
-    
+
     // Emit harvest event
     this.scene.events.emit('vegetation:harvest', {
       vegetationEntity,
       harvesterEntity,
       vegetation,
     } as HarvestEvent);
-    
+
     // Emit growth event if regrowth is enabled
-    if (vegetation.config.canRegrow && vegetation.config.regrowthTime && vegetation.config.regrowthTime > 0) {
+    if (
+      vegetation.config.canRegrow &&
+      vegetation.config.regrowthTime &&
+      vegetation.config.regrowthTime > 0
+    ) {
       this.scene.events.emit('vegetation:growth-start', {
         vegetationEntity,
         vegetation,
@@ -352,23 +359,27 @@ export class VegetationSystem {
    */
   private updateGrowth(deltaTime: number): void {
     const allVegetation = this.scene.queryEntities(VegetationComponent);
-    
+
     for (const entity of allVegetation) {
       const vegetation = entity.getComponent(VegetationComponent);
       if (!vegetation) {
         continue;
       }
-      
+
       // Skip if no regrowth configured
-      if (!vegetation.config.canRegrow || !vegetation.config.regrowthTime || vegetation.config.regrowthTime <= 0) {
+      if (
+        !vegetation.config.canRegrow ||
+        !vegetation.config.regrowthTime ||
+        vegetation.config.regrowthTime <= 0
+      ) {
         continue;
       }
-      
+
       // Only update if harvested or not fully grown
       if (vegetation.isHarvested || vegetation.growthStage < 1.0) {
         const oldStage = vegetation.growthStage;
         const changed = vegetation.updateGrowth(deltaTime);
-        
+
         if (changed) {
           // Emit growth progress event
           this.scene.events.emit('vegetation:growth-progress', {
@@ -377,7 +388,7 @@ export class VegetationSystem {
             growthStage: vegetation.growthStage,
             previousStage: oldStage,
           });
-          
+
           // Emit fully grown event when reaching full growth
           if (vegetation.growthStage >= 1.0 && oldStage < 1.0) {
             this.scene.events.emit('vegetation:growth-complete', {
@@ -390,4 +401,3 @@ export class VegetationSystem {
     }
   }
 }
-

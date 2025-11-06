@@ -1,13 +1,13 @@
 /**
  * Frame Ring Buffer
- * 
+ *
  * Per-frame allocator for uniform buffers and storage buffers.
  * Reuses memory across frames to avoid allocations in hot paths.
  */
 
 /**
  * Frame ring buffer for per-frame allocations.
- * 
+ *
  * Uses a ring buffer pattern to recycle memory across frames.
  * Each frame gets its own allocation that's reused after N frames.
  */
@@ -29,7 +29,7 @@ export class FrameRingBuffer {
 
   /**
    * Gets or creates a buffer for the current frame.
-   * 
+   *
    * @param size - Required buffer size in bytes
    * @param usage - Buffer usage flags
    * @returns Buffer for current frame
@@ -99,4 +99,3 @@ export class FrameRingBuffer {
     this.frameCount = 0;
   }
 }
-

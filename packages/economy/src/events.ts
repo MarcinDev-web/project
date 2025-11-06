@@ -114,4 +114,3 @@ export const CurrencyEventNames = {
   WALLET_CREATED: 'currency:wallet:created',
   WALLET_DISPOSED: 'currency:wallet:disposed',
 } as const;
-

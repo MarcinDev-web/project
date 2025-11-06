@@ -4,9 +4,18 @@
  */
 
 import type { Scene } from '../core/Scene.js';
-import { PhysicsSystem, type PhysicsConfig, type CollisionEvent, type TriggerEvent } from './PhysicsSystem.js';
+import {
+  PhysicsSystem,
+  type PhysicsConfig,
+  type CollisionEvent,
+  type TriggerEvent,
+} from './PhysicsSystem.js';
 import { Entity } from '../core/Entity.js';
-import { PhysicsComponent, RigidbodyType, type AnyCollider } from '../components/PhysicsComponent.js';
+import {
+  PhysicsComponent,
+  RigidbodyType,
+  type AnyCollider,
+} from '../components/PhysicsComponent.js';
 import { Logger } from '@engine/core/utils';
 import { JointComponent } from '../components/JointComponent.js';
 import type { Vec3 } from '@engine/core/math';
@@ -22,7 +31,12 @@ import {
   type BallSocketJointConfig,
   type SliderJointConfig,
 } from './Joint.js';
-import { PhysicsRaycast, type PhysicsRay, type RaycastHit, type RaycastOptions } from './PhysicsRaycast.js';
+import {
+  PhysicsRaycast,
+  type PhysicsRay,
+  type RaycastHit,
+  type RaycastOptions,
+} from './PhysicsRaycast.js';
 
 /**
  * PhysicsWorld manages physics simulation for a scene
@@ -621,20 +635,14 @@ export class PhysicsWorld {
    */
   private normalizeDirection(direction: Vec3): Vec3 {
     const length = Math.sqrt(
-      direction[0] * direction[0] +
-      direction[1] * direction[1] +
-      direction[2] * direction[2]
+      direction[0] * direction[0] + direction[1] * direction[1] + direction[2] * direction[2]
     );
 
     if (length < 1e-6) {
       return [0, 0, 1]; // Default direction
     }
 
-    return [
-      direction[0] / length,
-      direction[1] / length,
-      direction[2] / length,
-    ];
+    return [direction[0] / length, direction[1] / length, direction[2] / length];
   }
 
   // ========== Static Helper Methods ==========
@@ -701,7 +709,14 @@ export class PhysicsWorld {
 /**
  * Export main physics components and types
  */
-export { PhysicsComponent, PhysicsSystem, RigidbodyType, JointComponent, JointType, PhysicsRaycast };
+export {
+  PhysicsComponent,
+  PhysicsSystem,
+  RigidbodyType,
+  JointComponent,
+  JointType,
+  PhysicsRaycast,
+};
 export type {
   PhysicsConfig,
   CollisionEvent,
@@ -719,4 +734,3 @@ export type {
   RaycastHit,
   RaycastOptions,
 };
-

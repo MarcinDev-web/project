@@ -73,7 +73,7 @@ export class TerrainComponent extends Component {
 
   clone(): TerrainComponent {
     const clone = new TerrainComponent();
-    
+
     // Deep clone heightmap data
     if (this.terrainData.heightmap) {
       const heightmap: HeightmapTerrainData = {
@@ -193,9 +193,10 @@ export class TerrainComponent extends Component {
     if (data.heightmap) {
       this.terrainData.heightmap = {
         ...data.heightmap,
-        heights: data.heightmap.heights instanceof Float32Array 
-          ? data.heightmap.heights 
-          : new Float32Array(data.heightmap.heights),
+        heights:
+          data.heightmap.heights instanceof Float32Array
+            ? data.heightmap.heights
+            : new Float32Array(data.heightmap.heights),
       };
     }
 
@@ -217,7 +218,7 @@ export class TerrainComponent extends Component {
           scale: layer.scale,
         };
         if (layer.blendFactor) {
-          deserializedLayer.blendFactor = Array.isArray(layer.blendFactor) 
+          deserializedLayer.blendFactor = Array.isArray(layer.blendFactor)
             ? new Float32Array(layer.blendFactor)
             : layer.blendFactor;
         }
@@ -232,4 +233,3 @@ export class TerrainComponent extends Component {
 }
 
 registerComponent(TerrainComponent.type, TerrainComponent);
-

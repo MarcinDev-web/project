@@ -1,6 +1,6 @@
 # Alias Configuration Guide
 
-This document describes where and why path aliases (`@engine/*`) are configured in the FORGE Engine monorepo.
+This document describes where and why path aliases (`@engine/*`) are configured in the Forge Engine monorepo.
 
 ## Overview
 

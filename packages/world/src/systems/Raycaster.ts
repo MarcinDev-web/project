@@ -71,10 +71,10 @@ export interface MeshBounds {
 
 /**
  * Raycaster for mouse picking and intersection tests.
- * 
+ *
  * This is an instance-based class (not static) for better performance and memory management.
  * Use object pooling for rays to reduce allocations in hot code paths.
- * 
+ *
  * @example
  * ```ts
  * const raycaster = new Raycaster();
@@ -86,10 +86,10 @@ export interface MeshBounds {
 export class Raycaster {
   /** Scratch buffer for matrix inversions - reused to avoid allocations */
   private readonly scratchMat: Mat4;
-  
+
   /** Ray object pool - reuse rays to reduce GC pressure */
   private readonly rayPool: Ray[] = [];
-  
+
   /**
    * Creates a new Raycaster instance.
    */
@@ -99,7 +99,7 @@ export class Raycaster {
   /**
    * Creates a ray from screen coordinates through the camera.
    * Uses object pooling to reduce allocations.
-   * 
+   *
    * @param x - Screen X coordinate (0 to canvas.width)
    * @param y - Screen Y coordinate (0 to canvas.height)
    * @param canvasWidth - Canvas width in pixels
@@ -144,7 +144,7 @@ export class Raycaster {
     const wy = worldRay[1] ?? 0;
     const wz = worldRay[2] ?? 0;
     const len = Math.hypot(wx, wy, wz) || 1;
-    
+
     // Populate ray
     ray.origin[0] = invView[12] ?? 0;
     ray.origin[1] = invView[13] ?? 0;
@@ -159,7 +159,7 @@ export class Raycaster {
   /**
    * Returns a ray to the pool for reuse.
    * Call this when you're done with a ray to reduce allocations.
-   * 
+   *
    * @param ray - Ray to recycle
    */
   recycleRay(ray: Ray): void {
@@ -364,7 +364,11 @@ export class Raycaster {
    * @param radius - Sphere radius
    * @returns Distance to intersection or null if no intersection
    */
-  private intersectSphere(ray: Ray, center: [number, number, number], radius: number): number | null {
+  private intersectSphere(
+    ray: Ray,
+    center: [number, number, number],
+    radius: number
+  ): number | null {
     // Vector from ray origin to sphere center
     const ocX = center[0] - ray.origin[0];
     const ocY = center[1] - ray.origin[1];
@@ -411,54 +415,48 @@ export class Raycaster {
   private intersectOBB(ray: Ray, obb: OBB): number | null {
     // For simplicity, we transform the ray to OBB local space
     // and then treat it as an AABB test
-    
+
     // Extract rotation quaternion
     const [qx, qy, qz, qw] = obb.rotation;
-    
+
     // Compute inverse rotation (conjugate for unit quaternion)
     const invQx = -qx;
     const invQy = -qy;
     const invQz = -qz;
     const invQw = qw;
-    
+
     // Transform ray origin to OBB local space
     // First, translate to OBB center
     const localOriginX = ray.origin[0] - obb.center[0];
     const localOriginY = ray.origin[1] - obb.center[1];
     const localOriginZ = ray.origin[2] - obb.center[2];
-    
+
     // Then rotate by inverse quaternion
     const rotatedOrigin = this.rotateVectorByQuaternion(
       [localOriginX, localOriginY, localOriginZ],
       [invQx, invQy, invQz, invQw]
     );
-    
+
     // Transform ray direction to OBB local space (no translation needed)
-    const rotatedDirection = this.rotateVectorByQuaternion(
-      ray.direction,
-      [invQx, invQy, invQz, invQw]
-    );
-    
+    const rotatedDirection = this.rotateVectorByQuaternion(ray.direction, [
+      invQx,
+      invQy,
+      invQz,
+      invQw,
+    ]);
+
     // Create local space AABB
     const localAABB: AABB = {
-      min: [
-        -obb.halfExtents[0],
-        -obb.halfExtents[1],
-        -obb.halfExtents[2],
-      ],
-      max: [
-        obb.halfExtents[0],
-        obb.halfExtents[1],
-        obb.halfExtents[2],
-      ],
+      min: [-obb.halfExtents[0], -obb.halfExtents[1], -obb.halfExtents[2]],
+      max: [obb.halfExtents[0], obb.halfExtents[1], obb.halfExtents[2]],
     };
-    
+
     // Create local space ray
     const localRay: Ray = {
       origin: rotatedOrigin,
       direction: rotatedDirection,
     };
-    
+
     // Test against local AABB
     return this.intersectAABB(localRay, localAABB);
   }
@@ -475,15 +473,15 @@ export class Raycaster {
   ): [number, number, number] {
     const [qx, qy, qz, qw] = q;
     const [vx, vy, vz] = v;
-    
+
     // v' = q * v * q^-1
     // Optimized formula: v' = v + 2 * cross(q.xyz, cross(q.xyz, v) + q.w * v)
-    
+
     const ix = qw * vx + qy * vz - qz * vy;
     const iy = qw * vy + qz * vx - qx * vz;
     const iz = qw * vz + qx * vy - qy * vx;
     const iw = -qx * vx - qy * vy - qz * vz;
-    
+
     return [
       ix * qw + iw * -qx + iy * -qz - iz * -qy,
       iy * qw + iw * -qy + iz * -qx - ix * -qz,

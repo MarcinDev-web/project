@@ -92,12 +92,12 @@ function catmullRomVec3(
     const p1 = values[p1o + c]!;
     const p2 = values[p2o + c]!;
     const p3 = values[p3o + c]!;
-    out[c] = 0.5 * (
-      (2 * p1) +
-      (-p0 + p2) * t +
-      (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
-      (-p0 + 3 * p1 - 3 * p2 + p3) * t3
-    );
+    out[c] =
+      0.5 *
+      (2 * p1 +
+        (-p0 + p2) * t +
+        (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
+        (-p0 + 3 * p1 - 3 * p2 + p3) * t3);
   }
   return out;
 }
@@ -110,5 +110,3 @@ function readQuat(out: Quat, values: Float32Array, keyIndex: number): Quat {
   out[3] = values[o + 3]!;
   return out;
 }
-
-

@@ -1,6 +1,6 @@
 # E2E Tests for Editor
 
-This directory contains end-to-end tests for critical user paths in the FORGE Engine editor.
+This directory contains end-to-end tests for critical user paths in the Forge Engine editor.
 
 ## Setup
 

@@ -184,4 +184,3 @@ export class LogicCubeComponent extends Component {
 }
 
 registerComponent(LogicCubeComponent.type, LogicCubeComponent);
-

@@ -3,7 +3,9 @@ import { DurabilityComponent } from '../components/DurabilityComponent.js';
 
 export class DurabilitySystem {
   private readonly scene: Scene;
-  constructor(scene: Scene) { this.scene = scene; }
+  constructor(scene: Scene) {
+    this.scene = scene;
+  }
 
   update(): void {
     const entities = this.scene.queryEntities(DurabilityComponent);
@@ -15,5 +17,3 @@ export class DurabilitySystem {
     }
   }
 }
-
-

@@ -60,5 +60,3 @@ export interface TransferRequest {
   amount: number;
   description?: string;
 }
-
-

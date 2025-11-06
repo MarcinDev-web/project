@@ -5,6 +5,7 @@
   "main": "./dist/apps/net-server/src/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
+    "prebuild": "pnpm run db:generate",
     "build": "tsc",
     "start": "node dist/apps/net-server/src/server.js",
     "test": "vitest run",

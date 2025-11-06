@@ -111,7 +111,8 @@ export class AttachmentComponent extends Component {
         combined.damageMultiplier = (combined.damageMultiplier ?? 1.0) * mods.damageMultiplier;
       }
       if (mods.fireRateMultiplier !== undefined) {
-        combined.fireRateMultiplier = (combined.fireRateMultiplier ?? 1.0) * mods.fireRateMultiplier;
+        combined.fireRateMultiplier =
+          (combined.fireRateMultiplier ?? 1.0) * mods.fireRateMultiplier;
       }
       if (mods.rangeMultiplier !== undefined) {
         combined.rangeMultiplier = (combined.rangeMultiplier ?? 1.0) * mods.rangeMultiplier;
@@ -123,10 +124,12 @@ export class AttachmentComponent extends Component {
         combined.maxAmmoMultiplier = (combined.maxAmmoMultiplier ?? 1.0) * mods.maxAmmoMultiplier;
       }
       if (mods.reloadDurationMultiplier !== undefined) {
-        combined.reloadDurationMultiplier = (combined.reloadDurationMultiplier ?? 1.0) * mods.reloadDurationMultiplier;
+        combined.reloadDurationMultiplier =
+          (combined.reloadDurationMultiplier ?? 1.0) * mods.reloadDurationMultiplier;
       }
       if (mods.projectileSpeedMultiplier !== undefined) {
-        combined.projectileSpeedMultiplier = (combined.projectileSpeedMultiplier ?? 1.0) * mods.projectileSpeedMultiplier;
+        combined.projectileSpeedMultiplier =
+          (combined.projectileSpeedMultiplier ?? 1.0) * mods.projectileSpeedMultiplier;
       }
 
       // Additives: sum together
@@ -183,9 +186,7 @@ export class AttachmentComponent extends Component {
     return { attachments };
   }
 
-  fromJSON(data: {
-    attachments?: Array<{ type: AttachmentType; id: string }>;
-  }): void {
+  fromJSON(data: { attachments?: Array<{ type: AttachmentType; id: string }> }): void {
     this.attachments.clear();
     if (data.attachments) {
       // Note: This requires attachment definitions to be loaded elsewhere

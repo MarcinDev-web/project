@@ -1,23 +1,31 @@
-import type { TransportServer, ClientConnection } from './TransportServer.js';
-import type { TransportKind, WebRTCSignalingMessage, WebRTCOffer } from '@engine/net-protocol';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { IncomingMessage } from 'http';
 import { randomUUID } from 'crypto';
+import {
+  createTransportLogger,
+  type ClientConnection,
+  type TransportLogger,
+  type TransportServer,
+} from './TransportServer.js';
+import type { TransportKind, WebRTCSignalingMessage, WebRTCOffer } from '@engine/net-protocol';
 
-// Import wrtc for Node.js WebRTC support
+type WrtcModule = {
+  RTCPeerConnection: typeof RTCPeerConnection;
+  RTCSessionDescription: typeof RTCSessionDescription;
+  RTCIceCandidate: typeof RTCIceCandidate;
+};
+
 let RTCPeerConnectionImpl: typeof RTCPeerConnection;
 let RTCSessionDescriptionImpl: typeof RTCSessionDescription;
 let RTCIceCandidateImpl: typeof RTCIceCandidate;
 
 try {
-  // Try to load wrtc package
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const wrtc = require('wrtc');
+  const wrtc = require('wrtc') as WrtcModule;
   RTCPeerConnectionImpl = wrtc.RTCPeerConnection;
   RTCSessionDescriptionImpl = wrtc.RTCSessionDescription;
   RTCIceCandidateImpl = wrtc.RTCIceCandidate;
 } catch {
-  // Fallback to browser globals if available (for testing in browser context)
   if (typeof RTCPeerConnection !== 'undefined') {
     RTCPeerConnectionImpl = RTCPeerConnection;
     RTCSessionDescriptionImpl = RTCSessionDescription;
@@ -32,6 +40,7 @@ try {
 export interface WebRTCTransportServerOptions {
   signalingPort: number;
   iceServers?: RTCIceServer[];
+  logger?: TransportLogger;
 }
 
 interface PeerState {
@@ -45,25 +54,32 @@ export class WebRTCTransportServer implements TransportServer {
   private wss: WebSocketServer | null = null;
   private readonly peers = new Map<string, PeerState>();
   private readonly signalingSockets = new Map<string, WebSocket>();
-  private readonly defaultIceServers: RTCIceServer[] = [
-    { urls: 'stun:stun.l.google.com:19302' },
-  ];
+  private readonly defaultIceServers: RTCIceServer[] = [{ urls: 'stun:stun.l.google.com:19302' }];
+  private readonly logger: ReturnType<typeof createTransportLogger>;
 
-  constructor(private readonly options: WebRTCTransportServerOptions) {}
+  constructor(private readonly options: WebRTCTransportServerOptions) {
+    this.logger = createTransportLogger(options.logger);
+  }
 
-  async start(): Promise<void> {
+  start(): Promise<void> {
+    if (this.wss) {
+      return Promise.resolve();
+    }
+
     this.wss = new WebSocketServer({ port: this.options.signalingPort });
-    
+
     this.wss.on('connection', (ws: WebSocket, req: IncomingMessage) => {
       const clientId = this.extractClientId(req.url ?? '') || randomUUID();
       this.signalingSockets.set(clientId, ws);
 
-      ws.on('message', async (data: Buffer) => {
+      ws.on('message', (data: Buffer) => {
         try {
           const msg = JSON.parse(data.toString()) as WebRTCSignalingMessage;
-          await this.handleSignaling(clientId, msg);
+          void this.handleSignaling(clientId, msg).catch((err) => {
+            this.logger.error('WebRTC signaling error:', err);
+          });
         } catch (err) {
-          console.error('WebRTC signaling error:', err);
+          this.logger.error('WebRTC signaling parse error:', err);
         }
       });
 
@@ -80,119 +96,15 @@ export class WebRTCTransportServer implements TransportServer {
       });
 
       ws.on('error', (err: Error) => {
-        console.error('WebSocket error for client', clientId, err);
+        this.logger.error('WebSocket error for client', clientId, err);
       });
     });
 
-    console.log(`WebRTC signaling server listening on port ${this.options.signalingPort}`);
+    this.logger.info(`WebRTC signaling server listening on port ${this.options.signalingPort}`);
+    return Promise.resolve();
   }
 
-  private extractClientId(url: string): string | null {
-    const match = url.match(/[?&]clientId=([^&]+)/);
-    return match?.[1] ?? null;
-  }
-
-  private async handleSignaling(clientId: string, msg: WebRTCSignalingMessage): Promise<void> {
-    switch (msg.type) {
-      case 'webrtc:offer': {
-        await this.handleOffer(clientId, msg as WebRTCOffer);
-        break;
-      }
-      case 'webrtc:ice': {
-        const peer = this.peers.get(clientId);
-        if (peer && msg.candidate) {
-          try {
-            await peer.pc.addIceCandidate(new RTCIceCandidateImpl(msg.candidate));
-          } catch (err) {
-            console.error('Error adding ICE candidate:', err);
-          }
-        }
-        break;
-      }
-    }
-  }
-
-  private async handleOffer(clientId: string, offer: WebRTCOffer): Promise<void> {
-    const iceServers = this.options.iceServers || this.defaultIceServers;
-    const pc = new RTCPeerConnectionImpl({ iceServers });
-
-    const peerState: PeerState = {
-      pc,
-      dataChannels: new Map(),
-      clientId,
-    };
-
-    this.peers.set(clientId, peerState);
-
-    // Handle incoming data channels (client creates them)
-    pc.ondatachannel = (event) => {
-      const dc = event.channel;
-      const channelLabel = dc.label || 'default';
-      
-      peerState.dataChannels.set(channelLabel, dc);
-
-      dc.onopen = () => {
-        console.log(`Data channel "${channelLabel}" opened for client ${clientId}`);
-      };
-
-      dc.onerror = (err) => {
-        console.error(`Data channel "${channelLabel}" error for client ${clientId}:`, err);
-      };
-
-      dc.onclose = () => {
-        console.log(`Data channel "${channelLabel}" closed for client ${clientId}`);
-        peerState.dataChannels.delete(channelLabel);
-      };
-
-      dc.onmessage = (_event: MessageEvent<ArrayBuffer>) => {
-        // Messages handled by connection handler
-        console.debug(`Data channel "${channelLabel}" message from client ${clientId}`);
-      };
-    };
-
-    // Handle ICE candidates
-    pc.onicecandidate = (event) => {
-      const ws = this.signalingSockets.get(clientId);
-      if (event.candidate && ws && ws.readyState === WebSocket.OPEN) {
-        ws.send(JSON.stringify({
-          type: 'webrtc:ice',
-          candidate: event.candidate.toJSON(),
-          clientId,
-        }));
-      }
-    };
-
-    pc.onconnectionstatechange = () => {
-      console.log(`Client ${clientId} connection state: ${pc.connectionState}`);
-      if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
-        this.peers.delete(clientId);
-      }
-    };
-
-    try {
-      await pc.setRemoteDescription(new RTCSessionDescriptionImpl(offer.offer));
-      const answer = await pc.createAnswer();
-      await pc.setLocalDescription(answer);
-
-      const ws = this.signalingSockets.get(clientId);
-      if (ws && ws.readyState === WebSocket.OPEN) {
-        const localDesc = pc.localDescription?.toJSON();
-        if (localDesc) {
-          ws.send(JSON.stringify({
-            type: 'webrtc:answer',
-            answer: localDesc,
-            clientId,
-          }));
-        }
-      }
-    } catch (err) {
-      console.error('Error handling offer:', err);
-      pc.close();
-      this.peers.delete(clientId);
-    }
-  }
-
-  async stop(): Promise<void> {
+  stop(): Promise<void> {
     if (this.wss) {
       this.wss.close();
       this.wss = null;
@@ -205,6 +117,7 @@ export class WebRTCTransportServer implements TransportServer {
     }
     this.peers.clear();
     this.signalingSockets.clear();
+    return Promise.resolve();
   }
 
   getConnection(clientId: string, channelLabel = 'default'): ClientConnection | null {
@@ -220,12 +133,10 @@ export class WebRTCTransportServer implements TransportServer {
       send: (bytes: Uint8Array) => {
         if (dc.readyState === 'open') {
           try {
-            // RTCDataChannel.send accepts ArrayBufferView (which includes Uint8Array)
-            // Create a copy to avoid SharedArrayBuffer issues
             const buffer = new Uint8Array(bytes);
             dc.send(buffer);
           } catch (err) {
-            console.error('Error sending on data channel:', err);
+            this.logger.error('Error sending on data channel:', err);
           }
         }
       },
@@ -244,7 +155,6 @@ export class WebRTCTransportServer implements TransportServer {
     const peer = this.peers.get(clientId);
     if (!peer) return null;
 
-    // Return first open data channel
     for (const dc of peer.dataChannels.values()) {
       if (dc.readyState === 'open') {
         return this.getConnection(clientId, dc.label);
@@ -252,5 +162,107 @@ export class WebRTCTransportServer implements TransportServer {
     }
 
     return null;
+  }
+
+  private extractClientId(url: string): string | null {
+    const match = url.match(/[?&]clientId=([^&]+)/);
+    return match?.[1] ?? null;
+  }
+
+  private async handleSignaling(clientId: string, msg: WebRTCSignalingMessage): Promise<void> {
+    if (msg.type === 'webrtc:offer') {
+      await this.handleOffer(clientId, msg);
+      return;
+    }
+
+    if (msg.type === 'webrtc:ice') {
+      const peer = this.peers.get(clientId);
+      if (peer && msg.candidate) {
+        try {
+          await peer.pc.addIceCandidate(new RTCIceCandidateImpl(msg.candidate));
+        } catch (err) {
+          this.logger.error('Error adding ICE candidate:', err);
+        }
+      }
+    }
+  }
+
+  private async handleOffer(clientId: string, offer: WebRTCOffer): Promise<void> {
+    const iceServers = this.options.iceServers ?? this.defaultIceServers;
+    const pc = new RTCPeerConnectionImpl({ iceServers });
+
+    const peerState: PeerState = {
+      pc,
+      dataChannels: new Map(),
+      clientId,
+    };
+
+    this.peers.set(clientId, peerState);
+
+    pc.ondatachannel = (event) => {
+      const dc = event.channel;
+      const channelLabel = dc.label || 'default';
+
+      peerState.dataChannels.set(channelLabel, dc);
+
+      dc.onopen = () => {
+        this.logger.debug(`Data channel "${channelLabel}" opened for client ${clientId}`);
+      };
+
+      dc.onerror = (err) => {
+        this.logger.error(`Data channel "${channelLabel}" error for client ${clientId}:`, err);
+      };
+
+      dc.onclose = () => {
+        this.logger.debug(`Data channel "${channelLabel}" closed for client ${clientId}`);
+        peerState.dataChannels.delete(channelLabel);
+      };
+
+      dc.onmessage = () => {
+        this.logger.debug(`Data channel "${channelLabel}" message from client ${clientId}`);
+      };
+    };
+
+    pc.onicecandidate = (event) => {
+      const ws = this.signalingSockets.get(clientId);
+      if (event.candidate && ws && ws.readyState === WebSocket.OPEN) {
+        const payload = {
+          type: 'webrtc:ice',
+          candidate: event.candidate.toJSON(),
+          clientId,
+        };
+        ws.send(JSON.stringify(payload));
+      }
+    };
+
+    pc.onconnectionstatechange = () => {
+      this.logger.debug(`Client ${clientId} connection state: ${pc.connectionState}`);
+      if (pc.connectionState === 'failed' || pc.connectionState === 'closed') {
+        this.peers.delete(clientId);
+      }
+    };
+
+    try {
+      await pc.setRemoteDescription(new RTCSessionDescriptionImpl(offer.offer));
+      const answer = await pc.createAnswer();
+      await pc.setLocalDescription(answer);
+
+      const ws = this.signalingSockets.get(clientId);
+      if (ws && ws.readyState === WebSocket.OPEN) {
+        const localDesc = pc.localDescription?.toJSON();
+        if (localDesc) {
+          const payload = {
+            type: 'webrtc:answer',
+            answer: localDesc,
+            clientId,
+          };
+          ws.send(JSON.stringify(payload));
+        }
+      }
+    } catch (err) {
+      this.logger.error('Error handling offer:', err);
+      pc.close();
+      this.peers.delete(clientId);
+    }
   }
 }

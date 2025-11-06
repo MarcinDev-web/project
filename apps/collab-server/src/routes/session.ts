@@ -1,4 +1,5 @@
 import type { FastifyInstance } from 'fastify';
+import type { PrismaClient, Prisma } from '@prisma/client';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { verifyJwtFromRequest } from './auth.js';
@@ -15,7 +16,7 @@ const saveSchema = z.object({
   payload: z.any(),
 });
 
-export function registerSessionRoutes(app: FastifyInstance, prisma: any): void {
+export function registerSessionRoutes(app: FastifyInstance, prisma: PrismaClient): void {
   app.post('/session', async (req, reply) => {
     const auth = verifyJwtFromRequest(req);
     if (!auth) return reply.status(401).send({ error: 'Unauthorized' });
@@ -24,7 +25,7 @@ export function registerSessionRoutes(app: FastifyInstance, prisma: any): void {
       const sessionId = body.sessionId ?? randomUUID();
 
       // Create session and ensure membership in transaction
-      await prisma.$transaction(async (tx: any) => {
+      await prisma.$transaction(async (tx: Prisma.TransactionClient) => {
         await tx.session.upsert({
           where: { id: sessionId },
           update: {},
@@ -91,12 +92,11 @@ export function registerSessionRoutes(app: FastifyInstance, prisma: any): void {
     }
   });
 
-  app.get('/load', async (req, reply) => {
+  app.get<{ Querystring: { projectId?: string } }>('/load', async (req, reply) => {
     const auth = verifyJwtFromRequest(req);
     if (!auth) return reply.status(401).send({ error: 'Unauthorized' });
     try {
-      const q = req.query as { projectId?: string };
-      const projectId = q.projectId ?? '';
+      const projectId = req.query.projectId ?? '';
       if (!projectId) return reply.status(400).send({ error: 'projectId required' });
 
       const snapshot = await prisma.sceneSnapshot.findFirst({

@@ -237,12 +237,15 @@ export class CurrencyManager implements IDisposable {
 
   private setupEventHandlers(): void {
     // Subscribe to transaction events and add to history
-    const unsubscribeCompleted = this.events.on(CurrencyEventNames.TRANSACTION_COMPLETED, (data) => {
-      if (data && typeof data === 'object' && 'transaction' in data) {
-        const event = data as { transaction: Transaction };
-        this.history.add(event.transaction);
+    const unsubscribeCompleted = this.events.on(
+      CurrencyEventNames.TRANSACTION_COMPLETED,
+      (data) => {
+        if (data && typeof data === 'object' && 'transaction' in data) {
+          const event = data as { transaction: Transaction };
+          this.history.add(event.transaction);
+        }
       }
-    });
+    );
 
     const unsubscribeFailed = this.events.on(CurrencyEventNames.TRANSACTION_FAILED, (data) => {
       if (data && typeof data === 'object' && 'transaction' in data) {
@@ -255,4 +258,3 @@ export class CurrencyManager implements IDisposable {
     this.disposables.add(unsubscribeFailed);
   }
 }
-

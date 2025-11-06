@@ -6,7 +6,7 @@ import type {
   GetWalletResponse,
   ListLedgerResponse,
   TransferRequest,
-} from './types.js';
+} from './types';
 
 export interface EconomyApiClientOptions {
   baseUrl?: string; // e.g. '/api'
@@ -38,7 +38,7 @@ export class EconomyApiClient {
       credentials: 'include',
     });
     if (!res.ok) throw new Error(`Wallet request failed: ${res.status}`);
-    return res.json();
+    return (await res.json()) as GetWalletResponse;
   }
 
   async checkout(items: CartItem[]): Promise<CheckoutResponse> {
@@ -50,13 +50,13 @@ export class EconomyApiClient {
       body: JSON.stringify(body),
     });
     if (!res.ok) throw new Error(`Checkout failed: ${res.status}`);
-    return res.json();
+    return (await res.json()) as CheckoutResponse;
   }
 
   // The following endpoints are part of the economy ledger API implemented server-side.
   // If the server doesn't expose them yet, these methods will fail with 404 until implemented.
 
-  async deposit(req: DepositWithdrawRequest): Promise<{ success: true }>{
+  async deposit(req: DepositWithdrawRequest): Promise<{ success: true }> {
     const res = await fetch(`${this.baseUrl}/economy/deposit`, {
       method: 'POST',
       headers: this.headers(),
@@ -64,10 +64,10 @@ export class EconomyApiClient {
       body: JSON.stringify(req),
     });
     if (!res.ok) throw new Error(`Deposit failed: ${res.status}`);
-    return res.json();
+    return (await res.json()) as { success: true };
   }
 
-  async withdraw(req: DepositWithdrawRequest): Promise<{ success: true }>{
+  async withdraw(req: DepositWithdrawRequest): Promise<{ success: true }> {
     const res = await fetch(`${this.baseUrl}/economy/withdraw`, {
       method: 'POST',
       headers: this.headers(),
@@ -75,10 +75,10 @@ export class EconomyApiClient {
       body: JSON.stringify(req),
     });
     if (!res.ok) throw new Error(`Withdraw failed: ${res.status}`);
-    return res.json();
+    return (await res.json()) as { success: true };
   }
 
-  async transfer(req: TransferRequest): Promise<{ success: true }>{
+  async transfer(req: TransferRequest): Promise<{ success: true }> {
     const res = await fetch(`${this.baseUrl}/economy/transfer`, {
       method: 'POST',
       headers: this.headers(),
@@ -86,7 +86,7 @@ export class EconomyApiClient {
       body: JSON.stringify(req),
     });
     if (!res.ok) throw new Error(`Transfer failed: ${res.status}`);
-    return res.json();
+    return (await res.json()) as { success: true };
   }
 
   async listLedger(limit = 100): Promise<ListLedgerResponse> {
@@ -98,8 +98,6 @@ export class EconomyApiClient {
       credentials: 'include',
     });
     if (!res.ok) throw new Error(`Ledger list failed: ${res.status}`);
-    return res.json();
+    return (await res.json()) as ListLedgerResponse;
   }
 }
-
-

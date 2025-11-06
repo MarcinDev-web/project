@@ -68,7 +68,7 @@ export class ParkourSystem {
       const direction = normalizeVec3([...launchPad.direction] as Vec3);
       const force = scaleVec3(direction, launchPad.force);
       // Apply velocity boost (add to existing velocity)
-      controller.velocity = addVec3(controller.velocity, force) as Vec3;
+      controller.velocity = addVec3(controller.velocity, force);
     }
 
     // Record activation
@@ -112,7 +112,7 @@ export class ParkourSystem {
       if (speedZone.direction) {
         const direction = normalizeVec3([...speedZone.direction] as Vec3);
         const boost = scaleVec3(direction, speedZone.boostForce);
-        controller.velocity = addVec3(controller.velocity, boost) as Vec3;
+        controller.velocity = addVec3(controller.velocity, boost);
       }
     }
   }
@@ -141,4 +141,3 @@ export class ParkourSystem {
     this.activeLaunchPads.clear();
   }
 }
-

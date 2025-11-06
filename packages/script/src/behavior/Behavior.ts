@@ -10,6 +10,7 @@ import {
 } from '../coroutine/CoroutineScheduler.js';
 import type { PhysicsWorld } from '@engine/world';
 import type { AnimationSystem } from '@engine/stdlib/Animation';
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Renderer = any; // Temp
 
 export interface BehaviorContext {
@@ -83,39 +84,38 @@ export class BehaviorInstance {
   }
 
   /** Called once after instance is created and attached to an entity. */
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
+
   onInit(): void {}
 
   /** Called every frame by ScriptSystem when enabled. */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-empty-function
+
   onUpdate(_deltaTime: number): void {}
 
   /** Called during the fixed timestep loop (typically physics). */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-empty-function
+
   onFixedUpdate(_fixedDeltaTime: number): void {}
 
   /** Called after all Update callbacks in the frame. */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-empty-function
+
   onLateUpdate(_deltaTime: number): void {}
 
   /** Called when a subscribed event is published on the EventBus. */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-empty-function
+
   onEvent(_type: string, _payload?: unknown, _sender?: Entity | null): void {}
 
   /** Async variant of onEvent, scheduled by coroutine/event dispatchers. */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-empty-function
-  // eslint-disable-next-line @typescript-eslint/require-await
+
   async onEventAsync(_type: string, _payload?: unknown, _sender?: Entity | null): Promise<void> {}
 
   /** Called before the instance is destroyed or detached. */
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
+
   onDestroy(): void {}
 
   /**
    * Hot-reload hook invoked when the behavior constructor is re-registered.
    * Existing instance prototype is updated; implement to migrate state.
    */
-  // eslint-disable-next-line @typescript-eslint/no-empty-function
+
   onHotReload(_previousConstructorName?: string): void {}
 
   private getScheduler(): CoroutineScheduler {
@@ -126,5 +126,3 @@ export class BehaviorInstance {
     return runtime.scheduler as CoroutineScheduler;
   }
 }
-
-

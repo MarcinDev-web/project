@@ -1,6 +1,6 @@
 /**
  * @engine/script - UGC Scripting System
- * 
+ *
  * LogicCubes, Behaviors, ScriptRuntime, Script Components
  */
 
@@ -13,4 +13,3 @@ export * from './connection/index.js';
 export { VariableStorage } from './storage/VariableStorage.js'; // Named to avoid VariableData conflict
 export * from './services/index.js';
 export * from './signals/index.js';
-

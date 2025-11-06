@@ -25,7 +25,8 @@ export class EconomySystem {
       const e = data as RewardEvent;
       if (!e?.amount) return;
       if (e.walletId) {
-        const wallet = this.currency.getWallet(e.walletId) ?? this.currency.createWallet(e.walletId);
+        const wallet =
+          this.currency.getWallet(e.walletId) ?? this.currency.createWallet(e.walletId);
         wallet.deposit(e.amount, e.reason ?? 'Reward');
         return;
       }
@@ -37,5 +38,3 @@ export class EconomySystem {
     });
   }
 }
-
-

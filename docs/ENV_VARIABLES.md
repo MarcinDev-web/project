@@ -9,6 +9,13 @@
 - **Gdzie ustawić:** Vercel Dashboard → Settings → Environment Variables → Production
 - **Zabezpieczenie:** Nie jest secretem, może być publiczny (to URL API)
 
+### 2. `VITE_WS_URL` ✅ **ZALECANE W PRODUKCJI**
+- **Opis:** Absolutny URL do WebSocket endpointu backendu
+- **Format:** `wss://<your-backend-domain>/ws`
+- **Przykład:** `wss://net-server-production.up.railway.app/ws`
+- **Uwagi:** Jeśli nie ustawisz, frontend spróbuje wyliczyć adres na podstawie `VITE_API_URL` (zamiana `/api` → `/ws` i `http(s)` → `ws(s)`).
+- **Gdzie ustawić:** Vercel Dashboard → Settings → Environment Variables → Production
+
 ---
 
 ## 🔒 Backend (net-server) - Wymagane Zmienne
@@ -40,9 +47,9 @@
 - **Zabezpieczenie:** 🔴 **SECRET**
 
 ### 3. `FRONTEND_URL` ⚠️ **WYMAGANE W PRODUKCJI**
-- **Opis:** URL frontendu (używane do CORS)
-- **Przykład:** `https://your-app.vercel.app` lub `https://your-app.vercel.app,https://your-custom-domain.com`
-- **Format:** Może być wiele URLi oddzielonych przecinkami
+- **Opis:** Główny URL frontendu (używany do CORS oraz generowania linków share)
+- **Przykład:** `https://your-app.vercel.app` lub `https://your-app.vercel.app,https://studio.your-domain.com`
+- **Format:** Może być wiele URL-i oddzielonych przecinkami – **pierwszy wpis traktowany jest jako domena kanoniczna** (używana np. w udostępnianiu projektów)
 - **Zabezpieczenie:** Może być publiczny (to URL frontendu)
 
 ### 4. `NODE_ENV` ⚠️ **WYMAGANE**
@@ -62,36 +69,45 @@
 
 ## 📋 Backend - Opcjonalne Zmienne (z wartościami domyślnymi)
 
-### 6. `PORT`
+### 6. `CORS_ALLOWED_ORIGINS`
+- **Domyślna:** Brak (używane są tylko wartości z `FRONTEND_URL` lub domyślne localhosty w dev)
+- **Opis:** Dodatkowe dozwolone originy do CORS (np. preview Vercel, dodatkowe aplikacje)
+- **Format:** Lista rozdzielana przecinkami. Obsługiwane są wildcardy domenowe, np. `https://*.vercel.app`
+
+### 7. `PRIMARY_FRONTEND_URL`
+- **Domyślna:** Pierwszy wpis z `FRONTEND_URL`
+- **Opis:** Wymusza kanoniczny URL używany w linkach udostępniania, jeżeli `FRONTEND_URL` zawiera wiele wpisów lub wildcardy
+
+### 8. `PORT`
 - **Domyślna:** `3000`
 - **Opis:** Port na którym działa HTTP server
 
-### 7. `WS_PORT`
+### 9. `WS_PORT`
 - **Domyślna:** `3001`
 - **Opis:** Port na którym działa WebSocket server
 
-### 8. `DATA_DIR`
+### 10. `DATA_DIR`
 - **Domyślna:** `./data`
 - **Opis:** Katalog dla danych JSON (jeśli nie używasz bazy)
 
-### 9. `AUTH_RATE_LIMIT_MAX`
+### 11. `AUTH_RATE_LIMIT_MAX`
 - **Domyślna:** `5`
 - **Opis:** Maksymalna liczba requestów auth na 15 minut
 - **Zalecana wartość:** `5` (zachowaj domyślną)
 
-### 10. `ECONOMY_RATE_LIMIT_MAX`
+### 12. `ECONOMY_RATE_LIMIT_MAX`
 - **Domyślna:** `20`
 - **Opis:** Maksymalna liczba requestów economy na minutę
 
-### 11. `BCRYPT_ROUNDS`
+### 13. `BCRYPT_ROUNDS`
 - **Domyślna:** `12`
 - **Opis:** Liczba rund hashowania bcrypt (większa = bezpieczniejsze, ale wolniejsze)
 
-### 12. `JWT_EXPIRES_IN`
+### 14. `JWT_EXPIRES_IN`
 - **Domyślna:** `15m`
 - **Opis:** Czas wygaśnięcia JWT tokena
 
-### 13. `JWT_REFRESH_EXPIRES_IN`
+### 15. `JWT_REFRESH_EXPIRES_IN`
 - **Domyślna:** `7d`
 - **Opis:** Czas wygaśnięcia refresh tokena
 
@@ -174,7 +190,8 @@
 
 - [ ] `JWT_SECRET` jest **minimum 32 znaki** i **nie jest wartością domyślną**
 - [ ] `JWT_REFRESH_SECRET` jest ustawiony (jeśli używasz osobnego)
-- [ ] `FRONTEND_URL` wskazuje na **dokładny URL** twojego frontendu (bez wildcardów `*`)
+- [ ] `FRONTEND_URL` wskazuje na **dokładny główny URL** twojego frontendu (bez wildcardów `*`)
+- [ ] `CORS_ALLOWED_ORIGINS` zawiera wszystkie dodatkowe domeny (preview, alternatywne aplikacje) wymagające dostępu
 - [ ] `DATABASE_URL` zawiera `sslmode=require` (dla PostgreSQL)
 - [ ] `NODE_ENV=production` jest ustawione
 - [ ] Wszystkie **secrets są w Environment Variables**, **NIE w kodzie**
@@ -224,7 +241,9 @@ Backend automatycznie waliduje konfigurację przy starcie. Sprawdź logi:
 **Rozwiązanie:** Wygeneruj nowy secret używając komend powyżej i ustaw go w env variables.
 
 ### Błąd: "CORS error" w przeglądarce
-**Rozwiązanie:** Upewnij się, że `FRONTEND_URL` w backendzie zawiera dokładny URL frontendu (z `https://`).
+**Rozwiązanie:**
+- Upewnij się, że `FRONTEND_URL` w backendzie zawiera dokładny główny URL frontendu (z `https://`)
+- Dodaj dodatkowe domeny (np. preview Vercel) do `CORS_ALLOWED_ORIGINS`
 
 ### Błąd: "405 Method Not Allowed" na `/auth/register` lub innych endpointach
 **Rozwiązanie:** 

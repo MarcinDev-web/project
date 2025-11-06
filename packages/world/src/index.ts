@@ -1,6 +1,6 @@
 /**
  * @engine/world - ECS Runtime
- * 
+ *
  * World, Scene, Components, Systems, Physics
  */
 
@@ -29,13 +29,34 @@ export { PhysicsComponent, RigidbodyType } from './components/PhysicsComponent.j
 export { WaterComponent } from './components/WaterComponent.js';
 export type { WaterComponentJSON } from './components/WaterComponent.js';
 export { SpawnPointComponent } from './components/SpawnPointComponent.js';
-export { CheckpointComponent, type CheckpointComponentJSON } from './components/CheckpointComponent.js';
-export { TimerGateComponent, type TimerGateComponentJSON } from './components/TimerGateComponent.js';
-export { LaunchPadComponent, type LaunchPadComponentJSON } from './components/LaunchPadComponent.js';
-export { BouncePadComponent, type BouncePadComponentJSON } from './components/BouncePadComponent.js';
-export { MovingPlatformComponent, type MovingPlatformComponentJSON } from './components/MovingPlatformComponent.js';
-export { HazardZoneComponent, type HazardZoneComponentJSON } from './components/HazardZoneComponent.js';
-export { SpeedZoneComponent, type SpeedZoneComponentJSON } from './components/SpeedZoneComponent.js';
+export {
+  CheckpointComponent,
+  type CheckpointComponentJSON,
+} from './components/CheckpointComponent.js';
+export {
+  TimerGateComponent,
+  type TimerGateComponentJSON,
+} from './components/TimerGateComponent.js';
+export {
+  LaunchPadComponent,
+  type LaunchPadComponentJSON,
+} from './components/LaunchPadComponent.js';
+export {
+  BouncePadComponent,
+  type BouncePadComponentJSON,
+} from './components/BouncePadComponent.js';
+export {
+  MovingPlatformComponent,
+  type MovingPlatformComponentJSON,
+} from './components/MovingPlatformComponent.js';
+export {
+  HazardZoneComponent,
+  type HazardZoneComponentJSON,
+} from './components/HazardZoneComponent.js';
+export {
+  SpeedZoneComponent,
+  type SpeedZoneComponentJSON,
+} from './components/SpeedZoneComponent.js';
 
 // Explicit exports for utility types
 export type { RgbaColor } from './utils/colors.js';
@@ -57,7 +78,11 @@ export type { BVHEntry } from './spatial/BVH';
 
 // Systems (selective to avoid duplicates)
 export { Raycaster, type Ray, type RaycastHit } from './systems/Raycaster.js';
-export { SelectionManager, getSelectionHighlight, type SelectionHighlight } from './systems/Selection.js';
+export {
+  SelectionManager,
+  getSelectionHighlight,
+  type SelectionHighlight,
+} from './systems/Selection.js';
 export { WeaponSystem } from './systems/WeaponSystem.js';
 export { InventorySystem } from './systems/InventorySystem.js';
 
@@ -73,4 +98,3 @@ export * from './physics/Joint.js';
 export * from './physics/Octree.js';
 export * from './physics/PhysicsRaycast.js';
 export * from './physics/inertia.js';
-

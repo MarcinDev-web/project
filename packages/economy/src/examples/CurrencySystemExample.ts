@@ -3,9 +3,9 @@
  * This demonstrates how to integrate the currency system with player entities.
  */
 
-import { CurrencyManager, CurrencyWallet, type CurrencyAmount } from '../index.js';
-import { CurrencyEventNames } from '../events.js';
-import type { CurrencyDepositedEvent, CurrencyTransferredEvent } from '../events.js';
+import { CurrencyManager, CurrencyWallet, type CurrencyAmount } from '../index';
+import { CurrencyEventNames } from '../events';
+import type { CurrencyDepositedEvent, CurrencyTransferredEvent } from '../events';
 
 /**
  * Example: Setting up currency system for a game world
@@ -23,7 +23,9 @@ export function setupGameCurrencySystem(): CurrencyManager {
   manager.events.on(CurrencyEventNames.DEPOSITED, (data) => {
     const event = data as CurrencyDepositedEvent;
     if (event) {
-      console.log(`[Currency] Player ${event.walletId} deposited ${event.amount.amount} ${event.amount.currency}`);
+      console.warn(
+        `[Currency] Player ${event.walletId} deposited ${event.amount.amount} ${event.amount.currency}`
+      );
       // Could trigger achievement unlocks, notifications, etc.
     }
   });
@@ -31,7 +33,7 @@ export function setupGameCurrencySystem(): CurrencyManager {
   manager.events.on(CurrencyEventNames.TRANSFERRED, (data) => {
     const event = data as CurrencyTransferredEvent;
     if (event) {
-      console.log(
+      console.warn(
         `[Currency] Transfer: ${event.fromWalletId} → ${event.toWalletId}: ${event.amount.amount} ${event.amount.currency}`
       );
       // Could trigger trading UI updates, notifications, etc.
@@ -77,7 +79,8 @@ export function purchaseItem(
     wallet.withdraw(itemCost, `Purchase: ${itemName}`);
     return true;
   } catch (error) {
-    console.warn(`[Purchase] Failed: ${error}`);
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[Purchase] Failed: ${message}`);
     return false;
   }
 }
@@ -95,7 +98,8 @@ export function tradeBetweenPlayers(
     fromWallet.transfer(toWallet, amount, tradeDescription);
     return true;
   } catch (error) {
-    console.warn(`[Trade] Failed: ${error}`);
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[Trade] Failed: ${message}`);
     return false;
   }
 }
@@ -111,10 +115,17 @@ export function exchangePlayerCurrency(
   exchangeRate: number
 ): boolean {
   try {
-    wallet.exchange(fromCurrency, toCurrency, fromAmount, exchangeRate, `Exchange ${fromCurrency} → ${toCurrency}`);
+    wallet.exchange(
+      fromCurrency,
+      toCurrency,
+      fromAmount,
+      exchangeRate,
+      `Exchange ${fromCurrency} → ${toCurrency}`
+    );
     return true;
   } catch (error) {
-    console.warn(`[Exchange] Failed: ${error}`);
+    const message = error instanceof Error ? error.message : String(error);
+    console.warn(`[Exchange] Failed: ${message}`);
     return false;
   }
 }
@@ -123,65 +134,78 @@ export function exchangePlayerCurrency(
  * Example: Complete game economy workflow
  */
 export function exampleGameEconomyWorkflow(): void {
-  console.log('=== Game Economy System Example ===\n');
+  console.warn('=== Game Economy System Example ===\n');
 
   // 1. Setup currency system
   const manager = setupGameCurrencySystem();
-  console.log('✓ Currency system initialized\n');
+  console.warn('✓ Currency system initialized\n');
 
   // 2. Create player wallets
-  const player1Wallet = setupPlayerWallet(manager, 'player1', new Map([
-    ['coins', 100],
-    ['gems', 10],
-  ]));
-  console.log(`✓ Player 1 wallet created: ${player1Wallet.balance('coins')} coins, ${player1Wallet.balance('gems')} gems\n`);
+  const player1Wallet = setupPlayerWallet(
+    manager,
+    'player1',
+    new Map([
+      ['coins', 100],
+      ['gems', 10],
+    ])
+  );
+  console.warn(
+    `✓ Player 1 wallet created: ${player1Wallet.balance('coins')} coins, ${player1Wallet.balance('gems')} gems\n`
+  );
 
-  const player2Wallet = setupPlayerWallet(manager, 'player2', new Map([
-    ['coins', 50],
-  ]));
-  console.log(`✓ Player 2 wallet created: ${player2Wallet.balance('coins')} coins\n`);
+  const player2Wallet = setupPlayerWallet(manager, 'player2', new Map([['coins', 50]]));
+  console.warn(`✓ Player 2 wallet created: ${player2Wallet.balance('coins')} coins\n`);
 
   // 3. Player 1 completes quest and gets reward
   givePlayerReward(player1Wallet, { currency: 'coins', amount: 50 }, 'Quest completion');
-  console.log(`✓ Player 1 balance after reward: ${player1Wallet.balance('coins')} coins\n`);
+  console.warn(`✓ Player 1 balance after reward: ${player1Wallet.balance('coins')} coins\n`);
 
   // 4. Player 1 purchases item
   const purchased = purchaseItem(player1Wallet, { currency: 'coins', amount: 75 }, 'Magic Sword');
-  console.log(`✓ Purchase ${purchased ? 'successful' : 'failed'}: ${player1Wallet.balance('coins')} coins remaining\n`);
+  console.warn(
+    `✓ Purchase ${purchased ? 'successful' : 'failed'}: ${player1Wallet.balance('coins')} coins remaining\n`
+  );
 
   // 5. Player 1 trades with Player 2
-  const traded = tradeBetweenPlayers(player1Wallet, player2Wallet, { currency: 'coins', amount: 25 }, 'Trade: Equipment');
-  console.log(`✓ Trade ${traded ? 'successful' : 'failed'}`);
-  console.log(`  Player 1: ${player1Wallet.balance('coins')} coins`);
-  console.log(`  Player 2: ${player2Wallet.balance('coins')} coins\n`);
+  const traded = tradeBetweenPlayers(
+    player1Wallet,
+    player2Wallet,
+    { currency: 'coins', amount: 25 },
+    'Trade: Equipment'
+  );
+  console.warn(`✓ Trade ${traded ? 'successful' : 'failed'}`);
+  console.warn(`  Player 1: ${player1Wallet.balance('coins')} coins`);
+  console.warn(`  Player 2: ${player2Wallet.balance('coins')} coins\n`);
 
   // 6. Player 2 exchanges coins for gems
   const exchanged = exchangePlayerCurrency(player2Wallet, 'coins', 'gems', 30, 0.1);
-  console.log(`✓ Exchange ${exchanged ? 'successful' : 'failed'}`);
-  console.log(`  Player 2: ${player2Wallet.balance('coins')} coins, ${player2Wallet.balance('gems')} gems\n`);
+  console.warn(`✓ Exchange ${exchanged ? 'successful' : 'failed'}`);
+  console.warn(
+    `  Player 2: ${player2Wallet.balance('coins')} coins, ${player2Wallet.balance('gems')} gems\n`
+  );
 
   // 7. View statistics
   const stats = manager.getStatistics();
-  console.log('=== Global Statistics ===');
-  console.log(`Total wallets: ${stats.totalWallets}`);
-  console.log(`Total transactions: ${stats.totalTransactions}`);
-  console.log('Total balances:');
+  console.warn('=== Global Statistics ===');
+  console.warn(`Total wallets: ${stats.totalWallets}`);
+  console.warn(`Total transactions: ${stats.totalTransactions}`);
+  console.warn('Total balances:');
   for (const [currency, total] of stats.totalBalances.entries()) {
-    console.log(`  ${currency}: ${total}`);
+    console.warn(`  ${currency}: ${total}`);
   }
-  console.log('');
+  console.warn('');
 
   // 8. View transaction history
   const history = manager.getHistory();
-  console.log('=== Recent Transactions ===');
+  console.warn('=== Recent Transactions ===');
   const recent = history.getRecent(5);
   for (const tx of recent) {
-    console.log(`[${tx.type}] ${tx.amount.amount} ${tx.amount.currency} - ${tx.description || 'No description'}`);
+    const description = tx.description ?? 'No description';
+    console.warn(`[${tx.type}] ${tx.amount.amount} ${tx.amount.currency} - ${description}`);
   }
-  console.log('');
+  console.warn('');
 
   // Cleanup
   manager.dispose();
-  console.log('✓ Currency system disposed\n');
+  console.warn('✓ Currency system disposed\n');
 }
-

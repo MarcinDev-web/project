@@ -1,11 +1,11 @@
 /**
- * BrandWatermark - FORGE Engine branding overlay
+ * BrandWatermark - Forge Engine branding overlay
  * 
  * Displays branding watermark in the editor (top-left corner):
  * - "FORGE ENGINE · DEV BUILD" in dev mode
  * - "FORGE ENGINE · XXX FPS" when FPS tracking is enabled
  * 
- * This ensures every screenshot, video, and demo carries the FORGE Engine identity.
+ * This ensures every screenshot, video, and demo carries the Forge Engine identity.
  */
 
 import { WATERMARKS } from '@engine/brand';

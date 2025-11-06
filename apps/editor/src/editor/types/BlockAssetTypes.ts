@@ -42,6 +42,18 @@ export interface AssetPreset {
     windStrength?: number;
     windFrequency?: number;
   };
+  /** NPC configuration (if this is an NPC asset) */
+  npcConfig?: {
+    unitType: 'soldier' | 'guard' | 'civilian' | 'custom';
+    faction: 'ally' | 'enemy' | 'neutral';
+    behavior: 'idle' | 'patrol' | 'shoot-player' | 'follow-player' | 'guard-position';
+    armyId?: string;
+    patrolWaypoints?: Array<[number, number, number]>;
+    patrolSpeed?: number;
+    guardPosition?: [number, number, number];
+    guardRadius?: number;
+    detectionRange?: number;
+  };
 }
 
 /**

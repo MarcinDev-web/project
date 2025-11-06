@@ -31,10 +31,11 @@ Projekt został przygotowany do deploy na Vercel. Aplikacja platformowa (`apps/p
    - Output Directory: `apps/platform/dist` *(już ustawione w vercel.json)*
    - Install Command: `pnpm install` *(już ustawione w vercel.json)*
 
-3. **Zmienne środowiskowe (jeśli potrzebne):**
+3. **Zmienne środowiskowe:**
    
-   Jeśli aplikacja wymaga połączenia z backend API, ustaw:
-   - `VITE_API_URL` - URL do backend API (domyślnie `/api`)
+   Jeśli aplikacja komunikuje się z backendem:
+   - `VITE_API_URL` - absolutny URL do backend API (musi kończyć się na `/api`)
+   - `VITE_WS_URL` - absolutny URL do WebSocket (`/ws`)
    
    W Vercel Dashboard: Settings → Environment Variables
 
@@ -68,12 +69,13 @@ Aplikacja używa WebSocket do real-time komunikacji. Upewnij się, że:
 - Sprawdź czy `pnpm install` działa lokalnie
 - Sprawdź logi build w Vercel Dashboard
 
-### API calls fail
-- Sprawdź czy backend API jest dostępny
-- Ustaw odpowiednie zmienne środowiskowe
+### API/WS calls fail
+- Sprawdź czy backend API/WS jest dostępny
+- Ustaw `VITE_API_URL` i `VITE_WS_URL`
 - Sprawdź CORS settings na backendzie
 
 ### WebSocket fails
-- Upewnij się, że backend WebSocket jest dostępny
+- Upewnij się, że backend WebSocket jest dostępny pod `/ws`
 - Sprawdź czy używasz wss:// (secure WebSocket) dla HTTPS
+- Jeśli używasz Railway, backend WS działa na tym samym porcie co HTTP
 

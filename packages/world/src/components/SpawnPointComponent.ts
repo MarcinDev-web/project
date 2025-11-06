@@ -8,7 +8,7 @@ export interface SpawnPointComponentJSON {
 
 /**
  * SpawnPointComponent marks an entity as a potential player spawn location.
- * 
+ *
  * Usage:
  * - Place entities with this component in the scene to define spawn points
  * - Mark one as `isDefault: true` to designate the primary spawn point
@@ -17,7 +17,7 @@ export interface SpawnPointComponentJSON {
 export class SpawnPointComponent extends Component {
   static readonly type = 'SpawnPoint';
 
-  /** 
+  /**
    * If true, this is the primary/default spawn point.
    * If multiple spawn points have isDefault=true, the first one found is used.
    */
@@ -58,4 +58,3 @@ export class SpawnPointComponent extends Component {
 }
 
 registerComponent(SpawnPointComponent.type, SpawnPointComponent);
-

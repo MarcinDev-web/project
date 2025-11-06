@@ -14,7 +14,7 @@ export interface MovementInput {
 
 /**
  * Unified interface for movement controllers
- * 
+ *
  * Provides a common API for different movement types:
  * - CharacterController (physics-based gameplay movement)
  * - EditorCameraController (free-fly editor navigation)
@@ -45,4 +45,3 @@ export interface MovementController {
    */
   getPosition(): Vec3;
 }
-

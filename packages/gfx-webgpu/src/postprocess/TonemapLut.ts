@@ -156,13 +156,32 @@ fn ACESFilm(x: vec3<f32>) -> vec3<f32> {
   render(
     encoder: GPUCommandEncoder,
     srcView: GPUTextureView,
-    bloomView: GPUTextureView,
+    bloomView: GPUTextureView | null,
     dstView: GPUTextureView,
     ssaoView?: GPUTextureView | null,
     opts?: { querySet?: GPUQuerySet; begin?: number; end?: number }
   ): void {
     if (!this.pipeline || !this.bindGroupLayout || !this.sampler || !this.lutTexture) return;
-    
+
+    // Create placeholder black texture for bloom if not provided (no bloom = black)
+    let placeholderBloom: GPUTexture | null = null;
+    if (!bloomView) {
+      placeholderBloom = this.device.createTexture({
+        label: 'tonemap-bloom-placeholder',
+        size: [1, 1, 1],
+        format: 'rgba16float',
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+      });
+      // Write black (no bloom = 0.0) in float16
+      const blackData = new Float32Array([0.0, 0.0, 0.0, 0.0]);
+      this.device.queue.writeTexture(
+        { texture: placeholderBloom },
+        blackData.buffer as ArrayBuffer,
+        { bytesPerRow: 16, rowsPerImage: 1 },
+        [1, 1, 1]
+      );
+    }
+
     // Create placeholder white texture for SSAO if not provided (no occlusion = white)
     let placeholderSSAO: GPUTexture | null = null;
     if (!ssaoView) {
@@ -181,7 +200,8 @@ fn ACESFilm(x: vec3<f32>) -> vec3<f32> {
         [1, 1, 1]
       );
     }
-    
+
+    const bloomToUse = bloomView ?? placeholderBloom!.createView();
     const ssaoToUse = ssaoView ?? placeholderSSAO!.createView();
     
     if (!this.cachedBindGroup || this.cachedSrcView !== srcView || this.cachedBloomView !== bloomView || this.cachedSSAOView !== ssaoView) {
@@ -192,7 +212,7 @@ fn ACESFilm(x: vec3<f32>) -> vec3<f32> {
           { binding: 0, resource: srcView },
           { binding: 1, resource: this.sampler },
           { binding: 2, resource: this.lutTexture.createView({ dimension: '3d' }) },
-          { binding: 3, resource: bloomView },
+          { binding: 3, resource: bloomToUse },
           { binding: 4, resource: ssaoToUse },
         ],
       });
@@ -220,6 +240,22 @@ fn ACESFilm(x: vec3<f32>) -> vec3<f32> {
     pass.setBindGroup(0, this.cachedBindGroup!);
     pass.draw(3, 1, 0, 0);
     pass.end();
+  }
+
+  dispose(): void {
+    try {
+      this.lutTexture?.destroy();
+    } catch {
+      // ignore
+    }
+    this.lutTexture = null;
+    this.pipeline = null;
+    this.bindGroupLayout = null;
+    this.sampler = null;
+    this.cachedBindGroup = null;
+    this.cachedSrcView = null;
+    this.cachedBloomView = null;
+    this.cachedSSAOView = null;
   }
 }
 

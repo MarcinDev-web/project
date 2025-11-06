@@ -1,6 +1,6 @@
 /**
  * Weapon System Helper Utilities
- * 
+ *
  * Easy-to-use functions for creators to set up and manage weapons, attachments, ammo, and inventory.
  */
 
@@ -8,7 +8,10 @@ import type { Entity } from '../core/Entity.js';
 import { WeaponComponent } from '../components/WeaponComponent.js';
 import { AttachmentComponent } from '../components/AttachmentComponent.js';
 import { AmmoComponent } from '../components/AmmoComponent.js';
-import { InventoryComponent, type InventoryComponentData } from '../components/InventoryComponent.js';
+import {
+  InventoryComponent,
+  type InventoryComponentData,
+} from '../components/InventoryComponent.js';
 import { createWeapon } from '../factories/WeaponFactory.js';
 import { getAttachment, getAllAttachments, getAttachmentsByType } from '../data/attachments.js';
 import { getAmmoType, getAllAmmoTypes } from '../data/ammo.js';
@@ -241,7 +244,7 @@ export function changeAmmoType(entity: Entity, ammoType: AmmoType): void {
 export function getEffectiveWeaponStats(entity: Entity) {
   const inventory = entity.getComponent(InventoryComponent);
   const weapon = inventory ? inventory.getActiveWeapon() : entity.getComponent(WeaponComponent);
-  
+
   if (!weapon) {
     return undefined;
   }
@@ -338,12 +341,26 @@ export const WeaponLoadouts = {
  * Quick setup for full inventory (PvP example)
  */
 export function setupPvPLoadout(entity: Entity) {
-  return setupInventory(entity, [
-    { preset: 'rifle', attachments: ['red_dot', 'vertical_grip'], ammoType: 'standard', weaponAmmo: 30 },
-    { preset: 'pistol', attachments: [], ammoType: 'standard', weaponAmmo: 12 },
-    { preset: 'sniper', attachments: ['sniper_scope'], ammoType: 'armor_piercing', weaponAmmo: 5 },
-  ], {
-    maxWeapons: 9,
-    switchDuration: 0.5,
-  });
+  return setupInventory(
+    entity,
+    [
+      {
+        preset: 'rifle',
+        attachments: ['red_dot', 'vertical_grip'],
+        ammoType: 'standard',
+        weaponAmmo: 30,
+      },
+      { preset: 'pistol', attachments: [], ammoType: 'standard', weaponAmmo: 12 },
+      {
+        preset: 'sniper',
+        attachments: ['sniper_scope'],
+        ammoType: 'armor_piercing',
+        weaponAmmo: 5,
+      },
+    ],
+    {
+      maxWeapons: 9,
+      switchDuration: 0.5,
+    }
+  );
 }

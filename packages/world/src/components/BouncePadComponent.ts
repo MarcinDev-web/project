@@ -57,4 +57,3 @@ export class BouncePadComponent extends Component {
 }
 
 registerComponent(BouncePadComponent.type, BouncePadComponent);
-

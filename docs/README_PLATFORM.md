@@ -1,4 +1,4 @@
-# FORGE Platform - Uruchomienie
+# Forge World Platform - Uruchomienie
 
 ## Struktura Projektu
 

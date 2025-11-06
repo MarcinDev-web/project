@@ -243,7 +243,7 @@ export class InventoryComponent extends Component {
   }): void {
     if (typeof data.maxWeapons === 'number') this.maxWeapons = data.maxWeapons;
     if (typeof data.switchDuration === 'number') this.switchDuration = data.switchDuration;
-    
+
     this.weapons = [];
     if (data.weapons) {
       for (const weaponData of data.weapons) {

@@ -1,3 +1,5 @@
+import { Logger } from '@engine/core/utils';
+
 export interface BloomConfig {
   /** Brightness threshold (1.0 = no bloom) */
   threshold?: number;
@@ -21,6 +23,9 @@ export class BloomPass {
   private format: GPUTextureFormat | null = null;
   private mipChain: GPUTexture[] = [];
   private mipViews: GPUTextureView[] = [];
+  private pendingDestroy: GPUTexture[] = [];
+  private previousFrameTempTextures: GPUTexture[] = []; // Temp textures from previous frame (safe to destroy)
+  private currentFrameTempTextures: GPUTexture[] = []; // Temp textures from current frame (will be destroyed next frame)
 
   private config: Required<BloomConfig> = {
     threshold: 1.0,
@@ -37,8 +42,7 @@ export class BloomPass {
    */
   setConfig(config: BloomConfig): void {
     this.config = { ...this.config, ...config };
-    this.mipChain = []; // Invalidate mip chain on config change
-    this.mipViews = [];
+    this.releaseMipChain();
   }
 
   /**
@@ -229,15 +233,7 @@ struct BlurParams {
     if (this.mipChain.length > 0) {
       const firstMip = this.mipChain[0];
       if (firstMip && (firstMip.width !== expectedFirstMipWidth || firstMip.height !== expectedFirstMipHeight)) {
-        for (const tex of this.mipChain) {
-          try {
-            tex?.destroy();
-          } catch {
-            // ignore
-          }
-        }
-        this.mipChain = [];
-        this.mipViews = [];
+        this.releaseMipChain();
       }
     }
 
@@ -459,6 +455,132 @@ struct BlurParams {
     
     // Update temp textures array on encoder with all textures (blur + upsample)
     (encoder as any).__bloomTempTextures = tempTextures;
+    
+    // Move current frame textures to previous (they'll be destroyed after submit)
+    // Store new textures as current (they'll be destroyed in next frame)
+    this.previousFrameTempTextures = this.currentFrameTempTextures;
+    this.currentFrameTempTextures = tempTextures;
+  }
+  
+  /**
+   * Flushes pending temp textures after encoder submit.
+   * Should be called after queue.submit() to ensure textures are safe to destroy.
+   */
+  flushTempTextures(queue: GPUQueue): void {
+    // Destroy textures from previous frame (they're safe now after submit)
+    const previousFrameTextures = this.previousFrameTempTextures;
+    if (previousFrameTextures.length > 0) {
+      // Clear immediately so we don't destroy them again
+      this.previousFrameTempTextures = [];
+      
+      const destroyTextures = () => {
+        for (const texture of previousFrameTextures) {
+          try {
+            texture.destroy();
+          } catch (err) {
+            Logger.warn('Failed to destroy bloom temp texture', err);
+          }
+        }
+      };
+      
+      // Wait for GPU work to complete before destroying
+      queue
+        .onSubmittedWorkDone()
+        .then(() => destroyTextures())
+        .catch((err) => {
+          Logger.warn('Failed to defer destroy bloom temp textures after GPU work', err);
+          // Fallback: destroy after delay
+          setTimeout(destroyTextures, 200);
+        });
+    }
+  }
+
+  dispose(): void {
+    try {
+      this.configBuffer?.destroy();
+    } catch {
+      // ignore
+    }
+    this.configBuffer = null;
+    this.releaseMipChain(true);
+    if (this.pendingDestroy.length > 0) {
+      const textures = this.pendingDestroy.splice(0);
+      for (const texture of textures) {
+        try {
+          texture.destroy();
+        } catch {
+          // ignore
+        }
+      }
+    }
+    // Destroy any pending temp textures immediately on dispose
+    const allTempTextures = [...this.previousFrameTempTextures, ...this.currentFrameTempTextures];
+    this.previousFrameTempTextures = [];
+    this.currentFrameTempTextures = [];
+    for (const texture of allTempTextures) {
+      try {
+        texture.destroy();
+      } catch {
+        // ignore
+      }
+    }
+    this.cachedBindGroups.clear();
+    this.brightPassPipeline = null;
+    this.blurPipeline = null;
+    this.upsamplePipeline = null;
+    this.brightPassLayout = null;
+    this.blurLayout = null;
+    this.upsampleLayout = null;
+    this.sampler = null;
+    this.format = null;
+  }
+
+  flushPendingDestroy(queue: GPUQueue): void {
+    if (this.pendingDestroy.length === 0) {
+      return;
+    }
+    const textures = this.pendingDestroy.splice(0);
+    const destroyTextures = () => {
+      for (const texture of textures) {
+        try {
+          texture.destroy();
+        } catch (err) {
+          Logger.warn('Failed to destroy bloom mip texture', err);
+        }
+      }
+    };
+    queue
+      .onSubmittedWorkDone()
+      .then(() => destroyTextures())
+      .catch((err) => {
+        Logger.warn('Failed to defer destroy bloom mip textures after GPU work', err);
+        setTimeout(destroyTextures, 200);
+      });
+  }
+
+  private releaseMipChain(forceImmediate = false): void {
+    if (this.mipChain.length === 0) {
+      this.mipViews = [];
+      return;
+    }
+    if (forceImmediate) {
+      for (const tex of this.mipChain) {
+        if (!tex) continue;
+        try {
+          tex.destroy();
+        } catch {
+          // ignore
+        }
+      }
+    } else {
+      for (const tex of this.mipChain) {
+        if (tex) {
+          this.pendingDestroy.push(tex);
+        }
+      }
+    }
+    this.mipChain = [];
+    this.mipViews = [];
   }
 }
 

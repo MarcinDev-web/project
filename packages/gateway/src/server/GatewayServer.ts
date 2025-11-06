@@ -1,5 +1,13 @@
 import express, { type Express, type Request, type Response } from 'express';
 import cors from 'cors';
+import {
+  type CorsConfig,
+  getCorsConfig,
+  isOriginAllowed,
+  describeAllowedOrigins,
+  CORS_ALLOWED_HEADERS,
+  CORS_ALLOWED_METHODS,
+} from '@shared/config/cors';
 import type { DirectoryService } from '../registry/DirectoryService.js';
 import { ZoneTokenIssuer } from '../tokens/ZoneTokenIssuer.js';
 import { tokenEndpointLimiter, healthEndpointLimiter } from '../middleware/RateLimiter.js';
@@ -8,18 +16,39 @@ export interface GatewayServerOptions {
   port: number;
   tokenSecret: Uint8Array;
   directory: DirectoryService;
+  corsConfig?: CorsConfig;
 }
 
 export class GatewayServer {
   private app: Express;
   private server: ReturnType<Express['listen']> | null = null;
 
-  constructor(
-    private readonly options: GatewayServerOptions
-  ) {
+  constructor(private readonly options: GatewayServerOptions) {
     const tokenIssuer = new ZoneTokenIssuer(options.tokenSecret);
     this.app = express();
-    this.app.use(cors());
+    const corsConfig = options.corsConfig ?? getCorsConfig();
+    const allowedOriginsDescription = describeAllowedOrigins(corsConfig);
+    this.app.use(
+      cors({
+        origin: (origin, callback) => {
+          if (!origin) {
+            return callback(null, true);
+          }
+
+          if (isOriginAllowed(origin, corsConfig)) {
+            return callback(null, true);
+          }
+
+          console.warn(`Blocked CORS origin: ${origin}. Allowed: ${allowedOriginsDescription}`);
+          return callback(new Error('Not allowed by CORS'));
+        },
+        credentials: true,
+        allowedHeaders: CORS_ALLOWED_HEADERS,
+        methods: CORS_ALLOWED_METHODS,
+        maxAge: 86400,
+        optionsSuccessStatus: 204,
+      })
+    );
     this.app.use(express.json());
 
     // Health check endpoint (with rate limiting)
@@ -28,35 +57,41 @@ export class GatewayServer {
     });
 
     // Zone token endpoint (with rate limiting)
-    this.app.post('/api/zones/:id/token', tokenEndpointLimiter.middleware(), async (req: Request, res: Response) => {
-      try {
-        const zoneId = req.params.id;
-        const { userId } = req.body as { userId?: string };
+    this.app.post(
+      '/api/zones/:id/token',
+      tokenEndpointLimiter.middleware(),
+      (req: Request, res: Response) => {
+        void (async () => {
+          try {
+            const zoneId = req.params.id;
+            const { userId } = req.body as { userId?: string };
 
-        if (!userId || !zoneId) {
-          return res.status(400).json({ error: 'userId and zoneId required' });
-        }
+            if (!userId || !zoneId) {
+              return res.status(400).json({ error: 'userId and zoneId required' });
+            }
 
-        // Check if zone exists and is healthy
-        const zone = this.options.directory.getZone(zoneId);
-        if (!zone || !zone.healthy) {
-          return res.status(404).json({ error: 'Zone not found or unavailable' });
-        }
+            // Check if zone exists and is healthy
+            const zone = this.options.directory.getZone(zoneId);
+            if (!zone || !zone.healthy) {
+              return res.status(404).json({ error: 'Zone not found or unavailable' });
+            }
 
-        // Issue token (15 minutes TTL)
-        const token = await tokenIssuer.issue(userId, zoneId, 15 * 60);
-        
-        res.json({
-          token,
-          zoneId,
-          endpoint: zone.endpoint,
-          expiresAt: Date.now() + 15 * 60 * 1000,
-        });
-      } catch (err) {
-        console.error('Token issuance error:', err);
-        res.status(500).json({ error: 'Internal server error' });
+            // Issue token (15 minutes TTL)
+            const token = await tokenIssuer.issue(userId, zoneId, 15 * 60);
+
+            res.json({
+              token,
+              zoneId,
+              endpoint: zone.endpoint,
+              expiresAt: Date.now() + 15 * 60 * 1000,
+            });
+          } catch (err) {
+            console.error('Token issuance error:', err);
+            res.status(500).json({ error: 'Internal server error' });
+          }
+        })();
       }
-    });
+    );
 
     // List available zones
     this.app.get('/api/zones', (req: Request, res: Response) => {
@@ -87,7 +122,7 @@ export class GatewayServer {
   async start(): Promise<void> {
     return new Promise((resolve) => {
       this.server = this.app.listen(this.options.port, () => {
-        console.log(`Gateway server listening on port ${this.options.port}`);
+        console.warn(`Gateway server listening on port ${this.options.port}`);
         resolve();
       });
     });
@@ -104,4 +139,3 @@ export class GatewayServer {
     });
   }
 }
-

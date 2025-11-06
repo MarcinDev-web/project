@@ -78,4 +78,3 @@ export function registerBuiltInLogicCubes(): void {
   LogicCubeRegistry.register('uiSetValue', UISetValueAction);
   LogicCubeRegistry.register('uiEnableElement', UIEnableElementAction);
 }
-

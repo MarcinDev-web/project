@@ -5,11 +5,36 @@
 import { getTokens } from '../utils/storage';
 import type { WebSocketMessage } from './useWebSocket';
 
-// WebSocket URL - direct connection in dev (no CORS issues), proxy in production
-// Use 127.0.0.1 instead of localhost to force IPv4
-const WS_URL = process.env.NODE_ENV === 'production'
-  ? `wss://${window.location.hostname}/ws`
-  : 'ws://127.0.0.1:3001';
+// Resolve WebSocket URL
+// Priority:
+// 1) VITE_WS_URL (absolute, e.g. wss://your-railway-app.railway.app/ws)
+// 2) Derive from VITE_API_URL by replacing /api with /ws and http->ws
+// 3) Dev fallback
+function resolveWsUrl(): string {
+  const explicit = (import.meta as any).env?.VITE_WS_URL as string | undefined;
+  if (explicit) return explicit;
+
+  const api = (import.meta as any).env?.VITE_API_URL as string | undefined;
+  if (api) {
+    try {
+      const u = new URL(api, window.location.origin);
+      u.protocol = u.protocol === 'https:' ? 'wss:' : 'ws:';
+      // Replace trailing /api (with or without slash) with /ws
+      const newPath = u.pathname.replace(/\/?api\/?$/, '/ws');
+      u.pathname = newPath.endsWith('/ws') ? newPath : `${newPath}/ws`;
+      u.search = '';
+      u.hash = '';
+      return u.toString().replace(/\/$/, '');
+    } catch {
+      // fall through to dev default
+    }
+  }
+
+  // Use 127.0.0.1 instead of localhost to force IPv4
+  return 'ws://127.0.0.1:3001';
+}
+
+const WS_URL = resolveWsUrl();
 
 class WebSocketManager {
   private ws: WebSocket | null = null;

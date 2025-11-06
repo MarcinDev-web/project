@@ -1,6 +1,6 @@
 /**
  * BlockBehaviorSystem - Applies gameplay effects from blocks (ice, slime, lava, poison)
- * 
+ *
  * Tracks collisions between dynamic entities and blocks, applying:
  * - Friction multipliers (ice/slime)
  * - Movement speed multipliers (ice/slime)
@@ -14,11 +14,12 @@ import { CharacterController } from '../components/CharacterController.js';
 import { HealthComponent } from '../components/HealthComponent.js';
 import type { PhysicsSystem, CollisionEvent } from '../physics/PhysicsSystem.js';
 // Lazy import to avoid circular dependency (blocks imports world types)
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let getBlock: (id: string) => any = () => undefined;
 try {
   // Dynamic require to break circular dependency during build
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
+  // eslint-disable-next-line @typescript-eslint/no-require-imports, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
   getBlock = require('@engine/blocks').getBlock;
 } catch {
   // Fallback for build time - will work at runtime
@@ -135,7 +136,7 @@ export class BlockBehaviorSystem {
     // If we found a dynamic entity colliding with a block, track it
     if (dynamicEntity && blockEntity) {
       this.dynamicEntities.add(dynamicEntity);
-      
+
       // Initialize effects if not already tracked
       if (!this.activeEffects.has(dynamicEntity)) {
         this.initializeEffects(dynamicEntity);
@@ -218,25 +219,40 @@ export class BlockBehaviorSystem {
       const blockId = blockEntity.userData?.blockId;
       if (!blockId) continue;
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const blockDef = typeof blockId === 'string' ? getBlock(blockId) : undefined;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       if (!blockDef?.behavior) continue;
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
       const behavior = blockDef.behavior;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       if (behavior.frictionMultiplier !== undefined) {
         // Use maximum friction multiplier (strongest effect)
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
         maxFrictionMultiplier = Math.max(maxFrictionMultiplier, behavior.frictionMultiplier);
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       if (behavior.restitutionMultiplier !== undefined) {
         // Use maximum restitution multiplier (strongest bounce effect)
-        maxRestitutionMultiplier = Math.max(maxRestitutionMultiplier, behavior.restitutionMultiplier);
+
+        maxRestitutionMultiplier = Math.max(
+          maxRestitutionMultiplier,
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
+          behavior.restitutionMultiplier
+        );
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       if (behavior.movementSpeedMultiplier !== undefined) {
         // For speed, multiply effects (slime 0.5 + ice 1.5 = 0.75)
         // This allows effects to stack naturally
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         maxSpeedMultiplier *= behavior.movementSpeedMultiplier;
       }
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       if (behavior.damagePerSecond !== undefined) {
         // Use maximum damage per second (strongest effect)
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
         maxDamagePerSecond = Math.max(maxDamagePerSecond, behavior.damagePerSecond);
       }
     }
@@ -312,4 +328,3 @@ export class BlockBehaviorSystem {
     this.cleanupEffects(entity);
   }
 }
-

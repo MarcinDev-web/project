@@ -8,12 +8,9 @@ import { getWeaponPreset } from '../data/weapons.js';
  * @param attachmentIds - Optional array of attachment IDs (for reference, apply via AttachmentComponent)
  * @returns New WeaponComponent instance
  */
-export function createWeapon(
-  preset: WeaponPresetType,
-  attachmentIds?: string[]
-): WeaponComponent {
+export function createWeapon(preset: WeaponPresetType, attachmentIds?: string[]): WeaponComponent {
   const presetData = getWeaponPreset(preset);
-  
+
   // Create base weapon from preset
   const weaponData: WeaponComponentData = {
     type: presetData.type,
@@ -24,14 +21,14 @@ export function createWeapon(
     maxAmmo: presetData.maxAmmo,
     reloadDuration: presetData.reloadDuration,
   };
-  
+
   if (presetData.projectileSpeed !== undefined) {
     weaponData.projectileSpeed = presetData.projectileSpeed;
   }
   if (presetData.projectileLifetime !== undefined) {
     weaponData.projectileLifetime = presetData.projectileLifetime;
   }
-  
+
   const weapon = new WeaponComponent(weaponData);
 
   // Store preset type for reference

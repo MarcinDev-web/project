@@ -29,10 +29,13 @@ export class TypedArrayPool {
     return cap;
   }
 
-  private popSuitable<T extends ArrayBufferView>(pool: T[], minLength: number): T | undefined {
+  private popSuitable<T extends ArrayBufferView & { length: number }>(
+    pool: T[],
+    minLength: number
+  ): T | undefined {
     for (let i = 0; i < pool.length; i++) {
       const arr = pool[i];
-      if ((arr as any).length >= minLength) {
+      if (arr.length >= minLength) {
         pool.splice(i, 1);
         return arr;
       }
@@ -42,5 +45,3 @@ export class TypedArrayPool {
 }
 
 export const GlobalTypedArrayPool = new TypedArrayPool();
-
-

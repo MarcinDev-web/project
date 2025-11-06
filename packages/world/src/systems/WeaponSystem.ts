@@ -11,17 +11,10 @@ import { PhysicsComponent, RigidbodyType } from '../components/PhysicsComponent.
 import { InventoryComponent } from '../components/InventoryComponent.js';
 import { AttachmentComponent } from '../components/AttachmentComponent.js';
 import { Raycaster, type Ray } from './Raycaster.js';
-import type {
-  WeaponFireEvent,
-  WeaponReloadEvent,
-} from '../types/weapon.js';
+import type { WeaponFireEvent, WeaponReloadEvent } from '../types/weapon.js';
 import type { Vec3 } from '@engine/core/math';
 import { getAmmoType } from '../data/ammo.js';
-import {
-  normalizeVec3Out,
-  crossVec3Out,
-  transformVec3ByQuatOut,
-} from '@engine/core/math';
+import { normalizeVec3Out, crossVec3Out, transformVec3ByQuatOut } from '@engine/core/math';
 import { quatFromAxisAngleOut } from '@engine/core/math';
 
 /**
@@ -45,16 +38,13 @@ export class WeaponSystem {
   private readonly scene: Scene;
   private readonly raycaster: Raycaster;
   private currentTime: number = 0;
-  
+
   /** Scratch vectors reused to avoid allocations */
   private readonly scratchVec1: Vec3 = [0, 0, 0];
   private readonly scratchVec2: Vec3 = [0, 0, 0];
   private readonly scratchQuat: [number, number, number, number] = [0, 0, 0, 1];
 
-  constructor(
-    scene: Scene,
-    _config?: WeaponSystemConfig
-  ) {
+  constructor(scene: Scene, _config?: WeaponSystemConfig) {
     this.scene = scene;
     this.raycaster = new Raycaster();
     // Config reserved for future use (input handling, projectile prefabs, etc.)
@@ -66,9 +56,9 @@ export class WeaponSystem {
    */
   update(deltaTime: number): void {
     if (!(deltaTime > 0)) return;
-    
+
     this.currentTime += deltaTime;
-    
+
     // Update entities with direct WeaponComponent
     const entities = this.scene.queryEntities(WeaponComponent);
     for (const entity of entities) {
@@ -103,11 +93,7 @@ export class WeaponSystem {
    * @param origin - Fire origin (optional, defaults to entity transform position)
    * @returns true if fire was successful
    */
-  fire(
-    entity: Entity,
-    direction: Vec3 | null = null,
-    origin: Vec3 | null = null
-  ): boolean {
+  fire(entity: Entity, direction: Vec3 | null = null, origin: Vec3 | null = null): boolean {
     // Check for inventory first (preferred for PvP)
     const inventory = entity.getComponent(InventoryComponent);
     if (inventory) {
@@ -195,11 +181,26 @@ export class WeaponSystem {
 
     // Fire weapon based on type
     if (weapon.type === 'hitscan') {
-      this.fireHitscan(entity, weapon, this.scratchVec1, this.scratchVec2, effectiveDamage, ammoTypeDef.effects);
+      this.fireHitscan(
+        entity,
+        weapon,
+        this.scratchVec1,
+        this.scratchVec2,
+        effectiveDamage,
+        ammoTypeDef.effects
+      );
     } else if (weapon.type === 'projectile') {
       const effectiveSpreadForProjectile = effectiveSpread;
       this.applySpread(this.scratchVec2, effectiveSpreadForProjectile);
-      this.fireProjectile(entity, weapon, this.scratchVec1, this.scratchVec2, effectiveDamage, ammoTypeDef.effects, attachmentModifiers);
+      this.fireProjectile(
+        entity,
+        weapon,
+        this.scratchVec1,
+        this.scratchVec2,
+        effectiveDamage,
+        ammoTypeDef.effects,
+        attachmentModifiers
+      );
     }
 
     // Emit fire event
@@ -215,7 +216,11 @@ export class WeaponSystem {
 
     // Fire component callback
     if (weapon.onFire) {
-      weapon.onFire(effectiveDamage, [...this.scratchVec2] as [number, number, number], [...this.scratchVec1] as [number, number, number]);
+      weapon.onFire(
+        effectiveDamage,
+        [...this.scratchVec2] as [number, number, number],
+        [...this.scratchVec1] as [number, number, number]
+      );
     }
 
     return true;
@@ -246,7 +251,7 @@ export class WeaponSystem {
       const attachmentModifiers = this.getAttachmentModifiers(entity);
       const oldAmmo = weapon.ammo;
       weapon.startReload(this.currentTime);
-      
+
       const effectiveReloadDuration = weapon.getEffectiveReloadDuration(attachmentModifiers);
       const reloadEvent: WeaponReloadEvent = {
         entity,
@@ -313,7 +318,7 @@ export class WeaponSystem {
       if (health) {
         // For now, apply full damage. Armor system can be added later
         // If armor exists, apply penetration: finalDamage = damage * (1 - armor * (1 - penetration))
-        let finalDamage = damage;
+        const finalDamage = damage;
         if (ammoEffects.armorPenetration !== undefined && ammoEffects.armorPenetration > 0) {
           // Armor penetration reduces armor effectiveness
           // This is a placeholder - full armor system needed
@@ -371,16 +376,16 @@ export class WeaponSystem {
     // Calculate rotation from forward vector
     const forward: Vec3 = [0, 0, -1]; // Default forward
     const axis: Vec3 = [0, 0, 0];
-    
+
     // Cross product to get rotation axis
     crossVec3Out(axis, forward, direction);
-    
-    const axisLength = Math.hypot(axis[0]!, axis[1]!, axis[2]!);
+
+    const axisLength = Math.hypot(axis[0], axis[1], axis[2]);
     if (axisLength > 1e-6) {
       normalizeVec3Out(axis, axis);
-      const dot = forward[0]! * direction[0]! + forward[1]! * direction[1]! + forward[2]! * direction[2]!;
+      const dot = forward[0] * direction[0] + forward[1] * direction[1] + forward[2] * direction[2];
       const angle = Math.acos(Math.max(-1, Math.min(1, dot)));
-      
+
       if (angle > 1e-6) {
         quatFromAxisAngleOut(this.scratchQuat, axis, angle);
         projectile.transform.rotation = [...this.scratchQuat];
@@ -394,11 +399,12 @@ export class WeaponSystem {
     const projectileComp = new ProjectileComponent({
       damage: damage,
       speed: effectiveSpeed,
-      lifetime: weapon.projectileLifetime ?? weapon.getEffectiveRange(attachmentModifiers) / effectiveSpeed,
+      lifetime:
+        weapon.projectileLifetime ?? weapon.getEffectiveRange(attachmentModifiers) / effectiveSpeed,
       ownerId: entity.id,
     });
     projectileComp.spawnTime = this.currentTime;
-    
+
     // Store ammo effects in projectile for later use (explosive, etc.)
     // This would require extending ProjectileComponent or using a separate component
     // For now, damage is already applied
@@ -409,9 +415,9 @@ export class WeaponSystem {
     physics.rigidbodyType = RigidbodyType.Dynamic;
     physics.mass = 0.1; // Light projectile
     physics.velocity = [
-      direction[0]! * effectiveSpeed,
-      direction[1]! * effectiveSpeed,
-      direction[2]! * effectiveSpeed,
+      direction[0] * effectiveSpeed,
+      direction[1] * effectiveSpeed,
+      direction[2] * effectiveSpeed,
     ];
     projectile.addComponent(physics);
 
@@ -440,11 +446,11 @@ export class WeaponSystem {
     // Calculate up and right vectors
     const up: Vec3 = [0, 1, 0];
     const right: Vec3 = [0, 0, 0];
-    
+
     // Cross product: right = direction × up
     crossVec3Out(right, direction, up);
-    
-    const rightLength = Math.hypot(right[0]!, right[1]!, right[2]!);
+
+    const rightLength = Math.hypot(right[0], right[1], right[2]);
     if (rightLength < 1e-6) {
       // Direction is parallel to up, use different right vector
       right[0] = 1;
@@ -461,7 +467,7 @@ export class WeaponSystem {
     // Rotate around forward by phi
     quatFromAxisAngleOut(this.scratchQuat, direction, phi);
     transformVec3ByQuatOut(direction, direction, this.scratchQuat);
-    
+
     normalizeVec3Out(direction, direction);
   }
 
@@ -472,4 +478,3 @@ export class WeaponSystem {
     return this.currentTime;
   }
 }
-

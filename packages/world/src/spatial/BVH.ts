@@ -1,6 +1,6 @@
 /**
  * Bounding Volume Hierarchy (BVH)
- * 
+ *
  * Spatial acceleration structure for efficient broad-phase culling.
  * Uses AABB hierarchy with per-frame refit for dynamic scenes.
  */
@@ -36,7 +36,7 @@ export interface BVHEntry {
 
 /**
  * Bounding Volume Hierarchy for spatial queries.
- * 
+ *
  * Uses a binary tree structure with AABBs. Supports per-frame refit
  * for dynamic scenes without full rebuild.
  */
@@ -163,7 +163,7 @@ export class BVH {
    */
   private queryRecursive(nodeIndex: number, bounds: AABB, out: BVHEntry[]): void {
     const node = this.nodes[nodeIndex]!;
-    
+
     // Test intersection with node bounds
     if (!BoundingVolume.intersects(node.bounds, bounds)) {
       return;
@@ -190,8 +190,12 @@ export class BVH {
       return { min: [0, 0, 0], max: [0, 0, 0] };
     }
 
-    let minX = Infinity, minY = Infinity, minZ = Infinity;
-    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+    let minX = Infinity,
+      minY = Infinity,
+      minZ = Infinity;
+    let maxX = -Infinity,
+      maxY = -Infinity,
+      maxZ = -Infinity;
 
     for (let i = start; i < end; i++) {
       const entry = this.entries[i]!;
@@ -275,4 +279,3 @@ export class BVH {
     return 1 + Math.max(this.calculateDepth(node.left), this.calculateDepth(node.right));
   }
 }
-

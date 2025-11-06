@@ -12,8 +12,15 @@ export type JointPaletteScratch = {
   tmpS: Float32Array; // length = 3
 };
 
-export function ensureScratch(jointCount: number, scratch?: JointPaletteScratch): JointPaletteScratch {
-  if (scratch && scratch.globalMatrices.length >= jointCount * 16 && scratch.computed.length >= jointCount) {
+export function ensureScratch(
+  jointCount: number,
+  scratch?: JointPaletteScratch
+): JointPaletteScratch {
+  if (
+    scratch &&
+    scratch.globalMatrices.length >= jointCount * 16 &&
+    scratch.computed.length >= jointCount
+  ) {
     scratch.computed.fill(0);
     return scratch;
   }
@@ -52,15 +59,20 @@ export function computeJointPalette(
     const ibo = i * 16;
     // out = global * inverseBind
     mat4Multiply(
-      (outPalette.subarray(go, go + 16) as unknown) as Mat4,
-      (s.globalMatrices.subarray(go, go + 16) as unknown) as Mat4,
-      (skeleton.inverseBindMatrices.subarray(ibo, ibo + 16) as unknown) as Mat4
+      outPalette.subarray(go, go + 16) as unknown as Mat4,
+      s.globalMatrices.subarray(go, go + 16) as unknown as Mat4,
+      skeleton.inverseBindMatrices.subarray(ibo, ibo + 16) as unknown as Mat4
     );
   }
   return outPalette;
 }
 
-function computeGlobalForJoint(index: number, skeleton: Skeleton, pose: Pose, s: JointPaletteScratch): void {
+function computeGlobalForJoint(
+  index: number,
+  skeleton: Skeleton,
+  pose: Pose,
+  s: JointPaletteScratch
+): void {
   if (s.computed[index]) return;
   const parent = skeleton.parents[index]!;
   // Build local matrix
@@ -76,7 +88,12 @@ function computeGlobalForJoint(index: number, skeleton: Skeleton, pose: Pose, s:
   s.tmpS[0] = pose.localScales[to + 0]!;
   s.tmpS[1] = pose.localScales[to + 1]!;
   s.tmpS[2] = pose.localScales[to + 2]!;
-  mat4FromQuatTranslationScale(s.tmpMat as unknown as Mat4, s.tmpR as unknown as Quat, s.tmpT as unknown as Vec3, s.tmpS as unknown as Vec3);
+  mat4FromQuatTranslationScale(
+    s.tmpMat as unknown as Mat4,
+    s.tmpR as unknown as Quat,
+    s.tmpT as unknown as Vec3,
+    s.tmpS as unknown as Vec3
+  );
 
   const outSlice = s.globalMatrices.subarray(index * 16, index * 16 + 16) as unknown as Mat4;
   if (parent === -1) {
@@ -90,5 +107,3 @@ function computeGlobalForJoint(index: number, skeleton: Skeleton, pose: Pose, s:
   }
   s.computed[index] = 1;
 }
-
-

@@ -73,7 +73,12 @@ Dodaj w Railway Dashboard → Twój serwis → **Variables**:
 4. **`FRONTEND_URL`:**
    - **Value:** `https://your-app.vercel.app`
    - *(zastąp swoim URL frontendu z Vercel)*
-   - Może być wiele URLi oddzielonych przecinkami: `https://app1.vercel.app,https://app2.vercel.app`
+   - Może być wiele URL-i oddzielonych przecinkami: `https://app1.vercel.app,https://app2.vercel.app`
+   - **Uwaga:** pierwszy wpis traktowany jest jako kanoniczny URL (linki share)
+
+5. **(Opcjonalnie) `CORS_ALLOWED_ORIGINS`:**
+   - Dodaj jeśli potrzebujesz dodatkowych originów (np. preview Vercel, staging)
+   - Przykład: `https://*.vercel.app,https://admin.your-domain.com`
 
 ### **PostgreSQL Database:**
 ✅ **Railway automatycznie:**
@@ -164,9 +169,10 @@ Po udanym deploymencie net-server:
 - Jeśli nie widzisz `DATABASE_URL`, upewnij się że baza została dodana do projektu
 
 ### Błąd: "CORS error" w przeglądarce
-**Problem:** FRONTEND_URL nie zawiera dokładnego URL frontendu  
+**Problem:** konfiguracja CORS nie zawiera domeny frontendu / preview  
 **Rozwiązanie:** 
-- Zaktualizuj `FRONTEND_URL` w Railway Variables: `https://your-app.vercel.app`
+- Upewnij się, że `FRONTEND_URL` zawiera główny URL frontendu (pierwszy wpis = kanoniczny)
+- Jeśli korzystasz z preview/staging, dodaj je w `CORS_ALLOWED_ORIGINS` (obsługiwane wildcardy, np. `https://*.vercel.app`)
 - Railway automatycznie zrestartuje serwis po zmianie zmiennych
 
 ### Błąd: "Build failed"

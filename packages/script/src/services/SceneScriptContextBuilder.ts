@@ -4,6 +4,7 @@ import type { ScriptServices } from '../behavior/Behavior.js';
 import type { PhysicsWorld } from '@engine/world';
 import type { AnimationSystem } from '@engine/stdlib/Animation';
 // NOTE: Renderer type placeholder (gfx-webgpu exists but not exporting Renderer type cleanly yet)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Renderer = any; // Temp placeholder
 
 /**
@@ -52,8 +53,10 @@ export class SceneScriptContextBuilder {
       services.animation = { system: animation };
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     const renderer = this.getRenderer();
     if (renderer) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       services.rendering = { renderer };
     }
 
@@ -62,17 +65,19 @@ export class SceneScriptContextBuilder {
 
   private getPhysicsFromScene(): PhysicsWorld | null {
     const runtime = this.scene.scriptRuntime;
-    return (runtime?.physicsWorld as PhysicsWorld) ?? null;
+    return (runtime?.physicsWorld as PhysicsWorld | null | undefined) ?? null;
   }
 
   private getAnimationSystem(): AnimationSystem | null {
     const runtime = this.scene.scriptRuntime;
-    return (runtime?.animationSystem as AnimationSystem | undefined) ?? null;
+    return (runtime?.animationSystem as AnimationSystem | null | undefined) ?? null;
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
   private getRenderer(): Renderer | null {
     const runtime = this.scene.scriptRuntime;
-    return runtime?.renderingPipeline ?? null;
+    if (!runtime?.renderingPipeline) return null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return runtime.renderingPipeline as any;
   }
 }
-

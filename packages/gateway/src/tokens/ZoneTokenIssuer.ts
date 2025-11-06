@@ -17,8 +17,6 @@ export class ZoneTokenIssuer {
 
   rotateSecret(newSecret: Uint8Array): void {
     // Rolling change; old tokens will fail verification once rotated
-    (this as any).secret = newSecret;
+    (this as { secret: Uint8Array }).secret = newSecret;
   }
 }
-
-

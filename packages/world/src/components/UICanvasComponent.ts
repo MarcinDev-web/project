@@ -41,11 +41,7 @@ export class UICanvasComponent extends Component {
     };
   }
 
-  fromJSON(data: {
-    enabled?: boolean;
-    zIndex?: number;
-    backgroundColor?: string;
-  }): void {
+  fromJSON(data: { enabled?: boolean; zIndex?: number; backgroundColor?: string }): void {
     if (typeof data.enabled === 'boolean') {
       this.enabled = data.enabled;
     }
@@ -59,4 +55,3 @@ export class UICanvasComponent extends Component {
 }
 
 registerComponent(UICanvasComponent.type, UICanvasComponent);
-

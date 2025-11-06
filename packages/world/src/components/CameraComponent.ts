@@ -52,7 +52,7 @@ export class CameraComponent extends Component {
     if (this.projection === 'perspective') {
       return mat4Perspective(out, this.fov, aspect, this.near, this.far);
     }
-    throw new Error(`Unsupported projection type: ${this.projection}`);
+    throw new Error(`Unsupported projection type: ${this.projection as string}`);
   }
 
   /**
@@ -70,7 +70,7 @@ export class CameraComponent extends Component {
     const worldMatrix = transform.getWorldMatrix();
     try {
       return mat4Invert(out, worldMatrix);
-    } catch (error) {
+    } catch {
       const fallbackTarget: Vec3 = [position[0], position[1], position[2] - 1];
       return mat4LookAt(out, position, fallbackTarget, this.up);
     }
@@ -102,19 +102,30 @@ export class CameraComponent extends Component {
 
   fromJSON(data: CameraComponentJSON): void {
     if (data.projection) this.projection = data.projection;
-    
+
     // Validate and set FOV (must be in valid range [0, π])
-    if (typeof data.fov === 'number' && Number.isFinite(data.fov) && data.fov > 0 && data.fov < Math.PI) {
+    if (
+      typeof data.fov === 'number' &&
+      Number.isFinite(data.fov) &&
+      data.fov > 0 &&
+      data.fov < Math.PI
+    ) {
       this.fov = data.fov;
     } else if (typeof data.fov === 'number' && Number.isFinite(data.fov)) {
       // Clamp to valid range if out of bounds
       this.fov = Math.max(0.001, Math.min(data.fov, Math.PI - 0.001));
     }
-    
+
     // Validate and set near/far (must be positive and near < far)
-    const newNear = typeof data.near === 'number' && Number.isFinite(data.near) && data.near > 0 ? data.near : this.near;
-    const newFar = typeof data.far === 'number' && Number.isFinite(data.far) && data.far > 0 ? data.far : this.far;
-    
+    const newNear =
+      typeof data.near === 'number' && Number.isFinite(data.near) && data.near > 0
+        ? data.near
+        : this.near;
+    const newFar =
+      typeof data.far === 'number' && Number.isFinite(data.far) && data.far > 0
+        ? data.far
+        : this.far;
+
     if (newNear < newFar) {
       this.near = newNear;
       this.far = newFar;
@@ -123,19 +134,19 @@ export class CameraComponent extends Component {
       this.near = DEFAULT_NEAR;
       this.far = DEFAULT_FAR;
     }
-    
+
     if (typeof data.primary === 'boolean') this.primary = data.primary;
-    
+
     // Validate and set up vector (must be non-zero length)
     if (Array.isArray(data.up) && data.up.length === 3) {
-      const upVec = data.up as Vec3;
+      const upVec = data.up;
       const length = Math.hypot(upVec[0], upVec[1], upVec[2]);
       if (length > 0.001) {
         // Normalize to ensure unit vector
         this.up = [upVec[0] / length, upVec[1] / length, upVec[2] / length] as Vec3;
       }
     }
-    
+
     if (Array.isArray(data.target) && data.target.length === 3) {
       this.target = [...data.target] as Vec3;
     } else if (data.target === null) {
@@ -145,4 +156,3 @@ export class CameraComponent extends Component {
 }
 
 registerComponent(CameraComponent.type, CameraComponent);
-

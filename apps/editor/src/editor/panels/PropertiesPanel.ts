@@ -33,11 +33,12 @@ import { BehaviorRegistry } from '@engine/script';
 import { AnimationComponent } from '@engine/stdlib/Animation';
 import { createAnimationSection } from '../ui/animation/AnimationSection';
 import { MaterialComponent } from '@engine/world/components/MaterialComponent';
-import { CharacterController } from '@engine/world';
+import { CharacterController, NpcComponent } from '@engine/world';
 import { UIElementComponent } from '@engine/world/components/UIElementComponent';
 import { UIElementProperties } from '../ui/UIElementProperties';
 import { MovementProfileRegistry, PRESET_PROFILES, type MovementProfileExtension } from '@engine/stdlib/MovementProfiles';
 import { showCustomProfileEditor } from '../ui/CustomProfileEditor';
+import { getAllNpcUnitTypes, getAllNpcBehaviors, getAllNpcFactions } from '@engine/editor-utils';
 
 const MIN_SCALE = 0.001;
 
@@ -66,6 +67,7 @@ const SECTION_METADATA: SectionMeta[] = [
   { id: 'environment', label: 'Environment', icon: 'sun' },
   { id: 'animation', label: 'Animation', icon: 'play' },
   { id: 'character-controller', label: 'Character Controller', icon: 'user' },
+  { id: 'npc', label: 'NPC', icon: 'user' },
   { id: 'ui', label: 'UI', icon: 'layers' },
   { id: 'scripts', label: 'Scripts', icon: 'list' },
 ];
@@ -2781,6 +2783,18 @@ export class PropertiesPanel {
           () => this.toggleSectionCollapse('character-controller')
         );
       }
+      case 'npc': {
+        const npcComponent = entity.getComponent(NpcComponent);
+        if (!npcComponent) return null;
+        return this.createCollapsibleSection(
+          'npc',
+          'NPC',
+          'user',
+          this.createNpcProperties(entity, npcComponent),
+          collapsed,
+          () => this.toggleSectionCollapse('npc')
+        );
+      }
       case 'ui': {
         const uiElementComponent = entity.getComponent(UIElementComponent);
         const content = uiElementComponent
@@ -3173,6 +3187,257 @@ export class PropertiesPanel {
     actionsRow.appendChild(createCustomBtn);
     actionsRow.appendChild(resetBtn);
     container.appendChild(actionsRow);
+
+    return container;
+  }
+
+  /**
+   * Creates NPC properties content
+   */
+  private createNpcProperties(
+    _entity: Entity,
+    npc: NpcComponent
+  ): HTMLElement {
+    const container = document.createElement('div');
+    container.className = 'property-content';
+
+    // Unit Type
+    const unitTypeRow = document.createElement('div');
+    unitTypeRow.className = 'property-row-v2';
+    
+    const unitTypeLabel = document.createElement('label');
+    unitTypeLabel.className = 'property-label-v2';
+    unitTypeLabel.textContent = 'Unit Type';
+    
+    const unitTypeSelect = document.createElement('select');
+    unitTypeSelect.className = 'property-select';
+    
+    const unitTypes = getAllNpcUnitTypes();
+    unitTypes.forEach(unitType => {
+      const option = document.createElement('option');
+      option.value = unitType.id;
+      option.textContent = unitType.name;
+      if (npc.unitType === unitType.id) {
+        option.selected = true;
+      }
+      unitTypeSelect.appendChild(option);
+    });
+
+    unitTypeSelect.addEventListener('change', () => {
+      const prev = npc.unitType;
+      npc.unitType = unitTypeSelect.value as any;
+      this.registerUndo(() => {
+        npc.unitType = prev;
+        this.refresh();
+      });
+      this.refresh();
+    }, { signal: this.refreshAbort!.signal });
+
+    unitTypeRow.appendChild(unitTypeLabel);
+    unitTypeRow.appendChild(unitTypeSelect);
+    container.appendChild(unitTypeRow);
+
+    // Faction
+    const factionRow = document.createElement('div');
+    factionRow.className = 'property-row-v2';
+    
+    const factionLabel = document.createElement('label');
+    factionLabel.className = 'property-label-v2';
+    factionLabel.textContent = 'Faction';
+    
+    const factionSelect = document.createElement('select');
+    factionSelect.className = 'property-select';
+    
+    const factions = getAllNpcFactions();
+    factions.forEach(faction => {
+      const option = document.createElement('option');
+      option.value = faction.id;
+      option.textContent = faction.name;
+      if (npc.faction === faction.id) {
+        option.selected = true;
+      }
+      factionSelect.appendChild(option);
+    });
+
+    factionSelect.addEventListener('change', () => {
+      const prev = npc.faction;
+      npc.faction = factionSelect.value as any;
+      this.registerUndo(() => {
+        npc.faction = prev;
+        this.refresh();
+      });
+      this.refresh();
+    }, { signal: this.refreshAbort!.signal });
+
+    factionRow.appendChild(factionLabel);
+    factionRow.appendChild(factionSelect);
+    container.appendChild(factionRow);
+
+    // Behavior
+    const behaviorRow = document.createElement('div');
+    behaviorRow.className = 'property-row-v2';
+    
+    const behaviorLabel = document.createElement('label');
+    behaviorLabel.className = 'property-label-v2';
+    behaviorLabel.textContent = 'Behavior';
+    
+    const behaviorSelect = document.createElement('select');
+    behaviorSelect.className = 'property-select';
+    
+    const behaviors = getAllNpcBehaviors();
+    behaviors.forEach(behavior => {
+      const option = document.createElement('option');
+      option.value = behavior.id;
+      option.textContent = behavior.name;
+      if (npc.behavior === behavior.id) {
+        option.selected = true;
+      }
+      behaviorSelect.appendChild(option);
+    });
+
+    behaviorSelect.addEventListener('change', () => {
+      const prev = npc.behavior;
+      npc.behavior = behaviorSelect.value as any;
+      this.registerUndo(() => {
+        npc.behavior = prev;
+        this.refresh();
+      });
+      this.refresh();
+    }, { signal: this.refreshAbort!.signal });
+
+    behaviorRow.appendChild(behaviorLabel);
+    behaviorRow.appendChild(behaviorSelect);
+    container.appendChild(behaviorRow);
+
+    // Army ID
+    const armyRow = document.createElement('div');
+    armyRow.className = 'property-row-v2';
+    
+    const armyLabel = document.createElement('label');
+    armyLabel.className = 'property-label-v2';
+    armyLabel.textContent = 'Army ID';
+    
+    const armyInput = document.createElement('input');
+    armyInput.type = 'text';
+    armyInput.className = 'property-input';
+    armyInput.value = npc.armyId;
+    armyInput.placeholder = 'Optional';
+
+    this.addDebouncedInput(armyInput, () => {
+      const prev = npc.armyId;
+      npc.armyId = armyInput.value.trim();
+      this.registerUndo(() => {
+        npc.armyId = prev;
+        this.refresh();
+      });
+      this.refresh();
+    }, 300);
+
+    armyRow.appendChild(armyLabel);
+    armyRow.appendChild(armyInput);
+    container.appendChild(armyRow);
+
+    // Behavior-specific settings
+    if (npc.behavior === 'patrol') {
+      // Patrol Speed
+      const speedRow = document.createElement('div');
+      speedRow.className = 'property-row-v2';
+      
+      const speedLabel = document.createElement('label');
+      speedLabel.className = 'property-label-v2';
+      speedLabel.textContent = 'Patrol Speed';
+      
+      const speedInput = document.createElement('input');
+      speedInput.type = 'number';
+      speedInput.className = 'property-input';
+      speedInput.min = '0.5';
+      speedInput.max = '10';
+      speedInput.step = '0.5';
+      speedInput.value = String(npc.patrolSpeed);
+
+      this.addDebouncedInput(speedInput, () => {
+        const prev = npc.patrolSpeed;
+        const value = parseFloat(speedInput.value);
+        if (!isNaN(value)) {
+          npc.patrolSpeed = value;
+          this.registerUndo(() => {
+            npc.patrolSpeed = prev;
+            this.refresh();
+          });
+          this.refresh();
+        }
+      }, 300);
+
+      speedRow.appendChild(speedLabel);
+      speedRow.appendChild(speedInput);
+      container.appendChild(speedRow);
+    } else if (npc.behavior === 'shoot-player') {
+      // Detection Range
+      const rangeRow = document.createElement('div');
+      rangeRow.className = 'property-row-v2';
+      
+      const rangeLabel = document.createElement('label');
+      rangeLabel.className = 'property-label-v2';
+      rangeLabel.textContent = 'Detection Range';
+      
+      const rangeInput = document.createElement('input');
+      rangeInput.type = 'number';
+      rangeInput.className = 'property-input';
+      rangeInput.min = '5';
+      rangeInput.max = '100';
+      rangeInput.step = '5';
+      rangeInput.value = String(npc.detectionRange);
+
+      this.addDebouncedInput(rangeInput, () => {
+        const prev = npc.detectionRange;
+        const value = parseFloat(rangeInput.value);
+        if (!isNaN(value)) {
+          npc.detectionRange = value;
+          this.registerUndo(() => {
+            npc.detectionRange = prev;
+            this.refresh();
+          });
+          this.refresh();
+        }
+      }, 300);
+
+      rangeRow.appendChild(rangeLabel);
+      rangeRow.appendChild(rangeInput);
+      container.appendChild(rangeRow);
+    } else if (npc.behavior === 'guard-position') {
+      // Guard Radius
+      const radiusRow = document.createElement('div');
+      radiusRow.className = 'property-row-v2';
+      
+      const radiusLabel = document.createElement('label');
+      radiusLabel.className = 'property-label-v2';
+      radiusLabel.textContent = 'Guard Radius';
+      
+      const radiusInput = document.createElement('input');
+      radiusInput.type = 'number';
+      radiusInput.className = 'property-input';
+      radiusInput.min = '1';
+      radiusInput.max = '50';
+      radiusInput.step = '1';
+      radiusInput.value = String(npc.guardRadius);
+
+      this.addDebouncedInput(radiusInput, () => {
+        const prev = npc.guardRadius;
+        const value = parseFloat(radiusInput.value);
+        if (!isNaN(value)) {
+          npc.guardRadius = value;
+          this.registerUndo(() => {
+            npc.guardRadius = prev;
+            this.refresh();
+          });
+          this.refresh();
+        }
+      }, 300);
+
+      radiusRow.appendChild(radiusLabel);
+      radiusRow.appendChild(radiusInput);
+      container.appendChild(radiusRow);
+    }
 
     return container;
   }

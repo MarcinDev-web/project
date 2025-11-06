@@ -210,7 +210,7 @@ export class UISystem {
     let element: HTMLElement;
 
     switch (component.type) {
-      case 'button':
+      case 'button': {
         element = document.createElement('button');
         element.className = 'game-ui-button';
         (element as HTMLButtonElement).type = 'button';
@@ -230,6 +230,7 @@ export class UISystem {
         element.addEventListener('click', clickHandler);
         this.clickHandlers.set(element, clickHandler);
         break;
+      }
 
       case 'text':
         element = document.createElement('div');
@@ -248,7 +249,7 @@ export class UISystem {
         (element as HTMLImageElement).alt = component.elementId;
         break;
 
-      case 'slider':
+      case 'slider': {
         element = document.createElement('input');
         element.className = 'game-ui-slider';
         (element as HTMLInputElement).type = 'range';
@@ -256,7 +257,7 @@ export class UISystem {
         (element as HTMLInputElement).max = String(component.maxValue ?? 100);
         (element as HTMLInputElement).step = String(component.step ?? 1);
         (element as HTMLInputElement).value = String(component.value ?? component.minValue ?? 0);
-        
+
         const sliderChangeHandler = () => {
           if (component.enabled && component.visible) {
             const newValue = parseFloat((element as HTMLInputElement).value);
@@ -272,23 +273,25 @@ export class UISystem {
         element.addEventListener('input', sliderChangeHandler);
         this.clickHandlers.set(element, sliderChangeHandler);
         break;
+      }
 
-      case 'progress':
+      case 'progress': {
         element = document.createElement('div');
         element.className = 'game-ui-progress';
-        
+
         const progressBar = document.createElement('div');
         progressBar.className = 'game-ui-progress-bar';
         progressBar.style.width = `${((component.value ?? 0) * 100).toFixed(1)}%`;
         element.appendChild(progressBar);
-        
+
         const progressLabel = document.createElement('div');
         progressLabel.className = 'game-ui-progress-label';
         progressLabel.textContent = `${Math.round((component.value ?? 0) * 100)}%`;
         element.appendChild(progressLabel);
         break;
+      }
 
-      case 'input':
+      case 'input': {
         element = document.createElement('input');
         element.className = 'game-ui-input';
         (element as HTMLInputElement).type = component.inputType || 'text';
@@ -307,7 +310,7 @@ export class UISystem {
         } else {
           (element as HTMLInputElement).value = component.textContent || '';
         }
-        
+
         const inputChangeHandler = () => {
           if (component.enabled && component.visible) {
             const inputValue = (element as HTMLInputElement).value;
@@ -328,6 +331,7 @@ export class UISystem {
         element.addEventListener('change', inputChangeHandler);
         this.clickHandlers.set(element, inputChangeHandler);
         break;
+      }
 
       default:
         element = document.createElement('div');
@@ -402,7 +406,7 @@ export class UISystem {
         }
         break;
 
-      case 'slider':
+      case 'slider': {
         const slider = element as HTMLInputElement;
         if (typeof component.value === 'number') {
           slider.value = String(component.value);
@@ -423,8 +427,9 @@ export class UISystem {
           element.style.backgroundColor = component.backgroundColor;
         }
         break;
+      }
 
-      case 'progress':
+      case 'progress': {
         const progressBar = element.querySelector('.game-ui-progress-bar') as HTMLElement;
         const progressLabel = element.querySelector('.game-ui-progress-label') as HTMLElement;
         if (progressBar) {
@@ -444,8 +449,9 @@ export class UISystem {
           }
         }
         break;
+      }
 
-      case 'input':
+      case 'input': {
         const input = element as HTMLInputElement;
         if (component.inputType === 'number') {
           if (typeof component.value === 'number') {
@@ -552,4 +558,3 @@ export class UISystem {
     return false;
   }
 }
-

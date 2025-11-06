@@ -102,5 +102,3 @@ function validateJoint(pose: Pose, jointIndex: number): void {
     throw new RangeError(`jointIndex ${jointIndex} out of range [0, ${pose.jointCount - 1}]`);
   }
 }
-
-

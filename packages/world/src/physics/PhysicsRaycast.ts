@@ -7,7 +7,12 @@ import {
   dotVec3,
   transformVec3ByQuatOut,
 } from '@engine/core/math';
-import { PhysicsComponent, type BoxCollider, type SphereCollider, type CapsuleCollider } from '../components/PhysicsComponent.js';
+import {
+  PhysicsComponent,
+  type BoxCollider,
+  type SphereCollider,
+  type CapsuleCollider,
+} from '../components/PhysicsComponent.js';
 
 /**
  * Represents a ray for physics queries
@@ -124,7 +129,11 @@ export class PhysicsRaycast {
 
     // Transform back to world space
     const localPointTMP: Vec3 = [0, 0, 0];
-    const localPoint: Vec3 = addVec3Out(localPointTMP, localOrigin, scaleVec3Out([0,0,0], localDir, distance));
+    const localPoint: Vec3 = addVec3Out(
+      localPointTMP,
+      localOrigin,
+      scaleVec3Out([0, 0, 0], localDir, distance)
+    );
     const worldPoint = this.localToWorld(localPoint, entityPosition, entityRotation);
     const worldNormal: Vec3 = [0, 0, 0];
     transformVec3ByQuatOut(worldNormal, hitNormal, entityRotation);
@@ -132,7 +141,9 @@ export class PhysicsRaycast {
     {
       const len = Math.hypot(worldNormal[0], worldNormal[1], worldNormal[2]);
       if (len > this.EPSILON) {
-        worldNormal[0] /= len; worldNormal[1] /= len; worldNormal[2] /= len;
+        worldNormal[0] /= len;
+        worldNormal[1] /= len;
+        worldNormal[2] /= len;
       }
     }
 
@@ -177,17 +188,21 @@ export class PhysicsRaycast {
     const t2 = (-b + sqrtD) / (2.0 * a);
 
     // Use the closest positive intersection
-    let t = t1 >= 0 ? t1 : t2;
+    const t = t1 >= 0 ? t1 : t2;
 
     if (t < 0 || (ray.maxDistance !== undefined && t > ray.maxDistance)) {
       return null;
     }
 
-    const point = addVec3Out([0,0,0], ray.origin, scaleVec3Out([0,0,0], ray.direction, t));
-    const normal = subVec3Out([0,0,0], point, entityPosition);
+    const point = addVec3Out([0, 0, 0], ray.origin, scaleVec3Out([0, 0, 0], ray.direction, t));
+    const normal = subVec3Out([0, 0, 0], point, entityPosition);
     {
       const len = Math.hypot(normal[0], normal[1], normal[2]);
-      if (len > this.EPSILON) { normal[0]/=len; normal[1]/=len; normal[2]/=len; }
+      if (len > this.EPSILON) {
+        normal[0] /= len;
+        normal[1] /= len;
+        normal[2] /= len;
+      }
     }
 
     return {
@@ -214,7 +229,7 @@ export class PhysicsRaycast {
     transformVec3ByQuatOut(localDir, ray.direction, this.invertQuat(entityRotation));
 
     const radius = capsuleCollider.radius * Math.max(entityScale[0], entityScale[2]);
-    const halfHeight = (capsuleCollider.height * entityScale[1]) * 0.5 - radius;
+    const halfHeight = capsuleCollider.height * entityScale[1] * 0.5 - radius;
 
     // Capsule endpoints (along Y axis in local space)
     const p1: Vec3 = [0, -halfHeight, 0];
@@ -222,8 +237,8 @@ export class PhysicsRaycast {
 
     // Ray-capsule intersection
     const pa = localOrigin;
-    const ba = subVec3Out([0,0,0], p2, p1);
-    const oa = subVec3Out([0,0,0], pa, p1);
+    const ba = subVec3Out([0, 0, 0], p2, p1);
+    const oa = subVec3Out([0, 0, 0], pa, p1);
 
     const baba = dotVec3(ba, ba);
     const bard = dotVec3(ba, localDir);
@@ -246,20 +261,28 @@ export class PhysicsRaycast {
           return null;
         }
 
-        const localPoint = addVec3Out([0,0,0], localOrigin, scaleVec3Out([0,0,0], localDir, t));
+        const localPoint = addVec3Out([0, 0, 0], localOrigin, scaleVec3Out([0, 0, 0], localDir, t));
         const worldPoint = this.localToWorld(localPoint, entityPosition, entityRotation);
 
         // Calculate normal
-        const capsulePoint = addVec3Out([0,0,0], p1, scaleVec3Out([0,0,0], ba, y / baba));
-        const localNormal = subVec3Out([0,0,0], localPoint, capsulePoint);
+        const capsulePoint = addVec3Out([0, 0, 0], p1, scaleVec3Out([0, 0, 0], ba, y / baba));
+        const localNormal = subVec3Out([0, 0, 0], localPoint, capsulePoint);
         {
           const len = Math.hypot(localNormal[0], localNormal[1], localNormal[2]);
-          if (len > this.EPSILON) { localNormal[0]/=len; localNormal[1]/=len; localNormal[2]/=len; }
+          if (len > this.EPSILON) {
+            localNormal[0] /= len;
+            localNormal[1] /= len;
+            localNormal[2] /= len;
+          }
         }
-        const worldNormal = transformVec3ByQuatOut([0,0,0], localNormal, entityRotation);
+        const worldNormal = transformVec3ByQuatOut([0, 0, 0], localNormal, entityRotation);
         {
           const len = Math.hypot(worldNormal[0], worldNormal[1], worldNormal[2]);
-          if (len > this.EPSILON) { worldNormal[0]/=len; worldNormal[1]/=len; worldNormal[2]/=len; }
+          if (len > this.EPSILON) {
+            worldNormal[0] /= len;
+            worldNormal[1] /= len;
+            worldNormal[2] /= len;
+          }
         }
 
         return {
@@ -275,7 +298,7 @@ export class PhysicsRaycast {
       let closestHit: { hit: boolean; distance: number; point: Vec3; normal: Vec3 } | null = null;
 
       for (const cap of caps) {
-        const oc = subVec3Out([0,0,0], localOrigin, cap);
+        const oc = subVec3Out([0, 0, 0], localOrigin, cap);
         const a2 = dotVec3(localDir, localDir);
         const b2 = 2.0 * dotVec3(oc, localDir);
         const c2 = dotVec3(oc, oc) - radius * radius;
@@ -287,17 +310,29 @@ export class PhysicsRaycast {
 
           if (t1 >= 0 && (ray.maxDistance === undefined || t1 <= ray.maxDistance)) {
             if (!closestHit || t1 < closestHit.distance) {
-              const localPoint = addVec3Out([0,0,0], localOrigin, scaleVec3Out([0,0,0], localDir, t1));
+              const localPoint = addVec3Out(
+                [0, 0, 0],
+                localOrigin,
+                scaleVec3Out([0, 0, 0], localDir, t1)
+              );
               const worldPoint = this.localToWorld(localPoint, entityPosition, entityRotation);
-              const localNormal = subVec3Out([0,0,0], localPoint, cap);
+              const localNormal = subVec3Out([0, 0, 0], localPoint, cap);
               {
                 const len = Math.hypot(localNormal[0], localNormal[1], localNormal[2]);
-                if (len > this.EPSILON) { localNormal[0]/=len; localNormal[1]/=len; localNormal[2]/=len; }
+                if (len > this.EPSILON) {
+                  localNormal[0] /= len;
+                  localNormal[1] /= len;
+                  localNormal[2] /= len;
+                }
               }
-              const worldNormal = transformVec3ByQuatOut([0,0,0], localNormal, entityRotation);
+              const worldNormal = transformVec3ByQuatOut([0, 0, 0], localNormal, entityRotation);
               {
                 const len = Math.hypot(worldNormal[0], worldNormal[1], worldNormal[2]);
-                if (len > this.EPSILON) { worldNormal[0]/=len; worldNormal[1]/=len; worldNormal[2]/=len; }
+                if (len > this.EPSILON) {
+                  worldNormal[0] /= len;
+                  worldNormal[1] /= len;
+                  worldNormal[2] /= len;
+                }
               }
 
               closestHit = {
@@ -346,27 +381,30 @@ export class PhysicsRaycast {
       let result: { hit: boolean; distance: number; point: Vec3; normal: Vec3 } | null = null;
 
       switch (collider.shape) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
         case 'box':
           result = this.rayBoxIntersection(
             ray,
-            collider as BoxCollider,
+            collider,
             entity.transform.position,
             entity.transform.rotation,
             entity.transform.scale
           );
           break;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
         case 'sphere':
           result = this.raySphereIntersection(
             ray,
-            collider as SphereCollider,
+            collider,
             entity.transform.position,
             entity.transform.scale
           );
           break;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
         case 'capsule':
           result = this.rayCapsuleIntersection(
             ray,
-            collider as CapsuleCollider,
+            collider,
             entity.transform.position,
             entity.transform.rotation,
             entity.transform.scale
@@ -394,18 +432,26 @@ export class PhysicsRaycast {
   /**
    * Helper: Transform point from world to local space
    */
-  private static worldToLocal(point: Vec3, position: Vec3, rotation: [number, number, number, number]): Vec3 {
+  private static worldToLocal(
+    point: Vec3,
+    position: Vec3,
+    rotation: [number, number, number, number]
+  ): Vec3 {
     const translated: Vec3 = [0, 0, 0];
     subVec3Out(translated, point, position);
-    return transformVec3ByQuatOut([0,0,0], translated, this.invertQuat(rotation));
+    return transformVec3ByQuatOut([0, 0, 0], translated, this.invertQuat(rotation));
   }
 
   /**
    * Helper: Transform point from local to world space
    */
-  private static localToWorld(point: Vec3, position: Vec3, rotation: [number, number, number, number]): Vec3 {
-    const rotated = transformVec3ByQuatOut([0,0,0], point, rotation);
-    return addVec3Out([0,0,0], rotated, position);
+  private static localToWorld(
+    point: Vec3,
+    position: Vec3,
+    rotation: [number, number, number, number]
+  ): Vec3 {
+    const rotated = transformVec3ByQuatOut([0, 0, 0], point, rotation);
+    return addVec3Out([0, 0, 0], rotated, position);
   }
 
   /**
@@ -415,4 +461,3 @@ export class PhysicsRaycast {
     return [-q[0], -q[1], -q[2], q[3]];
   }
 }
-

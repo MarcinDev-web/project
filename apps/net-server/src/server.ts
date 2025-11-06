@@ -1,6 +1,13 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
+import {
+  getCorsConfig,
+  isOriginAllowed,
+  describeAllowedOrigins,
+  CORS_ALLOWED_HEADERS,
+  CORS_ALLOWED_METHODS,
+} from '@shared/config/cors';
 import { ProjectStorage } from './storage/ProjectStorage.js';
 import { AuthManager } from './auth/AuthManager.js';
 import { createAuthMiddleware, requireAdmin, requireModerator } from './auth/middleware.js';
@@ -109,8 +116,6 @@ const WS_PORT = process.env.WS_PORT
     : 3001;
 const DATA_DIR = process.env.DATA_DIR || './data';
 const THUMBNAIL_DIR = path.join(DATA_DIR, 'thumbnails');
-// Default frontend URLs: editor (5173) and platform (5174)
-const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173,http://localhost:5174';
 const isProduction = process.env.NODE_ENV === 'production';
 
 // Set default JWT secrets for development if not provided (must be at least 32 chars)
@@ -286,6 +291,10 @@ const userCarts = new Map<
 type ResaleListing = { sellerId: string; price: CurrencyAmount; createdAt: number };
 const resaleListings = new Map<string, ResaleListing[]>();
 
+const corsConfig = getCorsConfig();
+const FRONTEND_URL = corsConfig.primaryOrigin;
+const allowedOriginsDescription = describeAllowedOrigins(corsConfig);
+
 // Register plugins
 await app.register(cookie);
 await app.register(cors, {
@@ -294,16 +303,20 @@ await app.register(cors, {
     if (!origin) {
       return cb(null, true);
     }
-    const allowedOrigins = FRONTEND_URL.split(',').map((origin) => origin.trim());
-    // Check if origin is in allowed list
-    if (allowedOrigins.includes(origin)) {
+
+    if (isOriginAllowed(origin, corsConfig)) {
       return cb(null, true);
     }
+
+    securityLogger.logSuspiciousActivity(
+      undefined,
+      `Blocked CORS origin: ${origin}. Allowed: ${allowedOriginsDescription}`
+    );
     cb(new Error('Not allowed by CORS'), false);
   },
   credentials: true,
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  methods: CORS_ALLOWED_METHODS,
+  allowedHeaders: CORS_ALLOWED_HEADERS,
   maxAge: 86400, // 24 hours
 });
 
@@ -439,7 +452,23 @@ void authManager.initialize().then(async () => {
 
   // Initialize WebSocket server after auth is ready
 
-  const wsHandler = new WebSocketHandler(WS_PORT, sessionManager, authManager, messageHandler);
+  const wsHandler = isProduction
+    ? new WebSocketHandler(
+        { server: app.server, path: '/ws' },
+        sessionManager,
+        authManager,
+        messageHandler,
+        friendsStorage,
+        corsConfig
+      )
+    : new WebSocketHandler(
+        { port: WS_PORT },
+        sessionManager,
+        authManager,
+        messageHandler,
+        friendsStorage,
+        corsConfig
+      );
   // wsHandler is kept alive by its internal WebSocket server
   void wsHandler;
 });

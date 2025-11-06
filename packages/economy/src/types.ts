@@ -55,4 +55,3 @@ export enum TransactionType {
  * Player/wallet identifier.
  */
 export type WalletId = string;
-

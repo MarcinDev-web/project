@@ -78,7 +78,7 @@ export class ProjectileSystem {
     this.collisionListener = (event: CollisionEvent) => {
       this.handleCollision(event);
     };
-    
+
     this.physicsSystem.onCollision(this.collisionListener);
   }
 
@@ -91,9 +91,21 @@ export class ProjectileSystem {
     const projectileB = event.entityB.getComponent(ProjectileComponent);
 
     if (projectileA) {
-      this.onProjectileHit(event.entityA, projectileA, event.entityB, event.contactPoint, event.normal);
+      this.onProjectileHit(
+        event.entityA,
+        projectileA,
+        event.entityB,
+        event.contactPoint,
+        event.normal
+      );
     } else if (projectileB) {
-      this.onProjectileHit(event.entityB, projectileB, event.entityA, event.contactPoint, event.normal);
+      this.onProjectileHit(
+        event.entityB,
+        projectileB,
+        event.entityA,
+        event.contactPoint,
+        event.normal
+      );
     }
   }
 
@@ -115,7 +127,7 @@ export class ProjectileSystem {
     // Apply damage to hit entity
     const health = hitEntity.getComponent(HealthComponent);
     let damageDealt = 0;
-    
+
     if (health) {
       damageDealt = health.takeDamage(projectile.damage);
     }
@@ -180,4 +192,3 @@ export class ProjectileSystem {
     return this.currentTime;
   }
 }
-

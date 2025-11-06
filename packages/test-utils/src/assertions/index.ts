@@ -68,15 +68,39 @@ export async function expectToExecuteWithin(fn: () => void | Promise<void>, maxM
 /**
  * Assert that memory is properly cleaned up (no leaks)
  */
-export function expectNoMemoryLeak(
-  setup: () => any,
-  teardown: (obj: any) => void,
-  iterations = 100
-) {
-  // Force initial GC if available
-  if (global.gc) global.gc();
+interface PerformanceWithMemory extends Performance {
+  memory?: {
+    usedJSHeapSize?: number;
+  };
+}
 
-  const initial = (performance as any).memory?.usedJSHeapSize ?? 0;
+type DisposableLike = {
+  isDisposed?: boolean;
+  destroyed?: boolean;
+  listenerCount?: () => number;
+};
+
+function runGcIfAvailable(): void {
+  const maybeGc = (globalThis as typeof globalThis & { gc?: () => void }).gc;
+  if (maybeGc) {
+    maybeGc();
+  }
+}
+
+function getUsedJsHeapSize(perf: PerformanceWithMemory): number {
+  const used = perf.memory?.usedJSHeapSize;
+  return typeof used === 'number' ? used : 0;
+}
+
+export function expectNoMemoryLeak<T>(
+  setup: () => T,
+  teardown: (obj: T) => void,
+  iterations = 100
+): void {
+  // Force initial GC if available
+  runGcIfAvailable();
+
+  const initial = getUsedJsHeapSize(performance as PerformanceWithMemory);
 
   // Run multiple iterations
   for (let i = 0; i < iterations; i++) {
@@ -85,11 +109,12 @@ export function expectNoMemoryLeak(
   }
 
   // Force GC again
-  if (global.gc) global.gc();
+  runGcIfAvailable();
 
-  const final = (performance as any).memory?.usedJSHeapSize ?? 0;
+  const final = getUsedJsHeapSize(performance as PerformanceWithMemory);
   const growth = final - initial;
-  const growthPercent = (growth / initial) * 100;
+  const denominator = initial === 0 ? 1 : initial;
+  const growthPercent = (growth / denominator) * 100;
 
   // Allow for some growth (10%) but not significant leaks
   expect(growthPercent).toBeLessThan(10);
@@ -98,16 +123,16 @@ export function expectNoMemoryLeak(
 /**
  * Assert that an object is properly disposed (all resources freed)
  */
-export function expectToBeDisposed(obj: any) {
+export function expectToBeDisposed(obj: DisposableLike): void {
   // Check common disposal indicators
-  if ('isDisposed' in obj) {
+  if (typeof obj.isDisposed === 'boolean') {
     expect(obj.isDisposed).toBe(true);
   }
-  if ('destroyed' in obj) {
+  if (typeof obj.destroyed === 'boolean') {
     expect(obj.destroyed).toBe(true);
   }
   // Check that no listeners remain
-  if ('listenerCount' in obj) {
+  if (typeof obj.listenerCount === 'function') {
     expect(obj.listenerCount()).toBe(0);
   }
 }

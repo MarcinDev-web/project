@@ -1,8 +1,18 @@
 import type { Scene } from '../core/Scene.js';
 
-export interface RecipeIngredient { id: string; quantity: number }
-export interface RecipeOutput { id: string; quantity: number }
-export interface Recipe { id: string; inputs: RecipeIngredient[]; outputs: RecipeOutput[]; }
+export interface RecipeIngredient {
+  id: string;
+  quantity: number;
+}
+export interface RecipeOutput {
+  id: string;
+  quantity: number;
+}
+export interface Recipe {
+  id: string;
+  inputs: RecipeIngredient[];
+  outputs: RecipeOutput[];
+}
 
 export class CraftingSystem {
   // @ts-expect-error - Reserved for future use
@@ -18,7 +28,7 @@ export class CraftingSystem {
     this.recipes.set(recipe.id, recipe);
   }
 
-  hasRecipe(id: string): boolean { return this.recipes.has(id); }
+  hasRecipe(id: string): boolean {
+    return this.recipes.has(id);
+  }
 }
-
-

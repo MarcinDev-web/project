@@ -99,6 +99,8 @@ export default defineWorkspace([
           '@engine/net/*': resolve(__dirname, 'packages/net/src/*'),
           '@engine/net-protocol': resolve(__dirname, 'packages/net-protocol/src'),
           '@engine/net-protocol/*': resolve(__dirname, 'packages/net-protocol/src/*'),
+          '@shared': resolve(__dirname, 'shared'),
+          '@shared/*': resolve(__dirname, 'shared/*'),
         },
         conditions: ['test', 'development', 'import', 'module'],
       },

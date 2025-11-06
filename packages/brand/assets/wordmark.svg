@@ -1,14 +1,14 @@
 <svg width="400" height="80" viewBox="0 0 400 80" xmlns="http://www.w3.org/2000/svg">
-  <!-- FORGE Worlds Wordmark -->
+  <!-- Forge World Wordmark -->
   
   <!-- FORGE text -->
   <text x="20" y="50" font-family="Inter, Roboto, sans-serif" font-size="48" font-weight="700" fill="#ffffff" letter-spacing="-1">
     FORGE
   </text>
   
-  <!-- WORLDS text (smaller, lighter) -->
+  <!-- WORLD text (smaller, lighter) -->
   <text x="180" y="50" font-family="Inter, Roboto, sans-serif" font-size="32" font-weight="500" fill="#8a8a8a" letter-spacing="0">
-    WORLDS
+    WORLD
   </text>
   
   <!-- Accent line (hot orange) -->

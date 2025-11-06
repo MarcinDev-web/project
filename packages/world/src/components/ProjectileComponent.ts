@@ -116,4 +116,3 @@ export class ProjectileComponent extends Component {
 }
 
 registerComponent(ProjectileComponent.type, ProjectileComponent);
-

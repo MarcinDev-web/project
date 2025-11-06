@@ -11,31 +11,59 @@
  * This is the core rendering loop extracted from the main Renderer.
  */
 
-import type { Scene, Entity, RgbaColor } from '@engine/world';
-import { MaterialComponent } from '@engine/world';
+import type { Scene, Entity } from '@engine/world';
+import { EnvironmentComponent } from '@engine/world';
 import type { FrameResources, GeometryData } from '../resources/resources';
-import { createDepthTexture, createMsaaColorTarget, createHdrColorTarget } from '../resources/resources';
 import { FrustumCuller } from './FrustumCuller';
 import { InstanceDataBuilder, type CustomGeometryEntity } from './InstanceManager';
 import { GeometryCache } from './GeometryCache';
-import { GPUBufferPool } from './bufferPool';
 import { ComputePrepass } from './ComputePrepass';
-import { EnvironmentComponent } from '@engine/world';
 import type { EnvironmentRenderer } from '../renderers/EnvironmentRenderer';
 import type { WaterRenderer } from '../renderers/WaterRenderer';
 import type { LogicConnectionRenderer } from '../LogicConnectionRenderer';
-import { mat4Invert, mat4FromQuatTranslation, mat4Scale, type Mat4, type Vec3, type Quat } from '@engine/core/math';
 import { Logger } from '@engine/core/utils';
-import { CLEAR_COLOR, MSAA_SAMPLE_COUNT, TIMESTAMP_QUERY_COUNT, TIMESTAMP_BUFFER_SIZE, GPU_TIMESTAMP_PAIRS, TIMESTAMP_INDICES } from '../config';
-import { TonemapLutPass } from '../postprocess/TonemapLut';
-import { BloomPass } from '../postprocess/Bloom';
-import { FXAAPass } from '../postprocess/FXAAPass';
+import { mat4Invert, type Mat4, type Vec3 } from '@engine/core/math';
+import {
+  CLEAR_COLOR,
+  MSAA_SAMPLE_COUNT,
+  TIMESTAMP_QUERY_COUNT,
+  TIMESTAMP_BUFFER_SIZE,
+  GPU_TIMESTAMP_PAIRS,
+  TIMESTAMP_INDICES,
+} from '../config';
 import { ForwardPlus, type PointLight } from '../lighting/ForwardPlus';
 import { ScreenSpaceLOD } from './ScreenSpaceLOD';
-import { SSAOPass } from '../postprocess/SSAO';
 import { UniformManager } from './UniformManager';
 import { ShadowPass } from '../shadows/ShadowPass';
-import { NormalRenderPass } from './NormalRenderPass';
+import { FrameTargetManager } from './FrameTargetManager';
+import {
+  PostProcessPipeline,
+  type PostProcessFeatureFlags,
+  type PostProcessInputs,
+} from './PostProcessPipeline';
+import { CustomGeometryRenderer } from './CustomGeometryRenderer';
+import {
+  updateInstanceBuffers,
+  reallocateInstanceBuffers,
+  type InstanceBufferData,
+} from './InstanceBufferUtils';
+import type { GPUBufferPool } from './bufferPool';
+
+interface ResolvedFeatureFlags extends PostProcessFeatureFlags {
+  enableComputePrepass: boolean;
+  enableShadows: boolean;
+  enableForwardPlus: boolean;
+  enableScreenLOD: boolean;
+}
+
+interface SceneUpdateResult {
+  geometry: GeometryData;
+  timings?: {
+    cullingTime: number;
+    instanceUpdateTime: number;
+    totalCPUTime: number;
+  };
+}
 
 export interface FrameRenderContext {
   device: GPUDevice;
@@ -58,23 +86,20 @@ export interface FrameRenderContext {
   uniformManager: UniformManager;
   lightingData?: import('../lighting/LightManager').LightingData;
   onShadowMetrics?: (counts: readonly [number, number, number, number]) => void;
-  // Performance/quality flags
   featureFlags?: {
     enableComputePrepass?: boolean;
     enableShadows?: boolean;
     enableBloom?: boolean;
-    enableHDR?: boolean; // reserved for HDR toggle path (later todo)
-    enableSSAO?: boolean; // Screen Space Ambient Occlusion
-    enableFXAA?: boolean; // Fast Approximate Anti-Aliasing
-    enableForwardPlus?: boolean; // Forward+ tiled light culling
-    enableScreenLOD?: boolean; // Screen-space LOD selection
+    enableHDR?: boolean;
+    enableSSAO?: boolean;
+    enableFXAA?: boolean;
+    enableForwardPlus?: boolean;
+    enableScreenLOD?: boolean;
   };
   shadowQuality?: 'low' | 'med' | 'high' | 'ultra';
   msaaSampleCount?: number;
-  time?: number; // Current time for animation
-  // Internal: device used to configure the context (for validation)
+  time?: number;
   configuredDevice?: GPUDevice;
-  // Internal: device that was used to create frameResources (for validation)
   frameResourcesDevice?: GPUDevice;
 }
 
@@ -82,15 +107,14 @@ export interface FrameRenderContext {
  * FrameRenderer manages the per-frame rendering operations.
  */
 export class FrameRenderer {
-  private static readonly TEXTURE_CLEANUP_DELAY_MS = 100;
-  private static readonly TEXTURE_CLEANUP_FALLBACK_DELAY_MS = 200;
-
   private frustumCuller: FrustumCuller;
   private instanceBuilder: InstanceDataBuilder;
   private geometryCache: GeometryCache;
+  private customRenderer: CustomGeometryRenderer;
+  private frameTargets: FrameTargetManager;
+  private postProcess: PostProcessPipeline;
   private visibleEntitiesCache: Entity[] = [];
   private customGeometryEntitiesCache: CustomGeometryEntity[] = [];
-  private depthTextureSize = { width: 0, height: 0 };
   private computePrepass: ComputePrepass | null = null;
   private pendingTimestampRead = false;
   private staticBundle: GPURenderBundle | null = null;
@@ -103,43 +127,21 @@ export class FrameRenderer {
   private bundleOverlayPipeline: GPURenderPipeline | null = null;
   private bundleUniformBindGroup: GPUBindGroup | null = null;
   private bundleTextureBindGroup: GPUBindGroup | null = null;
-  private pendingTextureCleanup: GPUTexture[] = [];
-  // Postprocess resources
-  private hdrColorTexture: GPUTexture | null = null;
-  private bloomTexture: GPUTexture | null = null;
-  private normalTexture: GPUTexture | null = null;
-  private ssaoTexture: GPUTexture | null = null;
-  private resolvedDepthTexture: GPUTexture | null = null;
-  private resolvedDepthView: GPUTextureView | null = null;
-  private hdrColorView: GPUTextureView | null = null;
-  private bloomTextureView: GPUTextureView | null = null;
-  private normalTextureView: GPUTextureView | null = null;
-  private ssaoTextureView: GPUTextureView | null = null;
-  private tonemapPass: TonemapLutPass | null = null;
-  private bloomPass: BloomPass | null = null;
-  private fxaaPass: FXAAPass | null = null;
-  private ssaoPass: SSAOPass | null = null;
   private forwardPlus: ForwardPlus | null = null;
   private screenSpaceLOD: ScreenSpaceLOD | null = null;
   private shadowPass: ShadowPass | null = null;
-  private normalRenderPass: NormalRenderPass | null = null;
-  private tonemapOutputTexture: GPUTexture | null = null;
-  private tonemapOutputView: GPUTextureView | null = null;
-  // Depth resolve for converting multisampled depth to single-sampled
-  private depthResolvePipeline: GPURenderPipeline | null = null;
-  private depthResolveLayout: GPUBindGroupLayout | null = null;
-  private depthResolveUniformBuffer: GPUBuffer | null = null;
+  private instanceScaleScratch = new Float32Array(0);
+  private ownedLodScaleBuffer: GPUBuffer | null = null;
 
   constructor(initialCapacity = 1000) {
     this.frustumCuller = new FrustumCuller();
     this.instanceBuilder = new InstanceDataBuilder(initialCapacity);
     this.geometryCache = new GeometryCache();
+    this.customRenderer = new CustomGeometryRenderer(this.geometryCache);
+    this.frameTargets = new FrameTargetManager();
+    this.postProcess = new PostProcessPipeline();
   }
 
-  /**
-   * Renders a single frame.
-   * Returns updated geometry data.
-   */
   renderFrame(
     ctx: FrameRenderContext,
     viewProjectionMatrix: Mat4,
@@ -148,128 +150,175 @@ export class FrameRenderer {
     viewMatrix?: Mat4,
     projectionMatrix?: Mat4
   ): GeometryData {
-    const { device, canvas, context, frameResources, scene, environmentRenderer, gridRenderer } = ctx;
-    let { geometry } = ctx;
+    const { device, frameResources } = ctx;
+    let geometry = ctx.geometry;
 
-    // Handle canvas resize (recreate depth/MSAA textures if needed)
-    if (this.depthTextureSize.width !== canvas.width || this.depthTextureSize.height !== canvas.height) {
-      this.enqueueTextureCleanup(frameResources.depthTexture);
-      this.enqueueTextureCleanup(frameResources.msaaColorTexture);
-      this.enqueueTextureCleanup(this.hdrColorTexture);
-      this.enqueueTextureCleanup(this.bloomTexture);
-      this.enqueueTextureCleanup(this.normalTexture);
-      this.enqueueTextureCleanup(this.ssaoTexture);
-      this.enqueueTextureCleanup(this.resolvedDepthTexture);
-      this.enqueueTextureCleanup(this.tonemapOutputTexture);
-      this.hdrColorTexture = null;
-      this.bloomTexture = null;
-      this.normalTexture = null;
-      this.ssaoTexture = null;
-      this.resolvedDepthTexture = null;
-      this.tonemapOutputTexture = null;
-      this.hdrColorView = null;
-      this.bloomTextureView = null;
-      this.tonemapOutputView = null;
-      this.normalTextureView = null;
-      this.ssaoTextureView = null;
-      this.resolvedDepthView = null;
-      const sampleCount = ctx.msaaSampleCount ?? MSAA_SAMPLE_COUNT;
-      frameResources.depthTexture = createDepthTexture(device, canvas, sampleCount);
-      frameResources.depthTextureView = frameResources.depthTexture.createView({
-        label: 'frame-depth-view',
-      });
-      // Create resolved (non-multisampled) depth texture for post-processing (SSAO)
-      const enableSSAO = ctx.featureFlags?.enableSSAO !== false;
-      if (enableSSAO && sampleCount > 1) {
-        this.resolvedDepthTexture = createDepthTexture(device, canvas, 1);
-        this.resolvedDepthView = this.resolvedDepthTexture.createView({
-          label: 'resolved-depth-view',
-        });
-      }
-      frameResources.msaaColorTexture = createMsaaColorTarget(
-        device,
-        canvas,
-        'rgba16float',
-        sampleCount
-      );
-      frameResources.msaaColorView = frameResources.msaaColorTexture.createView({
-        label: 'frame-msaa-color-view',
-      });
-      const enableHDR = ctx.featureFlags?.enableHDR !== false;
-      const enableBloom = ctx.featureFlags?.enableBloom !== false;
-      if (enableHDR) {
-        this.hdrColorTexture = createHdrColorTarget(device, canvas);
-        this.hdrColorView = this.hdrColorTexture.createView();
-        if (enableBloom) {
-          // Half-resolution bloom target
-          const halfW = Math.max(1, Math.floor(canvas.width / 2));
-          const halfH = Math.max(1, Math.floor(canvas.height / 2));
-          this.bloomTexture = device.createTexture({
-            label: 'frame-bloom-texture',
-            size: { width: halfW, height: halfH, depthOrArrayLayers: 1 },
-            format: 'rgba16float',
-            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-          });
-          this.bloomTextureView = this.bloomTexture.createView();
-        }
-      }
-      // Normal texture for G-buffer (SSAO needs normals)
-      // Single-sampled since it needs to be sampled by shaders
-      if (enableSSAO) {
-        this.normalTexture = device.createTexture({
-          label: 'frame-normal-texture',
-          size: { width: canvas.width, height: canvas.height, depthOrArrayLayers: 1 },
-          format: 'rgba16float',
-          usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-          sampleCount: 1, // Single-sampled for shader sampling
-        });
-        this.normalTextureView = this.normalTexture.createView();
-        // SSAO output texture
-        this.ssaoTexture = device.createTexture({
-          label: 'frame-ssao-texture',
-          size: { width: canvas.width, height: canvas.height, depthOrArrayLayers: 1 },
-          format: 'rgba16float',
-          usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-        });
-        this.ssaoTextureView = this.ssaoTexture.createView();
-      }
-      this.depthTextureSize = { width: canvas.width, height: canvas.height };
+    const configuredDevice = this.validateConfiguredDevice(ctx);
+    if (!configuredDevice) {
+      return geometry;
     }
-    
-    // CRITICAL: Validate device consistency FIRST
-    // The encoder and all textures must be associated with the same device
-    // The context's getCurrentTexture() returns a texture associated with configuredDevice
-    // We must use configuredDevice throughout this frame
-    const configuredDevice = ctx.configuredDevice ?? device;
-    if (device !== configuredDevice) {
-      Logger.warn('Device mismatch in FrameRenderer - skipping frame to avoid WebGPU errors');
+    if (!this.validateFrameResourcesDevice(ctx)) {
       return geometry;
     }
 
-    // CRITICAL: Validate that frameResources match the current device
-    // After device recreation, frameResources may be invalid (created with old device)
-    const frameResourcesDevice = ctx.frameResourcesDevice ?? device;
-    if (device !== frameResourcesDevice) {
-      Logger.warn(
-        'FrameResources device mismatch - resources were created with different device. ' +
-        'Skipping frame to avoid WebGPU errors. Device may have been recreated.'
-      );
-      return geometry;
-    }
+    const featureFlags = this.resolveFeatureFlags(ctx.featureFlags);
+    const sampleCount = ctx.msaaSampleCount ?? MSAA_SAMPLE_COUNT;
 
-    // Create encoder FIRST with configuredDevice to lock device context
-    // This ensures all subsequent resources are created with the same device
+    const targetState = this.frameTargets.ensureTargets(ctx, frameResources, {
+      sampleCount,
+      enableHDR: featureFlags.enableHDR,
+      enableBloom: featureFlags.enableBloom,
+      enableSSAO: featureFlags.enableSSAO,
+      enableFXAA: featureFlags.enableFXAA,
+    });
+
     const encoder = configuredDevice.createCommandEncoder({ label: 'frame-encoder' });
-    
-    // Get swap chain texture AFTER creating encoder to minimize chance of device change
-    // CRITICAL: getCurrentTexture() must return texture from the same device as encoder
-    let swapChainTexture: GPUTexture;
+    const swapChainTexture = this.acquireSwapChainTexture(ctx, configuredDevice, encoder);
+    if (!swapChainTexture) {
+      return geometry;
+    }
+    const swapChainView = swapChainTexture.createView({ label: 'frame-color-resolve-view' });
+
+    this.writeFrameBeginTimestamp(frameResources, encoder);
+
+    const sceneUpdate = this.updateScene(ctx, geometry, viewProjectionMatrix);
+    geometry = sceneUpdate.geometry;
+
+    this.runScreenSpaceLOD(
+      ctx,
+      featureFlags,
+      encoder,
+      viewProjectionMatrix,
+      eyePosition,
+      geometry,
+      frameResources,
+      viewMatrix,
+      projectionMatrix
+    );
+
+    this.runShadowPass(ctx, featureFlags, encoder, frameResources, geometry, viewMatrix, projectionMatrix);
+
+    this.runForwardPlus(ctx, featureFlags, encoder, viewProjectionMatrix, viewMatrix, eyePosition);
+    this.runComputePrepass(ctx, featureFlags, encoder, frameResources);
+
+    const renderPass = this.beginMainPass(
+      encoder,
+      frameResources,
+      targetState,
+      swapChainView,
+      featureFlags,
+      passDescriptor
+    );
+
+    this.renderEnvironment(ctx, renderPass, viewProjectionMatrix, eyePosition);
+    this.renderStaticGeometry(renderPass, ctx, geometry, frameResources, sampleCount);
+    this.customRenderer.render({
+      encoder: renderPass,
+      device,
+      frameResources,
+      entities: this.customGeometryEntitiesCache,
+    });
+    this.renderWater(ctx, renderPass, viewProjectionMatrix, eyePosition);
+    this.renderGrid(ctx, renderPass, viewProjectionMatrix);
+    this.renderLogicConnections(ctx, renderPass, viewProjectionMatrix, eyePosition);
+
+    renderPass.end();
+
+    this.postProcess.run(
+      this.buildPostProcessInputs(ctx, featureFlags, targetState, {
+        encoder,
+        geometry,
+        frameResources,
+        swapChainView,
+        sampleCount,
+        viewMatrix,
+        projectionMatrix,
+      })
+    );
+
+    this.writeFrameEndTimestamp(frameResources, encoder);
+    this.resolveTimestampQueries(frameResources, encoder);
+
+    const commandBuffer = encoder.finish();
+    this.submitAndCleanup(configuredDevice, commandBuffer, encoder);
+    this.frameTargets.flush(configuredDevice.queue);
+    this.postProcess.flush(configuredDevice.queue);
+
+    this.handleTimestampRead(ctx, device, frameResources);
+
+    if (sceneUpdate.timings && ctx.onCpuTimings) {
+      ctx.onCpuTimings(sceneUpdate.timings);
+    }
+
+    return geometry;
+  }
+
+  dispose(): void {
     try {
-      swapChainTexture = context.getCurrentTexture();
-      // Additional validation: In WebGPU, textures are implicitly associated with their device
-      // We can't directly check texture.device, but we can verify the context is configured
-      // with the correct device by ensuring configuredDevice hasn't changed
-      const currentConfigured = ctx.configuredDevice ?? device;
+      this.computePrepass?.dispose();
+    } catch {
+      // ignore
+    }
+    this.computePrepass = null;
+    this.forwardPlus?.dispose?.();
+    this.forwardPlus = null;
+    this.screenSpaceLOD?.dispose?.();
+    this.screenSpaceLOD = null;
+    this.shadowPass?.dispose?.();
+    this.shadowPass = null;
+    this.postProcess.dispose();
+    this.frameTargets.dispose();
+    this.invalidateBundle();
+    this.pendingTimestampRead = false;
+    try {
+      this.ownedLodScaleBuffer?.destroy();
+    } catch {
+      // ignore
+    }
+    this.ownedLodScaleBuffer = null;
+  }
+
+  private resolveFeatureFlags(flags: FrameRenderContext['featureFlags']): ResolvedFeatureFlags {
+    return {
+      enableComputePrepass: flags?.enableComputePrepass !== false,
+      enableShadows: flags?.enableShadows !== false,
+      enableBloom: flags?.enableBloom !== false,
+      enableHDR: flags?.enableHDR !== false,
+      enableSSAO: flags?.enableSSAO !== false,
+      enableFXAA: flags?.enableFXAA === true,
+      enableForwardPlus: flags?.enableForwardPlus !== false,
+      enableScreenLOD: flags?.enableScreenLOD !== false,
+    };
+  }
+
+  private validateConfiguredDevice(ctx: FrameRenderContext): GPUDevice | null {
+    const configuredDevice = ctx.configuredDevice ?? ctx.device;
+    if (ctx.device !== configuredDevice) {
+      Logger.warn('Device mismatch in FrameRenderer - skipping frame to avoid WebGPU errors');
+      return null;
+    }
+    return configuredDevice;
+  }
+
+  private validateFrameResourcesDevice(ctx: FrameRenderContext): boolean {
+    const frameResourcesDevice = ctx.frameResourcesDevice ?? ctx.device;
+    if (ctx.device !== frameResourcesDevice) {
+      Logger.warn(
+        'FrameResources device mismatch - resources were created with different device. Skipping frame.'
+      );
+      return false;
+    }
+    return true;
+  }
+
+  private acquireSwapChainTexture(
+    ctx: FrameRenderContext,
+    configuredDevice: GPUDevice,
+    encoder: GPUCommandEncoder
+  ): GPUTexture | null {
+    try {
+      const texture = ctx.context.getCurrentTexture();
+      const currentConfigured = ctx.configuredDevice ?? ctx.device;
       if (currentConfigured !== configuredDevice) {
         Logger.warn('Device changed between encoder creation and texture acquisition - aborting');
         try {
@@ -277,304 +326,402 @@ export class FrameRenderer {
         } catch {
           // ignore
         }
-        return geometry;
+        return null;
       }
+      return texture;
     } catch (err) {
       Logger.warn('Failed to get current swap chain texture - device may have changed:', err);
-      // Clean up encoder if we can't get texture
       try {
         encoder.finish();
       } catch {
         // ignore
       }
-      return geometry;
+      return null;
     }
-    // Frame begin timestamp (surround entire frame)
-    if (frameResources.timestampQuerySet) {
+  }
+
+  private writeFrameBeginTimestamp(frameResources: FrameResources, encoder: GPUCommandEncoder): void {
+    if (!frameResources.timestampQuerySet) {
+      return;
+    }
+    try {
+      (encoder as any).writeTimestamp?.(
+        frameResources.timestampQuerySet,
+        TIMESTAMP_INDICES.FRAME_BEGIN
+      );
+    } catch {
+      // ignore unsupported timestamp writes
+    }
+  }
+
+  private writeFrameEndTimestamp(frameResources: FrameResources, encoder: GPUCommandEncoder): void {
+    if (!frameResources.timestampQuerySet) {
+      return;
+    }
+    try {
+      (encoder as any).writeTimestamp?.(
+        frameResources.timestampQuerySet,
+        TIMESTAMP_INDICES.FRAME_END
+      );
+    } catch {
+      // ignore unsupported timestamp writes
+    }
+  }
+
+  private resolveTimestampQueries(frameResources: FrameResources, encoder: GPUCommandEncoder): void {
+    if (
+      !frameResources.timestampQuerySet ||
+      !frameResources.timestampResolveBuffer ||
+      !frameResources.timestampReadBuffer
+    ) {
+      return;
+    }
+    encoder.resolveQuerySet(
+      frameResources.timestampQuerySet,
+      0,
+      TIMESTAMP_QUERY_COUNT,
+      frameResources.timestampResolveBuffer,
+      0
+    );
+    encoder.copyBufferToBuffer(
+      frameResources.timestampResolveBuffer,
+      0,
+      frameResources.timestampReadBuffer,
+      0,
+      TIMESTAMP_BUFFER_SIZE
+    );
+  }
+
+  private submitAndCleanup(device: GPUDevice, commandBuffer: GPUCommandBuffer, encoder: GPUCommandEncoder): void {
+    device.queue.submit([commandBuffer]);
+    // Clear bloom temp textures reference - they'll be destroyed in next frame by BloomPass
+    (encoder as any).__bloomTempTextures = undefined;
+  }
+
+  private updateScene(
+    ctx: FrameRenderContext,
+    geometry: GeometryData,
+    viewProjectionMatrix: Mat4
+  ): SceneUpdateResult {
+    const { scene, device, frameResources } = ctx;
+    if (!scene) {
+      return { geometry };
+    }
+
+    try {
+      const cullStart = performance.now();
+      const frustum = this.frustumCuller.extractFrustumFromVP(viewProjectionMatrix);
+      const allEntities = scene.getActiveEntities();
+      this.frustumCuller.cullEntitiesToArray(allEntities, frustum, this.visibleEntitiesCache);
+      const cullingTime = performance.now() - cullStart;
+
+      const { defaultGeometry, customGeometry } = this.instanceBuilder.separateCustomGeometry(
+        this.visibleEntitiesCache
+      );
+      this.customGeometryEntitiesCache = customGeometry;
+
+      const instanceStart = performance.now();
+      const sceneData = this.instanceBuilder.build(defaultGeometry);
+      const instanceData: InstanceBufferData = {
+        instanceOffsetData: sceneData.instanceOffsetData,
+        instanceColorScaleData: sceneData.instanceColorScaleData,
+        instanceSecondaryColorData: sceneData.instanceSecondaryColorData,
+        instanceEmissiveColorData: sceneData.instanceEmissiveColorData,
+        instanceMaterialParamsData: sceneData.instanceMaterialParamsData,
+        instanceRotationData: sceneData.instanceRotationData,
+        instanceMaterialIdData: sceneData.instanceMaterialIdData,
+      };
+
+      if (geometry.instanceCount === sceneData.instanceCount) {
+        updateInstanceBuffers(device, frameResources, instanceData);
+      } else {
+        reallocateInstanceBuffers(device, frameResources, instanceData);
+      }
+
+      const instanceUpdateTime = performance.now() - instanceStart;
+      geometry = { ...geometry, ...sceneData };
+      this.geometryCache.tick();
+
+      const totalCPUTime = cullingTime + instanceUpdateTime;
+      return {
+        geometry,
+        timings: { cullingTime, instanceUpdateTime, totalCPUTime },
+      };
+    } catch (err) {
+      Logger.warn('Frustum culling/update failed:', err);
+      return { geometry };
+    }
+  }
+
+  private runScreenSpaceLOD(
+    ctx: FrameRenderContext,
+    featureFlags: ResolvedFeatureFlags,
+    encoder: GPUCommandEncoder,
+    viewProjectionMatrix: Mat4,
+    eyePosition: Vec3,
+    geometry: GeometryData,
+    frameResources: FrameResources,
+    viewMatrix?: Mat4,
+    projectionMatrix?: Mat4
+  ): void {
+    if (
+      !featureFlags.enableScreenLOD ||
+      !ctx.scene ||
+      !viewMatrix ||
+      !projectionMatrix ||
+      geometry.instanceCount === 0
+    ) {
+      return;
+    }
+    try {
+      if (!this.screenSpaceLOD) {
+        this.screenSpaceLOD = new ScreenSpaceLOD(ctx.device);
+      }
+      const scaleBuffer = this.extractInstanceScales(ctx.device, frameResources, geometry);
+      this.screenSpaceLOD.selectLOD(
+        encoder,
+        viewProjectionMatrix,
+        eyePosition,
+        ctx.canvas.width,
+        ctx.canvas.height,
+        frameResources.instanceOffsetBuffer,
+        scaleBuffer,
+        geometry.instanceCount
+      );
+    } catch (err) {
+      Logger.warn('Screen-space LOD selection failed:', err);
+    }
+  }
+
+  private runShadowPass(
+    ctx: FrameRenderContext,
+    featureFlags: ResolvedFeatureFlags,
+    encoder: GPUCommandEncoder,
+    frameResources: FrameResources,
+    geometry: GeometryData,
+    viewMatrix?: Mat4,
+    projectionMatrix?: Mat4
+  ): void {
+    if (!featureFlags.enableShadows || !viewMatrix || !projectionMatrix) {
+      return;
+    }
+    try {
+      if (!this.shadowPass) {
+        this.shadowPass = new ShadowPass(ctx.device);
+      }
       try {
-        (encoder as any).writeTimestamp?.(frameResources.timestampQuerySet, TIMESTAMP_INDICES.FRAME_BEGIN);
+        const q = ctx.shadowQuality ?? 'med';
+        this.shadowPass.setQualityPreset(q);
       } catch {
-        // ignore when not supported by mock
+        // ignore invalid quality preset
       }
-    }
-
-    // Per-frame frustum culling and dynamic instance buffer updates (before shadow pass to avoid destroy-use hazards)
-    let cullingTime = 0;
-    let instanceUpdateTime = 0;
-    if (scene) {
-      try {
-        // Time culling
-        const cullStart = performance.now();
-        const frustum = this.frustumCuller.extractFrustumFromVP(viewProjectionMatrix);
-        const allEntities = scene.getActiveEntities();
-        this.frustumCuller.cullEntitiesToArray(allEntities, frustum, this.visibleEntitiesCache);
-        cullingTime = performance.now() - cullStart;
-        
-        // Separate entities with custom geometry (meshData) from default geometry
-        const { defaultGeometry, customGeometry } = this.instanceBuilder.separateCustomGeometry(this.visibleEntitiesCache);
-        this.customGeometryEntitiesCache = customGeometry;
-        
-        // Time instance update
-        const instanceStart = performance.now();
-        // Build instance data only for default geometry entities
-        const sceneData = this.instanceBuilder.build(defaultGeometry);
-
-        if (geometry.instanceCount === sceneData.instanceCount) {
-          // Same count: update in place
-          this.updateInstanceBuffers(device, frameResources, sceneData);
-        } else {
-          // Different count: reallocate
-          this.reallocateInstanceBuffers(device, frameResources, sceneData);
+      this.shadowPass.render({
+        encoder,
+        frameResources,
+        geometry,
+        viewMatrix,
+        projectionMatrix,
+        uniformManager: ctx.uniformManager,
+        lightingData: ctx.lightingData,
+        ibl: {
+          brdfLut: ctx.environmentRenderer?.getBrdfLutTexture?.() ?? null,
+          envCube: ctx.environmentRenderer?.getEnvCubeTexture?.() ?? null,
+        },
+      });
+      if (typeof ctx.onShadowMetrics === 'function') {
+        try {
+          ctx.onShadowMetrics(this.shadowPass.getLastCascadeInstanceCounts());
+        } catch {
+          // ignore metric failures
         }
-        instanceUpdateTime = performance.now() - instanceStart;
-        geometry = { ...geometry, ...sceneData };
-        
-        // Update geometry cache frame counter (for LRU)
-        this.geometryCache.tick();
-
-        // Report CPU timings if callback provided
-        if (ctx.onCpuTimings) {
-          const totalCPUTime = cullingTime + instanceUpdateTime;
-          ctx.onCpuTimings({
-            cullingTime,
-            instanceUpdateTime,
-            totalCPUTime,
-          });
-        }
-      } catch (err) {
-        Logger.warn('Frustum culling/update failed:', err);
       }
+    } catch (err) {
+      Logger.warn('Shadow pass failed:', err);
     }
+  }
 
-    // Screen-space LOD selection (runs after instance buffer updates)
-    const enableScreenLOD = ctx.featureFlags?.enableScreenLOD !== false;
-    if (enableScreenLOD && scene && viewMatrix && projectionMatrix && geometry.instanceCount > 0) {
-      try {
-        if (!this.screenSpaceLOD) {
-          this.screenSpaceLOD = new ScreenSpaceLOD(device);
+  private runForwardPlus(
+    ctx: FrameRenderContext,
+    featureFlags: ResolvedFeatureFlags,
+    encoder: GPUCommandEncoder,
+    viewProjectionMatrix: Mat4,
+    viewMatrix: Mat4 | undefined,
+    eyePosition: Vec3
+  ): void {
+    if (!featureFlags.enableForwardPlus || !ctx.lightingData || !viewMatrix) {
+      return;
+    }
+    try {
+      if (!this.forwardPlus) {
+        this.forwardPlus = new ForwardPlus(ctx.device);
+      }
+      const pointLights: PointLight[] = [];
+      if (ctx.lightingData?.lights) {
+        for (const light of ctx.lightingData.lights) {
+          if (light && light.type === 1) {
+            pointLights.push({
+              position: light.position,
+              color: light.color,
+              range: light.range ?? 10.0,
+              intensity: 1.0,
+            });
+          }
         }
-        
-        // Extract instance positions and scales from geometry
-        const instancePositions = frameResources.instanceOffsetBuffer;
-        // Create scale buffer from instance data (scale is in instanceColorScale.w)
-        const instanceScales = this.extractInstanceScales(device, frameResources, geometry.instanceCount);
-        
-        // Perform LOD selection
-        const lodBuffer = this.screenSpaceLOD.selectLOD(
+      }
+      if (pointLights.length > 0) {
+        this.forwardPlus.updateLights(pointLights);
+        this.forwardPlus.cullLights(
           encoder,
           viewProjectionMatrix,
+          viewMatrix,
           eyePosition,
-          canvas.width,
-          canvas.height,
-          instancePositions,
-          instanceScales,
-          geometry.instanceCount
+          ctx.canvas.width,
+          ctx.canvas.height,
+          pointLights.length
         );
-        
-        // Store LOD buffer for use in rendering (can be bound as uniform or used to filter instances)
-        // This would be used to select which geometry to render per instance
-      } catch (err) {
-        Logger.warn('Screen-space LOD selection failed:', err);
       }
+    } catch (err) {
+      Logger.warn('Forward+ light culling failed:', err);
     }
+  }
 
-    // Shadow map pre-pass before main render pass (after buffers updated)
-    if (ctx.featureFlags?.enableShadows !== false) {
-      try {
-        // Lazy initialize shadow pass
-        if (!this.shadowPass) {
-          this.shadowPass = new ShadowPass(device);
-        }
-        // Apply quality preset each frame (cheap)
-        try {
-          const q = ctx.shadowQuality ?? 'med';
-          this.shadowPass.setQualityPreset(q);
-        } catch {}
-        if (viewMatrix && projectionMatrix) {
-          this.shadowPass.render({
-            encoder,
-            frameResources,
-            geometry,
-            viewMatrix,
-            projectionMatrix,
-            uniformManager: ctx.uniformManager,
-            lightingData: ctx.lightingData,
-            ibl: {
-              brdfLut: ctx.environmentRenderer && (ctx.environmentRenderer as any).getBrdfLutTexture?.(),
-              envCube: ctx.environmentRenderer && (ctx.environmentRenderer as any).getEnvCubeTexture?.(),
-            },
-          });
-          if (typeof ctx.onShadowMetrics === 'function') {
-            try {
-              ctx.onShadowMetrics(this.shadowPass.getLastCascadeInstanceCounts());
-            } catch {}
-          }
-        }
-      } catch (err) {
-        Logger.warn('Shadow pass failed:', err);
-      }
+  private runComputePrepass(
+    ctx: FrameRenderContext,
+    featureFlags: ResolvedFeatureFlags,
+    encoder: GPUCommandEncoder,
+    frameResources: FrameResources
+  ): void {
+    if (!featureFlags.enableComputePrepass) {
+      return;
     }
-
-    // Forward+ light culling (runs before render pass)
-    const enableForwardPlus = ctx.featureFlags?.enableForwardPlus !== false;
-    if (enableForwardPlus && ctx.lightingData && viewMatrix && projectionMatrix) {
-      try {
-        if (!this.forwardPlus) {
-          this.forwardPlus = new ForwardPlus(device);
-        }
-        // Extract point lights from packed lighting data (type 1 = point)
-        const pointLights: PointLight[] = [];
-        if (ctx.lightingData?.lights) {
-          for (const light of ctx.lightingData.lights) {
-            if (light && light.type === 1) {
-              pointLights.push({
-                position: light.position,
-                color: light.color,
-                range: light.range ?? 10.0,
-                intensity: 1.0,
-              });
-            }
-          }
-        }
-        // Update lights and perform culling
-        if (pointLights.length > 0) {
-          this.forwardPlus.updateLights(pointLights);
-          this.forwardPlus.cullLights(
-            encoder,
-            viewProjectionMatrix,
-            viewMatrix,
-            eyePosition,
-            canvas.width,
-            canvas.height,
-            pointLights.length
-          );
-        }
-      } catch (err) {
-        Logger.warn('Forward+ light culling failed:', err);
-      }
-    }
-
-    // Compute prepass (runs before render pass)
     try {
-      if (ctx.featureFlags?.enableComputePrepass !== false) {
-        if (!this.computePrepass) {
-          if (typeof (encoder as GPUCommandEncoder).beginComputePass === 'function') {
-            this.computePrepass = new ComputePrepass(device);
-          }
+      if (!this.computePrepass && typeof encoder.beginComputePass === 'function') {
+        this.computePrepass = new ComputePrepass(ctx.device);
+      }
+      if (!this.computePrepass) {
+        return;
+      }
+      if (frameResources.timestampQuerySet) {
+        try {
+          (encoder as any).writeTimestamp?.(
+            frameResources.timestampQuerySet,
+            TIMESTAMP_INDICES.COMPUTE_BEGIN
+          );
+        } catch {
+          // ignore
         }
-        if (frameResources.timestampQuerySet) {
-          try {
-            (encoder as any).writeTimestamp?.(frameResources.timestampQuerySet, TIMESTAMP_INDICES.COMPUTE_BEGIN);
-          } catch {}
-        }
-        this.computePrepass?.run(encoder);
-        if (frameResources.timestampQuerySet) {
-          try {
-            (encoder as any).writeTimestamp?.(frameResources.timestampQuerySet, TIMESTAMP_INDICES.COMPUTE_END);
-          } catch {}
+      }
+      this.computePrepass.run(encoder);
+      if (frameResources.timestampQuerySet) {
+        try {
+          (encoder as any).writeTimestamp?.(
+            frameResources.timestampQuerySet,
+            TIMESTAMP_INDICES.COMPUTE_END
+          );
+        } catch {
+          // ignore
         }
       }
     } catch (err) {
       Logger.warn('Compute prepass failed:', err);
     }
-    
-    // Create swap chain texture view RIGHT BEFORE use to minimize device mismatch window
-    // Double-check device hasn't changed (async device recreation can happen)
-    const currentConfiguredDevice = ctx.configuredDevice ?? device;
-    if (currentConfiguredDevice !== configuredDevice || currentConfiguredDevice !== (ctx.frameResourcesDevice ?? device)) {
-      Logger.warn('Device changed during frame rendering - aborting to avoid errors');
-      try {
-        encoder.finish();
-      } catch {
-        // ignore
-      }
-      return geometry;
-    }
-    const swapChainView = swapChainTexture.createView({ label: 'frame-color-resolve-view' });
+  }
 
-    // Base pass descriptor with required attachments
-    const enableHDR = ctx.featureFlags?.enableHDR !== false;
-    const basePassDesc: GPURenderPassDescriptor = {
-      label: 'frame-render-pass',
-      colorAttachments: [
-        {
-          view: frameResources.msaaColorView,
-          resolveTarget: enableHDR
-            ? (this.hdrColorView ?? (this.hdrColorTexture ??= createHdrColorTarget(device, canvas)).createView({ label: 'frame-hdr-view' }))
-            : swapChainView,
-          clearValue: CLEAR_COLOR,
-          loadOp: 'clear',
-          storeOp: 'store',
-        },
-      ],
-      depthStencilAttachment: {
-        view: frameResources.depthTextureView,
-        depthClearValue: 1.0,
-        depthLoadOp: 'clear',
-        depthStoreOp: 'discard',
-      },
+  private beginMainPass(
+    encoder: GPUCommandEncoder,
+    frameResources: FrameResources,
+    targetState: ReturnType<FrameTargetManager['ensureTargets']>,
+    swapChainView: GPUTextureView,
+    featureFlags: ResolvedFeatureFlags,
+    passDescriptor?: GPURenderPassDescriptor
+  ): GPURenderPassEncoder {
+    const enableHDR = featureFlags.enableHDR;
+    const colorAttachment: GPURenderPassColorAttachment = {
+      view: frameResources.msaaColorView,
+      resolveTarget: enableHDR ? targetState.hdrView ?? swapChainView : swapChainView,
+      clearValue: CLEAR_COLOR,
+      loadOp: 'clear',
+      storeOp: 'store',
     };
-    // Preserve optional timestamp/occlusion fields from provided descriptor
-    const finalPassDesc: GPURenderPassDescriptor = {
-      ...basePassDesc,
-      ...(passDescriptor?.timestampWrites
-        ? { timestampWrites: passDescriptor.timestampWrites }
-        : {}),
-      ...(passDescriptor?.occlusionQuerySet
-        ? { occlusionQuerySet: passDescriptor.occlusionQuerySet }
-        : {}),
+    const depthAttachment: GPURenderPassDepthStencilAttachment = {
+      view: frameResources.depthTextureView,
+      depthClearValue: 1.0,
+      depthLoadOp: 'clear',
+      depthStoreOp: targetState.needsDepthStore ? 'store' : 'discard',
+    };
+
+    const baseDescriptor: GPURenderPassDescriptor = {
+      label: 'frame-render-pass',
+      colorAttachments: [colorAttachment],
+      depthStencilAttachment: depthAttachment,
+    };
+
+    return encoder.beginRenderPass({
+      ...baseDescriptor,
+      ...(passDescriptor?.timestampWrites ? { timestampWrites: passDescriptor.timestampWrites } : {}),
+      ...(passDescriptor?.occlusionQuerySet ? { occlusionQuerySet: passDescriptor.occlusionQuerySet } : {}),
       ...(typeof passDescriptor?.maxDrawCount === 'number'
         ? { maxDrawCount: passDescriptor.maxDrawCount }
         : {}),
-    };
+    });
+  }
 
-    // (moved culling and instance buffer updates above the shadow pass)
-
-    const passEncoder = encoder.beginRenderPass(finalPassDesc);
-
-    // Render environment/skybox first (background)
-    if (environmentRenderer && scene) {
-      const environmentEntities = scene.queryEntities(EnvironmentComponent);
-      const environmentEntity = environmentEntities.find((e: Entity) => e.active);
-      if (environmentEntity) {
-        const envComponent = environmentEntity.getComponent(EnvironmentComponent);
-        if (envComponent && envComponent.enabled) {
-          const inverseVP = new Float32Array(16);
-          mat4Invert(inverseVP, viewProjectionMatrix);
-          environmentRenderer.updateUniforms(inverseVP, eyePosition);
-          environmentRenderer.updateParams(envComponent);
-          environmentRenderer.render(passEncoder, envComponent);
-        }
-      }
+  private renderEnvironment(
+    ctx: FrameRenderContext,
+    passEncoder: GPURenderPassEncoder,
+    viewProjectionMatrix: Mat4,
+    eyePosition: Vec3
+  ): void {
+    const { environmentRenderer, scene } = ctx;
+    if (!environmentRenderer || !scene) {
+      return;
     }
+    const environmentEntities = scene.queryEntities(EnvironmentComponent);
+    const environmentEntity = environmentEntities.find((entity: Entity) => entity.active);
+    if (!environmentEntity) {
+      return;
+    }
+    const envComponent = environmentEntity.getComponent(EnvironmentComponent);
+    if (!envComponent || !envComponent.enabled) {
+      return;
+    }
+    try {
+      const inverseVP = new Float32Array(16);
+      mat4Invert(inverseVP, viewProjectionMatrix);
+      environmentRenderer.updateUniforms(inverseVP, eyePosition);
+      environmentRenderer.updateParams(envComponent);
+      environmentRenderer.render(passEncoder, envComponent);
+    } catch (err) {
+      Logger.warn('Environment render failed:', err);
+    }
+  }
 
-    // Determine if the cached render bundle is still valid
-    if (
+  private renderStaticGeometry(
+    passEncoder: GPURenderPassEncoder,
+    ctx: FrameRenderContext,
+    geometry: GeometryData,
+    frameResources: FrameResources,
+    sampleCount: number
+  ): void {
+    const { device } = ctx;
+    const geometryChanged =
+      this.bundleInstanceCount !== geometry.instanceCount ||
+      this.bundleIndexCount !== geometry.indices.length ||
+      this.bundleOpaqueCount !== (geometry.opaqueCount ?? geometry.instanceCount);
+    const pipelineChanged =
       this.bundleRenderPipeline !== frameResources.renderPipeline ||
       this.bundleTransparentPipeline !== frameResources.transparentPipeline ||
       this.bundleOverlayPipeline !== frameResources.overlayPipeline ||
       this.bundleUniformBindGroup !== frameResources.uniformBindGroup ||
-      this.bundleTextureBindGroup !== frameResources.textureBindGroup
-    ) {
-      this.invalidateBundle();
-    }
-    if (
-      this.bundleInstanceCount !== geometry.instanceCount ||
-      this.bundleIndexCount !== geometry.indices.length ||
-      this.bundleOpaqueCount !== (geometry.opaqueCount ?? geometry.instanceCount)
-    ) {
+      this.bundleTextureBindGroup !== frameResources.textureBindGroup;
+
+    if (geometryChanged || pipelineChanged) {
       this.invalidateBundle();
     }
 
     if (this.bundleDirty || !this.staticBundle) {
       try {
-        this.staticBundle = this.recordStaticBundle(
-          device,
-          frameResources,
-          ctx.presentationFormat,
-          geometry,
-          ctx.msaaSampleCount ?? MSAA_SAMPLE_COUNT
-        );
+        this.staticBundle = this.recordStaticBundle(device, frameResources, geometry, sampleCount);
         this.bundleDirty = false;
         this.bundleInstanceCount = geometry.instanceCount;
         this.bundleIndexCount = geometry.indices.length;
@@ -593,711 +740,170 @@ export class FrameRenderer {
     if (this.staticBundle) {
       try {
         passEncoder.executeBundles([this.staticBundle]);
+        return;
       } catch {
-        this.drawStaticGeometry(passEncoder, frameResources, geometry);
-      }
-    } else {
-      this.drawStaticGeometry(passEncoder, frameResources, geometry);
-    }
-
-    // Render custom geometry entities (with meshData)
-    this.drawCustomGeometry(passEncoder, device, frameResources);
-
-    // Render water (after opaque, before transparent/grid)
-    if (ctx.waterRenderer && scene) {
-      try {
-        const envCubemap = ctx.environmentRenderer
-          ? (ctx.environmentRenderer as any).getEnvCubeTexture?.() || null
-          : null;
-        const time = ctx.time ?? 0;
-        ctx.waterRenderer.render(
-          passEncoder,
-          scene,
-          viewProjectionMatrix,
-          eyePosition,
-          time,
-          envCubemap,
-          frameResources.depthTexture,
-          frameResources.msaaColorTexture
-        );
-      } catch (err) {
-        Logger.warn('Water render failed:', err);
+        // fallthrough to direct draw
       }
     }
 
-    // Render grid overlay if available
-    if (gridRenderer && typeof gridRenderer.render === 'function') {
-      try {
-        gridRenderer.render(passEncoder, viewProjectionMatrix);
-      } catch (err) {
-        Logger.warn('Grid render failed:', err);
-      }
-    }
-
-    // Render logic cube connections if available
-    const { logicConnectionRenderer } = ctx;
-    if (logicConnectionRenderer && ctx.scene) {
-      try {
-        logicConnectionRenderer.render(passEncoder, viewProjectionMatrix, eyePosition);
-      } catch (err) {
-        Logger.warn('Logic connection render failed:', err);
-      }
-    }
-
-    passEncoder.end();
-    
-    // Render normals to G-buffer if SSAO is enabled
-    const enableSSAO = ctx.featureFlags?.enableSSAO !== false;
-    if (enableSSAO && this.normalTextureView && frameResources.depthTextureView) {
-      // Initialize normal render pass if needed
-      if (!this.normalRenderPass) {
-        this.normalRenderPass = new NormalRenderPass(device);
-      }
-      
-      if (this.normalRenderPass && !this.normalRenderPass.isInitialized()) {
-        // Create vertex buffer layouts matching the main render pass
-        const vertexBuffers: GPUVertexBufferLayout[] = [
-          {
-            arrayStride: 24,
-            stepMode: 'vertex',
-            attributes: [
-              { shaderLocation: 0, offset: 0, format: 'float32x3' },
-              { shaderLocation: 1, offset: 12, format: 'snorm8x4' },
-              { shaderLocation: 2, offset: 16, format: 'float16x2' },
-              { shaderLocation: 3, offset: 20, format: 'unorm8x4' },
-            ],
-          },
-          {
-            arrayStride: 12,
-            stepMode: 'instance',
-            attributes: [{ shaderLocation: 4, offset: 0, format: 'float32x3' }],
-          },
-          {
-            arrayStride: 16,
-            stepMode: 'instance',
-            attributes: [{ shaderLocation: 5, offset: 0, format: 'float32x4' }],
-          },
-          {
-            arrayStride: 16,
-            stepMode: 'instance',
-            attributes: [{ shaderLocation: 6, offset: 0, format: 'float32x4' }],
-          },
-          {
-            arrayStride: 16,
-            stepMode: 'instance',
-            attributes: [{ shaderLocation: 7, offset: 0, format: 'float32x4' }],
-          },
-          {
-            arrayStride: 16,
-            stepMode: 'instance',
-            attributes: [{ shaderLocation: 8, offset: 0, format: 'float32x4' }],
-          },
-          {
-            arrayStride: 16,
-            stepMode: 'instance',
-            attributes: [{ shaderLocation: 9, offset: 0, format: 'float32x4' }],
-          },
-          {
-            arrayStride: 4,
-            stepMode: 'instance',
-            attributes: [{ shaderLocation: 10, offset: 0, format: 'float32' }],
-          },
-        ];
-        
-        this.normalRenderPass.initialize(
-          frameResources.uniformBindGroupLayout,
-          frameResources.textureBindGroupLayout,
-          vertexBuffers,
-          'rgba16float',
-          1 // Single-sampled for shader sampling compatibility
-        );
-      }
-      
-      // Render normals to texture
-      // Note: No depth attachment needed - we just write normals, depth test not required
-      if (this.normalRenderPass) {
-        const normalPass = encoder.beginRenderPass({
-          label: 'normal-render-pass',
-          colorAttachments: [
-            {
-              view: this.normalTextureView,
-              clearValue: { r: 0.5, g: 0.5, b: 1.0, a: 1.0 }, // Encoded (0,0,1) = world up normal
-              loadOp: 'clear',
-              storeOp: 'store',
-            },
-          ],
-        });
-        
-        this.normalRenderPass.render(normalPass, frameResources, geometry);
-        normalPass.end();
-      }
-    }
-    // Postprocess: SSAO -> Bloom -> Tonemap+LUT to the swap chain
-    // Initialize passes lazily
-    if (enableHDR) {
-      if (!this.bloomPass) { this.bloomPass = new BloomPass(device); this.bloomPass.initialize('rgba16float'); }
-      if (!this.tonemapPass) { this.tonemapPass = new TonemapLutPass(device); this.tonemapPass.initialize(ctx.presentationFormat); }
-    }
-    if (enableSSAO && !this.ssaoPass) {
-      this.ssaoPass = new SSAOPass(device);
-      this.ssaoPass.initialize('rgba16float');
-    }
-    // Ensure views exist (created on resize)
-    if (!this.hdrColorTexture) {
-      this.hdrColorTexture = createHdrColorTarget(device, canvas);
-      this.hdrColorView = this.hdrColorTexture.createView();
-    }
-    if (!this.hdrColorView) this.hdrColorView = this.hdrColorTexture.createView();
-    if (enableHDR && !this.bloomTexture) {
-      const halfW = Math.max(1, Math.floor(canvas.width / 2));
-      const halfH = Math.max(1, Math.floor(canvas.height / 2));
-      this.bloomTexture = device.createTexture({
-        label: 'frame-bloom-texture',
-        size: { width: halfW, height: halfH, depthOrArrayLayers: 1 },
-        format: 'rgba16float',
-        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-      });
-      this.bloomTextureView = this.bloomTexture.createView();
-    }
-    if (enableHDR && this.bloomTexture && !this.bloomTextureView) {
-      this.bloomTextureView = this.bloomTexture.createView();
-    }
-
-    const hdrView = this.hdrColorView;
-    const bloomView = this.bloomTextureView;
-    const ssaoView = this.ssaoTextureView;
-    const depthView = frameResources.depthTextureView;
-    
-    // Ensure resolved depth texture exists for SSAO (if multisampled)
-    const sampleCount = ctx.msaaSampleCount ?? MSAA_SAMPLE_COUNT;
-    if (enableSSAO && sampleCount > 1 && !this.resolvedDepthTexture) {
-      this.resolvedDepthTexture = createDepthTexture(device, canvas, 1);
-      this.resolvedDepthView = this.resolvedDepthTexture.createView({
-        label: 'resolved-depth-view',
-      });
-    }
-    
-    // Resolve multisampled depth to non-multisampled for post-processing
-    if (enableSSAO && sampleCount > 1 && this.resolvedDepthView && frameResources.depthTexture) {
-      this.resolveDepthTexture(device, encoder, frameResources.depthTextureView, this.resolvedDepthView, canvas.width, canvas.height);
-    }
-    
-    // SSAO pass (before bloom) - use resolved depth if multisampled, otherwise use original
-    const depthViewForSSAO = (sampleCount > 1 && this.resolvedDepthView) ? this.resolvedDepthView : depthView;
-    if (enableSSAO && hdrView && depthViewForSSAO && ssaoView && this.ssaoPass && viewMatrix && projectionMatrix) {
-      // Calculate inverse projection matrix for SSAO
-      const projectionMatrixInv = new Float32Array(16);
-      mat4Invert(projectionMatrixInv, projectionMatrix);
-      
-      // Use normal texture if available, otherwise fallback to depth (less accurate)
-      const normalViewToUse = this.normalTextureView ?? depthViewForSSAO;
-      
-      this.ssaoPass.render(
-        encoder,
-        depthViewForSSAO,
-        normalViewToUse,
-        ssaoView,
-        canvas.width,
-        canvas.height,
-        projectionMatrix,
-        projectionMatrixInv,
-        frameResources.timestampQuerySet
-          ? { querySet: frameResources.timestampQuerySet, begin: TIMESTAMP_INDICES.MAIN_PASS_END + 1, end: TIMESTAMP_INDICES.MAIN_PASS_END + 2 }
-          : undefined
-      );
-    }
-    
-    // Bloom pass with timestamps (optional flag)
-    if (enableHDR && hdrView && bloomView && this.bloomPass && ctx.featureFlags?.enableBloom !== false) {
-      this.bloomPass.render(
-        encoder,
-        hdrView,
-        bloomView,
-        canvas.width,
-        canvas.height,
-        frameResources.timestampQuerySet
-          ? { querySet: frameResources.timestampQuerySet, begin: TIMESTAMP_INDICES.BLOOM_BEGIN, end: TIMESTAMP_INDICES.BLOOM_END }
-          : undefined
-      );
-    }
-    // Tonemap pass with timestamps (only when HDR path is enabled)
-    // Create intermediate texture for FXAA if needed
-    const enableFXAA = ctx.featureFlags?.enableFXAA === true; // Default to false for FXAA
-    let tonemapOutputView: GPUTextureView | null = null;
-    let tonemapOutputTexture: GPUTexture | null = null;
-    
-    if (enableHDR && hdrView && bloomView && this.tonemapPass) {
-      // If FXAA is enabled, render to intermediate texture first
-      if (enableFXAA) {
-        // Store texture reference for cleanup
-        if (!this.tonemapOutputTexture || 
-            this.tonemapOutputTexture.width !== canvas.width || 
-            this.tonemapOutputTexture.height !== canvas.height) {
-          this.enqueueTextureCleanup(this.tonemapOutputTexture);
-          this.tonemapOutputTexture = null;
-          this.tonemapOutputView = null;
-          this.tonemapOutputTexture = device.createTexture({
-            label: 'tonemap-output',
-            size: { width: canvas.width, height: canvas.height, depthOrArrayLayers: 1 },
-            format: 'bgra8unorm',
-            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
-          });
-          this.tonemapOutputView = this.tonemapOutputTexture.createView();
-        }
-        tonemapOutputTexture = this.tonemapOutputTexture;
-        tonemapOutputView = this.tonemapOutputView;
-      }
-      
-      this.tonemapPass.render(
-        encoder,
-        hdrView,
-        bloomView,
-        enableFXAA ? (tonemapOutputView ?? swapChainView) : swapChainView,
-        ssaoView, // Pass SSAO texture (can be null)
-        frameResources.timestampQuerySet
-          ? { querySet: frameResources.timestampQuerySet, begin: TIMESTAMP_INDICES.TONEMAP_BEGIN, end: TIMESTAMP_INDICES.TONEMAP_END }
-          : undefined
-      );
-    }
-    
-    // FXAA pass (after tonemap if enabled)
-    if (enableFXAA && tonemapOutputView && swapChainView && !this.fxaaPass) {
-      this.fxaaPass = new FXAAPass(device);
-    }
-    if (enableFXAA && tonemapOutputView && swapChainView && this.fxaaPass) {
-      this.fxaaPass.apply(encoder, tonemapOutputView, swapChainView);
-    }
-
-    // Frame end timestamp (after all passes; before resolve/copy)
-    if (frameResources.timestampQuerySet) {
-      try {
-        (encoder as any).writeTimestamp?.(frameResources.timestampQuerySet, TIMESTAMP_INDICES.FRAME_END);
-      } catch {}
-    }
-
-    // Resolve and copy timestamps after all writes are recorded
-    if (frameResources.timestampQuerySet && frameResources.timestampResolveBuffer && frameResources.timestampReadBuffer) {
-      encoder.resolveQuerySet(
-        frameResources.timestampQuerySet,
-        0,
-        TIMESTAMP_QUERY_COUNT,
-        frameResources.timestampResolveBuffer,
-        0
-      );
-      encoder.copyBufferToBuffer(
-        frameResources.timestampResolveBuffer,
-        0,
-        frameResources.timestampReadBuffer,
-        0,
-        TIMESTAMP_BUFFER_SIZE
-      );
-    }
-
-    const commandBuffer = encoder.finish();
-
-    const tempTextures = (encoder as any).__bloomTempTextures as GPUTexture[] | undefined;
-    if (tempTextures) {
-      (encoder as any).__bloomTempTextures = undefined;
-      if (Array.isArray(tempTextures) && tempTextures.length > 0) {
-        this.enqueueTexturesForCleanup(tempTextures);
-      }
-    }
-
-    configuredDevice.queue.submit([commandBuffer]);
-
-    this.flushPendingTextureCleanup(configuredDevice.queue);
-
-    if (
-      frameResources.timestampQuerySet &&
-      frameResources.timestampResolveBuffer &&
-      frameResources.timestampReadBuffer &&
-      typeof ctx.onGpuTimings === 'function'
-    ) {
-      this.scheduleTimestampRead(device, frameResources, ctx.onGpuTimings);
-    }
-
-    return geometry;
+    this.drawStaticGeometry(passEncoder, frameResources, geometry);
   }
 
-  private enqueueTextureCleanup(texture: GPUTexture | null | undefined): void {
-    if (texture) {
-      this.pendingTextureCleanup.push(texture);
-    }
-  }
-
-  private enqueueTexturesForCleanup(textures: Iterable<GPUTexture | null | undefined>): void {
-    for (const texture of textures) {
-      this.enqueueTextureCleanup(texture);
-    }
-  }
-
-  private flushPendingTextureCleanup(queue: GPUQueue): void {
-    if (this.pendingTextureCleanup.length === 0) {
+  private renderWater(
+    ctx: FrameRenderContext,
+    passEncoder: GPURenderPassEncoder,
+    viewProjectionMatrix: Mat4,
+    eyePosition: Vec3
+  ): void {
+    const { waterRenderer, scene, environmentRenderer, frameResources } = ctx;
+    if (!waterRenderer || !scene) {
       return;
     }
-
-    const texturesToCleanup = this.pendingTextureCleanup.splice(0);
-
-    const cleanupTextures = () => {
-      for (const texture of texturesToCleanup) {
-        try {
-          texture.destroy();
-        } catch {
-          // Ignore - texture may already be destroyed or device lost
-        }
-      }
-    };
-
-    queue
-      .onSubmittedWorkDone()
-      .then(() => {
-        setTimeout(cleanupTextures, FrameRenderer.TEXTURE_CLEANUP_DELAY_MS);
-      })
-      .catch((err) => {
-        Logger.warn('Failed to wait for GPU work completion during texture cleanup:', err);
-        setTimeout(cleanupTextures, FrameRenderer.TEXTURE_CLEANUP_FALLBACK_DELAY_MS);
-      });
-  }
-
-  /**
-   * Extracts instance scales from instance color scale buffer.
-   * Scale is stored in instanceColorScale.w component.
-   */
-  private extractInstanceScales(device: GPUDevice, frameResources: FrameResources, instanceCount: number): GPUBuffer | null {
-    // For now, return null to use default scales (1.0) in ScreenSpaceLOD
-    // In a full implementation, you would:
-    // 1. Read the instanceColorScale buffer
-    // 2. Extract the w component (scale) for each instance
-    // 3. Create a new buffer with just the scales
-    // This is a performance optimization - avoiding the readback for now
-    return null; // Will use default scales in ScreenSpaceLOD
-  }
-
-  /**
-   * Releases resources owned by the FrameRenderer
-   */
-  dispose(): void {
     try {
-      this.computePrepass?.dispose();
-    } catch {
-      // ignore
+      const envCubemap = environmentRenderer?.getEnvCubeTexture?.() ?? null;
+      const time = ctx.time ?? 0;
+      waterRenderer.render(
+        passEncoder,
+        scene,
+        viewProjectionMatrix,
+        eyePosition,
+        time,
+        envCubemap,
+        frameResources.depthTexture,
+        frameResources.msaaColorTexture
+      );
+    } catch (err) {
+      Logger.warn('Water render failed:', err);
     }
-    this.computePrepass = null;
-    this.pendingTimestampRead = false;
-    this.invalidateBundle();
-    try { this.hdrColorTexture?.destroy(); } catch {}
-    try { this.bloomTexture?.destroy(); } catch {}
-    try { this.normalTexture?.destroy(); } catch {}
-    try { this.ssaoTexture?.destroy(); } catch {}
-    try { this.resolvedDepthTexture?.destroy(); } catch {}
-    try { this.ssaoPass?.dispose(); } catch {}
-    try { this.normalRenderPass?.dispose(); } catch {}
-    try { this.forwardPlus?.dispose(); } catch {}
-    try { this.fxaaPass?.dispose(); } catch {}
-    try { this.screenSpaceLOD?.dispose(); } catch {}
-    this.hdrColorTexture = null;
-    this.bloomTexture = null;
-    this.normalTexture = null;
-    this.forwardPlus = null;
-    this.fxaaPass = null;
-    this.screenSpaceLOD = null;
-    this.ssaoTexture = null;
-    this.ssaoPass = null;
-    this.normalRenderPass = null;
   }
 
-  /**
-   * Updates instance buffers in place (same count).
-   */
-  private updateInstanceBuffers(
+  private renderGrid(
+    ctx: FrameRenderContext,
+    passEncoder: GPURenderPassEncoder,
+    viewProjectionMatrix: Mat4
+  ): void {
+    const { gridRenderer } = ctx;
+    if (!gridRenderer?.render) {
+      return;
+    }
+    try {
+      gridRenderer.render(passEncoder, viewProjectionMatrix);
+    } catch (err) {
+      Logger.warn('Grid render failed:', err);
+    }
+  }
+
+  private renderLogicConnections(
+    ctx: FrameRenderContext,
+    passEncoder: GPURenderPassEncoder,
+    viewProjectionMatrix: Mat4,
+    eyePosition: Vec3
+  ): void {
+    const { logicConnectionRenderer, scene } = ctx;
+    if (!logicConnectionRenderer || !scene) {
+      return;
+    }
+    try {
+      logicConnectionRenderer.render(passEncoder, viewProjectionMatrix, eyePosition);
+    } catch (err) {
+      Logger.warn('Logic connection render failed:', err);
+    }
+  }
+
+  private buildPostProcessInputs(
+    ctx: FrameRenderContext,
+    featureFlags: ResolvedFeatureFlags,
+    targetState: ReturnType<FrameTargetManager['ensureTargets']>,
+    params: {
+      encoder: GPUCommandEncoder;
+      geometry: GeometryData;
+      frameResources: FrameResources;
+      swapChainView: GPUTextureView;
+      sampleCount: number;
+      viewMatrix?: Mat4;
+      projectionMatrix?: Mat4;
+    }
+  ): PostProcessInputs {
+    return {
+      ctx,
+      encoder: params.encoder,
+      frameResources: params.frameResources,
+      featureFlags: {
+        enableHDR: featureFlags.enableHDR,
+        enableBloom: featureFlags.enableBloom,
+        enableSSAO: featureFlags.enableSSAO,
+        enableFXAA: featureFlags.enableFXAA,
+      },
+      targets: {
+        hdrView: targetState.hdrView,
+        bloomView: targetState.bloomView,
+        normalView: targetState.normalView,
+        ssaoView: targetState.ssaoView,
+        resolvedDepthView: targetState.resolvedDepthView,
+        tonemapIntermediateView: targetState.tonemapIntermediateView,
+        needsDepthStore: targetState.needsDepthStore,
+      },
+      geometry: params.geometry,
+      viewMatrix: params.viewMatrix,
+      projectionMatrix: params.projectionMatrix,
+      sampleCount: params.sampleCount,
+      swapChainView: params.swapChainView,
+    };
+  }
+
+  private extractInstanceScales(
     device: GPUDevice,
     frameResources: FrameResources,
-    sceneData: {
-      instanceOffsetData: Float32Array;
-      instanceColorScaleData: Float32Array;
-      instanceSecondaryColorData: Float32Array;
-      instanceEmissiveColorData: Float32Array;
-      instanceMaterialParamsData: Float32Array;
-      instanceRotationData: Float32Array;
-      instanceMaterialIdData: Float32Array;
+    geometry: GeometryData
+  ): GPUBuffer | null {
+    const { instanceCount } = geometry;
+    if (instanceCount === 0) {
+      return null;
     }
-  ): void {
-    device.queue.writeBuffer(
-      frameResources.instanceOffsetBuffer,
-      0,
-      sceneData.instanceOffsetData.buffer as ArrayBuffer,
-      sceneData.instanceOffsetData.byteOffset,
-      sceneData.instanceOffsetData.byteLength
-    );
-    device.queue.writeBuffer(
-      frameResources.instanceColorScaleBuffer,
-      0,
-      sceneData.instanceColorScaleData.buffer as ArrayBuffer,
-      sceneData.instanceColorScaleData.byteOffset,
-      sceneData.instanceColorScaleData.byteLength
-    );
-    device.queue.writeBuffer(
-      frameResources.instanceSecondaryColorBuffer,
-      0,
-      sceneData.instanceSecondaryColorData.buffer as ArrayBuffer,
-      sceneData.instanceSecondaryColorData.byteOffset,
-      sceneData.instanceSecondaryColorData.byteLength
-    );
-    device.queue.writeBuffer(
-      frameResources.instanceEmissiveColorBuffer,
-      0,
-      sceneData.instanceEmissiveColorData.buffer as ArrayBuffer,
-      sceneData.instanceEmissiveColorData.byteOffset,
-      sceneData.instanceEmissiveColorData.byteLength
-    );
-    device.queue.writeBuffer(
-      frameResources.instanceMaterialParamsBuffer,
-      0,
-      sceneData.instanceMaterialParamsData.buffer as ArrayBuffer,
-      sceneData.instanceMaterialParamsData.byteOffset,
-      sceneData.instanceMaterialParamsData.byteLength
-    );
-    device.queue.writeBuffer(
-      frameResources.instanceRotationBuffer,
-      0,
-      sceneData.instanceRotationData.buffer as ArrayBuffer,
-      sceneData.instanceRotationData.byteOffset,
-      sceneData.instanceRotationData.byteLength
-    );
-
-    // Ensure materialId buffer has enough capacity
-    if (
-      (frameResources.instanceMaterialIdBuffer.size ?? 0) <
-      sceneData.instanceMaterialIdData.byteLength
-    ) {
-      const pool = (frameResources as unknown as { bufferPool: GPUBufferPool }).bufferPool;
-      const materialIdBuf = pool.getOrCreate(
-        'instance-material-id',
-        sceneData.instanceMaterialIdData.byteLength,
-        GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-        'instance-material-id-buffer'
+    const source = geometry.instanceColorScaleData;
+    if (!source || source.length < instanceCount * 4) {
+      return null;
+    }
+    if (this.instanceScaleScratch.length < instanceCount) {
+      this.instanceScaleScratch = new Float32Array(
+        Math.max(instanceCount, this.instanceScaleScratch.length * 2 || 128)
       );
+    }
+    const scratch = this.instanceScaleScratch;
+    for (let i = 0; i < instanceCount; i++) {
+      scratch[i] = source[i * 4 + 3] ?? 1;
+    }
+    const byteLength = instanceCount * Float32Array.BYTES_PER_ELEMENT;
+    const pool = (frameResources as unknown as { bufferPool?: GPUBufferPool }).bufferPool;
+
+    if (pool) {
+      const buffer = pool.getOrCreate(
+        'lod-instance-scale',
+        byteLength,
+        GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+        'lod-instance-scale-buffer'
+      );
+      device.queue.writeBuffer(buffer, 0, scratch.buffer, 0, byteLength);
+      return buffer;
+    }
+
+    if (!this.ownedLodScaleBuffer || this.ownedLodScaleBuffer.size < byteLength) {
       try {
-        const prev = frameResources.instanceMaterialIdBuffer;
-        if (pool.get('instance-material-id') !== prev && prev !== materialIdBuf) prev.destroy();
+        this.ownedLodScaleBuffer?.destroy();
       } catch {
         // ignore
       }
-      frameResources.instanceMaterialIdBuffer = materialIdBuf;
-    }
-    device.queue.writeBuffer(
-      frameResources.instanceMaterialIdBuffer,
-      0,
-      sceneData.instanceMaterialIdData.buffer as ArrayBuffer,
-      sceneData.instanceMaterialIdData.byteOffset,
-      sceneData.instanceMaterialIdData.byteLength
-    );
-  }
-
-  /**
-   * Reallocates instance buffers (different count).
-   */
-  private reallocateInstanceBuffers(
-    device: GPUDevice,
-    frameResources: FrameResources,
-    sceneData: {
-      instanceOffsetData: Float32Array;
-      instanceColorScaleData: Float32Array;
-      instanceSecondaryColorData: Float32Array;
-      instanceEmissiveColorData: Float32Array;
-      instanceMaterialParamsData: Float32Array;
-      instanceRotationData: Float32Array;
-      instanceMaterialIdData: Float32Array;
-    }
-  ): void {
-    const pool = (frameResources as unknown as { bufferPool: GPUBufferPool }).bufferPool;
-
-    // Keep references and check if pooled
-    const prevOffsetBuf = frameResources.instanceOffsetBuffer;
-    const prevColorScaleBuf = frameResources.instanceColorScaleBuffer;
-    const prevSecondaryColorBuf = frameResources.instanceSecondaryColorBuffer;
-    const prevEmissiveColorBuf = frameResources.instanceEmissiveColorBuffer;
-    const prevMaterialParamsBuf = frameResources.instanceMaterialParamsBuffer;
-    const prevRotationBuf = frameResources.instanceRotationBuffer;
-    const prevMaterialIdBuf = frameResources.instanceMaterialIdBuffer;
-
-    const wasPooledOffset = pool.get('instance-offset') === prevOffsetBuf;
-    const wasPooledColorScale = pool.get('instance-color-scale') === prevColorScaleBuf;
-    const wasPooledSecondary = pool.get('instance-secondary-color') === prevSecondaryColorBuf;
-    const wasPooledEmissive = pool.get('instance-emissive-color') === prevEmissiveColorBuf;
-    const wasPooledMaterialParams =
-      pool.get('instance-material-params') === prevMaterialParamsBuf;
-    const wasPooledRotation = pool.get('instance-rotation') === prevRotationBuf;
-    const wasPooledMaterialId = pool.get('instance-material-id') === prevMaterialIdBuf;
-
-    // Reallocate via pool
-    const offsetBuf = pool.getOrCreate(
-      'instance-offset',
-      sceneData.instanceOffsetData.byteLength,
-      GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-      'instance-offset-buffer'
-    );
-    const colorScaleBuf = pool.getOrCreate(
-      'instance-color-scale',
-      sceneData.instanceColorScaleData.byteLength,
-      GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-      'instance-color-scale-buffer'
-    );
-    const secondaryColorBuf = pool.getOrCreate(
-      'instance-secondary-color',
-      sceneData.instanceSecondaryColorData.byteLength,
-      GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-      'instance-secondary-color-buffer'
-    );
-    const emissiveColorBuf = pool.getOrCreate(
-      'instance-emissive-color',
-      sceneData.instanceEmissiveColorData.byteLength,
-      GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-      'instance-emissive-color-buffer'
-    );
-    const materialParamsBuf = pool.getOrCreate(
-      'instance-material-params',
-      sceneData.instanceMaterialParamsData.byteLength,
-      GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-      'instance-material-params-buffer'
-    );
-    const rotationBuf = pool.getOrCreate(
-      'instance-rotation',
-      sceneData.instanceRotationData.byteLength,
-      GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-      'instance-rotation-buffer'
-    );
-    const materialIdBuf = pool.getOrCreate(
-      'instance-material-id',
-      sceneData.instanceMaterialIdData.byteLength,
-      GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-      'instance-material-id-buffer'
-    );
-
-    frameResources.instanceOffsetBuffer = offsetBuf;
-    frameResources.instanceColorScaleBuffer = colorScaleBuf;
-    frameResources.instanceSecondaryColorBuffer = secondaryColorBuf;
-    frameResources.instanceEmissiveColorBuffer = emissiveColorBuf;
-    frameResources.instanceMaterialParamsBuffer = materialParamsBuf;
-    frameResources.instanceRotationBuffer = rotationBuf;
-    frameResources.instanceMaterialIdBuffer = materialIdBuf;
-
-    // Upload data
-    this.updateInstanceBuffers(device, frameResources, sceneData);
-
-    this.invalidateBundle();
-
-    // Destroy previous non-pooled buffers
-    try {
-      if (!wasPooledOffset && prevOffsetBuf !== offsetBuf) prevOffsetBuf.destroy();
-    } catch {
-      // ignore
-    }
-    try {
-      if (!wasPooledColorScale && prevColorScaleBuf !== colorScaleBuf) prevColorScaleBuf.destroy();
-    } catch {
-      // ignore
-    }
-    try {
-      if (!wasPooledSecondary && prevSecondaryColorBuf !== secondaryColorBuf) prevSecondaryColorBuf.destroy();
-    } catch {
-      // ignore
-    }
-    try {
-      if (!wasPooledEmissive && prevEmissiveColorBuf !== emissiveColorBuf) prevEmissiveColorBuf.destroy();
-    } catch {
-      // ignore
-    }
-    try {
-      if (!wasPooledMaterialParams && prevMaterialParamsBuf !== materialParamsBuf)
-        prevMaterialParamsBuf.destroy();
-    } catch {
-      // ignore
-    }
-    try {
-      if (!wasPooledRotation && prevRotationBuf !== rotationBuf) prevRotationBuf.destroy();
-    } catch {
-      // ignore
-    }
-    try {
-      if (!wasPooledMaterialId && prevMaterialIdBuf !== materialIdBuf) prevMaterialIdBuf.destroy();
-    } catch {
-      // ignore
-    }
-  }
-
-  private scheduleTimestampRead(
-    device: GPUDevice,
-    frameResources: FrameResources,
-    callback: (timings: { label: string; timeMs: number }[]) => void
-  ): void {
-    if (this.pendingTimestampRead) {
-      return;
-    }
-    this.pendingTimestampRead = true;
-
-    const readBuffer = frameResources.timestampReadBuffer!;
-
-    device.queue
-      .onSubmittedWorkDone()
-      .then(() => readBuffer.mapAsync(GPUMapMode.READ))
-      .then(() => {
-        let snapshot: ArrayBuffer;
-        try {
-          const mapped = readBuffer.getMappedRange();
-          snapshot = mapped.slice(0);
-        } finally {
-          try {
-            readBuffer.unmap();
-          } catch {
-            // ignore
-          }
-        }
-
-        const values = new BigUint64Array(snapshot);
-        const timings: { label: string; timeMs: number }[] = [];
-        for (const pair of GPU_TIMESTAMP_PAIRS) {
-          const begin = values[pair.beginIndex];
-          const end = values[pair.endIndex];
-          if (begin === undefined || end === undefined || begin === 0n || end <= begin) {
-            continue;
-          }
-          const delta = end - begin;
-          if (delta <= 0) {
-            continue;
-          }
-          const durationNs = Number(delta) * frameResources.timestampPeriod;
-          if (!Number.isFinite(durationNs) || durationNs <= 0) {
-            continue;
-          }
-          timings.push({ label: pair.label, timeMs: durationNs / 1_000_000 });
-        }
-        callback(timings);
-      })
-      .catch((err) => {
-        Logger.warn('GPU timestamp read failed', err);
-        try {
-          readBuffer.unmap();
-        } catch {
-          // ignore
-        }
-      })
-      .finally(() => {
-        this.pendingTimestampRead = false;
+      this.ownedLodScaleBuffer = device.createBuffer({
+        label: 'lod-instance-scale-buffer',
+        size: byteLength,
+        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
       });
-  }
-
-  private invalidateBundle(): void {
-    this.staticBundle = null;
-    this.bundleDirty = true;
-    this.bundleInstanceCount = 0;
-    this.bundleIndexCount = 0;
-    this.bundleOpaqueCount = 0;
-    this.bundleRenderPipeline = null;
-    this.bundleTransparentPipeline = null;
-    this.bundleOverlayPipeline = null;
-    this.bundleUniformBindGroup = null;
-    this.bundleTextureBindGroup = null;
+    }
+    const buffer = this.ownedLodScaleBuffer;
+    if (buffer) {
+      device.queue.writeBuffer(buffer, 0, scratch.buffer, 0, byteLength);
+    }
+    return buffer ?? null;
   }
 
   private drawStaticGeometry(
@@ -1339,310 +945,111 @@ export class FrameRenderer {
     encoder.drawIndexed(geometry.indices.length, totalInstances, 0, 0, 0);
   }
 
-  /**
-   * Renders custom geometry entities (those with meshData)
-   */
-  private drawCustomGeometry(
-    encoder: GPURenderPassEncoder,
-    device: GPUDevice,
-    frameResources: FrameResources
-  ): void {
-    if (this.customGeometryEntitiesCache.length === 0) return;
-
-    // For each custom geometry entity, render individually
-    // We can optimize this later by grouping entities with same geometry
-    for (const { entity, meshComponent } of this.customGeometryEntitiesCache) {
-      if (!entity.active) continue;
-
-      const meshData = meshComponent.meshData;
-      if (!meshData?.vertices || !meshData.indices) {
-        const entityName = entity.name || entity.id || 'unnamed';
-        const meshType = meshComponent.meshType || 'unknown';
-        Logger.warn(
-          `[FrameRenderer] Skipping entity "${entityName}" (id: ${entity.id}) with meshType="${meshType}" ` +
-          `due to missing or invalid geometry (meshData: ${meshData ? 'present but invalid' : 'missing'}). ` +
-          `This usually means the geometry generator failed or was not called.`
-        );
-        continue;
-      }
-
-      // Get or create geometry buffers from cache
-      const geometryBuffers = this.geometryCache.getGeometryBuffers(device, meshData);
-      if (!geometryBuffers) {
-        // Geometry was invalid or failed to create - log entity info for debugging
-        const entityName = entity.name || entity.id || 'unnamed';
-        const meshType = meshComponent.meshType || 'unknown';
-        Logger.warn(
-          `[FrameRenderer] Skipping entity "${entityName}" (id: ${entity.id}) with meshType="${meshType}" ` +
-          `due to invalid geometry buffers (geometry cache failed to create buffers). ` +
-          `Check geometry validation in GeometryCache.`
-        );
-        continue;
-      }
-
-      // Get material
-      const material = entity.getComponent(MaterialComponent);
-      
-      // Apply avatar colors from userData.avatarColorSlots if present
-      // This allows dynamic color updates for avatar parts
-      if (material && entity.userData?.avatarColorSlots) {
-        const colorSlots = entity.userData.avatarColorSlots as Record<string, RgbaColor>;
-        if (colorSlots.primary) {
-          material.primaryColor = colorSlots.primary;
-        }
-        if (colorSlots.secondary) {
-          material.secondaryColor = colorSlots.secondary;
-        }
-        if (colorSlots.accent) {
-          material.accentColor = colorSlots.accent;
-        }
-        if (colorSlots.emissive) {
-          material.emissiveColor = colorSlots.emissive;
-          material.emissiveIntensity = colorSlots.emissive[3] ?? 0;
-        }
-        material.updateFlags();
-      }
-      
-      const primary = material?.primaryColor ?? [1, 1, 1, 1];
-      const alpha = primary[3] ?? (material?.opacity ?? 1);
-      const flags = material?.flags ?? 0;
-      const isTransparent = (flags & MaterialComponent.FLAG_TRANSPARENT) !== 0 || alpha < 0.999;
-
-      // Update instance buffers with this entity's transform data
-      // Use single-instance buffers from geometry cache (already set up)
-      // We need to update the instance data for this entity
-      const pos = entity.transform.getWorldPosition();
-      const rot = entity.transform.rotation;
-      const scale = entity.transform.scale;
-      const maxScale = Math.max(scale[0], scale[1], scale[2]);
-
-      // Use accentColor if available, otherwise fallback to secondaryColor, then primary
-      const accent = material?.accentColor;
-      const secondary = accent ?? material?.secondaryColor ?? primary;
-      const emissive = material?.emissiveColor ?? [0, 0, 0, 1];
-      const metallic = material?.metallic ?? 0;
-      const roughness = material?.roughness ?? 1;
-
-      // Write instance data to buffers (single instance)
-      device.queue.writeBuffer(geometryBuffers.instanceOffsetBuffer, 0, new Float32Array(pos));
-      device.queue.writeBuffer(geometryBuffers.instanceColorScaleBuffer, 0, new Float32Array([primary[0], primary[1], primary[2], maxScale]));
-      device.queue.writeBuffer(geometryBuffers.instanceSecondaryColorBuffer, 0, new Float32Array([secondary[0], secondary[1], secondary[2], secondary[3] ?? 1]));
-      device.queue.writeBuffer(geometryBuffers.instanceEmissiveColorBuffer, 0, new Float32Array([emissive[0], emissive[1], emissive[2], material?.emissiveIntensity ?? 0]));
-      device.queue.writeBuffer(geometryBuffers.instanceMaterialParamsBuffer, 0, new Float32Array([alpha, metallic, roughness, flags]));
-      device.queue.writeBuffer(geometryBuffers.instanceRotationBuffer, 0, new Float32Array(rot));
-      device.queue.writeBuffer(geometryBuffers.instanceMaterialIdBuffer, 0, new Uint32Array([material?.materialId ?? 0]));
-
-      // Set up vertex buffers for custom geometry
-      encoder.setVertexBuffer(0, geometryBuffers.vertexBuffer);
-      encoder.setVertexBuffer(1, geometryBuffers.instanceOffsetBuffer);
-      encoder.setVertexBuffer(2, geometryBuffers.instanceColorScaleBuffer);
-      encoder.setVertexBuffer(3, geometryBuffers.instanceSecondaryColorBuffer);
-      encoder.setVertexBuffer(4, geometryBuffers.instanceEmissiveColorBuffer);
-      encoder.setVertexBuffer(5, geometryBuffers.instanceMaterialParamsBuffer);
-      encoder.setVertexBuffer(6, geometryBuffers.instanceRotationBuffer);
-      encoder.setVertexBuffer(7, geometryBuffers.instanceMaterialIdBuffer);
-      encoder.setIndexBuffer(geometryBuffers.indexBuffer, 'uint16');
-
-      // Set bind groups (same as default geometry)
-      encoder.setBindGroup(0, frameResources.uniformBindGroup);
-      encoder.setBindGroup(1, frameResources.textureBindGroup);
-
-      // Choose pipeline based on transparency
-      if (isTransparent) {
-        if (frameResources.transparentPipeline) {
-          encoder.setPipeline(frameResources.transparentPipeline);
-          encoder.drawIndexed(geometryBuffers.indexCount, 1, 0, 0, 0);
-        }
-      } else {
-        encoder.setPipeline(frameResources.renderPipeline);
-        encoder.drawIndexed(geometryBuffers.indexCount, 1, 0, 0, 0);
-      }
-
-      // Render overlay pass if needed
-      encoder.setPipeline(frameResources.overlayPipeline);
-      encoder.drawIndexed(geometryBuffers.indexCount, 1, 0, 0, 0);
-    }
-  }
-
   private recordStaticBundle(
     device: GPUDevice,
     frameResources: FrameResources,
-    presentationFormat: GPUTextureFormat,
     geometry: GeometryData,
     sampleCount: number
   ): GPURenderBundle {
-    if (typeof (device as any).createRenderBundleEncoder !== 'function') {
-      // Fallback path when mock device lacks bundle encoder support
+    const createRenderBundleEncoder = (device as any).createRenderBundleEncoder;
+    if (typeof createRenderBundleEncoder !== 'function') {
       throw new Error('RenderBundleEncoder not supported');
     }
-    const bundleEncoder = device.createRenderBundleEncoder({
+    const bundleEncoder = createRenderBundleEncoder.call(device, {
       label: 'frame-static-bundle',
       colorFormats: ['rgba16float'],
       depthStencilFormat: 'depth24plus',
       sampleCount,
     });
-
     this.drawStaticGeometry(bundleEncoder, frameResources, geometry);
-
     return bundleEncoder.finish();
   }
 
-  /**
-   * Initializes the depth resolve render pipeline for converting multisampled depth to single-sampled
-   */
-  private initializeDepthResolvePipeline(device: GPUDevice): void {
-    if (this.depthResolvePipeline) {
-      return; // Already initialized
-    }
-
-    // Create bind group layout
-    // Use textureLoad which works with multisampled textures (reads first sample)
-    if (!this.depthResolveLayout) {
-      this.depthResolveLayout = device.createBindGroupLayout({
-        label: 'depth-resolve-bgl',
-        entries: [
-          { binding: 0, visibility: GPUShaderStage.FRAGMENT, texture: { sampleType: 'depth', multisampled: true } },
-          { binding: 1, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
-        ],
-      });
-    }
-
-    // Create uniform buffer for texture dimensions
-    if (!this.depthResolveUniformBuffer) {
-      this.depthResolveUniformBuffer = device.createBuffer({
-        label: 'depth-resolve-uniforms',
-        size: 8, // 2 floats: width, height
-        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-      });
-    }
-
-    // Create fullscreen vertex shader
-    const vs = device.createShaderModule({
-      code: `
-struct VSOut {
-  @builtin(position) pos: vec4<f32>,
-  @location(0) uv: vec2<f32>,
-}
-@vertex
-fn vs_fullscreen(@builtin(vertex_index) vid: u32) -> VSOut {
-  var o: VSOut;
-  let x = f32((vid << 1u) & 2u);
-  let y = f32(vid & 2u);
-  o.pos = vec4<f32>(x * 2.0 - 1.0, y * -2.0 + 1.0, 0.0, 1.0);
-  o.uv = vec2<f32>(x, y);
-  return o;
-}
-`,
-    });
-
-    // Fragment shader that reads depth and outputs as frag_depth
-    // Use textureLoad with integer coordinates for multisampled textures
-    // For multisampled depth, we read sample 0 (first sample)
-    const fs = device.createShaderModule({
-      code: `
-@group(0) @binding(0) var depthTex : texture_depth_multisampled_2d;
-
-struct Uniforms {
-  width: f32,
-  height: f32,
-}
-
-@group(0) @binding(1) var<uniform> uniforms : Uniforms;
-
-@fragment
-fn fs_main(@location(0) v_uv: vec2<f32>) -> @builtin(frag_depth) f32 {
-  // Convert UV to integer pixel coordinates
-  let texCoord = vec2<i32>(v_uv * vec2<f32>(uniforms.width, uniforms.height));
-  // Use textureLoad to read depth at integer coordinates
-  // For multisampled textures: textureLoad(texture, coord, sample_index)
-  // Use sample 0 (first sample)
-  let depth = textureLoad(depthTex, texCoord, 0);
-  return depth;
-}
-`,
-    });
-
-    // Create render pipeline
-    this.depthResolvePipeline = device.createRenderPipeline({
-      label: 'depth-resolve-pipeline',
-      layout: device.createPipelineLayout({
-        bindGroupLayouts: [this.depthResolveLayout],
-      }),
-      vertex: {
-        module: vs,
-        entryPoint: 'vs_fullscreen',
-      },
-      fragment: {
-        module: fs,
-        entryPoint: 'fs_main',
-        targets: [], // No color targets, depth only
-      },
-      primitive: {
-        topology: 'triangle-list',
-      },
-      depthStencil: {
-        format: 'depth24plus',
-        depthWriteEnabled: true,
-        depthCompare: 'always', // Always write the sampled depth value
-      },
-      multisample: {
-        count: 1, // Output is single-sampled
-      },
-    });
-  }
-
-  /**
-   * Resolves multisampled depth texture to non-multisampled for post-processing
-   */
-  private resolveDepthTexture(
+  private scheduleTimestampRead(
     device: GPUDevice,
-    encoder: GPUCommandEncoder,
-    multisampledDepthView: GPUTextureView,
-    resolvedDepthView: GPUTextureView,
-    width: number,
-    height: number
+    frameResources: FrameResources,
+    callback: (timings: { label: string; timeMs: number }[]) => void
   ): void {
-    // Initialize pipeline if needed
-    this.initializeDepthResolvePipeline(device);
-
-    if (!this.depthResolvePipeline || !this.depthResolveLayout || !this.depthResolveUniformBuffer) {
-      Logger.warn('Depth resolve pipeline not initialized');
+    if (this.pendingTimestampRead) {
       return;
     }
+    this.pendingTimestampRead = true;
+    const readBuffer = frameResources.timestampReadBuffer!;
+    device.queue
+      .onSubmittedWorkDone()
+      .then(() => readBuffer.mapAsync(GPUMapMode.READ))
+      .then(() => {
+        let snapshot: ArrayBuffer;
+        try {
+          const mapped = readBuffer.getMappedRange();
+          snapshot = mapped.slice(0);
+        } finally {
+          try {
+            readBuffer.unmap();
+          } catch {
+            // ignore
+          }
+        }
 
-    // Update uniform buffer with texture dimensions
-    const uniformData = new Float32Array([width, height]);
-    device.queue.writeBuffer(this.depthResolveUniformBuffer, 0, uniformData);
-
-    // Create bind group for this resolve pass
-    // textureLoad works with multisampled textures (reads from sample 0)
-    const bindGroup = device.createBindGroup({
-      label: 'depth-resolve-bg',
-      layout: this.depthResolveLayout,
-      entries: [
-        { binding: 0, resource: multisampledDepthView },
-        { binding: 1, resource: { buffer: this.depthResolveUniformBuffer } },
-      ],
-    });
-
-    // Render pass that writes to resolved depth
-    const pass = encoder.beginRenderPass({
-      label: 'depth-resolve-pass',
-      colorAttachments: [], // No color output
-      depthStencilAttachment: {
-        view: resolvedDepthView,
-        depthLoadOp: 'clear',
-        depthStoreOp: 'store',
-        depthClearValue: 1.0,
-      },
-    });
-
-    pass.setPipeline(this.depthResolvePipeline);
-    pass.setBindGroup(0, bindGroup);
-    pass.draw(3, 1, 0, 0); // Fullscreen triangle
-    pass.end();
+        const values = new BigUint64Array(snapshot);
+        const timings: { label: string; timeMs: number }[] = [];
+        for (const pair of GPU_TIMESTAMP_PAIRS) {
+          const begin = values[pair.beginIndex];
+          const end = values[pair.endIndex];
+          if (begin === undefined || end === undefined || begin === 0n || end <= begin) {
+            continue;
+          }
+          const delta = end - begin;
+          if (delta <= 0n) {
+            continue;
+          }
+          const durationNs = Number(delta) * frameResources.timestampPeriod;
+          if (!Number.isFinite(durationNs) || durationNs <= 0) {
+            continue;
+          }
+          timings.push({ label: pair.label, timeMs: durationNs / 1_000_000 });
+        }
+        callback(timings);
+      })
+      .catch((err) => {
+        Logger.warn('GPU timestamp read failed', err);
+        try {
+          readBuffer.unmap();
+        } catch {
+          // ignore
+        }
+      })
+      .finally(() => {
+        this.pendingTimestampRead = false;
+      });
   }
+
+  private invalidateBundle(): void {
+    this.staticBundle = null;
+    this.bundleDirty = true;
+    this.bundleInstanceCount = 0;
+    this.bundleIndexCount = 0;
+    this.bundleOpaqueCount = 0;
+    this.bundleRenderPipeline = null;
+    this.bundleTransparentPipeline = null;
+    this.bundleOverlayPipeline = null;
+    this.bundleUniformBindGroup = null;
+    this.bundleTextureBindGroup = null;
+  }
+
+  private handleTimestampRead(
+    ctx: FrameRenderContext,
+    device: GPUDevice,
+    frameResources: FrameResources
+  ): void {
+    if (
+      frameResources.timestampQuerySet &&
+      frameResources.timestampResolveBuffer &&
+      frameResources.timestampReadBuffer &&
+      typeof ctx.onGpuTimings === 'function'
+    ) {
+      this.scheduleTimestampRead(device, frameResources, ctx.onGpuTimings);
+    }
+  }
+
 }
-
-
-

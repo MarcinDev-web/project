@@ -41,5 +41,3 @@ export class BehaviorRegistry {
     return BehaviorRegistry.version;
   }
 }
-
-

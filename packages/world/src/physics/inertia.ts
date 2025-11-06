@@ -84,18 +84,14 @@ export function calculateInertiaTensor(shape: InertiaShape, mass: number): Mat3 
     default: {
       // Exhaustiveness check
       const _exhaustive: never = shape;
-      // eslint-disable-next-line @typescript-eslint/restrict-template-expressions
+
       throw new Error(`Unsupported shape type: ${String(_exhaustive)}`);
     }
   }
 }
 
 function diagonalMat3(ixx: number, iyy: number, izz: number): Mat3 {
-  return [
-    ixx, 0, 0,
-    0, iyy, 0,
-    0, 0, izz,
-  ];
+  return [ixx, 0, 0, 0, iyy, 0, 0, 0, izz];
 }
 
 function isFinitePositive(n: number): boolean {
@@ -111,5 +107,3 @@ function isFiniteVec3(v: Vec3): boolean {
     Number.isFinite(v[2])
   );
 }
-
-

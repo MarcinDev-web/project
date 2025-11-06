@@ -40,7 +40,7 @@ export class JointComponent extends Component {
    * Remove a joint by ID
    */
   removeJointById(id: string): boolean {
-    const index = this.joints.findIndex(j => j.getId() === id);
+    const index = this.joints.findIndex((j) => j.getId() === id);
     if (index !== -1) {
       this.joints.splice(index, 1);
       return true;
@@ -52,22 +52,22 @@ export class JointComponent extends Component {
    * Get a joint by ID
    */
   getJointById(id: string): Joint | undefined {
-    return this.joints.find(j => j.getId() === id);
+    return this.joints.find((j) => j.getId() === id);
   }
 
   /**
    * Get all enabled joints
    */
   getEnabledJoints(): Joint[] {
-    return this.joints.filter(j => j.isEnabled());
+    return this.joints.filter((j) => j.isEnabled());
   }
 
   /**
    * Remove all broken joints
    */
   removeBrokenJoints(): Joint[] {
-    const broken = this.joints.filter(j => j.isBroken());
-    this.joints = this.joints.filter(j => !j.isBroken());
+    const broken = this.joints.filter((j) => j.isBroken());
+    this.joints = this.joints.filter((j) => !j.isBroken());
     return broken;
   }
 
@@ -98,10 +98,11 @@ export class JointComponent extends Component {
   /**
    * Serialize the component
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   serialize(): any {
     return {
       type: this.getType(),
-      joints: this.joints.map(joint => ({
+      joints: this.joints.map((joint) => ({
         id: joint.getId(),
         config: joint.config,
         state: joint.state,
@@ -113,6 +114,7 @@ export class JointComponent extends Component {
    * Deserialize the component
    * Note: This requires entities to be resolved separately
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   static deserialize(data: any): JointComponent {
     const component = new JointComponent();
     void data; // parameter intentionally unused for now
@@ -121,4 +123,3 @@ export class JointComponent extends Component {
     return component;
   }
 }
-

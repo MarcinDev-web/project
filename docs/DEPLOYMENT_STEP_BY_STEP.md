@@ -87,8 +87,13 @@ node scripts/generate-jwt-secret.js
 4. **`FRONTEND_URL`:**
    - **Value:** `https://your-app.vercel.app`
    - *(zastąp swoim URL frontendu)*
+   - Jeśli masz wiele aplikacji, możesz dodać kolejne adresy po przecinku. **Pierwszy wpis jest traktowany jako domena kanoniczna** (wykorzystywana np. przy generowaniu linków share)
 
-5. **`DATABASE_URL`:**
+5. **(Opcjonalnie) `CORS_ALLOWED_ORIGINS`:**
+   - Dodaj jeśli potrzebujesz dodatkowych originów (np. preview Vercel, staging)
+   - Przykład: `https://*.vercel.app,https://admin.twoja-domena.com`
+
+6. **`DATABASE_URL`:**
    - ✅ Railway automatycznie ustawi to przy dodaniu PostgreSQL Database
    - Jeśli nie widzisz tej zmiennej, upewnij się że baza została dodana do projektu
 
@@ -129,7 +134,7 @@ node scripts/generate-jwt-secret.js
 
 ---
 
-## Krok 4: Ustawienie VITE_API_URL w Vercel
+## Krok 4: Ustawienie VITE_API_URL i VITE_WS_URL w Vercel
 
 ### 4.1. Przez Vercel Dashboard (Zalecane)
 
@@ -140,9 +145,14 @@ node scripts/generate-jwt-secret.js
 2. **Przejdź do Environment Variables:**
    - Settings → **Environment Variables**
 
-3. **Dodaj nową zmienną:**
+3. **Dodaj zmienne:**
    - **Key:** `VITE_API_URL`
-   - **Value:** `https://net-server-production.up.railway.app` *(URL z kroku 3.2)*
+   - **Value:** `https://net-server-production.up.railway.app/api` *(URL z kroku 3.2, z `/api` na końcu)*
+   - **Environments:** ✅ Production, ✅ Preview (opcjonalnie)
+
+4. **Dodaj WebSocket URL:**
+   - **Key:** `VITE_WS_URL`
+   - **Value:** `wss://net-server-production.up.railway.app/ws`
    - **Environments:** ✅ Production, ✅ Preview (opcjonalnie)
 
 4. **Zapisz**
@@ -154,10 +164,15 @@ node scripts/generate-jwt-secret.js
 vercel env add VITE_API_URL production
 
 # Wprowadź wartość gdy zostaniesz zapytany:
-# https://net-server-production.up.railway.app
+# https://net-server-production.up.railway.app/api
 
 # Powtórz dla preview (opcjonalnie):
 vercel env add VITE_API_URL preview
+
+# Dodaj VITE_WS_URL
+vercel env add VITE_WS_URL production
+# Wprowadź wartość: wss://net-server-production.up.railway.app/ws
+vercel env add VITE_WS_URL preview
 ```
 
 ---
@@ -245,11 +260,13 @@ vercel --prod
 ### Problem: CORS errors w przeglądarce
 
 **Sprawdź:**
-1. Czy `FRONTEND_URL` w platformie zawiera dokładny URL frontendu (z `https://`)
-2. Czy frontend URL jest bez trailing slash
+1. Czy `FRONTEND_URL` zawiera główny URL frontendu (pierwszy wpis = domena kanoniczna)
+2. Czy dodatkowe domeny (preview/staging) zostały dopisane do `CORS_ALLOWED_ORIGINS`
+3. Czy adresy nie mają zbędnego trailing slasha
 
 **Rozwiązanie:**
 - Zaktualizuj `FRONTEND_URL` w Railway Variables
+- Dodaj brakujące domeny (np. `https://*.vercel.app`) do `CORS_ALLOWED_ORIGINS`
 - Railway automatycznie zrestartuje serwis po zmianie
 
 ---

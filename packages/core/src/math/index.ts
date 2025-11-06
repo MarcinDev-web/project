@@ -1012,10 +1012,7 @@ export function extractFrustumPlanes(out: FrustumPlane[], vp: Mat4): FrustumPlan
 
   // Matrix is column-major
   // Left: row3 + row0
-  const left = normalizeVec3Out(
-    [0, 0, 0],
-    [vp[3]! + vp[0]!, vp[7]! + vp[4]!, vp[11]! + vp[8]!]
-  );
+  const left = normalizeVec3Out([0, 0, 0], [vp[3]! + vp[0]!, vp[7]! + vp[4]!, vp[11]! + vp[8]!]);
   const leftD = -(vp[15]! + vp[12]!);
   const leftLen = Math.hypot(left[0], left[1], left[2]);
   out[0] = {
@@ -1024,10 +1021,7 @@ export function extractFrustumPlanes(out: FrustumPlane[], vp: Mat4): FrustumPlan
   };
 
   // Right: row3 - row0
-  const right = normalizeVec3Out(
-    [0, 0, 0],
-    [vp[3]! - vp[0]!, vp[7]! - vp[4]!, vp[11]! - vp[8]!]
-  );
+  const right = normalizeVec3Out([0, 0, 0], [vp[3]! - vp[0]!, vp[7]! - vp[4]!, vp[11]! - vp[8]!]);
   const rightD = -(vp[15]! - vp[12]!);
   const rightLen = Math.hypot(right[0], right[1], right[2]);
   out[1] = {
@@ -1036,10 +1030,7 @@ export function extractFrustumPlanes(out: FrustumPlane[], vp: Mat4): FrustumPlan
   };
 
   // Bottom: row3 + row1
-  const bottom = normalizeVec3Out(
-    [0, 0, 0],
-    [vp[3]! + vp[1]!, vp[7]! + vp[5]!, vp[11]! + vp[9]!]
-  );
+  const bottom = normalizeVec3Out([0, 0, 0], [vp[3]! + vp[1]!, vp[7]! + vp[5]!, vp[11]! + vp[9]!]);
   const bottomD = -(vp[15]! + vp[13]!);
   const bottomLen = Math.hypot(bottom[0], bottom[1], bottom[2]);
   out[2] = {
@@ -1048,10 +1039,7 @@ export function extractFrustumPlanes(out: FrustumPlane[], vp: Mat4): FrustumPlan
   };
 
   // Top: row3 - row1
-  const top = normalizeVec3Out(
-    [0, 0, 0],
-    [vp[3]! - vp[1]!, vp[7]! - vp[5]!, vp[11]! - vp[9]!]
-  );
+  const top = normalizeVec3Out([0, 0, 0], [vp[3]! - vp[1]!, vp[7]! - vp[5]!, vp[11]! - vp[9]!]);
   const topD = -(vp[15]! - vp[13]!);
   const topLen = Math.hypot(top[0], top[1], top[2]);
   out[3] = {
@@ -1060,10 +1048,7 @@ export function extractFrustumPlanes(out: FrustumPlane[], vp: Mat4): FrustumPlan
   };
 
   // Near: row3 + row2
-  const near = normalizeVec3Out(
-    [0, 0, 0],
-    [vp[3]! + vp[2]!, vp[7]! + vp[6]!, vp[11]! + vp[10]!]
-  );
+  const near = normalizeVec3Out([0, 0, 0], [vp[3]! + vp[2]!, vp[7]! + vp[6]!, vp[11]! + vp[10]!]);
   const nearD = -(vp[15]! + vp[14]!);
   const nearLen = Math.hypot(near[0], near[1], near[2]);
   out[4] = {
@@ -1072,10 +1057,7 @@ export function extractFrustumPlanes(out: FrustumPlane[], vp: Mat4): FrustumPlan
   };
 
   // Far: row3 - row2
-  const far = normalizeVec3Out(
-    [0, 0, 0],
-    [vp[3]! - vp[2]!, vp[7]! - vp[6]!, vp[11]! - vp[10]!]
-  );
+  const far = normalizeVec3Out([0, 0, 0], [vp[3]! - vp[2]!, vp[7]! - vp[6]!, vp[11]! - vp[10]!]);
   const farD = -(vp[15]! - vp[14]!);
   const farLen = Math.hypot(far[0], far[1], far[2]);
   out[5] = {
@@ -1093,11 +1075,7 @@ export function extractFrustumPlanes(out: FrustumPlane[], vp: Mat4): FrustumPlan
  * @param plane - Frustum plane
  * @returns Positive distance if AABB is in front of plane, negative if behind
  */
-export function frustumPlaneTestAABB(
-  aabbMin: Vec3,
-  aabbMax: Vec3,
-  plane: FrustumPlane
-): number {
+export function frustumPlaneTestAABB(aabbMin: Vec3, aabbMax: Vec3, plane: FrustumPlane): number {
   assertVec3('aabbMin', aabbMin);
   assertVec3('aabbMax', aabbMax);
   const [nx, ny, nz] = plane.normal;

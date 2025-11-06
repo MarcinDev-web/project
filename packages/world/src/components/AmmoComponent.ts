@@ -49,7 +49,7 @@ export class AmmoComponent extends Component {
    */
   addAmmo(type: AmmoType, amount: number): number {
     if (amount <= 0) return this.getAmmoCount(type);
-    
+
     const current = this.getAmmoCount(type);
     const newCount = current + amount;
     this.ammoCounts.set(type, newCount);
@@ -64,17 +64,17 @@ export class AmmoComponent extends Component {
    */
   consumeAmmo(type: AmmoType, amount: number): number {
     if (amount <= 0) return 0;
-    
+
     const current = this.getAmmoCount(type);
     const consumed = Math.min(amount, current);
     const remaining = current - consumed;
-    
+
     if (remaining > 0) {
       this.ammoCounts.set(type, remaining);
     } else {
       this.ammoCounts.delete(type);
     }
-    
+
     return consumed;
   }
 
@@ -145,9 +145,7 @@ export class AmmoComponent extends Component {
     return { ammoCounts };
   }
 
-  fromJSON(data: {
-    ammoCounts?: Record<string, number>;
-  }): void {
+  fromJSON(data: { ammoCounts?: Record<string, number> }): void {
     this.ammoCounts.clear();
     if (data.ammoCounts) {
       for (const [type, count] of Object.entries(data.ammoCounts)) {

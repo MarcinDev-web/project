@@ -340,4 +340,3 @@ export class TimerData extends LogicCube {
     return false;
   }
 }
-

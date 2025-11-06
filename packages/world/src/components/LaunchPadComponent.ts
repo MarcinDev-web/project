@@ -70,4 +70,3 @@ export class LaunchPadComponent extends Component {
 }
 
 registerComponent(LaunchPadComponent.type, LaunchPadComponent);
-

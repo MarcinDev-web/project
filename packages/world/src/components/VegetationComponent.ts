@@ -18,17 +18,17 @@ export enum VegetationType {
 export interface VegetationConfig {
   /** Type of vegetation */
   type: VegetationType;
-  
+
   /** Billboard texture for grass/flowers (optional, used for billboard rendering) */
   billboardTexture?: string;
   /** Number of billboard texture variants (for variety) */
   billboardCount?: number;
-  
+
   /** 3D model URL for trees/shrubs (optional, used for 3D rendering) */
   modelUrl?: string;
   /** Number of LOD levels for 3D models */
   lodLevels?: number;
-  
+
   /** Physical properties */
   /** Height of vegetation in world units */
   height: number;
@@ -38,7 +38,7 @@ export interface VegetationConfig {
   canBeHarvested: boolean;
   /** Time in seconds to harvest (0 = instant) */
   harvestTime?: number;
-  
+
   /** Growth properties */
   /** Whether this vegetation can regrow after being harvested */
   canRegrow?: boolean;
@@ -46,7 +46,7 @@ export interface VegetationConfig {
   regrowthTime?: number;
   /** Growth rate multiplier (1.0 = normal, 2.0 = twice as fast) */
   growthRate?: number;
-  
+
   /** Visual parameters */
   /** Wind strength (0-1) affecting vertex displacement */
   windStrength: number;
@@ -62,7 +62,7 @@ export interface VegetationConfig {
 
 /**
  * VegetationComponent - Represents vegetation entities (grass, trees, shrubs, flowers)
- * 
+ *
  * Provides configuration and state for vegetation rendering and gameplay interaction.
  */
 export class VegetationComponent extends Component {
@@ -70,25 +70,25 @@ export class VegetationComponent extends Component {
 
   /** Vegetation configuration */
   config: VegetationConfig;
-  
+
   /** Growth stage (0-1) for growth animation (0 = newly planted/harvested, 1 = fully grown) */
   growthStage: number = 1.0;
-  
+
   /** Whether this vegetation has been harvested */
   isHarvested: boolean = false;
-  
+
   /** Instance ID for instanced rendering (used by renderer) */
   instanceId: string = '';
-  
+
   /** Unique phase offset for wind animation (randomized per instance) */
   windPhase: number = 0;
-  
+
   /** Unique color variation per instance (0-1, for visual variety) */
   colorVariationFactor: number = 0;
 
   constructor(config?: Partial<VegetationConfig>) {
     super();
-    
+
     // Default configuration
     const defaultConfig: VegetationConfig = {
       type: VegetationType.Grass,
@@ -102,12 +102,12 @@ export class VegetationComponent extends Component {
       colorVariation: 0.1,
       scaleVariation: 0.15,
     };
-    
+
     this.config = { ...defaultConfig, ...config };
-    
+
     // Randomize wind phase for natural variation
     this.windPhase = Math.random() * Math.PI * 2;
-    
+
     // Randomize color variation factor for visual variety
     this.colorVariationFactor = Math.random();
   }
@@ -210,9 +210,9 @@ export class VegetationComponent extends Component {
     const growthRate = this.config.growthRate ?? 1.0;
     const growthDelta = (deltaTime / regrowthTime) * growthRate;
     const oldStage = this.growthStage;
-    
+
     this.growthStage = Math.min(1.0, this.growthStage + growthDelta);
-    
+
     // Mark as no longer harvested when growth reaches threshold
     if (this.isHarvested && this.growthStage >= 0.5) {
       this.isHarvested = false;
@@ -230,4 +230,3 @@ export class VegetationComponent extends Component {
 }
 
 registerComponent(VegetationComponent.type, VegetationComponent);
-

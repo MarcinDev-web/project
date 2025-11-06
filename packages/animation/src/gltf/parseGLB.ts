@@ -2,8 +2,10 @@
  * Minimal GLB (glTF Binary) v2.0 parser.
  * Supports JSON + one BIN chunk. External buffers/data URIs are not handled.
  */
+import { convertFromGltf, type GLTF } from './convertFromGltf';
+
 export type ParsedGlb = {
-  gltf: any;
+  gltf: GLTF;
   binChunk: ArrayBuffer | null;
 };
 
@@ -17,19 +19,21 @@ export function parseGlb(buffer: ArrayBuffer): ParsedGlb {
   }
   const totalLength = view.getUint32(8, true);
   let offset = 12;
-  let json: any = null;
+  let json: GLTF | null = null;
   let bin: ArrayBuffer | null = null;
 
   while (offset + 8 <= totalLength) {
-    const chunkLength = view.getUint32(offset, true); offset += 4;
-    const chunkType = view.getUint32(offset, true); offset += 4;
+    const chunkLength = view.getUint32(offset, true);
+    offset += 4;
+    const chunkType = view.getUint32(offset, true);
+    offset += 4;
     const chunkDataStart = offset;
     const chunkDataEnd = offset + chunkLength;
     const chunkData = buffer.slice(chunkDataStart, chunkDataEnd);
     // JSON = 0x4E4F534A, BIN = 0x004E4942
     if (chunkType === 0x4e4f534a) {
       const text = new TextDecoder().decode(new Uint8Array(chunkData));
-      json = JSON.parse(text);
+      json = JSON.parse(text) as GLTF;
     } else if (chunkType === 0x004e4942) {
       bin = chunkData;
     }
@@ -44,12 +48,9 @@ export function parseGlb(buffer: ArrayBuffer): ParsedGlb {
 
 export function importFromGlb(buffer: ArrayBuffer) {
   const { gltf, binChunk } = parseGlb(buffer);
-  const { convertFromGltf } = require('../gltf/convertFromGltf') as typeof import('../gltf/convertFromGltf');
   const resolver = (bufferIndex: number) => {
     if (bufferIndex === 0 && binChunk) return binChunk;
     throw new Error(`Only single BIN chunk supported (index ${bufferIndex})`);
   };
   return convertFromGltf(gltf, resolver);
 }
-
-

@@ -3,6 +3,7 @@ import type { Entity } from '../core/Entity.js';
 export type ComponentJSON = unknown;
 
 export interface ComponentClass<T extends Component = Component> {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   new (...args: any[]): T;
   /** Unique string identifier for the component type. */
   readonly type?: string;
@@ -30,6 +31,7 @@ export abstract class Component {
    * Serializes component state into a plain JSON-compatible payload.
    * Subclasses should override when they have custom data to persist.
    */
+  // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
   toJSON(): ComponentJSON | null {
     return {};
   }

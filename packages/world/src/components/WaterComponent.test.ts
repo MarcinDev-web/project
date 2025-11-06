@@ -75,7 +75,7 @@ describe('WaterComponent', () => {
     const component = new WaterComponent();
     component.waveDirection = [3, 4]; // Should normalize to [0.6, 0.8]
     component.normalizeWaveDirection();
-    
+
     const len = Math.sqrt(
       component.waveDirection[0] * component.waveDirection[0] +
         component.waveDirection[1] * component.waveDirection[1]
@@ -109,4 +109,3 @@ describe('WaterComponent', () => {
     expect(component.getType()).toBe('Water');
   });
 });
-

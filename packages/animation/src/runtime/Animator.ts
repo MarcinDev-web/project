@@ -2,7 +2,7 @@ import type { Pose } from '../core/Pose';
 import { createPose } from '../core/Pose';
 import { blendPoseLinear } from '../core/Blend';
 import type { AnimatorController, AnimatorParameterMap } from './AnimatorController';
-import type { AnimationClip, TranslationTrack, RotationTrack, ScaleTrack } from '../core/AnimationClip';
+import type { AnimationClip } from '../core/AnimationClip';
 import { sampleRotationAt, sampleScaleAt, sampleTranslationAt } from '../sampling/Samplers';
 
 export class Animator {
@@ -50,8 +50,10 @@ export class Animator {
       // advance both times
       const from = this.controller.getState(this.fadeFromStateName!);
       const to = this.controller.getState(this.fadeToStateName!);
-      if (from.clip.duration > 0) this.fadeFromTime = (this.fadeFromTime + dtClamped * from.speed) % from.clip.duration;
-      if (to.clip.duration > 0) this.fadeToTime = (this.fadeToTime + dtClamped * to.speed) % to.clip.duration;
+      if (from.clip.duration > 0)
+        this.fadeFromTime = (this.fadeFromTime + dtClamped * from.speed) % from.clip.duration;
+      if (to.clip.duration > 0)
+        this.fadeToTime = (this.fadeToTime + dtClamped * to.speed) % to.clip.duration;
       this.fadeTime += dtClamped;
       if (this.fadeTime >= this.fadeDuration) {
         // finalize
@@ -78,8 +80,10 @@ export class Animator {
           const from = this.controller.getState(this.fadeFromStateName!);
           const to = this.controller.getState(this.fadeToStateName!);
           this.fadeTime = Math.min(this.fadeDuration, dtClamped);
-          if (from.clip.duration > 0) this.fadeFromTime = (this.fadeFromTime + dtClamped * from.speed) % from.clip.duration;
-          if (to.clip.duration > 0) this.fadeToTime = (this.fadeToTime + dtClamped * to.speed) % to.clip.duration;
+          if (from.clip.duration > 0)
+            this.fadeFromTime = (this.fadeFromTime + dtClamped * from.speed) % from.clip.duration;
+          if (to.clip.duration > 0)
+            this.fadeToTime = (this.fadeToTime + dtClamped * to.speed) % to.clip.duration;
         } else {
           this.setState(tr.to);
         }
@@ -141,15 +145,15 @@ function applyClipToPose(outPose: Pose, clip: AnimationClip, time: number): void
   for (const track of clip.tracks) {
     switch (track.kind) {
       case 'translation':
-        sampleTranslationAt(tOut, track as TranslationTrack, time);
+        sampleTranslationAt(tOut, track, time);
         writeVec3(outPose.localTranslations, track.jointIndex, tOut);
         break;
       case 'scale':
-        sampleScaleAt(sOut, track as ScaleTrack, time);
+        sampleScaleAt(sOut, track, time);
         writeVec3(outPose.localScales, track.jointIndex, sOut);
         break;
       case 'rotation':
-        sampleRotationAt(rOut, track as RotationTrack, time);
+        sampleRotationAt(rOut, track, time);
         writeQuat(outPose.localRotations, track.jointIndex, rOut);
         break;
     }
@@ -167,12 +171,14 @@ function writeVec3(dst: Float32Array, jointIndex: number, v: [number, number, nu
   dst[o + 2] = v[2];
 }
 
-function writeQuat(dst: Float32Array, jointIndex: number, q: [number, number, number, number]): void {
+function writeQuat(
+  dst: Float32Array,
+  jointIndex: number,
+  q: [number, number, number, number]
+): void {
   const o = jointIndex * 4;
   dst[o + 0] = q[0];
   dst[o + 1] = q[1];
   dst[o + 2] = q[2];
   dst[o + 3] = q[3];
 }
-
-

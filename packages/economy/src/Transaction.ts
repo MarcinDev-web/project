@@ -63,11 +63,13 @@ export class Transaction {
   /**
    * Creates a copy of this transaction with updated fields.
    */
-  with(updates: Partial<{
-    status: TransactionStatus;
-    description?: string;
-    metadata?: TransactionMetadata;
-  }>): Transaction {
+  with(
+    updates: Partial<{
+      status: TransactionStatus;
+      description?: string;
+      metadata?: TransactionMetadata;
+    }>
+  ): Transaction {
     const params: {
       id: string;
       timestamp: number;
@@ -136,11 +138,15 @@ export class Transaction {
    */
   private static validate(transaction: Transaction): void {
     if (!Number.isFinite(transaction.amount.amount) || transaction.amount.amount < 0) {
-      throw new Error(`Transaction amount must be non-negative and finite, got: ${transaction.amount.amount}`);
+      throw new Error(
+        `Transaction amount must be non-negative and finite, got: ${transaction.amount.amount}`
+      );
     }
 
     if (!transaction.amount.currency || typeof transaction.amount.currency !== 'string') {
-      throw new Error(`Transaction currency must be a non-empty string, got: ${transaction.amount.currency}`);
+      throw new Error(
+        `Transaction currency must be a non-empty string, got: ${transaction.amount.currency}`
+      );
     }
 
     if (transaction.type === TransactionType.TRANSFER) {
@@ -159,4 +165,3 @@ export class Transaction {
     }
   }
 }
-

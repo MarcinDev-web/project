@@ -365,7 +365,7 @@ export class FixedJoint extends Joint {
       const TMP2: Vec3 = [0, 0, 0];
       this.applyImpulseB(scaleVec3Out(TMP2, correction, -1), anchorB);
 
-      this.state.currentForce = errorMag * 0.35 / dt;
+      this.state.currentForce = (errorMag * 0.35) / dt;
     }
   }
 
@@ -581,10 +581,10 @@ export class HingeJoint extends Joint {
       // Apply corrective angular impulse
       const TMP3: Vec3 = [0, 0, 0];
       const correction = scaleVec3Out(TMP3, axisError, 0.1);
-      
+
       const physicsA = this.getPhysicsA();
       const physicsB = this.getPhysicsB();
-      
+
       if (physicsA && physicsA.rigidbodyType === RigidbodyType.Dynamic) {
         addVec3Out(physicsA.angularVelocity, physicsA.angularVelocity, correction);
       }
@@ -596,8 +596,9 @@ export class HingeJoint extends Joint {
     // Handle angle limits
     if (this.config.useLimits) {
       // Simplified limit handling - would need proper angle calculation in production
-      this.currentAngle = Math.atan2(worldAxisB[1], worldAxisB[0]) - Math.atan2(worldAxisA[1], worldAxisA[0]);
-      
+      this.currentAngle =
+        Math.atan2(worldAxisB[1], worldAxisB[0]) - Math.atan2(worldAxisA[1], worldAxisA[0]);
+
       if (this.currentAngle < this.config.minAngle!) {
         // Apply corrective impulse
         const physicsB = this.getPhysicsB();
@@ -681,7 +682,7 @@ export class BallSocketJoint extends Joint {
         this.applyImpulseB(scaleVec3Out(TMPB, correction, -1), anchorB);
       }
 
-      this.state.currentForce = errorMag * 0.2 / dt;
+      this.state.currentForce = (errorMag * 0.2) / dt;
     }
 
     // Angular limits (cone and twist) - simplified implementation
@@ -764,11 +765,19 @@ export class SliderJoint extends Joint {
     if (this.config.useLimits) {
       if (this.currentDistance < this.config.minDistance!) {
         const TMP6: Vec3 = [0, 0, 0];
-        const correction = scaleVec3Out(TMP6, normalizedAxis, (this.config.minDistance! - this.currentDistance) * 0.2);
+        const correction = scaleVec3Out(
+          TMP6,
+          normalizedAxis,
+          (this.config.minDistance! - this.currentDistance) * 0.2
+        );
         this.applyImpulseB(correction, anchorB);
       } else if (this.currentDistance > this.config.maxDistance!) {
         const TMP7: Vec3 = [0, 0, 0];
-        const correction = scaleVec3Out(TMP7, normalizedAxis, (this.config.maxDistance! - this.currentDistance) * 0.2);
+        const correction = scaleVec3Out(
+          TMP7,
+          normalizedAxis,
+          (this.config.maxDistance! - this.currentDistance) * 0.2
+        );
         this.applyImpulseB(correction, anchorB);
       }
     }
@@ -778,7 +787,10 @@ export class SliderJoint extends Joint {
       const physicsB = this.getPhysicsB();
       if (physicsB && physicsB.rigidbodyType === RigidbodyType.Dynamic) {
         const motorForce = this.config.motorSpeed! * dt;
-        const clampedForce = Math.max(-this.config.maxMotorForce!, Math.min(this.config.maxMotorForce!, motorForce));
+        const clampedForce = Math.max(
+          -this.config.maxMotorForce!,
+          Math.min(this.config.maxMotorForce!, motorForce)
+        );
         const TMP8: Vec3 = [0, 0, 0];
         const motorImpulse = scaleVec3Out(TMP8, normalizedAxis, clampedForce);
         this.applyImpulseB(motorImpulse, anchorB);
@@ -820,7 +832,7 @@ export function createJoint(config: AnyJointConfig): Joint {
     case JointType.Slider:
       return new SliderJoint(config);
     default:
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-unsafe-member-access
       throw new Error(`Unknown joint type: ${(config as any).type}`);
   }
 }
-

@@ -84,4 +84,3 @@ export function setWaterTransparency(entity: Entity, transparency: number): bool
   water.transparency = Math.max(0, Math.min(1, transparency));
   return true;
 }
-

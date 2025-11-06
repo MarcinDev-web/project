@@ -352,9 +352,29 @@ app.use(cors());
 
 3. **Skonfigurować CORS**
    ```typescript
+   import {
+     getCorsConfig,
+     isOriginAllowed,
+     describeAllowedOrigins,
+     CORS_ALLOWED_HEADERS,
+     CORS_ALLOWED_METHODS,
+   } from '@shared/config/cors';
+
+   const corsConfig = getCorsConfig();
+   const allowedOriginsDescription = describeAllowedOrigins(corsConfig);
+
    app.use(cors({
-     origin: process.env.FRONTEND_URL || 'http://localhost:5173',
-     credentials: true
+     origin: (origin, callback) => {
+       if (!origin || isOriginAllowed(origin, corsConfig)) {
+         return callback(null, true);
+       }
+       console.warn(`Blocked CORS origin: ${origin}. Allowed: ${allowedOriginsDescription}`);
+       return callback(new Error('Not allowed by CORS'));
+     },
+     credentials: true,
+     allowedHeaders: CORS_ALLOWED_HEADERS,
+     methods: CORS_ALLOWED_METHODS,
+     maxAge: 86400,
    }));
    ```
 

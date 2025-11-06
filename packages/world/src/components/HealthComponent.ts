@@ -113,10 +113,7 @@ export class HealthComponent extends Component {
     };
   }
 
-  fromJSON(data: {
-    maxHealth?: number;
-    currentHealth?: number;
-  }): void {
+  fromJSON(data: { maxHealth?: number; currentHealth?: number }): void {
     if (typeof data.maxHealth === 'number') {
       this.maxHealth = data.maxHealth;
     }
@@ -130,4 +127,3 @@ export class HealthComponent extends Component {
 }
 
 registerComponent(HealthComponent.type, HealthComponent);
-

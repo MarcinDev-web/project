@@ -1,6 +1,6 @@
 # SIMD Optimizations - Planning Document
 
-This document outlines potential SIMD (Single Instruction, Multiple Data) optimizations for Rust/WASM modules in FORGE Engine.
+This document outlines potential SIMD (Single Instruction, Multiple Data) optimizations for Rust/WASM modules in Forge Engine.
 
 ## Overview
 

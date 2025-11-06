@@ -24,7 +24,7 @@ describe('InventorySystem', () => {
   it('should add weapon to inventory', () => {
     const inventory = new InventoryComponent();
     entity.addComponent(inventory);
-    
+
     const weapon = new WeaponComponent({ damage: 30 });
     const added = inventorySystem.addWeapon(entity, weapon);
     expect(added).toBe(true);
@@ -34,12 +34,12 @@ describe('InventorySystem', () => {
   it('should switch weapon', () => {
     const inventory = new InventoryComponent();
     entity.addComponent(inventory);
-    
+
     const weapon1 = new WeaponComponent({ damage: 30 });
     const weapon2 = new WeaponComponent({ damage: 50 });
     inventorySystem.addWeapon(entity, weapon1);
     inventorySystem.addWeapon(entity, weapon2);
-    
+
     const switched = inventorySystem.switchWeapon(entity, 1);
     expect(switched).toBe(true);
     expect(inventory.getActiveWeaponIndex()).toBe(1);
@@ -48,10 +48,10 @@ describe('InventorySystem', () => {
   it('should get active weapon', () => {
     const inventory = new InventoryComponent();
     entity.addComponent(inventory);
-    
+
     const weapon = new WeaponComponent({ damage: 30 });
     inventorySystem.addWeapon(entity, weapon);
-    
+
     const active = inventorySystem.getActiveWeapon(entity);
     expect(active).toBeDefined();
     expect(active?.damage).toBe(30);
@@ -60,10 +60,10 @@ describe('InventorySystem', () => {
   it('should check if can fire', () => {
     const inventory = new InventoryComponent();
     entity.addComponent(inventory);
-    
+
     const weapon = new WeaponComponent({ damage: 30, ammo: 10 });
     inventorySystem.addWeapon(entity, weapon);
-    
+
     const canFire = inventorySystem.canFire(entity, 0);
     expect(canFire).toBe(true);
   });
@@ -71,13 +71,13 @@ describe('InventorySystem', () => {
   it('should not allow fire while switching', () => {
     const inventory = new InventoryComponent();
     entity.addComponent(inventory);
-    
+
     const weapon1 = new WeaponComponent({ damage: 30 });
     const weapon2 = new WeaponComponent({ damage: 50 });
     inventorySystem.addWeapon(entity, weapon1);
     inventorySystem.addWeapon(entity, weapon2);
     inventorySystem.switchWeapon(entity, 1);
-    
+
     const canFire = inventorySystem.canFire(entity, 0);
     expect(canFire).toBe(false);
   });
@@ -85,13 +85,13 @@ describe('InventorySystem', () => {
   it('should update weapon switching', () => {
     const inventory = new InventoryComponent();
     entity.addComponent(inventory);
-    
+
     const weapon1 = new WeaponComponent({ damage: 30 });
     const weapon2 = new WeaponComponent({ damage: 50 });
     inventorySystem.addWeapon(entity, weapon1);
     inventorySystem.addWeapon(entity, weapon2);
     inventorySystem.switchWeapon(entity, 1);
-    
+
     inventorySystem.update(inventory.switchDuration);
     // Switch should complete after duration
     const canFire = inventorySystem.canFire(entity, inventory.switchDuration + 0.1);

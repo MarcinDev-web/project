@@ -1,5 +1,13 @@
 import type { FastifyInstance } from 'fastify';
+import type { PrismaClient } from '@prisma/client';
+import jwt from 'jsonwebtoken';
 import type { RawData, WebSocket } from 'ws';
+import {
+  type CorsConfig,
+  isOriginAllowed,
+  describeAllowedOrigins,
+  getCorsConfig,
+} from '@shared/config/cors';
 
 type PublicUser = {
   id: string;
@@ -51,7 +59,6 @@ interface ConnectionMeta {
 }
 
 const JWT_SECRET = process.env.JWT_SECRET || 'change-me-in-production';
-import jwt from 'jsonwebtoken';
 
 const rooms = new Map<string, Set<WebSocket>>();
 const locks = new Map<string, string>(); // key: `${sessionId}:${entityId}` -> userId
@@ -190,10 +197,22 @@ function checkAndStartPlayMode(requestId: string, sessionId: string, forceTimeou
   }
 }
 
-export function createWsServer(app: FastifyInstance, _prisma: any): void {
+export function createWsServer(
+  app: FastifyInstance,
+  _prisma: PrismaClient,
+  corsConfig?: CorsConfig
+): void {
+  const resolvedCorsConfig = corsConfig ?? getCorsConfig();
+  const allowedOriginsDescription = describeAllowedOrigins(resolvedCorsConfig);
   // @fastify/websocket v11 handler signature: (socket, request)
-  app.get('/ws', { websocket: true }, (socket /*, req */) => {
+  app.get('/ws', { websocket: true }, (socket, req) => {
     const ws = socket as unknown as WebSocket;
+    const origin = typeof req.headers.origin === 'string' ? req.headers.origin : undefined;
+    if (origin && !isOriginAllowed(origin, resolvedCorsConfig)) {
+      req.log.warn({ origin }, `Blocked WebSocket origin. Allowed: ${allowedOriginsDescription}`);
+      ws.close(1008, 'Origin not allowed');
+      return;
+    }
     const meta: ConnectionMeta = { userId: null, sessionId: null };
 
     ws.on('message', (raw: RawData) => {

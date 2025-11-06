@@ -7,5 +7,3 @@ export function chooseTransport(cap: ClientCapabilities): TransportKind {
   }
   return 'websocket';
 }
-
-

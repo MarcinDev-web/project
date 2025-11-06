@@ -15,7 +15,7 @@ export interface SnapshotOptions {
   /**
    * Replace dynamic values (like timestamps, UUIDs)
    */
-  replacements?: Record<string, any>;
+  replacements?: Record<string, unknown>;
   /**
    * Sort arrays before snapshotting for consistency
    */
@@ -26,7 +26,7 @@ export interface SnapshotOptions {
  * Normalize an object for snapshot testing
  * Removes non-deterministic fields and sorts data
  */
-export function normalizeForSnapshot<T>(obj: T, options: SnapshotOptions = {}): any {
+export function normalizeForSnapshot<T>(obj: T, options: SnapshotOptions = {}): unknown {
   const { exclude = [], replacements = {}, sortArrays = true } = options;
 
   if (obj === null || obj === undefined) {
@@ -39,13 +39,14 @@ export function normalizeForSnapshot<T>(obj: T, options: SnapshotOptions = {}): 
   }
 
   if (obj instanceof Date) {
-    return replacements.Date ?? '<Date>';
+    const dateReplacement = replacements.Date;
+    return typeof dateReplacement === 'string' ? dateReplacement : '<Date>';
   }
 
   if (typeof obj === 'object') {
-    const normalized: any = {};
+    const normalized: Record<string, unknown> = {};
 
-    for (const [key, value] of Object.entries(obj)) {
+    for (const [key, value] of Object.entries(obj as Record<string, unknown>)) {
       // Skip excluded properties
       if (exclude.includes(key)) {
         continue;
@@ -105,7 +106,7 @@ export function expectToMatchInlineSnapshot<T>(
 /**
  * Snapshot testing for JSON serialization
  */
-export function expectJsonToMatchSnapshot(obj: any, options?: SnapshotOptions) {
+export function expectJsonToMatchSnapshot(obj: unknown, options?: SnapshotOptions): void {
   const json = JSON.stringify(normalizeForSnapshot(obj, options), null, 2);
   expect(json).toMatchSnapshot();
 }
@@ -113,7 +114,7 @@ export function expectJsonToMatchSnapshot(obj: any, options?: SnapshotOptions) {
 /**
  * Snapshot testing for scene serialization
  */
-export function expectSceneToMatchSnapshot(scene: any, options: SnapshotOptions = {}) {
+export function expectSceneToMatchSnapshot(scene: unknown, options: SnapshotOptions = {}): void {
   const defaultOptions: SnapshotOptions = {
     exclude: ['_internal', '__proto__'],
     replacements: {},
@@ -128,7 +129,7 @@ export function expectSceneToMatchSnapshot(scene: any, options: SnapshotOptions 
 /**
  * Compare two serializations for equality (useful for versioning tests)
  */
-export function expectSerializationToEqual(v1: any, v2: any, options?: SnapshotOptions) {
+export function expectSerializationToEqual<T>(v1: T, v2: T, options?: SnapshotOptions): void {
   const normalized1 = normalizeForSnapshot(v1, options);
   const normalized2 = normalizeForSnapshot(v2, options);
   expect(normalized1).toEqual(normalized2);

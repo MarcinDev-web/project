@@ -1,4 +1,9 @@
-import type { TransportServer, ClientConnection } from './TransportServer.js';
+import {
+  createTransportLogger,
+  type ClientConnection,
+  type TransportLogger,
+  type TransportServer,
+} from './TransportServer.js';
 import type { TransportKind } from '@engine/net-protocol';
 
 // WebTransport requires HTTP/3 (QUIC) which needs special server setup
@@ -11,6 +16,7 @@ export interface WebTransportServerOptions {
   port: number;
   cert: string; // Path to certificate file (PEM format)
   key: string; // Path to private key file (PEM format)
+  logger?: TransportLogger;
 }
 
 interface WebTransportSession {
@@ -28,17 +34,18 @@ export class WebTransportServer implements TransportServer {
   public readonly kind: TransportKind = 'webtransport';
   private server: HttpServer | null = null;
   private readonly connections = new Map<string, WebTransportSession>();
+  private readonly logger: ReturnType<typeof createTransportLogger>;
 
-  constructor(_options: WebTransportServerOptions) {
+  constructor(private readonly options: WebTransportServerOptions) {
     // WebTransport requires HTTPS/WSS with valid certificate
     // Options stored for future implementation when HTTP/3 server is added
-    void _options; // Mark as intentionally unused for now
+    this.logger = createTransportLogger(options.logger);
   }
 
-  async start(): Promise<void> {
+  start(): Promise<void> {
     // WebTransport server implementation placeholder
     // Requires HTTP/3 (QUIC) server implementation
-    // 
+    //
     // Options:
     // 1. Use Node.js --experimental-http3 flag (Node.js 18.3+)
     // 2. Use h3 or other HTTP/3 library
@@ -48,13 +55,13 @@ export class WebTransportServer implements TransportServer {
     // - Create HTTP/3 server with TLS
     // - Handle WebTransport upgrade requests
     // - Manage WebTransport sessions with datagrams and streams
-    
-    console.warn(
+
+    this.logger.warn(
       'WebTransport server is not fully implemented. ' +
-      'WebTransport requires HTTP/3 (QUIC) support. ' +
-      'Use Node.js --experimental-http3 or an HTTP/3 library.'
+        'WebTransport requires HTTP/3 (QUIC) support. ' +
+        'Use Node.js --experimental-http3 or an HTTP/3 library.'
     );
-    
+
     // Placeholder: In real implementation, initialize HTTP/3 server here
     // For now, create a mock server object with close method
     this.server = {
@@ -62,8 +69,8 @@ export class WebTransportServer implements TransportServer {
         // Placeholder implementation
       },
     };
+    return Promise.resolve();
   }
-
 
   async stop(): Promise<void> {
     if (this.server) {
@@ -74,7 +81,7 @@ export class WebTransportServer implements TransportServer {
       try {
         session.close();
       } catch (err) {
-        console.error('Error closing WebTransport session:', err);
+        this.logger.error('Error closing WebTransport session:', err);
       }
     }
     this.connections.clear();
@@ -89,11 +96,14 @@ export class WebTransportServer implements TransportServer {
       kind: 'webtransport',
       send: (bytes: Uint8Array) => {
         const writer = session.datagramsWritable.getWriter();
-        writer.write(bytes).catch((err) => {
-          console.error('Error sending datagram:', err);
-        }).finally(() => {
-          writer.releaseLock();
-        });
+        void writer
+          .write(bytes)
+          .catch((err) => {
+            this.logger.error('Error sending datagram:', err);
+          })
+          .finally(() => {
+            writer.releaseLock();
+          });
       },
       close: () => {
         session.close();
@@ -102,4 +112,3 @@ export class WebTransportServer implements TransportServer {
     };
   }
 }
-

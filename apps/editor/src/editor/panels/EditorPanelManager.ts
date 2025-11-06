@@ -27,6 +27,7 @@ import { TemplateGalleryPanel } from './TemplateGalleryPanel';
 import { VegetationPanel } from './VegetationPanel';
 import { EconomyPanel } from './EconomyPanel';
 import { UIPanel } from './UIPanel';
+import { NpcPanel } from './NpcPanel';
 import { UICanvasComponent } from '@engine/world/components/UICanvasComponent';
 import { UIElementComponent } from '@engine/world/components/UIElementComponent';
 import { TerrainPanel } from '../terrain/ui/TerrainPanel';
@@ -83,6 +84,7 @@ export class EditorPanelManager {
   private logicPanel: LogicPanel | null = null;
   private templateGallery: TemplateGalleryPanel | null = null;
   private vegetationPanel: VegetationPanel | null = null;
+  private npcPanel: NpcPanel | null = null;
   private uiPanel: UIPanel | null = null;
   private terrainPanel: TerrainPanel | null = null;
   private renderSettingsPanel: RenderSettingsPanel | null = null;
@@ -216,6 +218,36 @@ export class EditorPanelManager {
       },
     });
 
+    // Initialize NPC Panel
+    const defaultNpcPreset: AssetPreset = {
+      name: 'NPC',
+      scale: [1, 1, 1],
+      color: [0.5, 0.5, 0.5, 1],
+      npcConfig: {
+        unitType: 'soldier',
+        faction: 'neutral',
+        behavior: 'idle',
+      },
+    };
+    this.npcPanel = new NpcPanel({
+      assetPreset: defaultNpcPreset,
+      onConfigChanged: (config) => {
+        // Update the preset with new config
+        if (defaultNpcPreset.npcConfig) {
+          defaultNpcPreset.npcConfig = config;
+        }
+      },
+      onCreatePreset: (config) => {
+        // Create new NPC preset
+        console.log('[NpcPanel] Create preset:', config);
+        // TODO: Integrate with asset system to create new NPC presets
+      },
+      onStartPlacement: (preset) => {
+        // Start placement with NPC preset
+        this.config.onStartPlacement(preset);
+      },
+    });
+
     // Initialize Economy Panel
     const economyPanel = new EconomyPanel();
 
@@ -341,6 +373,13 @@ export class EditorPanelManager {
       label: 'Vegetation',
       icon: 'leaf',
       content: this.vegetationPanel.element,
+    });
+
+    this.sidebarTabs.addTab({
+      id: 'npcs',
+      label: 'NPCs',
+      icon: 'user',
+      content: this.npcPanel.element,
     });
 
     this.sidebarTabs.addTab({

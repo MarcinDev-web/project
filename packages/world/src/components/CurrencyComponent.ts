@@ -49,7 +49,9 @@ export class CurrencyComponent extends Component {
    */
   getWallet(): CurrencyWallet {
     if (!this.wallet) {
-      throw new Error(`CurrencyComponent: Wallet not initialized. Call setManager() first or ensure entity has wallet.`);
+      throw new Error(
+        `CurrencyComponent: Wallet not initialized. Call setManager() first or ensure entity has wallet.`
+      );
     }
     return this.wallet;
   }
@@ -110,9 +112,7 @@ export class CurrencyComponent extends Component {
     };
   }
 
-  fromJSON(data: {
-    walletId?: string;
-  }): void {
+  fromJSON(data: { walletId?: string }): void {
     if (data.walletId) {
       this.walletId = data.walletId;
     }
@@ -127,4 +127,3 @@ export class CurrencyComponent extends Component {
 }
 
 registerComponent(CurrencyComponent.type, CurrencyComponent);
-

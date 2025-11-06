@@ -177,7 +177,11 @@ export class WeaponComponent extends Component {
   private _reloadStartTime: number = -Infinity;
 
   /** Callback invoked when weapon fires */
-  onFire?: (damage: number, direction: [number, number, number], origin: [number, number, number]) => void;
+  onFire?: (
+    damage: number,
+    direction: [number, number, number],
+    origin: [number, number, number]
+  ) => void;
 
   /** Callback invoked when reload starts */
   onReload?: () => void;
@@ -238,10 +242,7 @@ export class WeaponComponent extends Component {
    * @param attachmentModifiers - Optional attachment modifiers (if not provided, will compute from entity)
    * @param ammoMultiplier - Optional ammo type damage multiplier
    */
-  getEffectiveDamage(
-    attachmentModifiers?: StatModifiers,
-    ammoMultiplier?: number
-  ): number {
+  getEffectiveDamage(attachmentModifiers?: StatModifiers, ammoMultiplier?: number): number {
     let damage = this._baseDamage;
 
     // Apply attachment modifiers
@@ -512,7 +513,9 @@ export class WeaponComponent extends Component {
       maxAmmo: this._baseMaxAmmo,
       reloadDuration: this._baseReloadDuration,
       projectileSpeed: this._baseProjectileSpeed,
-      ...(this._baseProjectileLifetime !== undefined && { projectileLifetime: this._baseProjectileLifetime }),
+      ...(this._baseProjectileLifetime !== undefined && {
+        projectileLifetime: this._baseProjectileLifetime,
+      }),
       currentAmmoType: this.currentAmmoType,
       acceptedAmmoTypes: [...this.acceptedAmmoTypes],
     };
@@ -559,4 +562,3 @@ export class WeaponComponent extends Component {
 }
 
 registerComponent(WeaponComponent.type, WeaponComponent);
-

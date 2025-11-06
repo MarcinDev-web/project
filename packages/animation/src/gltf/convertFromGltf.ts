@@ -1,20 +1,45 @@
 import type { Skeleton, Joint } from '../core/Skeleton';
 import { createSkeleton } from '../core/Skeleton';
-import type { AnimationClip, Track, Interpolation } from '../core/AnimationClip';
+import type {
+  AnimationClip,
+  Track,
+  Interpolation,
+  TranslationTrack,
+  ScaleTrack,
+  RotationTrack,
+} from '../core/AnimationClip';
 import { createClip } from '../core/AnimationClip';
 import type { MorphTargetClip, MorphChannel } from '../core/Morph';
 import { createMorphClip } from '../core/Morph';
 
-type GLTF = {
+export type GLTF = {
   nodes: Array<{ name?: string; children?: number[]; mesh?: number }>;
   skins?: Array<{ joints: number[]; inverseBindMatrices?: number }>;
-  accessors: Array<{ bufferView?: number; byteOffset?: number; componentType: number; count: number; type: string }>;
-  bufferViews: Array<{ buffer: number; byteOffset?: number; byteLength: number; byteStride?: number }>;
+  accessors: Array<{
+    bufferView?: number;
+    byteOffset?: number;
+    componentType: number;
+    count: number;
+    type: string;
+  }>;
+  bufferViews: Array<{
+    buffer: number;
+    byteOffset?: number;
+    byteLength: number;
+    byteStride?: number;
+  }>;
   buffers: Array<{ uri?: string; byteLength: number }>;
   animations?: Array<{
     name?: string;
-    samplers: Array<{ input: number; output: number; interpolation?: 'LINEAR' | 'STEP' | 'CUBICSPLINE' }>;
-    channels: Array<{ sampler: number; target: { node: number; path: 'translation' | 'rotation' | 'scale' | 'weights' } }>;
+    samplers: Array<{
+      input: number;
+      output: number;
+      interpolation?: 'LINEAR' | 'STEP' | 'CUBICSPLINE';
+    }>;
+    channels: Array<{
+      sampler: number;
+      target: { node: number; path: 'translation' | 'rotation' | 'scale' | 'weights' };
+    }>;
   }>;
   meshes?: Array<{ primitives: Array<{ targets?: Array<Record<string, unknown>> }> }>;
 };
@@ -34,7 +59,9 @@ export function convertFromGltf(
   const skin = gltf.skins[options?.skinIndex ?? 0]!;
   const jointNodeIndices = skin.joints;
   const jointCount = jointNodeIndices.length;
-  const joints: Joint[] = jointNodeIndices.map((ni) => ({ name: gltf.nodes[ni]?.name ?? `joint_${ni}` }));
+  const joints: Joint[] = jointNodeIndices.map((ni) => ({
+    name: gltf.nodes[ni]?.name ?? `joint_${ni}`,
+  }));
 
   // Build parent indices for joint list by scanning node children
   const nodeParent = new Int16Array(gltf.nodes.length).fill(-1);
@@ -49,7 +76,8 @@ export function convertFromGltf(
   for (let j = 0; j < jointCount; j++) {
     const nodeIndex = jointNodeIndices[j]!;
     const parentNode = nodeParent[nodeIndex]!;
-    parents[j] = parentNode >= 0 && nodeToJoint.has(parentNode) ? (nodeToJoint.get(parentNode) as number) : -1;
+    parents[j] =
+      parentNode >= 0 && nodeToJoint.has(parentNode) ? (nodeToJoint.get(parentNode) as number) : -1;
   }
 
   // Inverse bind matrices
@@ -87,7 +115,8 @@ export function convertFromGltf(
         // Split combined weights into per-target channels
         const out = readAccessorAsFloat32(gltf, resolveBuffer, sampler.output);
         const meshIndex = gltf.nodes[ch.target.node]?.mesh;
-        const targetCount = meshIndex != null ? (gltf.meshes?.[meshIndex]?.primitives?.[0]?.targets?.length ?? 0) : 0;
+        const targetCount =
+          meshIndex != null ? (gltf.meshes?.[meshIndex]?.primitives?.[0]?.targets?.length ?? 0) : 0;
         if (targetCount > 0) {
           const values = unwrapCubicIfNeeded(out, sampler.interpolation, targetCount);
           for (let t = 0; t < targetCount; t++) {
@@ -106,12 +135,37 @@ export function convertFromGltf(
         const out = readAccessorAsFloat32(gltf, resolveBuffer, sampler.output);
         const values = unwrapCubicIfNeeded(out, sampler.interpolation, stride);
         const kind = ch.target.path;
-        tracks.push({ kind, jointIndex: jIdx, times, values, interpolation: interp } as any);
+        if (kind === 'translation') {
+          const track: TranslationTrack = {
+            kind,
+            jointIndex: jIdx,
+            times,
+            values,
+            interpolation: interp,
+          };
+          tracks.push(track);
+        } else {
+          const track: ScaleTrack = {
+            kind,
+            jointIndex: jIdx,
+            times,
+            values,
+            interpolation: interp,
+          };
+          tracks.push(track);
+        }
       } else if (ch.target.path === 'rotation') {
         const stride = 4;
         const out = readAccessorAsFloat32(gltf, resolveBuffer, sampler.output);
         const values = unwrapCubicIfNeeded(out, sampler.interpolation, stride);
-        tracks.push({ kind: 'rotation', jointIndex: jIdx, times, values, interpolation: interp } as any);
+        const track: RotationTrack = {
+          kind: 'rotation',
+          jointIndex: jIdx,
+          times,
+          values,
+          interpolation: interp,
+        };
+        tracks.push(track);
       }
     }
     if (tracks.length > 0) {
@@ -148,8 +202,9 @@ function readAccessorAsFloat32(
   const stride = numComponents(acc.type);
   const out = new Float32Array(acc.count * stride);
   switch (acc.componentType) {
-    case 5126: { // FLOAT
-      const view = new Float32Array(slice.buffer as ArrayBuffer, slice.byteOffset, acc.count * stride);
+    case 5126: {
+      // FLOAT
+      const view = new Float32Array(slice.buffer, slice.byteOffset, acc.count * stride);
       out.set(view as unknown as Float32Array);
       break;
     }
@@ -157,9 +212,9 @@ function readAccessorAsFloat32(
     case 5122: // SHORT
     case 5121: // UNSIGNED_BYTE
     case 5120: // BYTE
-    case 5125: { // UNSIGNED_INT
-      // Convert integers to floats
-      const view = componentArray(acc.componentType, slice) as unknown as { [k: number]: number };
+    case 5125: {
+      // UNSIGNED_INT
+      const view = componentArray(acc.componentType, slice);
       for (let i = 0; i < out.length; i++) out[i] = view[i] ?? 0;
       break;
     }
@@ -208,12 +263,10 @@ function componentTypeBytes(componentType: number): number {
   }
 }
 
-function componentArray(componentType: number, slice: Uint8Array):
-  | Int8Array
-  | Uint8Array
-  | Int16Array
-  | Uint16Array
-  | Uint32Array {
+function componentArray(
+  componentType: number,
+  slice: Uint8Array
+): Int8Array | Uint8Array | Int16Array | Uint16Array | Uint32Array {
   switch (componentType) {
     case 5120:
       return new Int8Array(slice.buffer, slice.byteOffset, slice.byteLength);
@@ -230,7 +283,11 @@ function componentArray(componentType: number, slice: Uint8Array):
   }
 }
 
-function unwrapCubicIfNeeded(values: Float32Array, interpolation: string | undefined, stride: number): Float32Array {
+function unwrapCubicIfNeeded(
+  values: Float32Array,
+  interpolation: string | undefined,
+  stride: number
+): Float32Array {
   if (interpolation !== 'CUBICSPLINE') return values;
   // CUBICSPLINE layout: [inTangent, value, outTangent] per keyframe
   const keyCount = Math.floor(values.length / (stride * 3));
@@ -243,5 +300,3 @@ function unwrapCubicIfNeeded(values: Float32Array, interpolation: string | undef
   }
   return out;
 }
-
-

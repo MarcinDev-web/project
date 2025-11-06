@@ -1,4 +1,9 @@
-import type { TransportServer, ClientConnection } from './TransportServer.js';
+import {
+  createTransportLogger,
+  type ClientConnection,
+  type TransportLogger,
+  type TransportServer,
+} from './TransportServer.js';
 import type { TransportKind } from '@engine/net-protocol';
 import { WebSocketServer, WebSocket } from 'ws';
 import type { IncomingMessage } from 'http';
@@ -6,16 +11,24 @@ import type { IncomingMessage } from 'http';
 export interface WebSocketTransportServerOptions {
   port: number;
   host?: string;
+  logger?: TransportLogger;
 }
 
 export class WebSocketTransportServer implements TransportServer {
   public readonly kind: TransportKind = 'websocket';
   private wss: WebSocketServer | null = null;
   private readonly connections = new Map<string, WebSocket>();
+  private readonly logger: ReturnType<typeof createTransportLogger>;
 
-  constructor(private readonly options: WebSocketTransportServerOptions) {}
+  constructor(private readonly options: WebSocketTransportServerOptions) {
+    this.logger = createTransportLogger(options.logger);
+  }
 
-  async start(): Promise<void> {
+  start(): Promise<void> {
+    if (this.wss) {
+      return Promise.resolve();
+    }
+
     this.wss = new WebSocketServer({
       port: this.options.port,
       host: this.options.host || '0.0.0.0',
@@ -25,7 +38,7 @@ export class WebSocketTransportServer implements TransportServer {
       const clientId = this.extractClientId(req.url ?? '') || this.generateClientId();
       this.connections.set(clientId, ws);
 
-      console.log(`WebSocket client connected: ${clientId}`);
+      this.logger.info(`WebSocket client connected: ${clientId}`);
 
       ws.on('message', (data: Buffer) => {
         // Messages handled by external handler
@@ -33,11 +46,11 @@ export class WebSocketTransportServer implements TransportServer {
       });
 
       ws.on('error', (err: Error) => {
-        console.error(`WebSocket error for client ${clientId}:`, err);
+        this.logger.error(`WebSocket error for client ${clientId}:`, err);
       });
 
       ws.on('close', () => {
-        console.log(`WebSocket client disconnected: ${clientId}`);
+        this.logger.info(`WebSocket client disconnected: ${clientId}`);
         this.connections.delete(clientId);
         this.onClose?.(clientId);
       });
@@ -46,10 +59,13 @@ export class WebSocketTransportServer implements TransportServer {
       ws.send(JSON.stringify({ type: 'connected', clientId }));
     });
 
-    console.log(`WebSocket server listening on ${this.options.host || '0.0.0.0'}:${this.options.port}`);
+    this.logger.info(
+      `WebSocket server listening on ${this.options.host || '0.0.0.0'}:${this.options.port}`
+    );
+    return Promise.resolve();
   }
 
-  async stop(): Promise<void> {
+  stop(): Promise<void> {
     if (this.wss) {
       // Close all connections
       for (const ws of this.connections.values()) {
@@ -60,8 +76,9 @@ export class WebSocketTransportServer implements TransportServer {
       // Close server
       this.wss.close();
       this.wss = null;
-      console.log('WebSocket server stopped');
+      this.logger.info('WebSocket server stopped');
     }
+    return Promise.resolve();
   }
 
   getConnection(clientId: string): ClientConnection | null {
@@ -76,7 +93,7 @@ export class WebSocketTransportServer implements TransportServer {
           try {
             ws.send(bytes);
           } catch (err) {
-            console.error(`Error sending to client ${clientId}:`, err);
+            this.logger.error(`Error sending to client ${clientId}:`, err);
           }
         }
       },

@@ -138,12 +138,21 @@ Vercel automatycznie użyje konfiguracji z `vercel.json`:
    - **Environments:** ✅ Production, ✅ Preview (opcjonalnie)
 3. **Zapisz**
 
+### 5.3. Ustawienie VITE_WS_URL w Vercel (WebSocket)
+
+1. W Vercel Dashboard → Twój projekt → **Settings** → **Environment Variables**
+2. **"+ Add"** → Dodaj:
+   - **Key:** `VITE_WS_URL`
+   - **Value:** `wss://your-net-server.railway.app/ws`
+   - **Environments:** ✅ Production, ✅ Preview (opcjonalnie)
+3. **Zapisz**
+
 **Przykład poprawnej wartości:**
 ```
 https://net-server-production.up.railway.app/api
 ```
 
-### 5.3. Generowanie Publicznego URL Backendu (Railway)
+### 5.4. Generowanie Publicznego URL Backendu (Railway)
 
 Jeśli jeszcze nie masz publicznego URL:
 

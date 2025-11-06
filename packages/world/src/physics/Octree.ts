@@ -422,4 +422,3 @@ export class Octree {
     return idA < idB ? `${idA}-${idB}` : `${idB}-${idA}`;
   }
 }
-

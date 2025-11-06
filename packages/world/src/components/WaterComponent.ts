@@ -73,8 +73,7 @@ export class WaterComponent extends Component {
    */
   normalizeWaveDirection(): void {
     const len = Math.sqrt(
-      this.waveDirection[0] * this.waveDirection[0] +
-        this.waveDirection[1] * this.waveDirection[1]
+      this.waveDirection[0] * this.waveDirection[0] + this.waveDirection[1] * this.waveDirection[1]
     );
     if (len > 0.0001) {
       this.waveDirection[0] /= len;
@@ -166,4 +165,3 @@ export class WaterComponent extends Component {
 }
 
 registerComponent(WaterComponent.type, WaterComponent);
-

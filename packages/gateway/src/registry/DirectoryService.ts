@@ -39,5 +39,3 @@ export class DirectoryService {
     return healthyOnly ? zones.filter((z) => z.healthy) : zones;
   }
 }
-
-

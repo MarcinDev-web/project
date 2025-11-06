@@ -42,7 +42,7 @@ describe('Weapon System Integration', () => {
     // Create weapon from preset
     const weapon = createWeapon('rifle');
     weapon.ammo = 30;
-    
+
     // Add to inventory
     const inventory = player.getComponent(InventoryComponent)!;
     inventorySystem.addWeapon(player, weapon);
@@ -77,7 +77,7 @@ describe('Weapon System Integration', () => {
     // Fire and check effective spread is reduced
     const activeWeapon = inventory.getActiveWeapon()!;
     const baseSpread = activeWeapon.spread;
-    
+
     weaponSystem.fire(player, [0, 0, -1]);
     weaponSystem.update(0.1);
 
@@ -91,13 +91,13 @@ describe('Weapon System Integration', () => {
     const weapon = createWeapon('rifle');
     weapon.ammo = 30;
     weapon.currentAmmoType = 'armor_piercing';
-    
+
     const inventory = player.getComponent(InventoryComponent)!;
     inventorySystem.addWeapon(player, weapon);
 
     // Get ammo type definition
     const ammoDef = getAmmoType('armor_piercing');
-    
+
     // Fire
     weaponSystem.fire(player, [0, 0, -1]);
     weaponSystem.update(0.1);
@@ -105,8 +105,11 @@ describe('Weapon System Integration', () => {
     // Damage should be modified by ammo type
     const activeWeapon = inventory.getActiveWeapon()!;
     const attachmentModifiers = player.getComponent(AttachmentComponent)?.getEffectiveStats();
-    const effectiveDamage = activeWeapon.getEffectiveDamage(attachmentModifiers, ammoDef.effects.damageMultiplier);
-    
+    const effectiveDamage = activeWeapon.getEffectiveDamage(
+      attachmentModifiers,
+      ammoDef.effects.damageMultiplier
+    );
+
     // Armor piercing has 0.9 multiplier
     expect(effectiveDamage).toBeLessThan(activeWeapon.damage);
   });
@@ -123,7 +126,7 @@ describe('Weapon System Integration', () => {
 
     // Start with rifle
     expect(inventory.getActiveWeapon()?.weaponPreset || 'rifle').toBeDefined();
-    
+
     // Switch to pistol
     inventorySystem.switchWeapon(player, 1);
     inventorySystem.update(0.6); // Complete switch
@@ -154,7 +157,7 @@ describe('Weapon System Integration', () => {
     const weapon = createWeapon('rifle');
     weapon.ammo = 30;
     weapon.currentAmmoType = 'hollow_point';
-    
+
     const inventory = player.getComponent(InventoryComponent)!;
     inventorySystem.addWeapon(player, weapon);
 
@@ -170,10 +173,13 @@ describe('Weapon System Integration', () => {
     const activeWeapon = inventory.getActiveWeapon()!;
     const attachmentModifiers = attachmentComp.getEffectiveStats();
     const ammoDef = getAmmoType('hollow_point');
-    
-    const effectiveDamage = activeWeapon.getEffectiveDamage(attachmentModifiers, ammoDef.effects.damageMultiplier);
+
+    const effectiveDamage = activeWeapon.getEffectiveDamage(
+      attachmentModifiers,
+      ammoDef.effects.damageMultiplier
+    );
     const effectiveMaxAmmo = activeWeapon.getEffectiveMaxAmmo(attachmentModifiers);
-    
+
     expect(effectiveMaxAmmo).toBeGreaterThan(weapon.maxAmmo); // Extended mag increases ammo
     expect(effectiveDamage).toBeGreaterThan(weapon.damage); // Hollow point increases damage
   });

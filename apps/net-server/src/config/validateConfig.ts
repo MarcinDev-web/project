@@ -3,6 +3,8 @@
  * Validates all environment variables and configuration on startup.
  */
 
+import { getCorsConfig } from '@shared/config/cors';
+
 const isProduction = process.env.NODE_ENV === 'production';
 
 export interface ConfigValidationResult {
@@ -64,20 +66,41 @@ function validateDatabaseUrl(url: string | undefined): { valid: boolean; warning
 /**
  * Validate CORS origins configuration.
  */
-function validateCorsOrigins(origin: string | undefined): { valid: boolean; warning?: string } {
-  if (!origin) {
-    return { valid: true };
-  }
+function validateCorsOrigins(): { valid: boolean; warning?: string; error?: string } {
+  try {
+    const config = getCorsConfig({ forceRecompute: true });
 
-  // Warn if using wildcard in production
-  if (isProduction && (origin === '*' || origin.includes('*'))) {
+    if (isProduction && config.exactOrigins.length === 0) {
+      return {
+        valid: false,
+        error:
+          'FRONTEND_URL must be set to at least one exact origin in production for CORS allowlist',
+      };
+    }
+
+    if (isProduction && config.wildcardOrigins.length > 0) {
+      return {
+        valid: true,
+        warning: `CORS wildcard origins configured (${config.wildcardOrigins
+          .map((pattern) => pattern.raw)
+          .join(', ')}). Prefer explicit origins in production.`,
+      };
+    }
+
+    if (!process.env.FRONTEND_URL) {
+      return {
+        valid: true,
+        warning: 'FRONTEND_URL is not set. Development defaults will be used for CORS allowlist.',
+      };
+    }
+
+    return { valid: true };
+  } catch (error) {
     return {
-      valid: true,
-      warning: 'CORS origin should not use wildcards in production - specify exact origins',
+      valid: false,
+      error: error instanceof Error ? error.message : String(error),
     };
   }
-
-  return { valid: true };
 }
 
 /**
@@ -128,7 +151,10 @@ export function validateConfig(): ConfigValidationResult {
   }
 
   // Validate CORS
-  const corsValidation = validateCorsOrigins(process.env.FRONTEND_URL);
+  const corsValidation = validateCorsOrigins();
+  if (!corsValidation.valid && corsValidation.error) {
+    errors.push(corsValidation.error);
+  }
   if (corsValidation.warning) {
     warnings.push(corsValidation.warning);
   }

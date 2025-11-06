@@ -250,13 +250,17 @@ export class PhysicsSystem {
     // because ScriptComponent from @engine/script may not match ComponentClass type exactly
     const allEntities = this.scene.getAllEntities();
     for (const entity of allEntities) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
       const scriptComp = entity.getComponent(ScriptComponent as any);
       if (!scriptComp) continue;
       // TypeScript doesn't know getInstances() exists on Component, but it does on ScriptComponent
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any
       const instances = (scriptComp as any).getInstances();
       for (const behavior of instances) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         if (!behavior.enabled) continue;
         try {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
           behavior.onFixedUpdate(dt);
         } catch {
           // ignore behavior errors to keep physics running
@@ -302,9 +306,9 @@ export class PhysicsSystem {
     const torque = physics.consumeTorque();
     const IW = physics.getWorldInverseInertiaTensor();
     // alpha = I_world^{-1} * torque
-    const ax = IW[0]! * torque[0] + IW[3]! * torque[1] + IW[6]! * torque[2];
-    const ay = IW[1]! * torque[0] + IW[4]! * torque[1] + IW[7]! * torque[2];
-    const az = IW[2]! * torque[0] + IW[5]! * torque[1] + IW[8]! * torque[2];
+    const ax = IW[0] * torque[0] + IW[3] * torque[1] + IW[6] * torque[2];
+    const ay = IW[1] * torque[0] + IW[4] * torque[1] + IW[7] * torque[2];
+    const az = IW[2] * torque[0] + IW[5] * torque[1] + IW[8] * torque[2];
     physics.angularVelocity[0] += ax * dt;
     physics.angularVelocity[1] += ay * dt;
     physics.angularVelocity[2] += az * dt;
@@ -384,8 +388,8 @@ export class PhysicsSystem {
     // Narrow phase: check each pair for actual collision
     for (let k = 0; k < this.pairsScratch.length; k++) {
       const pair = this.pairsScratch[k]!;
-      const entityA = pair[0]!;
-      const entityB = pair[1]!;
+      const entityA = pair[0];
+      const entityB = pair[1];
       const physicsA = entityA.getComponent(PhysicsComponent);
       const physicsB = entityB.getComponent(PhysicsComponent);
 
@@ -443,11 +447,7 @@ export class PhysicsSystem {
     return this.collisionsScratch;
   }
 
-
-  private getBroadPhasePairsBruteForceInto(
-    entities: Entity[],
-    out: Array<[Entity, Entity]>
-  ): void {
+  private getBroadPhasePairsBruteForceInto(entities: Entity[], out: Array<[Entity, Entity]>): void {
     for (let i = 0; i < entities.length; i++) {
       const entityA = entities[i];
       if (!entityA) continue;
@@ -504,7 +504,7 @@ export class PhysicsSystem {
     // Position correction (prevent sinking)
     const correctionPercent = 1.05; // Slightly overshoot to ensure separation in next frame
     const slop = 0.0; // No allowance to ensure separation in tests
-    const correctionMagnitude = Math.max(depth - slop, 0) / totalInvMass * correctionPercent;
+    const correctionMagnitude = (Math.max(depth - slop, 0) / totalInvMass) * correctionPercent;
 
     const correctionA = correctionMagnitude * invMassA;
     const correctionB = correctionMagnitude * invMassB;
@@ -534,8 +534,7 @@ export class PhysicsSystem {
     ];
 
     // Relative velocity along normal
-    const velAlongNormal =
-      relVel[0] * normal[0] + relVel[1] * normal[1] + relVel[2] * normal[2];
+    const velAlongNormal = relVel[0] * normal[0] + relVel[1] * normal[1] + relVel[2] * normal[2];
 
     // Don't resolve if velocities are separating
     if (velAlongNormal > 0) return;
@@ -590,8 +589,7 @@ export class PhysicsSystem {
     ];
 
     // Remove normal component to get tangential velocity
-    const velAlongNormal =
-      relVel[0] * normal[0] + relVel[1] * normal[1] + relVel[2] * normal[2];
+    const velAlongNormal = relVel[0] * normal[0] + relVel[1] * normal[1] + relVel[2] * normal[2];
     const tangent: Vec3 = [
       relVel[0] - normal[0] * velAlongNormal,
       relVel[1] - normal[1] * velAlongNormal,
@@ -610,7 +608,7 @@ export class PhysicsSystem {
     const friction = (physicsA.material.friction + physicsB.material.friction) / 2;
 
     // Calculate friction impulse
-    const frictionMagnitude = -tangentLength / totalInvMass * friction;
+    const frictionMagnitude = (-tangentLength / totalInvMass) * friction;
     const frictionImpulse: Vec3 = [
       tangent[0] * frictionMagnitude,
       tangent[1] * frictionMagnitude,
@@ -858,14 +856,12 @@ export class PhysicsSystem {
   /**
    * Gets octree statistics (if spatial partitioning is enabled)
    */
-  getOctreeStats():
-    | {
-        nodeCount: number;
-        entityCount: number;
-        maxDepth: number;
-        avgEntitiesPerLeaf: number;
-      }
-    | null {
+  getOctreeStats(): {
+    nodeCount: number;
+    entityCount: number;
+    maxDepth: number;
+    avgEntitiesPerLeaf: number;
+  } | null {
     return this.octree ? this.octree.getStats() : null;
   }
 
@@ -885,4 +881,3 @@ export class PhysicsSystem {
     }
   }
 }
-

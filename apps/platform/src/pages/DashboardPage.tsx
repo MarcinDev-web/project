@@ -67,7 +67,7 @@ export function DashboardPage() {
       <div className="page-container">
         <div className="dashboard-header">
           <h1 className="dashboard-title">Dashboard</h1>
-          <p className="dashboard-subtitle">Welcome back to FORGE Platform</p>
+          <p className="dashboard-subtitle">Welcome back to Forge World</p>
         </div>
 
         {user && (

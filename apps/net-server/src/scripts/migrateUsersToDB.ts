@@ -46,7 +46,7 @@ async function migrateUsers(): Promise<void> {
 
   // Initialize database connection
   console.log('🗄️  Connecting to database...');
-  const dbPool = createDbPool();
+  const dbPool = await createDbPool();
 
   try {
     // Create UserStorageDB instance

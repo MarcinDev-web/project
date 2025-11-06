@@ -23,5 +23,3 @@ export class SkeletalBindingComponent extends Component {
 }
 
 registerComponent(SkeletalBindingComponent.type, SkeletalBindingComponent);
-
-

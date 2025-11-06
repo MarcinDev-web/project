@@ -95,9 +95,9 @@ export class SignalSystem {
 
     // Return unsubscribe function
     return () => {
-      const idx = handlers!.indexOf(handler);
+      const idx = handlers.indexOf(handler);
       if (idx >= 0) {
-        handlers!.splice(idx, 1);
+        handlers.splice(idx, 1);
       }
     };
   }
@@ -149,10 +149,7 @@ export class SignalSystem {
   emit(event: SignalEvent): void {
     // Find all connections that match this signal
     for (const connection of this.connections.values()) {
-      if (
-        connection.sourceEntity === event.source &&
-        connection.signalType === event.type
-      ) {
+      if (connection.sourceEntity === event.source && connection.signalType === event.type) {
         // Execute action
         this.executeAction(connection, event);
       }
@@ -232,4 +229,3 @@ export class SignalSystem {
     this.handlers.clear();
   }
 }
-

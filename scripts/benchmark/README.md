@@ -1,6 +1,6 @@
 # Performance Benchmarks
 
-Automated performance benchmarking scripts for FORGE Engine.
+Automated performance benchmarking scripts for Forge Engine.
 
 ## Scripts
 

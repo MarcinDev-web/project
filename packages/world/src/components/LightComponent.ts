@@ -70,11 +70,13 @@ export class LightComponent extends Component {
   fromJSON(data: Record<string, unknown>): void {
     if (typeof data.lightType === 'string') this.lightType = data.lightType as LightType;
     if (Array.isArray(data.color) && data.color.length === 3) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       this.color = [...data.color] as Vec3;
     }
     if (typeof data.intensity === 'number') this.intensity = data.intensity;
     if (typeof data.range === 'number') this.range = data.range;
     if (Array.isArray(data.direction) && data.direction.length === 3) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       this.direction = [...data.direction] as Vec3;
     }
     if (typeof data.innerConeAngle === 'number') this.innerConeAngle = data.innerConeAngle;

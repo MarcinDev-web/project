@@ -4,6 +4,7 @@ import type { SceneScriptContextBuilder } from '../services/SceneScriptContextBu
 import type { PhysicsWorld } from '@engine/world';
 import type { AnimationSystem } from '@engine/stdlib/Animation';
 // NOTE: Renderer placeholder
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Renderer = any; // Temp placeholder
 
 export interface ScriptRuntime {
@@ -13,7 +14,7 @@ export interface ScriptRuntime {
   contextBuilder: SceneScriptContextBuilder;
   physicsWorld?: PhysicsWorld | null;
   animationSystem?: AnimationSystem | null;
+  // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
   renderingPipeline?: Renderer | null;
   [key: string]: unknown; // Index signature for core compatibility
 }
-

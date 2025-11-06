@@ -4,13 +4,7 @@ import type { Vec2, Vec4 } from '@engine/core/math';
 /**
  * Water preset types for common water scenarios
  */
-export type WaterPresetType =
-  | 'calm_lake'
-  | 'ocean'
-  | 'pool'
-  | 'river'
-  | 'pond'
-  | 'stormy_ocean';
+export type WaterPresetType = 'calm_lake' | 'ocean' | 'pool' | 'river' | 'pond' | 'stormy_ocean';
 
 /**
  * Create a water component from a preset
@@ -176,4 +170,3 @@ export function addWaterToEntity(
   entity.addComponent(water);
   return water;
 }
-

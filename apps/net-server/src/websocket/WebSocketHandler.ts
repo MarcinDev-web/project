@@ -1,10 +1,17 @@
 import { WebSocketServer, WebSocket } from 'ws';
+import type { IncomingMessage, Server as HttpServer } from 'node:http';
 import { ReplicationServer } from './ReplicationServer.js';
 import { SessionManager } from './SessionManager.js';
 import { AuthManager } from '../auth/AuthManager.js';
 import { MessageHandler } from './MessageHandler.js';
 import { FriendsStorage } from '../storage/FriendsStorage.js';
 import { securityLogger } from '../logging/SecurityLogger.js';
+import {
+  type CorsConfig,
+  getCorsConfig,
+  isOriginAllowed,
+  describeAllowedOrigins,
+} from '@shared/config/cors';
 import type { PresenceOnlineMessage, PresenceOfflineMessage } from '../types/websocket.js';
 
 /**
@@ -29,28 +36,42 @@ export class WebSocketHandler {
   private readonly lastLogTimes = new Map<string, number>(); // logKey -> last log time
   private friendsStorage: FriendsStorage | null = null;
   private cleanupInterval: NodeJS.Timeout | null = null;
+  private readonly corsConfig: CorsConfig;
+  private readonly allowedOriginsDescription: string;
 
   constructor(
-    port: number,
+    options: { port: number } | { server: HttpServer; path?: string },
     sessionManager: SessionManager,
     authManager: AuthManager,
     messageHandler?: MessageHandler,
-    friendsStorage?: FriendsStorage
+    friendsStorage?: FriendsStorage,
+    corsConfig?: CorsConfig
   ) {
     this.sessionManager = sessionManager;
     this.replicationServer = new ReplicationServer(sessionManager, authManager, messageHandler);
     this.friendsStorage = friendsStorage ?? null;
+    this.corsConfig = corsConfig ?? getCorsConfig();
+    this.allowedOriginsDescription = describeAllowedOrigins(this.corsConfig);
 
     // Set up presence callback
     this.sessionManager.setPresenceCallback((userId, isOnline) => {
       this.handlePresenceChange(userId, isOnline);
     });
 
-    this.wss = new WebSocketServer({
-      host: '0.0.0.0', // Listen on all interfaces (IPv4 and IPv6)
-      port,
-      maxPayload: MAX_MESSAGE_SIZE, // Limit message size
-    });
+    // Create WebSocket server - either attach to existing HTTP server (prod) or listen on a port (dev)
+    if ('server' in options) {
+      this.wss = new WebSocketServer({
+        server: options.server,
+        path: options.path ?? '/ws',
+        maxPayload: MAX_MESSAGE_SIZE,
+      });
+    } else {
+      this.wss = new WebSocketServer({
+        host: '0.0.0.0',
+        port: options.port,
+        maxPayload: MAX_MESSAGE_SIZE,
+      });
+    }
 
     this.wss.on('connection', (ws: WebSocket, req) => {
       this.handleConnection(ws, req);
@@ -64,7 +85,11 @@ export class WebSocketHandler {
       5 * 60 * 1000
     ); // Check every 5 minutes
 
-    console.log(`WebSocket server listening on ws://localhost:${port}`);
+    if ('server' in options) {
+      console.log(`WebSocket server attached at path ${options.path ?? '/ws'}`);
+    } else {
+      console.log(`WebSocket server listening on ws://localhost:${options.port}`);
+    }
   }
 
   /**
@@ -83,9 +108,25 @@ export class WebSocketHandler {
   /**
    * Handle new WebSocket connection.
    */
-  private handleConnection(ws: WebSocket, req: any): void {
+  private handleConnection(ws: WebSocket, req: IncomingMessage): void {
     // Get client IP
-    const ip = req.socket.remoteAddress || req.headers['x-forwarded-for'] || 'unknown';
+    const forwardedFor = req.headers['x-forwarded-for'];
+    const forwardedIp = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
+    const ip = (req.socket.remoteAddress || forwardedIp || 'unknown') as string;
+
+    const originHeader = typeof req.headers.origin === 'string' ? req.headers.origin : undefined;
+    if (originHeader && !isOriginAllowed(originHeader, this.corsConfig)) {
+      const logKey = `security:cors:${originHeader}:${ip}`;
+      if (this.shouldLog(logKey)) {
+        securityLogger.logSuspiciousActivity(
+          undefined,
+          `Blocked WebSocket origin: ${originHeader}. Allowed: ${this.allowedOriginsDescription}`,
+          ip
+        );
+      }
+      ws.close(1008, 'Origin not allowed');
+      return;
+    }
 
     // Rate limit connections per IP
     const connectionCount = this.ipConnectionCounts.get(ip) || 0;

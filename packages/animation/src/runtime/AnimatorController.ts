@@ -54,8 +54,6 @@ export class AnimatorController {
   }
 
   getTransitionsFrom(name: string): AnimatorTransition[] {
-    return this.transitions.filter(t => t.from === name);
+    return this.transitions.filter((t) => t.from === name);
   }
 }
-
-

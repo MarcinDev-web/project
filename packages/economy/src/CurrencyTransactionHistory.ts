@@ -78,7 +78,7 @@ export class CurrencyTransactionHistory {
    * Gets all transactions matching the filter.
    */
   getAll(filter?: TransactionFilter): Transaction[] {
-    return this.filter(this.transactions, filter).map(tx => this.cloneTransaction(tx));
+    return this.filter(this.transactions, filter).map((tx) => this.cloneTransaction(tx));
   }
 
   /**
@@ -98,7 +98,10 @@ export class CurrencyTransactionHistory {
   getRecent(count: number, filter?: TransactionFilter): Transaction[] {
     const filtered = this.filter(this.transactions, filter);
     const start = Math.max(0, filtered.length - count);
-    return filtered.slice(start).reverse().map(tx => this.cloneTransaction(tx));
+    return filtered
+      .slice(start)
+      .reverse()
+      .map((tx) => this.cloneTransaction(tx));
   }
 
   /**
@@ -168,14 +171,14 @@ export class CurrencyTransactionHistory {
    * Exports all transactions (for serialization).
    */
   export(): Transaction[] {
-    return this.transactions.map(tx => this.cloneTransaction(tx));
+    return this.transactions.map((tx) => this.cloneTransaction(tx));
   }
 
   /**
    * Imports transactions (replaces current history).
    */
   import(transactions: Transaction[]): void {
-    this.transactions = transactions.map(tx => this.cloneTransaction(tx)).slice(-this.maxSize);
+    this.transactions = transactions.map((tx) => this.cloneTransaction(tx)).slice(-this.maxSize);
   }
 
   /**
@@ -193,7 +196,7 @@ export class CurrencyTransactionHistory {
       return transactions;
     }
 
-    return transactions.filter(tx => {
+    return transactions.filter((tx) => {
       if (filter.currency && tx.amount.currency !== filter.currency) {
         return false;
       }
@@ -260,4 +263,3 @@ export class CurrencyTransactionHistory {
     return new Transaction(params);
   }
 }
-

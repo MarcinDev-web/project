@@ -27,16 +27,8 @@ export class BoundingVolume {
    */
   static fromCenterSize(center: Vec3, halfSize: Vec3): AABB {
     return {
-      min: [
-        center[0] - halfSize[0],
-        center[1] - halfSize[1],
-        center[2] - halfSize[2],
-      ],
-      max: [
-        center[0] + halfSize[0],
-        center[1] + halfSize[1],
-        center[2] + halfSize[2],
-      ],
+      min: [center[0] - halfSize[0], center[1] - halfSize[1], center[2] - halfSize[2]],
+      max: [center[0] + halfSize[0], center[1] + halfSize[1], center[2] + halfSize[2]],
     };
   }
 
@@ -50,11 +42,7 @@ export class BoundingVolume {
     // Calculate AABB based on all colliders
     if (physics.colliders.length === 0) {
       // No colliders, use entity scale as fallback
-      return this.fromCenterSize(position, [
-        scale[0] / 2,
-        scale[1] / 2,
-        scale[2] / 2,
-      ]);
+      return this.fromCenterSize(position, [scale[0] / 2, scale[1] / 2, scale[2] / 2]);
     }
 
     // Initialize with extreme values
@@ -75,15 +63,18 @@ export class BoundingVolume {
 
       let halfExtents: Vec3;
 
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
       if (collider.shape === 'box') {
         halfExtents = [
           (collider.size[0] * scale[0]) / 2,
           (collider.size[1] * scale[1]) / 2,
           (collider.size[2] * scale[2]) / 2,
         ];
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
       } else if (collider.shape === 'sphere') {
         const radius = collider.radius * ((scale[0] + scale[1] + scale[2]) / 3);
         halfExtents = [radius, radius, radius];
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
       } else if (collider.shape === 'capsule') {
         const radius = collider.radius * ((scale[0] + scale[2]) / 2);
         const height = collider.height * scale[1];
@@ -152,11 +143,7 @@ export class BoundingVolume {
    * Gets the size (dimensions) of an AABB
    */
   static getSize(aabb: AABB): Vec3 {
-    return [
-      aabb.max[0] - aabb.min[0],
-      aabb.max[1] - aabb.min[1],
-      aabb.max[2] - aabb.min[2],
-    ];
+    return [aabb.max[0] - aabb.min[0], aabb.max[1] - aabb.min[1], aabb.max[2] - aabb.min[2]];
   }
 
   /**
@@ -164,16 +151,8 @@ export class BoundingVolume {
    */
   static expand(aabb: AABB, margin: number): AABB {
     return {
-      min: [
-        aabb.min[0] - margin,
-        aabb.min[1] - margin,
-        aabb.min[2] - margin,
-      ],
-      max: [
-        aabb.max[0] + margin,
-        aabb.max[1] + margin,
-        aabb.max[2] + margin,
-      ],
+      min: [aabb.min[0] - margin, aabb.min[1] - margin, aabb.min[2] - margin],
+      max: [aabb.max[0] + margin, aabb.max[1] + margin, aabb.max[2] + margin],
     };
   }
 
@@ -211,4 +190,3 @@ export class BoundingVolume {
     return 2 * (size[0] * size[1] + size[1] * size[2] + size[2] * size[0]);
   }
 }
-

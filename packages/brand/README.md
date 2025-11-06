@@ -1,8 +1,8 @@
 # @engine/brand
 
-**Centralized branding and visual identity for FORGE Worlds**
+**Centralized branding and visual identity for Forge World**
 
-This package contains all branding constants, color schemes, typography settings, watermark configurations, and logo assets used across FORGE Worlds.
+This package contains all branding constants, color schemes, typography settings, watermark configurations, and logo assets used across Forge World.
 
 ## 🎯 Purpose
 
@@ -30,7 +30,7 @@ element.style.color = COLORS.TEXT_PRIMARY;
 element.style.fontFamily = TYPOGRAPHY.FONT_STACK;
 
 // Display branding
-title.textContent = BRAND.PLATFORM_NAME; // "FORGE Worlds"
+title.textContent = BRAND.PLATFORM_NAME; // "Forge World"
 subtitle.textContent = BRAND.TAGLINE; // "Open-source 3D game creation platform..."
 badge.textContent = BRAND.ENGINE_TAG; // "POWERED BY FORGE ENGINE"
 ```
@@ -69,19 +69,21 @@ button.style.boxShadow = UI.SHADOW.MD;
 
 | Color | Hex | Usage |
 |-------|-----|-------|
-| PRIMARY_BG | `#0f0f10` | Main background (steel-black) |
-| ACCENT_HOT | `#ff3b00` | Hot metal / sparks / CTAs |
+| PRIMARY_BG | `#1B1B1D` | Main background (steel gray) |
+| ACCENT_HOT | `#FF6A00` | Forge orange - energy, creation |
+| ACCENT_TECH | `#2E6AFF` | Technical blue - Forge Engine |
 | TEXT_PRIMARY | `#ffffff` | Main text |
-| TEXT_DIM | `#8a8a8a` | Secondary text |
+| TEXT_DIM | `#E1E1E3` | Secondary text (light ash) |
 
-**Theme:** Dark industrial forge aesthetic with hot metal accents.
+**Theme:** Anvil and fire as creation metaphor - steel gray with forge orange accents.
 
 ## 📐 Typography
 
-- **Primary Font:** Inter, Roboto, system-ui
+- **Plaza Entertainment (Classic):** Inter, Neue Haas Grotesk, Satoshi
+- **Forge World (Geometric):** Orbitron, Rajdhani, Exo 2
 - **Monospace:** JetBrains Mono, Fira Code, Consolas
 - **Base Size:** 14px
-- **Weights:** 300, 400, 500, 600, 700
+- **Weights:** 300, 400, 500, 600, 700, 800
 
 ## 🖼️ Watermark Presets
 
@@ -126,12 +128,12 @@ FORGE · OPEN SOURCE
 
 **One-liner (everywhere):**
 ```
-FORGE Worlds — Open-source 3D game creation platform built by the community, for the community. POWERED BY FORGE ENGINE.
+Forge World — Open-source 3D game creation platform built by the community, for the community. POWERED BY FORGE ENGINE.
 ```
 
 **README:**
 ```markdown
-# FORGE Worlds
+# Forge World
 
 Open-source 3D game creation platform built by the community, for the community.
 
@@ -140,7 +142,7 @@ POWERED BY FORGE ENGINE.
 
 **Social Media Bio:**
 ```
-FORGE Worlds — Open-source 3D game creation platform. Built by the community, for the community. POWERED BY FORGE ENGINE #WebGPU #GameDev #OpenSource #FORGE
+Forge World — Open-source 3D game creation platform. Built by the community, for the community. POWERED BY FORGE ENGINE #WebGPU #GameDev #OpenSource #FORGE
 ```
 
 ## 🔄 Updating Branding
@@ -230,7 +232,7 @@ function createButton(text: string): HTMLButtonElement {
 
 ---
 
-**Built with ❤️ for FORGE Worlds**
+**Built with ❤️ by Plaza Entertainment Studio for Forge World**
 
 **POWERED BY FORGE ENGINE**
 

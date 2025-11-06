@@ -50,7 +50,7 @@ describe('ProjectileComponent', () => {
     it('should return correct remaining time', () => {
       projectile.spawnTime = 0;
       projectile.lifetime = 5.0;
-      
+
       expect(projectile.getRemainingLifetime(2.0)).toBe(3.0);
       expect(projectile.getRemainingLifetime(5.0)).toBe(0);
       expect(projectile.getRemainingLifetime(6.0)).toBe(0);
@@ -64,7 +64,7 @@ describe('ProjectileComponent', () => {
       projectile.lifetime = 5.0;
       projectile.ownerId = 'player-123';
       projectile.spawnTime = 10.0;
-      
+
       const json = projectile.toJSON();
 
       expect(json.damage).toBe(50);
@@ -82,7 +82,7 @@ describe('ProjectileComponent', () => {
         ownerId: 'enemy-456',
         spawnTime: 5.0,
       };
-      
+
       projectile.fromJSON(data);
 
       expect(projectile.damage).toBe(40);
@@ -108,4 +108,3 @@ describe('ProjectileComponent', () => {
     });
   });
 });
-

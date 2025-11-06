@@ -70,4 +70,3 @@ export class TimerGateComponent extends Component {
 }
 
 registerComponent(TimerGateComponent.type, TimerGateComponent);
-

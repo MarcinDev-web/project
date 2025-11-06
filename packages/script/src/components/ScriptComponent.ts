@@ -1,8 +1,9 @@
 import { Component } from '@engine/world';
 import { registerComponent } from '@engine/world';
 import type { Scene } from '@engine/world';
-import type { BehaviorConstructor, BehaviorInstance, BehaviorContext } from '../behavior/Behavior.js';
+import type { BehaviorInstance, BehaviorContext } from '../behavior/Behavior.js';
 import { BehaviorRegistry } from '../behavior/BehaviorRegistry.js';
+import type { BehaviorConstructor } from '../behavior/Behavior.js';
 
 export interface ScriptDefinition {
   /** Registry name for behavior constructor */
@@ -90,7 +91,8 @@ export class ScriptComponent extends Component {
     const entity = this.entity;
     const runtime = scene?.scriptRuntime;
     if (scene && entity && runtime) {
-      (runtime.contextBuilder as any)?.invalidate?.(entity.id);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      runtime.contextBuilder.invalidate(entity.id);
     }
   }
 
@@ -134,24 +136,28 @@ export class ScriptComponent extends Component {
     const scene = entity?.scene;
     if (!entity || !scene) return;
 
-    const ctor = BehaviorRegistry.get(def.name) as BehaviorConstructor | undefined;
+    const ctor: BehaviorConstructor | undefined = BehaviorRegistry.get(def.name);
     if (!ctor) return; // behavior not registered yet
 
     const runtime = scene.scriptRuntime;
-    const services = (runtime?.contextBuilder as any).getServices(entity);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+    const services = runtime?.contextBuilder.getServices(entity);
 
     // Lazy import: create instance with context
     const context: BehaviorContext = {
       entity,
       scene,
       events: scene.events,
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       ...(services != null ? { services } : {}),
     };
     const instance = new ctor(context, def.params);
     instance.enabled = def.enabled ?? true;
     if (runtime) {
-      (runtime.behaviors as any).add(instance);
-      (runtime.scheduler as any).attachBehaviorInstance(instance);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      runtime.behaviors.add(instance);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      runtime.scheduler.attachBehaviorInstance(instance);
     }
     try {
       instance.onInit();
@@ -169,11 +175,13 @@ export class ScriptComponent extends Component {
       // ignore script destroy errors
     }
     const runtime = currentScene?.scriptRuntime;
-    (runtime?.scheduler as any)?.detachBehaviorInstance?.(inst);
-    (runtime?.behaviors as any)?.delete?.(inst);
+    if (runtime) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      runtime.scheduler.detachBehaviorInstance(inst);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+      runtime.behaviors.delete(inst);
+    }
   }
 }
 
 registerComponent(ScriptComponent.type, ScriptComponent);
-
-

@@ -153,4 +153,3 @@ export interface LogicCubeState {
   /** Custom state data specific to cube type */
   state?: Record<string, unknown>;
 }
-

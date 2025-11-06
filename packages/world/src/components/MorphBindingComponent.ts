@@ -20,5 +20,3 @@ export class MorphBindingComponent extends Component {
 }
 
 registerComponent(MorphBindingComponent.type, MorphBindingComponent);
-
-

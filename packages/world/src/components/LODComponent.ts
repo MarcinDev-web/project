@@ -1,6 +1,6 @@
 /**
  * LOD Component
- * 
+ *
  * Component for entities that support Level of Detail (LOD).
  * Tracks screen-space size and current LOD level.
  */
@@ -18,16 +18,16 @@ export class LODComponent extends Component {
 
   /** Current LOD level */
   currentLOD: LODLevel = 0;
-  
+
   /** Target LOD level (may differ from current during transitions) */
   targetLOD: LODLevel = 0;
-  
+
   /** Screen-space size (pixels) */
   screenSize: number = 0;
-  
+
   /** Transition progress (0-1) for smooth LOD switching */
   transitionProgress: number = 1.0;
-  
+
   /** Whether LOD is enabled for this entity */
   enabled: boolean = true;
 
@@ -105,10 +105,10 @@ export class LODComponent extends Component {
     if (typeof data.currentLOD === 'number') this.currentLOD = data.currentLOD;
     if (typeof data.targetLOD === 'number') this.targetLOD = data.targetLOD;
     if (typeof data.screenSize === 'number') this.screenSize = data.screenSize;
-    if (typeof data.transitionProgress === 'number') this.transitionProgress = data.transitionProgress;
+    if (typeof data.transitionProgress === 'number')
+      this.transitionProgress = data.transitionProgress;
     if (typeof data.enabled === 'boolean') this.enabled = data.enabled;
   }
 }
 
 registerComponent(LODComponent.type, LODComponent);
-

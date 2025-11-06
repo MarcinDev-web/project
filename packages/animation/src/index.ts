@@ -20,5 +20,3 @@ export type AnimationPublicAPI = {
 export function getAnimationPublicAPI(): AnimationPublicAPI {
   return { version: ANIMATION_PACKAGE_VERSION };
 }
-
-

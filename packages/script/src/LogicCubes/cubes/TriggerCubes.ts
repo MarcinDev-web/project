@@ -314,4 +314,3 @@ export class OnPlayerLeaveTrigger extends LogicCube {
     return null;
   }
 }
-

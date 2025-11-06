@@ -45,6 +45,8 @@ export class EconomyPanel {
       const data: GetWalletResponse = await this.client.getWallet();
       this.renderBalances(data);
     } catch (e) {
+      // Silently handle 401 (unauthorized) - user is not logged in
+      // This is expected behavior, no need to log to console
       this.balancesContainer.innerHTML = `<div class="panel-hint">Login to view wallet</div>`;
     }
   }

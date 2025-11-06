@@ -1,7 +1,7 @@
 /**
  * @engine/brand - Centralized branding and visual identity
  *
- * This package contains all branding constants used across FORGE Worlds.
+ * This package contains all branding constants used across Forge World.
  * Using these constants ensures consistent visual identity in UI, overlays,
  * watermarks, screenshots, and social media content.
  *
@@ -19,20 +19,23 @@
  */
 
 /**
- * Core brand identity - FORGE Worlds platform and FORGE Engine
+ * Core brand identity - Forge World platform and Forge Engine
  */
 export const BRAND = {
+  /** Company/Studio name */
+  STUDIO_NAME: 'Plaza Entertainment Studio',
+
   /** Main product name */
   NAME: 'FORGE',
 
-  /** Platform name - FORGE Worlds */
-  PLATFORM_NAME: 'FORGE Worlds',
+  /** Platform name - Forge World */
+  PLATFORM_NAME: 'Forge World',
 
-  /** Engine name - FORGE Engine */
-  ENGINE_NAME: 'FORGE Engine',
+  /** Engine name - Forge Engine */
+  ENGINE_NAME: 'Forge Engine',
 
   /** Full platform name (display) */
-  FULL_NAME: 'FORGE Worlds',
+  FULL_NAME: 'Forge World',
 
   /** Short name / acronym */
   SHORT_NAME: 'FORGE',
@@ -57,7 +60,7 @@ export const BRAND = {
 
   /** Full pitch (one sentence) */
   PITCH:
-    'FORGE Worlds — Open-source 3D game creation platform built by the community, for the community. POWERED BY FORGE ENGINE.',
+    'Forge World — Open-source 3D game creation platform built by the community, for the community. POWERED BY FORGE ENGINE.',
 
   /** Mission statement */
   MISSION: 'Empowering creators worldwide to build, share, and play 3D games without barriers.',
@@ -78,29 +81,38 @@ export const BRAND = {
  * Brand color palette
  *
  * Inspired by forge/metalwork aesthetic:
- * - Dark, almost black steel background
- * - Hot orange/red accents (glowing metal, sparks)
- * - Clean white text
- * - Subtle gray for secondary elements
+ * - Steel gray background (anvil and fire metaphor)
+ * - Hot orange accent (forge energy)
+ * - Technical blue for Forge Engine
+ * - Clean contrast with light ash and dark graphite
  */
 export const COLORS = {
-  /** Primary background - almost black steel */
-  PRIMARY_BG: '#0f0f10',
+  /** Primary background - steel gray */
+  PRIMARY_BG: '#1B1B1D',
 
-  /** Secondary background - slightly lighter */
-  SECONDARY_BG: '#1a1a1c',
+  /** Secondary background - dark graphite */
+  SECONDARY_BG: '#0E0E10',
 
-  /** Accent color - hot metal / spark */
-  ACCENT_HOT: '#ff3b00',
+  /** Accent color - forge orange (glowing metal) */
+  ACCENT_HOT: '#FF6A00',
 
-  /** Accent hover state - brighter */
-  ACCENT_HOT_HOVER: '#ff5722',
+  /** Accent hover state - brighter forge glow */
+  ACCENT_HOT_HOVER: '#FF8A33',
+
+  /** Technical accent - subtle blue for Forge Engine */
+  ACCENT_TECH: '#2E6AFF',
+
+  /** Light accent - ash */
+  LIGHT_ASH: '#E1E1E3',
 
   /** Primary text - pure white */
   TEXT_PRIMARY: '#ffffff',
 
-  /** Secondary text - dimmed */
-  TEXT_DIM: '#8a8a8a',
+  /** Secondary text - light ash */
+  TEXT_DIM: '#E1E1E3',
+
+  /** Tertiary text - dimmed gray */
+  TEXT_MUTED: '#8a8a8a',
 
   /** Success state - green */
   SUCCESS: '#00c853',
@@ -114,16 +126,23 @@ export const COLORS = {
   /** Border color - subtle gray */
   BORDER: '#2a2a2c',
 
-  /** Overlay background - semi-transparent black */
-  OVERLAY_BG: 'rgba(15, 15, 16, 0.85)',
+  /** Overlay background - semi-transparent steel */
+  OVERLAY_BG: 'rgba(27, 27, 29, 0.85)',
 } as const;
 
 /**
  * Typography settings
+ *
+ * Two-tier system:
+ * - FORGE WORLD: Geometric, massive fonts (Orbitron, Rajdhani, Exo 2)
+ * - PLAZA ENTERTAINMENT: Classic sans-serif (Inter, Satoshi, Neue Haas Grotesk)
  */
 export const TYPOGRAPHY = {
-  /** Font family stack */
-  FONT_STACK: 'Inter, Roboto, system-ui, -apple-system, sans-serif',
+  /** Font family stack - Plaza Entertainment (elegant, classic) */
+  FONT_STACK: 'Inter, "Neue Haas Grotesk", Satoshi, system-ui, -apple-system, sans-serif',
+
+  /** Font family stack - Forge World (geometric, massive) */
+  FONT_FORGE: 'Orbitron, Rajdhani, "Exo 2", "Eurostile", "Michroma", sans-serif',
 
   /** Monospace font stack (for code/debug) */
   FONT_MONO: '"JetBrains Mono", "Fira Code", Consolas, monospace',
@@ -147,6 +166,7 @@ export const TYPOGRAPHY = {
     MEDIUM: 500,
     SEMIBOLD: 600,
     BOLD: 700,
+    HEAVY: 800,
   },
 } as const;
 

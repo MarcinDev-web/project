@@ -14,5 +14,3 @@ export class RuntimePlayerTag extends Component {
 }
 
 registerComponent(RuntimePlayerTag.type, RuntimePlayerTag);
-
-

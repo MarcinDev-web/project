@@ -1,6 +1,6 @@
 # @engine/blocks
 
-Block definitions library for FORGE Engine.
+Block definitions library for Forge Engine.
 
 Contains block type definitions, categories, and built-in block library inspired by Kogama/Roblox/Minecraft style blocks.
 

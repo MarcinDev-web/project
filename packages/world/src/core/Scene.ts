@@ -26,7 +26,7 @@ export class Scene {
   readonly events: EventBus;
   /** Optional scripting runtime context injected when ScriptSystem is active */
   scriptRuntime: ScriptRuntime | null = null;
-  
+
   // Query cache for performance optimization
   private _queryCache = new Map<string, Entity[]>();
   private _activeEntitiesCache: Entity[] | null = null;
@@ -201,7 +201,10 @@ export class Scene {
     if (componentClasses.length === 0) return this.getAllEntities();
 
     // Generate cache key from component class names
-    const cacheKey = componentClasses.map((cls) => cls.name).sort().join(',');
+    const cacheKey = componentClasses
+      .map((cls) => cls.name)
+      .sort()
+      .join(',');
 
     // Return cached result if valid
     if (!this._queryCacheDirty && this._queryCache.has(cacheKey)) {
@@ -229,7 +232,7 @@ export class Scene {
 
     // Cache the result
     this._queryCache.set(cacheKey, result);
-    
+
     return result;
   }
 
@@ -331,7 +334,7 @@ export class Scene {
     }
     this.invalidateQueryCache();
   }
-  
+
   /**
    * Invalidates the query cache, forcing queries to recompute.
    * Called when entities or components are added/removed.
@@ -342,7 +345,7 @@ export class Scene {
     this._activeEntitiesCache = null;
     this._allEntitiesCache = null;
   }
-  
+
   /**
    * Validates the query cache after batch updates.
    * Can be called to mark cache as valid after known safe state.
@@ -400,10 +403,13 @@ export class Scene {
     }
 
     const cameras = Array.from(this._cameraMap.values());
-    const fallback = cameras.find((entity) => {
-      const camera = entity.getComponent(CameraComponent);
-      return camera?.primary;
-    }) ?? cameras[0] ?? null;
+    const fallback =
+      cameras.find((entity) => {
+        const camera = entity.getComponent(CameraComponent);
+        return camera?.primary;
+      }) ??
+      cameras[0] ??
+      null;
 
     if (fallback) {
       this._setPrimaryCamera(fallback);
@@ -475,9 +481,11 @@ export class Scene {
 
     try {
       // Parse JSON
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       const data = JSON.parse(json);
 
       // fromJSON will perform full validation
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
       return Scene.fromJSON(data);
     } catch (error) {
       // Provide detailed error message

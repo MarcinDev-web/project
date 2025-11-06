@@ -300,4 +300,3 @@ export class DelayGate extends LogicCube {
     return null;
   }
 }
-

@@ -421,4 +421,3 @@ export function getBlock(id: string): BlockDefinition | undefined {
 export function getAllCategories(): BlockCategory[] {
   return ['basic', 'natural', 'gameplay'];
 }
-

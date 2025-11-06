@@ -15,7 +15,11 @@ export type MorphTargetClip = {
   targetCount: number; // total morph targets in the mesh binding
 };
 
-export function createMorphClip(name: string, channels: MorphChannel[], targetCount: number): MorphTargetClip {
+export function createMorphClip(
+  name: string,
+  channels: MorphChannel[],
+  targetCount: number
+): MorphTargetClip {
   let duration = 0;
   for (const ch of channels) {
     if (!(ch.targetIndex >= 0 && ch.targetIndex < targetCount)) {
@@ -34,7 +38,11 @@ export function createMorphClip(name: string, channels: MorphChannel[], targetCo
  * Samples morph weights for all targets at the given time into `outWeights`.
  * `outWeights.length` must equal `clip.targetCount`. Channels not affecting a target leave its weight at 0.
  */
-export function sampleMorphWeightsAt(outWeights: Float32Array, clip: MorphTargetClip, time: number): Float32Array {
+export function sampleMorphWeightsAt(
+  outWeights: Float32Array,
+  clip: MorphTargetClip,
+  time: number
+): Float32Array {
   if (outWeights.length < clip.targetCount) {
     throw new Error(`outWeights must be length >= ${clip.targetCount}`);
   }
@@ -64,7 +72,11 @@ function sampleScalar(ch: MorphChannel, idx: number, t: number): number {
   const p3 = ch.values[i3]!;
   const t2 = t * t;
   const t3 = t2 * t;
-  return 0.5 * ((2 * p1) + (-p0 + p2) * t + (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 + (-p0 + 3 * p1 - 3 * p2 + p3) * t3);
+  return (
+    0.5 *
+    (2 * p1 +
+      (-p0 + p2) * t +
+      (2 * p0 - 5 * p1 + 4 * p2 - p3) * t2 +
+      (-p0 + 3 * p1 - 3 * p2 + p3) * t3)
+  );
 }
-
-

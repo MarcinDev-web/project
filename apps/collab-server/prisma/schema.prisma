@@ -1,6 +1,7 @@
 // Prisma schema for collab-server
 generator client {
   provider = "prisma-client-js"
+  output   = "../../node_modules/.prisma/collab-client"
 }
 
 datasource db {

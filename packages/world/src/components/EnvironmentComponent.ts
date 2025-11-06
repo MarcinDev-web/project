@@ -267,8 +267,8 @@ export class EnvironmentComponent extends Component {
     clone.fogNear = this.fogNear;
     clone.fogFar = this.fogFar;
     clone.fogDensity = this.fogDensity;
-      clone._ambientIntensity = this._ambientIntensity;
-      clone._exposure = this._exposure;
+    clone._ambientIntensity = this._ambientIntensity;
+    clone._exposure = this._exposure;
     clone.enabled = this.enabled;
     return clone;
   }
@@ -318,11 +318,12 @@ export class EnvironmentComponent extends Component {
     if (typeof data.fogNear === 'number') this.fogNear = data.fogNear;
     if (typeof data.fogFar === 'number') this.fogFar = data.fogFar;
     if (typeof data.fogDensity === 'number') this.fogDensity = data.fogDensity;
-    if (typeof data.ambientIntensity === 'number') this._ambientIntensity = Math.max(0, Math.min(10, data.ambientIntensity));
-    if (typeof data.exposure === 'number' && data.exposure > 0) this._exposure = Math.min(10, data.exposure);
+    if (typeof data.ambientIntensity === 'number')
+      this._ambientIntensity = Math.max(0, Math.min(10, data.ambientIntensity));
+    if (typeof data.exposure === 'number' && data.exposure > 0)
+      this._exposure = Math.min(10, data.exposure);
     if (typeof data.enabled === 'boolean') this.enabled = data.enabled;
   }
 }
 
 registerComponent(EnvironmentComponent.type, EnvironmentComponent);
-

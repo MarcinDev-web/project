@@ -76,4 +76,3 @@ export class MovingPlatformComponent extends Component {
 }
 
 registerComponent(MovingPlatformComponent.type, MovingPlatformComponent);
-

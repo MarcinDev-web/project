@@ -45,5 +45,3 @@ export function getInverseBindMatrix(out: Mat4, skeleton: Skeleton, jointIndex: 
   for (let i = 0; i < 16; i++) out[i] = inverseBindMatrices[offset + i]!;
   return out;
 }
-
-

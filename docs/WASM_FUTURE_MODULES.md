@@ -1,6 +1,6 @@
 # Future WASM Modules - Planning Document
 
-This document outlines potential additional WASM modules for FORGE Engine.
+This document outlines potential additional WASM modules for Forge Engine.
 
 ## Overview
 

@@ -69,4 +69,3 @@ export class HazardZoneComponent extends Component {
 }
 
 registerComponent(HazardZoneComponent.type, HazardZoneComponent);
-

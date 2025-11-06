@@ -1,11 +1,10 @@
 /**
  * Weapon System Usage Examples
- * 
+ *
  * This file demonstrates how creators can use the weapon system.
  * These are examples and won't be compiled in production builds.
  */
 
-/* eslint-disable @typescript-eslint/no-unused-vars */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 
 import type { Entity } from '../core/Entity.js';
@@ -98,11 +97,13 @@ export function example4_DynamicCustomization(scene: Scene, entity: Entity) {
 
   // Check effective stats
   const stats = getEffectiveWeaponStats(entity);
+  // eslint-disable-next-line no-console
   console.log('Effective damage:', stats?.damage);
+  // eslint-disable-next-line no-console
   console.log('Effective spread:', stats?.spread);
 
   const weaponSystem = new WeaponSystem(scene);
-  
+
   // Fire with modified stats
   weaponSystem.fire(entity);
 }
@@ -114,20 +115,26 @@ export function example5_Events(scene: Scene, entity: Entity) {
   setupWeaponEntity(entity, 'rifle');
 
   // Listen to weapon events
+
   scene.events.on('weapon:fire', (event: any) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     console.log('Weapon fired:', event.damage, event.weaponType);
   });
 
   scene.events.on('weapon:reload', (event: any) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     console.log('Reloading:', event.reloadDuration);
   });
 
   // Inventory events
+
   scene.events.on('weapon:switched', (event: any) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     console.log('Weapon switched to index:', event.newWeaponIndex);
   });
 
   scene.events.on('inventory:updated', (event: any) => {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     console.log('Inventory action:', event.action);
   });
 }

@@ -2,11 +2,7 @@ import type { BehaviorInstance } from '../behavior/Behavior.js';
 
 export type CoroutineGenerator = Generator<CoroutineYield, void, unknown>;
 
-export type CoroutineYield =
-  | number
-  | WaitForSeconds
-  | WaitForFrames
-  | WaitForPredicate;
+export type CoroutineYield = number | WaitForSeconds | WaitForFrames | WaitForPredicate;
 
 export interface WaitForSeconds {
   type: 'seconds';
@@ -187,7 +183,9 @@ function isFrames(wait: CoroutineYield): wait is WaitForFrames {
 }
 
 function isPredicate(wait: CoroutineYield): wait is WaitForPredicate {
-  return typeof wait === 'object' && wait !== null && (wait as WaitForPredicate).type === 'predicate';
+  return (
+    typeof wait === 'object' && wait !== null && (wait as WaitForPredicate).type === 'predicate'
+  );
 }
 
 function normalizeYield(value: CoroutineYield): CoroutineYield {
@@ -205,5 +203,3 @@ function normalizeYield(value: CoroutineYield): CoroutineYield {
   }
   return value;
 }
-
-

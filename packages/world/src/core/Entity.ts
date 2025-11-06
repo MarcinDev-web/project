@@ -472,7 +472,6 @@ export class Entity {
     return out;
   }
 
-
   private deserializeComponents(
     components: Array<{ type: string; props?: Record<string, unknown> }>
   ): void {

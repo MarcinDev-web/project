@@ -1,29 +1,66 @@
-// Dynamic import to avoid TypeScript compilation issues with custom Prisma output path
-let PrismaClientConstructor: (new (args?: any) => any) | null = null;
-let prisma: any | null = null;
+import type { Prisma, PrismaClient } from '@prisma/client';
 
-async function loadPrismaConstructor(): Promise<new (args?: any) => any> {
+// Dynamic import to avoid TypeScript compilation issues with custom Prisma output path
+// Prisma generates client to custom location: ../../node_modules/.prisma/collab-client
+// This requires dynamic import as TypeScript cannot resolve this path statically
+
+type PrismaClientCtor = new (args?: Prisma.PrismaClientOptions) => PrismaClient;
+
+interface PrismaModuleExports {
+  PrismaClient?: unknown;
+  default?: {
+    PrismaClient?: unknown;
+  };
+}
+
+let PrismaClientConstructor: PrismaClientCtor | null = null;
+let prisma: PrismaClient | null = null;
+
+function isPrismaClientCtor(value: unknown): value is PrismaClientCtor {
+  return typeof value === 'function';
+}
+
+function extractPrismaClientCtor(moduleExports: unknown): PrismaClientCtor {
+  if (!moduleExports || typeof moduleExports !== 'object') {
+    throw new Error('Invalid Prisma module export');
+  }
+
+  const exportsObject = moduleExports as PrismaModuleExports;
+
+  if (isPrismaClientCtor(exportsObject.PrismaClient)) {
+    return exportsObject.PrismaClient;
+  }
+
+  const defaultExport = exportsObject.default;
+  if (defaultExport && typeof defaultExport === 'object') {
+    const maybeDefault = defaultExport as PrismaModuleExports['default'];
+    if (maybeDefault?.PrismaClient && isPrismaClientCtor(maybeDefault.PrismaClient)) {
+      return maybeDefault.PrismaClient;
+    }
+  }
+
+  throw new Error('PrismaClient export not found');
+}
+
+async function loadPrismaConstructor(): Promise<PrismaClientCtor> {
   if (PrismaClientConstructor) {
-    return PrismaClientConstructor as new (args?: any) => any;
+    return PrismaClientConstructor;
   }
 
   try {
     // Try custom output location first (from schema.prisma)
     const customModule = await import('../../node_modules/.prisma/collab-client');
-    PrismaClientConstructor = customModule.PrismaClient as any;
-    return PrismaClientConstructor as new (args?: any) => any;
+    PrismaClientConstructor = extractPrismaClientCtor(customModule);
+    return PrismaClientConstructor;
   } catch {
     // Fallback to standard location
     const standardModule = await import('@prisma/client');
-    // Handle both ESM and CJS formats
-    const PrismaClientClass =
-      (standardModule as any).PrismaClient || (standardModule as any).default?.PrismaClient;
-    PrismaClientConstructor = PrismaClientClass;
-    return PrismaClientConstructor as new (args?: any) => any;
+    PrismaClientConstructor = extractPrismaClientCtor(standardModule);
+    return PrismaClientConstructor;
   }
 }
 
-export async function getPrismaClient(): Promise<any> {
+export async function getPrismaClient(): Promise<PrismaClient> {
   if (!prisma) {
     const PrismaClient = await loadPrismaConstructor();
     const connectionString = process.env.DATABASE_URL;

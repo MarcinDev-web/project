@@ -75,4 +75,3 @@ export class MovingPlatformSystem {
     // No cleanup needed
   }
 }
-

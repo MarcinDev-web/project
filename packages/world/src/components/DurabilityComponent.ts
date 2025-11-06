@@ -39,5 +39,3 @@ export class DurabilityComponent extends Component {
 }
 
 registerComponent(DurabilityComponent.type, DurabilityComponent);
-
-

@@ -36,4 +36,4 @@ export * from './DurabilityComponent.js';
 export * from './TerrainComponent.js';
 export * from './UICanvasComponent.js';
 export * from './UIElementComponent.js';
-
+export * from './NpcComponent.js';

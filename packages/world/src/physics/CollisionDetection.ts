@@ -52,43 +52,47 @@ export class CollisionDetection {
     const posB = this.getWorldPosition(colliderB.center, transformB);
 
     // Dispatch to specific collision function
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
     if (colliderA.shape === 'box' && colliderB.shape === 'box') {
       return this.boxBox(
-        colliderA as BoxCollider,
+        colliderA,
         posA,
         transformA.rotation,
         transformA.scale,
-        colliderB as BoxCollider,
+        colliderB,
         posB,
         transformB.rotation,
         transformB.scale
       );
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
     } else if (colliderA.shape === 'sphere' && colliderB.shape === 'sphere') {
       return this.sphereSphere(
-        colliderA as SphereCollider,
+        colliderA,
         posA,
         transformA.scale,
-        colliderB as SphereCollider,
+        colliderB,
         posB,
         transformB.scale
       );
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
     } else if (colliderA.shape === 'box' && colliderB.shape === 'sphere') {
       return this.boxSphere(
-        colliderA as BoxCollider,
+        colliderA,
         posA,
         transformA.rotation,
         transformA.scale,
-        colliderB as SphereCollider,
+        colliderB,
         posB,
         transformB.scale
       );
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
     } else if (colliderA.shape === 'sphere' && colliderB.shape === 'box') {
       const result = this.boxSphere(
-        colliderB as BoxCollider,
+        colliderB,
         posB,
         transformB.rotation,
         transformB.scale,
-        colliderA as SphereCollider,
+        colliderA,
         posA,
         transformA.scale
       );
@@ -100,22 +104,14 @@ export class CollisionDetection {
         c.normal[2] = -c.normal[2];
       }
       return result;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
     } else if (colliderA.shape === 'capsule' && colliderB.shape === 'box') {
       // Precise capsule-box collision
-      return this.capsuleBox(
-        colliderA as CapsuleCollider,
-        transformA,
-        colliderB as BoxCollider,
-        transformB
-      );
+      return this.capsuleBox(colliderA, transformA, colliderB, transformB);
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
     } else if (colliderA.shape === 'box' && colliderB.shape === 'capsule') {
       // Precise box-capsule collision (swap order)
-      const result = this.capsuleBox(
-        colliderB as CapsuleCollider,
-        transformB,
-        colliderA as BoxCollider,
-        transformA
-      );
+      const result = this.capsuleBox(colliderB, transformB, colliderA, transformA);
       // Flip normal direction
       for (let i = 0; i < result.contacts.length; i++) {
         const c = result.contacts[i]!;
@@ -124,6 +120,7 @@ export class CollisionDetection {
         c.normal[2] = -c.normal[2];
       }
       return result;
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
     } else if (colliderA.shape === 'capsule' || colliderB.shape === 'capsule') {
       // Other capsule collisions (capsule-sphere, capsule-capsule)
       return this.capsuleCollision(colliderA, transformA, colliderB, transformB);
@@ -174,7 +171,7 @@ export class CollisionDetection {
     const dy = posB[1] - posA[1];
     const dz = posB[2] - posA[2];
     const distSq = dx * dx + dy * dy + dz * dz;
-    
+
     let normal: Vec3;
     if (distSq > this.EPSILON * this.EPSILON) {
       const dist = Math.sqrt(distSq);
@@ -185,11 +182,7 @@ export class CollisionDetection {
     }
 
     const contact: ContactPoint = {
-      position: [
-        (posA[0] + posB[0]) / 2,
-        (posA[1] + posB[1]) / 2,
-        (posA[2] + posB[2]) / 2,
-      ],
+      position: [(posA[0] + posB[0]) / 2, (posA[1] + posB[1]) / 2, (posA[2] + posB[2]) / 2],
       normal,
       depth: collision.depth,
     };
@@ -212,10 +205,8 @@ export class CollisionDetection {
     scaleB: Vec3
   ): CollisionInfo {
     // Apply scale to radii (use average scale)
-    const radiusA =
-      sphereA.radius * ((scaleA[0] + scaleA[1] + scaleA[2]) / 3);
-    const radiusB =
-      sphereB.radius * ((scaleB[0] + scaleB[1] + scaleB[2]) / 3);
+    const radiusA = sphereA.radius * ((scaleA[0] + scaleA[1] + scaleA[2]) / 3);
+    const radiusB = sphereB.radius * ((scaleB[0] + scaleB[1] + scaleB[2]) / 3);
 
     const dx = posB[0] - posA[0];
     const dy = posB[1] - posA[1];
@@ -346,7 +337,8 @@ export class CollisionDetection {
     const capsulePos = this.getWorldPosition(capsule.center, capsuleTransform);
 
     // Get capsule segment endpoints in world space
-    const scaledRadius = capsule.radius * Math.max(capsuleTransform.scale[0], capsuleTransform.scale[2]);
+    const scaledRadius =
+      capsule.radius * Math.max(capsuleTransform.scale[0], capsuleTransform.scale[2]);
     const half = Math.max(0, (capsule.height * capsuleTransform.scale[1] - 2 * scaledRadius) / 2);
     const localA: Vec3 = [0, -half, 0];
     const localB: Vec3 = [0, half, 0];
@@ -385,12 +377,7 @@ export class CollisionDetection {
 
     // Find closest point on capsule segment to box
     // Use iterative approach: sample points along segment or use closest point algorithm
-    const closestOnSegment = this.closestPointOnSegmentToBox(
-      localSegA,
-      localSegB,
-      boxMin,
-      boxMax
-    );
+    const closestOnSegment = this.closestPointOnSegmentToBox(localSegA, localSegB, boxMin, boxMax);
 
     // Clamp closest point to box surface
     const closestOnBox: Vec3 = [
@@ -427,7 +414,14 @@ export class CollisionDetection {
       const distToMinZ = closestOnBox[2] - boxMin[2];
       const distToMaxZ = boxMax[2] - closestOnBox[2];
 
-      const minDist = Math.min(distToMinX, distToMaxX, distToMinY, distToMaxY, distToMinZ, distToMaxZ);
+      const minDist = Math.min(
+        distToMinX,
+        distToMaxX,
+        distToMinY,
+        distToMaxY,
+        distToMinZ,
+        distToMaxZ
+      );
       if (minDist === distToMinX) localNormal = [-1, 0, 0];
       else if (minDist === distToMaxX) localNormal = [1, 0, 0];
       else if (minDist === distToMinY) localNormal = [0, -1, 0];
@@ -467,11 +461,7 @@ export class CollisionDetection {
     boxMax: Vec3
   ): Vec3 {
     // Vector along segment
-    const segDir: Vec3 = [
-      segB[0] - segA[0],
-      segB[1] - segA[1],
-      segB[2] - segA[2],
-    ];
+    const segDir: Vec3 = [segB[0] - segA[0], segB[1] - segA[1], segB[2] - segA[2]];
     const segLenSq = segDir[0] ** 2 + segDir[1] ** 2 + segDir[2] ** 2;
 
     // If segment is degenerate (point), return the point
@@ -486,11 +476,7 @@ export class CollisionDetection {
       (boxMin[2] + boxMax[2]) / 2,
     ];
 
-    const toCenter: Vec3 = [
-      boxCenter[0] - segA[0],
-      boxCenter[1] - segA[1],
-      boxCenter[2] - segA[2],
-    ];
+    const toCenter: Vec3 = [boxCenter[0] - segA[0], boxCenter[1] - segA[1], boxCenter[2] - segA[2]];
 
     const segDirNorm: Vec3 = [
       segDir[0] / Math.sqrt(segLenSq),
@@ -518,16 +504,8 @@ export class CollisionDetection {
       [segB[0], segB[1], segB[2]],
       pointOnSeg,
       // Midpoints
-      [
-        (segA[0] + pointOnSeg[0]) / 2,
-        (segA[1] + pointOnSeg[1]) / 2,
-        (segA[2] + pointOnSeg[2]) / 2,
-      ],
-      [
-        (pointOnSeg[0] + segB[0]) / 2,
-        (pointOnSeg[1] + segB[1]) / 2,
-        (pointOnSeg[2] + segB[2]) / 2,
-      ],
+      [(segA[0] + pointOnSeg[0]) / 2, (segA[1] + pointOnSeg[1]) / 2, (segA[2] + pointOnSeg[2]) / 2],
+      [(pointOnSeg[0] + segB[0]) / 2, (pointOnSeg[1] + segB[1]) / 2, (pointOnSeg[2] + segB[2]) / 2],
     ];
 
     for (const sample of samples) {
@@ -607,9 +585,10 @@ export class CollisionDetection {
     collider: AnyCollider,
     t: ColliderTransform
   ): { a: Vec3; b: Vec3 } {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
     if (collider.shape === 'capsule') {
       // Capsule is aligned with local Y; apply scale and rotation
-      const cap = collider as CapsuleCollider;
+      const cap = collider;
       const scaledRadius = cap.radius * Math.max(t.scale[0], t.scale[2]);
       const half = Math.max(0, (cap.height * t.scale[1] - 2 * scaledRadius) / 2);
       const localA: Vec3 = [0, -half, 0];
@@ -618,6 +597,7 @@ export class CollisionDetection {
       const worldB = this.addVec(this.rotateVector(localB, t.rotation), t.position);
       return { a: worldA, b: worldB };
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
     if (collider.shape === 'sphere') {
       const pos = this.getWorldPosition(collider.center, t);
       return { a: pos, b: pos };
@@ -628,15 +608,17 @@ export class CollisionDetection {
   }
 
   private static getEffectiveRadius(collider: AnyCollider, t: ColliderTransform): number {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
     if (collider.shape === 'capsule') {
-      return (collider as CapsuleCollider).radius * Math.max(t.scale[0], t.scale[2]);
+      return collider.radius * Math.max(t.scale[0], t.scale[2]);
     }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
     if (collider.shape === 'sphere') {
       const s = t.scale;
-      return (collider as SphereCollider).radius * ((s[0] + s[1] + s[2]) / 3);
+      return collider.radius * ((s[0] + s[1] + s[2]) / 3);
     }
     // Box: approximate by inscribed sphere radius along smallest half-extent (for interaction with capsule)
-    const b = collider as BoxCollider;
+    const b = collider;
     const rx = (b.size[0] * t.scale[0]) / 2;
     const ry = (b.size[1] * t.scale[1]) / 2;
     const rz = (b.size[2] * t.scale[2]) / 2;
@@ -644,7 +626,12 @@ export class CollisionDetection {
   }
 
   // Compute closest points between two segments AB and CD
-  private static closestPointsBetweenSegments(A: Vec3, B: Vec3, C: Vec3, D: Vec3): { pA: Vec3; pB: Vec3 } {
+  private static closestPointsBetweenSegments(
+    A: Vec3,
+    B: Vec3,
+    C: Vec3,
+    D: Vec3
+  ): { pA: Vec3; pB: Vec3 } {
     const EPS = this.EPSILON;
     const u: Vec3 = [B[0] - A[0], B[1] - A[1], B[2] - A[2]];
     const v: Vec3 = [D[0] - C[0], D[1] - C[1], D[2] - C[2]];
@@ -656,25 +643,50 @@ export class CollisionDetection {
     const d = this.dot(u, w0);
     const e = this.dot(v, w0);
 
-    let sN = 0, sD = a;
-    let tN = 0, tD = c;
+    let sN = 0,
+      sD = a;
+    let tN = 0,
+      tD = c;
 
     const DDen = a * c - b * b;
 
     if (DDen > EPS) {
-      sN = (b * e - c * d);
-      tN = (a * e - b * d);
-      if (sN < 0) { sN = 0; tN = e; tD = c; }
-      else if (sN > sD) { sN = sD; tN = e + b; tD = c; }
+      sN = b * e - c * d;
+      tN = a * e - b * d;
+      if (sN < 0) {
+        sN = 0;
+        tN = e;
+        tD = c;
+      } else if (sN > sD) {
+        sN = sD;
+        tN = e + b;
+        tD = c;
+      }
     } else {
       // Parallel
-      sN = 0; sD = 1; tN = e; tD = c;
+      sN = 0;
+      sD = 1;
+      tN = e;
+      tD = c;
     }
 
     if (tN < 0) {
-      tN = 0; if (-d < 0) sN = 0; else if (-d > a) sN = sD; else { sN = -d; sD = a; }
+      tN = 0;
+      if (-d < 0) sN = 0;
+      else if (-d > a) sN = sD;
+      else {
+        sN = -d;
+        sD = a;
+      }
     } else if (tN > tD) {
-      tN = tD; const tmp = -d + b; if (tmp < 0) sN = 0; else if (tmp > a) sN = sD; else { sN = tmp; sD = a; }
+      tN = tD;
+      const tmp = -d + b;
+      if (tmp < 0) sN = 0;
+      else if (tmp > a) sN = sD;
+      else {
+        sN = tmp;
+        sD = a;
+      }
     }
 
     const sc = Math.abs(sN) < EPS ? 0 : sN / sD;
@@ -692,12 +704,7 @@ export class CollisionDetection {
   /**
    * OBB (Oriented Bounding Box) structure
    */
-  private static boxToOBB(
-    box: BoxCollider,
-    position: Vec3,
-    rotation: Quat,
-    scale: Vec3
-  ): OBB {
+  private static boxToOBB(box: BoxCollider, position: Vec3, rotation: Quat, scale: Vec3): OBB {
     const matrix = quatToMatrix3(rotation);
     const a0: Vec3 = [matrix[0]!, matrix[3]!, matrix[6]!];
     const a1: Vec3 = [matrix[1]!, matrix[4]!, matrix[7]!];
@@ -832,4 +839,3 @@ interface OBB {
   axes: [Vec3, Vec3, Vec3];
   halfSizes: Vec3;
 }
-

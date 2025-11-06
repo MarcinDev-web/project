@@ -1,12 +1,13 @@
-# FORGE Worlds - Branding Guide
+# Forge World - Branding Guide
 
-**Official branding documentation for FORGE Worlds**
+**Official branding documentation for Forge World**
 
 ## 📛 Brand Identity
 
 ### Name
-- **Platform Name:** FORGE Worlds
-- **Engine Name:** FORGE Engine
+- **Company/Studio:** Plaza Entertainment Studio
+- **Platform Name:** Forge World
+- **Engine Name:** Forge Engine
 - **Primary:** FORGE
 - **Short Name:** FORGE
 - **Technical (Engine):** FORGE ENGINE
@@ -15,7 +16,7 @@
 
 ### Pitch (one sentence)
 ```
-FORGE Worlds — Open-source 3D game creation platform built by the community, for the community. POWERED BY FORGE ENGINE.
+Forge World — Open-source 3D game creation platform built by the community, for the community. POWERED BY FORGE ENGINE.
 ```
 
 ### Mission Statement
@@ -29,30 +30,69 @@ Empowering creators worldwide to build, share, and play 3D games without barrier
 
 ## 🎨 Visual Identity
 
+### Core Concept
+
+**Anvil and Fire as Creation Metaphor**  
+Forge (kuźnia) symbolizes power and creation from raw ideas - transforming concepts into reality through craftsmanship and technology.
+
+### Logo System
+
+1. **Plaza Entertainment Studio**
+   - Minimalistic, text-based logo
+   - Subtle "P" in the form of a spark
+   - Classic sans-serif typography (Inter, Neue Haas Grotesk)
+   - Emphasis on elegance and professionalism
+
+2. **Forge World**
+   - Dynamic logo with glowing "F" or anvil symbol
+   - Futuristic style with geometric fonts (Orbitron, Rajdhani)
+   - Forge orange accent (#FF6A00) for energy
+   - Represents the platform and creative power
+
+3. **Forge Engine**
+   - Technical, monochromatic version
+   - "Powered by" tagline variant
+   - Subtle blue accent (#2E6AFF) for technical tone
+   - Clean, professional appearance for developer-facing contexts
+
 ### Color Palette
+
+**Theme:** Anvil and fire as a metaphor for creation - Forge as a symbol of power, creating from raw ideas.
 
 | Color | Hex | Usage |
 |-------|-----|-------|
-| **Primary Background** | `#0f0f10` | Almost black steel - main background |
-| **Secondary Background** | `#1a1a1c` | Slightly lighter - panels, cards |
-| **Accent Hot** | `#ff3b00` | Hot metal/sparks - CTAs, highlights |
-| **Accent Hot Hover** | `#ff5722` | Brighter - hover states |
+| **Primary Background** | `#1B1B1D` | Steel gray - technology, power |
+| **Secondary Background** | `#0E0E10` | Dark graphite - deeper surfaces |
+| **Accent Hot** | `#FF6A00` | Forge orange - energy, creation |
+| **Accent Hot Hover** | `#FF8A33` | Brighter forge glow - hover states |
+| **Accent Tech** | `#2E6AFF` | Subtle blue - Forge Engine technical tone |
+| **Light Ash** | `#E1E1E3` | Light accent - highlights, contrast |
 | **Text Primary** | `#ffffff` | Pure white - main text |
-| **Text Dim** | `#8a8a8a` | Gray - secondary text, hints |
+| **Text Dim** | `#E1E1E3` | Light ash - secondary text |
+| **Text Muted** | `#8a8a8a` | Muted gray - tertiary text |
 | **Success** | `#00c853` | Green - success states |
 | **Warning** | `#ffa726` | Amber - warnings |
 | **Error** | `#ff1744` | Red - errors |
 | **Border** | `#2a2a2c` | Subtle gray - dividers |
-| **Overlay Background** | `rgba(15, 15, 16, 0.85)` | Semi-transparent - modals, overlays |
+| **Overlay Background** | `rgba(27, 27, 29, 0.85)` | Semi-transparent steel - modals, overlays |
 
 ### Typography
 
-**Primary Font Stack:**
-```css
-Inter, Roboto, system-ui, -apple-system, sans-serif
-```
+**Two-tier font system for brand hierarchy:**
 
-**Monospace Font Stack:**
+**FORGE WORLD - Geometric, Massive:**
+```css
+Orbitron, Rajdhani, "Exo 2", "Eurostile", "Michroma", sans-serif
+```
+Use for: Forge World branding, headers, hero sections, impactful statements
+
+**PLAZA ENTERTAINMENT - Classic, Elegant:**
+```css
+Inter, "Neue Haas Grotesk", Satoshi, system-ui, -apple-system, sans-serif
+```
+Use for: Plaza Entertainment Studio branding, body text, UI elements, professional content
+
+**Monospace (Code/Debug):**
 ```css
 "JetBrains Mono", "Fira Code", Consolas, monospace
 ```
@@ -73,6 +113,7 @@ Inter, Roboto, system-ui, -apple-system, sans-serif
 - Medium: 500
 - Semibold: 600 (UI elements)
 - Bold: 700 (headings)
+- Heavy: 800 (Forge World headers)
 
 ## 🖼️ Watermarks & Overlays
 
@@ -139,7 +180,7 @@ import { BRAND, COLORS, TYPOGRAPHY, WATERMARKS, UI } from '@engine/brand';
 
 // Display brand name
 console.log(BRAND.NAME); // "FORGE"
-console.log(BRAND.PLATFORM_NAME); // "FORGE Worlds"
+console.log(BRAND.PLATFORM_NAME); // "Forge World"
 console.log(BRAND.ENGINE_NAME); // "FORGE Engine"
 console.log(BRAND.ENGINE_TAG); // "POWERED BY FORGE ENGINE"
 
@@ -171,19 +212,19 @@ function renderLoop() {
 
 ### Twitter/X Bio
 ```
-FORGE Worlds — Open-source 3D game creation platform. Built by the community, for the community. POWERED BY FORGE ENGINE #WebGPU #GameDev #OpenSource #FORGE
+Forge World — Open-source 3D game creation platform. Built by the community, for the community. POWERED BY FORGE ENGINE #WebGPU #GameDev #OpenSource #FORGE
 ```
 
 ### GitHub Description
 ```
-FORGE Worlds - Open-source WebGPU/TypeScript game platform for browser-based 3D game creation. Built by the community, for the community. POWERED BY FORGE ENGINE.
+Forge World - Open-source WebGPU/TypeScript game platform for browser-based 3D game creation. Built by the community, for the community. POWERED BY FORGE ENGINE.
 ```
 
 ### YouTube Video Description
 ```
-Created with FORGE Worlds
+Created with Forge World
 
-FORGE Worlds — Open-source 3D game creation platform built by the community, for the community.
+Forge World — Open-source 3D game creation platform built by the community, for the community.
 POWERED BY FORGE ENGINE
 
 🔗 Learn more: https://forge.worlds
@@ -192,7 +233,7 @@ POWERED BY FORGE ENGINE
 
 ### Reddit/Forums
 ```
-Made with FORGE Worlds - an open-source, browser-based 3D game platform powered by FORGE Engine and WebGPU. Built by the community, for the community.
+Made with Forge World - an open-source, browser-based 3D game platform powered by Forge Engine and WebGPU. Built by the community, for the community.
 
 Check it out: [link]
 ```
@@ -201,8 +242,8 @@ Check it out: [link]
 
 ### Always Include Branding
 1. **In-Game Watermark:** Bottom-right corner (social watermark)
-2. **Video Intro/Outro:** Show FORGE Worlds logo/name
-3. **Thumbnail:** Include "FORGE Worlds" or "FORGE" text or logo
+2. **Video Intro/Outro:** Show Forge World logo/name
+3. **Thumbnail:** Include "Forge World" or "FORGE" text or logo
 4. **Open Source Badge:** Consider adding community badge (top-right) to emphasize open-source nature
 
 ### Best Practices
@@ -228,8 +269,8 @@ Check it out: [link]
 ### Do's and Don'ts
 
 ✅ **Do:**
-- Use "FORGE Worlds" for the platform name
-- Use "FORGE Engine" for the engine name
+- Use "Forge World" for the platform name
+- Use "Forge Engine" for the engine name
 - Use "FORGE" for short/branding
 - Emphasize open-source and community nature
 - Highlight browser-native nature
@@ -289,9 +330,9 @@ Before sharing any screenshot, video, or demo:
 
 **Updated:** 2025-01-XX  
 **Version:** 3.0.0  
-**Status:** ✅ Fully Implemented (FORGE Worlds / FORGE Engine)
+**Status:** ✅ Fully Implemented (Forge World / Forge Engine)
 
-**Built with ❤️ by the community**
+**Built with ❤️ by Plaza Entertainment Studio**
 
 **POWERED BY FORGE ENGINE**
 

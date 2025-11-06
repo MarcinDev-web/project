@@ -16,23 +16,23 @@ describe('Footer', () => {
 
   it('should display copyright text', () => {
     render(<Footer />);
-    const copyrightText = screen.getByText(/2025 FORGE Platform/i);
+    const copyrightText = screen.getByText(/2025 Forge World/i);
     expect(copyrightText).toBeInTheDocument();
   });
 
   it('should display powered by text', () => {
     render(<Footer />);
-    const poweredByText = screen.getByText(/Powered by FORGE Engine/i);
+    const poweredByText = screen.getByText(/Powered by Forge Engine/i);
     expect(poweredByText).toBeInTheDocument();
   });
 
   it('should not re-render unnecessarily (memo check)', () => {
     const { rerender } = render(<Footer />);
-    const firstRender = screen.getByText(/2025 FORGE Platform/i);
+    const firstRender = screen.getByText(/2025 Forge World/i);
     
     // Re-render with same props (should use memoized version)
     rerender(<Footer />);
-    const secondRender = screen.getByText(/2025 FORGE Platform/i);
+    const secondRender = screen.getByText(/2025 Forge World/i);
     
     expect(firstRender).toBe(secondRender);
   });

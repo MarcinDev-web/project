@@ -35,4 +35,3 @@ export interface CTMConfig {
   /** Number of random variants (for random pattern) */
   randomVariants?: number;
 }
-

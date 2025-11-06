@@ -30,7 +30,7 @@ describe('InventoryComponent', () => {
     inventory.addWeapon(weapon1);
     inventory.addWeapon(weapon2);
     expect(inventory.getActiveWeaponIndex()).toBe(0);
-    
+
     const switched = inventory.switchWeapon(1, 0);
     expect(switched).toBe(true);
     expect(inventory.getActiveWeaponIndex()).toBe(1);
@@ -66,7 +66,7 @@ describe('InventoryComponent', () => {
     inventory.addWeapon(weapon2);
     inventory.switchWeapon(1, 0);
     expect(inventory.isSwitching).toBe(true);
-    
+
     const completed = inventory.updateSwitch(inventory.switchDuration);
     expect(completed).toBe(true);
     expect(inventory.isSwitching).toBe(false);

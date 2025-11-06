@@ -458,6 +458,54 @@ fn vs_main(
       // If layout mismatch occurs in a test environment, keep placeholder bind group
     }
   }
+
+  dispose(): void {
+    try {
+      this.atlas?.destroy();
+    } catch {
+      // ignore
+    }
+    this.atlas = null;
+    this.atlasView = null;
+    try {
+      this.uniformBuffer?.destroy();
+    } catch {
+      // ignore
+    }
+    this.uniformBuffer = null;
+    this.uniformBindGroup = null;
+    this.uniformLayout = null;
+    this.comparisonSampler = null;
+    try {
+      this.culledOffsetBuffer?.destroy();
+    } catch {
+      // ignore
+    }
+    this.culledOffsetBuffer = null;
+    try {
+      this.culledColorScaleBuffer?.destroy();
+    } catch {
+      // ignore
+    }
+    this.culledColorScaleBuffer = null;
+    try {
+      this.culledRotationBuffer?.destroy();
+    } catch {
+      // ignore
+    }
+    this.culledRotationBuffer = null;
+    try {
+      this.culledMaterialIdBuffer?.destroy();
+    } catch {
+      // ignore
+    }
+    this.culledMaterialIdBuffer = null;
+    this.culledOffsetF32 = null;
+    this.culledColorScaleF32 = null;
+    this.culledRotationF32 = null;
+    this.culledMaterialIdF32 = null;
+    this.pipeline = null;
+  }
 }
 
 

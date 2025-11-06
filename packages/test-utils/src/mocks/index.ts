@@ -33,7 +33,7 @@ export function createMockCanvas(width = 800, height = 600): HTMLCanvasElement {
   }));
 
   // Mock getContext
-  canvas.getContext = vi.fn(() => ({
+  const contextMock = {
     canvas,
     configure: vi.fn(),
     unconfigure: vi.fn(),
@@ -41,7 +41,10 @@ export function createMockCanvas(width = 800, height = 600): HTMLCanvasElement {
       createView: vi.fn(() => ({})),
       destroy: vi.fn(),
     })),
-  })) as any;
+  } as unknown as RenderingContext;
+
+  const getContextMock: typeof canvas.getContext = vi.fn(() => contextMock);
+  canvas.getContext = getContextMock;
 
   return canvas;
 }

@@ -74,10 +74,7 @@ export class ScriptSystem {
     if (this.fixedDeltaTime > 0 && deltaTime > 0 && this.maxFixedStepsPerUpdate > 0) {
       this.fixedAccumulator += deltaTime;
       let steps = 0;
-      while (
-        this.fixedAccumulator >= this.fixedDeltaTime &&
-        steps < this.maxFixedStepsPerUpdate
-      ) {
+      while (this.fixedAccumulator >= this.fixedDeltaTime && steps < this.maxFixedStepsPerUpdate) {
         this.fixedAccumulator -= this.fixedDeltaTime;
         for (const inst of this.runtime.behaviors) {
           if (!inst || inst.enabled !== true) continue;
@@ -131,5 +128,3 @@ export class ScriptSystem {
     this.runtime.contextBuilder.reset();
   }
 }
-
-

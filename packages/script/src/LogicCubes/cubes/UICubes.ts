@@ -12,7 +12,9 @@ import { getLogicConnectionManager } from '../../connection/index.js';
  * UIButtonClick Trigger - Fires when a UI button is clicked
  */
 export class UIButtonClickTrigger extends LogicCube {
-  private clickHandler: ((event: any) => void) | null = null;
+  private clickHandler:
+    | ((event: { elementId: string; entity: unknown; component: UIElementComponent }) => void)
+    | null = null;
 
   getMetadata(): LogicCubeMetadata {
     return {
@@ -68,7 +70,11 @@ export class UIButtonClickTrigger extends LogicCube {
     const elementId = this.getConfig<string>('elementId', '');
     if (!elementId) return;
 
-    this.clickHandler = (event: { elementId: string; entity: any; component: UIElementComponent }) => {
+    this.clickHandler = (event: {
+      elementId: string;
+      entity: unknown;
+      component: UIElementComponent;
+    }) => {
       if (event.elementId === elementId && this.enabled && !this.isOnCooldown()) {
         // Emit signals through event bus - LogicCubeSystem will process them
         const connectionManager = getLogicConnectionManager(this.scene);
@@ -84,7 +90,7 @@ export class UIButtonClickTrigger extends LogicCube {
             timestamp: Date.now(),
             data: elementId,
           };
-          
+
           // Emit trigger signal to connected cubes
           const connections = connectionManager.getConnectionsFromPort(this.entity.id, 'output');
           for (const conn of connections) {
@@ -98,9 +104,12 @@ export class UIButtonClickTrigger extends LogicCube {
               sender: this.entity,
             });
           }
-          
+
           // Emit elementId string signal
-          const stringConnections = connectionManager.getConnectionsFromPort(this.entity.id, 'elementId');
+          const stringConnections = connectionManager.getConnectionsFromPort(
+            this.entity.id,
+            'elementId'
+          );
           for (const conn of stringConnections) {
             this.scene.events.publish({
               type: 'logic:signal',
@@ -126,7 +135,11 @@ export class UIButtonClickTrigger extends LogicCube {
     }
   }
 
-  onSignalReceived(_portId: string, _signal: LogicSignal, _context: LogicExecutionContext): Map<string, LogicSignal> | null {
+  onSignalReceived(
+    _portId: string,
+    _signal: LogicSignal,
+    _context: LogicExecutionContext
+  ): Map<string, LogicSignal> | null {
     // This cube doesn't receive signals, it generates them on UI click
     return null;
   }
@@ -181,7 +194,11 @@ export class UIShowElementAction extends LogicCube {
     };
   }
 
-  onSignalReceived(portId: string, signal: LogicSignal, _context: LogicExecutionContext): Map<string, LogicSignal> | null {
+  onSignalReceived(
+    portId: string,
+    signal: LogicSignal,
+    _context: LogicExecutionContext
+  ): Map<string, LogicSignal> | null {
     if (portId !== 'trigger') return null;
 
     const elementId = this.getConfig<string>('elementId', '');
@@ -263,7 +280,11 @@ export class UISetTextAction extends LogicCube {
     };
   }
 
-  onSignalReceived(portId: string, signal: LogicSignal, _context: LogicExecutionContext): Map<string, LogicSignal> | null {
+  onSignalReceived(
+    portId: string,
+    signal: LogicSignal,
+    _context: LogicExecutionContext
+  ): Map<string, LogicSignal> | null {
     if (portId !== 'trigger') return null;
 
     const elementId = this.getConfig<string>('elementId', '');
@@ -349,7 +370,11 @@ export class UISetImageAction extends LogicCube {
     };
   }
 
-  onSignalReceived(portId: string, signal: LogicSignal, _context: LogicExecutionContext): Map<string, LogicSignal> | null {
+  onSignalReceived(
+    portId: string,
+    signal: LogicSignal,
+    _context: LogicExecutionContext
+  ): Map<string, LogicSignal> | null {
     if (portId !== 'trigger') return null;
 
     const elementId = this.getConfig<string>('elementId', '');
@@ -431,7 +456,11 @@ export class UISetValueAction extends LogicCube {
     };
   }
 
-  onSignalReceived(portId: string, signal: LogicSignal, _context: LogicExecutionContext): Map<string, LogicSignal> | null {
+  onSignalReceived(
+    portId: string,
+    signal: LogicSignal,
+    _context: LogicExecutionContext
+  ): Map<string, LogicSignal> | null {
     if (portId !== 'trigger') return null;
 
     const elementId = this.getConfig<string>('elementId', '');
@@ -517,7 +546,11 @@ export class UIEnableElementAction extends LogicCube {
     };
   }
 
-  onSignalReceived(portId: string, signal: LogicSignal, _context: LogicExecutionContext): Map<string, LogicSignal> | null {
+  onSignalReceived(
+    portId: string,
+    signal: LogicSignal,
+    _context: LogicExecutionContext
+  ): Map<string, LogicSignal> | null {
     if (portId !== 'trigger') return null;
 
     const elementId = this.getConfig<string>('elementId', '');
@@ -549,4 +582,3 @@ export class UIEnableElementAction extends LogicCube {
     return outputs;
   }
 }
-

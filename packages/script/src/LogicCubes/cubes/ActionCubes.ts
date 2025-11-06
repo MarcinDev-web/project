@@ -55,14 +55,18 @@ export class SendMessageAction extends LogicCube {
     };
   }
 
-  onSignalReceived(portId: string, signal: LogicSignal, _context: LogicExecutionContext): Map<string, LogicSignal> | null {
+  onSignalReceived(
+    portId: string,
+    signal: LogicSignal,
+    _context: LogicExecutionContext
+  ): Map<string, LogicSignal> | null {
     if (portId !== 'trigger') return null;
 
     const message = this.getConfig<string>('message', 'CustomEvent');
     const dataStr = this.getConfig<string>('data', '{}');
 
     try {
-      const data = JSON.parse(dataStr);
+      const data: unknown = JSON.parse(dataStr);
       this.scene.events.publish({ type: message, payload: data, sender: this.entity });
       Logger.info(`Logic cube sent message: ${message}`, data);
     } catch (error) {
@@ -150,7 +154,11 @@ export class SetVariableAction extends LogicCube {
     };
   }
 
-  onSignalReceived(portId: string, signal: LogicSignal, _context: LogicExecutionContext): Map<string, LogicSignal> | null {
+  onSignalReceived(
+    portId: string,
+    signal: LogicSignal,
+    _context: LogicExecutionContext
+  ): Map<string, LogicSignal> | null {
     if (portId !== 'trigger') return null;
 
     // Get variable storage from scene (we'll need to access it through the system)
@@ -251,7 +259,11 @@ export class SpawnEntityAction extends LogicCube {
     };
   }
 
-  onSignalReceived(portId: string, signal: LogicSignal, _context: LogicExecutionContext): Map<string, LogicSignal> | null {
+  onSignalReceived(
+    portId: string,
+    signal: LogicSignal,
+    _context: LogicExecutionContext
+  ): Map<string, LogicSignal> | null {
     if (portId !== 'trigger') return null;
 
     const prefabName = this.getConfig<string>('prefabName', 'Cube');
@@ -372,7 +384,11 @@ export class LogAction extends LogicCube {
     };
   }
 
-  onSignalReceived(portId: string, signal: LogicSignal, _context: LogicExecutionContext): Map<string, LogicSignal> | null {
+  onSignalReceived(
+    portId: string,
+    signal: LogicSignal,
+    _context: LogicExecutionContext
+  ): Map<string, LogicSignal> | null {
     if (portId !== 'trigger') return null;
 
     const message = this.getConfig<string>('message', 'Hello World');
@@ -388,4 +404,3 @@ export class LogAction extends LogicCube {
     return outputs;
   }
 }
-

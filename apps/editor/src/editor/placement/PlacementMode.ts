@@ -3,7 +3,7 @@
  * Inspired by Minecraft's block placement system.
  */
 
-import { Entity, MaterialComponent, LightComponent, PhysicsComponent, RigidbodyType, VegetationComponent, VegetationType } from '@engine/world';
+import { Entity, MaterialComponent, LightComponent, PhysicsComponent, RigidbodyType, VegetationComponent, VegetationType, NpcComponent, CharacterController, WeaponComponent } from '@engine/world';
 import type { VegetationConfig } from '@engine/world';
 import type { Scene } from '@engine/world';
 import type { Vec3, Quat } from '@engine/core/math';
@@ -325,6 +325,11 @@ export class PlacementMode {
       this.applyVegetationProperties(entity, this.preview.asset.vegetationConfig);
     }
 
+    // Apply NPC properties if this is an NPC asset
+    if (this.preview.asset?.npcConfig) {
+      this.applyNpcProperties(entity, this.preview.asset.npcConfig);
+    }
+
     // Add to scene
     this.scene.addEntity(entity);
 
@@ -506,6 +511,84 @@ export class PlacementMode {
         entity.addComponent(new MaterialComponent());
       }
     }
+  }
+
+  /**
+   * Applies NPC properties to an entity
+   * @param entity - The entity to apply properties to
+   * @param npcConfig - The NPC configuration from the asset preset
+   */
+  private applyNpcProperties(
+    entity: Entity,
+    npcConfig: AssetPreset['npcConfig']
+  ): void {
+    if (!npcConfig) {
+      return;
+    }
+
+    // Create NpcComponent with configuration
+    // For guard-position behavior, set guard position to entity position if not specified
+    let guardPosition = npcConfig.guardPosition;
+    if (npcConfig.behavior === 'guard-position' && !guardPosition) {
+      guardPosition = [
+        entity.transform.position[0],
+        entity.transform.position[1],
+        entity.transform.position[2],
+      ];
+    }
+
+    const npcComponent = new NpcComponent({
+      unitType: npcConfig.unitType ?? 'soldier',
+      faction: npcConfig.faction ?? 'neutral',
+      behavior: npcConfig.behavior ?? 'idle',
+      armyId: npcConfig.armyId ?? '',
+      patrolWaypoints: npcConfig.patrolWaypoints,
+      patrolSpeed: npcConfig.patrolSpeed,
+      guardPosition: guardPosition,
+      guardRadius: npcConfig.guardRadius,
+      detectionRange: npcConfig.detectionRange,
+    });
+    entity.addComponent(npcComponent);
+
+    // Add CharacterController for movement
+    if (!entity.getComponent(CharacterController)) {
+      const controller = new CharacterController({
+        moveSpeed: npcConfig.patrolSpeed ?? 3.0,
+        autoRotate: true,
+      });
+      entity.addComponent(controller);
+    }
+
+    // Add PhysicsComponent if not present (required for CharacterController)
+    if (!entity.getComponent(PhysicsComponent)) {
+      const physics = new PhysicsComponent();
+      physics.rigidbodyType = RigidbodyType.Dynamic;
+      physics.mass = 70; // Average human mass
+      physics.useGravity = true;
+      physics.linearDrag = 5;
+      physics.addCapsuleCollider(0.5, 2.0); // Radius 0.5, height 2.0
+      physics.freezeRotationX = true;
+      physics.freezeRotationZ = true;
+      entity.addComponent(physics);
+    }
+
+    // Add WeaponComponent for combat behaviors (soldier, guard)
+    if ((npcConfig.unitType === 'soldier' || npcConfig.unitType === 'guard') && 
+        !entity.getComponent(WeaponComponent)) {
+      const weapon = new WeaponComponent({
+        type: 'hitscan',
+        damage: 25,
+        fireRate: 10,
+        range: 100,
+        ammo: 30,
+        maxAmmo: 30,
+      });
+      entity.addComponent(weapon);
+    }
+
+    // Store NPC type in userData for easy identification
+    entity.userData.npcType = npcConfig.unitType;
+    entity.userData.npcFaction = npcConfig.faction;
   }
 
   /**

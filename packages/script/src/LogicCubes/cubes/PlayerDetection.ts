@@ -191,4 +191,3 @@ export class PlayerDetection {
     return Math.sqrt(dx * dx + dy * dy + dz * dz);
   }
 }
-

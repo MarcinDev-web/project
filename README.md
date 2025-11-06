@@ -1,4 +1,4 @@
-# FORGE Engine
+# Forge Engine
 
 **Production-grade WebGPU/TypeScript game engine with modular architecture**
 
@@ -6,7 +6,7 @@
 
 ## 🎯 Overview
 
-FORGE Engine is a modern, open-source 3D game engine built from the ground up with WebGPU and TypeScript. It features a complete modular monorepo architecture, comprehensive testing, and a professional 3D scene editor - all running directly in your browser.
+Forge Engine is a modern, open-source 3D game engine built from the ground up with WebGPU and TypeScript. It features a complete modular monorepo architecture, comprehensive testing, and a professional 3D scene editor - all running directly in your browser.
 
 **Key Features:**
 - ⚡ WebGPU-powered rendering with PBR materials and shadows
@@ -265,7 +265,7 @@ ISC
 
 ---
 
-## 🔥 Why FORGE Engine?
+## 🔥 Why Forge Engine?
 
 - **⚡ Forged for performance** - WebGPU-powered, browser-native
 - **🏗️ Built to scale** - From prototypes to production-ready games

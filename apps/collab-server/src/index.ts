@@ -1,27 +1,36 @@
 import Fastify from 'fastify';
 import websocket from '@fastify/websocket';
 import cors from '@fastify/cors';
+import {
+  getCorsConfig,
+  isOriginAllowed,
+  describeAllowedOrigins,
+  CORS_ALLOWED_HEADERS,
+  CORS_ALLOWED_METHODS,
+} from '@shared/config/cors';
 import { getPrismaClient, ensureSchema, disconnectPrisma } from './lib/db.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerSessionRoutes } from './routes/session.js';
 import { createWsServer } from './ws/server.js';
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 4000;
-const ALLOWED_ORIGINS = (process.env.ALLOWED_ORIGINS || '')
-  .split(',')
-  .map((s) => s.trim())
-  .filter(Boolean);
 
 async function main(): Promise<void> {
   const app = Fastify({ logger: true });
+  const corsConfig = getCorsConfig();
+  const allowedOriginsDescription = describeAllowedOrigins(corsConfig);
 
   await app.register(cors, {
     origin: (origin, cb) => {
       if (!origin) return cb(null, true);
-      if (ALLOWED_ORIGINS.length === 0 || ALLOWED_ORIGINS.includes(origin)) return cb(null, true);
+      if (isOriginAllowed(origin, corsConfig)) return cb(null, true);
+      app.log.warn({ origin }, `Blocked CORS origin. Allowed: ${allowedOriginsDescription}`);
       cb(new Error('Not allowed'), false);
     },
     credentials: true,
+    allowedHeaders: CORS_ALLOWED_HEADERS,
+    methods: CORS_ALLOWED_METHODS,
+    maxAge: 86400,
   });
 
   await app.register(websocket);
@@ -31,7 +40,7 @@ async function main(): Promise<void> {
 
   registerAuthRoutes(app, prisma);
   registerSessionRoutes(app, prisma);
-  createWsServer(app, prisma);
+  createWsServer(app, prisma, corsConfig);
 
   app.get('/health', () => ({ status: 'ok' }));
 

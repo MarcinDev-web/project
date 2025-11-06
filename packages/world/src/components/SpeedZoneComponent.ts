@@ -69,4 +69,3 @@ export class SpeedZoneComponent extends Component {
 }
 
 registerComponent(SpeedZoneComponent.type, SpeedZoneComponent);
-

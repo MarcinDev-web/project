@@ -310,9 +310,15 @@ export class PhysicsComponent extends Component {
       // Still apply freeze toggles to the effective inverse tensor
       const base = this._inverseInertiaTensorLocalBase;
       const invLocal: Mat3 = [
-        this.freezeRotationX ? 0 : base[0]!, 0, 0,
-        0, this.freezeRotationY ? 0 : base[4]!, 0,
-        0, 0, this.freezeRotationZ ? 0 : base[8]!,
+        this.freezeRotationX ? 0 : base[0],
+        0,
+        0,
+        0,
+        this.freezeRotationY ? 0 : base[4],
+        0,
+        0,
+        0,
+        this.freezeRotationZ ? 0 : base[8],
       ];
       this._inverseInertiaTensorLocal = invLocal;
       return;
@@ -329,17 +335,17 @@ export class PhysicsComponent extends Component {
     const volumes: number[] = [];
     const calcVolume = (c: AnyCollider): number => {
       if (c.shape === ColliderShape.Box) {
-        const w = (c as BoxCollider).size[0] * sx;
-        const h = (c as BoxCollider).size[1] * sy;
-        const d = (c as BoxCollider).size[2] * sz;
+        const w = c.size[0] * sx;
+        const h = c.size[1] * sy;
+        const d = c.size[2] * sz;
         return Math.max(0, w) * Math.max(0, h) * Math.max(0, d);
       }
       if (c.shape === ColliderShape.Sphere) {
-        const r = (c as SphereCollider).radius * ((sx + sy + sz) / 3);
+        const r = c.radius * ((sx + sy + sz) / 3);
         return (4 / 3) * Math.PI * r * r * r;
       }
       // Capsule: height includes hemispheres; cylinder height = total - 2r
-      const cap = c as CapsuleCollider;
+      const cap = c;
       const r = cap.radius * Math.max(sx, sz);
       const totalH = cap.height * sy;
       const cylH = Math.max(0, totalH - 2 * r);
@@ -370,15 +376,15 @@ export class PhysicsComponent extends Component {
 
         let I_local: Mat3;
         if (c.shape === ColliderShape.Box) {
-          const b = c as BoxCollider;
+          const b = c;
           const size: Vec3 = [b.size[0] * sx, b.size[1] * sy, b.size[2] * sz];
           I_local = calculateInertiaTensor({ type: 'box', size }, m_i);
         } else if (c.shape === ColliderShape.Sphere) {
-          const s = c as SphereCollider;
+          const s = c;
           const r = s.radius * ((sx + sy + sz) / 3);
           I_local = calculateInertiaTensor({ type: 'sphere', radius: r }, m_i);
         } else {
-          const k = c as CapsuleCollider;
+          const k = c;
           const r = k.radius * Math.max(sx, sz);
           const totalH = k.height * sy;
           const cylH = Math.max(0, totalH - 2 * r);
@@ -414,9 +420,15 @@ export class PhysicsComponent extends Component {
     // Store base (unfrozen) inverse diag and compute effective inverse applying freeze
     this._inverseInertiaTensorLocalBase = [invIxx, 0, 0, 0, invIyy, 0, 0, 0, invIzz];
     const invLocal: Mat3 = [
-      this.freezeRotationX ? 0 : invIxx, 0, 0,
-      0, this.freezeRotationY ? 0 : invIyy, 0,
-      0, 0, this.freezeRotationZ ? 0 : invIzz,
+      this.freezeRotationX ? 0 : invIxx,
+      0,
+      0,
+      0,
+      this.freezeRotationY ? 0 : invIyy,
+      0,
+      0,
+      0,
+      this.freezeRotationZ ? 0 : invIzz,
     ];
     this._inverseInertiaTensorLocal = invLocal;
 
@@ -435,28 +447,24 @@ export class PhysicsComponent extends Component {
     const c1: Vec3 = [R[3]!, R[4]!, R[5]!];
     const c2: Vec3 = [R[6]!, R[7]!, R[8]!];
 
-    const d0 = this._inverseInertiaTensorLocal[0]!;
-    const d1 = this._inverseInertiaTensorLocal[4]!;
-    const d2 = this._inverseInertiaTensorLocal[8]!;
+    const d0 = this._inverseInertiaTensorLocal[0];
+    const d1 = this._inverseInertiaTensorLocal[4];
+    const d2 = this._inverseInertiaTensorLocal[8];
 
     // W = R * diag(d) * R^T => sum_k d_k * c_k c_k^T
-    const w00 = d0 * c0[0]! * c0[0]! + d1 * c1[0]! * c1[0]! + d2 * c2[0]! * c2[0]!;
-    const w01 = d0 * c0[0]! * c0[1]! + d1 * c1[0]! * c1[1]! + d2 * c2[0]! * c2[1]!;
-    const w02 = d0 * c0[0]! * c0[2]! + d1 * c1[0]! * c1[2]! + d2 * c2[0]! * c2[2]!;
+    const w00 = d0 * c0[0] * c0[0] + d1 * c1[0] * c1[0] + d2 * c2[0] * c2[0];
+    const w01 = d0 * c0[0] * c0[1] + d1 * c1[0] * c1[1] + d2 * c2[0] * c2[1];
+    const w02 = d0 * c0[0] * c0[2] + d1 * c1[0] * c1[2] + d2 * c2[0] * c2[2];
 
-    const w10 = d0 * c0[1]! * c0[0]! + d1 * c1[1]! * c1[0]! + d2 * c2[1]! * c2[0]!;
-    const w11 = d0 * c0[1]! * c0[1]! + d1 * c1[1]! * c1[1]! + d2 * c2[1]! * c2[1]!;
-    const w12 = d0 * c0[1]! * c0[2]! + d1 * c1[1]! * c1[2]! + d2 * c2[1]! * c2[2]!;
+    const w10 = d0 * c0[1] * c0[0] + d1 * c1[1] * c1[0] + d2 * c2[1] * c2[0];
+    const w11 = d0 * c0[1] * c0[1] + d1 * c1[1] * c1[1] + d2 * c2[1] * c2[1];
+    const w12 = d0 * c0[1] * c0[2] + d1 * c1[1] * c1[2] + d2 * c2[1] * c2[2];
 
-    const w20 = d0 * c0[2]! * c0[0]! + d1 * c1[2]! * c1[0]! + d2 * c2[2]! * c2[0]!;
-    const w21 = d0 * c0[2]! * c0[1]! + d1 * c1[2]! * c1[1]! + d2 * c2[2]! * c2[1]!;
-    const w22 = d0 * c0[2]! * c0[2]! + d1 * c1[2]! * c1[2]! + d2 * c2[2]! * c2[2]!;
+    const w20 = d0 * c0[2] * c0[0] + d1 * c1[2] * c1[0] + d2 * c2[2] * c2[0];
+    const w21 = d0 * c0[2] * c0[1] + d1 * c1[2] * c1[1] + d2 * c2[2] * c2[1];
+    const w22 = d0 * c0[2] * c0[2] + d1 * c1[2] * c1[2] + d2 * c2[2] * c2[2];
 
-    return [
-      w00, w10, w20,
-      w01, w11, w21,
-      w02, w12, w22,
-    ];
+    return [w00, w10, w20, w01, w11, w21, w02, w12, w22];
   }
 
   /**
@@ -589,9 +597,11 @@ export class PhysicsComponent extends Component {
     }
     if (typeof data.mass === 'number') this.mass = data.mass;
     if (Array.isArray(data.velocity) && data.velocity.length === 3) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       this.velocity = [...data.velocity] as Vec3;
     }
     if (Array.isArray(data.angularVelocity) && data.angularVelocity.length === 3) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       this.angularVelocity = [...data.angularVelocity] as Vec3;
     }
     if (typeof data.linearDrag === 'number') this.linearDrag = data.linearDrag;

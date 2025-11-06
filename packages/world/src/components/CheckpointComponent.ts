@@ -8,7 +8,7 @@ export interface CheckpointComponentJSON {
 
 /**
  * CheckpointComponent marks an entity as a checkpoint that the player can activate.
- * 
+ *
  * Usage:
  * - Place entities with this component in the scene to define checkpoints
  * - When the player enters the checkpoint's activation radius, it becomes the active checkpoint
@@ -60,4 +60,3 @@ export class CheckpointComponent extends Component {
 }
 
 registerComponent(CheckpointComponent.type, CheckpointComponent);
-

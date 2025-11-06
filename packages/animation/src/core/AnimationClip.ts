@@ -56,5 +56,3 @@ export function validateTrack(track: Track): void {
     throw new Error(`values length ${values.length} must be times.length * ${stride}`);
   }
 }
-
-

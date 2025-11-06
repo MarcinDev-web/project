@@ -207,10 +207,17 @@ export class UIElementComponent extends Component {
     if (typeof data.elementId === 'string') {
       this.elementId = data.elementId;
     }
-    if (data.type && ['button', 'text', 'image', 'slider', 'progress', 'input'].includes(data.type)) {
-      this.type = data.type as UIElementType;
+    if (
+      data.type &&
+      ['button', 'text', 'image', 'slider', 'progress', 'input'].includes(data.type)
+    ) {
+      this.type = data.type;
     }
-    if (data.position && typeof data.position.x === 'number' && typeof data.position.y === 'number') {
+    if (
+      data.position &&
+      typeof data.position.x === 'number' &&
+      typeof data.position.y === 'number'
+    ) {
       this.position = { ...data.position };
     }
     if (data.size && typeof data.size.width === 'number' && typeof data.size.height === 'number') {
@@ -241,4 +248,3 @@ export class UIElementComponent extends Component {
 }
 
 registerComponent(UIElementComponent.type, UIElementComponent);
-

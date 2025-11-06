@@ -73,8 +73,17 @@ export class LogicCubeSystem {
     registerLogicConnectionManager(scene, this.connectionManager);
 
     // Listen for external logic signals (e.g., from UI events)
-    scene.events.on('logic:signal', (event: any) => {
-      const { targetEntityId, targetPort, signal } = event.payload || {};
+    scene.events.on<{
+      type: 'logic:signal';
+      payload?: {
+        targetEntityId?: EntityId;
+        targetPort?: string;
+        signal?: LogicSignal;
+      };
+      sender?: unknown;
+      target?: unknown;
+    }>('logic:signal', (event) => {
+      const { targetEntityId, targetPort, signal } = event?.payload ?? {};
       if (targetEntityId && targetPort && signal) {
         this.signalQueue.push({
           targetEntityId,
@@ -258,11 +267,7 @@ export class LogicCubeSystem {
           signal: item.signal,
         };
 
-        const outputSignals = cube.onSignalReceived(
-          item.targetPort,
-          item.signal,
-          signalContext
-        );
+        const outputSignals = cube.onSignalReceived(item.targetPort, item.signal, signalContext);
 
         // Emit output signals
         if (outputSignals && outputSignals.size > 0) {
@@ -340,11 +345,7 @@ export class LogicCubeSystem {
   /**
    * Restores the system state
    */
-  fromJSON(data: {
-    connections?: unknown;
-    variables?: unknown;
-    gameTime?: number;
-  }): void {
+  fromJSON(data: { connections?: unknown; variables?: unknown; gameTime?: number }): void {
     if (data.connections) {
       this.connectionManager.fromJSON(data.connections as never);
     }
@@ -356,4 +357,3 @@ export class LogicCubeSystem {
     }
   }
 }
-

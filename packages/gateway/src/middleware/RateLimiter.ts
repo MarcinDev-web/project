@@ -15,7 +15,7 @@ export class GatewayRateLimiter {
     this.config = {
       capacity: config.capacity,
       refillPerSec: config.refillPerSec,
-      keyGenerator: config.keyGenerator || this.defaultKeyGenerator,
+      keyGenerator: config.keyGenerator || ((req: Request) => this.defaultKeyGenerator(req)),
     };
   }
 
@@ -69,4 +69,3 @@ export const healthEndpointLimiter = new GatewayRateLimiter({
   capacity: 100, // More lenient for health checks
   refillPerSec: 10, // 10 per second
 });
-

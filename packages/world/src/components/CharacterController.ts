@@ -79,14 +79,14 @@ export interface CharacterInput {
 
 /**
  * Character Controller Component
- * 
+ *
  * Provides character movement with physics integration, including:
  * - Walking, running, jumping
  * - Ground detection
  * - Slope handling
  * - Stair climbing
  * - Camera-relative movement
- * 
+ *
  * Implements MovementController interface for unified movement API.
  */
 export class CharacterController extends Component implements MovementController {
@@ -130,6 +130,7 @@ export class CharacterController extends Component implements MovementController
   private physics: PhysicsComponent | null = null;
 
   /** Current movement profile */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   private currentProfile: any = null; // MovementProfile from @engine/stdlib (using any to avoid circular dependency)
 
   /** Current rotation angle for smooth interpolation (radians) */
@@ -167,7 +168,7 @@ export class CharacterController extends Component implements MovementController
 
     // Get or create physics component
     this.physics = entity.getComponent(PhysicsComponent);
-    
+
     if (!this.physics) {
       // Create physics component with character settings
       this.physics = new PhysicsComponent();
@@ -175,14 +176,14 @@ export class CharacterController extends Component implements MovementController
       this.physics.mass = 70; // Average human mass
       this.physics.useGravity = true;
       this.physics.linearDrag = 5; // High drag for responsive control
-      
+
       // Add capsule collider for character
       this.physics.addCapsuleCollider(0.5, 2.0); // Radius 0.5, height 2.0
-      
+
       // Freeze rotation to prevent character from tipping over
       this.physics.freezeRotationX = true;
       this.physics.freezeRotationZ = true;
-      
+
       entity.addComponent(this.physics);
     }
 
@@ -200,7 +201,7 @@ export class CharacterController extends Component implements MovementController
     // Handle MovementInput (unified interface)
     if ('cameraForward' in input && input.cameraForward !== undefined) {
       // CharacterInput with camera directions
-      this.setCharacterInput(input as CharacterInput);
+      this.setCharacterInput(input);
     } else {
       // MovementInput - convert to CharacterInput
       this.setMovementInput(input as MovementInput);
@@ -256,7 +257,7 @@ export class CharacterController extends Component implements MovementController
   update(deltaTime: number): void {
     // Ensure physics component exists
     this.ensurePhysicsComponent();
-    
+
     if (!this.physics || !this.entity) return;
 
     // Update timers
@@ -305,8 +306,7 @@ export class CharacterController extends Component implements MovementController
   private updateState(): void {
     if (this.isGrounded) {
       const horizontalSpeed = Math.sqrt(
-        this.velocity[0] * this.velocity[0] + 
-        this.velocity[2] * this.velocity[2]
+        this.velocity[0] * this.velocity[0] + this.velocity[2] * this.velocity[2]
       );
 
       if (horizontalSpeed < 0.1) {
@@ -359,7 +359,7 @@ export class CharacterController extends Component implements MovementController
     // Adjust smoothing time constant based on air control
     const smoothingTau = (this.config.velocitySmoothing ?? 0.1) / controlMultiplier;
     const alpha = this.expDecayAlpha(smoothingTau, deltaTime);
-    
+
     this.velocity[0] += (targetVelocity[0] - this.velocity[0]) * alpha;
     this.velocity[2] += (targetVelocity[2] - this.velocity[2]) * alpha;
 
@@ -400,14 +400,15 @@ export class CharacterController extends Component implements MovementController
     if (!this.physics) return;
 
     // Check if we can jump (grounded or within coyote time, and jump buffered)
-    const canJump = (this.isGrounded || this.timeSinceGrounded < this.coyoteTime) &&
-                    this.timeSinceJumpPressed <= this.jumpBufferTime;
+    const canJump =
+      (this.isGrounded || this.timeSinceGrounded < this.coyoteTime) &&
+      this.timeSinceJumpPressed <= this.jumpBufferTime;
 
     if (this.jumpRequested && canJump) {
       // Apply jump force
       this.velocity[1] = this.config.jumpForce;
       this.syncVelocityToPhysics();
-      
+
       this.isGrounded = false;
       this.timeSinceGrounded = this.coyoteTime; // Prevent double jump
       this.timeSinceJumpPressed = Infinity; // Consume jump input
@@ -437,7 +438,7 @@ export class CharacterController extends Component implements MovementController
     this.currentRotationY = currentEuler[1]; // Y-axis rotation (yaw)
 
     // Use deltaTime from update() if available, otherwise estimate
-    const dt = deltaTime ?? (1 / 60); // Default to 60 FPS if not provided
+    const dt = deltaTime ?? 1 / 60; // Default to 60 FPS if not provided
 
     // Smoothly interpolate rotation angle using exponential damping
     const rotationTau = 1.0 / this.config.rotationSpeed; // Convert speed to time constant
@@ -481,7 +482,9 @@ export class CharacterController extends Component implements MovementController
   private normalizeInto(out: Vec3, v: Vec3): void {
     const length = Math.sqrt(v[0] * v[0] + v[1] * v[1] + v[2] * v[2]);
     if (length < 1e-6) {
-      out[0] = 0; out[1] = 0; out[2] = 0;
+      out[0] = 0;
+      out[1] = 0;
+      out[2] = 0;
       return;
     }
     const inv = 1 / length;
@@ -517,7 +520,9 @@ export class CharacterController extends Component implements MovementController
     if (entity) {
       // Use setter to properly update position (getter returns a copy)
       entity.transform.position = [position[0], position[1], position[2]];
-      this.velocity[0] = 0; this.velocity[1] = 0; this.velocity[2] = 0;
+      this.velocity[0] = 0;
+      this.velocity[1] = 0;
+      this.velocity[2] = 0;
       if (this.physics) {
         this.physics.velocity[0] = 0;
         this.physics.velocity[1] = 0;
@@ -533,31 +538,41 @@ export class CharacterController extends Component implements MovementController
     this.velocity[0] += velocity[0];
     this.velocity[1] += velocity[1];
     this.velocity[2] += velocity[2];
-    
+
     this.syncVelocityToPhysics();
   }
 
   /**
    * Apply a movement profile to this controller
-   * 
+   *
    * @param profile - Movement profile to apply
    */
-  applyProfile(profile: any): void { // MovementProfile from @engine/stdlib (using any to avoid circular dependency)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  applyProfile(profile: any): void {
+    // MovementProfile from @engine/stdlib (using any to avoid circular dependency)
     // Apply config from profile
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     this.config = { ...profile.config };
 
     // Apply extensions
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     if (profile.extensions) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       for (const ext of profile.extensions) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         if (ext.onApply) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
           ext.onApply(this);
         }
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         if (ext.modifyConfig) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
           this.config = ext.modifyConfig(this.config);
         }
       }
     }
 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     this.currentProfile = profile;
 
     // Update physics gravity if needed
@@ -569,10 +584,12 @@ export class CharacterController extends Component implements MovementController
 
   /**
    * Get the current movement profile
-   * 
+   *
    * @returns Current profile or null if none applied
    */
-  getCurrentProfile(): any | null { // MovementProfile from @engine/stdlib (using any to avoid circular dependency)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-redundant-type-constituents
+  getCurrentProfile(): any | null {
+    // MovementProfile from @engine/stdlib (using any to avoid circular dependency)
     return this.currentProfile;
   }
 
@@ -583,6 +600,7 @@ export class CharacterController extends Component implements MovementController
     const clone = new CharacterController(this.config);
     clone.state = this.state;
     if (this.currentProfile) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       clone.currentProfile = this.currentProfile;
     }
     return clone;
@@ -591,7 +609,9 @@ export class CharacterController extends Component implements MovementController
   /**
    * Serialize the component
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   serialize(): any {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const result: any = {
       type: this.getType(),
       config: this.config,
@@ -601,7 +621,9 @@ export class CharacterController extends Component implements MovementController
     };
 
     // Include profile ID if profile is applied
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     if (this.currentProfile?.id) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
       result.profileId = this.currentProfile.id;
     }
 
@@ -611,24 +633,30 @@ export class CharacterController extends Component implements MovementController
   /**
    * Deserialize the component
    */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   static deserialize(data: any): CharacterController {
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
     const controller = new CharacterController(data.config);
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     controller.state = data.state;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     controller.isGrounded = data.isGrounded;
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     controller.velocity = data.velocity;
 
     // Load profile if profileId is provided
     // Note: This requires @engine/stdlib to be available at runtime
     // Profile loading is deferred to runtime to avoid circular dependency
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     if (data.profileId) {
       // Profile will be loaded by CharacterControllerSystem.update()
       // This is a placeholder - actual loading happens in CharacterControllerSystem
       // or similar higher-level system that has access to MovementProfileRegistry
       // Store placeholder that will be recognized by ensureProfileLoaded()
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
       controller.currentProfile = { id: data.profileId, name: '' } as any;
     }
 
     return controller;
   }
 }
-

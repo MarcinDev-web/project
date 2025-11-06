@@ -1,4 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
+import type { PrismaClient, User } from '@prisma/client';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
@@ -16,10 +17,9 @@ interface JwtPayload {
   email: string;
 }
 
-async function findUserByEmail(
-  prisma: any,
-  email: string
-): Promise<{ id: string; email: string; passwordHash: string } | null> {
+type AuthUser = Pick<User, 'id' | 'email' | 'passwordHash'>;
+
+async function findUserByEmail(prisma: PrismaClient, email: string): Promise<AuthUser | null> {
   const user = await prisma.user.findUnique({
     where: { email },
     select: { id: true, email: true, passwordHash: true },
@@ -28,10 +28,10 @@ async function findUserByEmail(
 }
 
 async function insertUser(
-  prisma: any,
+  prisma: PrismaClient,
   email: string,
   passwordHash: string
-): Promise<{ id: string; email: string }> {
+): Promise<Pick<User, 'id' | 'email'>> {
   const id = randomUUID();
   await prisma.user.upsert({
     where: { email },
@@ -52,7 +52,7 @@ function signToken(userId: string, email: string): { token: string; expiresAt: n
   return { token, expiresAt };
 }
 
-export function registerAuthRoutes(app: FastifyInstance, prisma: any): void {
+export function registerAuthRoutes(app: FastifyInstance, prisma: PrismaClient): void {
   app.post('/auth/login', async (req, reply) => {
     try {
       const body = loginSchema.parse(req.body);

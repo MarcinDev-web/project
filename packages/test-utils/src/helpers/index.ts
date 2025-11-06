@@ -4,6 +4,13 @@
 
 import { vi } from 'vitest';
 
+type ConsoleMethod = 'log' | 'warn' | 'error';
+type AnyFunction = (...args: unknown[]) => unknown;
+type MethodKeys<T> = {
+  [K in keyof T]: T[K] extends AnyFunction ? K : never;
+}[keyof T];
+type MethodOf<T, K extends keyof T> = Extract<T[K], AnyFunction>;
+
 /**
  * Wait for a condition to become true (with timeout)
  */
@@ -49,20 +56,25 @@ export async function runFrames(count: number): Promise<void> {
 /**
  * Suppress console warnings/errors during a test
  */
-export function suppressConsole(methods: ('log' | 'warn' | 'error')[] = ['warn', 'error']) {
-  const originalMethods = new Map<string, any>();
+export function suppressConsole(methods: ConsoleMethod[] = ['warn', 'error']) {
+  const originalMethods = new Map<ConsoleMethod, AnyFunction>();
 
   return {
     suppress: () => {
       methods.forEach((method) => {
-        originalMethods.set(method, console[method]);
-        console[method] = vi.fn();
+        const current = Reflect.get(console, method);
+        if (typeof current === 'function') {
+          originalMethods.set(method, current as AnyFunction);
+          Reflect.set(console, method, vi.fn());
+        }
       });
     },
     restore: () => {
       methods.forEach((method) => {
         const original = originalMethods.get(method);
-        if (original) console[method] = original;
+        if (original) {
+          Reflect.set(console, method, original);
+        }
       });
     },
   };
@@ -71,14 +83,14 @@ export function suppressConsole(methods: ('log' | 'warn' | 'error')[] = ['warn',
 /**
  * Create a temporary spy on an object method
  */
-export function withSpy<T extends object, K extends keyof T>(
+export function withSpy<T extends Record<string, unknown>, K extends MethodKeys<T>>(
   obj: T,
   method: K,
-  implementation?: T[K]
+  implementation?: MethodOf<T, K>
 ) {
-  const spy = vi.spyOn(obj, method as any);
+  const spy = vi.spyOn(obj, method as unknown as K);
   if (implementation) {
-    spy.mockImplementation(implementation as any);
+    spy.mockImplementation(implementation as AnyFunction);
   }
 
   return {
@@ -121,7 +133,7 @@ export function benchmark(fn: () => void | Promise<void>, iterations = 1000) {
  */
 export function createDeferred<T = void>() {
   let resolve!: (value: T) => void;
-  let reject!: (reason?: any) => void;
+  let reject!: (reason?: unknown) => void;
 
   const promise = new Promise<T>((res, rej) => {
     resolve = res;

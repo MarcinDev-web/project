@@ -70,7 +70,7 @@ export class CreatorEconomy {
   private readonly zoneId: string;
   // creatorId stored for potential future use in telemetry/logging
   // @ts-expect-error Reserved for future use
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+
   private readonly _creatorId: string;
 
   /** Active player sessions */
@@ -239,4 +239,3 @@ export class CreatorEconomy {
     this.uniquePlayersToday.clear();
   }
 }
-

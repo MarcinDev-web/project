@@ -1,20 +1,12 @@
 // @engine/economy - Currency and economy system
 
 // Types
-export type {
-  Currency,
-  CurrencyAmount,
-  CurrencyBalance,
-  WalletId,
-} from './types.js';
+export type { Currency, CurrencyAmount, CurrencyBalance, WalletId } from './types.js';
 
 // Examples (for documentation and reference)
 export * from './examples/CurrencySystemExample.js';
 
-export {
-  TransactionType,
-  TransactionStatus,
-} from './types.js';
+export { TransactionType, TransactionStatus } from './types.js';
 
 // Transaction
 export { Transaction } from './Transaction.js';
@@ -32,9 +24,7 @@ export { CurrencyManager } from './CurrencyManager.js';
 export type { CurrencyStatistics } from './CurrencyManager.js';
 
 // Events
-export {
-  CurrencyEventNames,
-} from './events.js';
+export { CurrencyEventNames } from './events.js';
 
 export type {
   CurrencyDepositedEvent,
@@ -66,4 +56,3 @@ export { OnChainBridge } from './bridge/OnChainBridge.js';
 
 // Creator Economy
 export * from './creator/index.js';
-

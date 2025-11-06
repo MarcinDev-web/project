@@ -4,4 +4,5 @@ export * from './HistoryManager';
 export * from './HistoryHelpers';
 export * from './SnapSystem';
 export * from './SnapConfig';
+export * from './NpcRegistry';
 

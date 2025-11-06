@@ -1,11 +1,6 @@
 import { EventBus } from '@engine/core/event';
 import type { IDisposable } from '@engine/core/utils';
-import type {
-  Currency,
-  CurrencyAmount,
-  CurrencyBalance,
-  WalletId,
-} from './types';
+import type { Currency, CurrencyAmount, CurrencyBalance, WalletId } from './types';
 import { TransactionStatus, TransactionType } from './types';
 import {
   type BalanceChangedEvent,
@@ -32,7 +27,7 @@ export class CurrencyWallet implements IDisposable {
    */
   constructor(
     public readonly id: WalletId,
-    private readonly events: EventBus | null = null,
+    private readonly events: EventBus | null = null
   ) {}
 
   /**
@@ -103,8 +98,13 @@ export class CurrencyWallet implements IDisposable {
         ...(description !== undefined ? { description } : {}),
       });
 
-      this.emitFailed(transaction, new Error(`Insufficient balance: ${currentBalance} < ${amount.amount}`));
-      throw new Error(`Insufficient balance: have ${currentBalance}, need ${amount.amount} ${amount.currency}`);
+      this.emitFailed(
+        transaction,
+        new Error(`Insufficient balance: ${currentBalance} < ${amount.amount}`)
+      );
+      throw new Error(
+        `Insufficient balance: have ${currentBalance}, need ${amount.amount} ${amount.currency}`
+      );
     }
 
     const transaction = new Transaction({
@@ -149,8 +149,13 @@ export class CurrencyWallet implements IDisposable {
         ...(description !== undefined ? { description } : {}),
       });
 
-      this.emitFailed(transaction, new Error(`Insufficient balance: ${currentBalance} < ${amount.amount}`));
-      throw new Error(`Insufficient balance: have ${currentBalance}, need ${amount.amount} ${amount.currency}`);
+      this.emitFailed(
+        transaction,
+        new Error(`Insufficient balance: ${currentBalance} < ${amount.amount}`)
+      );
+      throw new Error(
+        `Insufficient balance: have ${currentBalance}, need ${amount.amount} ${amount.currency}`
+      );
     }
 
     const transaction = new Transaction({
@@ -172,7 +177,14 @@ export class CurrencyWallet implements IDisposable {
     const toNewBalance = toPreviousBalance + amount.amount;
     to.balances.set(amount.currency, toNewBalance);
 
-    this.emitTransferred(transaction, to, fromPreviousBalance, fromNewBalance, toPreviousBalance, toNewBalance);
+    this.emitTransferred(
+      transaction,
+      to,
+      fromPreviousBalance,
+      fromNewBalance,
+      toPreviousBalance,
+      toNewBalance
+    );
 
     return transaction;
   }
@@ -192,7 +204,7 @@ export class CurrencyWallet implements IDisposable {
     toCurrency: Currency,
     fromAmount: number,
     exchangeRate: number,
-    description?: string,
+    description?: string
   ): Transaction {
     this.ensureNotDisposed();
 
@@ -219,8 +231,13 @@ export class CurrencyWallet implements IDisposable {
         ...(description !== undefined ? { description } : {}),
       });
 
-      this.emitFailed(transaction, new Error(`Insufficient balance: ${currentBalance} < ${fromAmount}`));
-      throw new Error(`Insufficient balance: have ${currentBalance}, need ${fromAmount} ${fromCurrency}`);
+      this.emitFailed(
+        transaction,
+        new Error(`Insufficient balance: ${currentBalance} < ${fromAmount}`)
+      );
+      throw new Error(
+        `Insufficient balance: have ${currentBalance}, need ${fromAmount} ${fromCurrency}`
+      );
     }
 
     const toAmount = fromAmount * exchangeRate;
@@ -248,7 +265,18 @@ export class CurrencyWallet implements IDisposable {
     const toNewBalance = toPreviousBalance + toAmount;
     this.balances.set(toCurrency, toNewBalance);
 
-    this.emitExchanged(transaction, fromCurrency, toCurrency, fromAmount, toAmount, exchangeRate, fromPreviousBalance, fromNewBalance, toPreviousBalance, toNewBalance);
+    this.emitExchanged(
+      transaction,
+      fromCurrency,
+      toCurrency,
+      fromAmount,
+      toAmount,
+      exchangeRate,
+      fromPreviousBalance,
+      fromNewBalance,
+      toPreviousBalance,
+      toNewBalance
+    );
 
     return transaction;
   }
@@ -313,7 +341,11 @@ export class CurrencyWallet implements IDisposable {
     }
   }
 
-  private emitDeposited(transaction: Transaction, previousBalance: number, newBalance: number): void {
+  private emitDeposited(
+    transaction: Transaction,
+    previousBalance: number,
+    newBalance: number
+  ): void {
     if (!this.events) return;
 
     const event: CurrencyDepositedEvent = {
@@ -327,11 +359,17 @@ export class CurrencyWallet implements IDisposable {
     };
 
     this.events.emit(CurrencyEventNames.DEPOSITED, event);
-    this.events.emit(CurrencyEventNames.TRANSACTION_COMPLETED, { transaction } as TransactionCompletedEvent);
+    this.events.emit(CurrencyEventNames.TRANSACTION_COMPLETED, {
+      transaction,
+    } as TransactionCompletedEvent);
     this.emitBalanceChanged(transaction, transaction.amount.currency, previousBalance, newBalance);
   }
 
-  private emitWithdrawn(transaction: Transaction, previousBalance: number, newBalance: number): void {
+  private emitWithdrawn(
+    transaction: Transaction,
+    previousBalance: number,
+    newBalance: number
+  ): void {
     if (!this.events) return;
 
     const event: CurrencyWithdrawnEvent = {
@@ -345,7 +383,9 @@ export class CurrencyWallet implements IDisposable {
     };
 
     this.events.emit(CurrencyEventNames.WITHDRAWN, event);
-    this.events.emit(CurrencyEventNames.TRANSACTION_COMPLETED, { transaction } as TransactionCompletedEvent);
+    this.events.emit(CurrencyEventNames.TRANSACTION_COMPLETED, {
+      transaction,
+    } as TransactionCompletedEvent);
     this.emitBalanceChanged(transaction, transaction.amount.currency, previousBalance, newBalance);
   }
 
@@ -355,7 +395,7 @@ export class CurrencyWallet implements IDisposable {
     fromPreviousBalance: number,
     fromNewBalance: number,
     _toPreviousBalance: number,
-    toNewBalance: number,
+    toNewBalance: number
   ): void {
     if (!this.events) return;
 
@@ -375,8 +415,15 @@ export class CurrencyWallet implements IDisposable {
     };
 
     this.events.emit(CurrencyEventNames.TRANSFERRED, event);
-    this.events.emit(CurrencyEventNames.TRANSACTION_COMPLETED, { transaction } as TransactionCompletedEvent);
-    this.emitBalanceChanged(transaction, transaction.amount.currency, fromPreviousBalance, fromNewBalance);
+    this.events.emit(CurrencyEventNames.TRANSACTION_COMPLETED, {
+      transaction,
+    } as TransactionCompletedEvent);
+    this.emitBalanceChanged(
+      transaction,
+      transaction.amount.currency,
+      fromPreviousBalance,
+      fromNewBalance
+    );
   }
 
   private emitExchanged(
@@ -389,7 +436,7 @@ export class CurrencyWallet implements IDisposable {
     fromPreviousBalance: number,
     fromNewBalance: number,
     toPreviousBalance: number,
-    toNewBalance: number,
+    toNewBalance: number
   ): void {
     if (!this.events) return;
 
@@ -410,12 +457,19 @@ export class CurrencyWallet implements IDisposable {
     };
 
     this.events.emit(CurrencyEventNames.EXCHANGED, event);
-    this.events.emit(CurrencyEventNames.TRANSACTION_COMPLETED, { transaction } as TransactionCompletedEvent);
+    this.events.emit(CurrencyEventNames.TRANSACTION_COMPLETED, {
+      transaction,
+    } as TransactionCompletedEvent);
     this.emitBalanceChanged(transaction, fromCurrency, fromPreviousBalance, fromNewBalance);
     this.emitBalanceChanged(transaction, toCurrency, toPreviousBalance, toNewBalance);
   }
 
-  private emitBalanceChanged(transaction: Transaction, currency: Currency, previousBalance: number, newBalance: number): void {
+  private emitBalanceChanged(
+    transaction: Transaction,
+    currency: Currency,
+    previousBalance: number,
+    newBalance: number
+  ): void {
     if (!this.events) return;
 
     const event: BalanceChangedEvent = {
@@ -440,4 +494,3 @@ export class CurrencyWallet implements IDisposable {
     this.events.emit(CurrencyEventNames.TRANSACTION_FAILED, event);
   }
 }
-

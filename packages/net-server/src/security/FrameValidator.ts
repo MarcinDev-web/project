@@ -10,5 +10,3 @@ export function validateControlFrameLength(len: number, limits: FrameLimits): bo
 export function validateStateFrameLength(len: number, limits: FrameLimits): boolean {
   return len >= 0 && len <= limits.maxStateBytes;
 }
-
-
