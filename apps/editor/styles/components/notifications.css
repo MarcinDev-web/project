@@ -287,3 +287,92 @@
   gap: var(--spacing-3);
 }
 
+/* ============================================
+   PORT SELECTION MODAL
+   ============================================ */
+
+.port-selection-modal {
+  min-width: 480px;
+  max-width: 600px;
+}
+
+.port-selection-entity-name {
+  font-size: var(--text-sm);
+  color: var(--text-3);
+  margin-bottom: var(--spacing-4);
+  font-style: italic;
+}
+
+.port-selection-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+  margin-bottom: var(--spacing-4);
+}
+
+.port-selection-item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--spacing-3);
+  padding: var(--spacing-4);
+  background: rgba(60, 70, 85, 0.3);
+  border: 2px solid rgba(60, 70, 85, 0.5);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  text-align: left;
+  width: 100%;
+}
+
+.port-selection-item:hover {
+  background: rgba(60, 70, 85, 0.5);
+  border-color: rgba(100, 120, 150, 0.8);
+  transform: translateX(4px);
+}
+
+.port-selection-item:focus {
+  outline: 2px solid var(--color-primary, #3b82f6);
+  outline-offset: 2px;
+}
+
+.port-selection-item:active {
+  transform: translateX(2px);
+}
+
+.port-selection-icon {
+  flex-shrink: 0;
+  margin-top: 2px;
+  color: var(--text-2);
+}
+
+.port-selection-item:hover .port-selection-icon {
+  color: var(--text-1);
+}
+
+.port-selection-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.port-selection-label {
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--text-1);
+  margin-bottom: var(--spacing-1);
+}
+
+.port-selection-description {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+  margin-bottom: var(--spacing-1);
+  line-height: 1.4;
+}
+
+.port-selection-type {
+  font-size: var(--text-xs);
+  color: var(--text-3);
+  font-family: var(--font-mono, monospace);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+

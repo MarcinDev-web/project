@@ -88,7 +88,8 @@ export function withSpy<T extends Record<string, unknown>, K extends MethodKeys<
   method: K,
   implementation?: MethodOf<T, K>
 ) {
-  const spy = vi.spyOn(obj, method as unknown as K);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const spy = vi.spyOn(obj, method as any) as any;
   if (implementation) {
     spy.mockImplementation(implementation as AnyFunction);
   }

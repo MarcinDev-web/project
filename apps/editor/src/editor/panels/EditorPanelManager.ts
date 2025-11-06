@@ -13,6 +13,7 @@ import type { SelectionManager } from '@engine/world';
 import type { EditorState } from '../core/state';
 import type { AssetPreset, Asset } from '../types/BlockAssetTypes';
 import type { RgbaColor } from '../../utils/colors';
+import type { VegetationPresetManager } from '../managers/VegetationPresetManager';
 import { PropertiesPanel } from './PropertiesPanel';
 import { LogicPanel } from './LogicPanel';
 import { LayersPanel } from './LayersPanel';
@@ -69,6 +70,7 @@ export interface EditorPanelManagerConfig {
   } | null;
   getTerrainBuilderStudio?: () => TerrainBuilderStudio | null;
   getRenderer?: () => import('@engine/gfx-webgpu').Renderer | null;
+  vegetationPresetManager?: VegetationPresetManager | null;
 }
 
 /**
@@ -202,8 +204,22 @@ export class EditorPanelManager {
       },
       onCreatePreset: (config) => {
         // Create new vegetation preset
-        console.log('[VegetationPanel] Create preset:', config);
-        // TODO: Integrate with asset system to create new vegetation presets
+        if (this.config.vegetationPresetManager && config) {
+          // Prompt for preset name
+          const name = prompt('Enter preset name:');
+          if (name && name.trim()) {
+            try {
+              const preset = this.config.vegetationPresetManager.createPreset(name.trim(), config);
+              // Refresh asset palette to show new preset
+              this.refreshAssetBrowser();
+              console.log('[VegetationPanel] Created preset:', preset.name);
+            } catch (error) {
+              console.error('[VegetationPanel] Failed to create preset:', error);
+            }
+          }
+        } else {
+          console.warn('[VegetationPanel] VegetationPresetManager not available');
+        }
       },
       onActivatePaint: (preset) => {
         const paintController = this.config.getVegetationPaintController?.();
@@ -506,6 +522,11 @@ export class EditorPanelManager {
         const preset = this.assetToPreset(asset);
         this.config.onStartPlacement(preset);
       },
+      onStartPlacementPreset: (preset: AssetPreset) => {
+        // Handle vegetation preset placement
+        this.config.onStartPlacement(preset);
+      },
+      vegetationPresetManager: this.config.vegetationPresetManager ?? null,
     });
     this.assetPalette.mount();
     this.disposables.add(() => this.assetPalette?.dispose());

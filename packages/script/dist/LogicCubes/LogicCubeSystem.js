@@ -52,7 +52,7 @@ export class LogicCubeSystem {
         registerLogicConnectionManager(scene, this.connectionManager);
         // Listen for external logic signals (e.g., from UI events)
         scene.events.on('logic:signal', (event) => {
-            const { targetEntityId, targetPort, signal } = event.payload || {};
+            const { targetEntityId, targetPort, signal } = event?.payload ?? {};
             if (targetEntityId && targetPort && signal) {
                 this.signalQueue.push({
                     targetEntityId,

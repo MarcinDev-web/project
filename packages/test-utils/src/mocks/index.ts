@@ -43,7 +43,8 @@ export function createMockCanvas(width = 800, height = 600): HTMLCanvasElement {
     })),
   } as unknown as RenderingContext;
 
-  const getContextMock: typeof canvas.getContext = vi.fn(() => contextMock);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const getContextMock = vi.fn(() => contextMock) as any;
   canvas.getContext = getContextMock;
 
   return canvas;

@@ -11,14 +11,17 @@
 import type { Scene } from '@engine/world';
 import type { EditorState } from '../core/state';
 import { BLOCK_LIBRARY } from '@engine/blocks';
-import type { BlockAsset } from '../types/BlockAssetTypes';
+import type { BlockAsset, AssetPreset } from '../types/BlockAssetTypes';
 import { blockToAsset } from '../types/BlockAssetTypes';
+import type { VegetationPresetManager } from '../managers/VegetationPresetManager';
 
 export interface AssetPaletteConfig {
   scene: Scene;
   state: EditorState;
   onAssetSelect: (asset: BlockAsset) => void;
   onStartPlacement: (asset: BlockAsset) => void;
+  onStartPlacementPreset?: (preset: AssetPreset) => void;
+  vegetationPresetManager?: VegetationPresetManager | null;
 }
 
 export class AssetPalette {
@@ -28,14 +31,27 @@ export class AssetPalette {
   private isExpanded = false;
   private hotbarSlots: (BlockAsset | null)[] = new Array(9).fill(null);
   private allBlocks: BlockAsset[] = [];
+  private vegetationAssets: BlockAsset[] = [];
   private keyboardCleanup: (() => void) | null = null;
+  private presetManagerListener: (() => void) | null = null;
 
   constructor(private readonly config: AssetPaletteConfig) {
     // Convert all blocks to assets
     this.allBlocks = Object.values(BLOCK_LIBRARY).map(blockToAsset);
     
+    // Load vegetation presets
+    this.loadVegetationPresets();
+    
     // Initialize hotbar with first 9 blocks
     this.hotbarSlots = this.allBlocks.slice(0, 9);
+
+    // Listen for vegetation preset changes
+    if (this.config.vegetationPresetManager) {
+      this.presetManagerListener = this.config.vegetationPresetManager.addListener(() => {
+        this.loadVegetationPresets();
+        this.refresh();
+      });
+    }
   }
 
   /**
@@ -125,7 +141,7 @@ export class AssetPalette {
   }
 
   /**
-   * Creates the build menu with all blocks
+   * Creates the build menu with all blocks and vegetation presets
    */
   private createBuildMenu(): HTMLElement {
     const menu = document.createElement('div');
@@ -143,6 +159,12 @@ export class AssetPalette {
     // Add all blocks to grid
     for (const asset of this.allBlocks) {
       const item = this.createBlockItem(asset);
+      grid.appendChild(item);
+    }
+
+    // Add vegetation presets to grid
+    for (const asset of this.vegetationAssets) {
+      const item = this.createVegetationItem(asset);
       grid.appendChild(item);
     }
 
@@ -175,6 +197,61 @@ export class AssetPalette {
     });
 
     return item;
+  }
+
+  /**
+   * Creates a vegetation preset item for the grid
+   */
+  private createVegetationItem(asset: BlockAsset): HTMLElement {
+    const item = document.createElement('div');
+    item.className = 'build-menu-item build-menu-item-vegetation';
+    item.title = asset.name;
+
+    const preview = document.createElement('div');
+    preview.className = 'build-menu-item-preview';
+    preview.style.backgroundColor = this.rgbaToString(asset.color);
+    // Add vegetation icon indicator
+    preview.style.position = 'relative';
+    const icon = document.createElement('div');
+    icon.textContent = '🌿';
+    icon.style.position = 'absolute';
+    icon.style.top = '2px';
+    icon.style.right = '2px';
+    icon.style.fontSize = '12px';
+    preview.appendChild(icon);
+    item.appendChild(preview);
+
+    const name = document.createElement('div');
+    name.className = 'build-menu-item-name';
+    name.textContent = asset.name;
+    item.appendChild(name);
+
+    // Click to place vegetation preset
+    item.addEventListener('click', () => {
+      if (this.config.vegetationPresetManager && this.config.onStartPlacementPreset) {
+        // Find the preset by asset ID
+        const presetId = asset.id.replace('vegetation-', '');
+        const preset = this.config.vegetationPresetManager.getPreset(presetId);
+        if (preset) {
+          this.config.onStartPlacementPreset(preset);
+          this.toggleBuildMenu(); // Close menu after selection
+        }
+      }
+    });
+
+    return item;
+  }
+
+  /**
+   * Loads vegetation presets as assets
+   */
+  private loadVegetationPresets(): void {
+    if (!this.config.vegetationPresetManager) {
+      this.vegetationAssets = [];
+      return;
+    }
+
+    this.vegetationAssets = this.config.vegetationPresetManager.getAllPresetsAsAssets();
   }
 
   /**
@@ -239,11 +316,21 @@ export class AssetPalette {
    * Refreshes the palette (for external updates)
    */
   public refresh(): void {
+    // Reload vegetation presets
+    this.loadVegetationPresets();
+
     // Re-render hotbar if needed
     if (this.hotbar) {
       const newHotbar = this.createHotbar();
       this.hotbar.replaceWith(newHotbar);
       this.hotbar = newHotbar;
+    }
+
+    // Re-render build menu if needed
+    if (this.buildMenu) {
+      const newBuildMenu = this.createBuildMenu();
+      this.buildMenu.replaceWith(newBuildMenu);
+      this.buildMenu = newBuildMenu;
     }
   }
 
@@ -254,6 +341,11 @@ export class AssetPalette {
     if (this.keyboardCleanup) {
       this.keyboardCleanup();
       this.keyboardCleanup = null;
+    }
+
+    if (this.presetManagerListener) {
+      this.presetManagerListener();
+      this.presetManagerListener = null;
     }
 
     if (this.container?.parentElement) {

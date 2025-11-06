@@ -86,6 +86,7 @@ export interface FrameRenderContext {
   uniformManager: UniformManager;
   lightingData?: import('../lighting/LightManager').LightingData;
   onShadowMetrics?: (counts: readonly [number, number, number, number]) => void;
+  onRenderStats?: (stats: { drawCalls: number; triangles: number }) => void;
   featureFlags?: {
     enableComputePrepass?: boolean;
     enableShadows?: boolean;
@@ -250,6 +251,13 @@ export class FrameRenderer {
       ctx.onCpuTimings(sceneUpdate.timings);
     }
 
+    // Calculate and report render stats
+    if (ctx.onRenderStats) {
+      const drawCalls = this.calculateDrawCalls(geometry);
+      const triangles = this.calculateTriangles(geometry);
+      ctx.onRenderStats({ drawCalls, triangles });
+    }
+
     return geometry;
   }
 
@@ -276,6 +284,53 @@ export class FrameRenderer {
       // ignore
     }
     this.ownedLodScaleBuffer = null;
+  }
+
+  /**
+   * Calculates the number of draw calls based on geometry.
+   * Draw calls = number of drawIndexed calls (opaque + transparent + overlay + custom geometry)
+   */
+  private calculateDrawCalls(geometry: GeometryData): number {
+    let drawCalls = 0;
+    const totalInstances = geometry.instanceCount;
+    const opaqueCount = Math.min(Math.max(geometry.opaqueCount ?? totalInstances, 0), totalInstances);
+    const transparentCount = Math.max(totalInstances - opaqueCount, 0);
+
+    // Opaque geometry draw call
+    if (opaqueCount > 0) {
+      drawCalls++;
+    }
+
+    // Transparent geometry draw call
+    if (transparentCount > 0) {
+      drawCalls++;
+    }
+
+    // Overlay draw call (always present if there are instances)
+    if (totalInstances > 0) {
+      drawCalls++;
+    }
+
+    // Custom geometry draw calls (approximate - one per custom geometry entity)
+    drawCalls += this.customGeometryEntitiesCache.length;
+
+    return drawCalls;
+  }
+
+  /**
+   * Calculates the total number of triangles rendered.
+   * Triangles = (indices.length / 3) * instanceCount + custom geometry triangles
+   */
+  private calculateTriangles(geometry: GeometryData): number {
+    // Base geometry triangles (instanced)
+    const baseTriangles = geometry.indices.length / 3;
+    const instancedTriangles = baseTriangles * geometry.instanceCount;
+
+    // Custom geometry triangles (approximate - each custom geometry entity contributes)
+    // This is a rough estimate since we don't track exact triangle counts for custom geometry
+    const customGeometryTriangles = this.customGeometryEntitiesCache.length * 12; // Estimate: 12 triangles per custom entity
+
+    return Math.round(instancedTriangles + customGeometryTriangles);
   }
 
   private resolveFeatureFlags(flags: FrameRenderContext['featureFlags']): ResolvedFeatureFlags {

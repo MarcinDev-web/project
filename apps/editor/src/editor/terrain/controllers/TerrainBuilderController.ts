@@ -233,9 +233,15 @@ export class TerrainBuilderController {
           -Math.cos(orientation.yaw) * cosPitch,
         ];
       }
+    } else {
+      // Extract camera position and forward direction from scene's primary camera
+      const primaryCamera = this.config.scene.primaryCamera;
+      if (primaryCamera) {
+        const transform = primaryCamera.transform;
+        cameraPosition = transform.getWorldPosition();
+        forward = transform.getForward([0, 0, -1]);
+      }
     }
-    // If cameraDirector is not available, default values are used
-    // TODO: Implement proper camera position extraction from scene's primary camera
 
     // Normalize forward vector
 

@@ -150,7 +150,7 @@ function isFrames(wait) {
     return typeof wait === 'object' && wait !== null && wait.type === 'frames';
 }
 function isPredicate(wait) {
-    return typeof wait === 'object' && wait !== null && wait.type === 'predicate';
+    return (typeof wait === 'object' && wait !== null && wait.type === 'predicate');
 }
 function normalizeYield(value) {
     if (typeof value === 'number') {

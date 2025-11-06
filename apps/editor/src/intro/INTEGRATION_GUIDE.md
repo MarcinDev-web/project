@@ -177,17 +177,12 @@ private readonly particleCount = 500; // More particles (caution: performance!)
 
 ## 🐛 Known Limitations
 
-1. **Rotation Animation Disabled**
-   - Cube rotation animation is commented out
-   - Reason: Transform uses quaternions, need proper quat math
-   - TODO: Add `quatMultiply` for smooth rotation
-
-2. **Particle Rendering Limited**
+1. **Particle Rendering Limited**
    - Only 50 of 200 particles are rendered as cubes
    - Reason: Performance optimization
    - Rest are physics-only (invisible)
 
-3. **WebGPU Required**
+2. **WebGPU Required**
    - No WebGL fallback yet
    - Gracefully fails and continues to main app
 
@@ -212,6 +207,11 @@ Możliwe ulepszenia (opcjonalne):
 - [ ] WebGL fallback
 
 ## 📝 Changelog
+
+**2025-11-06 - v1.1.0 - Rotation Optimization**
+- ✅ Optimized quaternion rotation using `quatNormalizeOut` (reduces allocations)
+- ✅ Smooth quaternion multiplication for cubes and energy rings
+- ✅ Updated documentation to reflect enabled rotation animations
 
 **2025-11-06 - v1.0.0 - Initial Release**
 - ✅ Created IntroScene with WebGPU rendering

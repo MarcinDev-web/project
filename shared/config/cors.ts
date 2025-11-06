@@ -68,12 +68,12 @@ function sanitizeOriginEntry(entry: string): string | null {
 
   // Allow wildcard domains like https://*.vercel.app
   const wildcardMatch = entry.trim().match(/^(https?):\/\/([^/]+)$/);
-  if (!wildcardMatch) {
+  if (!wildcardMatch || wildcardMatch.length < 3) {
     return null;
   }
 
   const [, protocol, hostPattern] = wildcardMatch;
-  if (!hostPattern.includes('*')) {
+  if (!hostPattern || !hostPattern.includes('*')) {
     return normalizeOrigin(entry);
   }
 
@@ -98,7 +98,14 @@ function createPattern(originPattern: string): CorsPattern | null {
     };
   }
 
-  const [protocol, hostPattern] = sanitized.split('://');
+  const parts = sanitized.split('://');
+  if (parts.length < 2) {
+    return null;
+  }
+  const [protocol, hostPattern] = parts;
+  if (!hostPattern) {
+    return null;
+  }
   const escaped = hostPattern
     .split('*')
     .map((segment) => segment.replace(/[-/\\^$+?.()|[\]{}]/g, '\\$&'))

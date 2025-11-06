@@ -186,4 +186,4 @@ export class NpcComponent extends Component {
 }
 
 // Register component
-registerComponent(NpcComponent);
+registerComponent(NpcComponent.type, NpcComponent);

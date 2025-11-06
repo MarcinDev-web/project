@@ -39,7 +39,7 @@ export class WebTransportServer implements TransportServer {
   constructor(private readonly options: WebTransportServerOptions) {
     // WebTransport requires HTTPS/WSS with valid certificate
     // Options stored for future implementation when HTTP/3 server is added
-    this.logger = createTransportLogger(options.logger);
+    this.logger = createTransportLogger(this.options.logger);
   }
 
   start(): Promise<void> {

@@ -41,6 +41,7 @@ export class BuildStats {
     totalCPUTime: number;
   } = { cullingTime: 0, instanceUpdateTime: 0, totalCPUTime: 0 };
   private shadowMetrics: readonly [number, number, number, number] | null = null;
+  private renderStats: { drawCalls: number; triangles: number } | null = null;
   private capabilities: RendererCapabilities;
   
   private updateInterval: number | null = null;
@@ -53,6 +54,11 @@ export class BuildStats {
     
     // Load saved visibility preference
     this.isVisible = localStorage.getItem('buildStatsVisible') === 'true';
+
+    // Register render stats callback
+    this.renderer.onRenderStats((stats) => {
+      this.renderStats = stats;
+    });
   }
 
   /**
@@ -278,11 +284,15 @@ export class BuildStats {
   }
 
   /**
-   * Gets renderer statistics.
+   * Gets renderer statistics from the Renderer API callback.
    */
   private getRendererStats(): { drawCalls: number | null; triangles: number | null } {
-    // Try to get stats from renderer (may not be exposed)
-    // This is a placeholder - implement based on your Renderer API
+    if (this.renderStats) {
+      return {
+        drawCalls: this.renderStats.drawCalls,
+        triangles: this.renderStats.triangles,
+      };
+    }
     return {
       drawCalls: null,
       triangles: null,

@@ -32,32 +32,23 @@ export class BehaviorInstance {
         return this.getScheduler().waitUntil(predicate);
     }
     /** Called once after instance is created and attached to an entity. */
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
     onInit() { }
     /** Called every frame by ScriptSystem when enabled. */
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-empty-function
     onUpdate(_deltaTime) { }
     /** Called during the fixed timestep loop (typically physics). */
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-empty-function
     onFixedUpdate(_fixedDeltaTime) { }
     /** Called after all Update callbacks in the frame. */
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-empty-function
     onLateUpdate(_deltaTime) { }
     /** Called when a subscribed event is published on the EventBus. */
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-empty-function
     onEvent(_type, _payload, _sender) { }
     /** Async variant of onEvent, scheduled by coroutine/event dispatchers. */
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars, @typescript-eslint/no-empty-function
-    // eslint-disable-next-line @typescript-eslint/require-await
     async onEventAsync(_type, _payload, _sender) { }
     /** Called before the instance is destroyed or detached. */
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
     onDestroy() { }
     /**
      * Hot-reload hook invoked when the behavior constructor is re-registered.
      * Existing instance prototype is updated; implement to migrate state.
      */
-    // eslint-disable-next-line @typescript-eslint/no-empty-function
     onHotReload(_previousConstructorName) { }
     getScheduler() {
         const runtime = this.context.scene.scriptRuntime;

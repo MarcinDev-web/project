@@ -4,6 +4,7 @@ import type { Scene } from '@engine/world';
 import type { BehaviorInstance, BehaviorContext } from '../behavior/Behavior.js';
 import { BehaviorRegistry } from '../behavior/BehaviorRegistry.js';
 import type { BehaviorConstructor } from '../behavior/Behavior.js';
+import type { ScriptRuntime } from '../LogicCubes/types.js';
 
 export interface ScriptDefinition {
   /** Registry name for behavior constructor */
@@ -89,10 +90,11 @@ export class ScriptComponent extends Component {
     }
     this.instances = [];
     const entity = this.entity;
-    const runtime = scene?.scriptRuntime;
-    if (scene && entity && runtime) {
+    const runtime = scene?.scriptRuntime as ScriptRuntime | null | undefined;
+    const contextBuilder = runtime?.contextBuilder;
+    if (scene && entity && contextBuilder) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-      runtime.contextBuilder.invalidate(entity.id);
+      contextBuilder.invalidate(entity.id);
     }
   }
 
@@ -139,9 +141,10 @@ export class ScriptComponent extends Component {
     const ctor: BehaviorConstructor | undefined = BehaviorRegistry.get(def.name);
     if (!ctor) return; // behavior not registered yet
 
-    const runtime = scene.scriptRuntime;
+    const runtime = scene.scriptRuntime as ScriptRuntime | null | undefined;
+    const contextBuilder = runtime?.contextBuilder;
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
-    const services = runtime?.contextBuilder.getServices(entity);
+    const services = contextBuilder?.getServices(entity);
 
     // Lazy import: create instance with context
     const context: BehaviorContext = {
@@ -153,11 +156,13 @@ export class ScriptComponent extends Component {
     };
     const instance = new ctor(context, def.params);
     instance.enabled = def.enabled ?? true;
-    if (runtime) {
+    const behaviors = runtime?.behaviors;
+    const scheduler = runtime?.scheduler;
+    if (behaviors && scheduler) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-      runtime.behaviors.add(instance);
+      behaviors.add(instance);
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-      runtime.scheduler.attachBehaviorInstance(instance);
+      scheduler.attachBehaviorInstance(instance);
     }
     try {
       instance.onInit();
@@ -174,12 +179,14 @@ export class ScriptComponent extends Component {
     } catch {
       // ignore script destroy errors
     }
-    const runtime = currentScene?.scriptRuntime;
-    if (runtime) {
+    const runtime = currentScene?.scriptRuntime as ScriptRuntime | null | undefined;
+    const scheduler = runtime?.scheduler;
+    const behaviors = runtime?.behaviors;
+    if (scheduler && behaviors) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-      runtime.scheduler.detachBehaviorInstance(inst);
+      scheduler.detachBehaviorInstance(inst);
       // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-      runtime.behaviors.delete(inst);
+      behaviors.delete(inst);
     }
   }
 }

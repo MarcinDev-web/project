@@ -17,6 +17,7 @@ export class ZoneTokenIssuer {
 
   rotateSecret(newSecret: Uint8Array): void {
     // Rolling change; old tokens will fail verification once rotated
-    (this as { secret: Uint8Array }).secret = newSecret;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    (this as any).secret = newSecret;
   }
 }

@@ -85,7 +85,8 @@ export class CompareVariableCondition extends LogicCube {
         if (!isNaN(parseFloat(compareValueStr))) {
             compareValue = parseFloat(compareValueStr);
         }
-        else if (compareValueStr.toLowerCase() === 'true' || compareValueStr.toLowerCase() === 'false') {
+        else if (compareValueStr.toLowerCase() === 'true' ||
+            compareValueStr.toLowerCase() === 'false') {
             compareValue = compareValueStr.toLowerCase() === 'true';
         }
         else {

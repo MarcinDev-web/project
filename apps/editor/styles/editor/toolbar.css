@@ -179,6 +179,41 @@
   color: var(--text-3);
 }
 
+.toolbar-v2-dropdown-item.has-submenu {
+  position: relative;
+}
+
+.toolbar-v2-submenu {
+  position: absolute;
+  top: 0;
+  left: 100%;
+  margin-left: var(--spacing-1);
+  min-width: 180px;
+  background: linear-gradient(180deg, var(--color-surface-solid) 0%, var(--color-surface-solid-deep) 100%);
+  border: 3px solid var(--color-border-medium);
+  border-radius: 10px;
+  padding: var(--spacing-2);
+  box-shadow: 0 8px 16px var(--color-overlay-600);
+  z-index: calc(var(--z-dropdown) + 1);
+  display: none;
+  animation: slideRightToolbar 150ms ease-out;
+}
+
+.toolbar-v2-dropdown-item.has-submenu:hover .toolbar-v2-submenu {
+  display: block;
+}
+
+@keyframes slideRightToolbar {
+  from {
+    opacity: 0;
+    transform: translateX(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
 .toolbar-v2-dropdown-divider {
   height: 1px;
   background: var(--border-default);

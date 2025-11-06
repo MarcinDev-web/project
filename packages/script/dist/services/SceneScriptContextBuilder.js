@@ -35,8 +35,10 @@ export class SceneScriptContextBuilder {
         if (animation) {
             services.animation = { system: animation };
         }
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
         const renderer = this.getRenderer();
         if (renderer) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             services.rendering = { renderer };
         }
         return services;
@@ -49,9 +51,13 @@ export class SceneScriptContextBuilder {
         const runtime = this.scene.scriptRuntime;
         return runtime?.animationSystem ?? null;
     }
+    // eslint-disable-next-line @typescript-eslint/no-redundant-type-constituents
     getRenderer() {
         const runtime = this.scene.scriptRuntime;
-        return runtime?.renderingPipeline ?? null;
+        if (!runtime?.renderingPipeline)
+            return null;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        return runtime.renderingPipeline;
     }
 }
 //# sourceMappingURL=SceneScriptContextBuilder.js.map

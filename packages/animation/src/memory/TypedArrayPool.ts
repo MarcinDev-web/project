@@ -35,7 +35,7 @@ export class TypedArrayPool {
   ): T | undefined {
     for (let i = 0; i < pool.length; i++) {
       const arr = pool[i];
-      if (arr.length >= minLength) {
+      if (arr && arr.length >= minLength) {
         pool.splice(i, 1);
         return arr;
       }

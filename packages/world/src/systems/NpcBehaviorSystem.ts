@@ -16,14 +16,13 @@ import { CharacterController } from '../components/CharacterController.js';
 import { WeaponComponent } from '../components/WeaponComponent.js';
 import { RuntimePlayerTag } from '../components/RuntimePlayerTag.js';
 import { WeaponSystem } from './WeaponSystem.js';
-import type { Vec3 } from '@engine/core/math';
+import type { Vec3, Quat } from '@engine/core/math';
 import {
   normalizeVec3Out,
-  subtractVec3Out,
+  subVec3Out,
   distanceVec3,
   dotVec3,
   quatFromAxisAngleOut,
-  type Quat,
 } from '@engine/core/math';
 
 /**
@@ -36,8 +35,6 @@ export class NpcBehaviorSystem {
 
   /** Scratch vectors reused to avoid allocations */
   private readonly scratchVec1: Vec3 = [0, 0, 0];
-  private readonly scratchVec2: Vec3 = [0, 0, 0];
-  private readonly scratchVec3: Vec3 = [0, 0, 0];
   private readonly scratchQuat: Quat = [0, 0, 0, 1];
 
   /** Patrol state per NPC */
@@ -147,7 +144,7 @@ export class NpcBehaviorSystem {
 
     // Calculate direction to waypoint
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-    subtractVec3Out(this.scratchVec1, currentWaypoint, npcPos);
+    subVec3Out(this.scratchVec1, currentWaypoint, npcPos);
     const distance = distanceVec3(npcPos, currentWaypoint);
 
     // Check if reached waypoint (within 0.5 units)
@@ -194,7 +191,7 @@ export class NpcBehaviorSystem {
 
     // Calculate distance to player
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-    subtractVec3Out(this.scratchVec1, playerPos, npcPos);
+    subVec3Out(this.scratchVec1, playerPos, npcPos);
     const distance = distanceVec3(npcPos, playerPos);
 
     // Check if player is in detection range
@@ -252,7 +249,7 @@ export class NpcBehaviorSystem {
 
     // Calculate direction to player
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-    subtractVec3Out(this.scratchVec1, playerPos, npcPos);
+    subVec3Out(this.scratchVec1, playerPos, npcPos);
     const distance = distanceVec3(npcPos, playerPos);
 
     // Stop if too close (within 2 units)
@@ -295,7 +292,7 @@ export class NpcBehaviorSystem {
 
     // Calculate distance from guard position
     // eslint-disable-next-line @typescript-eslint/no-unsafe-call
-    subtractVec3Out(this.scratchVec1, guardPos, npcPos);
+    subVec3Out(this.scratchVec1, guardPos, npcPos);
     const distance = distanceVec3(npcPos, guardPos);
 
     // If too far from guard position, move back

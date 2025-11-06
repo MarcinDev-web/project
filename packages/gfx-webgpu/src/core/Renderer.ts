@@ -129,6 +129,7 @@ export interface Renderer {
     totalCPUTime: number;
   }) => void): void;
   onShadowMetrics(handler: (metrics: readonly [number, number, number, number]) => void): void;
+  onRenderStats(handler: (stats: { drawCalls: number; triangles: number }) => void): void;
   updateRenderSettings(settings: Partial<{
     enableHDR: boolean;
     enableBloom: boolean;
@@ -333,6 +334,7 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
     totalCPUTime: number;
   }) => void> = [];
   const shadowMetricsListeners: Array<(metrics: readonly [number, number, number, number]) => void> = [];
+  const renderStatsListeners: Array<(stats: { drawCalls: number; triangles: number }) => void> = [];
 
   let cleanedUp = false;
   
@@ -840,6 +842,19 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
               },
             }
           : {}),
+        ...(renderStatsListeners.length
+          ? {
+              onRenderStats: (stats) => {
+                for (const listener of renderStatsListeners) {
+                  try {
+                    listener(stats);
+                  } catch (err) {
+                    Logger.warn('Render stats listener failed', err);
+                  }
+                }
+              },
+            }
+          : {}),
       },
       viewProjectionMatrix,
       [eyeX, eyeY, eyeZ],
@@ -1007,6 +1022,9 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
     },
     onShadowMetrics: (handler: (metrics: readonly [number, number, number, number]) => void) => {
       shadowMetricsListeners.push(handler);
+    },
+    onRenderStats: (handler: (stats: { drawCalls: number; triangles: number }) => void) => {
+      renderStatsListeners.push(handler);
     },
     updateRenderSettings: (settings: Partial<typeof renderSettings>) => {
       renderSettings = { ...renderSettings, ...settings };

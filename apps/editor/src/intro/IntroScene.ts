@@ -12,7 +12,7 @@ import {
   type Vec3, 
   quatFromEulerOut,
   quatMultiplyOut,
-  quatNormalize
+  quatNormalizeOut
 } from '@engine/core/math';
 import { FOV_RADIANS, Z_FAR, Z_NEAR } from '@engine/gfx-webgpu/config';
 
@@ -489,7 +489,7 @@ export class IntroScene {
         Math.sin(originalAngle + orbitAngle) * radius,
       ];
       
-      // Self rotation using quaternions
+      // Self rotation using quaternions (smooth quaternion multiplication)
       const rotSpeed: [number, number, number] = [
         0.5 + i * 0.1,
         0.7 + i * 0.15,
@@ -505,9 +505,11 @@ export class IntroScene {
       const deltaRot: [number, number, number, number] = [0, 0, 0, 1];
       quatFromEulerOut(deltaRot, deltaEuler);
       
+      // Multiply current rotation by delta rotation (incremental rotation)
       const newRot: [number, number, number, number] = [0, 0, 0, 1];
       quatMultiplyOut(newRot, cube.transform.rotation, deltaRot);
-      cube.transform.rotation = quatNormalize(newRot);
+      // Normalize in-place to avoid allocations
+      quatNormalizeOut(cube.transform.rotation, newRot);
       
       // Pulsing scale
       const pulseScale = 1.0 + Math.sin(this.pulseTime * 3 + i) * 0.1;
@@ -529,15 +531,17 @@ export class IntroScene {
     
     // Animate energy rings (pulsing and rotation)
     this.energyRings.forEach((ring, i) => {
-      // Rotation
+      // Rotation using quaternion multiplication
       const rotSpeed = 0.3 + i * 0.2;
       const deltaEuler: [number, number, number] = [0, rotSpeed * deltaTime, 0];
       const deltaRot: [number, number, number, number] = [0, 0, 0, 1];
       quatFromEulerOut(deltaRot, deltaEuler);
       
+      // Multiply current rotation by delta rotation (incremental rotation)
       const newRot: [number, number, number, number] = [0, 0, 0, 1];
       quatMultiplyOut(newRot, ring.transform.rotation, deltaRot);
-      ring.transform.rotation = quatNormalize(newRot);
+      // Normalize in-place to avoid allocations
+      quatNormalizeOut(ring.transform.rotation, newRot);
       
       // Pulsing scale
       const pulse = Math.sin(this.pulseTime * 2 + i * 0.5) * 0.2 + 1.0;

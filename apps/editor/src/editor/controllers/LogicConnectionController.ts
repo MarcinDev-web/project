@@ -9,6 +9,7 @@ import type { LogicPort } from '@engine/script';
 import { LogicCubeComponent } from '@engine/script';
 import { LogicCubeLibrary } from '../managers/LogicCubeLibrary';
 import { Logger } from '../../utils/logger';
+import { showPortSelectionModal } from '../ui/PortSelectionModal';
 
 type ConnectionMode = 'idle' | 'selecting-source' | 'selecting-target';
 
@@ -61,8 +62,9 @@ export class LogicConnectionController {
 
   /**
    * Handles entity click for connection creation
+   * Returns a promise that resolves to true if the click was handled, false otherwise.
    */
-  handleEntityClick(entity: Entity): boolean {
+  async handleEntityClick(entity: Entity): Promise<boolean> {
     if (this.mode === 'idle') return false;
 
     const component = entity.getComponent(LogicCubeComponent);
@@ -72,7 +74,7 @@ export class LogicConnectionController {
     }
 
     if (this.mode === 'selecting-source') {
-      return this.handleSourceSelection(entity, component);
+      return await this.handleSourceSelection(entity, component);
     } else if (this.mode === 'selecting-target') {
       return this.handleTargetSelection(entity, component);
     }
@@ -83,7 +85,7 @@ export class LogicConnectionController {
   /**
    * Handles source entity selection
    */
-  private handleSourceSelection(entity: Entity, component: LogicCubeComponent): boolean {
+  private async handleSourceSelection(entity: Entity, component: LogicCubeComponent): Promise<boolean> {
     // Get cube metadata to find output ports
     const cubeType = component.getCubeType();
     const entry = LogicCubeLibrary.get(cubeType);
@@ -99,14 +101,35 @@ export class LogicConnectionController {
       return false;
     }
 
-    // For now, use the first output port
-    // TODO: Show port selection UI if multiple ports
-    this.sourceEntity = entity;
-    this.sourcePort = outputPorts[0] || null;
+    // If only one port, use it directly
+    if (outputPorts.length === 1) {
+      this.sourceEntity = entity;
+      this.sourcePort = outputPorts[0] || null;
+      this.mode = 'selecting-target';
+      this.onModeChanged?.('selecting-target');
+      Logger.info('Connection mode: Select target cube');
+      return true;
+    }
 
+    // Multiple ports - show selection UI
+    const selectedPort = await showPortSelectionModal({
+      title: 'Select Output Port',
+      message: 'This cube has multiple output ports. Select which one to use:',
+      ports: outputPorts,
+      entityName: entity.name,
+    });
+
+    if (!selectedPort) {
+      // User cancelled
+      Logger.info('Port selection cancelled');
+      return false;
+    }
+
+    this.sourceEntity = entity;
+    this.sourcePort = selectedPort;
     this.mode = 'selecting-target';
     this.onModeChanged?.('selecting-target');
-    Logger.info('Connection mode: Select target cube');
+    Logger.info(`Connection mode: Select target cube (using port: ${selectedPort.label || selectedPort.id})`);
 
     return true;
   }

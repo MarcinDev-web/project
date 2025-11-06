@@ -11,11 +11,14 @@
  */
 
 import type { OrbitControls } from '@engine/camera';
-import type { Scene } from '@engine/world';
+import type { Scene, Entity } from '@engine/world';
 import type { SelectionManager } from '@engine/world';
+import { Raycaster } from '@engine/world';
 import type { EditorState, EasyPlacePattern } from '../core/state';
 import type { PlacementMode } from '../placement/PlacementMode';
-import type { Vec3, Quat } from '@engine/core/math';
+import type { Vec3, Quat, Mat4 } from '@engine/core/math';
+import { mat4Perspective, mat4LookAt } from '@engine/core/math';
+import { FOV_RADIANS, Z_FAR, Z_NEAR } from '@engine/gfx-webgpu/config';
 import { Logger } from '../../utils/logger';
 import { PatternPlacer } from '../placement/PatternPlacer';
 import type { CollisionDetector } from '../placement/CollisionDetector';
@@ -60,6 +63,7 @@ const COLOR_PRESETS: [number, number, number, number][] = [
 export class EasyPlaceController {
   private abortController: AbortController | null = null;
   private patternPlacer: PatternPlacer;
+  private raycaster: Raycaster;
   private patternState: PatternState = {
     active: false,
     type: 'single',
@@ -75,6 +79,7 @@ export class EasyPlaceController {
 
   constructor(private readonly config: EasyPlaceControllerConfig) {
     this.patternPlacer = new PatternPlacer(config.scene, config.collisionDetector);
+    this.raycaster = new Raycaster();
   }
 
   /**
@@ -284,12 +289,88 @@ export class EasyPlaceController {
   /**
    * Handles Alt+Click to copy properties
    */
-  private handleAltClick(_event: MouseEvent): void {
+  private handleAltClick(event: MouseEvent): void {
     if (!this.isEasyPlaceActive()) return;
 
     // Raycast to find entity under cursor
-    // TODO: Implement raycasting to get entity
-    this.config.onStatusMessage?.('Property copy not yet implemented', 1000);
+    const ray = this.createRayFromMouseEvent(event);
+    if (!ray) {
+      this.config.onStatusMessage?.('No entity found under cursor', 1000);
+      return;
+    }
+
+    // Get all entities except preview entities
+    const entities = this.config.scene
+      .getActiveEntities()
+      .filter((e) => !e.userData.isPreview);
+
+    if (entities.length === 0) {
+      this.config.onStatusMessage?.('No entities in scene', 1000);
+      return;
+    }
+
+    // Find closest entity hit by ray
+    const hit = this.raycaster.raycastClosest(ray as any, entities);
+    if (!hit || !hit.entity) {
+      this.config.onStatusMessage?.('No entity found under cursor', 1000);
+      return;
+    }
+
+    const entity = hit.entity as Entity;
+
+    // Copy properties from hit entity
+    this.copiedProperties = {
+      color: [...entity.color] as [number, number, number, number],
+      scale: [...entity.transform.scale] as Vec3,
+      rotation: [...entity.transform.rotation] as Quat,
+    };
+
+    // Apply to preview if placement is active
+    if (this.config.placementMode.isActive()) {
+      this.applyStoredProperties();
+      this.config.updateSceneBuffers();
+    }
+
+    this.config.onStatusMessage?.('Properties copied!', 1000);
+    Logger.debug(`Easy Place: Copied properties from ${entity.name}`);
+  }
+
+  /**
+   * Creates a ray from mouse event for raycasting
+   */
+  private createRayFromMouseEvent(event: MouseEvent): { origin: Vec3; direction: Vec3 } | null {
+    const rect = this.config.canvas.getBoundingClientRect();
+    // Calculate mouse position in canvas coordinates (accounting for canvas size vs display size)
+    const canvasDisplayWidth = rect.width;
+    const canvasDisplayHeight = rect.height;
+    const canvasInternalWidth = this.config.canvas.width;
+    const canvasInternalHeight = this.config.canvas.height;
+    
+    const mouseX = ((event.clientX - rect.left) / canvasDisplayWidth) * canvasInternalWidth;
+    const mouseY = ((event.clientY - rect.top) / canvasDisplayHeight) * canvasInternalHeight;
+
+    // Use orbit controls to get camera matrices
+    const { yaw, pitch, distance } = this.config.controls.getState();
+    const aspect = canvasInternalWidth / canvasInternalHeight;
+
+    const projectionMatrix = new Float32Array(16) as Mat4;
+    const viewMatrix = new Float32Array(16) as Mat4;
+
+    mat4Perspective(projectionMatrix, FOV_RADIANS, aspect, Z_NEAR, Z_FAR);
+
+    const eyeX = Math.cos(pitch) * Math.sin(yaw) * distance;
+    const eyeY = Math.sin(pitch) * distance;
+    const eyeZ = Math.cos(pitch) * Math.cos(yaw) * distance;
+    mat4LookAt(viewMatrix, [eyeX, eyeY, eyeZ], [0, 0, 0], [0, 1, 0]);
+
+    return this.raycaster.createRayFromScreen(
+      mouseX,
+      mouseY,
+      canvasInternalWidth,
+      canvasInternalHeight,
+      viewMatrix,
+      projectionMatrix
+    );
   }
 
   /**

@@ -388,20 +388,30 @@ export class EditorToolbar {
       }
 
       if (item.submenu) {
+        menuItem.classList.add('has-submenu');
         const arrow = document.createElement('span');
         arrow.textContent = '›';
         arrow.className = 'toolbar-v2-submenu-arrow';
         menuItem.appendChild(arrow);
-        // TODO: Implement submenu
+        
+        // Create submenu dropdown
+        const submenu = this.createSubmenu(item.submenu, menuItem);
+        menuItem.appendChild(submenu);
+        
+        // Prevent closing parent menu when clicking on submenu item
+        menuItem.addEventListener('click', (e) => {
+          e.stopPropagation();
+          // Don't close menu if submenu exists - let hover handle it
+        });
+      } else {
+        menuItem.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (item.action) {
+            item.action();
+          }
+          this.closeAllMenus();
+        });
       }
-
-      menuItem.addEventListener('click', (e) => {
-        e.stopPropagation();
-        if (item.action) {
-          item.action();
-        }
-        this.closeAllMenus();
-      });
 
       dropdown.appendChild(menuItem);
     });
@@ -420,6 +430,76 @@ export class EditorToolbar {
     menuContainer.appendChild(dropdown);
 
     return menuContainer;
+  }
+
+  /**
+   * Creates a submenu dropdown for a menu item
+   */
+  private createSubmenu(submenuItems: DropdownMenuItem[], parentItem: HTMLElement): HTMLElement {
+    const submenu = document.createElement('div');
+    submenu.className = 'toolbar-v2-submenu';
+
+    submenuItems.forEach(subItem => {
+      if (subItem.divider) {
+        const divider = document.createElement('div');
+        divider.className = 'toolbar-v2-dropdown-divider';
+        submenu.appendChild(divider);
+        return;
+      }
+
+      const submenuItem = document.createElement('button');
+      submenuItem.type = 'button';
+      submenuItem.className = 'toolbar-v2-dropdown-item';
+
+      if (subItem.icon) {
+        submenuItem.appendChild(createIcon(subItem.icon as any, 14));
+      }
+
+      const labelSpan = document.createElement('span');
+      labelSpan.textContent = subItem.label ?? '';
+      submenuItem.appendChild(labelSpan);
+
+      if (subItem.shortcut) {
+        const shortcut = document.createElement('span');
+        shortcut.className = 'toolbar-v2-shortcut';
+        shortcut.textContent = subItem.shortcut;
+        submenuItem.appendChild(shortcut);
+      }
+
+      // Support nested submenus (recursive)
+      if (subItem.submenu) {
+        submenuItem.classList.add('has-submenu');
+        const arrow = document.createElement('span');
+        arrow.textContent = '›';
+        arrow.className = 'toolbar-v2-submenu-arrow';
+        submenuItem.appendChild(arrow);
+        
+        const nestedSubmenu = this.createSubmenu(subItem.submenu, submenuItem);
+        submenuItem.appendChild(nestedSubmenu);
+        
+        submenuItem.addEventListener('click', (e) => {
+          e.stopPropagation();
+          // Don't close menu if nested submenu exists
+        });
+      } else {
+        submenuItem.addEventListener('click', (e) => {
+          e.stopPropagation();
+          if (subItem.action) {
+            subItem.action();
+          }
+          this.closeAllMenus();
+        });
+      }
+
+      submenu.appendChild(submenuItem);
+    });
+
+    // Prevent clicks inside submenu from closing parent menu
+    submenu.addEventListener('click', (e) => {
+      e.stopPropagation();
+    });
+
+    return submenu;
   }
 
   /**
@@ -977,7 +1057,7 @@ export class EditorToolbar {
   }
 
   /**
-   * Closes all open menus
+   * Closes all open menus and submenus
    */
   private closeAllMenus(): void {
     if (this.activeMenu) {
@@ -987,6 +1067,11 @@ export class EditorToolbar {
     const allDropdowns = document.querySelectorAll('.toolbar-v2-dropdown');
     allDropdowns.forEach(dropdown => {
       (dropdown as HTMLElement).style.display = 'none';
+    });
+    // Close all submenus
+    const allSubmenus = document.querySelectorAll('.toolbar-v2-submenu');
+    allSubmenus.forEach(submenu => {
+      (submenu as HTMLElement).style.display = 'none';
     });
   }
 

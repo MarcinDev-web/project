@@ -65,8 +65,10 @@ export class ScriptComponent extends Component {
         this.instances = [];
         const entity = this.entity;
         const runtime = scene?.scriptRuntime;
-        if (scene && entity && runtime) {
-            runtime.contextBuilder?.invalidate?.(entity.id);
+        const contextBuilder = runtime?.contextBuilder;
+        if (scene && entity && contextBuilder) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+            contextBuilder.invalidate(entity.id);
         }
     }
     toJSON() {
@@ -113,19 +115,26 @@ export class ScriptComponent extends Component {
         if (!ctor)
             return; // behavior not registered yet
         const runtime = scene.scriptRuntime;
-        const services = (runtime?.contextBuilder).getServices(entity);
+        const contextBuilder = runtime?.contextBuilder;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call
+        const services = contextBuilder?.getServices(entity);
         // Lazy import: create instance with context
         const context = {
             entity,
             scene,
             events: scene.events,
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
             ...(services != null ? { services } : {}),
         };
         const instance = new ctor(context, def.params);
         instance.enabled = def.enabled ?? true;
-        if (runtime) {
-            runtime.behaviors.add(instance);
-            runtime.scheduler.attachBehaviorInstance(instance);
+        const behaviors = runtime?.behaviors;
+        const scheduler = runtime?.scheduler;
+        if (behaviors && scheduler) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+            behaviors.add(instance);
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+            scheduler.attachBehaviorInstance(instance);
         }
         try {
             instance.onInit();
@@ -144,8 +153,14 @@ export class ScriptComponent extends Component {
             // ignore script destroy errors
         }
         const runtime = currentScene?.scriptRuntime;
-        runtime?.scheduler?.detachBehaviorInstance?.(inst);
-        runtime?.behaviors?.delete?.(inst);
+        const scheduler = runtime?.scheduler;
+        const behaviors = runtime?.behaviors;
+        if (scheduler && behaviors) {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+            scheduler.detachBehaviorInstance(inst);
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call
+            behaviors.delete(inst);
+        }
     }
 }
 registerComponent(ScriptComponent.type, ScriptComponent);
