@@ -340,6 +340,40 @@ Przeprowadzono major refactoring eliminujący duplikację kodu między `apps/edi
 
 ---
 
+## Editor UI Architecture
+
+### Panel System
+
+Editor używa modularnego systemu paneli zarządzanego przez `EditorPanelManager`:
+
+**Lokalizacja:** `apps/editor/src/editor/panels/`
+
+**Dostępne panele:**
+- **LayersPanel** - zarządzanie warstwami sceny
+- **BookmarksPanel** - zakładki do szybkiej nawigacji
+- **HistoryPanel** - historia undo/redo
+- **LogicPanel** - konfiguracja LogicCubes
+- **TemplateGalleryPanel** - galeria szablonów
+- **VegetationPanel** - narzędzia do roślinności
+- **NpcPanel** - konfiguracja NPC
+- **WeaponPanel** - zarządzanie bronią
+- **UIPanel** - elementy UI canvas
+- **TerrainPanel** - narzędzia terenu
+- **RenderSettingsPanel** - ustawienia renderowania
+- **SettingsPanel** - preferencje edytora (UI, kamera, precyzja, historia)
+
+**Wzorzec implementacji:**
+- Każdy panel to klasa z metodą `mount(parent: HTMLElement)`
+- Panele implementują `dispose()` dla cleanup
+- Style w `ui-panel.css` (wspólne style dla wszystkich paneli)
+- Ustawienia zapisywane w localStorage przez `storageSave/load`
+
+**SettingsPanel** (Oct 2025):
+- Zarządza preferencjami edytora (UI visibility, precision controls, camera settings)
+- Synchronizuje się z `EditorState` w czasie rzeczywistym
+- Persistuje ustawienia między sesjami
+- Sekcje: UI Preferences, Precision Controls, Camera Preferences, Rotation Snap, History, Easy Place Mode
+
 ## Szczegóły Techniczne
 
 Dokumenty techniczne w `technical/`:
