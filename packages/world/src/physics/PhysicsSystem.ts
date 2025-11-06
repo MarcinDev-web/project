@@ -254,7 +254,7 @@ export class PhysicsSystem {
       const scriptComp = entity.getComponent(ScriptComponent as any);
       if (!scriptComp) continue;
       // TypeScript doesn't know getInstances() exists on Component, but it does on ScriptComponent
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-explicit-any
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
       const instances = (scriptComp as any).getInstances();
       for (const behavior of instances) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access

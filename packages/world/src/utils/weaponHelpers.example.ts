@@ -117,24 +117,23 @@ export function example5_Events(scene: Scene, entity: Entity) {
   // Listen to weapon events
 
   scene.events.on('weapon:fire', (event: any) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, no-console
     console.log('Weapon fired:', event.damage, event.weaponType);
   });
 
   scene.events.on('weapon:reload', (event: any) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, no-console
     console.log('Reloading:', event.reloadDuration);
   });
 
   // Inventory events
-
   scene.events.on('weapon:switched', (event: any) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, no-console
     console.log('Weapon switched to index:', event.newWeaponIndex);
   });
 
   scene.events.on('inventory:updated', (event: any) => {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, no-console
     console.log('Inventory action:', event.action);
   });
 }

@@ -487,6 +487,7 @@ export class UISystem {
           element.style.fontFamily = component.fontFamily;
         }
         break;
+      }
     }
   }
 

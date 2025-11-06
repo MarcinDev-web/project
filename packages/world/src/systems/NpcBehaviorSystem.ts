@@ -70,7 +70,6 @@ export class NpcBehaviorSystem {
     const playerEntity = this.findPlayerEntity();
 
     for (const npcEntity of npcEntities) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       const npc = npcEntity.getComponent(NpcComponent);
       if (!npc) continue;
 
@@ -109,13 +108,11 @@ export class NpcBehaviorSystem {
   /**
    * Handle idle behavior (stand still)
    */
-  private handleIdle(entity: Entity, npc: NpcComponent): void {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+  private handleIdle(entity: Entity, _npc: NpcComponent): void {
     const controller = entity.getComponent(CharacterController);
     if (!controller) return;
 
     // Set zero movement input
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     controller.setInput({
       moveDirection: [0, 0, 0],
       sprint: false,
@@ -126,15 +123,13 @@ export class NpcBehaviorSystem {
   /**
    * Handle patrol behavior (move between waypoints)
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  private handlePatrol(entity: Entity, npc: NpcComponent, deltaTime: number): void {
+  private handlePatrol(entity: Entity, npc: NpcComponent, _deltaTime: number): void {
     if (npc.patrolWaypoints.length === 0) {
       // No waypoints, fall back to idle
       this.handleIdle(entity, npc);
       return;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const controller = entity.getComponent(CharacterController);
     if (!controller) return;
 
@@ -148,10 +143,10 @@ export class NpcBehaviorSystem {
 
     const state = this.patrolState.get(entity)!;
     const currentWaypoint = npc.patrolWaypoints[state.currentWaypointIndex]!;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     const npcPos = entity.transform.position;
 
     // Calculate direction to waypoint
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
     subtractVec3Out(this.scratchVec1, currentWaypoint, npcPos);
     const distance = distanceVec3(npcPos, currentWaypoint);
 
@@ -163,7 +158,6 @@ export class NpcBehaviorSystem {
     } else {
       // Move towards waypoint
       normalizeVec3Out(this.scratchVec1, this.scratchVec1);
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       controller.setInput({
         moveDirection: this.scratchVec1,
         sprint: false,
@@ -178,16 +172,13 @@ export class NpcBehaviorSystem {
   /**
    * Handle shoot-player behavior (aim and fire at player)
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private handleShootPlayer(
     entity: Entity,
     npc: NpcComponent,
     playerEntity: Entity | null,
-    deltaTime: number
+    _deltaTime: number
   ): void {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const controller = entity.getComponent(CharacterController);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const weapon = entity.getComponent(WeaponComponent);
 
     if (!controller) return;
@@ -198,12 +189,11 @@ export class NpcBehaviorSystem {
       return;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     const npcPos = entity.transform.position;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     const playerPos = playerEntity.transform.position;
 
     // Calculate distance to player
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
     subtractVec3Out(this.scratchVec1, playerPos, npcPos);
     const distance = distanceVec3(npcPos, playerPos);
 
@@ -219,7 +209,6 @@ export class NpcBehaviorSystem {
     this.rotateTowardsDirection(entity, this.scratchVec1);
 
     // Stop movement when shooting
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     controller.setInput({
       moveDirection: [0, 0, 0],
       sprint: false,
@@ -229,13 +218,11 @@ export class NpcBehaviorSystem {
     // Fire weapon if available
     if (weapon) {
       const lastFire = this.lastFireTime.get(entity) ?? -Infinity;
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
       const fireRate = weapon.fireRate;
       const timeBetweenShots = 1.0 / fireRate;
 
       if (this.currentTime - lastFire >= timeBetweenShots) {
         // Fire in direction of player
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-argument
         this.weaponSystem.fire(entity, this.scratchVec1, null);
         this.lastFireTime.set(entity, this.currentTime);
       }
@@ -245,14 +232,12 @@ export class NpcBehaviorSystem {
   /**
    * Handle follow-player behavior (move towards player)
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   private handleFollowPlayer(
     entity: Entity,
     npc: NpcComponent,
     playerEntity: Entity | null,
-    deltaTime: number
+    _deltaTime: number
   ): void {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const controller = entity.getComponent(CharacterController);
     if (!controller) return;
 
@@ -262,18 +247,16 @@ export class NpcBehaviorSystem {
       return;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     const npcPos = entity.transform.position;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     const playerPos = playerEntity.transform.position;
 
     // Calculate direction to player
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
     subtractVec3Out(this.scratchVec1, playerPos, npcPos);
     const distance = distanceVec3(npcPos, playerPos);
 
     // Stop if too close (within 2 units)
     if (distance < 2.0) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       controller.setInput({
         moveDirection: [0, 0, 0],
         sprint: false,
@@ -284,7 +267,6 @@ export class NpcBehaviorSystem {
 
     // Move towards player
     normalizeVec3Out(this.scratchVec1, this.scratchVec1);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     controller.setInput({
       moveDirection: this.scratchVec1,
       sprint: false,
@@ -298,30 +280,27 @@ export class NpcBehaviorSystem {
   /**
    * Handle guard-position behavior (patrol around a position)
    */
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  private handleGuardPosition(entity: Entity, npc: NpcComponent, deltaTime: number): void {
+  private handleGuardPosition(entity: Entity, npc: NpcComponent, _deltaTime: number): void {
     if (!npc.guardPosition) {
       // No guard position, fall back to idle
       this.handleIdle(entity, npc);
       return;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
     const controller = entity.getComponent(CharacterController);
     if (!controller) return;
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     const npcPos = entity.transform.position;
     const guardPos = npc.guardPosition;
 
     // Calculate distance from guard position
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call
     subtractVec3Out(this.scratchVec1, guardPos, npcPos);
     const distance = distanceVec3(npcPos, guardPos);
 
     // If too far from guard position, move back
     if (distance > npc.guardRadius) {
       normalizeVec3Out(this.scratchVec1, this.scratchVec1);
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       controller.setInput({
         moveDirection: this.scratchVec1,
         sprint: false,
@@ -330,7 +309,6 @@ export class NpcBehaviorSystem {
       this.rotateTowardsDirection(entity, this.scratchVec1);
     } else {
       // Within guard radius, stand still and look around
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
       controller.setInput({
         moveDirection: [0, 0, 0],
         sprint: false,
@@ -357,13 +335,9 @@ export class NpcBehaviorSystem {
 
     // Set rotation
     quatFromAxisAngleOut(this.scratchQuat, [0, 1, 0], angle);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     entity.transform.rotation[0] = this.scratchQuat[0]!;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     entity.transform.rotation[1] = this.scratchQuat[1]!;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     entity.transform.rotation[2] = this.scratchQuat[2]!;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     entity.transform.rotation[3] = this.scratchQuat[3]!;
   }
 
