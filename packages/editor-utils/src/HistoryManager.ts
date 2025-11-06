@@ -86,6 +86,37 @@ export class HistoryManager {
     return this.entries.length;
   }
 
+  /**
+   * Returns the current history index (-1 if empty, 0-based).
+   */
+  getCurrentIndex(): number {
+    return this.index;
+  }
+
+  /**
+   * Gets a snapshot at a specific index (0-based).
+   * Returns null if index is out of bounds.
+   */
+  getSnapshotAt(index: number): SceneSnapshot | null {
+    if (index < 0 || index >= this.entries.length) {
+      return null;
+    }
+    return HistoryManager.cloneSnapshot(this.entries[index]!);
+  }
+
+  /**
+   * Jumps to a specific index in history and returns the snapshot.
+   * This is used for "jump to history index" functionality.
+   * Returns null if index is out of bounds.
+   */
+  jumpTo(index: number): SceneSnapshot | null {
+    if (index < 0 || index >= this.entries.length) {
+      return null;
+    }
+    this.index = index;
+    return HistoryManager.cloneSnapshot(this.entries[index]!);
+  }
+
   freeze(): void {
     this.frozen = true;
   }

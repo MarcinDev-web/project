@@ -8,15 +8,10 @@
  */
 
 import { createIcon } from '../utils/icons';
-
-export interface HistoryAction {
-  id: string;
-  type: string;
-  description: string;
-  timestamp: number;
-}
+import type { HistoryManager, SceneSnapshot } from '@engine/editor-utils';
 
 export interface HistoryPanelConfig {
+  history?: HistoryManager;
   onUndo?: () => void;
   onRedo?: () => void;
   onJumpTo?: (index: number) => void;
@@ -25,10 +20,13 @@ export interface HistoryPanelConfig {
 export class HistoryPanel {
   private readonly root: HTMLElement;
   private readonly list: HTMLElement;
-  private actions: HistoryAction[] = [];
-  private currentIndex = -1;
+  private readonly undoBtn: HTMLButtonElement;
+  private readonly redoBtn: HTMLButtonElement;
+  private history: HistoryManager | null = null;
 
   constructor(private readonly config: HistoryPanelConfig) {
+    this.history = config.history ?? null;
+    
     this.root = document.createElement('section');
     this.root.className = 'history-panel';
 
@@ -45,25 +43,27 @@ export class HistoryPanel {
     const controls = document.createElement('div');
     controls.className = 'history-controls';
 
-    const undoBtn = document.createElement('button');
-    undoBtn.type = 'button';
-    undoBtn.className = 'btn-icon-sm btn-ghost';
-    undoBtn.title = 'Undo';
-    undoBtn.appendChild(createIcon('undo', 16));
-    undoBtn.addEventListener('click', () => {
+    this.undoBtn = document.createElement('button');
+    this.undoBtn.type = 'button';
+    this.undoBtn.className = 'btn-icon-sm btn-ghost';
+    this.undoBtn.title = 'Undo';
+    this.undoBtn.appendChild(createIcon('undo', 16));
+    this.undoBtn.addEventListener('click', () => {
       this.config.onUndo?.();
+      this.sync();
     });
-    controls.appendChild(undoBtn);
+    controls.appendChild(this.undoBtn);
 
-    const redoBtn = document.createElement('button');
-    redoBtn.type = 'button';
-    redoBtn.className = 'btn-icon-sm btn-ghost';
-    redoBtn.title = 'Redo';
-    redoBtn.appendChild(createIcon('redo', 16));
-    redoBtn.addEventListener('click', () => {
+    this.redoBtn = document.createElement('button');
+    this.redoBtn.type = 'button';
+    this.redoBtn.className = 'btn-icon-sm btn-ghost';
+    this.redoBtn.title = 'Redo';
+    this.redoBtn.appendChild(createIcon('redo', 16));
+    this.redoBtn.addEventListener('click', () => {
       this.config.onRedo?.();
+      this.sync();
     });
-    controls.appendChild(redoBtn);
+    controls.appendChild(this.redoBtn);
 
     header.appendChild(controls);
     this.root.appendChild(header);
@@ -77,23 +77,18 @@ export class HistoryPanel {
   }
 
   /**
-   * Adds an action to the history
+   * Syncs the panel with the HistoryManager state.
+   * Call this after undo/redo operations or when history changes.
    */
-  addAction(action: HistoryAction): void {
-    // Remove any actions after current index (branching)
-    this.actions = this.actions.slice(0, this.currentIndex + 1);
-    
-    // Add new action
-    this.actions.push(action);
-    this.currentIndex = this.actions.length - 1;
+  sync(): void {
+    this.render();
+  }
 
-    // Limit history size
-    const MAX_HISTORY = 50;
-    if (this.actions.length > MAX_HISTORY) {
-      this.actions = this.actions.slice(-MAX_HISTORY);
-      this.currentIndex = this.actions.length - 1;
-    }
-
+  /**
+   * Sets the HistoryManager instance to sync with.
+   */
+  setHistory(history: HistoryManager | null): void {
+    this.history = history;
     this.render();
   }
 
@@ -101,8 +96,13 @@ export class HistoryPanel {
    * Moves to a specific point in history
    */
   jumpTo(index: number): void {
-    if (index >= 0 && index < this.actions.length) {
-      this.currentIndex = index;
+    if (!this.history) {
+      this.config.onJumpTo?.(index);
+      return;
+    }
+    
+    const size = this.history.size();
+    if (index >= 0 && index < size) {
       this.config.onJumpTo?.(index);
       this.render();
     }
@@ -114,7 +114,16 @@ export class HistoryPanel {
   private render(): void {
     this.list.innerHTML = '';
 
-    if (this.actions.length === 0) {
+    // Update button states
+    if (this.history) {
+      this.undoBtn.disabled = !this.history.canUndo();
+      this.redoBtn.disabled = !this.history.canRedo();
+    } else {
+      this.undoBtn.disabled = true;
+      this.redoBtn.disabled = true;
+    }
+
+    if (!this.history || this.history.size() === 0) {
       const empty = document.createElement('div');
       empty.className = 'inspector-empty';
       empty.innerHTML = `
@@ -126,13 +135,17 @@ export class HistoryPanel {
       return;
     }
 
-    // Render actions (newest first)
-    const reversedActions = [...this.actions].reverse();
+    // Get all snapshots from history
+    const snapshots = this.history.export();
+    const currentIndex = this.history.getCurrentIndex();
+
+    // Render snapshots (newest first)
+    const reversedSnapshots = [...snapshots].reverse();
     
-    reversedActions.forEach((action, reverseIndex) => {
-      const index = this.actions.length - 1 - reverseIndex;
-      const isCurrent = index === this.currentIndex;
-      const isPast = index <= this.currentIndex;
+    reversedSnapshots.forEach((snapshot, reverseIndex) => {
+      const index = snapshots.length - 1 - reverseIndex;
+      const isCurrent = index === currentIndex;
+      const isPast = index <= currentIndex;
 
       const item = document.createElement('button');
       item.type = 'button';
@@ -163,12 +176,12 @@ export class HistoryPanel {
 
       const desc = document.createElement('div');
       desc.className = 'history-description';
-      desc.textContent = action.description;
+      desc.textContent = snapshot.description || `Snapshot ${index + 1}`;
       content.appendChild(desc);
 
       const time = document.createElement('div');
       time.className = 'history-time';
-      time.textContent = this.formatTimestamp(action.timestamp);
+      time.textContent = this.formatTimestamp(snapshot.timestamp);
       content.appendChild(time);
 
       item.appendChild(content);
@@ -212,8 +225,7 @@ export class HistoryPanel {
    * Clears all history
    */
   clear(): void {
-    this.actions = [];
-    this.currentIndex = -1;
+    this.history?.clear();
     this.render();
   }
 }

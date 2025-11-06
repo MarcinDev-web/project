@@ -35,6 +35,7 @@ import { TerrainPanel } from '../terrain/ui/TerrainPanel';
 import type { TerrainBuilderStudio } from '../terrain/TerrainBuilderStudio';
 import { RenderSettingsPanel } from './RenderSettingsPanel';
 import { SettingsPanel } from './SettingsPanel';
+import { hydrateScene, resolveEntityByPath, type SceneSnapshot } from '@engine/editor-utils';
 
 export interface PanelVisibility {
   sidebar?: boolean;
@@ -141,17 +142,15 @@ export class EditorPanelManager {
 
     // Initialize History Panel
     this.historyPanel = new HistoryPanel({
+      history: this.config.state.history,
       onUndo: () => {
-        console.log('Undo requested');
-        // TODO: Integrate with command history system
+        this.handleUndo();
       },
       onRedo: () => {
-        console.log('Redo requested');
-        // TODO: Integrate with command history system
+        this.handleRedo();
       },
       onJumpTo: (index) => {
-        console.log('Jump to history index:', index);
-        // TODO: Integrate with command history system
+        this.handleJumpTo(index);
       },
     });
 
@@ -516,9 +515,11 @@ export class EditorPanelManager {
       refresh: () => this.assetPalette?.refresh(),
     };
 
-    // Setup periodic badge updates
+    // Setup periodic badge updates and history panel sync
     const badgeInterval = window.setInterval(() => {
       this.sidebarTabs?.updateAllBadges();
+      // Sync history panel to reflect any changes (e.g., new snapshots added)
+      this.historyPanel?.sync();
     }, 1000);
     this.disposables.add(() => clearInterval(badgeInterval));
   }
@@ -532,6 +533,13 @@ export class EditorPanelManager {
     this.propertiesPanel?.refresh();
     this.logicPanel?.refresh();
     this.weaponPanel?.refresh();
+  }
+
+  /**
+   * Refreshes the history panel (syncs with current history state).
+   */
+  refreshHistory(): void {
+    this.historyPanel?.sync();
   }
 
   /**
@@ -588,6 +596,66 @@ export class EditorPanelManager {
       logicPanel: false, // Not separately controlled
       codeEditor: false, // Not separately controlled
     };
+  }
+
+  /**
+   * Handles undo operation from history panel.
+   */
+  private handleUndo(): void {
+    if (!this.config.state.history.canUndo()) {
+      return;
+    }
+    const snapshot = this.config.state.history.undo();
+    if (snapshot) {
+      this.applySnapshot(snapshot);
+      this.historyPanel?.sync();
+    }
+  }
+
+  /**
+   * Handles redo operation from history panel.
+   */
+  private handleRedo(): void {
+    if (!this.config.state.history.canRedo()) {
+      return;
+    }
+    const snapshot = this.config.state.history.redo();
+    if (snapshot) {
+      this.applySnapshot(snapshot);
+      this.historyPanel?.sync();
+    }
+  }
+
+  /**
+   * Handles jump to specific history index.
+   */
+  private handleJumpTo(index: number): void {
+    const snapshot = this.config.state.history.jumpTo(index);
+    if (snapshot) {
+      this.applySnapshot(snapshot);
+      this.historyPanel?.sync();
+    }
+  }
+
+  /**
+   * Applies a scene snapshot (used for undo/redo/jump to).
+   */
+  private applySnapshot(snapshot: SceneSnapshot): void {
+    this.config.state.disableHistory();
+    try {
+      hydrateScene(this.config.scene, snapshot.sceneJSON);
+      this.config.updateSceneBuffers();
+      const resolved = resolveEntityByPath(this.config.scene, snapshot.selectedPath ?? null);
+      if (resolved) {
+        this.config.selection.select(resolved);
+      } else {
+        this.config.selection.clearSelection();
+      }
+      this.refreshProperties();
+      this.config.onSelectionVisualsNeeded?.();
+    } finally {
+      this.config.state.enableHistory();
+    }
   }
 
   /**
