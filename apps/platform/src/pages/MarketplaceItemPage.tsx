@@ -96,7 +96,7 @@ export function MarketplaceItemPage() {
     try {
       setPurchasing(true);
       // Use shop checkout API for marketplace items
-      const response = await apiClient.post('/api/shop/checkout', {
+      const response = await apiClient.post<{ success: boolean; purchaseId?: string; error?: string }>('/api/shop/checkout', {
         items: [
           {
             itemId: item.id,
@@ -229,8 +229,16 @@ export function MarketplaceItemPage() {
                 )}
               </div>
               <div style={{ display: 'flex', gap: 'var(--spacing-3)', alignItems: 'center', flexWrap: 'wrap' }}>
+                <Link
+                  to={`/player/${item.id}`}
+                  style={{ textDecoration: 'none' }}
+                >
+                  <Button variant="primary">
+                    Play
+                  </Button>
+                </Link>
                 <Button 
-                  variant="primary" 
+                  variant="secondary" 
                   onClick={handlePurchase}
                   disabled={purchasing}
                 >

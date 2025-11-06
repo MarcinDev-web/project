@@ -3,10 +3,10 @@
  * Supports both PostgreSQL (preferred) and JSON file storage (fallback)
  */
 
-import type { PrismaClient } from '../../node_modules/.prisma/net-client';
+import type { PrismaClient } from '../../node_modules/.prisma/net-client/index.js';
 import { promises as fs } from 'fs';
 import path from 'path';
-import type { ProjectData } from '../types';
+import type { ProjectData } from '../types.js';
 
 export interface StudioProject {
   id: string;
@@ -181,6 +181,74 @@ export class StudioProjectsStorageDB {
         }
       }
     );
+  }
+
+  async listPublishedProjectsGlobal(options?: {
+    limit?: number;
+    offset?: number;
+    search?: string;
+    tags?: string[];
+  }): Promise<StudioProject[]> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const where: any = {
+      isPublished: true,
+    };
+
+    if (options?.tags && options.tags.length > 0) {
+      where.tags = {
+        hasSome: options.tags,
+      };
+    }
+
+    if (options?.search && options.search.trim()) {
+      const searchTerm = options.search.trim().toLowerCase();
+      where.OR = [
+        { name: { contains: searchTerm, mode: 'insensitive' } },
+        { description: { contains: searchTerm, mode: 'insensitive' } },
+      ];
+    }
+
+    const take = options?.limit;
+    const skip = options?.offset ?? 0;
+
+    const projects = await this.prisma.userProject.findMany({
+      where,
+      orderBy: { updatedAt: 'desc' },
+      ...(take !== undefined ? { take } : {}),
+      ...(skip ? { skip } : {}),
+    });
+
+    return projects.map((project) => {
+      try {
+        const jsonData = project.projectData.toString('utf-8');
+        const projectData = JSON.parse(jsonData) as ProjectData;
+        const result: StudioProject = {
+          id: project.id,
+          userId: project.userId,
+          name: project.name,
+          projectData,
+          isPublished: project.isPublished,
+          createdAt: project.createdAt.getTime(),
+          updatedAt: project.updatedAt.getTime(),
+          version: project.version,
+        };
+
+        if (project.description !== null) {
+          result.description = project.description;
+        }
+        if (project.thumbnailUrl !== null) {
+          result.thumbnailUrl = project.thumbnailUrl;
+        }
+        if (project.tags.length > 0) {
+          result.tags = project.tags;
+        }
+
+        return result;
+      } catch (error) {
+        console.error(`Failed to deserialize project data for ${project.id}:`, error);
+        throw new Error(`Invalid project data format for ${project.id}`);
+      }
+    });
   }
 
   async updateProject(
@@ -436,4 +504,45 @@ export class StudioProjectsStorage {
       published: userProjects.filter((p) => p.isPublished).length,
     };
   }
+
+  async listPublishedProjectsGlobal(options?: {
+    limit?: number;
+    offset?: number;
+    search?: string;
+    tags?: string[];
+  }): Promise<StudioProject[]> {
+    const projects = await this.readProjects();
+    let allProjects = Object.values(projects).flatMap((userProjects) =>
+      Object.values(userProjects)
+    );
+
+    allProjects = allProjects.filter((project) => project.isPublished);
+
+    if (options?.tags && options.tags.length > 0) {
+      const tagSet = new Set(options.tags.map((tag) => tag.toLowerCase()));
+      allProjects = allProjects.filter((project) =>
+        (project.tags || []).some((tag) => tagSet.has(tag.toLowerCase()))
+      );
+    }
+
+    if (options?.search && options.search.trim()) {
+      const searchTerm = options.search.trim().toLowerCase();
+      allProjects = allProjects.filter((project) => {
+        const nameMatch = project.name.toLowerCase().includes(searchTerm);
+        const descriptionMatch = project.description
+          ? project.description.toLowerCase().includes(searchTerm)
+          : false;
+        return nameMatch || descriptionMatch;
+      });
+    }
+
+    allProjects.sort((a, b) => b.updatedAt - a.updatedAt);
+
+    const offset = options?.offset ?? 0;
+    const limit = options?.limit ?? allProjects.length;
+
+    return allProjects.slice(offset, offset + limit);
+  }
 }
+
+

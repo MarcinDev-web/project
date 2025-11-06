@@ -1,9 +1,9 @@
-/**
+﻿/**
  * Studio Settings Storage - manages studio owner settings and preferences
  * Supports PostgreSQL (preferred) and JSON file fallback
  */
 
-import type { PrismaClient } from '../../node_modules/.prisma/net-client';
+import type { PrismaClient } from '../../node_modules/.prisma/net-client/index.js';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -164,3 +164,5 @@ export class StudioSettingsStorage {
     return next;
   }
 }
+
+

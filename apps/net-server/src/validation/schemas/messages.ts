@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { uuidSchema, trimmedStringSchema, arraySchema } from './base';
+import { uuidSchema, trimmedStringSchema, arraySchema } from './base.js';
 
 /**
  * Create message schema.
@@ -80,3 +80,4 @@ export type AddGroupMembersRequest = z.infer<typeof addGroupMembersSchema>;
 export type ConversationIdParam = z.infer<typeof conversationIdParamSchema>;
 export type GroupIdParam = z.infer<typeof groupIdParamSchema>;
 export type MessageIdParam = z.infer<typeof messageIdParamSchema>;
+

@@ -1,13 +1,13 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
-import { ProjectStorage } from './storage/ProjectStorage';
-import { AuthManager } from './auth/AuthManager';
-import { createAuthMiddleware, requireAdmin, requireModerator } from './auth/middleware';
-import { securityHeadersHook } from './middleware/securityHeaders';
-import { assertConfigValid } from './config/validateConfig';
-import { securityLogger } from './logging/SecurityLogger';
-import { validateQuery } from './validation/middleware';
+import { ProjectStorage } from './storage/ProjectStorage.js';
+import { AuthManager } from './auth/AuthManager.js';
+import { createAuthMiddleware, requireAdmin, requireModerator } from './auth/middleware.js';
+import { securityHeadersHook } from './middleware/securityHeaders.js';
+import { assertConfigValid } from './config/validateConfig.js';
+import { securityLogger } from './logging/SecurityLogger.js';
+import { validateQuery } from './validation/middleware.js';
 import {
   publishItemSchema,
   resaleListingSchema,
@@ -15,7 +15,7 @@ import {
   marketplaceItemIdParamSchema,
 } from './validation/schemas/marketplace';
 import jwt from 'jsonwebtoken';
-import type { JWTPayload } from './types/auth';
+import type { JWTPayload } from './types/auth.js';
 
 // Helper to extract user ID from token (optional, doesn't fail if invalid)
 async function getUserIdFromToken(authHeader: string | undefined): Promise<string | null> {
@@ -31,61 +31,62 @@ async function getUserIdFromToken(authHeader: string | undefined): Promise<strin
     return null;
   }
 }
-import { SessionManager } from './websocket/SessionManager';
-import { WebSocketHandler } from './websocket/WebSocketHandler';
-import { GameSessionTracker } from './websocket/GameSessionTracker';
-import { MessageHandler } from './websocket/MessageHandler';
-import { ForumHandler } from './websocket/ForumHandler';
-import { UserProfileStorage } from './storage/UserProfileStorage';
-import { sanitizeMarketplacePublishRequest } from './validation/marketplace';
-import { MarketplaceStorage } from './storage/MarketplaceStorage';
-import { MarketplaceStorageDB } from './storage/MarketplaceStorageDB';
-import { BuildStorage } from './storage/BuildStorage';
+import { SessionManager } from './websocket/SessionManager.js';
+import { WebSocketHandler } from './websocket/WebSocketHandler.js';
+import { GameSessionTracker } from './websocket/GameSessionTracker.js';
+import { MessageHandler } from './websocket/MessageHandler.js';
+import { ForumHandler } from './websocket/ForumHandler.js';
+import { UserProfileStorage } from './storage/UserProfileStorage.js';
+import { sanitizeMarketplacePublishRequest } from './validation/marketplace.js';
+import { MarketplaceStorage } from './storage/MarketplaceStorage.js';
+import { MarketplaceStorageDB } from './storage/MarketplaceStorageDB.js';
+import { BuildStorage } from './storage/BuildStorage.js';
 import {
   ValidationError,
   BuildDataError,
   PayloadTooLargeError,
   DatabaseError,
-} from './errors/MarketplaceErrors';
-import { LikesStorage } from './storage/LikesStorage';
-import { FriendsStorage } from './storage/FriendsStorage';
-import { MessagesStorage } from './storage/MessagesStorage';
-import { BlockedUsersStorage } from './storage/BlockedUsersStorage';
-import { NotificationsStorage } from './storage/NotificationsStorage';
-import { UserSettingsStorage } from './storage/UserSettingsStorage';
-import { ForumStorage } from './storage/ForumStorage';
-import { ShopStorage } from './storage/ShopStorage';
-import { ShopStorageDB } from './storage/ShopStorageDB';
-import { AssetStorage } from './storage/AssetStorage';
-import { AssetStorageDB } from './storage/AssetStorageDB';
-import { PurchaseStorage } from './storage/PurchaseStorage';
-import { PurchaseStorageDB } from './storage/PurchaseStorageDB';
-import { StudioProjectsStorage, StudioProjectsStorageDB } from './storage/StudioProjectsStorage';
-import { StudioSettingsStorage, StudioSettingsStorageDB } from './storage/StudioSettingsStorage';
-import { StudioTeamStorage, StudioTeamStorageDB } from './storage/StudioTeamStorage';
-import { CurrencyService } from './services/CurrencyService';
-import { PurchaseService } from './services/PurchaseService';
-import { LedgerService } from './services/LedgerService';
+} from './errors/MarketplaceErrors.js';
+import { LikesStorage } from './storage/LikesStorage.js';
+import { FriendsStorage } from './storage/FriendsStorage.js';
+import { MessagesStorage } from './storage/MessagesStorage.js';
+import { BlockedUsersStorage } from './storage/BlockedUsersStorage.js';
+import { NotificationsStorage } from './storage/NotificationsStorage.js';
+import { UserSettingsStorage } from './storage/UserSettingsStorage.js';
+import { ForumStorage } from './storage/ForumStorage.js';
+import { ShopStorage } from './storage/ShopStorage.js';
+import { ShopStorageDB } from './storage/ShopStorageDB.js';
+import { AssetStorage } from './storage/AssetStorage.js';
+import { AssetStorageDB } from './storage/AssetStorageDB.js';
+import { PurchaseStorage } from './storage/PurchaseStorage.js';
+import { PurchaseStorageDB } from './storage/PurchaseStorageDB.js';
+import { StudioProjectsStorage, StudioProjectsStorageDB } from './storage/StudioProjectsStorage.js';
+import { StudioSettingsStorage, StudioSettingsStorageDB } from './storage/StudioSettingsStorage.js';
+import { StudioTeamStorage, StudioTeamStorageDB } from './storage/StudioTeamStorage.js';
+import { CurrencyService } from './services/CurrencyService.js';
+import { PurchaseService } from './services/PurchaseService.js';
+import { LedgerService } from './services/LedgerService.js';
 import { CurrencyEventNames, type CurrencyAmount } from '@engine/economy';
-import { generateAndSaveThumbnail } from './utils/thumbnailGenerator';
-import { createDbPool, ensureSchema, getPrismaClient, disconnectPrisma } from './lib/db';
+import { generateAndSaveThumbnail } from './utils/thumbnailGenerator.js';
+import { createDbPool, ensureSchema, getPrismaClient, disconnectPrisma } from './lib/db.js';
 
 // Note: Fastify handles async errors natively, no need for asyncHandler
 
 // Import route modules
-import { createAuthRoutes } from './routes/auth.routes';
-import { createUsersRoutes } from './routes/users.routes';
-import { createMarketplaceRoutes } from './routes/marketplace.routes';
-import { createFriendsRoutes } from './routes/friends.routes';
-import { createMessagesRoutes } from './routes/messages.routes';
-import { createShareRoutes } from './routes/share.routes';
-import { createNotificationsRoutes } from './routes/notifications.routes';
-import { createSettingsRoutes } from './routes/settings.routes';
-import { createShopRoutes } from './routes/shop.routes';
-import { createStudioRoutes } from './routes/studio.routes';
-import { createForumRoutes } from './routes/forum.routes';
-import { createAdminRoutes } from './routes/admin.routes';
-import type { RouteDependencies } from './routes/index';
+import { createAuthRoutes } from './routes/auth.routes.js';
+import { createUsersRoutes } from './routes/users.routes.js';
+import { createMarketplaceRoutes } from './routes/marketplace.routes.js';
+import { createFriendsRoutes } from './routes/friends.routes.js';
+import { createMessagesRoutes } from './routes/messages.routes.js';
+import { createShareRoutes } from './routes/share.routes.js';
+import { createNotificationsRoutes } from './routes/notifications.routes.js';
+import { createSettingsRoutes } from './routes/settings.routes.js';
+import { createShopRoutes } from './routes/shop.routes.js';
+import { createStudioRoutes } from './routes/studio.routes.js';
+import { createForumRoutes } from './routes/forum.routes.js';
+import { createAdminRoutes } from './routes/admin.routes.js';
+import { createGamesRoutes } from './routes/games.routes.js';
+import type { RouteDependencies } from './routes/index.js';
 
 // Type for Prisma Client (backward compatibility)
 // Note: This is PrismaClient, not pg.Pool, but kept name for compatibility
@@ -390,8 +391,8 @@ void authManager.initialize().then(async () => {
   await forumStorage.initialize();
   console.log('All storage systems initialized');
 
-  // Auto-seed marketplace if empty (development only)
-  if (!isProduction) {
+  // Auto-seed marketplace if empty (development only, skip in tests)
+  if (!isProduction && process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
     const existingItems = await marketplaceStorage.getItems({ limit: 100 });
     if (existingItems.length === 0) {
       console.log('Marketplace is empty, seeding mock builds and avatars...');
@@ -549,6 +550,7 @@ const routeDeps: RouteDependencies = {
 await app.register(createAuthRoutes, { prefix: '/api/auth', dependencies: routeDeps });
 await app.register(createUsersRoutes, { prefix: '/api/users', dependencies: routeDeps });
 await app.register(createMarketplaceRoutes, { prefix: '/api/marketplace', dependencies: routeDeps });
+await app.register(createGamesRoutes, { prefix: '/api/games', dependencies: routeDeps });
 await app.register(createFriendsRoutes, { prefix: '/api/friends', dependencies: routeDeps });
 await app.register(createMessagesRoutes, { prefix: '/api/messages', dependencies: routeDeps });
 await app.register(createShareRoutes, { prefix: '/api/share', dependencies: routeDeps });
@@ -680,6 +682,7 @@ export {
   likesStorage,
   buildStorage,
   gameSessionTracker,
+  studioProjectsStorage,
   dbPool,
 };
 
@@ -689,3 +692,4 @@ if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
   console.log(`Net server listening on http://localhost:${PORT}`);
   console.log(`Data directory: ${DATA_DIR}`);
 }
+

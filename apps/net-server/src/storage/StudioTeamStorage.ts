@@ -1,16 +1,16 @@
-/**
+﻿/**
  * Studio Team Storage - manages teams, members, invitations and project access
  * Supports both PostgreSQL (preferred) and JSON file storage (fallback)
  */
 
-import type { PrismaClient } from '../../node_modules/.prisma/net-client';
+import type { PrismaClient } from '../../node_modules/.prisma/net-client/index.js';
 import { randomBytes } from 'node:crypto';
 import { promises as fs } from 'fs';
 import path from 'path';
 
 export interface StudioTeam {
   id: string;
-  studioOwnerId: string; // User ID właściciela studia
+  studioOwnerId: string; // User ID wÅ‚aÅ›ciciela studia
   name: string;
   description?: string;
   createdAt: number;
@@ -1015,3 +1015,5 @@ export class StudioTeamStorage {
     return true;
   }
 }
+
+

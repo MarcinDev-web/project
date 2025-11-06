@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { emailSchema } from './base';
+import { emailSchema } from './base.js';
 
 /**
  * Password validation schema.
@@ -53,3 +53,4 @@ export type RegisterRequest = z.infer<typeof registerSchema>;
 export type LoginRequest = z.infer<typeof loginSchema>;
 export type RefreshTokenRequest = z.infer<typeof refreshTokenSchema>;
 export type LogoutRequest = z.infer<typeof logoutSchema>;
+

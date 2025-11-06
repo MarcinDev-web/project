@@ -11,7 +11,7 @@
   "scripts": {
     "prebuild": "node -e \"console.log('Warning: Skipping wasm-pack installation, will use pre-built WASM files')\"",
     "postinstall": "node -e \"\"",
-    "build": "pnpm --filter @engine/economy build && pnpm --filter @engine/world build && pnpm --filter @engine/voxel build && pnpm --filter @engine/world-server build && pnpm -r build",
+    "build": "pnpm -r build",
     "dev": "pnpm --filter @apps/editor dev",
     "test": "pnpm -r test",
     "lint": "pnpm -r lint",
@@ -44,6 +44,7 @@
   "description": "",
   "devDependencies": {
     "@eslint/js": "^9.37.0",
+    "@playwright/test": "^1.56.1",
     "@types/node": "^24.7.2",
     "@vercel/node": "^5.5.3",
     "@webgpu/types": "^0.1.65",

@@ -4,8 +4,8 @@
 
 import { describe, it, expect } from 'vitest';
 import request from 'supertest';
-import { app, marketplaceStorage, buildStorage } from '../../server';
-import { createTestMarketplaceItem, createTestBuild, waitForItem } from '../helpers/testHelpers';
+import { app, marketplaceStorage, buildStorage } from '../../server.js';
+import { createTestMarketplaceItem, createTestBuild, waitForItem } from '../helpers/testHelpers.js';
 
 describe.skip('GET /api/marketplace/:id/build', () => {
   // Use server's shared instances to ensure items are valid
@@ -80,5 +80,6 @@ describe.skip('GET /api/marketplace/:id/build', () => {
       .expect(404);
   });
 });
+
 
 

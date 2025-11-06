@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { SessionManager } from '../SessionManager';
+import { SessionManager } from '../SessionManager.js';
 import type { WebSocket } from 'ws';
 
 // WebSocket readyState constants
@@ -88,4 +88,5 @@ describe('SessionManager', () => {
     expect(mockWsWithSend.send).not.toHaveBeenCalled();
   });
 });
+
 

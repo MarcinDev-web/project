@@ -341,3 +341,4 @@ export class FileUploadValidator {
 
 // Singleton instance
 export const fileUploadValidator = new FileUploadValidator();
+

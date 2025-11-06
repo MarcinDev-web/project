@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import type { RouteDependencies } from './index';
+import type { RouteDependencies } from './index.js';
 
 /**
  * Create settings routes for Fastify
@@ -83,3 +83,4 @@ export async function createSettingsRoutes(
     }
   );
 }
+

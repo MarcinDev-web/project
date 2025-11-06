@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { NotificationsStorage } from '../NotificationsStorage';
+import { NotificationsStorage } from '../NotificationsStorage.js';
 import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
@@ -167,4 +167,5 @@ describe('NotificationsStorage', () => {
     expect(notification.metadata?.messageId).toBe('msg_456');
   });
 });
+
 

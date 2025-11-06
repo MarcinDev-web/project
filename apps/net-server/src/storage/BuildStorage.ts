@@ -1,9 +1,9 @@
-/**
+﻿/**
  * Build Storage - stores actual project/scene data for marketplace builds
  */
 
-import type { PrismaClient } from '../../node_modules/.prisma/net-client';
-import type { ProjectData } from '../types';
+import type { PrismaClient } from '../../node_modules/.prisma/net-client/index.js';
+import type { ProjectData } from '../types.js';
 
 export class BuildStorage {
   constructor(private readonly prisma: PrismaClient) {}
@@ -94,3 +94,5 @@ export class BuildStorage {
     return count > 0;
   }
 }
+
+

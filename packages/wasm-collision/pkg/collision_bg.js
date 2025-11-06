@@ -21,6 +21,31 @@ function passArrayF32ToWasm0(arg, malloc) {
     WASM_VECTOR_LEN = arg.length;
     return ptr;
 }
+/**
+ * @param {Float32Array} a_center
+ * @param {Float32Array} a_axes
+ * @param {Float32Array} a_half
+ * @param {Float32Array} b_center
+ * @param {Float32Array} b_axes
+ * @param {Float32Array} b_half
+ * @returns {boolean}
+ */
+export function obb_intersect(a_center, a_axes, a_half, b_center, b_axes, b_half) {
+    const ptr0 = passArrayF32ToWasm0(a_center, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArrayF32ToWasm0(a_axes, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ptr2 = passArrayF32ToWasm0(a_half, wasm.__wbindgen_malloc);
+    const len2 = WASM_VECTOR_LEN;
+    const ptr3 = passArrayF32ToWasm0(b_center, wasm.__wbindgen_malloc);
+    const len3 = WASM_VECTOR_LEN;
+    const ptr4 = passArrayF32ToWasm0(b_axes, wasm.__wbindgen_malloc);
+    const len4 = WASM_VECTOR_LEN;
+    const ptr5 = passArrayF32ToWasm0(b_half, wasm.__wbindgen_malloc);
+    const len5 = WASM_VECTOR_LEN;
+    const ret = wasm.obb_intersect(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4, ptr5, len5);
+    return ret !== 0;
+}
 
 let cachedUint32ArrayMemory0 = null;
 
@@ -91,32 +116,6 @@ export function batch_check_trs(pre_pos, pre_rot, pre_scl, others_pos, others_ro
     var v7 = getArrayU32FromWasm0(ret[0], ret[1]).slice();
     wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
     return v7;
-}
-
-/**
- * @param {Float32Array} a_center
- * @param {Float32Array} a_axes
- * @param {Float32Array} a_half
- * @param {Float32Array} b_center
- * @param {Float32Array} b_axes
- * @param {Float32Array} b_half
- * @returns {boolean}
- */
-export function obb_intersect(a_center, a_axes, a_half, b_center, b_axes, b_half) {
-    const ptr0 = passArrayF32ToWasm0(a_center, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArrayF32ToWasm0(a_axes, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ptr2 = passArrayF32ToWasm0(a_half, wasm.__wbindgen_malloc);
-    const len2 = WASM_VECTOR_LEN;
-    const ptr3 = passArrayF32ToWasm0(b_center, wasm.__wbindgen_malloc);
-    const len3 = WASM_VECTOR_LEN;
-    const ptr4 = passArrayF32ToWasm0(b_axes, wasm.__wbindgen_malloc);
-    const len4 = WASM_VECTOR_LEN;
-    const ptr5 = passArrayF32ToWasm0(b_half, wasm.__wbindgen_malloc);
-    const len5 = WASM_VECTOR_LEN;
-    const ret = wasm.obb_intersect(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4, ptr5, len5);
-    return ret !== 0;
 }
 
 /**

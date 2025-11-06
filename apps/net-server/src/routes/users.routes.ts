@@ -1,8 +1,8 @@
 import type { FastifyInstance } from 'fastify';
 import { z } from 'zod';
-import type { RouteDependencies } from './index';
-import { updateProfileSchema, userIdParamSchema } from '../validation/schemas/user';
-import { validateBody, validateParams } from '../validation/middleware';
+import type { RouteDependencies } from './index.js';
+import { updateProfileSchema, userIdParamSchema } from '../validation/schemas/user.js';
+import { validateBody, validateParams } from '../validation/middleware.js';
 
 /**
  * Create users routes for Fastify
@@ -243,6 +243,7 @@ export async function createUsersRoutes(
     }
   );
 }
+
 
 
 

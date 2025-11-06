@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { GameSessionTracker } from '../GameSessionTracker';
+import { GameSessionTracker } from '../GameSessionTracker.js';
 
 describe('GameSessionTracker', () => {
   let tracker: GameSessionTracker;
@@ -239,3 +239,4 @@ describe('GameSessionTracker', () => {
     });
   });
 });
+

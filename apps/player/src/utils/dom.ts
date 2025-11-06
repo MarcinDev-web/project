@@ -1,10 +1,10 @@
-/**
+﻿/**
  * DOM utilities for player app
  */
 
 export interface PlayerDomHandles {
   canvas: HTMLCanvasElement;
-  statusEl: HTMLElement | null;
+  statusEl: HTMLElement;
   loadingEl: HTMLElement | null;
   errorEl: HTMLElement | null;
   exitButton: HTMLButtonElement | null;
@@ -21,6 +21,10 @@ export function requirePlayerDom(): PlayerDomHandles {
     throw new Error('Canvas element not found');
   }
 
+  if (!statusElement) {
+    throw new Error('Status element not found');
+  }
+
   return {
     canvas: canvasEl,
     statusEl: statusElement,
@@ -29,4 +33,3 @@ export function requirePlayerDom(): PlayerDomHandles {
     exitButton,
   };
 }
-

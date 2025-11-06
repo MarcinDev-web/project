@@ -1,32 +1,32 @@
-import type { AuthManager } from '../auth/AuthManager';
-import type { SessionManager } from '../websocket/SessionManager';
-import type { GameSessionTracker } from '../websocket/GameSessionTracker';
-import type { MessageHandler } from '../websocket/MessageHandler';
-import type { ForumHandler } from '../websocket/ForumHandler';
-import type { ProjectStorage } from '../storage/ProjectStorage';
-import type { UserProfileStorage } from '../storage/UserProfileStorage';
-import type { MarketplaceStorage } from '../storage/MarketplaceStorage';
-import type { MarketplaceStorageDB } from '../storage/MarketplaceStorageDB';
-import type { BuildStorage } from '../storage/BuildStorage';
-import type { LikesStorage } from '../storage/LikesStorage';
-import type { FriendsStorage } from '../storage/FriendsStorage';
-import type { MessagesStorage } from '../storage/MessagesStorage';
-import type { BlockedUsersStorage } from '../storage/BlockedUsersStorage';
-import type { NotificationsStorage } from '../storage/NotificationsStorage';
-import type { UserSettingsStorage } from '../storage/UserSettingsStorage';
-import type { ForumStorage } from '../storage/ForumStorage';
-import type { ShopStorage } from '../storage/ShopStorage';
-import type { AssetStorage } from '../storage/AssetStorage';
-import type { PurchaseStorage } from '../storage/PurchaseStorage';
-import type { StudioProjectsStorage } from '../storage/StudioProjectsStorage';
-import type { StudioTeamStorage } from '../storage/StudioTeamStorage';
-import type { StudioSettingsStorage } from '../storage/StudioSettingsStorage';
-import type { CurrencyService } from '../services/CurrencyService';
-import type { PurchaseService } from '../services/PurchaseService';
-import type { LedgerService } from '../services/LedgerService';
+﻿import type { AuthManager } from '../auth/AuthManager.js';
+import type { SessionManager } from '../websocket/SessionManager.js';
+import type { GameSessionTracker } from '../websocket/GameSessionTracker.js';
+import type { MessageHandler } from '../websocket/MessageHandler.js';
+import type { ForumHandler } from '../websocket/ForumHandler.js';
+import type { ProjectStorage } from '../storage/ProjectStorage.js';
+import type { UserProfileStorage } from '../storage/UserProfileStorage.js';
+import type { MarketplaceStorage } from '../storage/MarketplaceStorage.js';
+import type { MarketplaceStorageDB } from '../storage/MarketplaceStorageDB.js';
+import type { BuildStorage } from '../storage/BuildStorage.js';
+import type { LikesStorage } from '../storage/LikesStorage.js';
+import type { FriendsStorage } from '../storage/FriendsStorage.js';
+import type { MessagesStorage } from '../storage/MessagesStorage.js';
+import type { BlockedUsersStorage } from '../storage/BlockedUsersStorage.js';
+import type { NotificationsStorage } from '../storage/NotificationsStorage.js';
+import type { UserSettingsStorage } from '../storage/UserSettingsStorage.js';
+import type { ForumStorage } from '../storage/ForumStorage.js';
+import type { ShopStorage } from '../storage/ShopStorage.js';
+import type { AssetStorage } from '../storage/AssetStorage.js';
+import type { PurchaseStorage } from '../storage/PurchaseStorage.js';
+import type { StudioProjectsStorage } from '../storage/StudioProjectsStorage.js';
+import type { StudioTeamStorage } from '../storage/StudioTeamStorage.js';
+import type { StudioSettingsStorage } from '../storage/StudioSettingsStorage.js';
+import type { CurrencyService } from '../services/CurrencyService.js';
+import type { PurchaseService } from '../services/PurchaseService.js';
+import type { LedgerService } from '../services/LedgerService.js';
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { CurrencyAmount } from '@engine/economy';
-import type { PrismaClient } from '../../node_modules/.prisma/net-client';
+import type { PrismaClient } from '../../node_modules/.prisma/net-client/index.js';
 
 /**
  * RouteDependencies - all dependencies needed by route handlers
@@ -153,3 +153,5 @@ export interface RouteDependencies {
   ECONOMY_LISTING_FEE: Record<string, number>;
   ECONOMY_PLATFORM_FEE_BPS: number;
 }
+
+

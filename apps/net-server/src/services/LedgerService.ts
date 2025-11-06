@@ -54,3 +54,4 @@ export class LedgerService {
     return this.entries.slice(start).reverse();
   }
 }
+

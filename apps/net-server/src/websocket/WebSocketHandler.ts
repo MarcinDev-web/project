@@ -1,11 +1,11 @@
 import { WebSocketServer, WebSocket } from 'ws';
-import { ReplicationServer } from './ReplicationServer';
-import { SessionManager } from './SessionManager';
-import { AuthManager } from '../auth/AuthManager';
-import { MessageHandler } from './MessageHandler';
-import { FriendsStorage } from '../storage/FriendsStorage';
-import { securityLogger } from '../logging/SecurityLogger';
-import type { PresenceOnlineMessage, PresenceOfflineMessage } from '../types/websocket';
+import { ReplicationServer } from './ReplicationServer.js';
+import { SessionManager } from './SessionManager.js';
+import { AuthManager } from '../auth/AuthManager.js';
+import { MessageHandler } from './MessageHandler.js';
+import { FriendsStorage } from '../storage/FriendsStorage.js';
+import { securityLogger } from '../logging/SecurityLogger.js';
+import type { PresenceOnlineMessage, PresenceOfflineMessage } from '../types/websocket.js';
 
 /**
  * WebSocket security constants.
@@ -290,3 +290,4 @@ export class WebSocketHandler {
     this.wss.close();
   }
 }
+

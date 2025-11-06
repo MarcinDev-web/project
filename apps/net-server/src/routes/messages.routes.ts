@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import type { RouteDependencies } from './index';
+import type { RouteDependencies } from './index.js';
 
 /**
  * Create messages routes for Fastify
@@ -593,3 +593,4 @@ export async function createMessagesRoutes(
     }
   );
 }
+

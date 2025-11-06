@@ -1,7 +1,7 @@
 import type { WebSocket } from 'ws';
-import type { CollaborationSession, PublicUser } from '../types/websocket';
-import type { PublicUser as AuthPublicUser } from '../types/auth';
-import type { AuthManager } from '../auth/AuthManager';
+import type { CollaborationSession, PublicUser } from '../types/websocket.js';
+import type { PublicUser as AuthPublicUser } from '../types/auth.js';
+import type { AuthManager } from '../auth/AuthManager.js';
 
 /**
  * Manages active collaboration sessions and WebSocket connections.
@@ -267,3 +267,4 @@ export class SessionManager {
     this.presenceCallback = callback;
   }
 }
+

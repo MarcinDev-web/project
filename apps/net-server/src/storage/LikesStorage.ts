@@ -1,11 +1,11 @@
-/**
+﻿/**
  * Likes Storage - manages likes for marketplace items
  */
 
 import { promises as fs } from 'fs';
 import path from 'path';
-import type { PrismaClient } from '../../node_modules/.prisma/net-client';
-import type { MarketplaceStorage } from './MarketplaceStorage';
+import type { PrismaClient } from '../../node_modules/.prisma/net-client/index.js';
+import type { MarketplaceStorage } from './MarketplaceStorage.js';
 
 export class LikesStorage {
   private readonly dataDir?: string;
@@ -220,3 +220,5 @@ export class LikesStorage {
     }
   }
 }
+
+

@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { uuidSchema } from './base';
+import { uuidSchema } from './base.js';
 
 /**
  * Position schema (3D vector).
@@ -120,3 +120,4 @@ export type CursorUpdateMessageRequest = z.infer<typeof cursorUpdateMessageSchem
 export type PingMessageRequest = z.infer<typeof pingMessageSchema>;
 export type MessageTypingRequest = z.infer<typeof messageTypingSchema>;
 export type WebSocketMessageRequest = z.infer<typeof websocketMessageSchema>;
+

@@ -3,9 +3,9 @@
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { MessageHandler } from '../MessageHandler';
-import { MessagesStorage } from '../../storage/MessagesStorage';
-import { SessionManager } from '../SessionManager';
+import { MessageHandler } from '../MessageHandler.js';
+import { MessagesStorage } from '../../storage/MessagesStorage.js';
+import { SessionManager } from '../SessionManager.js';
 import type { WebSocket } from 'ws';
 
 describe('MessageHandler', () => {
@@ -136,4 +136,5 @@ describe('MessageHandler', () => {
     expect(sentMessage.userId).toBe(userId2);
   });
 });
+
 

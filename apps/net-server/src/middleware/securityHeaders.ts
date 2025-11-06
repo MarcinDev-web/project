@@ -114,3 +114,4 @@ export async function securityHeadersHook(
     reply.header('Expires', '0');
   }
 }
+

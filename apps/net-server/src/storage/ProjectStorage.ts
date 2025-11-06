@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import type { StoredShare } from '../types';
+import type { StoredShare } from '../types.js';
 
 /**
  * JSON file-based storage for shared projects.
@@ -190,3 +190,4 @@ export class ProjectStorage {
     return Array.from(this.storage.keys());
   }
 }
+

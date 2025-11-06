@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { uuidSchema, trimmedStringSchema } from './base';
+import { uuidSchema, trimmedStringSchema } from './base.js';
 
 /**
  * Avatar loadout schema (flexible structure for avatar customization).
@@ -47,3 +47,4 @@ export const userIdParamSchema = z.object({
 export type UpdateProfileRequest = z.infer<typeof updateProfileSchema>;
 export type UpdateAvatarLoadoutRequest = z.infer<typeof updateAvatarLoadoutSchema>;
 export type UserIdParam = z.infer<typeof userIdParamSchema>;
+

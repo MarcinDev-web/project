@@ -93,3 +93,4 @@ export async function csrfHook(
   // Then validate for state-changing operations
   await csrfValidationHook(request, reply);
 }
+

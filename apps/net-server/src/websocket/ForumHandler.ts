@@ -2,8 +2,8 @@
  * WebSocket handler for real-time forum updates.
  */
 
-import { SessionManager } from './SessionManager';
-import type { ForumStorage, ForumThread, ForumPost, Reaction } from '../storage/ForumStorage';
+import { SessionManager } from './SessionManager.js';
+import type { ForumStorage, ForumThread, ForumPost, Reaction } from '../storage/ForumStorage.js';
 import type {
   ForumThreadNewMessage,
   ForumThreadUpdatedMessage,
@@ -14,7 +14,7 @@ import type {
   ForumReactionNewMessage,
   ForumReactionRemovedMessage,
   ForumVoteChangedMessage,
-} from '../types/websocket';
+} from '../types/websocket.js';
 
 export class ForumHandler {
   private readonly sessionManager: SessionManager;
@@ -257,3 +257,4 @@ export class ForumHandler {
     this.broadcastToAll(fullMessage, excludeUserId);
   }
 }
+

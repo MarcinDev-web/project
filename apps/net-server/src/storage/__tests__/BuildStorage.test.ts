@@ -1,12 +1,12 @@
-/**
+﻿/**
  * Tests for BuildStorage
  */
 
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { getPrismaClient, ensureSchema } from '../../lib/db';
-import { BuildStorage } from '../BuildStorage';
-import type { PrismaClient } from '../../../node_modules/.prisma/net-client';
-import type { ProjectData } from '../../types';
+import { getPrismaClient, ensureSchema } from '../../lib/db.js';
+import { BuildStorage } from '../BuildStorage.js';
+import type { PrismaClient } from '../../../node_modules/.prisma/net-client/index.js';
+import type { ProjectData } from '../../types.js';
 
 describe('BuildStorage', () => {
   let prisma: PrismaClient;
@@ -251,3 +251,5 @@ describe('BuildStorage', () => {
     });
   });
 });
+
+

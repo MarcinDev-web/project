@@ -131,3 +131,4 @@ export class NotificationsStorage {
     return true;
   }
 }
+

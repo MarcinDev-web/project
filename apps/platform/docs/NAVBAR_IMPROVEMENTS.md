@@ -174,6 +174,82 @@ const isActive = (path: string) => {
 
 ---
 
+---
+
+## 🪟 Glassmorphism Enhancement (2025-11-05)
+
+### 📋 Podsumowanie
+
+Dodano efekt glassmorphism do navbaru dla zwiększenia kontrastu, warstwowości i lepszej integracji z aplikacją.
+
+### ✨ Nowe Funkcje
+
+#### 1. **Glassmorphism Background**
+- **Przezroczyste tło**: `rgba(30, 35, 42, 0.85)` zamiast pełnej krycia
+- **Backdrop filter**: `blur(12px)` dla efektu rozmycia tła
+- **Wsparcie przeglądarek**: Dodano `-webkit-backdrop-filter` dla Safari
+
+#### 2. **Zaawansowane cieniowanie**
+- **Wielowarstwowe cienie** dla głębi przestrzennej:
+  - Główny cień: `0 4px 12px rgba(0, 0, 0, 0.25)`
+  - Dodatkowy cień: `0 2px 6px rgba(0, 0, 0, 0.15)`
+  - Wewnętrzny połysk: `inset 0 1px 0 rgba(255, 255, 255, 0.05)`
+
+#### 3. **Subtelny border**
+- **Półprzezroczysty border**: `rgba(70, 80, 95, 0.3)` zamiast solid
+- **Lepsza integracja** z glassmorphism efektem
+
+### 🎨 Efekty Wizualne
+
+#### Przed
+- Pełne, matowe tło (`--bg-panel`)
+- Prosty cień: `0 1px 3px rgba(0, 0, 0, 0.1)`
+- Solid border
+
+#### Po
+- ✅ Przezroczyste tło z rozmytym tłem
+- ✅ Wielowarstwowe cieniowanie dla głębi
+- ✅ Subtelny, półprzezroczysty border
+- ✅ Efekt szkła z wewnętrznym połyskiem
+
+### 🔧 Zmiany Techniczne
+
+**Plik:** `apps/platform/src/styles/layout.css`
+
+```css
+.navbar {
+  background: rgba(30, 35, 42, 0.85);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-bottom: 1px solid rgba(70, 80, 95, 0.3);
+  box-shadow:
+    0 4px 12px rgba(0, 0, 0, 0.25),
+    0 2px 6px rgba(0, 0, 0, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.05);
+}
+```
+
+### 🎯 Korzyści UX
+
+1. **Lepsza integracja** - Navbar wygląda jak część aplikacji, nie nałożona belka
+2. **Większy kontrast** - Glassmorphism zwiększa czytelność treści
+3. **Głębia przestrzenna** - Wielowarstwowe cienie tworzą lepsze postrzeganie głębi
+4. **Nowoczesny wygląd** - Efekt szkła popularny w współczesnych aplikacjach
+
+### 🧪 Testowanie
+
+**Testy manualne:**
+- [ ] Sprawdź efekt glassmorphism na różnych tłach
+- [ ] Zweryfikuj czytelność tekstu na rozmytym tle
+- [ ] Przetestuj na różnych przeglądarkach (Safari, Chrome, Firefox)
+- [ ] Sprawdź wydajność na słabszych urządzeniach
+
+**Data:** 2025-11-05
+**Autor:** AI Assistant
+**Status:** ✅ Zaimplementowane
+
+---
+
 **Data:** 2025-11-01  
 **Autor:** AI Assistant  
 **Status:** ✅ Zaimplementowane

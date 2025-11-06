@@ -30,19 +30,12 @@ COPY packages/*/package.json ./packages/
 # Install dependencies (production + dev for build)
 RUN pnpm i --frozen-lockfile
 
-# Copy source code
-COPY apps ./apps
+# Copy built packages and applications
 COPY packages ./packages
-COPY shared ./shared
+COPY apps/net-server ./apps/net-server
 
-# Build required packages for net-server (recursive -r automatically builds dependencies)
-RUN pnpm --filter "@engine/core" --filter "@engine/animation" --filter "@engine/blocks" --filter "@engine/world" --filter "@engine/world-server" --filter "@engine/economy" --filter "@engine/script" -r build
-
-# Generate Prisma client before build
-RUN pnpm -C apps/net-server db:generate
-
-# Build the application
-RUN pnpm -C apps/net-server build
+# Generate Prisma client (dummy DATABASE_URL for client generation)
+RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" pnpm -C apps/net-server db:generate
 
 # Production image - minimal dependencies
 FROM base AS runner
@@ -66,14 +59,14 @@ COPY --from=builder --chown=nodejs:nodejs /app/package.json ./
 COPY --from=builder --chown=nodejs:nodejs /app/apps/net-server/package.json ./apps/net-server/
 COPY --from=builder --chown=nodejs:nodejs /app/packages ./packages
 
-# Copy only built application
-COPY --from=builder --chown=nodejs:nodejs /app/apps/net-server/dist ./apps/net-server/dist
+# Install production dependencies
+RUN CI=true pnpm install --frozen-lockfile --prod
 
-# Copy only production node_modules (from builder stage)
-COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
+# Copy built application (pre-built locally)
+COPY --chown=nodejs:nodejs apps/net-server/dist ./apps/net-server/dist
 
 # Prune dev dependencies (keep only production)
-RUN pnpm prune --prod
+RUN CI=true pnpm prune --prod
 
 # Switch to non-root user
 USER nodejs

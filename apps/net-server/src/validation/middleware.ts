@@ -6,8 +6,8 @@
 
 import type { FastifyReply, FastifyRequest } from 'fastify';
 import { z } from 'zod';
-import { securityLogger } from '../logging/SecurityLogger';
-import { FileUploadValidator } from '../security/FileUploadValidator';
+import { securityLogger } from '../logging/SecurityLogger.js';
+import { FileUploadValidator } from '../security/FileUploadValidator.js';
 
 /**
  * Validation error interface.
@@ -305,3 +305,4 @@ export function validateFileUpload(
     }
   };
 }
+

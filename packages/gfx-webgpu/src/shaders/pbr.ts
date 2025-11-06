@@ -321,9 +321,9 @@ fn fs_main(
   let specularIBL = prefilteredColor * (F0 * brdf.x + brdf.y);
   
   // Combine diffuse and specular IBL
-  let kS = fresnel_schlick(max(dot(N, V), 0.0), F0);
-  let kD = (1.0 - kS) * (1.0 - metallic);
-  let ambient = (kD * diffuseIBL * baseColor + specularIBL) * uniforms.ambientIntensity;
+  let kS_IBL = fresnel_schlick(max(dot(N, V), 0.0), F0);
+  let kD_IBL = (1.0 - kS_IBL) * (1.0 - metallic);
+  let ambient = (kD_IBL * diffuseIBL * baseColor + specularIBL) * uniforms.ambientIntensity;
 
   // Simple voxel tri-tone based on face orientation (top/side/bottom)
   let topMask = step(0.5, N.y);
@@ -360,10 +360,10 @@ fn fs_main(
   let specular = (D * G * F) / max(4.0 * max(dot(N, V), 0.0) * NdotL, 1e-4);
   let diffuse = lambert(baseColor) * (1.0 - metallic);
   
-  let kS = F;
-  let kD = (1.0 - kS) * (1.0 - metallic);
+  let kS_dir = F;
+  let kD_dir = (1.0 - kS_dir) * (1.0 - metallic);
   
-  var direct = (kD * diffuse + kS * specular) * uniforms.directionalLightColor * NdotL * shadowVal;
+  var direct = (kD_dir * diffuse + kS_dir * specular) * uniforms.directionalLightColor * NdotL * shadowVal;
 
   // Point lights - Full Cook-Torrance PBR
   for (var i = 0u; i < uniforms.pointLightCount && i < MAX_POINT_LIGHTS; i++) {
@@ -384,10 +384,10 @@ fn fs_main(
       let specular = (D * G * F) / max(4.0 * max(dot(N, V), 0.0) * NdotL, 1e-4);
       let diffuse = lambert(baseColor) * (1.0 - metallic);
       
-      let kS = F;
-      let kD = (1.0 - kS) * (1.0 - metallic);
+      let kS_point = F;
+      let kD_point = (1.0 - kS_point) * (1.0 - metallic);
       
-      direct += (kD * diffuse + kS * specular) * uniforms.pointLights[i].color * NdotL * attenuation;
+      direct += (kD_point * diffuse + kS_point * specular) * uniforms.pointLights[i].color * NdotL * attenuation;
     }
   }
 

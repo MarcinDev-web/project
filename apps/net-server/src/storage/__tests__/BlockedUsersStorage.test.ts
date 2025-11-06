@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { BlockedUsersStorage } from '../BlockedUsersStorage';
+import { BlockedUsersStorage } from '../BlockedUsersStorage.js';
 import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
@@ -117,4 +117,5 @@ describe('BlockedUsersStorage', () => {
     expect(blockedBy.length).toBe(2);
   });
 });
+
 

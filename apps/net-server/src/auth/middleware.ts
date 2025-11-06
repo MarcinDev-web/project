@@ -1,6 +1,6 @@
 import type { FastifyReply, FastifyRequest } from 'fastify';
-import type { AuthManager } from './AuthManager';
-import type { UserRole } from '../types/auth';
+import type { AuthManager } from './AuthManager.js';
+import type { UserRole } from '../types/auth.js';
 
 /**
  * Extend FastifyRequest to include user.
@@ -106,3 +106,4 @@ export function requireRole(role: UserRole) {
     }
   };
 }
+

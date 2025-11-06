@@ -9,6 +9,19 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+// Users
+model User {
+  id           String   @id
+  email        String   @unique
+  passwordHash String   @map("password_hash")
+  createdAt    DateTime @default(now()) @map("created_at")
+  updatedAt    DateTime @default(now()) @updatedAt @map("updated_at")
+  active       Boolean  @default(true)
+  role         String   @default("user") // 'user' | 'moderator' | 'admin'
+
+  @@map("users")
+}
+
 // Marketplace
 model MarketplaceItem {
   id            String    @id

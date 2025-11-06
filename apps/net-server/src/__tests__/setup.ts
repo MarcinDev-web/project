@@ -1,12 +1,12 @@
-/**
+﻿/**
  * Test setup infrastructure for API integration tests
  */
 
 import { afterEach, beforeEach } from 'vitest';
 import type { FastifyInstance } from 'fastify';
-import { app } from '../server';
-import { createDbPool, ensureSchema } from '../lib/db';
-import type { PrismaClient } from '../../node_modules/.prisma/net-client';
+import { app } from '../server.js';
+import { createDbPool, ensureSchema } from '../lib/db.js';
+import type { PrismaClient } from '../../node_modules/.prisma/net-client/index.js';
 import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
@@ -83,4 +83,6 @@ beforeEach(async () => {
 afterEach(async () => {
   await cleanupTestEnvironment();
 });
+
+
 

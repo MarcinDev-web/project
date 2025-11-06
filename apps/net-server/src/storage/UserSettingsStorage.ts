@@ -117,3 +117,4 @@ export class UserSettingsStorage {
     return settings.notificationPreferences[type];
   }
 }
+

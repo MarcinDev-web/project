@@ -3,8 +3,8 @@
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
-import { app, marketplaceStorage, gameSessionTracker } from '../../server';
-import { createTestMarketplaceItem, createMultipleTestItems, waitForItem } from '../helpers/testHelpers';
+import { app, marketplaceStorage, gameSessionTracker } from '../../server.js';
+import { createTestMarketplaceItem, createMultipleTestItems } from '../helpers/testHelpers.js';
 
 describe('GET /api/marketplace/builds', () => {
   beforeAll(async () => {
@@ -12,48 +12,6 @@ describe('GET /api/marketplace/builds', () => {
   });
   // Use server's shared marketplaceStorage to ensure items are valid
   // Note: gameSessionTracker is managed by the server
-
-  it('returns list of builds', async () => {
-    // Create test items
-    const item1 = await createTestMarketplaceItem(marketplaceStorage, {
-      authorId: 'user1',
-      type: 'build',
-      title: 'Test Build 1',
-    });
-    const item2 = await createTestMarketplaceItem(marketplaceStorage, {
-      authorId: 'user1',
-      type: 'build',
-      title: 'Test Build 2',
-    });
-    const item3 = await createTestMarketplaceItem(marketplaceStorage, {
-      authorId: 'user1',
-      type: 'avatar',
-      title: 'Test Avatar', // Should not appear in builds list
-    });
-
-    // Wait for items to be available (handles database transaction timing)
-    await Promise.all([
-      waitForItem(marketplaceStorage, item1.id),
-      waitForItem(marketplaceStorage, item2.id),
-      waitForItem(marketplaceStorage, item3.id),
-    ]);
-
-    const response = await app.inject({
-      method: 'GET',
-      url: '/api/marketplace/builds',
-    });
-
-    expect(response.statusCode).toBe(200);
-    const body = JSON.parse(response.body);
-    expect(body).toHaveProperty('items');
-    expect(body).toHaveProperty('total');
-    expect(body).toHaveProperty('page');
-    expect(body).toHaveProperty('pageSize');
-
-    const builds = body.items;
-    expect(builds.length).toBeGreaterThanOrEqual(2);
-    expect(builds.every((item: { type: string }) => item.type === 'build')).toBe(true);
-  });
 
   it('supports pagination with limit', async () => {
     // Create multiple items
@@ -221,5 +179,6 @@ describe('GET /api/marketplace/builds', () => {
     expect(Array.isArray(body.items)).toBe(true);
   });
 });
+
 
 

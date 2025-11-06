@@ -1,11 +1,12 @@
-import bcrypt from 'bcrypt';
+﻿import bcrypt from 'bcrypt';
 import jwt from 'jsonwebtoken';
 import { randomBytes } from 'node:crypto';
-import { UserStorage } from './UserStorage';
-import { TokenBlacklistService } from './TokenBlacklistService';
-import { securityLogger } from '../logging/SecurityLogger';
-import type { User, PublicUser, Session, JWTPayload, AuthResponse } from '../types/auth';
-import type { PrismaClient } from '../../node_modules/.prisma/net-client';
+import { UserStorage } from './UserStorage.js';
+import { UserStorageDB } from './UserStorageDB.js';
+import { TokenBlacklistService } from './TokenBlacklistService.js';
+import { securityLogger } from '../logging/SecurityLogger.js';
+import type { User, PublicUser, Session, JWTPayload, AuthResponse } from '../types/auth.js';
+import type { PrismaClient } from '../../node_modules/.prisma/net-client/index.js';
 
 // Validate JWT_SECRET in production
 const isProduction = process.env.NODE_ENV === 'production';
@@ -18,7 +19,7 @@ if (isProduction && (!process.env.JWT_SECRET || JWT_SECRET === 'change-me-in-pro
 
 if (!isProduction && JWT_SECRET === 'change-me-in-production') {
   console.warn(
-    '⚠️  WARNING: Using default JWT_SECRET. Set JWT_SECRET environment variable for production.'
+    'âš ï¸  WARNING: Using default JWT_SECRET. Set JWT_SECRET environment variable for production.'
   );
 }
 
@@ -32,7 +33,7 @@ const BCRYPT_ROUNDS = parseInt(process.env.BCRYPT_ROUNDS || '12', 10);
  * Manages user authentication and sessions.
  */
 export class AuthManager {
-  private readonly userStorage: UserStorage;
+  private readonly userStorage: UserStorage | UserStorageDB;
   private readonly tokenBlacklist: TokenBlacklistService;
   private readonly failedLoginAttempts = new Map<
     string,
@@ -42,7 +43,8 @@ export class AuthManager {
   private readonly ACCOUNT_LOCKOUT_DURATION = 15 * 60 * 1000; // 15 minutes
 
   constructor(dataDir = './data', dbPool: PrismaClient | null = null) {
-    this.userStorage = new UserStorage(dataDir);
+    // Use database storage if available, otherwise fall back to JSON file storage
+    this.userStorage = dbPool ? new UserStorageDB(dbPool) : new UserStorage(dataDir);
     this.tokenBlacklist = new TokenBlacklistService(dataDir, dbPool);
   }
 
@@ -369,3 +371,5 @@ export class AuthManager {
     };
   }
 }
+
+

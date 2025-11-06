@@ -182,3 +182,4 @@ export class AssetStorage {
     return assets.length;
   }
 }
+

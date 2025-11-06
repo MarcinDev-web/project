@@ -3,11 +3,11 @@
  */
 
 import jwt from 'jsonwebtoken';
-import type { AuthManager } from '../../auth/AuthManager';
-import type { MarketplaceStorage } from '../../storage/MarketplaceStorage';
-import type { MarketplaceStorageDB } from '../../storage/MarketplaceStorageDB';
+import type { AuthManager } from '../../auth/AuthManager.js';
+import type { MarketplaceStorage } from '../../storage/MarketplaceStorage.js';
+import type { MarketplaceStorageDB } from '../../storage/MarketplaceStorageDB.js';
 import type { Pool } from 'pg';
-import type { ProjectData } from '../../types';
+import type { ProjectData } from '../../types.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'test-secret-key';
 
@@ -201,4 +201,5 @@ export async function createMultipleTestItems(
 
   return itemIds;
 }
+
 

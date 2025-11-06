@@ -2,12 +2,12 @@
  * Seed script to add mock builds and avatars to marketplace
  */
 
-import { MarketplaceStorage } from '../storage/MarketplaceStorage';
-import { GameSessionTracker } from '../websocket/GameSessionTracker';
-import { generateAndSaveThumbnail } from '../utils/thumbnailGenerator';
-import { createDbPool } from '../lib/db';
-import { BuildStorage } from '../storage/BuildStorage';
-import type { ProjectData } from '../types';
+import { MarketplaceStorage } from '../storage/MarketplaceStorage.js';
+import { GameSessionTracker } from '../websocket/GameSessionTracker.js';
+import { generateAndSaveThumbnail } from '../utils/thumbnailGenerator.js';
+import { createDbPool } from '../lib/db.js';
+import { BuildStorage } from '../storage/BuildStorage.js';
+import type { ProjectData } from '../types.js';
 import path from 'path';
 
 const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
@@ -418,3 +418,4 @@ if (import.meta.url.endsWith(process.argv[1]?.replace(/\\/g, '/') || '')) {
       process.exit(1);
     });
 }
+

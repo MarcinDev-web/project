@@ -1,9 +1,9 @@
 import type { WebSocket } from 'ws';
-import { SessionManager } from './SessionManager';
-import { AuthManager } from '../auth/AuthManager';
-import { MessageHandler } from './MessageHandler';
-import { securityLogger } from '../logging/SecurityLogger';
-import { websocketMessageSchema } from '../validation/schemas/websocket';
+import { SessionManager } from './SessionManager.js';
+import { AuthManager } from '../auth/AuthManager.js';
+import { MessageHandler } from './MessageHandler.js';
+import { securityLogger } from '../logging/SecurityLogger.js';
+import { websocketMessageSchema } from '../validation/schemas/websocket.js';
 import type {
   WebSocketMessage,
   JoinSessionMessage,
@@ -17,7 +17,7 @@ import type {
   PingMessage,
   PongMessage,
   MessageTypingMessage,
-} from '../types/websocket';
+} from '../types/websocket.js';
 
 /**
  * Handles WebSocket message routing and replication logic.
@@ -385,3 +385,4 @@ export class ReplicationServer {
     }
   }
 }
+

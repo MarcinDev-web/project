@@ -30,15 +30,12 @@ COPY packages/*/package.json ./packages/
 # Install dependencies (production + dev for build)
 RUN pnpm i --frozen-lockfile
 
-# Copy source code
-COPY apps ./apps
+# Copy built packages and applications
 COPY packages ./packages
+COPY apps/collab-server ./apps/collab-server
 
-# Generate Prisma client before build
-RUN pnpm -C apps/collab-server db:generate
-
-# Build the application
-RUN pnpm -C apps/collab-server build
+# Generate Prisma client (dummy DATABASE_URL for client generation)
+RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" pnpm -C apps/collab-server db:generate
 
 # Production image - minimal dependencies
 FROM base AS runner
@@ -61,14 +58,17 @@ COPY --from=builder --chown=nodejs:nodejs /app/package.json ./
 COPY --from=builder --chown=nodejs:nodejs /app/apps/collab-server/package.json ./apps/collab-server/
 COPY --from=builder --chown=nodejs:nodejs /app/packages ./packages
 
-# Copy only built application
-COPY --from=builder --chown=nodejs:nodejs /app/apps/collab-server/dist ./apps/collab-server/dist
+# Install production dependencies
+RUN CI=true pnpm install --frozen-lockfile --prod
 
-# Copy only production node_modules (from builder stage)
-COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
+# Copy generated Prisma client (pre-generated locally)
+COPY --chown=nodejs:nodejs apps/collab-server/node_modules/@prisma ./node_modules/@prisma
+
+# Copy built application (pre-built locally)
+COPY --chown=nodejs:nodejs apps/collab-server/dist ./apps/collab-server/dist
 
 # Prune dev dependencies (keep only production)
-RUN pnpm prune --prod
+RUN CI=true pnpm prune --prod
 
 # Switch to non-root user
 USER nodejs

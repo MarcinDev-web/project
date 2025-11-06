@@ -2,7 +2,7 @@
  * WebSocket message types for real-time collaboration.
  */
 
-import type { PublicUser } from './auth';
+import type { PublicUser } from './auth.js';
 
 /**
  * Re-export PublicUser for convenience.
@@ -383,3 +383,4 @@ export interface CollaborationSession {
   createdAt: number;
   users: Map<string, PublicUser>; // userId -> user
 }
+

@@ -230,3 +230,4 @@ export function trimmedStringSchema(maxLength?: number, minLength = 0): z.ZodStr
 
   return schema;
 }
+

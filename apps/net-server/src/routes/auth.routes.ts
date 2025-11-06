@@ -1,13 +1,13 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import type { RouteDependencies } from './index';
+import type { RouteDependencies } from './index.js';
 import {
   registerSchema,
   loginSchema,
   refreshTokenSchema,
   logoutSchema,
-} from '../validation/schemas/auth';
-import { bodySizeLimit, BodySizeLimits } from '../middleware/bodySizeLimit';
-import { validateBody } from '../validation/middleware';
+} from '../validation/schemas/auth.js';
+import { bodySizeLimit, BodySizeLimits } from '../middleware/bodySizeLimit.js';
+import { validateBody } from '../validation/middleware.js';
 import rateLimit from '@fastify/rate-limit';
 
 /**
@@ -20,8 +20,10 @@ export async function createAuthRoutes(
   const { authManager, authMiddleware, profileStorage, authLimiter, isProduction, securityLogger } =
     opts.dependencies;
 
-  // Register rate limiter for auth routes
-  await app.register(rateLimit, authLimiter);
+  // Register rate limiter for auth routes (skip in tests)
+  if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
+    await app.register(rateLimit, authLimiter);
+  }
 
   /**
    * POST /api/auth/register

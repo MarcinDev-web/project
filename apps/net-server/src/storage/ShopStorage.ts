@@ -166,3 +166,4 @@ export class ShopStorage {
     return items.length;
   }
 }
+

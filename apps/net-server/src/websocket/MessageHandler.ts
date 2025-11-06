@@ -3,13 +3,13 @@
  */
 
 import type { WebSocket } from 'ws';
-import { MessagesStorage, type Message } from '../storage/MessagesStorage';
-import { SessionManager } from './SessionManager';
+import { MessagesStorage, type Message } from '../storage/MessagesStorage.js';
+import { SessionManager } from './SessionManager.js';
 import type {
   MessageNewMessage,
   MessageReadMessage,
   MessageTypingMessage,
-} from '../types/websocket';
+} from '../types/websocket.js';
 
 export class MessageHandler {
   private readonly messagesStorage: MessagesStorage;
@@ -154,3 +154,4 @@ export class MessageHandler {
     }
   }
 }
+

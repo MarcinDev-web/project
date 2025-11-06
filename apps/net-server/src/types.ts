@@ -13,6 +13,7 @@ export interface ProjectMetadata {
   createdAt: number;
   updatedAt: number;
   thumbnail?: string;
+  marketplaceItemId?: string;
 }
 
 /**
@@ -60,3 +61,4 @@ export interface ShareMetadataResponse {
   createdAt: number;
   expiresAt?: number;
 }
+

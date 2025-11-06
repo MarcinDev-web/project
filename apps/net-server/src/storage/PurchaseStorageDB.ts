@@ -1,10 +1,10 @@
-/**
+﻿/**
  * Purchase Storage DB - PostgreSQL implementation using Prisma
  */
 
-import type { PrismaClient as PrismaClientType } from '../../node_modules/.prisma/net-client';
-import { Prisma } from '../../node_modules/.prisma/net-client';
-import type { Purchase, PurchaseFilter, PurchaseItemType, PurchaseStatus } from './PurchaseStorage';
+import type { PrismaClient as PrismaClientType } from '../../node_modules/.prisma/net-client/index.js';
+import { Prisma } from '../../node_modules/.prisma/net-client/index.js';
+import type { Purchase, PurchaseFilter, PurchaseItemType, PurchaseStatus } from './PurchaseStorage.js';
 
 export class PurchaseStorageDB {
   constructor(private readonly prisma: PrismaClientType) {}
@@ -268,3 +268,5 @@ export class PurchaseStorageDB {
     };
   }
 }
+
+

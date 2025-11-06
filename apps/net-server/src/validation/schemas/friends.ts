@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { uuidSchema, emailSchema } from './base';
+import { uuidSchema, emailSchema } from './base.js';
 
 /**
  * Friend request schema (can use userId or email).
@@ -45,3 +45,4 @@ export type FriendRequest = z.infer<typeof friendRequestSchema>;
 export type AcceptFriendRequest = z.infer<typeof acceptFriendRequestSchema>;
 export type FriendRequestIdParam = z.infer<typeof friendRequestIdParamSchema>;
 export type FriendIdParam = z.infer<typeof friendIdParamSchema>;
+

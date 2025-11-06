@@ -2,9 +2,9 @@
  * Migration script to migrate marketplace data from JSON to PostgreSQL
  */
 
-import { getPrismaClient, ensureSchema, disconnectPrisma } from '../lib/db';
-import { MarketplaceStorage } from '../storage/MarketplaceStorage';
-import { MarketplaceStorageDB } from '../storage/MarketplaceStorageDB';
+import { getPrismaClient, ensureSchema, disconnectPrisma } from '../lib/db.js';
+import { MarketplaceStorage } from '../storage/MarketplaceStorage.js';
+import { MarketplaceStorageDB } from '../storage/MarketplaceStorageDB.js';
 import { promises as fs } from 'fs';
 import path from 'path';
 
@@ -162,3 +162,4 @@ if (import.meta.url === `file://${process.argv[1]}`) {
       process.exit(1);
     });
 }
+

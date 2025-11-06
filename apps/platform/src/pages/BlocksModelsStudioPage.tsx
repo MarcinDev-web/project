@@ -51,7 +51,7 @@ export function BlocksModelsStudioPage() {
 
   const handleBlockPlaced = useCallback((block: BlockDefinition, position: Vec3, scale: Vec3) => {
     setHasUnsavedChanges(true);
-    showToast(`Block "${block.name}" placed at (${position[0].toFixed(1)}, ${position[1].toFixed(1)}, ${position[2].toFixed(1)})`, 'success');
+    showToast(`Block "${block.name}" placed at (${position[0].toFixed(1)}, ${position[1].toFixed(1)}, ${position[2].toFixed(1)}) with scale (${scale[0].toFixed(1)}, ${scale[1].toFixed(1)}, ${scale[2].toFixed(1)})`, 'success');
   }, [showToast]);
 
   const handleSave = useCallback(async () => {

@@ -165,3 +165,4 @@ export async function generateAndSaveThumbnail(
   const filename = await saveThumbnail(thumbnailDir, itemId, svg);
   return filename;
 }
+

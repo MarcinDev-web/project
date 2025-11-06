@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { uuidSchema, trimmedStringSchema, arraySchema } from './base';
+import { uuidSchema, trimmedStringSchema, arraySchema } from './base.js';
 
 /**
  * Project data schema (flexible structure).
@@ -117,3 +117,4 @@ export type InviteTeamMemberRequest = z.infer<typeof inviteTeamMemberSchema>;
 export type TeamInvitationIdParam = z.infer<typeof teamInvitationIdParamSchema>;
 export type ShareProjectWithTeamRequest = z.infer<typeof shareProjectWithTeamSchema>;
 export type UpdateStudioSettingsRequest = z.infer<typeof updateStudioSettingsSchema>;
+

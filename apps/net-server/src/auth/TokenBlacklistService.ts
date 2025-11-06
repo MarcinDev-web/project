@@ -1,4 +1,4 @@
-/**
+﻿/**
  * Persistent token blacklist service.
  * Stores revoked tokens in a way that persists across server restarts.
  */
@@ -6,7 +6,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import type { PrismaClient } from '../../node_modules/.prisma/net-client';
+import type { PrismaClient } from '../../node_modules/.prisma/net-client/index.js';
 
 /**
  * Token blacklist entry with expiration.
@@ -97,6 +97,11 @@ export class TokenBlacklistService {
     if (existsSync(this.dataFile)) {
       try {
         const data = await readFile(this.dataFile, 'utf-8');
+        // Handle empty or whitespace-only files
+        if (data.trim() === '') {
+          console.log('Token blacklist file is empty, skipping load');
+          return;
+        }
         const entries = JSON.parse(data) as BlacklistEntry[];
         const now = Date.now();
 
@@ -112,6 +117,12 @@ export class TokenBlacklistService {
       } catch (error) {
         console.error('Failed to load token blacklist file:', error);
         this.memoryCache.clear();
+        // Try to recreate the file with empty array
+        try {
+          await writeFile(this.dataFile, '[]', 'utf-8');
+        } catch (writeError) {
+          console.error('Failed to recreate token blacklist file:', writeError);
+        }
       }
     }
   }
@@ -222,3 +233,5 @@ export class TokenBlacklistService {
     }
   }
 }
+
+

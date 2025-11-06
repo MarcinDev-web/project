@@ -4,8 +4,8 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
-import { app, authManager, marketplaceStorage } from '../../server';
-import { createTestUser, createTestMarketplaceItem, getAuthHeader, waitForItem } from '../helpers/testHelpers';
+import { app, authManager, marketplaceStorage } from '../../server.js';
+import { createTestUser, createTestMarketplaceItem, getAuthHeader, waitForItem } from '../helpers/testHelpers.js';
 
 describe.skip('Like API', () => {
   let user: { userId: string; email: string; token: string };
@@ -115,5 +115,6 @@ describe.skip('Like API', () => {
     });
   });
 });
+
 
 

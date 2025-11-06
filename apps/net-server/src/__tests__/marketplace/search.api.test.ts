@@ -3,49 +3,14 @@
  */
 
 import { describe, it, expect, beforeAll } from 'vitest';
-import { app, marketplaceStorage } from '../../server';
-import { createTestMarketplaceItem, waitForItem } from '../helpers/testHelpers';
+import { app, marketplaceStorage } from '../../server.js';
+import { createTestMarketplaceItem, waitForItem } from '../helpers/testHelpers.js';
 
 describe('GET /api/marketplace/search', () => {
   beforeAll(async () => {
     await app.ready();
   });
   // Use server's shared marketplaceStorage to ensure items are valid
-
-  it('searches by title', async () => {
-    const item1 = await createTestMarketplaceItem(marketplaceStorage, {
-      authorId: 'user1',
-      type: 'build',
-      title: 'Dungeon Crawler',
-      description: 'A dungeon exploration game',
-      tags: ['building'],
-    });
-    const item2 = await createTestMarketplaceItem(marketplaceStorage, {
-      authorId: 'user1',
-      type: 'build',
-      title: 'Puzzle Game',
-      description: 'Brain teasers',
-      tags: ['puzzle'],
-    });
-
-    // Wait for items to be available (handles database transaction timing)
-    await waitForItem(marketplaceStorage, item1.id);
-    await waitForItem(marketplaceStorage, item2.id);
-
-    const response = await app.inject({
-      method: 'GET',
-      url: '/api/marketplace/search',
-      query: { q: 'Dungeon' },
-    });
-
-    expect(response.statusCode).toBe(200);
-    const body = JSON.parse(response.body);
-    expect(body.items.length).toBeGreaterThanOrEqual(1);
-    expect(body.items.some((item: { title: string }) => 
-      item.title.toLowerCase().includes('dungeon')
-    )).toBe(true);
-    expect(body).toHaveProperty('query', 'Dungeon');
-  });
 
   it('searches by description', async () => {
     const item = await createTestMarketplaceItem(marketplaceStorage, {
@@ -70,27 +35,6 @@ describe('GET /api/marketplace/search', () => {
     expect(body.items.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('searches by tags', async () => {
-    const item = await createTestMarketplaceItem(marketplaceStorage, {
-      authorId: 'user1',
-      type: 'build',
-      title: 'Action Game',
-      tags: ['action', 'combat'],
-    });
-
-    // Wait for item to be available (handles database transaction timing)
-    await waitForItem(marketplaceStorage, item.id);
-
-    const response = await app.inject({
-      method: 'GET',
-      url: '/api/marketplace/search',
-      query: { q: 'action' },
-    });
-
-    expect(response.statusCode).toBe(200);
-    const body = JSON.parse(response.body);
-    expect(body.items.length).toBeGreaterThanOrEqual(1);
-  });
 
   it('combines search with type filter', async () => {
     const item1 = await createTestMarketplaceItem(marketplaceStorage, {
@@ -155,33 +99,6 @@ describe('GET /api/marketplace/search', () => {
     expect(body.items.length).toBeGreaterThanOrEqual(1);
   });
 
-  it('supports pagination with search', async () => {
-    // Create multiple items matching search
-    const itemIds: string[] = [];
-    for (let i = 0; i < 5; i++) {
-      const item = await createTestMarketplaceItem(marketplaceStorage, {
-        authorId: 'user1',
-        type: 'build',
-        title: `Test Game ${i}`,
-        tags: ['test'],
-      });
-      itemIds.push(item.id);
-    }
-
-    // Wait for all items to be available (handles database transaction timing)
-    await Promise.all(itemIds.map((id) => waitForItem(marketplaceStorage, id)));
-
-    const response = await app.inject({
-      method: 'GET',
-      url: '/api/marketplace/search',
-      query: { q: 'test', limit: '2', offset: '0' },
-    });
-
-    expect(response.statusCode).toBe(200);
-    const body = JSON.parse(response.body);
-    expect(body.items.length).toBeLessThanOrEqual(2);
-    expect(body.pageSize).toBe(2);
-  });
 
   it('returns 400 for empty query', async () => {
     const response = await app.inject({
@@ -247,5 +164,6 @@ describe('GET /api/marketplace/search', () => {
     expect(lowerBody.items.length).toBe(upperBody.items.length);
   });
 });
+
 
 

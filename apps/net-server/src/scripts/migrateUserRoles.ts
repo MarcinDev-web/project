@@ -6,7 +6,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import type { User } from '../types/auth';
+import type { User } from '../types/auth.js';
 
 const DATA_DIR = process.env.DATA_DIR || './data';
 const USERS_FILE = path.join(DATA_DIR, 'users.json');
@@ -67,3 +67,4 @@ if (import.meta.url === `file://${process.argv[1]}`) {
 }
 
 export { migrateUserRoles };
+

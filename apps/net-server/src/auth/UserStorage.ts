@@ -2,7 +2,7 @@ import { randomBytes } from 'node:crypto';
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import type { User } from '../types/auth';
+import type { User } from '../types/auth.js';
 
 /**
  * JSON file-based storage for user accounts.
@@ -220,3 +220,4 @@ export class UserStorage {
     await writeFile(this.dataFile, json, 'utf-8');
   }
 }
+

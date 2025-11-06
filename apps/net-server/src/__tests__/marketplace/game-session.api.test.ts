@@ -5,8 +5,8 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
-import { app, authManager, marketplaceStorage } from '../../server';
-import { createTestUser, createTestMarketplaceItem, waitForItem } from '../helpers/testHelpers';
+import { app, authManager, marketplaceStorage } from '../../server.js';
+import { createTestUser, createTestMarketplaceItem, waitForItem } from '../helpers/testHelpers.js';
 
 describe.skip('Game Session API', () => {
   let user1: { userId: string; email: string; token: string };
@@ -171,5 +171,6 @@ describe.skip('Game Session API', () => {
     });
   });
 });
+
 
 

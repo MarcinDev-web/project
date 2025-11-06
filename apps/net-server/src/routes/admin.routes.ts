@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import type { ForumCategory } from '../storage/ForumStorage';
-import type { RouteDependencies } from './index';
+import type { ForumCategory } from '../storage/ForumStorage.js';
+import type { RouteDependencies } from './index.js';
 
 /**
  * Create admin and moderator routes for Fastify
@@ -1241,3 +1241,4 @@ export async function createAdminRoutes(
   );
 
 }
+

@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { UserSettingsStorage } from '../UserSettingsStorage';
+import { UserSettingsStorage } from '../UserSettingsStorage.js';
 import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
@@ -98,4 +98,5 @@ describe('UserSettingsStorage', () => {
     expect(wantsFriendRequests).toBe(true); // Default
   });
 });
+
 

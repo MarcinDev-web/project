@@ -191,3 +191,4 @@ export class FriendsStorage {
     return true;
   }
 }
+

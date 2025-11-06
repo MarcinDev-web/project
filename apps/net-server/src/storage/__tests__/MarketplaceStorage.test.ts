@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { MarketplaceStorage } from '../MarketplaceStorage';
+import { MarketplaceStorage } from '../MarketplaceStorage.js';
 import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
@@ -359,3 +359,4 @@ describe('MarketplaceStorage', () => {
     });
   });
 });
+

@@ -5,11 +5,13 @@
   "files": [
     "collision_bg.wasm",
     "collision.js",
+    "collision_bg.js",
     "collision.d.ts"
   ],
   "main": "collision.js",
   "types": "collision.d.ts",
   "sideEffects": [
+    "./collision.js",
     "./snippets/*"
   ]
 }

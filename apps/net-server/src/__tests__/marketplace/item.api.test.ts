@@ -4,8 +4,8 @@
 
 import { describe, it, expect } from 'vitest';
 import request from 'supertest';
-import { app, marketplaceStorage } from '../../server';
-import { createTestMarketplaceItem, waitForItem } from '../helpers/testHelpers';
+import { app, marketplaceStorage } from '../../server.js';
+import { createTestMarketplaceItem, waitForItem } from '../helpers/testHelpers.js';
 
 describe.skip('GET /api/marketplace/:id', () => {
   // Use server's shared marketplaceStorage to ensure items are valid
@@ -91,5 +91,6 @@ describe.skip('GET /api/marketplace/:id', () => {
     expect(response.body).toHaveProperty('public');
   });
 });
+
 
 

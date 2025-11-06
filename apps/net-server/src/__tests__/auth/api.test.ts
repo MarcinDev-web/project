@@ -1,6 +1,6 @@
 // Note: Fastify inject is built-in, no need to import light-my-request
 import { describe, it, expect, beforeAll } from 'vitest';
-import { app, authManager } from '../../server';
+import { app, authManager } from '../../server.js';
 
 describe('Auth API', () => {
   const email = `auth_test_${Date.now()}@example.com`;
@@ -140,5 +140,6 @@ describe('Auth API', () => {
     expect(weakRes.statusCode).toBe(400);
   });
 });
+
 
 

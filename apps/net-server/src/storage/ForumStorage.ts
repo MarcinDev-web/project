@@ -1031,3 +1031,4 @@ export class ForumStorage {
     return posts.filter((post) => post.content.toLowerCase().includes(lowerQuery));
   }
 }
+

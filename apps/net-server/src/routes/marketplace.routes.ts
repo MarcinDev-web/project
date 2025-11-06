@@ -1,17 +1,17 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import { z } from 'zod';
 import rateLimit from '@fastify/rate-limit';
-import type { RouteDependencies } from './index';
-import { validateBody, validateParams, validateQuery } from '../validation/middleware';
+import type { RouteDependencies } from './index.js';
+import { validateBody, validateParams, validateQuery } from '../validation/middleware.js';
 import {
   publishItemSchema,
   resaleListingSchema,
   searchQuerySchema,
   marketplaceItemIdParamSchema,
-} from '../validation/schemas/marketplace';
-import { bodySizeLimit, BodySizeLimits } from '../middleware/bodySizeLimit';
-import { MarketplaceStorageDB } from '../storage/MarketplaceStorageDB';
-import type { ProjectData } from '../types';
+} from '../validation/schemas/marketplace.js';
+import { bodySizeLimit, BodySizeLimits } from '../middleware/bodySizeLimit.js';
+import { MarketplaceStorageDB } from '../storage/MarketplaceStorageDB.js';
+import type { ProjectData } from '../types.js';
 
 /**
  * Create marketplace routes for Fastify
@@ -1197,4 +1197,5 @@ export async function createMarketplaceRoutes(
   });
 
 }
+
 

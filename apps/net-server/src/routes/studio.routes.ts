@@ -1,9 +1,9 @@
 import type { FastifyInstance } from 'fastify';
-import type { RouteDependencies } from './index';
-import type { StudioProject } from '../storage/StudioProjectsStorage';
-import type { ProjectTeamAccess } from '../storage/StudioTeamStorage';
-import type { MarketplaceItem } from '../storage/MarketplaceStorage';
-import type { ProjectData } from '../types';
+import type { RouteDependencies } from './index.js';
+import type { StudioProject } from '../storage/StudioProjectsStorage.js';
+import type { ProjectTeamAccess } from '../storage/StudioTeamStorage.js';
+import type { MarketplaceItem } from '../storage/MarketplaceStorage.js';
+import type { ProjectData } from '../types.js';
 
 /**
  * Create studio routes for Fastify
@@ -325,8 +325,7 @@ export async function createStudioRoutes(
         const profile = await profileStorage.getProfile(request.user.id);
         const authorName = profile?.displayName || request.user.email;
 
-        const marketplaceId = `build_${Date.now()}_${Math.random().toString(36).substring(2, 9)}`;
-        const marketplaceItem: Omit<
+        const marketplaceItemInput: Omit<
           MarketplaceItem,
           'id' | 'createdAt' | 'updatedAt' | 'downloads' | 'likes'
         > = {
@@ -343,17 +342,28 @@ export async function createStudioRoutes(
           ...(body.price && { price: body.price }),
         };
 
-        await marketplaceStorage.createItem(marketplaceItem);
+        const createdItem = await marketplaceStorage.createItem(marketplaceItemInput);
+
+        const updatedProjectData = {
+          ...project.projectData,
+          metadata: {
+            ...project.projectData.metadata,
+            marketplaceItemId: createdItem.id,
+          },
+        };
 
         if (buildStorage) {
-          await buildStorage.saveBuild(marketplaceId, project.projectData);
+          await buildStorage.saveBuild(createdItem.id, updatedProjectData);
         }
 
-        await studioProjectsStorage.updateProject(request.user.id, id, { isPublished: true });
+        const updatedProject = await studioProjectsStorage.updateProject(request.user.id, id, {
+          isPublished: true,
+          projectData: updatedProjectData,
+        });
 
         reply.code(201).send({
-          marketplaceItem,
-          project,
+          marketplaceItem: createdItem,
+          project: updatedProject,
         });
       } catch (error) {
         console.error('Publish studio project error:', error);
@@ -1589,5 +1599,6 @@ export async function createStudioRoutes(
   });
 
 }
+
 
 

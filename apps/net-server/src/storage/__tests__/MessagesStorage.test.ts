@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach } from 'vitest';
-import { MessagesStorage } from '../MessagesStorage';
+import { MessagesStorage } from '../MessagesStorage.js';
 import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';
@@ -236,4 +236,5 @@ describe('MessagesStorage', () => {
     });
   });
 });
+
 

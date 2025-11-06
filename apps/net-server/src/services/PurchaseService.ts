@@ -2,12 +2,12 @@
  * Purchase Service - Handles purchase logic and checkout
  */
 
-import type { CurrencyService } from './CurrencyService';
+import type { CurrencyService } from './CurrencyService.js';
 import type { CurrencyAmount } from '@engine/economy';
-import type { ShopItem } from '../storage/ShopStorage';
-import type { Asset } from '../storage/AssetStorage';
-import type { PurchaseItem, PurchaseItemType } from '../storage/PurchaseStorage';
-import type { MarketplaceItem } from '../storage/MarketplaceStorage';
+import type { ShopItem } from '../storage/ShopStorage.js';
+import type { Asset } from '../storage/AssetStorage.js';
+import type { PurchaseItem, PurchaseItemType } from '../storage/PurchaseStorage.js';
+import type { MarketplaceItem } from '../storage/MarketplaceStorage.js';
 
 export interface CartItem {
   itemId: string;
@@ -330,3 +330,4 @@ export class PurchaseService {
     }
   }
 }
+

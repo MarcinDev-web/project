@@ -1,6 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
-import type { RouteDependencies } from './index';
-import type { ShareProjectRequest, ShareProjectResponse, ShareMetadataResponse } from '../types';
+import type { RouteDependencies } from './index.js';
+import type { ShareProjectRequest, ShareProjectResponse, ShareMetadataResponse } from '../types.js';
 
 /**
  * Create share routes for Fastify
@@ -159,3 +159,4 @@ export async function createShareRoutes(
     }
   );
 }
+

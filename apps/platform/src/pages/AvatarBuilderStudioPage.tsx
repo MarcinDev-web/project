@@ -21,7 +21,6 @@ export function AvatarBuilderStudioPage() {
   const [loadout, setLoadout] = useState<AvatarLoadout>(DEFAULT_AVATAR_LOADOUT);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [builderCore, setBuilderCore] = useState<AvatarBuilderCore | null>(null);
 
   // Load saved loadout on mount
@@ -60,7 +59,6 @@ export function AvatarBuilderStudioPage() {
 
   const handleLoadoutChange = useCallback((newLoadout: AvatarLoadout) => {
     setLoadout(newLoadout);
-    setHasUnsavedChanges(true);
   }, []);
 
   const handleSave = useCallback(async () => {
@@ -72,7 +70,6 @@ export function AvatarBuilderStudioPage() {
     setIsSaving(true);
     try {
       await profilesApi.saveAvatarLoadout(user.id, loadout);
-      setHasUnsavedChanges(false);
       showToast('Avatar saved successfully!', 'success');
     } catch (error) {
       console.error('Failed to save avatar loadout:', error);
@@ -84,7 +81,6 @@ export function AvatarBuilderStudioPage() {
 
   const handleReset = useCallback(() => {
     setLoadout(DEFAULT_AVATAR_LOADOUT);
-    setHasUnsavedChanges(true);
   }, []);
 
   if (isLoading) {

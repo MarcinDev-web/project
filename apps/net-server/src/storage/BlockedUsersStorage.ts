@@ -105,3 +105,4 @@ export class BlockedUsersStorage {
     return blocked.filter((b) => b.blockedUserId === userId).map((b) => b.userId);
   }
 }
+

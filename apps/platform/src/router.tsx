@@ -63,11 +63,7 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
   },
   {
     path: '/player/:buildId',
-    element: (
-      <ProtectedRoute>
-        <PlayerPage />
-      </ProtectedRoute>
-    ),
+    element: <PlayerPage />,
   },
   {
     path: '/marketplace',
@@ -250,4 +246,5 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
     ),
   },
 ]);
+
 

@@ -1,10 +1,10 @@
-/**
+﻿/**
  * Shop Storage DB - PostgreSQL implementation using Prisma
  */
 
-import type { PrismaClient as PrismaClientType } from '../../node_modules/.prisma/net-client';
-import { Prisma } from '../../node_modules/.prisma/net-client';
-import type { ShopItem, ShopItemsFilter } from './ShopStorage';
+import type { PrismaClient as PrismaClientType } from '../../node_modules/.prisma/net-client/index.js';
+import { Prisma } from '../../node_modules/.prisma/net-client/index.js';
+import type { ShopItem, ShopItemsFilter } from './ShopStorage.js';
 
 export class ShopStorageDB {
   constructor(private readonly prisma: PrismaClientType) {}
@@ -229,3 +229,5 @@ export class ShopStorageDB {
     return mapped;
   }
 }
+
+

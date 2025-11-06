@@ -257,3 +257,4 @@ export class SecurityLogger {
 
 // Singleton instance
 export const securityLogger = new SecurityLogger();
+

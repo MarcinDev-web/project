@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { uuidSchema, trimmedStringSchema } from './base';
+import { uuidSchema, trimmedStringSchema } from './base.js';
 
 /**
  * Create forum thread schema.
@@ -95,3 +95,4 @@ export type UpdateCategoryRequest = z.infer<typeof updateCategorySchema>;
 export type AddReactionRequest = z.infer<typeof addReactionSchema>;
 export type ForumItemIdParam = z.infer<typeof forumItemIdParamSchema>;
 export type ForumReactionParam = z.infer<typeof forumReactionParamSchema>;
+

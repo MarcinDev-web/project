@@ -4,8 +4,8 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
-import { app, authManager } from '../../server';
-import { createTestUser } from '../helpers/testHelpers';
+import { app, authManager } from '../../server.js';
+import { createTestUser } from '../helpers/testHelpers.js';
 
 describe.skip('Studio Progress & Monetization API', () => {
   let user: { userId: string; email: string; token: string };
@@ -77,6 +77,7 @@ describe.skip('Studio Progress & Monetization API', () => {
     expect(Array.isArray(res.body.insights)).toBe(true);
   });
 });
+
 
 
 

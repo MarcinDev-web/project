@@ -1,6 +1,6 @@
-// Import Prisma Client - handle custom output path from schema.prisma
+﻿// Import Prisma Client - handle custom output path from schema.prisma
 // schema.prisma sets output to "../node_modules/.prisma/net-client"
-import type { PrismaClient as PrismaClientType } from '../../node_modules/.prisma/net-client';
+import type { PrismaClient as PrismaClientType } from '../../node_modules/.prisma/net-client/index.js';
 
 let PrismaClientConstructor: (new (args?: any) => PrismaClientType) | null = null;
 let prisma: PrismaClientType | null = null;
@@ -35,17 +35,17 @@ export async function getPrismaClient(): Promise<PrismaClientType> {
     // In production, ensure SSL is used
     const isProduction = process.env.NODE_ENV === 'production';
     if (isProduction && !connectionString.includes('sslmode=')) {
-      console.warn('⚠️  WARNING: DATABASE_URL should use SSL (sslmode=require) in production');
+      console.warn('âš ï¸  WARNING: DATABASE_URL should use SSL (sslmode=require) in production');
     }
 
     // Validate connection string format
     try {
       const url = new URL(connectionString);
       if (!url.protocol.startsWith('postgres')) {
-        console.warn('⚠️  WARNING: DATABASE_URL should use postgresql:// or postgres:// protocol');
+        console.warn('âš ï¸  WARNING: DATABASE_URL should use postgresql:// or postgres:// protocol');
       }
     } catch (error) {
-      console.error('❌ ERROR: Invalid DATABASE_URL format:', error);
+      console.error('âŒ ERROR: Invalid DATABASE_URL format:', error);
       throw new Error('DATABASE_URL is not a valid URL');
     }
 
@@ -62,9 +62,9 @@ export async function getPrismaClient(): Promise<PrismaClientType> {
     // Test connection immediately
     try {
       await prisma.$connect();
-      console.log('✅ Database connection established');
+      console.log('âœ… Database connection established');
     } catch (error) {
-      console.error('❌ Failed to connect to database:', error);
+      console.error('âŒ Failed to connect to database:', error);
       throw error;
     }
   }
@@ -83,9 +83,9 @@ export async function ensureSchema(): Promise<void> {
   try {
     // Test connection with a simple query
     await client.$queryRaw`SELECT 1`;
-    console.log('✅ Database schema check passed');
+    console.log('âœ… Database schema check passed');
   } catch (error) {
-    console.error('❌ Database schema check failed:', error);
+    console.error('âŒ Database schema check failed:', error);
     throw error;
   }
 }
@@ -96,3 +96,5 @@ export async function disconnectPrisma(): Promise<void> {
     prisma = null;
   }
 }
+
+

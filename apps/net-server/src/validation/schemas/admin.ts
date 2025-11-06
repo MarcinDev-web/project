@@ -3,7 +3,7 @@
  */
 
 import { z } from 'zod';
-import { uuidSchema, userRoleSchema } from './base';
+import { uuidSchema, userRoleSchema } from './base.js';
 
 /**
  * Update user role schema.
@@ -50,3 +50,4 @@ export type UpdateUserRequest = z.infer<typeof updateUserSchema>;
 export type AdminUserIdParam = z.infer<typeof adminUserIdParamSchema>;
 export type AdminMarketplaceItemIdParam = z.infer<typeof adminMarketplaceItemIdParamSchema>;
 export type AdminProjectTokenParam = z.infer<typeof adminProjectTokenParamSchema>;
+

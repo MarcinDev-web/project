@@ -2,24 +2,32 @@
  * Player Page - redirects to player app
  */
 
-import { useEffect } from 'react';
+import { useEffect, useMemo } from 'react';
 import { useParams } from 'react-router-dom';
+
+const PLAYER_APP_URL = import.meta.env.VITE_PLAYER_URL ?? 'http://localhost:5175';
+
+const buildPlayerUrl = (baseUrl: string, buildId: string): string => {
+  const separator = baseUrl.includes('?') ? '&' : '?';
+  return `${baseUrl}${separator}buildId=${encodeURIComponent(buildId)}`;
+};
 
 export function PlayerPage() {
   const { buildId } = useParams<{ buildId: string }>();
+  const playerUrl = useMemo(
+    () => (buildId ? buildPlayerUrl(PLAYER_APP_URL, buildId) : ''),
+    [buildId]
+  );
   
   useEffect(() => {
     if (!buildId) {
-      // No buildId, redirect to marketplace
       window.location.href = '/marketplace';
       return;
     }
-    
-    // Redirect to player app with buildId in query string
-    // In production, this could be a different domain or subdomain
-    const playerUrl = `http://localhost:5174?buildId=${encodeURIComponent(buildId)}`;
-    window.location.href = playerUrl;
-  }, [buildId]);
+    if (playerUrl) {
+      window.location.replace(playerUrl);
+    }
+  }, [buildId, playerUrl]);
 
   return (
     <div style={{
@@ -34,7 +42,7 @@ export function PlayerPage() {
         <h1>Loading Game...</h1>
         <p style={{ color: 'var(--text-2)' }}>
           If you are not redirected automatically,{' '}
-          <a href={`http://localhost:5174?buildId=${buildId}`} style={{ color: 'var(--color-accent-400)' }}>
+          <a href={playerUrl || '#'} style={{ color: 'var(--color-accent-400)' }}>
             click here
           </a>
         </p>

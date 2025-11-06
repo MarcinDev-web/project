@@ -139,9 +139,9 @@ fn ACESFilm(x: vec3<f32>) -> vec3<f32> {
   
   // Apply dithering to reduce banding (subtle)
   let ditherValue = dither(pos.xy * 0.25) * 0.01;
-  let final = clamp(ldr + vec3<f32>(ditherValue), vec3<f32>(0.0), vec3<f32>(1.0));
+  let finalColor = clamp(ldr + vec3<f32>(ditherValue), vec3<f32>(0.0), vec3<f32>(1.0));
   
-  return vec4<f32>(final, 1.0);
+  return vec4<f32>(finalColor, 1.0);
 }
 `,
           }),

@@ -4,9 +4,9 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import request from 'supertest';
-import { app, authManager, marketplaceStorage, buildStorage, dbPool } from '../../server';
-import { createTestUser, createTestBuild } from '../helpers/testHelpers';
-import type { ProjectData } from '../../types';
+import { app, authManager, marketplaceStorage, buildStorage, dbPool } from '../../server.js';
+import { createTestUser, createTestBuild } from '../helpers/testHelpers.js';
+import type { ProjectData } from '../../types.js';
 
 describe.skip('POST /api/marketplace', () => {
   let user: { userId: string; email: string; token: string };
@@ -370,5 +370,6 @@ describe.skip('POST /api/marketplace', () => {
     }
   });
 });
+
 
 

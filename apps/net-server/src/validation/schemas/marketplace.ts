@@ -10,7 +10,7 @@ import {
   arraySchema,
   positiveNumberSchema,
   currencySchema,
-} from './base';
+} from './base.js';
 
 /**
  * Marketplace item type.
@@ -144,3 +144,4 @@ export type ResaleListingRequest = z.infer<typeof resaleListingSchema>;
 export type BuyResaleRequest = z.infer<typeof buyResaleSchema>;
 export type SearchQueryRequest = z.infer<typeof searchQuerySchema>;
 export type MarketplaceItemIdParam = z.infer<typeof marketplaceItemIdParamSchema>;
+

@@ -1,10 +1,10 @@
-/**
+﻿/**
  * Marketplace Storage DB - PostgreSQL implementation using Prisma
  */
 
-import type { PrismaClient as PrismaClientType } from '../../node_modules/.prisma/net-client';
-import { Prisma } from '../../node_modules/.prisma/net-client';
-import type { MarketplaceItem } from './MarketplaceStorage';
+import type { PrismaClient as PrismaClientType } from '../../node_modules/.prisma/net-client/index.js';
+import { Prisma } from '../../node_modules/.prisma/net-client/index.js';
+import type { MarketplaceItem } from './MarketplaceStorage.js';
 
 export class MarketplaceStorageDB {
   constructor(private readonly prisma: PrismaClientType) {}
@@ -402,3 +402,5 @@ export class MarketplaceStorageDB {
     return item;
   }
 }
+
+

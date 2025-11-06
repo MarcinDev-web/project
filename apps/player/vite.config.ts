@@ -33,7 +33,7 @@ export default defineConfig(({ command }) => {
       alias,
     },
     server: {
-      port: 5174,
+      port: 5175,
       proxy: {
         '/api': {
           target: 'http://localhost:3000',

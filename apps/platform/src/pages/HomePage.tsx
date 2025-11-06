@@ -1,10 +1,9 @@
 import { useState, useEffect } from 'react';
 import { Link } from 'react-router-dom';
 import { Layout } from '../components/layout/Layout';
-import { marketplaceApi, type MarketplaceItem } from '../api/marketplace';
-import { useAuth } from '../contexts/AuthContext';
+import { gamesApi, type GameSummary, type GamesSortOption } from '../api/games';
 
-type SortOption = 'newest' | 'popular' | 'trending';
+type SortOption = GamesSortOption;
 
 // Helper functions for game visuals
 const getGameEmoji = (tags: string[]): string => {
@@ -24,7 +23,7 @@ const getGameEmoji = (tags: string[]): string => {
     casual: '🎨',
     default: '🎮',
   };
-  return emojiMap[tag] || emojiMap.default;
+  return emojiMap[tag] ?? '🎮';
 };
 
 const getGameGradient = (id: string): string => {
@@ -37,204 +36,46 @@ const getGameGradient = (id: string): string => {
     'linear-gradient(135deg, rgba(178, 102, 234, 0.3) 0%, rgba(118, 75, 162, 0.3) 100%)',
   ];
   const hash = id.split('').reduce((acc, char) => acc + char.charCodeAt(0), 0);
-  return gradients[hash % gradients.length];
+  return gradients[hash % gradients.length]!;
 };
 
-// Mock games dla development/demo
-const MOCK_GAMES: MarketplaceItem[] = [
-  {
-    id: 'mock-1',
-    type: 'build',
-    title: 'Sky Fortress Adventure',
-    description: 'Epic adventure in floating castles. Explore, fight monsters, and discover ancient secrets high above the clouds.',
-    authorId: 'demo-user-1',
-    authorName: 'DragonMaster',
-    thumbnailUrl: '',
-    fileUrl: '',
-    tags: ['adventure', 'action', 'singleplayer'],
-    createdAt: Date.now() - 2 * 24 * 60 * 60 * 1000,
-    updatedAt: Date.now() - 2 * 24 * 60 * 60 * 1000,
-    downloads: 1247,
-    likes: 342,
-    public: true,
-    playersOnline: 12,
-  },
-  {
-    id: 'mock-2',
-    type: 'build',
-    title: 'Neon Racing Circuit',
-    description: 'High-speed racing in cyberpunk city. Customize your vehicle and compete in underground races.',
-    authorId: 'demo-user-2',
-    authorName: 'SpeedDemon',
-    thumbnailUrl: '',
-    fileUrl: '',
-    tags: ['racing', 'multiplayer', 'competitive'],
-    createdAt: Date.now() - 5 * 24 * 60 * 60 * 1000,
-    updatedAt: Date.now() - 5 * 24 * 60 * 60 * 1000,
-    downloads: 2893,
-    likes: 567,
-    public: true,
-    playersOnline: 28,
-  },
-  {
-    id: 'mock-3',
-    type: 'build',
-    title: 'Crystal Puzzle Mines',
-    description: 'Mind-bending puzzles in mysterious crystal caves. Solve intricate challenges to unlock deeper levels.',
-    authorId: 'demo-user-3',
-    authorName: 'PuzzleGenius',
-    thumbnailUrl: '',
-    fileUrl: '',
-    tags: ['puzzle', 'logic', 'singleplayer'],
-    createdAt: Date.now() - 1 * 24 * 60 * 60 * 1000,
-    updatedAt: Date.now() - 1 * 24 * 60 * 60 * 1000,
-    downloads: 856,
-    likes: 234,
-    public: true,
-    playersOnline: 5,
-  },
-  {
-    id: 'mock-4',
-    type: 'build',
-    title: 'Space Colony Builder',
-    description: 'Build and manage your own space station. Balance resources, defend against pirates, and expand your colony.',
-    authorId: 'demo-user-4',
-    authorName: 'CosmicArchitect',
-    thumbnailUrl: '',
-    fileUrl: '',
-    tags: ['strategy', 'builder', 'simulation'],
-    createdAt: Date.now() - 7 * 24 * 60 * 60 * 1000,
-    updatedAt: Date.now() - 3 * 24 * 60 * 60 * 1000,
-    downloads: 3421,
-    likes: 891,
-    public: true,
-    playersOnline: 34,
-  },
-  {
-    id: 'mock-5',
-    type: 'build',
-    title: 'Dungeon Crawler Legends',
-    description: 'Classic roguelike dungeon crawler. Procedurally generated levels, permadeath, and epic loot.',
-    authorId: 'demo-user-5',
-    authorName: 'LootHunter',
-    thumbnailUrl: '',
-    fileUrl: '',
-    tags: ['roguelike', 'rpg', 'hardcore'],
-    createdAt: Date.now() - 3 * 24 * 60 * 60 * 1000,
-    updatedAt: Date.now() - 1 * 24 * 60 * 60 * 1000,
-    downloads: 1678,
-    likes: 445,
-    public: true,
-    playersOnline: 18,
-  },
-  {
-    id: 'mock-6',
-    type: 'build',
-    title: 'Peaceful Farm Valley',
-    description: 'Relaxing farming simulation. Grow crops, raise animals, and build your dream farm in a cozy valley.',
-    authorId: 'demo-user-6',
-    authorName: 'FarmerJoe',
-    thumbnailUrl: '',
-    fileUrl: '',
-    tags: ['simulation', 'casual', 'relaxing'],
-    createdAt: Date.now() - 10 * 24 * 60 * 60 * 1000,
-    updatedAt: Date.now() - 10 * 24 * 60 * 60 * 1000,
-    downloads: 4567,
-    likes: 1203,
-    public: true,
-    playersOnline: 42,
-  },
-  {
-    id: 'mock-7',
-    type: 'build',
-    title: 'Battle Royale Arena',
-    description: '100 players, one survivor. Fast-paced battle royale with destructible environments and unique weapons.',
-    authorId: 'demo-user-7',
-    authorName: 'WarriorKing',
-    thumbnailUrl: '',
-    fileUrl: '',
-    tags: ['battle-royale', 'multiplayer', 'pvp'],
-    createdAt: Date.now() - 4 * 24 * 60 * 60 * 1000,
-    updatedAt: Date.now() - 4 * 24 * 60 * 60 * 1000,
-    downloads: 5234,
-    likes: 1456,
-    public: true,
-    playersOnline: 87,
-  },
-  {
-    id: 'mock-8',
-    type: 'build',
-    title: 'Mystic Tower Defense',
-    description: 'Defend your realm with magical towers. Combine elements and upgrade defenses against endless waves.',
-    authorId: 'demo-user-8',
-    authorName: 'MageDefender',
-    thumbnailUrl: '',
-    fileUrl: '',
-    tags: ['tower-defense', 'strategy', 'magic'],
-    createdAt: Date.now() - 6 * 24 * 60 * 60 * 1000,
-    updatedAt: Date.now() - 2 * 24 * 60 * 60 * 1000,
-    downloads: 2134,
-    likes: 678,
-    public: true,
-    playersOnline: 23,
-  },
-];
-
 export function HomePage() {
-  const { isAuthenticated } = useAuth();
-  const [builds, setBuilds] = useState<MarketplaceItem[]>([]);
+  const [games, setGames] = useState<GameSummary[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
 
   useEffect(() => {
-    loadBuilds();
+    void loadGames();
   }, [sortBy]);
 
   // Poll for online player count updates (every 10 seconds)
   useEffect(() => {
     const interval = setInterval(() => {
-      void loadBuilds(true); // Silent refresh to get updated player counts
+      void loadGames(true); // Silent refresh to get updated player counts
     }, 10000); // 10 seconds
 
     return () => clearInterval(interval);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const loadBuilds = async (silent = false) => {
+  const loadGames = async (silent = false) => {
     if (!silent) {
       setLoading(true);
     }
     try {
-      const response = await marketplaceApi.getBuilds({ limit: 50 });
-      let sortedBuilds = [...response.items];
+      const trimmedSearch = search.trim();
+      const response = await gamesApi.list({
+        limit: 60,
+        sortBy,
+        ...(trimmedSearch ? { search: trimmedSearch } : {}),
+      });
 
-      // Fallback to mock data if no real builds available
-      if (sortedBuilds.length === 0) {
-        sortedBuilds = [...MOCK_GAMES];
-      }
-
-      // Apply sorting
-      if (sortBy === 'newest') {
-        sortedBuilds.sort((a, b) => b.createdAt - a.createdAt);
-      } else if (sortBy === 'popular') {
-        sortedBuilds.sort((a, b) => (b.downloads + b.likes) - (a.downloads + a.likes));
-      } else if (sortBy === 'trending') {
-        // Trending: recent activity (downloads in last week, weighted by recency)
-        const now = Date.now();
-        const weekAgo = now - 7 * 24 * 60 * 60 * 1000;
-        sortedBuilds.sort((a, b) => {
-          const aRecent = a.createdAt > weekAgo ? (a.downloads * 2 + a.likes) : (a.downloads + a.likes);
-          const bRecent = b.createdAt > weekAgo ? (b.downloads * 2 + b.likes) : (b.downloads + b.likes);
-          return bRecent - aRecent;
-        });
-      }
-
-      setBuilds(sortedBuilds);
+      const fetchedGames = response.items ?? [];
+      setGames(fetchedGames);
     } catch (error) {
-      console.error('Failed to load builds:', error);
-      // Use mock data on error
-      setBuilds([...MOCK_GAMES]);
+      console.error('Failed to load games:', error);
+      setGames([]);
     } finally {
       if (!silent) {
         setLoading(false);
@@ -242,10 +83,10 @@ export function HomePage() {
     }
   };
 
-  const filteredBuilds = builds.filter(build =>
-    build.title.toLowerCase().includes(search.toLowerCase()) ||
-    build.description?.toLowerCase().includes(search.toLowerCase()) ||
-    build.authorName?.toLowerCase().includes(search.toLowerCase())
+  const filteredGames = games.filter(game =>
+    game.title.toLowerCase().includes(search.toLowerCase()) ||
+    game.description?.toLowerCase().includes(search.toLowerCase()) ||
+    game.authorName?.toLowerCase().includes(search.toLowerCase())
   );
 
   return (
@@ -291,6 +132,7 @@ export function HomePage() {
             <option value="newest">Newest</option>
             <option value="popular">Popular</option>
             <option value="trending">Trending</option>
+            <option value="updated">Recently Updated</option>
           </select>
         </div>
 
@@ -303,7 +145,7 @@ export function HomePage() {
           }}>
             Loading games...
           </div>
-        ) : filteredBuilds.length === 0 ? (
+        ) : filteredGames.length === 0 ? (
           <div style={{
             textAlign: 'center',
             padding: 'var(--spacing-16)',
@@ -317,47 +159,52 @@ export function HomePage() {
             gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
             gap: 'var(--spacing-4)',
           }}>
-            {filteredBuilds.map(build => (
-              <Link
-                key={build.id}
-                to={`/marketplace/${build.id}`}
-                style={{
-                  textDecoration: 'none',
-                  color: 'inherit',
-                }}
-              >
-                <div style={{
-                  background: 'var(--bg-panel)',
-                  border: '1px solid var(--border-default)',
-                  borderRadius: 'var(--radius-lg)',
-                  overflow: 'hidden',
-                  cursor: 'pointer',
-                  transition: 'var(--transition-base)',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = 'var(--bg-hover)';
-                  e.currentTarget.style.borderColor = 'var(--border-medium)';
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = 'var(--bg-panel)';
-                  e.currentTarget.style.borderColor = 'var(--border-default)';
-                }}
+            {filteredGames.map((game) => {
+              return (
+                <>
+                  <div
+                  key={game.id}
+                  style={{
+                    background: 'var(--bg-panel)',
+                    border: '1px solid var(--border-default)',
+                    borderRadius: 'var(--radius-lg)',
+                    overflow: 'hidden',
+                    transition: 'var(--transition-base)',
+                    display: 'flex',
+                    flexDirection: 'column',
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.background = 'var(--bg-hover)';
+                    e.currentTarget.style.borderColor = 'var(--border-medium)';
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.background = 'var(--bg-panel)';
+                    e.currentTarget.style.borderColor = 'var(--border-default)';
+                  }}
+                >
+                <Link
+                  to={`/marketplace/${game.id}`}
+                  style={{
+                    textDecoration: 'none',
+                    color: 'inherit',
+                    display: 'block',
+                  }}
                 >
                   {/* Thumbnail */}
                   <div style={{
                     width: '100%',
                     aspectRatio: '16/9',
-                    background: getGameGradient(build.id),
+                    background: getGameGradient(game.id),
                     display: 'flex',
                     alignItems: 'center',
                     justifyContent: 'center',
                     color: 'var(--text-3)',
                     fontSize: '3rem',
                   }}>
-                    {build.thumbnailUrl ? (
+                    {game.thumbnailUrl ? (
                       <img
-                        src={build.thumbnailUrl.startsWith('http') || build.thumbnailUrl.startsWith('/api') ? build.thumbnailUrl : `/api${build.thumbnailUrl}`}
-                        alt={build.title}
+                        src={game.thumbnailUrl.startsWith('http') || game.thumbnailUrl.startsWith('/api') ? game.thumbnailUrl : `/api${game.thumbnailUrl}`}
+                        alt={game.title}
                         style={{
                           width: '100%',
                           height: '100%',
@@ -368,13 +215,13 @@ export function HomePage() {
                           e.currentTarget.style.display = 'none';
                           const parent = e.currentTarget.parentElement;
                           if (parent) {
-                            parent.textContent = getGameEmoji(build.tags);
+                            parent.textContent = getGameEmoji(game.tags);
                             parent.style.fontSize = '3rem';
                           }
                         }}
                       />
                     ) : (
-                      getGameEmoji(build.tags)
+                      getGameEmoji(game.tags)
                     )}
                   </div>
 
@@ -391,7 +238,7 @@ export function HomePage() {
                       textOverflow: 'ellipsis',
                       whiteSpace: 'nowrap',
                     }}>
-                      {build.title}
+                      {game.title}
                     </h3>
                     <p style={{
                       margin: 0,
@@ -405,7 +252,7 @@ export function HomePage() {
                       WebkitBoxOrient: 'vertical',
                       minHeight: '2.5em',
                     }}>
-                      {build.description || 'No description'}
+                      {game.description || 'No description'}
                     </p>
                     <div style={{
                       display: 'flex',
@@ -414,21 +261,44 @@ export function HomePage() {
                       fontSize: 'var(--text-xs)',
                       color: 'var(--text-3)',
                     }}>
-                      <span>{build.authorName || 'Unknown'}</span>
+                      <span>{game.authorName || 'Unknown'}</span>
                       <div style={{ display: 'flex', gap: 'var(--spacing-3)' }}>
-                        {(build.playersOnline ?? 0) > 0 && (
+                        {(game.playersOnline ?? 0) > 0 && (
                           <span style={{ color: 'var(--color-success)', fontWeight: 'var(--font-medium)' }}>
-                            🟢 {build.playersOnline} online
+                            🟢 {game.playersOnline} online
                           </span>
                         )}
-                        <span>👁 {build.downloads}</span>
-                        <span>❤️ {build.likes}</span>
+                        <span>👁 {game.downloads}</span>
+                        <span>❤️ {game.likes}</span>
                       </div>
                     </div>
                   </div>
+                </Link>
+                <div style={{
+                  padding: '0 var(--spacing-4) var(--spacing-4)',
+                }}>
+                  <Link
+                    to={`/player/${game.id}`}
+                    style={{
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      padding: 'var(--spacing-2) var(--spacing-4)',
+                      background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                      color: '#ffffff',
+                      borderRadius: 'var(--radius-md)',
+                      textDecoration: 'none',
+                      fontSize: 'var(--text-sm)',
+                      fontWeight: 'var(--font-semibold)',
+                    }}
+                  >
+                    Play
+                  </Link>
                 </div>
-              </Link>
-            ))}
+                  </div>
+                </>
+              );
+            })}
           </div>
         )}
       </div>
