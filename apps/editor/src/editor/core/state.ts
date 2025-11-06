@@ -153,7 +153,7 @@ export class EditorState {
     // Initialize new snap-to-grid system
     this.snapConfig = signal<SnapConfig>({ ...DEFAULT_SNAP_CONFIG });
     this.gridConfig = signal<GridConfig>({ ...DEFAULT_GRID_CONFIG });
-    this.showGrid = signal<boolean>(true);
+    this.showGrid = signal<boolean>(false);
     this.placementMode = signal<boolean>(false);
     this.editorMode = signal<EditorMode>('edit');
     this.buildMode = signal<BuildMode>('free');

@@ -4,7 +4,7 @@ import { validateGridConfig, DEFAULT_GRID_CONFIG, type GridConfig } from './Grid
 describe('GridConfig', () => {
   describe('DEFAULT_GRID_CONFIG', () => {
     it('should have valid default values', () => {
-      expect(DEFAULT_GRID_CONFIG.visible).toBe(true);
+      expect(DEFAULT_GRID_CONFIG.visible).toBe(false);
       expect(DEFAULT_GRID_CONFIG.cellSize).toBe(1.0);
       expect(DEFAULT_GRID_CONFIG.extent).toBe(20);
       expect(DEFAULT_GRID_CONFIG.planes.horizontal).toBe(true);

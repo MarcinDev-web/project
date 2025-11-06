@@ -50,7 +50,7 @@ export interface GridConfig {
  * Default grid configuration
  */
 export const DEFAULT_GRID_CONFIG: GridConfig = {
-  visible: true,
+  visible: false,
   cellSize: 1.0,
   extent: 20,
   planes: {
