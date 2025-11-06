@@ -282,7 +282,7 @@
   
   /* Inspector-specific tokens */
   --inspector-section-padding: var(--spacing-5);
-  --inspector-section-gap: var(--spacing-4);
+  --inspector-section-gap: var(--spacing-6);
   --inspector-header-height: 3.5rem;
   --inspector-tab-height: 2.75rem;
   --inspector-tab-min-width: 80px;

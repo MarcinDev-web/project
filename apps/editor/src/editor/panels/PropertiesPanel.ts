@@ -39,6 +39,7 @@ import { UIElementProperties } from '../ui/UIElementProperties';
 import { MovementProfileRegistry, PRESET_PROFILES, type MovementProfileExtension } from '@engine/stdlib/MovementProfiles';
 import { showCustomProfileEditor } from '../ui/CustomProfileEditor';
 import { getAllNpcUnitTypes, getAllNpcBehaviors, getAllNpcFactions } from '@engine/editor-utils';
+import { QuickAccessBar } from '../ui/QuickAccessBar';
 
 const MIN_SCALE = 0.001;
 
@@ -85,9 +86,7 @@ export class PropertiesPanel {
     activeSection: 'transform',
   };
   private sectionElements = new Map<string, HTMLElement>();
-  private tabButtons = new Map<string, HTMLButtonElement>();
   private currentSectionOrder: string[] = [];
-  private sectionTabs: HTMLElement | null = null;
   private scrollRaf: number | null = null;
   private handleRootKeyDown = (e: KeyboardEvent) => {
     if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
@@ -97,7 +96,7 @@ export class PropertiesPanel {
   };
   private availableSections: string[] = [];
   private sectionsWrapper: HTMLElement | null = null;
-  private draggingTabId: string | null = null;
+  private quickAccessBar: QuickAccessBar | null = null;
 
   constructor(private readonly config: PropertiesPanelConfig) {
     this.root = document.createElement('section');
@@ -202,35 +201,45 @@ export class PropertiesPanel {
     this.beginRefreshScope();
     this.content.innerHTML = '';
     this.sectionElements.clear();
-    this.tabButtons.clear();
     this.renderedEntityId = selected.id;
 
-    const layoutContainer = document.createElement('div');
-    layoutContainer.className = 'inspector-layout';
+    // Create Quick Access Bar
+    if (this.quickAccessBar) {
+      this.quickAccessBar.dispose();
+    }
+    this.quickAccessBar = new QuickAccessBar({
+      entity: selected,
+      onTransformChanged: this.config.onTransformChanged,
+      onColorChanged: this.config.onColorChanged,
+      getSnapConfig: () => this.getSnapConfig(),
+      roundToIncrement: (value, increment) => this.roundToIncrement(value, increment),
+      entityHasTexture: (entity, materialComp) => this.entityHasTexture(entity, materialComp),
+      abortSignal: this.refreshAbort!.signal,
+      setManagedTimeout: (fn, ms) => this.setManagedTimeout(fn, ms),
+      registerUndo: (action) => this.registerUndo(action),
+      announce: (message) => this.announce(message),
+      refresh: () => this.refresh(),
+    });
+    this.content.appendChild(this.quickAccessBar.element);
 
-    const sectionEntries = this.buildSections(selected);
-    const tabs = this.renderTabs(sectionEntries.map((entry) => entry.id));
-    layoutContainer.appendChild(tabs);
-
+    // Create sections wrapper
     const sectionsWrapper = document.createElement('div');
     sectionsWrapper.className = 'inspector-sections';
     this.sectionsWrapper = sectionsWrapper;
-    layoutContainer.appendChild(sectionsWrapper);
+    this.content.appendChild(sectionsWrapper);
 
-    this.content.appendChild(layoutContainer);
-
+    // Entity card (simplified, less prominent)
     const entityCard = this.createEntityCard(selected);
     entityCard.classList.add('inspector-entity-card');
     this.sectionElements.set('entity-card', entityCard);
     sectionsWrapper.appendChild(entityCard);
 
+    // Build and add sections as accordion
+    const sectionEntries = this.buildSections(selected);
     for (const entry of sectionEntries) {
       this.sectionElements.set(entry.id, entry.element);
       sectionsWrapper.appendChild(entry.element);
     }
-
-    this.ensureActiveTab();
-    this.updateTabActiveState(this.getLayoutPrefs().activeSection);
   }
 
   public get element(): HTMLElement {
@@ -251,8 +260,11 @@ export class PropertiesPanel {
       window.clearTimeout(timeoutId);
     }
     this.activeTimeouts.clear();
+    if (this.quickAccessBar) {
+      this.quickAccessBar.dispose();
+      this.quickAccessBar = null;
+    }
     this.sectionElements.clear();
-    this.tabButtons.clear();
     this.content.innerHTML = '';
     this.root.remove();
   }
@@ -320,12 +332,18 @@ export class PropertiesPanel {
   private tryUpdateExistingValues(entity: Entity): boolean {
     let anyUpdated = false;
 
-    // Position
+    // Update QuickAccessBar if it exists
+    if (this.quickAccessBar) {
+      this.quickAccessBar.updateEntity(entity);
+      anyUpdated = true;
+    }
+
+    // Position (check both old and new field names for backward compatibility)
     const pos = entity.transform.position;
-    const posX = this.content.querySelector('input[data-field="position-x"]') as HTMLInputElement | null;
+    const posX = this.content.querySelector('input[data-field="position-x"], input[data-field="quick-position-x"]') as HTMLInputElement | null;
     if (posX) {
-      const posY = this.content.querySelector('input[data-field="position-y"]') as HTMLInputElement | null;
-      const posZ = this.content.querySelector('input[data-field="position-z"]') as HTMLInputElement | null;
+      const posY = this.content.querySelector('input[data-field="position-y"], input[data-field="quick-position-y"]') as HTMLInputElement | null;
+      const posZ = this.content.querySelector('input[data-field="position-z"], input[data-field="quick-position-z"]') as HTMLInputElement | null;
       // Only update if not currently being edited
       if (document.activeElement !== posX) {
         posX.value = Number.isFinite(pos[0]) ? pos[0].toFixed(2) : '0.00';
@@ -341,10 +359,10 @@ export class PropertiesPanel {
 
     // Scale
     const scale = entity.transform.scale;
-    const scaleX = this.content.querySelector('input[data-field="scale-x"]') as HTMLInputElement | null;
+    const scaleX = this.content.querySelector('input[data-field="scale-x"], input[data-field="quick-scale-x"]') as HTMLInputElement | null;
     if (scaleX) {
-      const scaleY = this.content.querySelector('input[data-field="scale-y"]') as HTMLInputElement | null;
-      const scaleZ = this.content.querySelector('input[data-field="scale-z"]') as HTMLInputElement | null;
+      const scaleY = this.content.querySelector('input[data-field="scale-y"], input[data-field="quick-scale-y"]') as HTMLInputElement | null;
+      const scaleZ = this.content.querySelector('input[data-field="scale-z"], input[data-field="quick-scale-z"]') as HTMLInputElement | null;
       // Only update if not currently being edited
       if (document.activeElement !== scaleX) {
         scaleX.value = Number.isFinite(scale[0]) ? scale[0].toFixed(2) : '0.00';
@@ -359,10 +377,10 @@ export class PropertiesPanel {
     }
 
     // Rotation (degrees)
-    const rotX = this.content.querySelector('input[data-field="rotation-x"]') as HTMLInputElement | null;
+    const rotX = this.content.querySelector('input[data-field="rotation-x"], input[data-field="quick-rotation-x"]') as HTMLInputElement | null;
     if (rotX) {
-      const rotY = this.content.querySelector('input[data-field="rotation-y"]') as HTMLInputElement | null;
-      const rotZ = this.content.querySelector('input[data-field="rotation-z"]') as HTMLInputElement | null;
+      const rotY = this.content.querySelector('input[data-field="rotation-y"], input[data-field="quick-rotation-y"]') as HTMLInputElement | null;
+      const rotZ = this.content.querySelector('input[data-field="rotation-z"], input[data-field="quick-rotation-z"]') as HTMLInputElement | null;
       const eulerRad = quatToEuler(entity.transform.rotation);
       const toDeg = (r: number) => (r * 180) / Math.PI;
       // Only update if not currently being edited
@@ -378,17 +396,17 @@ export class PropertiesPanel {
       anyUpdated = true;
     }
 
-    // Color
-    const colorInput = this.content.querySelector('input[data-field="appearance-base-color"]') as HTMLInputElement | null;
+    // Color (check both old and new field names)
+    const colorInput = this.content.querySelector('input[data-field="appearance-base-color"], input[data-field="quick-color"]') as HTMLInputElement | null;
     if (colorInput) {
       const hex = rgbaToHex(entity.color).toUpperCase();
       // Only update if not currently being edited
       if (document.activeElement !== colorInput) {
         colorInput.value = hex;
       }
-      const swatchInner = this.content.querySelector('[data-field="appearance-base-color-swatch"]') as HTMLElement | null;
+      const swatchInner = this.content.querySelector('[data-field="appearance-base-color-swatch"], [data-field="quick-color-swatch"]') as HTMLElement | null;
       if (swatchInner) swatchInner.style.background = hex;
-      const display = this.content.querySelector('input[data-field="appearance-base-color-display"]') as HTMLInputElement | null;
+      const display = this.content.querySelector('input[data-field="appearance-base-color-display"], input[data-field="quick-color-display"]') as HTMLInputElement | null;
       if (display && document.activeElement !== display) {
         display.value = hex;
       }
@@ -2405,51 +2423,9 @@ export class PropertiesPanel {
     }
     this.scrollRaf = window.requestAnimationFrame(() => {
       this.scrollRaf = null;
-      this.updateActiveTabFromScroll();
-      this.updateTabsSticky();
+      // Scroll handling simplified - no tab updates needed
     });
   };
-
-  private updateActiveTabFromScroll(): void {
-    if (!this.sectionsWrapper) return;
-    const contentRectTop = this.content.getBoundingClientRect().top;
-    let bestSection: string | null = null;
-    let bestDistance = Number.POSITIVE_INFINITY;
-
-    for (const id of this.availableSections) {
-      const section = this.sectionElements.get(id);
-      if (!section) continue;
-      const rect = section.getBoundingClientRect();
-      const distance = Math.abs(rect.top - contentRectTop - 32);
-      if (distance < bestDistance) {
-        bestDistance = distance;
-        bestSection = id;
-      }
-    }
-
-    if (bestSection) {
-      const current = this.getLayoutPrefs().activeSection;
-      if (current !== bestSection) {
-        this.setLayoutPrefs((prev) => ({
-          ...prev,
-          activeSection: bestSection,
-        }));
-        this.updateTabActiveState(bestSection);
-      }
-    }
-  }
-
-  private updateTabsSticky(): void {
-    if (!this.sectionTabs) return;
-    const header = this.root.querySelector('.inspector-header-v2');
-    const headerBottom = header ? header.getBoundingClientRect().bottom : 0;
-    const tabsTop = this.sectionTabs.getBoundingClientRect().top;
-    if (tabsTop <= headerBottom) {
-      this.sectionTabs.classList.add('inspector-tabs-sticky');
-    } else {
-      this.sectionTabs.classList.remove('inspector-tabs-sticky');
-    }
-  }
 
   private getLayoutPrefs(): InspectorLayoutPreferences {
     if (this.config.state) {
@@ -2488,7 +2464,11 @@ export class PropertiesPanel {
   private buildSections(entity: Entity): Array<{ id: string; element: HTMLElement }> {
     const built: Array<{ id: string; element: HTMLElement }> = [];
     const renderedIds: string[] = [];
-    for (const sectionId of this.currentSectionOrder) {
+    // Filter out transform and appearance - they're in QuickAccessBar now
+    const filteredOrder = this.currentSectionOrder.filter(
+      id => id !== 'transform' && id !== 'appearance'
+    );
+    for (const sectionId of filteredOrder) {
       const element = this.createSectionForId(sectionId, entity);
       if (element) {
         built.push({ id: sectionId, element });
@@ -2496,196 +2476,22 @@ export class PropertiesPanel {
       }
     }
     this.availableSections = renderedIds;
-    if (renderedIds.length !== this.currentSectionOrder.length) {
-      this.currentSectionOrder = renderedIds;
-      this.setLayoutPrefs((prev) => ({
-        ...prev,
-        order: renderedIds,
-      }));
-    }
     return built;
   }
 
-  private ensureActiveTab(): void {
-    const prefs = this.getLayoutPrefs();
-    const active = prefs.activeSection;
-    const fallback = this.availableSections[0] ?? null;
-    if (!active || !this.availableSections.includes(active)) {
-      this.setLayoutPrefs((prev) => ({
-        ...prev,
-        activeSection: fallback,
-      }));
-      this.updateTabActiveState(fallback);
-    } else {
-      this.updateTabActiveState(active);
-    }
-  }
-
-  private updateTabActiveState(activeId: string | null): void {
-    for (const [id, button] of this.tabButtons.entries()) {
-      const isActive = id === activeId;
-      button.classList.toggle('inspector-tab-active', isActive);
-      button.setAttribute('aria-selected', isActive ? 'true' : 'false');
-      button.tabIndex = isActive ? 0 : -1;
-    }
-  }
-
-  private renderTabs(sectionIds: string[]): HTMLElement {
-    this.availableSections = sectionIds;
-
-    const tabs = document.createElement('div');
-    tabs.className = 'inspector-tabs';
-    tabs.setAttribute('role', 'tablist');
-    tabs.addEventListener('dragover', this.handleTabDragOver);
-    tabs.addEventListener('drop', this.handleTabDrop);
-    this.sectionTabs = tabs;
-
-    const activeSection = this.getLayoutPrefs().activeSection;
-
-    for (const sectionId of sectionIds) {
-      const meta = SECTION_METADATA.find((entry) => entry.id === sectionId);
-      if (!meta) continue;
-      const button = document.createElement('button');
-      button.type = 'button';
-      button.className = 'inspector-tab';
-      button.setAttribute('role', 'tab');
-      button.setAttribute('data-section-id', sectionId);
-      button.draggable = true;
-
-      const iconSpan = document.createElement('span');
-      iconSpan.className = 'inspector-tab-icon';
-      iconSpan.appendChild(createIcon(meta.icon, 14));
-      const labelSpan = document.createElement('span');
-      labelSpan.className = 'inspector-tab-label';
-      labelSpan.textContent = meta.label;
-
-      button.appendChild(iconSpan);
-      button.appendChild(labelSpan);
-
-      button.addEventListener('click', () => this.focusSection(sectionId));
-      button.addEventListener('keydown', (event) => this.handleTabKeydown(event, sectionId));
-      button.addEventListener('dragstart', (event) => this.handleTabDragStart(event, sectionId));
-      button.addEventListener('dragend', this.handleTabDragEnd);
-
-      this.tabButtons.set(sectionId, button);
-      tabs.appendChild(button);
-    }
-
-    this.updateTabActiveState(activeSection);
-
-    return tabs;
-  }
-
-  
-
-  private handleTabKeydown(event: KeyboardEvent, sectionId: string): void {
-    if (event.key === 'Enter' || event.key === ' ') {
-      event.preventDefault();
-      this.focusSection(sectionId);
-      return;
-    }
-
-    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
-    event.preventDefault();
-    const currentIndex = this.availableSections.indexOf(sectionId);
-    if (currentIndex === -1) return;
-    const delta = event.key === 'ArrowRight' ? 1 : -1;
-    const nextIndex = (currentIndex + delta + this.availableSections.length) % this.availableSections.length;
-    const nextId = this.availableSections[nextIndex]!;
-    const button = this.tabButtons.get(nextId);
-    button?.focus();
-    this.focusSection(nextId);
-  }
-
-  private handleTabDragStart(event: DragEvent, sectionId: string): void {
-    this.draggingTabId = sectionId;
-    event.dataTransfer?.setData('text/plain', sectionId);
-    event.dataTransfer?.setDragImage?.(event.currentTarget as Element, 8, 8);
-    if (event.dataTransfer) {
-      event.dataTransfer.effectAllowed = 'move';
-    }
-  }
-
-  private handleTabDragEnd = (): void => {
-    this.draggingTabId = null;
-    for (const button of this.tabButtons.values()) {
-      button.classList.remove('inspector-tab-drop-before');
-      button.classList.remove('inspector-tab-drop-after');
-    }
-  };
-
-  private handleTabDragOver = (event: DragEvent): void => {
-    if (!this.draggingTabId) return;
-    event.preventDefault();
-    const target = (event.target as HTMLElement).closest('.inspector-tab') as HTMLButtonElement | null;
-    if (!target) return;
-    const targetId = target.getAttribute('data-section-id');
-    if (!targetId || targetId === this.draggingTabId) return;
-
-    const targetRect = target.getBoundingClientRect();
-    const offset = event.clientX - targetRect.left;
-    const insertBefore = offset < targetRect.width / 2;
-
-    for (const button of this.tabButtons.values()) {
-      button.classList.remove('inspector-tab-drop-before');
-      button.classList.remove('inspector-tab-drop-after');
-    }
-
-    target.classList.add(insertBefore ? 'inspector-tab-drop-before' : 'inspector-tab-drop-after');
-    event.dataTransfer!.dropEffect = 'move';
-  };
-
-  private handleTabDrop = (event: DragEvent): void => {
-    if (!this.draggingTabId) return;
-    event.preventDefault();
-    const target = (event.target as HTMLElement).closest('.inspector-tab') as HTMLButtonElement | null;
-    if (!target) return;
-    const targetId = target.getAttribute('data-section-id');
-    if (!targetId || targetId === this.draggingTabId) {
-      this.handleTabDragEnd();
-      return;
-    }
-
-    const targetRect = target.getBoundingClientRect();
-    const insertBefore = event.clientX - targetRect.left < targetRect.width / 2;
-    this.reorderSections(this.draggingTabId, targetId, insertBefore);
-    this.handleTabDragEnd();
-  };
-
-  private reorderSections(sourceId: string, targetId: string, before: boolean): void {
-    const order = [...this.currentSectionOrder];
-    const sourceIndex = order.indexOf(sourceId);
-    const targetIndex = order.indexOf(targetId);
-    if (sourceIndex === -1 || targetIndex === -1) return;
-
-    order.splice(sourceIndex, 1);
-    const nextIndex = order.indexOf(targetId);
-    const insertIndex = before ? nextIndex : nextIndex + 1;
-    order.splice(insertIndex, 0, sourceId);
-    this.currentSectionOrder = order;
-    this.setLayoutPrefs((prev) => ({
-      ...prev,
-      order,
-    }));
-
-    this.rerenderTabs();
-    this.rebuildSectionOrder();
-  }
-
-  private rerenderTabs(): void {
-    if (!this.sectionTabs || !this.sectionTabs.parentElement) return;
-    const parent = this.sectionTabs.parentElement;
-    const newTabs = this.renderTabs(this.availableSections);
-    parent.replaceChild(newTabs, this.sectionTabs);
-    this.updateTabActiveState(this.getLayoutPrefs().activeSection);
-  }
-
-  private rebuildSectionOrder(): void {
-    if (!this.sectionsWrapper) return;
-    for (const id of this.currentSectionOrder) {
-      const element = this.sectionElements.get(id);
-      if (element) {
-        this.sectionsWrapper.appendChild(element);
+  private focusSection(sectionId: string): void {
+    const section = this.sectionElements.get(sectionId);
+    if (!section) return;
+    
+    // Scroll to section
+    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    
+    // Expand if collapsed
+    const content = section.querySelector('.property-section-content');
+    if (content && content.classList.contains('collapsed')) {
+      const header = section.querySelector('.property-section-header') as HTMLButtonElement;
+      if (header) {
+        header.click();
       }
     }
   }
@@ -2740,24 +2546,12 @@ export class PropertiesPanel {
         );
       }
       case 'transform': {
-        return this.createCollapsibleSection(
-          'transform',
-          'Transform',
-          'move',
-          this.createTransformProperties(entity),
-          collapsed,
-          () => this.toggleSectionCollapse('transform')
-        );
+        // Transform is now in QuickAccessBar, skip here
+        return null;
       }
       case 'appearance': {
-        return this.createCollapsibleSection(
-          'appearance',
-          'Appearance',
-          'palette',
-          this.createAppearanceProperties(entity),
-          collapsed,
-          () => this.toggleSectionCollapse('appearance')
-        );
+        // Appearance (Color) is now in QuickAccessBar, skip here
+        return null;
       }
       case 'material': {
         const materialComponent = entity.getComponent(MaterialComponent);
@@ -2839,16 +2633,6 @@ export class PropertiesPanel {
     });
   }
 
-  private focusSection(sectionId: string): void {
-    const element = this.sectionElements.get(sectionId);
-    if (!element) return;
-    element.scrollIntoView({ block: 'start', behavior: 'smooth' });
-    this.setLayoutPrefs((prev) => ({
-      ...prev,
-      activeSection: sectionId,
-    }));
-    this.updateTabActiveState(sectionId);
-  }
 
   private createMaterialProperties(material: MaterialComponent): HTMLElement {
     const container = document.createElement('div');

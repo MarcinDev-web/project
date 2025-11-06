@@ -12,6 +12,61 @@
   max-width: 100vw;
 }
 
+/* ============================================
+   QUICK ACCESS BAR RESPONSIVE
+   ============================================ */
+
+.inspector-quick-access {
+  min-width: 0;
+}
+
+.quick-access-content {
+  gap: clamp(var(--spacing-3), 2vw, var(--spacing-4));
+}
+
+.quick-access-control-group {
+  padding: clamp(var(--spacing-2), 1.5vw, var(--spacing-3));
+}
+
+@media (max-width: 768px) {
+  .inspector-quick-access {
+    border-radius: var(--radius-lg);
+    margin-bottom: var(--spacing-3);
+  }
+
+  .quick-access-header {
+    padding: var(--spacing-2-5) var(--spacing-3);
+  }
+
+  .quick-access-content {
+    padding: var(--spacing-3);
+    gap: var(--spacing-3);
+  }
+
+  .quick-access-controls {
+    gap: var(--spacing-2-5);
+  }
+
+  .quick-access-control-group {
+    padding: var(--spacing-2-5);
+  }
+}
+
+@media (max-width: 480px) {
+  .quick-access-content {
+    padding: var(--spacing-2-5);
+  }
+
+  .quick-access-section-header {
+    font-size: 10px;
+  }
+
+  .quick-access-control-group .property-vector-v2 {
+    grid-template-columns: 1fr;
+    gap: var(--spacing-2);
+  }
+}
+
 .inspector-content {
   /* Ensure minimum padding on small screens */
   padding: clamp(var(--spacing-3), 2vw, var(--spacing-5));

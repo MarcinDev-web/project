@@ -45,9 +45,11 @@ describe('PropertiesPanel', () => {
       },
       behaviors: {
         add: vi.fn(),
+        delete: vi.fn(),
       },
       scheduler: {
         attachBehaviorInstance: vi.fn(),
+        detachBehaviorInstance: vi.fn(),
       },
     };
   });
@@ -72,6 +74,10 @@ describe('PropertiesPanel', () => {
     panel.mount(host);
     panel.refresh();
 
+    // Test QuickAccessBar is rendered
+    const quickAccess = host.querySelector('.inspector-quick-access');
+    expect(quickAccess).toBeTruthy();
+
     // Test name input (now in entity card)
     const nameInput = host.querySelector('.entity-card-name-input') as HTMLInputElement;
     expect(nameInput).toBeTruthy();
@@ -79,20 +85,84 @@ describe('PropertiesPanel', () => {
     nameInput.dispatchEvent(new Event('change'));
     expect(onEntityRenamed).toHaveBeenCalledWith(entity);
 
-    // Test transform inputs (now in property-vector-v2)
-    const positionInputs = host.querySelectorAll('.property-number-input');
-    expect(positionInputs.length).toBeGreaterThan(0);
+    // Test transform inputs (now in QuickAccessBar with quick- prefix)
+    const positionInputs = host.querySelectorAll('input[data-field^="quick-position"]');
+    expect(positionInputs.length).toBe(3); // X, Y, Z
     const xInput = positionInputs[0] as HTMLInputElement;
     xInput.value = '2.5';
     xInput.dispatchEvent(new Event('change'));
     expect(onTransformChanged).toHaveBeenCalledWith(entity);
 
-    // Test color input (now in enhanced color picker)
-    const colorInput = host.querySelector('input[type="color"]') as HTMLInputElement;
+    // Test color input (now in QuickAccessBar with quick-color prefix)
+    const colorInput = host.querySelector('input[data-field="quick-color"]') as HTMLInputElement;
     expect(colorInput).toBeTruthy();
     colorInput.value = '#ff0000';
     colorInput.dispatchEvent(new Event('input'));
     expect(onColorChanged).toHaveBeenCalledWith(entity, [1, 0, 0, 1]);
+  });
+
+  it('renders QuickAccessBar with transform and color controls', () => {
+    const panel = new PropertiesPanel({
+      selection,
+      onTransformChanged: vi.fn(),
+      onColorChanged: vi.fn(),
+      onEntityRenamed: vi.fn(),
+      state: editorState,
+    });
+    panel.mount(host);
+    panel.refresh();
+
+    // Check QuickAccessBar exists
+    const quickAccess = host.querySelector('.inspector-quick-access');
+    expect(quickAccess).toBeTruthy();
+
+    // Check QuickAccessBar has transform controls
+    const transformSection = quickAccess?.querySelector('.quick-access-section');
+    expect(transformSection).toBeTruthy();
+    
+    // Check position, rotation, scale inputs exist
+    const positionInputs = host.querySelectorAll('input[data-field^="quick-position"]');
+    expect(positionInputs.length).toBe(3);
+    
+    const rotationInputs = host.querySelectorAll('input[data-field^="quick-rotation"]');
+    expect(rotationInputs.length).toBe(3);
+    
+    const scaleInputs = host.querySelectorAll('input[data-field^="quick-scale"]');
+    expect(scaleInputs.length).toBe(3);
+
+    // Check color picker exists (if entity doesn't have texture)
+    const colorInput = host.querySelector('input[data-field="quick-color"]');
+    expect(colorInput).toBeTruthy();
+  });
+
+  it('allows collapsing and expanding QuickAccessBar', () => {
+    const panel = new PropertiesPanel({
+      selection,
+      onTransformChanged: vi.fn(),
+      onColorChanged: vi.fn(),
+      onEntityRenamed: vi.fn(),
+      state: editorState,
+    });
+    panel.mount(host);
+    panel.refresh();
+
+    const quickAccess = host.querySelector('.inspector-quick-access');
+    expect(quickAccess).toBeTruthy();
+
+    const collapseBtn = quickAccess?.querySelector('.quick-access-collapse') as HTMLButtonElement;
+    expect(collapseBtn).toBeTruthy();
+
+    const content = quickAccess?.querySelector('.quick-access-content');
+    expect(content).toBeTruthy();
+    expect(content?.classList.contains('collapsed')).toBe(false);
+
+    // Click to collapse
+    collapseBtn.click();
+    expect(content?.classList.contains('collapsed')).toBe(true);
+
+    // Click to expand
+    collapseBtn.click();
+    expect(content?.classList.contains('collapsed')).toBe(false);
   });
 
   it('renders animation component controls', () => {
@@ -111,8 +181,12 @@ describe('PropertiesPanel', () => {
     panel.mount(host);
     panel.refresh();
 
-    const animationSection = host.querySelector('.animation-properties');
+    // Check animation section exists (as accordion, not tab)
+    const animationSection = host.querySelector('#inspector-section-animation');
     expect(animationSection).toBeTruthy();
+    
+    const animationContent = host.querySelector('.animation-properties');
+    expect(animationContent).toBeTruthy();
     const clips = host.querySelectorAll('.animation-clip-item');
     expect(clips.length).toBeGreaterThan(0);
     const timeline = host.querySelector('.animation-timeline-slider');
@@ -175,6 +249,10 @@ describe('PropertiesPanel', () => {
     });
     panel.mount(host);
     panel.refresh();
+
+    // Check scripts section exists as accordion
+    const scriptsSection = host.querySelector('#inspector-section-scripts');
+    expect(scriptsSection).toBeTruthy();
 
     const emptyText = host.querySelector('.property-content .muted-text');
     expect(emptyText?.textContent).toContain('No scripts attached');
@@ -322,8 +400,13 @@ describe('PropertiesPanel', () => {
       panel.mount(host);
       panel.refresh();
 
-      const characterSection = host.querySelector('[data-section-id="character-controller"]');
+      // Check section exists as accordion (not tab)
+      const characterSection = host.querySelector('#inspector-section-character-controller');
       expect(characterSection).toBeTruthy();
+      
+      // Check it has collapsible header
+      const sectionHeader = characterSection?.querySelector('.property-section-header');
+      expect(sectionHeader).toBeTruthy();
     });
 
     it('does not render character controller section when component missing', () => {
@@ -337,7 +420,7 @@ describe('PropertiesPanel', () => {
       panel.mount(host);
       panel.refresh();
 
-      const characterSection = host.querySelector('[data-section-id="character-controller"]');
+      const characterSection = host.querySelector('#inspector-section-character-controller');
       expect(characterSection).toBeFalsy();
     });
 
