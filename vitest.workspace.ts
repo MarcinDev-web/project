@@ -3,6 +3,7 @@ import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import type { Plugin } from 'vite';
+import wasm from 'vite-plugin-wasm';
 
 const __dirname = resolve(fileURLToPath(import.meta.url), '..');
 
@@ -52,6 +53,7 @@ const resolveEngineAliasesPlugin = (): Plugin => {
   };
 };
 
+
 export default defineWorkspace([
   {
     test: {
@@ -60,7 +62,7 @@ export default defineWorkspace([
         './apps/editor/src/test/setup.ts',
         './packages/gfx-webgpu/__tests__/setup.ts',
       ],
-      plugins: [resolveEngineAliasesPlugin()],
+      plugins: [resolveEngineAliasesPlugin(), wasm()],
       resolve: {
         alias: {
           '@engine/core': resolve(__dirname, 'packages/core/src'),
@@ -211,6 +213,8 @@ export default defineWorkspace([
           allow: ['..'],
         },
       },
+      // Include WASM files as assets
+      assetsInclude: ['**/*.wasm'],
       // Coverage configuration
       coverage: {
         enabled: false, // Enable with --coverage flag
