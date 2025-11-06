@@ -1,6 +1,7 @@
 /**
  * PlayerDetection - Helper for detecting player proximity in logic cubes.
  */
+import { CharacterController } from '@engine/world';
 /**
  * Provides player detection utilities for trigger cubes
  */
@@ -32,21 +33,27 @@ export class PlayerDetection {
             return null;
         }
         this.lastPlayerCheckTime = now;
-        // Search by common player names
+        // Search by CharacterController component (primary method)
+        const entities = this.scene.queryEntities(CharacterController);
+        if (entities.length > 0) {
+            // Prefer entity with CharacterController that is active
+            for (const entity of entities) {
+                const controller = entity.getComponent(CharacterController);
+                if (controller) {
+                    this.playerEntity = entity;
+                    return entity;
+                }
+            }
+        }
+        // Fallback: Search by common player names
         const playerNames = ['Player', 'player', 'MainPlayer', 'Character'];
         for (const name of playerNames) {
-            const found = this.scene.findEntitiesByName(name)[0]; // Changed to findEntitiesByName
+            const found = this.scene.findEntitiesByName(name)[0];
             if (found) {
                 this.playerEntity = found;
                 return found;
             }
         }
-        // TODO: Search by CharacterController component when available
-        // const entities = this.scene.queryEntities(CharacterController);
-        // if (entities.length > 0) {
-        //   this.playerEntity = entities[0];
-        //   return entities[0];
-        // }
         return null;
     }
     /**

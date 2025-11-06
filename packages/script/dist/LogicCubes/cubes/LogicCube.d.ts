@@ -5,6 +5,7 @@
 import type { Entity } from '@engine/world';
 import type { Scene } from '@engine/world';
 import type { LogicPort, LogicSignal, LogicExecutionContext, LogicCubeMetadata } from './types.js';
+import type { PlayerDetection } from './PlayerDetection.js';
 /**
  * Abstract base class for logic cubes
  */
@@ -96,6 +97,10 @@ export declare abstract class LogicCube {
      * Called when the cube is destroyed
      */
     onDestroy(): void;
+    /**
+     * Gets the PlayerDetection helper from LogicCubeSystem
+     */
+    protected getPlayerDetection(): PlayerDetection | null;
 }
 /**
  * Type alias for logic cube constructor

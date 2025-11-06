@@ -191,9 +191,13 @@ export class IsPlayerNearCondition extends LogicCube {
     onSignalReceived(portId, signal) {
         if (portId !== 'trigger')
             return null;
-        // TODO: Implement player distance check
-        // For now, always return false
-        const result = false;
+        const radius = this.getConfig('radius', 5);
+        const playerDetection = this.getPlayerDetection();
+        let result = false;
+        if (playerDetection) {
+            const position = this.entity.transform.position;
+            result = playerDetection.isPlayerNear(position, radius);
+        }
         const outputs = new Map();
         const outputPort = result ? 'true' : 'false';
         outputs.set(outputPort, {
@@ -268,8 +272,22 @@ export class CheckDistanceCondition extends LogicCube {
     onSignalReceived(portId, signal) {
         if (portId !== 'trigger')
             return null;
-        // TODO: Implement distance check
-        const result = false;
+        const distance = this.getConfig('distance', 10);
+        const operator = this.getConfig('operator', 'lessThan');
+        const playerDetection = this.getPlayerDetection();
+        let result = false;
+        if (playerDetection) {
+            const position = this.entity.transform.position;
+            const playerDistance = playerDetection.getPlayerDistance(position);
+            if (playerDistance !== null) {
+                if (operator === 'lessThan') {
+                    result = playerDistance < distance;
+                }
+                else if (operator === 'greaterThan') {
+                    result = playerDistance > distance;
+                }
+            }
+        }
         const outputs = new Map();
         const outputPort = result ? 'true' : 'false';
         outputs.set(outputPort, {

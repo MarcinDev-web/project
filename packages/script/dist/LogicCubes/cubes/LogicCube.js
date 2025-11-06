@@ -2,6 +2,7 @@
  * Base class for all Logic Cube types.
  * Logic cubes are node-based logic elements that can be connected together.
  */
+import { getLogicCubeSystem } from '../LogicCubeSystemRegistry.js';
 /**
  * Abstract base class for logic cubes
  */
@@ -128,6 +129,13 @@ export class LogicCube {
      */
     onDestroy() {
         // Override in subclasses if needed
+    }
+    /**
+     * Gets the PlayerDetection helper from LogicCubeSystem
+     */
+    getPlayerDetection() {
+        const system = getLogicCubeSystem(this.scene);
+        return system?.getPlayerDetection() ?? null;
     }
 }
 //# sourceMappingURL=LogicCube.js.map

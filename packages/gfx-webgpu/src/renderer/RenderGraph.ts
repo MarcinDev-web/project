@@ -139,21 +139,122 @@ export class RenderGraph {
   }
 
   /**
-   * Executes all passes in dependency order.
+   * Performs topological sort of render passes based on texture dependencies.
+   * Uses Kahn's algorithm to order passes so that producers execute before consumers.
+   * 
+   * @returns Sorted passes in dependency order, or null if cycle detected
+   */
+  private topologicalSort(): RenderPassNode[] | null {
+    if (this.passes.length === 0) {
+      return [];
+    }
+
+    // Build dependency graph: pass A depends on pass B if A reads a texture that B writes
+    const passIndex = new Map<string, number>();
+    this.passes.forEach((pass, index) => {
+      passIndex.set(pass.id, index);
+    });
+
+    // Build texture -> producer pass mapping
+    const textureProducers = new Map<string, RenderPassNode[]>();
+    for (const pass of this.passes) {
+      for (const outputId of pass.outputs) {
+        if (!textureProducers.has(outputId)) {
+          textureProducers.set(outputId, []);
+        }
+        textureProducers.get(outputId)!.push(pass);
+      }
+    }
+
+    // Calculate in-degree for each pass (how many passes it depends on)
+    const inDegree = new Array<number>(this.passes.length).fill(0);
+    const dependencies: number[][] = new Array(this.passes.length).fill(null).map(() => []);
+
+    for (let i = 0; i < this.passes.length; i++) {
+      const pass = this.passes[i];
+      for (const inputId of pass.inputs) {
+        const producers = textureProducers.get(inputId);
+        if (producers) {
+          for (const producer of producers) {
+            const producerIndex = passIndex.get(producer.id);
+            if (producerIndex !== undefined && producerIndex !== i) {
+              // Pass i depends on producer
+              dependencies[producerIndex].push(i);
+              inDegree[i]++;
+            }
+          }
+        }
+      }
+    }
+
+    // Kahn's algorithm: start with passes that have no dependencies
+    const queue: number[] = [];
+    for (let i = 0; i < inDegree.length; i++) {
+      if (inDegree[i] === 0) {
+        queue.push(i);
+      }
+    }
+
+    const sorted: RenderPassNode[] = [];
+    let processedCount = 0;
+
+    while (queue.length > 0) {
+      const currentIndex = queue.shift()!;
+      const currentPass = this.passes[currentIndex];
+      sorted.push(currentPass);
+      processedCount++;
+
+      // Reduce in-degree of dependent passes
+      for (const dependentIndex of dependencies[currentIndex]) {
+        inDegree[dependentIndex]--;
+        if (inDegree[dependentIndex] === 0) {
+          queue.push(dependentIndex);
+        }
+      }
+    }
+
+    // If we didn't process all passes, there's a cycle
+    if (processedCount !== this.passes.length) {
+      return null;
+    }
+
+    return sorted;
+  }
+
+  /**
+   * Executes all passes in dependency order using topological sort.
    */
   execute(encoder: GPUCommandEncoder): void {
-    // Sort passes by dependencies (simple topological sort)
-    // For now, execute in order added (passes should be added in dependency order)
-    // TODO: Implement proper topological sort
-
+    // First, ensure all transient textures are created
+    // We need to do this before sorting to know which textures exist
     for (const pass of this.passes) {
+      for (const outputId of pass.outputs) {
+        if (this.transientTextures.has(outputId) && !this.textures.has(outputId)) {
+          // Default format - should be specified when registering transient texture
+          // For now, use a reasonable default
+          this.getOrCreateTexture(outputId, 'rgba16float', this.canvasWidth, this.canvasHeight, 1);
+        }
+      }
+    }
+
+    // Perform topological sort
+    let sortedPasses = this.topologicalSort();
+    
+    if (sortedPasses === null) {
+      console.error('[RenderGraph] Cycle detected in render pass dependencies. Execution order may be incorrect.');
+      // Fallback to original order (may cause incorrect rendering)
+      sortedPasses = this.passes;
+    }
+
+    // Execute passes in sorted order
+    for (const pass of sortedPasses) {
       // Ensure all input textures exist
       for (const inputId of pass.inputs) {
         if (!this.textures.has(inputId)) {
           // Try to get from transient set
           if (this.transientTextures.has(inputId)) {
             // Get format from first pass that outputs this texture
-            const outputPass = this.passes.find((p) => p.outputs.includes(inputId));
+            const outputPass = sortedPasses.find((p) => p.outputs.includes(inputId));
             if (outputPass) {
               // Default format - will be set by pass that creates it
               this.getOrCreateTexture(inputId, 'rgba16float', this.canvasWidth, this.canvasHeight, 1);

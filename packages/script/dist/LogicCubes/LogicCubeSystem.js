@@ -7,6 +7,7 @@ import { LogicConnectionManager } from '../connection/LogicConnectionManager.js'
 import { registerLogicConnectionManager } from '../connection/LogicConnectionRegistry.js';
 import { VariableStorage } from '../storage/VariableStorage.js';
 import { PlayerDetection } from './cubes/PlayerDetection.js';
+import { registerLogicCubeSystem } from './LogicCubeSystemRegistry.js';
 import { Logger } from '@engine/core/utils';
 /**
  * Registry for logic cube types
@@ -50,6 +51,7 @@ export class LogicCubeSystem {
         this.variableStorage = new VariableStorage();
         this.playerDetection = new PlayerDetection(scene);
         registerLogicConnectionManager(scene, this.connectionManager);
+        registerLogicCubeSystem(scene, this);
         // Listen for external logic signals (e.g., from UI events)
         scene.events.on('logic:signal', (event) => {
             const { targetEntityId, targetPort, signal } = event?.payload ?? {};

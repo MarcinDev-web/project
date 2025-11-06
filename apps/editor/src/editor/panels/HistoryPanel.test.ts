@@ -233,8 +233,9 @@ describe('HistoryPanel', () => {
       history.push(createSnapshot('Action 2'));
       panel.sync();
 
-      // Jump to first action (simulating undo)
-      panel.jumpTo(0);
+      // Jump to first action (simulating undo) - use history.undo() to actually change index
+      history.undo();
+      panel.sync();
 
       const futureItems = host.querySelectorAll('.history-item.future');
       expect(futureItems.length).toBe(1);
@@ -248,7 +249,8 @@ describe('HistoryPanel', () => {
       const panel = new HistoryPanel({ history, onUndo });
       panel.mount(host);
 
-      history.push(createSnapshot('Action'));
+      history.push(createSnapshot('Action 1'));
+      history.push(createSnapshot('Action 2')); // Need at least 2 actions to undo
       panel.sync();
 
       const undoBtn = host.querySelector('.history-controls button[title="Undo"]') as HTMLButtonElement;
@@ -313,7 +315,8 @@ describe('HistoryPanel', () => {
       panel.sync();
 
       const items = host.querySelectorAll('.history-item');
-      (items[1] as HTMLButtonElement).click(); // Jump to first action
+      (items[1] as HTMLButtonElement).click(); // Click on first action (index 0)
+      panel.sync(); // Sync after jump
 
       const currentItem = host.querySelector('.history-item.current');
       const description = currentItem?.querySelector('.history-description');
@@ -366,8 +369,9 @@ describe('HistoryPanel', () => {
       history.push(createSnapshot('Action 2'));
       panel.sync();
 
-      // Jump back to first action
-      panel.jumpTo(0);
+      // Jump back to first action using history.undo() to actually change index
+      history.undo();
+      panel.sync();
 
       // Add new action (should remove action_2)
       history.push(createSnapshot('Action 3'));

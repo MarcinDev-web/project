@@ -35,6 +35,7 @@ interface VegetationInstance {
   position: Vec3;
   rotation: number; // Y-axis rotation
   scale: number; // Varied scale for natural look (affected by growth stage)
+  distance?: number; // Distance from camera (for LOD selection)
 }
 
 /**
@@ -76,6 +77,9 @@ export class VegetationRenderer {
   /** Render pipeline for billboards */
   private billboardPipeline: GPURenderPipeline | null = null;
   
+  /** Render pipeline for 3D models */
+  private model3DPipeline: GPURenderPipeline | null = null;
+  
   /** Bind group layouts */
   private uniformBindGroupLayout: GPUBindGroupLayout | null = null;
   private textureBindGroupLayout: GPUBindGroupLayout | null = null;
@@ -86,6 +90,9 @@ export class VegetationRenderer {
   /** Texture for billboard (grass/flowers) */
   private billboardTexture: GPUTexture | null = null;
   private billboardSampler: GPUSampler | null = null;
+  
+  /** Default white texture for 3D models when no texture is available */
+  private defaultWhiteTexture: GPUTexture | null = null;
   
   /** Cached visible vegetation entities */
   private visibleVegetation: VegetationInstance[] = [];
@@ -99,6 +106,13 @@ export class VegetationRenderer {
     scale?: GPUBuffer;
     wind?: GPUBuffer;
     color?: GPUBuffer;
+    maxSize: number;
+  } = { maxSize: 0 };
+  
+  /** Buffer pool for 3D model instance data */
+  private model3DBufferPool: {
+    transform?: GPUBuffer; // mat4 per instance (64 bytes)
+    color?: GPUBuffer; // vec4 per instance (16 bytes)
     maxSize: number;
   } = { maxSize: 0 };
   
@@ -185,8 +199,25 @@ export class VegetationRenderer {
       addressModeV: 'clamp-to-edge',
     });
 
+    // Create default white texture for 3D models (1x1 white pixel)
+    this.defaultWhiteTexture = device.createTexture({
+      label: 'vegetation-default-white-texture',
+      size: [1, 1],
+      format: 'rgba8unorm',
+      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+    });
+    device.queue.writeTexture(
+      { texture: this.defaultWhiteTexture },
+      new Uint8Array([255, 255, 255, 255]),
+      { bytesPerRow: 4, rowsPerImage: 1 },
+      [1, 1]
+    );
+
     // Create render pipeline
     await this.createBillboardPipeline(device, presentationFormat);
+    
+    // Create 3D model render pipeline
+    await this.create3DModelPipeline(device, presentationFormat);
 
     // Initialize LOD manager for 3D models
     this.lodManager = new GeometryLODManager(device, {
@@ -337,6 +368,89 @@ export class VegetationRenderer {
   }
 
   /**
+   * Creates render pipeline for 3D model rendering with instancing
+   */
+  private async create3DModelPipeline(
+    device: GPUDevice,
+    presentationFormat: GPUTextureFormat
+  ): Promise<void> {
+    const shaderModule = device.createShaderModule({
+      label: 'vegetation-3d-model-shader',
+      code: this.get3DModelShaderCode(),
+    });
+
+    const pipelineLayout = device.createPipelineLayout({
+      label: 'vegetation-3d-model-pipeline-layout',
+      bindGroupLayouts: [this.uniformBindGroupLayout!, this.textureBindGroupLayout!],
+    });
+
+    const createPipeline = (desc: GPURenderPipelineDescriptor): GPURenderPipeline | Promise<GPURenderPipeline> => {
+      const anyDevice = device as unknown as {
+        createRenderPipelineAsync?: (d: GPURenderPipelineDescriptor) => Promise<GPURenderPipeline>;
+        createRenderPipeline: (d: GPURenderPipelineDescriptor) => GPURenderPipeline;
+      };
+      if (typeof anyDevice.createRenderPipelineAsync === 'function') {
+        return anyDevice.createRenderPipelineAsync(desc);
+      }
+      return anyDevice.createRenderPipeline(desc);
+    };
+
+    this.model3DPipeline = await createPipeline({
+      label: 'vegetation-3d-model-pipeline',
+      layout: pipelineLayout,
+      vertex: {
+        module: shaderModule,
+        entryPoint: 'vertexMain',
+        buffers: [
+          {
+            // Vertex buffer: position (vec3) + normal (vec3) + uv (vec2) = 8 floats = 32 bytes
+            arrayStride: 32,
+            stepMode: 'vertex',
+            attributes: [
+              { shaderLocation: 0, offset: 0, format: 'float32x3' }, // position
+              { shaderLocation: 1, offset: 12, format: 'float32x3' }, // normal
+              { shaderLocation: 2, offset: 24, format: 'float32x2' }, // uv
+            ],
+          },
+          {
+            // Instance transform (mat4) = 64 bytes
+            arrayStride: 64,
+            stepMode: 'instance',
+            attributes: [
+              { shaderLocation: 3, offset: 0, format: 'float32x4' }, // transform row 0
+              { shaderLocation: 4, offset: 16, format: 'float32x4' }, // transform row 1
+              { shaderLocation: 5, offset: 32, format: 'float32x4' }, // transform row 2
+              { shaderLocation: 6, offset: 48, format: 'float32x4' }, // transform row 3
+            ],
+          },
+          {
+            // Instance color (vec4) = 16 bytes
+            arrayStride: 16,
+            stepMode: 'instance',
+            attributes: [
+              { shaderLocation: 7, offset: 0, format: 'float32x4' }, // color
+            ],
+          },
+        ],
+      },
+      fragment: {
+        module: shaderModule,
+        entryPoint: 'fragmentMain',
+        targets: [{ format: presentationFormat }],
+      },
+      primitive: {
+        topology: 'triangle-list',
+        cullMode: 'back', // Cull back faces
+      },
+      depthStencil: {
+        format: 'depth24plus',
+        depthWriteEnabled: true,
+        depthCompare: 'less',
+      },
+    });
+  }
+
+  /**
    * Gets billboard shader code with advanced wind animation
    */
   private getBillboardShaderCode(): string {
@@ -470,6 +584,98 @@ fn fragmentMain(
   }
 
   /**
+   * Gets 3D model shader code for instanced rendering with LOD support
+   */
+  private get3DModelShaderCode(): string {
+    return `
+struct Uniforms {
+  viewProjectionMatrix: mat4x4<f32>,
+  cameraPosition: vec3<f32>,
+  _pad0: f32,
+  windParams: vec4<f32>, // x: globalStrength, y: globalFrequency, z: time, w: unused
+}
+
+@group(0) @binding(0) var<uniform> uniforms: Uniforms;
+@group(1) @binding(0) var texSampler: sampler;
+@group(1) @binding(1) var modelTexture: texture_2d<f32>;
+
+struct VertexOutput {
+  @builtin(position) position: vec4<f32>,
+  @location(0) uv: vec2<f32>,
+  @location(1) normal: vec3<f32>,
+  @location(2) worldPos: vec3<f32>,
+  @location(3) color: vec4<f32>,
+}
+
+@vertex
+fn vertexMain(
+  @location(0) vertexPos: vec3<f32>,
+  @location(1) vertexNormal: vec3<f32>,
+  @location(2) vertexUV: vec2<f32>,
+  @location(3) instanceTransform0: vec4<f32>,
+  @location(4) instanceTransform1: vec4<f32>,
+  @location(5) instanceTransform2: vec4<f32>,
+  @location(6) instanceTransform3: vec4<f32>,
+  @location(7) instanceColor: vec4<f32>
+) -> VertexOutput {
+  var output: VertexOutput;
+  
+  // Build instance transform matrix
+  let instanceTransform = mat4x4<f32>(
+    instanceTransform0,
+    instanceTransform1,
+    instanceTransform2,
+    instanceTransform3
+  );
+  
+  // Transform vertex to world space
+  let worldPos = (instanceTransform * vec4<f32>(vertexPos, 1.0)).xyz;
+  
+  // Transform normal to world space (using inverse transpose for proper normal transformation)
+  // For simplicity, we'll use the rotation part of the transform
+  let worldNormal = normalize((instanceTransform * vec4<f32>(vertexNormal, 0.0)).xyz);
+  
+  // Apply view-projection
+  output.position = uniforms.viewProjectionMatrix * vec4<f32>(worldPos, 1.0);
+  output.uv = vertexUV;
+  output.normal = worldNormal;
+  output.worldPos = worldPos;
+  output.color = instanceColor;
+  
+  return output;
+}
+
+@fragment
+fn fragmentMain(
+  @location(0) uv: vec2<f32>,
+  @location(1) normal: vec3<f32>,
+  @location(2) worldPos: vec3<f32>,
+  @location(3) color: vec4<f32>
+) -> @location(0) vec4<f32> {
+  // Sample texture if available
+  var baseColor = textureSample(modelTexture, texSampler, uv);
+  
+  // Apply instance color tint
+  baseColor.rgb = baseColor.rgb * color.rgb;
+  
+  // Simple lighting (directional light from above)
+  let lightDir = normalize(vec3<f32>(0.5, 1.0, 0.3));
+  let N = normalize(normal);
+  let lightIntensity = max(dot(N, lightDir), 0.3); // Ambient + diffuse
+  
+  baseColor.rgb = baseColor.rgb * lightIntensity;
+  
+  // Alpha discard for transparent areas
+  if (baseColor.a < 0.1) {
+    discard;
+  }
+  
+  return baseColor;
+}
+`;
+  }
+
+  /**
    * Updates vegetation renderer (called each frame)
    */
   update(deltaTime: number, scene: Scene | null, viewProjectionMatrix: Mat4, cameraPosition: Vec3): void {
@@ -542,6 +748,7 @@ fn fragmentMain(
         position,
         rotation: 0, // Can be randomized later
         scale: randomScale * vegetation.config.height * growthScale,
+        distance, // Store distance for LOD selection
       });
     }
 
@@ -586,44 +793,247 @@ fn fragmentMain(
     passEncoder: GPURenderPassEncoder,
     instances: VegetationInstance[]
   ): void {
-    if (!this.device || !this.lodManager) {
+    if (!this.device || !this.lodManager || !this.model3DPipeline) {
       return;
     }
 
-    // Group by model URL for batch rendering
-    const modelGroups = new Map<string, VegetationInstance[]>();
+    // Group by model URL and LOD level for efficient batch rendering
+    const modelLODGroups = new Map<string, Map<GeometryLODLevel, VegetationInstance[]>>();
+    
+    // Calculate LOD for each instance and group them
     for (const inst of instances) {
       const modelUrl = inst.vegetation.config.modelUrl;
       if (!modelUrl) {
         continue; // Skip if no model URL
       }
 
-      if (!modelGroups.has(modelUrl)) {
-        modelGroups.set(modelUrl, []);
-      }
-      modelGroups.get(modelUrl)!.push(inst);
-    }
-
-    // Render each model group
-    for (const [modelUrl, modelInstances] of modelGroups.entries()) {
       const geometry = this.modelGeometries.get(modelUrl);
       if (!geometry) {
-        Logger.warn(`[VegetationRenderer] Model geometry not loaded: ${modelUrl}`);
+        continue; // Skip if geometry not loaded
+      }
+
+      // Calculate distance for LOD selection
+      // Note: distance is already calculated in update(), but we need camera position
+      // For now, we'll use a simple distance-based LOD selection
+      const lodLevel = this.selectLODLevel(inst);
+      
+      // Register entity with LOD manager if not already registered
+      const entityId = inst.entity.id;
+      if (!this.lodManager.getCurrentLOD(entityId)) {
+        // Create LOD levels map if not exists
+        if (!geometry.lodLevels) {
+          // Use base geometry for all LOD levels (simplified - in production, generate actual LOD meshes)
+          geometry.lodLevels = new Map();
+          geometry.lodLevels.set(0, {
+            vertexBuffer: geometry.vertexBuffer,
+            indexBuffer: geometry.indexBuffer,
+            vertexCount: geometry.vertexCount,
+            indexCount: geometry.indexCount,
+          });
+          // For now, use same geometry for all LODs (in production, generate simplified meshes)
+          for (let i = 1; i <= 3; i++) {
+            geometry.lodLevels.set(i as GeometryLODLevel, {
+              vertexBuffer: geometry.vertexBuffer,
+              indexBuffer: geometry.indexBuffer,
+              vertexCount: geometry.vertexCount,
+              indexCount: geometry.indexCount,
+            });
+          }
+        }
+        
+        this.lodManager.registerEntity(entityId, geometry.lodLevels);
+      }
+
+      // Group by model URL and LOD level
+      if (!modelLODGroups.has(modelUrl)) {
+        modelLODGroups.set(modelUrl, new Map());
+      }
+      const lodMap = modelLODGroups.get(modelUrl)!;
+      if (!lodMap.has(lodLevel)) {
+        lodMap.set(lodLevel, []);
+      }
+      lodMap.get(lodLevel)!.push(inst);
+    }
+
+    // Render each model/LOD group
+    for (const [modelUrl, lodMap] of modelLODGroups.entries()) {
+      const geometry = this.modelGeometries.get(modelUrl);
+      if (!geometry) {
         continue;
       }
 
-      // TODO: Implement full 3D rendering pipeline with LOD
-      // For now, this is a placeholder structure
-      // Requires:
-      // 1. Model loading system integration
-      // 2. LOD geometry generation/caching
-      // 3. Instanced rendering pipeline for 3D models
-      // 4. Integration with existing PBR shader pipeline
+      // Render each LOD level separately
+      for (const [lodLevel, modelInstances] of lodMap.entries()) {
+        if (modelInstances.length === 0) {
+          continue;
+        }
 
-      Logger.debug(
-        `[VegetationRenderer] Would render ${modelInstances.length} instances of ${modelUrl} (3D model rendering not yet fully implemented)`
-      );
+        // Get LOD geometry
+        const lodGeometry = geometry.lodLevels?.get(lodLevel) ?? {
+          vertexBuffer: geometry.vertexBuffer,
+          indexBuffer: geometry.indexBuffer,
+          vertexCount: geometry.vertexCount,
+          indexCount: geometry.indexCount,
+        };
+
+        // Render this LOD group
+        this.render3DModelGroup(
+          passEncoder,
+          modelInstances,
+          lodGeometry,
+          modelUrl
+        );
+      }
     }
+  }
+
+  /**
+   * Selects LOD level based on distance
+   */
+  private selectLODLevel(instance: VegetationInstance): GeometryLODLevel {
+    const lodDistances = this.lodManager?.getConfig().lodDistances ?? [15, 30, 50, 80];
+    const distance = instance.distance ?? 0;
+    
+    if (distance <= lodDistances[0]) return 0;
+    if (distance <= lodDistances[1]) return 1;
+    if (distance <= lodDistances[2]) return 2;
+    return 3;
+  }
+
+  /**
+   * Renders a group of 3D model instances with the same LOD level
+   */
+  private render3DModelGroup(
+    passEncoder: GPURenderPassEncoder,
+    instances: VegetationInstance[],
+    geometry: {
+      vertexBuffer: GPUBuffer;
+      indexBuffer: GPUBuffer;
+      vertexCount: number;
+      indexCount: number;
+    },
+    modelUrl: string
+  ): void {
+    if (!this.device || !this.model3DPipeline) {
+      return;
+    }
+
+    const instanceCount = instances.length;
+    if (instanceCount === 0) {
+      return;
+    }
+
+    // Build instance data: transform matrices and colors
+    const transformData = new Float32Array(instanceCount * 16); // mat4 per instance
+    const colorData = new Float32Array(instanceCount * 4); // vec4 per instance
+
+    for (let i = 0; i < instanceCount; i++) {
+      const inst = instances[i];
+      if (!inst) continue;
+
+      // Build transform matrix (position, rotation, scale)
+      const pos = inst.position;
+      const scale = inst.scale;
+      const rotation = inst.rotation; // Y-axis rotation in radians
+
+      // Create transform matrix: T * R * S
+      // Rotation around Y axis
+      const cosR = Math.cos(rotation);
+      const sinR = Math.sin(rotation);
+      
+      // Scale matrix
+      const sx = scale;
+      const sy = scale * inst.vegetation.growthStage; // Apply growth stage
+      const sz = scale;
+
+      // Combined transform matrix (column-major)
+      const mat = [
+        cosR * sx, 0, sinR * sz, 0,
+        0, sy, 0, 0,
+        -sinR * sx, 0, cosR * sz, 0,
+        pos[0], pos[1], pos[2], 1,
+      ];
+
+      // Write matrix to buffer (column-major)
+      for (let j = 0; j < 16; j++) {
+        transformData[i * 16 + j] = mat[j] ?? 0;
+      }
+
+      // Color tint
+      const colorTint = inst.vegetation.config.colorTint ?? [1.0, 1.0, 1.0];
+      const colorVariation = inst.vegetation.config.colorVariation;
+      const variation = (inst.vegetation.colorVariationFactor - 0.5) * 2.0 * colorVariation;
+      colorData[i * 4 + 0] = colorTint[0] * (1.0 + variation);
+      colorData[i * 4 + 1] = colorTint[1] * (1.0 + variation);
+      colorData[i * 4 + 2] = colorTint[2] * (1.0 + variation);
+      colorData[i * 4 + 3] = 1.0; // Alpha
+    }
+
+    // Use buffer pool for better performance
+    const transformBufferSize = transformData.byteLength;
+    const colorBufferSize = colorData.byteLength;
+
+    if (this.model3DBufferPool.maxSize < instanceCount) {
+      // Destroy old buffers
+      this.model3DBufferPool.transform?.destroy();
+      this.model3DBufferPool.color?.destroy();
+
+      // Create new larger buffers
+      this.model3DBufferPool.transform = this.device.createBuffer({
+        label: 'vegetation-3d-instance-transform-pooled',
+        size: transformBufferSize,
+        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+      });
+
+      this.model3DBufferPool.color = this.device.createBuffer({
+        label: 'vegetation-3d-instance-color-pooled',
+        size: colorBufferSize,
+        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+      });
+
+      this.model3DBufferPool.maxSize = instanceCount;
+    }
+
+    // Write data to pooled buffers
+    this.device.queue.writeBuffer(this.model3DBufferPool.transform!, 0, transformData);
+    this.device.queue.writeBuffer(this.model3DBufferPool.color!, 0, colorData);
+
+    // Set up pipeline and render
+    passEncoder.setPipeline(this.model3DPipeline);
+
+    // Set vertex buffers
+    passEncoder.setVertexBuffer(0, geometry.vertexBuffer);
+    passEncoder.setVertexBuffer(1, this.model3DBufferPool.transform!);
+    passEncoder.setVertexBuffer(2, this.model3DBufferPool.color!);
+    passEncoder.setIndexBuffer(geometry.indexBuffer, 'uint32');
+
+    // Create bind groups
+    const uniformBindGroup = this.device.createBindGroup({
+      label: 'vegetation-3d-uniform-bg',
+      layout: this.uniformBindGroupLayout!,
+      entries: [{ binding: 0, resource: { buffer: this.uniformBuffer! } }],
+    });
+
+    // Use model-specific texture if available, otherwise use default white texture
+    // TODO: In production, load and cache textures per model URL
+    const modelTexture = this.billboardTexture ?? this.defaultWhiteTexture;
+    if (!modelTexture) {
+      Logger.warn(`[VegetationRenderer] No texture available for 3D model rendering: ${modelUrl}`);
+      return;
+    }
+
+    const textureBindGroup = this.device.createBindGroup({
+      label: 'vegetation-3d-texture-bg',
+      layout: this.textureBindGroupLayout!,
+      entries: [
+        { binding: 0, resource: this.billboardSampler! },
+        { binding: 1, resource: modelTexture.createView() },
+      ],
+    });
+
+    passEncoder.setBindGroup(0, uniformBindGroup);
+    passEncoder.setBindGroup(1, textureBindGroup);
+    passEncoder.drawIndexed(geometry.indexCount, instanceCount, 0, 0, 0);
   }
 
   /**
@@ -859,12 +1269,17 @@ fn fragmentMain(
     this.billboardGeometry?.indexBuffer.destroy();
     this.uniformBuffer?.destroy();
     this.billboardTexture?.destroy();
+    this.defaultWhiteTexture?.destroy();
 
     // Dispose buffer pool
     this.bufferPool.position?.destroy();
     this.bufferPool.scale?.destroy();
     this.bufferPool.wind?.destroy();
     this.bufferPool.color?.destroy();
+
+    // Dispose 3D model buffer pool
+    this.model3DBufferPool.transform?.destroy();
+    this.model3DBufferPool.color?.destroy();
 
     // Dispose 3D model geometries
     for (const geometry of this.modelGeometries.values()) {
@@ -880,11 +1295,16 @@ fn fragmentMain(
 
     this.billboardGeometry = null;
     this.billboardPipeline = null;
+    this.model3DPipeline = null;
     this.uniformBuffer = null;
     this.billboardTexture = null;
     this.billboardSampler = null;
+    this.defaultWhiteTexture = null;
     this.bufferPool = { maxSize: 0 };
+    this.model3DBufferPool = { maxSize: 0 };
     this.modelGeometries.clear();
+    this.lodManager?.dispose();
+    this.lodManager = null;
     this.initialized = false;
   }
 }

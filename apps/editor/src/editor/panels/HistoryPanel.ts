@@ -103,6 +103,8 @@ export class HistoryPanel {
     
     const size = this.history.size();
     if (index >= 0 && index < size) {
+      // Use history.jumpTo() to actually change the index
+      this.history.jumpTo(index);
       this.config.onJumpTo?.(index);
       this.render();
     }

@@ -9,7 +9,7 @@ import { LogicConnectionManager } from '../connection/LogicConnectionManager.js'
 import { registerLogicConnectionManager } from '../connection/LogicConnectionRegistry.js';
 import { VariableStorage } from '../storage/VariableStorage.js';
 import { PlayerDetection } from './cubes/PlayerDetection.js';
-import { registerLogicCubeSystem, unregisterLogicCubeSystem } from './LogicCubeSystemRegistry.js';
+import { registerLogicCubeSystem } from './LogicCubeSystemRegistry.js';
 import type { LogicCube, LogicCubeConstructor } from './cubes/LogicCube.js';
 import type { LogicSignal, LogicExecutionContext } from './cubes/types.js';
 import type { EntityId } from '@engine/world';
