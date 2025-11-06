@@ -84,6 +84,9 @@ importers:
 
   apps/collab-server:
     dependencies:
+      '@engine/net-server':
+        specifier: workspace:*
+        version: link:../../packages/net-server
       '@fastify/cors':
         specifier: ^11.0.0
         version: 11.1.0
@@ -521,6 +524,9 @@ importers:
       '@engine/core':
         specifier: workspace:*
         version: link:../core
+      '@engine/script':
+        specifier: workspace:*
+        version: link:../script
       '@engine/world':
         specifier: workspace:*
         version: link:../world
@@ -577,6 +583,9 @@ importers:
       '@engine/core':
         specifier: workspace:*
         version: link:../core
+      '@engine/editor-utils':
+        specifier: workspace:*
+        version: link:../editor-utils
       '@engine/world':
         specifier: workspace:*
         version: link:../world
