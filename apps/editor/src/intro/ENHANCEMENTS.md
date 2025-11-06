@@ -275,11 +275,67 @@ const ringCount = 5; // More rings!
 |---------|------|------|
 | Camera Phases | 1 (static) | 4 (timeline) |
 | Cinematic Overlay | Minimal HUD | Marvel-style letterbox, film grain, sweep |
+
+---
+
+## 🔫 Weapon System & PvP Support
+
+### Weapon Configuration Panel
+
+- **New Weapons Panel** in editor sidebar for configuring weapons on entities
+- **Preset Selection**: Choose from rifle, shotgun, sniper, pistol, SMG, or custom
+- **Attachment Management**: Add/remove scopes, suppressors, grips, magazines, barrels
+- **Ammo Configuration**: Set ammo type (standard, armor-piercing, hollow point, incendiary, explosive) and count
+- **Inventory Setup**: Configure multi-weapon loadouts with weapon switching
+- **Effective Stats Display**: See weapon stats with all modifiers applied
+- **Quick Setup Buttons**: One-click setup for common loadouts (Assault Rifle, Sniper, Pistol, PvP Loadout)
+
+### Play Mode Weapon HUD
+
+- **Real-time Weapon Display**: Shows current weapon name, ammo count, and max ammo
+- **Reload Progress Bar**: Visual feedback during reload animations
+- **Attachment Icons**: Display active attachments with tooltips
+- **Inventory Slots**: Visual representation of weapon inventory with active weapon highlighted
+- **Event-driven Updates**: Automatically updates on fire, reload, and weapon switch events
+- **Auto-hide in Edit Mode**: HUD only visible during play mode
+
+### PvP Demo Scene
+
+- **Ready-to-use Arena**: Pre-configured PvP arena with spawn points and cover objects
+- **Player Setup**: Two players with full weapon loadouts (rifle, pistol, sniper)
+- **System Integration**: WeaponSystem and InventorySystem pre-initialized
+- **Health Components**: Players have health for damage testing
+- **Quick Integration**: Use `createPvPDemoScene()` or `addPvPDemoToScene()` helper functions
+
+### Usage
+
+1. **In Editor**: Select an entity and open the Weapons panel to configure weapons
+2. **Quick Setup**: Use "PvP Loadout" button to instantly equip 3 weapons
+3. **Play Mode**: Enter play mode to see the weapon HUD in action
+4. **Demo Scene**: Load PvP demo template or add to existing scene using `addPvPDemoToScene()`
+
+### Weapon System Features
+
+- **Hitscan & Projectile Weapons**: Support for both instant-hit and projectile-based weapons
+- **Attachment Modifiers**: Attachments modify damage, fire rate, range, spread, reload time, etc.
+- **Ammo Type Effects**: Different ammo types have unique effects (armor penetration, damage over time, explosions)
+- **Weapon Switching**: Smooth weapon switching with configurable duration
+- **Event System**: Comprehensive event system for weapon fire, reload, switch, and inventory updates
+
+---
+
+## 📊 **Comparison Table**
+
+| Feature | v1.0 | v3.0 |
+|---------|------|------|
+| Camera Phases | 1 (static) | 4 (timeline) |
+| Cinematic Overlay | Minimal HUD | Marvel-style letterbox, film grain, sweep |
 | Camera Shake | ❌ | ✅ |
 | Particle Count | 200 | 300 |
 | Particle Types | 1 | 3 |
 | Particle Colors | 1 | 3 |
 | Particle Physics | Basic | Type-specific |
+| Weapon System | ❌ | ✅ (Panel + HUD + PvP Demo) |
 | Cubes | 8 | 12 |
 | Cube Layers | 1 | 3 |
 | Cube Rotation | ❌ | ✅ (Quaternions) |
