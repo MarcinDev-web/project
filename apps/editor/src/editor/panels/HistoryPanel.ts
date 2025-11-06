@@ -136,8 +136,9 @@ export class HistoryPanel {
     }
 
     // Get all snapshots from history
-    const snapshots = this.history.export();
-    const currentIndex = this.history.getCurrentIndex();
+    const history = this.history;
+    const snapshots = history.export();
+    const currentIndex = history.getCurrentIndex();
 
     // Render snapshots (newest first)
     const reversedSnapshots = [...snapshots].reverse();

@@ -27,7 +27,7 @@ import {
   getAllAmmoTypeNames,
   WeaponLoadouts,
   setupPvPLoadout,
-} from '@engine/world/utils';
+} from '@engine/world';
 import type { WeaponPresetType, AttachmentType, AmmoType } from '@engine/world/types/weapon';
 import { getAttachment } from '@engine/world/data/attachments';
 import { getAmmoType } from '@engine/world/data/ammo';
