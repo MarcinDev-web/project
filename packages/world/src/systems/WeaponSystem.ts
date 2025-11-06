@@ -16,6 +16,7 @@ import type { Vec3 } from '@engine/core/math';
 import { getAmmoType } from '../data/ammo.js';
 import { normalizeVec3Out, crossVec3Out, transformVec3ByQuatOut } from '@engine/core/math';
 import { quatFromAxisAngleOut } from '@engine/core/math';
+import type { StatusEffectSystem } from './StatusEffectSystem.js';
 
 /**
  * Configuration for WeaponSystem
@@ -29,6 +30,8 @@ export interface WeaponSystemConfig {
     material?: string;
     scale?: Vec3;
   };
+  /** Status effect system for DoT effects (optional) */
+  statusEffectSystem?: StatusEffectSystem;
 }
 
 /**
@@ -37,6 +40,7 @@ export interface WeaponSystemConfig {
 export class WeaponSystem {
   private readonly scene: Scene;
   private readonly raycaster: Raycaster;
+  private readonly statusEffectSystem: StatusEffectSystem | null;
   private currentTime: number = 0;
 
   /** Scratch vectors reused to avoid allocations */
@@ -44,9 +48,10 @@ export class WeaponSystem {
   private readonly scratchVec2: Vec3 = [0, 0, 0];
   private readonly scratchQuat: [number, number, number, number] = [0, 0, 0, 1];
 
-  constructor(scene: Scene, _config?: WeaponSystemConfig) {
+  constructor(scene: Scene, config?: WeaponSystemConfig) {
     this.scene = scene;
     this.raycaster = new Raycaster();
+    this.statusEffectSystem = config?.statusEffectSystem ?? null;
     // Config reserved for future use (input handling, projectile prefabs, etc.)
   }
 
@@ -328,9 +333,14 @@ export class WeaponSystem {
         const damageDealt = health.takeDamage(finalDamage);
 
         // Apply damage over time if incendiary
-        if (ammoEffects.damageOverTime && ammoEffects.dotDuration) {
-          // TODO: Apply DoT effect (requires status effect system)
-          // For now, just log - can be extended later
+        if (ammoEffects.damageOverTime && ammoEffects.dotDuration && this.statusEffectSystem) {
+          this.statusEffectSystem.applyStatusEffect(
+            hit.entity,
+            'damage_over_time',
+            ammoEffects.damageOverTime,
+            ammoEffects.dotDuration,
+            entity.id // Source entity ID
+          );
         }
 
         // Emit hit event

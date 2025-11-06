@@ -14,3 +14,4 @@ export * from './ParkourSystem.js';
 export * from './MovingPlatformSystem.js';
 export * from './TimeTrialSystem.js';
 export * from './NpcBehaviorSystem.js';
+export * from './StatusEffectSystem.js';

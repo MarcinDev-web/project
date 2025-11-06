@@ -6,6 +6,8 @@
 import type { Entity } from '@engine/world';
 import type { Scene } from '@engine/world';
 import type { LogicPort, LogicSignal, LogicExecutionContext, LogicCubeMetadata } from './types.js';
+import { getLogicCubeSystem } from '../LogicCubeSystemRegistry.js';
+import type { PlayerDetection } from './PlayerDetection.js';
 
 /**
  * Abstract base class for logic cubes
@@ -167,6 +169,14 @@ export abstract class LogicCube {
    */
   onDestroy(): void {
     // Override in subclasses if needed
+  }
+
+  /**
+   * Gets the PlayerDetection helper from LogicCubeSystem
+   */
+  protected getPlayerDetection(): PlayerDetection | null {
+    const system = getLogicCubeSystem(this.scene);
+    return system?.getPlayerDetection() ?? null;
   }
 }
 

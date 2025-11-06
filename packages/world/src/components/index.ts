@@ -37,3 +37,4 @@ export * from './TerrainComponent.js';
 export * from './UICanvasComponent.js';
 export * from './UIElementComponent.js';
 export * from './NpcComponent.js';
+export * from './StatusEffectComponent.js';

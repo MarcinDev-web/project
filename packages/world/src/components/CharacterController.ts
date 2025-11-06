@@ -42,6 +42,8 @@ export interface CharacterControllerConfig {
   autoRotate: boolean;
   /** Velocity smoothing time constant in seconds (default: 0.1). Lower = more responsive, higher = smoother. */
   velocitySmoothing?: number;
+  /** Speed multiplier for external effects (e.g., speed zones). Applied on top of base moveSpeed. */
+  speedMultiplier?: number;
 }
 
 /**
@@ -136,9 +138,18 @@ export class CharacterController extends Component implements MovementController
   /** Current rotation angle for smooth interpolation (radians) */
   private currentRotationY: number = 0;
 
+  /** Original moveSpeed value (tracked for restoration after speed zone effects) */
+  private originalMoveSpeed: number;
+
   constructor(config: Partial<CharacterControllerConfig> = {}) {
     super();
     this.config = { ...DEFAULT_CHARACTER_CONFIG, ...config };
+    // Track original moveSpeed for restoration
+    this.originalMoveSpeed = this.config.moveSpeed;
+    // Initialize speedMultiplier if not provided
+    if (this.config.speedMultiplier === undefined) {
+      this.config.speedMultiplier = 1.0;
+    }
   }
 
   /**
@@ -343,7 +354,9 @@ export class CharacterController extends Component implements MovementController
 
     // Calculate target speed
     const baseSpeed = this.config.moveSpeed;
-    const speed = this.isSprinting ? baseSpeed * this.config.sprintMultiplier : baseSpeed;
+    const speedMultiplier = this.config.speedMultiplier ?? 1.0;
+    const effectiveBaseSpeed = baseSpeed * speedMultiplier;
+    const speed = this.isSprinting ? effectiveBaseSpeed * this.config.sprintMultiplier : effectiveBaseSpeed;
 
     // Calculate target velocity
     const targetVelocity: Vec3 = [
@@ -543,6 +556,26 @@ export class CharacterController extends Component implements MovementController
   }
 
   /**
+   * Set speed multiplier (e.g., from speed zones)
+   * Stores original moveSpeed if not already stored
+   */
+  setSpeedMultiplier(multiplier: number): void {
+    // Store original moveSpeed on first modification
+    if (this.config.speedMultiplier === 1.0 || this.config.speedMultiplier === undefined) {
+      this.originalMoveSpeed = this.config.moveSpeed;
+    }
+    this.config.speedMultiplier = multiplier;
+  }
+
+  /**
+   * Reset speed multiplier to 1.0 and restore original moveSpeed
+   */
+  resetSpeedMultiplier(): void {
+    this.config.speedMultiplier = 1.0;
+    this.config.moveSpeed = this.originalMoveSpeed;
+  }
+
+  /**
    * Apply a movement profile to this controller
    *
    * @param profile - Movement profile to apply
@@ -572,6 +605,14 @@ export class CharacterController extends Component implements MovementController
       }
     }
 
+    // Update originalMoveSpeed when profile changes moveSpeed
+    // This ensures speed zone restoration works correctly after profile changes
+    this.originalMoveSpeed = this.config.moveSpeed;
+    // Initialize speedMultiplier if not provided
+    if (this.config.speedMultiplier === undefined) {
+      this.config.speedMultiplier = 1.0;
+    }
+
     // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     this.currentProfile = profile;
 
@@ -599,6 +640,7 @@ export class CharacterController extends Component implements MovementController
   clone(): CharacterController {
     const clone = new CharacterController(this.config);
     clone.state = this.state;
+    clone.originalMoveSpeed = this.originalMoveSpeed;
     if (this.currentProfile) {
       // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       clone.currentProfile = this.currentProfile;

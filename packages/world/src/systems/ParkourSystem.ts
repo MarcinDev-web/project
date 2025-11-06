@@ -104,9 +104,8 @@ export class ParkourSystem {
 
     const controller = playerEntity.getComponent(CharacterController);
     if (controller) {
-      // Apply speed multiplier via config
-      // TODO: Add speedMultiplier property to CharacterController or handle via velocity
-      controller.config.moveSpeed *= speedZone.speedMultiplier;
+      // Apply speed multiplier using dedicated method
+      controller.setSpeedMultiplier(speedZone.speedMultiplier);
 
       // Apply directional boost if specified
       if (speedZone.direction) {
@@ -123,9 +122,8 @@ export class ParkourSystem {
   removeSpeedZone(playerEntity: Entity): void {
     const controller = playerEntity.getComponent(CharacterController);
     if (controller) {
-      // TODO: Restore original moveSpeed - need to track original value
-      // For now, just reset to default
-      controller.config.moveSpeed = 5.0;
+      // Restore original moveSpeed using dedicated method
+      controller.resetSpeedMultiplier();
     }
   }
 

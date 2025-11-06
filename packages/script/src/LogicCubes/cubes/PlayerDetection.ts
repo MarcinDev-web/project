@@ -4,6 +4,7 @@
 
 import type { Scene } from '@engine/world';
 import type { Entity } from '@engine/world';
+import { CharacterController } from '@engine/world';
 import type { Vec3 } from '@engine/core/math';
 
 /**
@@ -41,22 +42,28 @@ export class PlayerDetection {
     }
     this.lastPlayerCheckTime = now;
 
-    // Search by common player names
+    // Search by CharacterController component (primary method)
+    const entities = this.scene.queryEntities(CharacterController);
+    if (entities.length > 0) {
+      // Prefer entity with CharacterController that is active
+      for (const entity of entities) {
+        const controller = entity.getComponent(CharacterController);
+        if (controller) {
+          this.playerEntity = entity;
+          return entity;
+        }
+      }
+    }
+
+    // Fallback: Search by common player names
     const playerNames = ['Player', 'player', 'MainPlayer', 'Character'];
     for (const name of playerNames) {
-      const found = this.scene.findEntitiesByName(name)[0]; // Changed to findEntitiesByName
+      const found = this.scene.findEntitiesByName(name)[0];
       if (found) {
         this.playerEntity = found;
         return found;
       }
     }
-
-    // TODO: Search by CharacterController component when available
-    // const entities = this.scene.queryEntities(CharacterController);
-    // if (entities.length > 0) {
-    //   this.playerEntity = entities[0];
-    //   return entities[0];
-    // }
 
     return null;
   }

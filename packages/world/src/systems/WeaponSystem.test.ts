@@ -1,8 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Scene } from '../core/Scene.js';
 import { WeaponSystem } from './WeaponSystem.js';
+import { StatusEffectSystem } from './StatusEffectSystem.js';
 import { WeaponComponent } from '../components/WeaponComponent.js';
 import { HealthComponent } from '../components/HealthComponent.js';
+import { StatusEffectComponent } from '../components/StatusEffectComponent.js';
 import { CameraComponent } from '../components/CameraComponent.js';
 import { ProjectileComponent } from '../components/ProjectileComponent.js';
 import { PhysicsComponent } from '../components/PhysicsComponent.js';
@@ -108,6 +110,49 @@ describe('WeaponSystem', () => {
       weaponEntity.transform.rotation = [0, 0, 0, 1];
       const fired = weaponSystem.fire(weaponEntity);
       expect(fired).toBe(true);
+    });
+
+    it('should apply DoT effect with incendiary ammo', () => {
+      const statusEffectSystem = new StatusEffectSystem(scene);
+      const weaponSystemWithDoT = new WeaponSystem(scene, {
+        statusEffectSystem,
+      });
+
+      const weapon = weaponEntity.getComponent(WeaponComponent)!;
+      weapon.currentAmmoType = 'incendiary'; // Use incendiary ammo
+
+      const targetHealth = targetEntity.getComponent(HealthComponent)!;
+      const initialHealth = targetHealth.currentHealth;
+
+      // Fire weapon
+      weaponSystemWithDoT.fire(weaponEntity, [0, 0, -1], [0, 0, 0]);
+
+      // Check that DoT effect was applied
+      const statusEffect = targetEntity.getComponent(StatusEffectComponent);
+      expect(statusEffect).toBeDefined();
+      expect(statusEffect?.hasEffect('damage_over_time')).toBe(true);
+
+      // Update status effect system to apply DoT
+      statusEffectSystem.update(0.5);
+      expect(targetHealth.currentHealth).toBeLessThan(initialHealth);
+    });
+
+    it('should not apply DoT if status effect system is not provided', () => {
+      const weapon = weaponEntity.getComponent(WeaponComponent)!;
+      weapon.currentAmmoType = 'incendiary';
+
+      const targetHealth = targetEntity.getComponent(HealthComponent)!;
+      const initialHealth = targetHealth.currentHealth;
+
+      // Fire weapon (without status effect system)
+      weaponSystem.fire(weaponEntity, [0, 0, -1], [0, 0, 0]);
+
+      // Check that DoT effect was NOT applied
+      const statusEffect = targetEntity.getComponent(StatusEffectComponent);
+      expect(statusEffect).toBeUndefined();
+
+      // Health should still be damaged by initial hit
+      expect(targetHealth.currentHealth).toBeLessThan(initialHealth);
     });
   });
 
