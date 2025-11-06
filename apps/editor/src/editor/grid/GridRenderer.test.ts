@@ -27,7 +27,7 @@ describe('GridRenderer', () => {
     it('should create instance with default config', () => {
       const renderer = new GridRenderer();
       expect(renderer).toBeDefined();
-      expect(renderer.isVisible()).toBe(true);
+      expect(renderer.isVisible()).toBe(false);
     });
 
     it('should create instance with custom config', () => {

@@ -7,7 +7,7 @@ import { Scene, Entity } from '@engine/world';
 import { WeaponHUD } from '../WeaponHUD';
 import { WeaponComponent } from '@engine/world/components/WeaponComponent';
 import { InventoryComponent } from '@engine/world/components/InventoryComponent';
-import { setupPvPLoadout } from '@engine/world/utils';
+import { setupPvPLoadout } from '@engine/world';
 
 describe('WeaponHUD', () => {
   let scene: Scene;

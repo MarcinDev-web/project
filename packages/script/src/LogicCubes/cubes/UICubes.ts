@@ -78,50 +78,50 @@ export class UIButtonClickTrigger extends LogicCube {
       if (!event || event.elementId !== elementId || !this.enabled || this.isOnCooldown()) {
         return;
       }
-      // Emit signals through event bus - LogicCubeSystem will process them
-      const connectionManager = getLogicConnectionManager(this.scene);
-      if (connectionManager) {
-        const triggerSignal: LogicSignal = {
-          type: 'trigger',
-          sourceEntityId: this.entity.id,
-          timestamp: Date.now(),
-        };
-        const stringSignal: LogicSignal = {
-          type: 'data',
-          sourceEntityId: this.entity.id,
-          timestamp: Date.now(),
-          data: elementId,
-        };
+        // Emit signals through event bus - LogicCubeSystem will process them
+        const connectionManager = getLogicConnectionManager(this.scene);
+        if (connectionManager) {
+          const triggerSignal: LogicSignal = {
+            type: 'trigger',
+            sourceEntityId: this.entity.id,
+            timestamp: Date.now(),
+          };
+          const stringSignal: LogicSignal = {
+            type: 'data',
+            sourceEntityId: this.entity.id,
+            timestamp: Date.now(),
+            data: elementId,
+          };
 
-        // Emit trigger signal to connected cubes
-        const connections = connectionManager.getConnectionsFromPort(this.entity.id, 'output');
-        for (const conn of connections) {
-          this.scene.events.publish({
-            type: 'logic:signal',
-            payload: {
-              targetEntityId: conn.targetEntityId,
-              targetPort: conn.targetPort,
-              signal: triggerSignal,
-            },
-            sender: this.entity,
-          });
-        }
+          // Emit trigger signal to connected cubes
+          const connections = connectionManager.getConnectionsFromPort(this.entity.id, 'output');
+          for (const conn of connections) {
+            this.scene.events.publish({
+              type: 'logic:signal',
+              payload: {
+                targetEntityId: conn.targetEntityId,
+                targetPort: conn.targetPort,
+                signal: triggerSignal,
+              },
+              sender: this.entity,
+            });
+          }
 
-        // Emit elementId string signal
-        const stringConnections = connectionManager.getConnectionsFromPort(
-          this.entity.id,
-          'elementId'
-        );
-        for (const conn of stringConnections) {
-          this.scene.events.publish({
-            type: 'logic:signal',
-            payload: {
-              targetEntityId: conn.targetEntityId,
-              targetPort: conn.targetPort,
-              signal: stringSignal,
-            },
-            sender: this.entity,
-          });
+          // Emit elementId string signal
+          const stringConnections = connectionManager.getConnectionsFromPort(
+            this.entity.id,
+            'elementId'
+          );
+          for (const conn of stringConnections) {
+            this.scene.events.publish({
+              type: 'logic:signal',
+              payload: {
+                targetEntityId: conn.targetEntityId,
+                targetPort: conn.targetPort,
+                signal: stringSignal,
+              },
+              sender: this.entity,
+            });
         }
       }
     };

@@ -7,7 +7,7 @@ import { Scene, Entity, SelectionManager } from '@engine/world';
 import { WeaponPanel } from '../WeaponPanel';
 import { WeaponComponent } from '@engine/world/components/WeaponComponent';
 import { InventoryComponent } from '@engine/world/components/InventoryComponent';
-import { setupWeaponEntity } from '@engine/world/utils';
+import { setupWeaponEntity } from '@engine/world';
 
 describe('WeaponPanel', () => {
   let scene: Scene;

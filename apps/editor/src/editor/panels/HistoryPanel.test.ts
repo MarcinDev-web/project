@@ -2,12 +2,22 @@
  * @vitest-environment jsdom
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { HistoryPanel, type HistoryAction } from './HistoryPanel';
+import { HistoryPanel } from './HistoryPanel';
+import { HistoryManager, type SceneSnapshot } from '@engine/editor-utils';
 
 function createHost(): HTMLElement {
   const el = document.createElement('div');
   document.body.appendChild(el);
   return el;
+}
+
+function createSnapshot(description: string, timestamp?: number): SceneSnapshot {
+  return {
+    sceneJSON: '{}',
+    selectedPath: null,
+    description,
+    timestamp: timestamp ?? Date.now(),
+  };
 }
 
 describe('HistoryPanel', () => {
@@ -66,69 +76,56 @@ describe('HistoryPanel', () => {
 
   describe('adding actions', () => {
     it('should add action to history', () => {
-      const panel = new HistoryPanel({});
+      const history = new HistoryManager();
+      const panel = new HistoryPanel({ history });
       panel.mount(host);
 
-      const action: HistoryAction = {
-        id: 'action_1',
-        type: 'create',
+      const snapshot: SceneSnapshot = {
+        sceneJSON: '{}',
+        selectedPath: null,
         description: 'Created entity',
         timestamp: Date.now(),
       };
 
-      panel.addAction(action);
+      history.push(snapshot);
+      panel.sync();
 
       const historyItems = host.querySelectorAll('.history-item');
       expect(historyItems.length).toBe(1);
     });
 
     it('should add multiple actions in order', () => {
-      const panel = new HistoryPanel({});
+      const history = new HistoryManager();
+      const panel = new HistoryPanel({ history });
       panel.mount(host);
 
-      panel.addAction({
-        id: 'action_1',
-        type: 'create',
-        description: 'First action',
-        timestamp: Date.now(),
-      });
-
-      panel.addAction({
-        id: 'action_2',
-        type: 'modify',
-        description: 'Second action',
-        timestamp: Date.now(),
-      });
+      history.push(createSnapshot('First action'));
+      history.push(createSnapshot('Second action'));
+      panel.sync();
 
       const historyItems = host.querySelectorAll('.history-item');
       expect(historyItems.length).toBe(2);
     });
 
     it('should display action description', () => {
-      const panel = new HistoryPanel({});
+      const history = new HistoryManager();
+      const panel = new HistoryPanel({ history });
       panel.mount(host);
 
-      panel.addAction({
-        id: 'action_1',
-        type: 'create',
-        description: 'Created cube',
-        timestamp: Date.now(),
-      });
+      history.push(createSnapshot('Created cube'));
+      panel.sync();
 
       const description = host.querySelector('.history-description');
       expect(description?.textContent).toBe('Created cube');
     });
 
     it('should display action timestamp', () => {
-      const panel = new HistoryPanel({});
+      const history = new HistoryManager();
+      const panel = new HistoryPanel({ history });
       panel.mount(host);
 
-      panel.addAction({
-        id: 'action_1',
-        type: 'create',
-        description: 'Action',
-        timestamp: Date.now(),
-      });
+      history.push(createSnapshot('Action'));
+      panel.sync();
 
       const time = host.querySelector('.history-time');
       expect(time).toBeTruthy();
@@ -136,40 +133,28 @@ describe('HistoryPanel', () => {
     });
 
     it('should limit history to maximum size', () => {
-      const panel = new HistoryPanel({});
+      const history = new HistoryManager(50);
+      const panel = new HistoryPanel({ history });
       panel.mount(host);
 
       // Add 60 actions (more than MAX_HISTORY of 50)
       for (let i = 0; i < 60; i++) {
-        panel.addAction({
-          id: `action_${i}`,
-          type: 'modify',
-          description: `Action ${i}`,
-          timestamp: Date.now() + i,
-        });
+        history.push(createSnapshot(`Action ${i}`, Date.now() + i));
       }
+      panel.sync();
 
       const historyItems = host.querySelectorAll('.history-item');
       expect(historyItems.length).toBe(50);
     });
 
     it('should mark most recent action as current', () => {
-      const panel = new HistoryPanel({});
+      const history = new HistoryManager();
+      const panel = new HistoryPanel({ history });
       panel.mount(host);
 
-      panel.addAction({
-        id: 'action_1',
-        type: 'create',
-        description: 'First',
-        timestamp: Date.now(),
-      });
-
-      panel.addAction({
-        id: 'action_2',
-        type: 'create',
-        description: 'Second',
-        timestamp: Date.now(),
-      });
+      history.push(createSnapshot('First'));
+      history.push(createSnapshot('Second'));
+      panel.sync();
 
       const currentItem = host.querySelector('.history-item.current');
       expect(currentItem).toBeTruthy();
@@ -181,22 +166,13 @@ describe('HistoryPanel', () => {
 
   describe('displaying actions', () => {
     it('should display actions in reverse order (newest first)', () => {
-      const panel = new HistoryPanel({});
+      const history = new HistoryManager();
+      const panel = new HistoryPanel({ history });
       panel.mount(host);
 
-      panel.addAction({
-        id: 'action_1',
-        type: 'create',
-        description: 'First',
-        timestamp: Date.now(),
-      });
-
-      panel.addAction({
-        id: 'action_2',
-        type: 'create',
-        description: 'Second',
-        timestamp: Date.now(),
-      });
+      history.push(createSnapshot('First'));
+      history.push(createSnapshot('Second'));
+      panel.sync();
 
       const descriptions = Array.from(host.querySelectorAll('.history-description')).map(
         el => el.textContent
@@ -207,37 +183,25 @@ describe('HistoryPanel', () => {
     });
 
     it('should show timeline markers for all actions', () => {
-      const panel = new HistoryPanel({});
+      const history = new HistoryManager();
+      const panel = new HistoryPanel({ history });
       panel.mount(host);
 
-      panel.addAction({
-        id: 'action_1',
-        type: 'create',
-        description: 'Action 1',
-        timestamp: Date.now(),
-      });
-
-      panel.addAction({
-        id: 'action_2',
-        type: 'create',
-        description: 'Action 2',
-        timestamp: Date.now(),
-      });
+      history.push(createSnapshot('Action 1'));
+      history.push(createSnapshot('Action 2'));
+      panel.sync();
 
       const markers = host.querySelectorAll('.history-marker');
       expect(markers.length).toBe(2);
     });
 
     it('should show special marker for current action', () => {
-      const panel = new HistoryPanel({});
+      const history = new HistoryManager();
+      const panel = new HistoryPanel({ history });
       panel.mount(host);
 
-      panel.addAction({
-        id: 'action_1',
-        type: 'create',
-        description: 'Action',
-        timestamp: Date.now(),
-      });
+      history.push(createSnapshot('Action'));
+      panel.sync();
 
       const currentItem = host.querySelector('.history-item.current');
       const marker = currentItem?.querySelector('.history-marker svg');
@@ -245,22 +209,13 @@ describe('HistoryPanel', () => {
     });
 
     it('should mark past actions correctly', () => {
-      const panel = new HistoryPanel({});
+      const history = new HistoryManager();
+      const panel = new HistoryPanel({ history });
       panel.mount(host);
 
-      panel.addAction({
-        id: 'action_1',
-        type: 'create',
-        description: 'Past',
-        timestamp: Date.now(),
-      });
-
-      panel.addAction({
-        id: 'action_2',
-        type: 'create',
-        description: 'Current',
-        timestamp: Date.now(),
-      });
+      history.push(createSnapshot('Past'));
+      history.push(createSnapshot('Current'));
+      panel.sync();
 
       const items = host.querySelectorAll('.history-item');
       const pastItems = Array.from(items).filter(item => !item.classList.contains('future'));
@@ -270,22 +225,13 @@ describe('HistoryPanel', () => {
     });
 
     it('should mark future actions after undo', () => {
-      const panel = new HistoryPanel({});
+      const history = new HistoryManager();
+      const panel = new HistoryPanel({ history });
       panel.mount(host);
 
-      panel.addAction({
-        id: 'action_1',
-        type: 'create',
-        description: 'Action 1',
-        timestamp: Date.now(),
-      });
-
-      panel.addAction({
-        id: 'action_2',
-        type: 'create',
-        description: 'Action 2',
-        timestamp: Date.now(),
-      });
+      history.push(createSnapshot('Action 1'));
+      history.push(createSnapshot('Action 2'));
+      panel.sync();
 
       // Jump to first action (simulating undo)
       panel.jumpTo(0);
@@ -297,9 +243,13 @@ describe('HistoryPanel', () => {
 
   describe('undo/redo buttons', () => {
     it('should call onUndo when undo button clicked', () => {
+      const history = new HistoryManager();
       const onUndo = vi.fn();
-      const panel = new HistoryPanel({ onUndo });
+      const panel = new HistoryPanel({ history, onUndo });
       panel.mount(host);
+
+      history.push(createSnapshot('Action'));
+      panel.sync();
 
       const undoBtn = host.querySelector('.history-controls button[title="Undo"]') as HTMLButtonElement;
       undoBtn.click();
@@ -308,9 +258,15 @@ describe('HistoryPanel', () => {
     });
 
     it('should call onRedo when redo button clicked', () => {
+      const history = new HistoryManager();
       const onRedo = vi.fn();
-      const panel = new HistoryPanel({ onRedo });
+      const panel = new HistoryPanel({ history, onRedo });
       panel.mount(host);
+
+      history.push(createSnapshot('Action 1'));
+      history.push(createSnapshot('Action 2'));
+      history.undo();
+      panel.sync();
 
       const redoBtn = host.querySelector('.history-controls button[title="Redo"]') as HTMLButtonElement;
       redoBtn.click();
@@ -332,23 +288,14 @@ describe('HistoryPanel', () => {
 
   describe('jumping to history state', () => {
     it('should jump to specific action when clicked', () => {
+      const history = new HistoryManager();
       const onJumpTo = vi.fn();
-      const panel = new HistoryPanel({ onJumpTo });
+      const panel = new HistoryPanel({ history, onJumpTo });
       panel.mount(host);
 
-      panel.addAction({
-        id: 'action_1',
-        type: 'create',
-        description: 'Action 1',
-        timestamp: Date.now(),
-      });
-
-      panel.addAction({
-        id: 'action_2',
-        type: 'create',
-        description: 'Action 2',
-        timestamp: Date.now(),
-      });
+      history.push(createSnapshot('Action 1'));
+      history.push(createSnapshot('Action 2'));
+      panel.sync();
 
       const items = host.querySelectorAll('.history-item');
       (items[1] as HTMLButtonElement).click(); // Click on first action
@@ -357,22 +304,13 @@ describe('HistoryPanel', () => {
     });
 
     it('should update current marker when jumping', () => {
-      const panel = new HistoryPanel({});
+      const history = new HistoryManager();
+      const panel = new HistoryPanel({ history });
       panel.mount(host);
 
-      panel.addAction({
-        id: 'action_1',
-        type: 'create',
-        description: 'Action 1',
-        timestamp: Date.now(),
-      });
-
-      panel.addAction({
-        id: 'action_2',
-        type: 'create',
-        description: 'Action 2',
-        timestamp: Date.now(),
-      });
+      history.push(createSnapshot('Action 1'));
+      history.push(createSnapshot('Action 2'));
+      panel.sync();
 
       const items = host.querySelectorAll('.history-item');
       (items[1] as HTMLButtonElement).click(); // Jump to first action
@@ -383,16 +321,13 @@ describe('HistoryPanel', () => {
     });
 
     it('should not jump to invalid index', () => {
+      const history = new HistoryManager();
       const onJumpTo = vi.fn();
-      const panel = new HistoryPanel({ onJumpTo });
+      const panel = new HistoryPanel({ history, onJumpTo });
       panel.mount(host);
 
-      panel.addAction({
-        id: 'action_1',
-        type: 'create',
-        description: 'Action',
-        timestamp: Date.now(),
-      });
+      history.push(createSnapshot('Action'));
+      panel.sync();
 
       // Try to jump to invalid indices
       panel.jumpTo(-1);
@@ -402,23 +337,14 @@ describe('HistoryPanel', () => {
     });
 
     it('should handle boundary indices correctly', () => {
+      const history = new HistoryManager();
       const onJumpTo = vi.fn();
-      const panel = new HistoryPanel({ onJumpTo });
+      const panel = new HistoryPanel({ history, onJumpTo });
       panel.mount(host);
 
-      panel.addAction({
-        id: 'action_1',
-        type: 'create',
-        description: 'Action 1',
-        timestamp: Date.now(),
-      });
-
-      panel.addAction({
-        id: 'action_2',
-        type: 'create',
-        description: 'Action 2',
-        timestamp: Date.now(),
-      });
+      history.push(createSnapshot('Action 1'));
+      history.push(createSnapshot('Action 2'));
+      panel.sync();
 
       // Jump to first action (index 0)
       panel.jumpTo(0);
@@ -432,33 +358,20 @@ describe('HistoryPanel', () => {
 
   describe('branching history', () => {
     it('should remove future actions when new action added after undo', () => {
-      const panel = new HistoryPanel({});
+      const history = new HistoryManager();
+      const panel = new HistoryPanel({ history });
       panel.mount(host);
 
-      panel.addAction({
-        id: 'action_1',
-        type: 'create',
-        description: 'Action 1',
-        timestamp: Date.now(),
-      });
-
-      panel.addAction({
-        id: 'action_2',
-        type: 'create',
-        description: 'Action 2',
-        timestamp: Date.now(),
-      });
+      history.push(createSnapshot('Action 1'));
+      history.push(createSnapshot('Action 2'));
+      panel.sync();
 
       // Jump back to first action
       panel.jumpTo(0);
 
       // Add new action (should remove action_2)
-      panel.addAction({
-        id: 'action_3',
-        type: 'create',
-        description: 'Action 3',
-        timestamp: Date.now(),
-      });
+      history.push(createSnapshot('Action 3'));
+      panel.sync();
 
       const items = host.querySelectorAll('.history-item');
       expect(items.length).toBe(2); // action_1 and action_3
@@ -474,22 +387,13 @@ describe('HistoryPanel', () => {
 
   describe('clearing history', () => {
     it('should clear all actions', () => {
-      const panel = new HistoryPanel({});
+      const history = new HistoryManager();
+      const panel = new HistoryPanel({ history });
       panel.mount(host);
 
-      panel.addAction({
-        id: 'action_1',
-        type: 'create',
-        description: 'Action 1',
-        timestamp: Date.now(),
-      });
-
-      panel.addAction({
-        id: 'action_2',
-        type: 'create',
-        description: 'Action 2',
-        timestamp: Date.now(),
-      });
+      history.push(createSnapshot('Action 1'));
+      history.push(createSnapshot('Action 2'));
+      panel.sync();
 
       panel.clear();
 
@@ -501,16 +405,13 @@ describe('HistoryPanel', () => {
     });
 
     it('should reset current index when cleared', () => {
+      const history = new HistoryManager();
       const onJumpTo = vi.fn();
-      const panel = new HistoryPanel({ onJumpTo });
+      const panel = new HistoryPanel({ history, onJumpTo });
       panel.mount(host);
 
-      panel.addAction({
-        id: 'action_1',
-        type: 'create',
-        description: 'Action',
-        timestamp: Date.now(),
-      });
+      history.push(createSnapshot('Action'));
+      panel.sync();
 
       panel.clear();
 
@@ -522,41 +423,29 @@ describe('HistoryPanel', () => {
 
   describe('timestamp formatting', () => {
     it('should format timestamp as time', () => {
-      const panel = new HistoryPanel({});
+      const history = new HistoryManager();
+      const panel = new HistoryPanel({ history });
       panel.mount(host);
 
       const now = new Date();
-      panel.addAction({
-        id: 'action_1',
-        type: 'create',
-        description: 'Action',
-        timestamp: now.getTime(),
-      });
+      history.push(createSnapshot('Action', now.getTime()));
+      panel.sync();
 
       const time = host.querySelector('.history-time');
       expect(time?.textContent).toMatch(/\d{1,2}:\d{2}:\d{2}/);
     });
 
     it('should format different timestamps distinctly', () => {
-      const panel = new HistoryPanel({});
+      const history = new HistoryManager();
+      const panel = new HistoryPanel({ history });
       panel.mount(host);
 
       const time1 = new Date('2025-01-01 10:30:00').getTime();
       const time2 = new Date('2025-01-01 14:45:30').getTime();
 
-      panel.addAction({
-        id: 'action_1',
-        type: 'create',
-        description: 'Morning',
-        timestamp: time1,
-      });
-
-      panel.addAction({
-        id: 'action_2',
-        type: 'create',
-        description: 'Afternoon',
-        timestamp: time2,
-      });
+      history.push(createSnapshot('Morning', time1));
+      history.push(createSnapshot('Afternoon', time2));
+      panel.sync();
 
       const times = Array.from(host.querySelectorAll('.history-time')).map(
         el => el.textContent
@@ -568,73 +457,54 @@ describe('HistoryPanel', () => {
 
   describe('edge cases', () => {
     it('should handle adding action with same ID', () => {
-      const panel = new HistoryPanel({});
+      const history = new HistoryManager();
+      const panel = new HistoryPanel({ history });
       panel.mount(host);
 
-      panel.addAction({
-        id: 'action_1',
-        type: 'create',
-        description: 'First',
-        timestamp: Date.now(),
-      });
-
-      panel.addAction({
-        id: 'action_1',
-        type: 'create',
-        description: 'Second',
-        timestamp: Date.now(),
-      });
+      history.push(createSnapshot('First'));
+      history.push(createSnapshot('Second'));
+      panel.sync();
 
       const items = host.querySelectorAll('.history-item');
       expect(items.length).toBe(2); // Both should be added
     });
 
     it('should handle very long action descriptions', () => {
-      const panel = new HistoryPanel({});
+      const history = new HistoryManager();
+      const panel = new HistoryPanel({ history });
       panel.mount(host);
 
       const longDescription = 'A'.repeat(1000);
-      
-      panel.addAction({
-        id: 'action_1',
-        type: 'create',
-        description: longDescription,
-        timestamp: Date.now(),
-      });
+      history.push(createSnapshot(longDescription));
+      panel.sync();
 
       const description = host.querySelector('.history-description');
       expect(description?.textContent).toBe(longDescription);
     });
 
     it('should handle rapid action additions', () => {
-      const panel = new HistoryPanel({});
+      const history = new HistoryManager();
+      const panel = new HistoryPanel({ history });
       panel.mount(host);
 
       // Add 10 actions rapidly
       for (let i = 0; i < 10; i++) {
-        panel.addAction({
-          id: `action_${i}`,
-          type: 'modify',
-          description: `Action ${i}`,
-          timestamp: Date.now() + i,
-        });
+        history.push(createSnapshot(`Action ${i}`, Date.now() + i));
       }
+      panel.sync();
 
       const items = host.querySelectorAll('.history-item');
       expect(items.length).toBe(10);
     });
 
     it('should handle jumping to same index multiple times', () => {
+      const history = new HistoryManager();
       const onJumpTo = vi.fn();
-      const panel = new HistoryPanel({ onJumpTo });
+      const panel = new HistoryPanel({ history, onJumpTo });
       panel.mount(host);
 
-      panel.addAction({
-        id: 'action_1',
-        type: 'create',
-        description: 'Action',
-        timestamp: Date.now(),
-      });
+      history.push(createSnapshot('Action'));
+      panel.sync();
 
       panel.jumpTo(0);
       panel.jumpTo(0);
@@ -644,19 +514,15 @@ describe('HistoryPanel', () => {
     });
 
     it('should handle empty action descriptions', () => {
-      const panel = new HistoryPanel({});
+      const history = new HistoryManager();
+      const panel = new HistoryPanel({ history });
       panel.mount(host);
 
-      panel.addAction({
-        id: 'action_1',
-        type: 'create',
-        description: '',
-        timestamp: Date.now(),
-      });
+      history.push(createSnapshot(''));
+      panel.sync();
 
       const description = host.querySelector('.history-description');
       expect(description).toBeTruthy();
     });
   });
 });
-
