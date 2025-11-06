@@ -78,6 +78,11 @@ import { CollaborationManager } from '../managers/CollaborationManager';
 import { BrandWatermark } from './BrandWatermark';
 import { PlayModeInviteDialog } from './PlayModeInviteDialog';
 import { showCustomProfileEditor } from './CustomProfileEditor';
+import { WeaponHUD } from './WeaponHUD';
+import { RuntimePlayerTag } from '@engine/world/components/RuntimePlayerTag';
+import { CharacterController } from '@engine/world/components/CharacterController';
+import { WeaponComponent } from '@engine/world/components/WeaponComponent';
+import { InventoryComponent } from '@engine/world/components/InventoryComponent';
 import type { PublicUser } from '@engine/net';
 
 export interface EditorUIConfig {
@@ -124,6 +129,7 @@ export class EditorUI {
   private collaborationManager: CollaborationManager | null = null;
   private collaborationPanelVisible = false;
   private playModeInviteDialog: PlayModeInviteDialog | null = null;
+  private weaponHUD: WeaponHUD | null = null;
 
   // Core systems
   private state: EditorState | null = null;
@@ -917,8 +923,10 @@ export class EditorUI {
       const mode = this.state!.editorMode.value;
       if (mode === 'play' && this.modeManager) {
         this.modeManager.enterPlayMode();
+        this.initializeWeaponHUD();
       } else if (mode === 'edit' && this.modeManager) {
         this.modeManager.exitPlayMode();
+        this.disposeWeaponHUD();
       }
     });
     this.disposables.add(() => modeEffect());
@@ -1795,6 +1803,56 @@ export class EditorUI {
       this.showPauseMenu();
     } else {
       this.hidePauseMenu();
+    }
+  }
+
+  /**
+   * Initializes weapon HUD for play mode
+   */
+  private initializeWeaponHUD(): void {
+    if (this.weaponHUD) {
+      this.weaponHUD.dispose();
+    }
+
+    if (!this.layout) return;
+
+    // Get canvas container from layout
+    const containers = this.layout.getContainers();
+    const canvasContainer = containers.canvasContainer || document.body;
+    if (!canvasContainer) return;
+
+    // Find player entity (entity with RuntimePlayerTag or CharacterController)
+    let playerEntity: Entity | null = null;
+    const playerTagged = this.config.scene.queryEntities(RuntimePlayerTag);
+    if (playerTagged.length > 0) {
+      playerEntity = playerTagged[0]!;
+    } else {
+      // Fallback: find entity with CharacterController and weapon
+      const withController = this.config.scene.queryEntities(CharacterController);
+      for (const entity of withController) {
+        if (entity.getComponent(WeaponComponent) || entity.getComponent(InventoryComponent)) {
+          playerEntity = entity;
+          break;
+        }
+      }
+    }
+
+    this.weaponHUD = new WeaponHUD({
+      scene: this.config.scene,
+      playerEntity,
+      container: canvasContainer,
+    });
+
+    this.weaponHUD.show();
+  }
+
+  /**
+   * Disposes weapon HUD
+   */
+  private disposeWeaponHUD(): void {
+    if (this.weaponHUD) {
+      this.weaponHUD.dispose();
+      this.weaponHUD = null;
     }
   }
 

@@ -10,7 +10,10 @@
                     "./components":  "./dist/components/index.js",
                     "./components/*":  "./dist/components/*.js",
                     "./systems":  "./dist/systems/index.js",
-                    "./physics":  "./dist/physics/index.js"
+                    "./physics":  "./dist/physics/index.js",
+                    "./utils":  "./dist/utils/index.js",
+                    "./data/*":  "./dist/data/*.js",
+                    "./types/*":  "./dist/types/*.js"
                 },
     "scripts":  {
                     "build":  "tsc -b && node ../../scripts/verify-world-build.js",

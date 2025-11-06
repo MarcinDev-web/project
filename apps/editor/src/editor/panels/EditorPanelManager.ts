@@ -28,11 +28,13 @@ import { VegetationPanel } from './VegetationPanel';
 import { EconomyPanel } from './EconomyPanel';
 import { UIPanel } from './UIPanel';
 import { NpcPanel } from './NpcPanel';
+import { WeaponPanel } from './WeaponPanel';
 import { UICanvasComponent } from '@engine/world/components/UICanvasComponent';
 import { UIElementComponent } from '@engine/world/components/UIElementComponent';
 import { TerrainPanel } from '../terrain/ui/TerrainPanel';
 import type { TerrainBuilderStudio } from '../terrain/TerrainBuilderStudio';
 import { RenderSettingsPanel } from './RenderSettingsPanel';
+import { SettingsPanel } from './SettingsPanel';
 
 export interface PanelVisibility {
   sidebar?: boolean;
@@ -85,9 +87,11 @@ export class EditorPanelManager {
   private templateGallery: TemplateGalleryPanel | null = null;
   private vegetationPanel: VegetationPanel | null = null;
   private npcPanel: NpcPanel | null = null;
+  private weaponPanel: WeaponPanel | null = null;
   private uiPanel: UIPanel | null = null;
   private terrainPanel: TerrainPanel | null = null;
   private renderSettingsPanel: RenderSettingsPanel | null = null;
+  private settingsPanel: SettingsPanel | null = null;
   private assetPalette: AssetPalette | null = null;
   private assetBrowserWrapper: { refresh: () => void } | null = null;
   private resizableSidebar: ResizableSidebar | null = null;
@@ -251,6 +255,17 @@ export class EditorPanelManager {
     // Initialize Economy Panel
     const economyPanel = new EconomyPanel();
 
+    // Initialize Weapon Panel
+    this.weaponPanel = new WeaponPanel({
+      selection: this.config.selection,
+      scene: this.config.scene,
+      onConfigChanged: () => {
+        this.config.updateSceneBuffers();
+        this.refreshProperties();
+      },
+      updateSceneBuffers: this.config.updateSceneBuffers,
+    });
+
     // Initialize UI Panel
     this.uiPanel = new UIPanel({
       scene: this.config.scene,
@@ -383,6 +398,13 @@ export class EditorPanelManager {
     });
 
     this.sidebarTabs.addTab({
+      id: 'weapons',
+      label: 'Weapons',
+      icon: 'target',
+      content: this.weaponPanel.element,
+    });
+
+    this.sidebarTabs.addTab({
       id: 'ui',
       label: 'UI',
       icon: 'layout',
@@ -405,13 +427,31 @@ export class EditorPanelManager {
       });
     }
 
-    const settingsPanel = this.createSettingsPanel();
+    // Initialize Settings Panel
+    const settingsContainer = document.createElement('div');
+    settingsContainer.className = 'settings-container';
+    this.settingsPanel = new SettingsPanel({
+      state: this.config.state,
+      onSettingsChanged: (settings) => {
+        // Settings changed - could emit event or update UI visibility
+        console.log('[SettingsPanel] Settings changed:', settings);
+        // Update UI visibility based on preferences
+        if (this.config.state.uiPreferences.value.showHotbar !== settings.uiPreferences.showHotbar) {
+          // Hotbar visibility is managed by AssetPalette
+        }
+        if (this.config.state.uiPreferences.value.showInspector !== settings.uiPreferences.showInspector) {
+          // Inspector visibility is managed by EditorPanelManager
+          this.setVisibility({ inspector: settings.uiPreferences.showInspector });
+        }
+      },
+    });
+    this.settingsPanel.mount(settingsContainer);
 
     this.sidebarTabs.addTab({
       id: 'settings',
       label: 'Settings',
       icon: 'settings',
-      content: settingsPanel,
+      content: settingsContainer,
     });
 
     // Add render settings tab
@@ -484,26 +524,6 @@ export class EditorPanelManager {
   }
 
 
-  /**
-   * Creates a placeholder settings panel.
-   */
-  private createSettingsPanel(): HTMLElement {
-    const panel = document.createElement('div');
-    panel.className = 'panel-placeholder';
-    panel.innerHTML = `
-      <div class="inspector-empty">
-        <div class="inspector-empty-icon">
-          <svg width="48" height="48" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
-            <circle cx="12" cy="12" r="3"/>
-            <path d="M12 1v6m0 6v6M5.6 5.6l4.2 4.2m4.2 4.2l4.2 4.2m-12.4 0l4.2-4.2m4.2-4.2l4.2-4.2"/>
-          </svg>
-        </div>
-        <span>Editor Settings</span>
-        <span class="text-xs text-3">Coming soon - configure editor preferences</span>
-      </div>
-    `;
-    return panel;
-  }
 
   /**
    * Refreshes the properties panel (updates displayed entity properties).
@@ -511,6 +531,7 @@ export class EditorPanelManager {
   refreshProperties(): void {
     this.propertiesPanel?.refresh();
     this.logicPanel?.refresh();
+    this.weaponPanel?.refresh();
   }
 
   /**
@@ -695,6 +716,9 @@ export class EditorPanelManager {
 
     this.renderSettingsPanel?.dispose();
     this.renderSettingsPanel = null;
+
+    this.settingsPanel?.dispose();
+    this.settingsPanel = null;
 
     // Clear references to panels without dispose methods
     // (Their DOM elements will be removed when parent is cleared)
