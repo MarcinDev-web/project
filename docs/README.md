@@ -53,6 +53,9 @@ Complete documentation for the UGC 3D Platform project.
 - **[technical/](./technical/)** - Technical specifications
   - [FRAME_MODEL.md](./technical/FRAME_MODEL.md) - Rendering frame model
   - [PLAY_MODE.md](./technical/PLAY_MODE.md) - Play mode state machine
+  - [WEBGPU_FEATURE_POLICY.md](./technical/WEBGPU_FEATURE_POLICY.md) - WebGPU feature tiers, adapter selection, device-loss & fallback
+  - [RUNTIME_DETERMINISM_AND_SERIALIZATION.md](./technical/RUNTIME_DETERMINISM_AND_SERIALIZATION.md) - Time model, RNG, units, serialization versioning
+  - [UGC_SECURITY_MODEL.md](./technical/UGC_SECURITY_MODEL.md) - UGC sandbox, capabilities, and asset validation pipeline
 
 ### Architecture Decisions
 - **[adr/](./adr/)** - Architecture Decision Records

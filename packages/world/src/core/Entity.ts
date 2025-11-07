@@ -425,9 +425,8 @@ export class Entity {
     return component;
   }
 
-  getComponent<T extends Component>(componentClass: ComponentClass<T>): T | null {
-    const component = this._components.get(componentClass);
-    return (component as T | undefined) ?? null;
+  getComponent<T extends Component>(componentClass: ComponentClass<T>): T | undefined {
+    return this._components.get(componentClass) as T | undefined;
   }
 
   hasComponent<T extends Component>(componentClass: ComponentClass<T>): boolean {

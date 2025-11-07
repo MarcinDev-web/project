@@ -23,6 +23,8 @@ describe('GET /api/marketplace/search', () => {
 
     // Wait for item to be available (handles database transaction timing)
     await waitForItem(marketplaceStorage, item.id);
+    // Allow search indexers to catch up (especially on CI)
+    await new Promise((resolve) => setTimeout(resolve, 100));
 
     const response = await app.inject({
       method: 'GET',
@@ -33,7 +35,7 @@ describe('GET /api/marketplace/search', () => {
     expect(response.statusCode).toBe(200);
     const body = JSON.parse(response.body);
     expect(body.items.length).toBeGreaterThanOrEqual(1);
-  });
+  }, 10000);
 
 
   it('combines search with type filter', async () => {

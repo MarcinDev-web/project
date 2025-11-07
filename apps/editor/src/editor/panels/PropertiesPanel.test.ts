@@ -234,7 +234,7 @@ describe('PropertiesPanel', () => {
     expect(onOpenScriptWorkbench).toHaveBeenCalled();
   });
 
-  it.skip('shows empty state with link when component has no scripts', () => {
+  it('shows empty state with link when component has no scripts', async () => {
     const scriptComponent = new ScriptComponent();
     entity.addComponent(scriptComponent);
     
@@ -254,10 +254,22 @@ describe('PropertiesPanel', () => {
     const scriptsSection = host.querySelector('#inspector-section-scripts');
     expect(scriptsSection).toBeTruthy();
 
-    const emptyText = host.querySelector('.property-content .muted-text');
+    // Expand the accordion if needed
+    const accordionHeader = scriptsSection?.querySelector('.property-section-header') as HTMLElement;
+    const contentWrapper = scriptsSection?.querySelector('#inspector-section-scripts-content') as HTMLElement;
+    if (contentWrapper?.classList.contains('collapsed')) {
+      accordionHeader?.click();
+    }
+
+    // Wait for content to be rendered
+    await new Promise(resolve => setTimeout(resolve, 10));
+
+    // Find empty text within scripts section content
+    const scriptsContent = scriptsSection?.querySelector('#inspector-section-scripts-content');
+    const emptyText = scriptsContent?.querySelector('.muted-text');
     expect(emptyText?.textContent).toContain('No scripts attached');
     
-    const workbenchBtn = host.querySelector('.script-workbench-link-btn') as HTMLButtonElement;
+    const workbenchBtn = scriptsContent?.querySelector('.script-workbench-link-btn') as HTMLButtonElement;
     expect(workbenchBtn).toBeTruthy();
     expect(workbenchBtn.textContent).toContain('Open Script Workbench');
   });
@@ -521,7 +533,7 @@ describe('PropertiesPanel', () => {
       expect(flyingBadge).toBeTruthy();
     });
 
-    it.skip('resets to default profile when reset button clicked', () => {
+    it('resets to default profile when reset button clicked', async () => {
       const controller = new CharacterController();
       controller.applyProfile(PRESET_PROFILES.FAST_HUMAN);
       entity.addComponent(controller);
@@ -536,11 +548,27 @@ describe('PropertiesPanel', () => {
       panel.mount(host);
       panel.refresh();
 
-      const resetBtn = host.querySelector('.property-reset-btn') as HTMLButtonElement;
+      // Expand character controller section if needed
+      const controllerSection = host.querySelector('#inspector-section-character-controller');
+      const accordionHeader = controllerSection?.querySelector('.property-section-header') as HTMLElement;
+      const contentWrapper = controllerSection?.querySelector('#inspector-section-character-controller-content') as HTMLElement;
+      if (contentWrapper?.classList.contains('collapsed')) {
+        accordionHeader?.click();
+      }
+
+      // Wait for content to be rendered
+      await new Promise(resolve => setTimeout(resolve, 10));
+
+      const controllerContent = controllerSection?.querySelector('#inspector-section-character-controller-content');
+      const resetBtn = controllerContent?.querySelector('.property-reset-btn') as HTMLButtonElement;
       expect(resetBtn).toBeTruthy();
 
       expect(controller.getCurrentProfile()?.id).toBe('fast-human');
       resetBtn.click();
+      
+      // Wait for refresh to complete
+      await new Promise(resolve => setTimeout(resolve, 10));
+      
       expect(controller.getCurrentProfile()?.id).toBe('human');
       expect(controller.config.moveSpeed).toBe(5.0);
     });

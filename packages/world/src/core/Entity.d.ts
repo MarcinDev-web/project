@@ -120,7 +120,7 @@ export declare class Entity {
      */
     static fromJSON(data: EntityData): Entity;
     addComponent<T extends Component>(component: T): T;
-    getComponent<T extends Component>(componentClass: ComponentClass<T>): T | null;
+    getComponent<T extends Component>(componentClass: ComponentClass<T>): T | undefined;
     hasComponent<T extends Component>(componentClass: ComponentClass<T>): boolean;
     removeComponent<T extends Component>(componentClass: ComponentClass<T>): T | null;
     /**

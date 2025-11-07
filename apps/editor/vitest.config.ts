@@ -23,5 +23,8 @@ export default defineConfig({
       '@engine/economy': path.resolve(__dirname, '../../packages/economy/src'),
     },
   },
+  optimizeDeps: {
+    exclude: ['@engine/wasm-collision'],
+  },
 });
 

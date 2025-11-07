@@ -10,14 +10,14 @@ import type { Vec2, Vec3 } from '@engine/core/math';
  * Check if an entity has water component
  */
 export function hasWater(entity: Entity): boolean {
-  return entity.getComponent(WaterComponent) !== null;
+  return entity.getComponent(WaterComponent) !== undefined;
 }
 
 /**
  * Get water component from entity (if exists)
  */
 export function getWater(entity: Entity): WaterComponent | null {
-  return entity.getComponent(WaterComponent) || null;
+  return entity.getComponent(WaterComponent) ?? null;
 }
 
 /**

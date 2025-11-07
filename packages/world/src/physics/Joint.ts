@@ -258,14 +258,14 @@ export abstract class Joint {
    * Get physics component for body A
    */
   protected getPhysicsA(): PhysicsComponent | null {
-    return this.config.entityA.getComponent(PhysicsComponent);
+    return this.config.entityA.getComponent(PhysicsComponent) ?? null;
   }
 
   /**
    * Get physics component for body B
    */
   protected getPhysicsB(): PhysicsComponent | null {
-    return this.config.entityB.getComponent(PhysicsComponent);
+    return this.config.entityB.getComponent(PhysicsComponent) ?? null;
   }
 
   /**

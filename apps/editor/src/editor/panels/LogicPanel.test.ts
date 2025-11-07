@@ -19,6 +19,31 @@ vi.mock('@engine/script', async () => {
   };
 });
 
+vi.mock('@engine/editor-utils', async () => {
+  const actual = await vi.importActual('@engine/editor-utils');
+  const mockGet = vi.fn().mockReturnValue({
+    metadata: {
+      type: 'onClickTrigger',
+      displayName: 'On Click Trigger',
+      category: 'trigger',
+      parameters: [],
+      inputs: [],
+      outputs: [],
+    },
+  });
+  const mockGetCategories = vi.fn().mockReturnValue(['trigger', 'action']);
+  const mockGetByCategory = vi.fn().mockReturnValue([]);
+  
+  return {
+    ...actual,
+    LogicCubeLibrary: {
+      getCategories: mockGetCategories,
+      getByCategory: mockGetByCategory,
+      get: mockGet,
+    },
+  };
+});
+
 function createHost(): HTMLElement {
   initBrowserPolyfills(); // Ensure DOM is ready
   const el = document.createElement('div');
@@ -358,7 +383,7 @@ describe('LogicPanel', () => {
 
     it('should handle cube type with no parameters', () => {
       // Mock a cube type with no parameters
-      const getSpy = vi.spyOn(LogicCubeLibrary, 'get').mockReturnValue({
+      vi.mocked(LogicCubeLibrary.get).mockReturnValueOnce({
         metadata: {
           type: 'simple',
           displayName: 'Simple',
@@ -383,8 +408,6 @@ describe('LogicPanel', () => {
         p => p.textContent === 'No parameters to configure'
       );
       expect(message).toBeTruthy();
-
-      getSpy.mockRestore();
     });
   });
 });

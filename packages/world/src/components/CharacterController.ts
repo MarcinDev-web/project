@@ -178,7 +178,7 @@ export class CharacterController extends Component implements MovementController
     if (!entity) return;
 
     // Get or create physics component
-    this.physics = entity.getComponent(PhysicsComponent);
+    this.physics = entity.getComponent(PhysicsComponent) ?? null;
 
     if (!this.physics) {
       // Create physics component with character settings

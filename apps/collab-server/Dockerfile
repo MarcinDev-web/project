@@ -37,6 +37,9 @@ COPY apps/collab-server ./apps/collab-server
 # Generate Prisma client (dummy DATABASE_URL for client generation)
 RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" pnpm -C apps/collab-server db:generate
 
+# Build TypeScript (required for Railway deployment)
+RUN pnpm -w --filter @apps/collab-server build
+
 # Production image - minimal dependencies
 FROM base AS runner
 

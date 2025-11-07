@@ -25,8 +25,8 @@ export class StatusEffectSystem {
   private readonly config: StatusEffectSystemConfig;
   private currentTime: number = 0;
 
-  /** Track last damage tick time per entity (for DoT) */
-  private readonly lastDamageTick: Map<string, number> = new Map();
+  /** Track last tick time per effect (supports DoT/HoT) */
+  private readonly lastEffectTick: Map<string, number> = new Map();
 
   constructor(scene: Scene, config?: StatusEffectSystemConfig) {
     this.scene = scene;
@@ -56,21 +56,22 @@ export class StatusEffectSystem {
       const effectsToRemove: string[] = [];
 
       for (const effect of effects) {
-        // Check if effect has expired
+        // Calculate elapsed time since effect started (may exceed duration if update is late)
         const elapsed = this.currentTime - effect.startTime;
+
+        // Apply effect (internally clamps to effect duration)
+        this.applyEffect(entity, effect, elapsed);
+
         if (elapsed >= effect.duration) {
           effectsToRemove.push(effect.id);
-          continue;
         }
-
-        // Apply effect based on type
-        this.applyEffect(entity, effect, elapsed);
       }
 
       // Remove expired effects
       if (this.config.enableAutoCleanup) {
         for (const effectId of effectsToRemove) {
           statusEffect.removeEffect(effectId);
+          this.lastEffectTick.delete(effectId);
         }
       }
     }
@@ -111,15 +112,19 @@ export class StatusEffectSystem {
     const health = entity.getComponent(HealthComponent);
     if (!health || !health.isAlive()) return;
 
-    const entityId = entity.id;
-    const lastTick = this.lastDamageTick.get(entityId) ?? effect.startTime;
-    const timeSinceLastTick = this.currentTime - lastTick;
+    const effectId = effect.id;
+    const lastTick = this.lastEffectTick.get(effectId) ?? effect.startTime;
+    const effectEndTime = effect.startTime + effect.duration;
+    const clampedTime = Math.min(this.currentTime, effectEndTime);
+    const timeSinceLastTick = clampedTime - lastTick;
 
     // Apply damage at intervals (not every frame for performance)
     if (timeSinceLastTick >= this.config.damageTickInterval!) {
       const damageThisTick = effect.strength * timeSinceLastTick;
-      health.takeDamage(damageThisTick);
-      this.lastDamageTick.set(entityId, this.currentTime);
+      if (damageThisTick > 0) {
+        health.takeDamage(damageThisTick);
+      }
+      this.lastEffectTick.set(effectId, clampedTime);
 
       // Emit DoT tick event
       this.scene.events.emit('status_effect:dot_tick', {
@@ -141,15 +146,19 @@ export class StatusEffectSystem {
     const health = entity.getComponent(HealthComponent);
     if (!health || !health.isAlive()) return;
 
-    const entityId = entity.id;
-    const lastTick = this.lastDamageTick.get(entityId) ?? effect.startTime;
-    const timeSinceLastTick = this.currentTime - lastTick;
+    const effectId = effect.id;
+    const lastTick = this.lastEffectTick.get(effectId) ?? effect.startTime;
+    const effectEndTime = effect.startTime + effect.duration;
+    const clampedTime = Math.min(this.currentTime, effectEndTime);
+    const timeSinceLastTick = clampedTime - lastTick;
 
     // Apply healing at intervals
     if (timeSinceLastTick >= this.config.damageTickInterval!) {
       const healThisTick = effect.strength * timeSinceLastTick;
-      health.heal(healThisTick);
-      this.lastDamageTick.set(entityId, this.currentTime);
+      if (healThisTick > 0) {
+        health.heal(healThisTick);
+      }
+      this.lastEffectTick.set(effectId, clampedTime);
 
       // Emit HoT tick event
       this.scene.events.emit('status_effect:hot_tick', {
@@ -189,6 +198,13 @@ export class StatusEffectSystem {
     // Generate unique effect ID
     const effectId = `${type}_${entity.id}_${this.currentTime}_${Math.random().toString(36).substring(2, 9)}`;
 
+    const shouldTrackTicks = type === 'damage_over_time' || type === 'heal_over_time';
+    const existingEffect = shouldTrackTicks ? statusEffect.getEffectByType(type) : undefined;
+
+    if (existingEffect) {
+      this.lastEffectTick.delete(existingEffect.id);
+    }
+
     const effect: StatusEffect = {
       id: effectId,
       type,
@@ -202,8 +218,10 @@ export class StatusEffectSystem {
     const applied = statusEffect.applyEffect(effect);
     if (!applied) return undefined;
 
-    // Initialize damage tick tracking
-    this.lastDamageTick.set(entity.id, this.currentTime);
+    // Initialize tick tracking for periodic effects
+    if (shouldTrackTicks) {
+      this.lastEffectTick.set(effectId, effect.startTime);
+    }
 
     // Emit effect applied event
     this.scene.events.emit('status_effect:applied', {
@@ -226,11 +244,7 @@ export class StatusEffectSystem {
 
     const removed = statusEffect.removeEffect(effectId);
     if (removed) {
-      // Clean up damage tick tracking if no DoT/HoT effects remain
-      const hasDoTOrHoT = statusEffect.hasEffect('damage_over_time') || statusEffect.hasEffect('heal_over_time');
-      if (!hasDoTOrHoT) {
-        this.lastDamageTick.delete(entity.id);
-      }
+      this.lastEffectTick.delete(effectId);
 
       // Emit effect removed event
       this.scene.events.emit('status_effect:removed', {
@@ -258,14 +272,7 @@ export class StatusEffectSystem {
     for (const effect of effects) {
       if (statusEffect.removeEffect(effect.id)) {
         removed++;
-      }
-    }
-
-    // Clean up damage tick tracking if needed
-    if (removed > 0) {
-      const hasDoTOrHoT = statusEffect.hasEffect('damage_over_time') || statusEffect.hasEffect('heal_over_time');
-      if (!hasDoTOrHoT) {
-        this.lastDamageTick.delete(entity.id);
+        this.lastEffectTick.delete(effect.id);
       }
     }
 
@@ -283,7 +290,7 @@ export class StatusEffectSystem {
    * Cleanup resources (call when system is disposed)
    */
   dispose(): void {
-    this.lastDamageTick.clear();
+    this.lastEffectTick.clear();
   }
 }
 

@@ -52,7 +52,7 @@ export class MultiplayerGameplayManager {
   async startSession(sessionId: string, localPlayerEntity: Entity): Promise<void> {
     this.sessionId = sessionId;
     this.localPlayerEntity = localPlayerEntity;
-    this.localPlayerController = localPlayerEntity.getComponent(CharacterControllerClass);
+    this.localPlayerController = localPlayerEntity.getComponent(CharacterControllerClass) ?? null;
 
     if (!this.localPlayerController) {
       throw new Error('Local player entity must have CharacterController component');

@@ -37,6 +37,9 @@ COPY apps/net-server ./apps/net-server
 # Generate Prisma client (dummy DATABASE_URL for client generation)
 RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" pnpm -C apps/net-server db:generate
 
+# Build TypeScript (required for Railway deployment)
+RUN pnpm -w --filter @apps/net-server build
+
 # Production image - minimal dependencies
 FROM base AS runner
 
@@ -77,5 +80,5 @@ EXPOSE 3000 3001
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-CMD ["node", "apps/net-server/dist/server.js"]
+CMD ["node", "apps/net-server/dist/apps/net-server/src/server.js"]
 

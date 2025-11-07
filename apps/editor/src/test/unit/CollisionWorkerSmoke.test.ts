@@ -1,8 +1,54 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
 import { requestCheckTrs } from '../../wasm/collisionWorkerClient';
 
-// Node test env lacks Worker; keep skipped by default
-describe.skip('collision worker smoke', () => {
+// Mock Web Worker for Node.js environment
+class MockWorker {
+  onmessage: ((ev: MessageEvent) => void) | null = null;
+  private messageHandlers: Array<(data: any) => void> = [];
+
+  constructor(_url: string | URL, _options?: WorkerOptions) {
+    // Simulate worker initialization
+    setTimeout(() => {
+      if (this.onmessage) {
+        this.onmessage({ data: { type: 'ready' } } as MessageEvent);
+      }
+    }, 0);
+  }
+
+  postMessage(data: any): void {
+    // Simulate worker processing
+    setTimeout(() => {
+      if (this.onmessage && data.id) {
+        // Return mock indices array
+        const indices = new Uint32Array([0, 1, 2]);
+        this.onmessage({
+          data: {
+            id: data.id,
+            ok: true,
+            indices,
+          },
+        } as MessageEvent);
+      }
+    }, 10);
+  }
+
+  terminate(): void {
+    // Cleanup
+  }
+}
+
+// Mock Worker global
+global.Worker = MockWorker as any;
+
+describe('collision worker smoke', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it('returns indices array', async () => {
     const indices = await requestCheckTrs(
       {
@@ -18,6 +64,7 @@ describe.skip('collision worker smoke', () => {
       1000
     );
     expect(indices).toBeInstanceOf(Uint32Array);
+    expect(indices.length).toBeGreaterThanOrEqual(0);
   });
 });
 

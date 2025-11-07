@@ -127,6 +127,12 @@ if (!process.env.JWT_REFRESH_SECRET && !isProduction) {
   process.env.JWT_REFRESH_SECRET = 'dev-refresh-secret-key-change-me-in-production-12345678';
 }
 
+// Set default FRONTEND_URL for development/test to avoid warnings
+// Must be set BEFORE validateConfig() is called
+if (!process.env.FRONTEND_URL && !isProduction) {
+  process.env.FRONTEND_URL = 'http://localhost:5173';
+}
+
 // Economy configuration (basic feature flags / anti-abuse controls)
 const ECONOMY_MIN_PRICE: Record<string, number> = {
   credits: parseFloat(String(process.env.ECONOMY_MIN_PRICE_CREDITS ?? '0.1')),

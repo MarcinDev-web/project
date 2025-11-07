@@ -3,6 +3,19 @@
  * Only loads polyfills when actually needed by tests
  */
 
+import { afterEach, vi } from 'vitest';
+
+// Mock WASM collision package to avoid ESM integration errors in tests
+// This prevents Vite from trying to load WASM files during test execution
+vi.mock('@engine/wasm-collision/pkg/collision.js', () => ({
+  default: {
+    init: vi.fn().mockResolvedValue(undefined),
+    init_panic_hook: vi.fn(),
+  },
+  init: vi.fn().mockResolvedValue(undefined),
+  init_panic_hook: vi.fn(),
+}));
+
 // Check if we're in a browser-like environment (jsdom)
 const isBrowserEnv = typeof window !== 'undefined' && typeof document !== 'undefined';
 
@@ -194,7 +207,6 @@ if (typeof window !== 'undefined' && typeof document !== 'undefined') {
 
 // Global cleanup: Clear all timers after each test to prevent hanging processes
 // This ensures that any intervals/timeouts created during tests are cleaned up
-import { afterEach, vi } from 'vitest';
 
 // Use fake timers to track and clean up all timers
 // This prevents tests from hanging due to uncleaned intervals/timeouts

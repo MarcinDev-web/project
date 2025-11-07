@@ -361,7 +361,7 @@ export class WeaponHUD {
     if (this.attachmentsListEl) {
       this.attachmentsListEl.innerHTML = '';
       if (this.attachmentComp) {
-        const attachments = this.attachmentComp.getAttachments();
+        const attachments = this.attachmentComp.getAllAttachments();
         for (const attachment of attachments) {
           const attEl = document.createElement('div');
           attEl.className = 'weapon-hud-attachment';

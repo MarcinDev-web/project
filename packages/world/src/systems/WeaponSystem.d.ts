@@ -4,6 +4,7 @@
 import type { Scene } from '../core/Scene.js';
 import type { Entity } from '../core/Entity.js';
 import type { Vec3 } from '@engine/core/math';
+import type { StatusEffectSystem } from './StatusEffectSystem.js';
 /**
  * Configuration for WeaponSystem
  */
@@ -16,6 +17,8 @@ export interface WeaponSystemConfig {
         material?: string;
         scale?: Vec3;
     };
+    /** Status effect system for DoT effects (optional) */
+    statusEffectSystem?: StatusEffectSystem;
 }
 /**
  * WeaponSystem manages weapon firing logic
@@ -23,12 +26,13 @@ export interface WeaponSystemConfig {
 export declare class WeaponSystem {
     private readonly scene;
     private readonly raycaster;
+    private readonly statusEffectSystem;
     private currentTime;
     /** Scratch vectors reused to avoid allocations */
     private readonly scratchVec1;
     private readonly scratchVec2;
     private readonly scratchQuat;
-    constructor(scene: Scene, _config?: WeaponSystemConfig);
+    constructor(scene: Scene, config?: WeaponSystemConfig);
     /**
      * Update weapon system (called each frame)
      * @param deltaTime - Time since last frame in seconds

@@ -38,6 +38,13 @@ describe('WeaponSystem', () => {
     health.maxHealth = 100;
     health.currentHealth = 100;
     targetEntity.addComponent(health);
+    targetEntity.meshBounds = {
+      type: 'aabb',
+      aabb: {
+        min: [-0.5, -0.5, -0.5],
+        max: [0.5, 0.5, 0.5],
+      },
+    };
     targetEntity.transform.position = [0, 0, -10];
     scene.addEntity(targetEntity);
   });
@@ -130,7 +137,9 @@ describe('WeaponSystem', () => {
       // Check that DoT effect was applied
       const statusEffect = targetEntity.getComponent(StatusEffectComponent);
       expect(statusEffect).toBeDefined();
-      expect(statusEffect?.hasEffect('damage_over_time')).toBe(true);
+      if (statusEffect) {
+        expect(statusEffect.hasEffect('damage_over_time')).toBe(true);
+      }
 
       // Update status effect system to apply DoT
       statusEffectSystem.update(0.5);
@@ -149,7 +158,7 @@ describe('WeaponSystem', () => {
 
       // Check that DoT effect was NOT applied
       const statusEffect = targetEntity.getComponent(StatusEffectComponent);
-      expect(statusEffect).toBeUndefined();
+      expect(statusEffect === null || statusEffect === undefined).toBe(true);
 
       // Health should still be damaged by initial hit
       expect(targetHealth.currentHealth).toBeLessThan(initialHealth);
