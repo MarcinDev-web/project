@@ -1,6 +1,17 @@
 export { initRenderer, type Renderer } from './core/Renderer';
 export type { GeometryData } from './resources/resources';
 
+// Adapter probing and capabilities
+export {
+  pickAdapter,
+  probeAdapterCapabilities,
+  probeResultToCapabilities,
+  validateMinimumLimits,
+  type FeatureTier,
+  type AdapterProbeResult,
+} from './core/adapterProbing';
+export type { RendererCapabilities, TextureCompressionSupport } from './config';
+
 // Performance monitoring
 export { PerformanceMonitor } from './core/PerformanceMonitor';
 export type {
@@ -47,6 +58,19 @@ export type { OcclusionCullingConfig, OcclusionTestResult } from './core/Occlusi
 // Texture Streaming
 export { TextureStreamingManager } from './textures/TextureStreamingManager';
 export type { TextureStreamingConfig, TextureEntry, TextureLOD } from './textures/TextureStreamingManager';
+
+// Texture Compression
+export { TextureCompressionManager } from './textures/TextureCompressionManager';
+export type { CompressionFormat, CompressionOptions } from './textures/TextureCompressionManager';
+
+// Texture Creation Helpers
+export {
+  createTextureSafe,
+  createTextureFromDataSafe,
+  isTextureFormatSupported,
+  getSupportedTextureFormats,
+} from './textures/TextureCreationHelpers';
+export type { SafeTextureCreationOptions } from './textures/TextureCreationHelpers';
 
 // Geometry LOD
 export { GeometryLODManager } from './core/GeometryLODManager';

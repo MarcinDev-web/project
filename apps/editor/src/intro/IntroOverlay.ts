@@ -189,7 +189,7 @@ export class IntroOverlay {
       this.container.setAttribute('data-phase', phase);
     }
 
-    const tagline = this.phaseTaglines[phase] ?? this.phaseTaglines.logo;
+    const tagline = this.phaseTaglines[phase] ?? this.phaseTaglines.logo ?? 'Unleash Your Creativity';
     this.updateTagline(tagline);
 
     this.statusMessage = this.phaseStatuses[phase] ?? null;
@@ -266,8 +266,11 @@ export class IntroOverlay {
         align-items: center;
         justify-content: center;
         overflow: hidden;
-        background: radial-gradient(110% 110% at 50% 40%, #141a2a 0%, #0b101f 55%, #05070d 100%);
-        animation: intro-bg-shift 8s ease-in-out infinite alternate;
+        background: 
+          radial-gradient(circle at 30% 40%, rgba(0, 100, 255, 0.15) 0%, transparent 50%),
+          radial-gradient(circle at 70% 60%, rgba(200, 50, 255, 0.12) 0%, transparent 50%),
+          linear-gradient(180deg, #0a0e1a 0%, #050810 50%, #020306 100%);
+        animation: intro-bg-shift 10s ease-in-out infinite alternate;
         color: #fff;
         opacity: 1;
         transition: opacity 0.6s ease;
@@ -278,12 +281,30 @@ export class IntroOverlay {
         position: absolute;
         inset: -20%;
         background:
-          radial-gradient(circle at 50% 30%, rgba(96, 165, 250, 0.12), rgba(96, 165, 250, 0) 55%),
-          radial-gradient(circle at 20% 80%, rgba(167, 139, 250, 0.1), rgba(167, 139, 250, 0) 40%);
-        filter: blur(40px);
-        opacity: 0.7;
+          radial-gradient(circle at 50% 30%, rgba(0, 150, 255, 0.2), rgba(0, 150, 255, 0) 60%),
+          radial-gradient(circle at 20% 80%, rgba(200, 50, 255, 0.15), rgba(200, 50, 255, 0) 50%),
+          radial-gradient(circle at 80% 20%, rgba(0, 200, 255, 0.1), rgba(0, 200, 255, 0) 40%);
+        filter: blur(60px);
+        opacity: 0.8;
         pointer-events: none;
         transition: opacity 1s ease;
+        animation: glow-pulse 4s ease-in-out infinite;
+      }
+      
+      #intro-overlay::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: repeating-linear-gradient(
+          0deg,
+          rgba(0, 150, 255, 0.03) 0px,
+          transparent 2px,
+          transparent 4px,
+          rgba(200, 50, 255, 0.02) 6px
+        );
+        pointer-events: none;
+        animation: scanlines 8s linear infinite;
+        opacity: 0.6;
       }
 
       .cinematic-bars {
@@ -308,14 +329,37 @@ export class IntroOverlay {
         position: relative;
         text-align: center;
         padding: clamp(2.5rem, 4vw, 3.8rem) clamp(2rem, 5vw, 4.2rem);
-        max-width: min(720px, 88%);
+        max-width: min(760px, 90%);
         border-radius: 2.4rem;
-        backdrop-filter: blur(18px);
-        background: linear-gradient(140deg, rgba(12, 17, 28, 0.72) 0%, rgba(22, 31, 48, 0.45) 100%);
-        border: 1px solid rgba(118, 150, 255, 0.25);
-        box-shadow: 0 30px 90px rgba(0, 0, 0, 0.45);
+        backdrop-filter: blur(24px) saturate(180%);
+        background: 
+          linear-gradient(135deg, rgba(0, 100, 255, 0.08) 0%, rgba(150, 50, 255, 0.08) 100%),
+          linear-gradient(180deg, rgba(10, 15, 25, 0.85) 0%, rgba(15, 20, 35, 0.75) 100%);
+        border: 2px solid transparent;
+        background-clip: padding-box;
+        box-shadow: 
+          0 40px 120px rgba(0, 0, 0, 0.6),
+          0 0 80px rgba(0, 150, 255, 0.15),
+          inset 0 0 60px rgba(0, 150, 255, 0.05);
         overflow: hidden;
         z-index: 3;
+      }
+      
+      .intro-content::before {
+        content: '';
+        position: absolute;
+        inset: -2px;
+        border-radius: inherit;
+        padding: 2px;
+        background: linear-gradient(135deg, 
+          rgba(0, 150, 255, 0.6) 0%, 
+          rgba(200, 50, 255, 0.6) 50%,
+          rgba(0, 200, 255, 0.6) 100%);
+        -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+        -webkit-mask-composite: xor;
+        mask-composite: exclude;
+        z-index: -1;
+        animation: border-glow 3s ease-in-out infinite;
       }
 
       .film-grain {
@@ -343,29 +387,38 @@ export class IntroOverlay {
         justify-content: center;
         padding: clamp(1.2rem, 3vw, 2rem) clamp(1.6rem, 4vw, 2.8rem);
         border-radius: 1.8rem;
-        background: linear-gradient(135deg, rgba(18, 27, 44, 0.8) 0%, rgba(39, 51, 78, 0.45) 100%);
-        border: 1px solid rgba(110, 138, 255, 0.35);
-        box-shadow: 0 24px 70px rgba(5, 8, 14, 0.6);
-        transition: transform 1.2s cubic-bezier(0.19, 1, 0.22, 1), box-shadow 1.2s ease;
+        background: 
+          linear-gradient(135deg, rgba(0, 80, 200, 0.15) 0%, rgba(100, 30, 180, 0.15) 100%),
+          linear-gradient(180deg, rgba(5, 10, 20, 0.9) 0%, rgba(15, 20, 40, 0.85) 100%);
+        border: 1px solid rgba(0, 150, 255, 0.4);
+        box-shadow: 
+          0 30px 90px rgba(0, 0, 0, 0.7),
+          0 0 60px rgba(0, 150, 255, 0.2),
+          inset 0 0 40px rgba(0, 150, 255, 0.08);
+        transition: transform 1.2s cubic-bezier(0.19, 1, 0.22, 1), 
+                    box-shadow 1.2s ease,
+                    border-color 1s ease;
       }
 
       .logo-text {
         margin: 0;
         display: flex;
+        flex-wrap: wrap;
         align-items: center;
-        gap: clamp(1.2rem, 2.5vw, 2rem);
-        font-size: clamp(3.2rem, 8vw, 5.6rem);
+        justify-content: center;
+        gap: clamp(0.8rem, 2vw, 1.6rem);
+        font-size: clamp(2.4rem, 7vw, 5rem);
         font-weight: 900;
         text-transform: uppercase;
-        letter-spacing: 0.12em;
-        line-height: 1;
+        letter-spacing: 0.08em;
+        line-height: 1.2;
         position: relative;
         z-index: 1;
       }
 
       .logo-word {
         display: flex;
-        gap: clamp(0.05em, 0.1em, 0.12em);
+        gap: clamp(0.05em, 0.08em, 0.1em);
       }
 
       .logo-letter {
@@ -383,15 +436,23 @@ export class IntroOverlay {
       }
 
       .logo-word--forge .logo-letter {
-        background: linear-gradient(120deg, #74b3ff 0%, #3b82f6 50%, #1d4ed8 100%);
+        background: linear-gradient(135deg, #00d4ff 0%, #0096ff 35%, #0066ff 70%, #0044cc 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
+        background-clip: text;
+        filter: drop-shadow(0 0 20px rgba(0, 150, 255, 0.7)) 
+                drop-shadow(0 0 40px rgba(0, 150, 255, 0.4));
+        animation: forge-glow 3s ease-in-out infinite;
       }
 
       .logo-word--world .logo-letter {
-        background: linear-gradient(120deg, #c4b5fd 0%, #8b5cf6 45%, #6d28d9 100%);
+        background: linear-gradient(135deg, #e879f9 0%, #c026d3 35%, #9333ea 70%, #7c3aed 100%);
         -webkit-background-clip: text;
         -webkit-text-fill-color: transparent;
+        background-clip: text;
+        filter: drop-shadow(0 0 20px rgba(192, 38, 211, 0.7)) 
+                drop-shadow(0 0 40px rgba(192, 38, 211, 0.4));
+        animation: world-glow 3s ease-in-out infinite 0.2s;
       }
 
       .logo-sweep {
@@ -412,8 +473,11 @@ export class IntroOverlay {
         margin-top: 1.2rem;
         font-size: 0.85rem;
         letter-spacing: 0.4em;
-        color: rgba(180, 195, 255, 0.65);
+        color: rgba(150, 200, 255, 0.75);
         text-transform: uppercase;
+        text-shadow: 
+          0 0 15px rgba(0, 150, 255, 0.4),
+          0 0 30px rgba(0, 100, 200, 0.2);
         opacity: 0;
         animation: subtitle-fade 1s ease forwards 1s;
       }
@@ -421,11 +485,14 @@ export class IntroOverlay {
       .intro-tagline p {
         margin: 0 0 clamp(2rem, 4vw, 3rem);
         font-size: clamp(1.1rem, 2vw, 1.5rem);
-        font-weight: 300;
-        letter-spacing: 0.22em;
-        color: rgba(223, 230, 255, 0.75);
+        font-weight: 400;
+        letter-spacing: 0.25em;
+        color: rgba(200, 220, 255, 0.85);
         text-transform: uppercase;
-        transition: color 0.6s ease, letter-spacing 0.6s ease;
+        text-shadow: 
+          0 0 20px rgba(0, 150, 255, 0.5),
+          0 0 40px rgba(150, 50, 255, 0.3);
+        transition: color 0.6s ease, letter-spacing 0.6s ease, text-shadow 0.6s ease;
       }
 
       .intro-tagline p.tagline-swap {
@@ -441,27 +508,54 @@ export class IntroOverlay {
 
       .loading-bar {
         width: min(420px, 100%);
-        height: 5px;
-        background: rgba(255, 255, 255, 0.14);
+        height: 6px;
+        background: rgba(20, 30, 50, 0.8);
         border-radius: 999px;
         overflow: hidden;
-        box-shadow: inset 0 0 12px rgba(0, 0, 0, 0.35);
+        box-shadow: 
+          inset 0 0 20px rgba(0, 0, 0, 0.6),
+          0 0 10px rgba(0, 100, 255, 0.2);
+        border: 1px solid rgba(0, 150, 255, 0.3);
       }
 
       .loading-progress {
         width: 12%;
         height: 100%;
-        background: linear-gradient(90deg, rgba(96, 165, 250, 0.2) 0%, rgba(167, 139, 250, 0.85) 60%, rgba(96, 165, 250, 0.9) 100%);
+        background: linear-gradient(90deg, 
+          rgba(0, 180, 255, 0.6) 0%, 
+          rgba(0, 150, 255, 1) 30%,
+          rgba(150, 50, 255, 1) 70%, 
+          rgba(200, 50, 255, 0.9) 100%);
         border-radius: inherit;
         transition: width 0.4s cubic-bezier(0.22, 1, 0.36, 1);
-        box-shadow: 0 0 18px rgba(135, 160, 255, 0.45);
+        box-shadow: 
+          0 0 25px rgba(0, 150, 255, 0.8),
+          0 0 50px rgba(150, 50, 255, 0.5),
+          inset 0 0 15px rgba(255, 255, 255, 0.4);
+        position: relative;
+        overflow: hidden;
+      }
+      
+      .loading-progress::after {
+        content: '';
+        position: absolute;
+        inset: 0;
+        background: linear-gradient(90deg, 
+          transparent 0%, 
+          rgba(255, 255, 255, 0.6) 50%, 
+          transparent 100%);
+        transform: translateX(-100%);
+        animation: loading-shimmer 2s ease-in-out infinite;
       }
 
       .loading-text {
         font-size: 0.9rem;
         letter-spacing: 0.22em;
         text-transform: uppercase;
-        color: rgba(210, 220, 255, 0.7);
+        color: rgba(180, 210, 255, 0.8);
+        text-shadow: 
+          0 0 10px rgba(0, 150, 255, 0.3),
+          0 0 20px rgba(100, 150, 255, 0.2);
         margin: 0;
       }
 
@@ -471,20 +565,36 @@ export class IntroOverlay {
 
       #intro-overlay[data-phase="logo"] .logo-wrapper {
         transform: scale(0.94);
+        border-color: rgba(0, 120, 255, 0.3);
       }
 
       #intro-overlay[data-phase="reveal"] .logo-wrapper {
         transform: scale(1.0);
+        border-color: rgba(0, 150, 255, 0.5);
+        box-shadow: 
+          0 30px 90px rgba(0, 0, 0, 0.7),
+          0 0 70px rgba(0, 150, 255, 0.3),
+          inset 0 0 40px rgba(0, 150, 255, 0.1);
       }
 
       #intro-overlay[data-phase="hero"] .logo-wrapper {
         transform: scale(1.05);
-        box-shadow: 0 26px 90px rgba(26, 31, 53, 0.65);
+        border-color: rgba(150, 50, 255, 0.6);
+        box-shadow: 
+          0 35px 110px rgba(0, 0, 0, 0.75),
+          0 0 90px rgba(150, 50, 255, 0.4),
+          0 0 120px rgba(0, 150, 255, 0.3),
+          inset 0 0 50px rgba(150, 50, 255, 0.12);
       }
 
       #intro-overlay[data-phase="finale"] .logo-wrapper {
         transform: scale(1.1);
-        box-shadow: 0 36px 120px rgba(50, 89, 255, 0.45);
+        border-color: rgba(200, 80, 255, 0.8);
+        box-shadow: 
+          0 40px 140px rgba(0, 0, 0, 0.8),
+          0 0 120px rgba(200, 50, 255, 0.6),
+          0 0 180px rgba(0, 150, 255, 0.4),
+          inset 0 0 60px rgba(200, 50, 255, 0.15);
       }
 
       #intro-overlay[data-phase="reveal"] .logo-word--forge .logo-letter.visible,
@@ -501,16 +611,59 @@ export class IntroOverlay {
         opacity: 0.4;
       }
 
-      #intro-overlay[data-phase="hero"] .intro-tagline p,
-      #intro-overlay[data-phase="finale"] .intro-tagline p {
-        color: rgba(255, 255, 255, 0.9);
+      #intro-overlay[data-phase="hero"] .intro-tagline p {
+        color: rgba(255, 255, 255, 0.95);
         letter-spacing: 0.28em;
+        text-shadow: 
+          0 0 25px rgba(150, 50, 255, 0.7),
+          0 0 50px rgba(0, 150, 255, 0.4);
+      }
+      
+      #intro-overlay[data-phase="finale"] .intro-tagline p {
+        color: rgba(255, 255, 255, 1);
+        letter-spacing: 0.32em;
+        text-shadow: 
+          0 0 30px rgba(200, 50, 255, 0.9),
+          0 0 60px rgba(0, 150, 255, 0.6),
+          0 0 90px rgba(150, 100, 255, 0.4);
       }
 
       @keyframes intro-bg-shift {
-        0% { filter: hue-rotate(0deg); }
-        50% { filter: hue-rotate(-6deg); }
-        100% { filter: hue-rotate(4deg); }
+        0% { filter: hue-rotate(0deg) brightness(1); }
+        50% { filter: hue-rotate(-8deg) brightness(1.05); }
+        100% { filter: hue-rotate(6deg) brightness(0.98); }
+      }
+
+      @keyframes glow-pulse {
+        0%, 100% { 
+          opacity: 0.8; 
+          transform: scale(1);
+        }
+        50% { 
+          opacity: 1; 
+          transform: scale(1.05);
+        }
+      }
+
+      @keyframes scanlines {
+        0% { transform: translateY(0); }
+        100% { transform: translateY(10px); }
+      }
+
+      @keyframes loading-shimmer {
+        0% { transform: translateX(-100%); }
+        100% { transform: translateX(200%); }
+      }
+
+      @keyframes border-glow {
+        0%, 100% { 
+          opacity: 0.6;
+          filter: hue-rotate(0deg);
+        }
+        50% { 
+          opacity: 1;
+          filter: hue-rotate(30deg);
+        }
       }
 
       @keyframes film-grain {
@@ -541,8 +694,40 @@ export class IntroOverlay {
       }
 
       @keyframes subtitle-fade {
-        0% { opacity: 0; letter-spacing: 0.6em; }
-        100% { opacity: 0.6; letter-spacing: 0.4em; }
+        0% { 
+          opacity: 0; 
+          letter-spacing: 0.6em; 
+          text-shadow: 0 0 5px rgba(0, 150, 255, 0.2);
+        }
+        100% { 
+          opacity: 1; 
+          letter-spacing: 0.4em;
+          text-shadow: 
+            0 0 15px rgba(0, 150, 255, 0.4),
+            0 0 30px rgba(0, 100, 200, 0.2);
+        }
+      }
+
+      @keyframes forge-glow {
+        0%, 100% { 
+          filter: drop-shadow(0 0 20px rgba(0, 150, 255, 0.7)) 
+                  drop-shadow(0 0 40px rgba(0, 150, 255, 0.4)); 
+        }
+        50% { 
+          filter: drop-shadow(0 0 30px rgba(0, 200, 255, 1)) 
+                  drop-shadow(0 0 60px rgba(0, 150, 255, 0.6)); 
+        }
+      }
+
+      @keyframes world-glow {
+        0%, 100% { 
+          filter: drop-shadow(0 0 20px rgba(192, 38, 211, 0.7)) 
+                  drop-shadow(0 0 40px rgba(192, 38, 211, 0.4)); 
+        }
+        50% { 
+          filter: drop-shadow(0 0 30px rgba(232, 121, 249, 1)) 
+                  drop-shadow(0 0 60px rgba(192, 38, 211, 0.6)); 
+        }
       }
 
       @media (max-width: 768px) {

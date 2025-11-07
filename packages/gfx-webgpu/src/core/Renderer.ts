@@ -1,6 +1,13 @@
 import type { OrbitControlsState } from '@engine/camera';
 import { updateCanvasSize, getTimestampPeriod } from './helpers';
 import {
+  pickAdapter,
+  probeAdapterCapabilities,
+  probeResultToCapabilities,
+  validateMinimumLimits,
+  type FeatureTier,
+} from './adapterProbing';
+import {
   DEFAULT_GEOMETRY,
   createGeometryBuffers,
   createTimestampResources,
@@ -35,6 +42,8 @@ import {
 } from '../config';
 import { TIMESTAMP_INDICES } from '../config';
 import type { RendererCapabilities } from '../config';
+import { TextureCompressionManager } from '../textures/TextureCompressionManager';
+import type { CompressionFormat } from '../textures/TextureCompressionManager';
 
 function hasPreferredCanvasFormat(
   gpu: unknown
@@ -154,6 +163,10 @@ export interface Renderer {
     enableComputePrepass: boolean;
     msaaSampleCount: 1 | 2 | 4;
   }>;
+  /** Texture compression debug controls */
+  getTextureCompressionManager(): TextureCompressionManager;
+  setTextureCompressionFormat(format: CompressionFormat | null): void;
+  setTextureCompressionEnabled(enabled: boolean): void;
   [key: string]: unknown;
 }
 
@@ -220,80 +233,39 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
     throw new Error('WebGPU not supported');
   }
 
-  const adapter = await navigator.gpu.requestAdapter();
+  // Use new adapter probing strategy
+  const adapter = await pickAdapter();
   if (!adapter) {
     statusEl.textContent = 'Failed to acquire GPU adapter.';
     throw new Error('Failed to acquire GPU adapter.');
   }
 
+  // Probe adapter capabilities to determine Tier and features
+  const probeResult = await probeAdapterCapabilities(adapter);
+  
+  // Validate minimum limits (warns but doesn't fail)
+  validateMinimumLimits(probeResult.limits);
+
+  // Build required features list based on Tier
   const requiredFeatures: GPUFeatureName[] = [];
-  if (adapter.features.has('timestamp-query')) {
+  if (probeResult.timestampQuery) {
     requiredFeatures.push('timestamp-query');
   }
   // Do not request occlusion-query proactively due to limited support in some runtimes
 
   let device = await adapter.requestDevice({ requiredFeatures });
 
-  const supportsTimestampQueries = device.features.has('timestamp-query');
-  const supportsOcclusionQueries = (device.features as unknown as Set<string>).has('occlusion-query');
+  // Convert probe result to RendererCapabilities format
+  const capabilities: RendererCapabilities = probeResultToCapabilities(probeResult);
 
-  // Query adapter/device info (best-effort)
-  let adapterInfo: { vendor?: string; architecture?: string; device?: string; description?: string } | undefined;
-  let adapterName: string | undefined;
-  try {
-    const anyAdapter = adapter as unknown as { requestAdapterInfo?: () => Promise<{ vendor?: string; architecture?: string; device?: string; description?: string; name?: string }> };
-    if (typeof anyAdapter.requestAdapterInfo === 'function') {
-      const info = await anyAdapter.requestAdapterInfo!();
-      const normalized: { vendor?: string; architecture?: string; device?: string; description?: string } = {};
-      if (typeof info.vendor === 'string') normalized.vendor = info.vendor;
-      if (typeof info.architecture === 'string') normalized.architecture = info.architecture;
-      if (typeof info.device === 'string') normalized.device = info.device;
-      if (typeof info.description === 'string') normalized.description = info.description;
-      adapterInfo = Object.keys(normalized).length > 0 ? normalized : undefined;
-      adapterName = typeof (info as any).name === 'string' ? (info as any).name : undefined;
-    }
-  } catch {
-    // ignore
-  }
-
-  const textureCompressionSupport = {
-    bc: device.features.has('texture-compression-bc'),
-    etc2: device.features.has('texture-compression-etc2'),
-    astc: device.features.has('texture-compression-astc'),
-  } as const;
-
-  const capabilitiesBase: RendererCapabilities = {
-    // adapterName and adapterInfo will be conditionally assigned below to avoid explicit undefined
-    features: {
-      timestampQuery: supportsTimestampQueries,
-      occlusionQuery: supportsOcclusionQueries,
-      compute: true, // WebGPU devices support compute; may be restricted by limits
-      textureCompression: textureCompressionSupport,
-    },
-    limits: {
-      maxTextureDimension2D: (adapter as any)?.limits?.maxTextureDimension2D ?? (device as any)?.limits?.maxTextureDimension2D ?? 4096,
-      maxBufferSize: (adapter as any)?.limits?.maxBufferSize ?? (device as any)?.limits?.maxBufferSize ?? 256 * 1024 * 1024,
-      maxBindGroups: (device as any)?.limits?.maxBindGroups,
-      maxStorageBufferBindingSize: (device as any)?.limits?.maxStorageBufferBindingSize,
-      maxUniformBufferBindingSize: (device as any)?.limits?.maxUniformBufferBindingSize,
-      maxComputeWorkgroupSizeX: (device as any)?.limits?.maxComputeWorkgroupSizeX,
-      maxComputeWorkgroupSizeY: (device as any)?.limits?.maxComputeWorkgroupSizeY,
-      maxComputeWorkgroupSizeZ: (device as any)?.limits?.maxComputeWorkgroupSizeZ,
-    },
-  };
-  const capabilities: RendererCapabilities = capabilitiesBase as RendererCapabilities;
-  if (typeof adapterName === 'string') {
-    (capabilities as any).adapterName = adapterName;
-  }
-  if (adapterInfo) {
-    (capabilities as any).adapterInfo = adapterInfo;
-  }
+  // Initialize texture compression manager
+  const textureCompressionManager = new TextureCompressionManager(capabilities);
 
   const {
     querySet: timestampQuerySet,
     resolveBuffer: timestampResolveBuffer,
     readBuffer: timestampReadBuffer,
-  } = createTimestampResources(device, supportsTimestampQueries, {
+  } = createTimestampResources(device, capabilities.features.timestampQuery, {
     queryCount: TIMESTAMP_QUERY_COUNT,
     bufferSize: TIMESTAMP_BUFFER_SIZE,
   });
@@ -347,12 +319,263 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
   let deviceRecreationAttempts = 0;
   const MAX_DEVICE_RECREATION_ATTEMPTS = 3;
   let isRecreatingDevice = false;
+  let currentTier = capabilities.tier;
+  let needsResourceRecreation = false;
+
+  /**
+   * Safely disposes GPU resources from frameResources.
+   * This is idempotent and safe to call multiple times.
+   */
+  function disposeFrameResources(): void {
+    if (!frameResources) return;
+
+    const safeDestroy = (resource: { destroy?: () => void } | null | undefined) => {
+      try {
+        resource?.destroy?.();
+      } catch (e) {
+        Logger.debug('Resource destroy failed during device recovery', e);
+      }
+    };
+
+    try {
+      safeDestroy(frameResources.timestampReadBuffer);
+      safeDestroy(frameResources.timestampResolveBuffer);
+      safeDestroy(frameResources.timestampQuerySet);
+      safeDestroy(frameResources.uniformBuffer);
+      safeDestroy(frameResources.vertexBuffer);
+      safeDestroy(frameResources.indexBuffer);
+      safeDestroy(frameResources.instanceOffsetBuffer);
+      safeDestroy(frameResources.instanceColorScaleBuffer);
+      safeDestroy(frameResources.instanceSecondaryColorBuffer);
+      safeDestroy(frameResources.instanceEmissiveColorBuffer);
+      safeDestroy(frameResources.instanceMaterialParamsBuffer);
+      safeDestroy(frameResources.instanceRotationBuffer);
+      safeDestroy(frameResources.instanceMaterialIdBuffer);
+      safeDestroy(frameResources.sideTexture);
+      safeDestroy(frameResources.topTexture);
+      safeDestroy(frameResources.msaaColorTexture);
+      safeDestroy(frameResources.depthTexture);
+      safeDestroy(frameResources.atlasMetaBuffer);
+      
+      // Dispose renderers
+      try {
+        environmentRenderer?.cleanup();
+        waterRenderer?.dispose();
+      } catch (e) {
+        Logger.debug('Renderer cleanup failed during device recovery', e);
+      }
+    } catch (e) {
+      Logger.warn('Frame resources disposal failed', e);
+    }
+  }
+
+  /**
+   * Recreates all frame resources with a new device after device loss.
+   * This is a complete recreation of all GPU resources.
+   */
+  async function recreateFrameResources(newDevice: GPUDevice, newAdapter: GPUAdapter): Promise<void> {
+    try {
+      Logger.info('Recreating frame resources with new device');
+      
+      // Dispose old resources first
+      disposeFrameResources();
+      
+      // Recreate geometry buffers (use current geometry state)
+      const geometryBuffers = createGeometryBuffers(newDevice, geometry);
+
+      // Recreate uniform resources
+      const uniformResources = createUniformResources(newDevice, {
+        bufferSize: UNIFORM_BUFFER_SIZE,
+        dataLength: UNIFORM_DATA_LENGTH,
+      });
+
+      // Recreate texture atlas
+      const vertexBuffers = createVertexBufferLayouts();
+      const { textureBindGroupLayout, textureBindGroup, atlasTexture, normalAtlasTexture, sampler, atlas, atlasMetaBuffer } =
+        createTextureAtlas(newDevice, undefined, 2048, 128);
+
+      // Recreate pipelines
+      const { renderPipeline, transparentPipeline, overlayPipeline } = await createPipelines(
+        newDevice,
+        'rgba16float',
+        uniformResources.uniformBindGroupLayout,
+        textureBindGroupLayout,
+        vertexBuffers,
+        { sampleCount: renderSettings.msaaSampleCount, statusEl }
+      );
+
+      // Recreate uniform bind group
+      const uniformBindGroup = newDevice.createBindGroup({
+        label: 'frame-uniform-bg',
+        layout: uniformResources.uniformBindGroupLayout,
+        entries: [
+          {
+            binding: 0,
+            resource: {
+              buffer: uniformResources.uniformBuffer,
+              offset: 0,
+              size: UNIFORM_BUFFER_SIZE,
+            },
+          },
+        ],
+      });
+
+      // Recreate depth and MSAA textures
+      const depthTexture = createDepthTexture(newDevice, canvas, renderSettings.msaaSampleCount);
+      const depthTextureView = depthTexture.createView({ label: 'frame-depth-view' });
+      const msaaColorTexture = createMsaaColorTarget(
+        newDevice,
+        canvas,
+        presentationFormat,
+        renderSettings.msaaSampleCount
+      );
+      const msaaColorView = msaaColorTexture.createView({ label: 'frame-msaa-color-view' });
+
+      // Recreate timestamp resources
+      const {
+        querySet: timestampQuerySet,
+        resolveBuffer: timestampResolveBuffer,
+        readBuffer: timestampReadBuffer,
+      } = createTimestampResources(newDevice, capabilities.features.timestampQuery, {
+        queryCount: TIMESTAMP_QUERY_COUNT,
+        bufferSize: TIMESTAMP_BUFFER_SIZE,
+      });
+
+      // Recreate buffer pool
+      const bufferPool = new GPUBufferPool(newDevice);
+
+      // Update uniform manager with new buffer
+      uniformManager.updateBuffer(newDevice, uniformResources.uniformBuffer);
+      
+      // Reinitialize static uniforms
+      uniformManager.initializeStaticUniforms(atlas.getConfig());
+
+      // Recreate frame resources object
+      frameResourcesDevice = newDevice;
+      frameResources = {
+        ...geometryBuffers,
+        uniformBuffer: uniformResources.uniformBuffer,
+        uniformBindGroupLayout: uniformResources.uniformBindGroupLayout,
+        textureBindGroupLayout,
+        renderPipeline,
+        transparentPipeline,
+        overlayPipeline,
+        uniformBindGroup,
+        uniformData: uniformResources.uniformData,
+        timestampQuerySet,
+        timestampResolveBuffer,
+        timestampReadBuffer,
+        timestampPeriod: getTimestampPeriod(newDevice, newAdapter),
+        sideTexture: atlasTexture,
+        topTexture: atlasTexture,
+        normalAtlasTexture,
+        sampler,
+        textureBindGroup,
+        atlasMetaBuffer,
+        depthTexture,
+        msaaColorTexture,
+        depthTextureView,
+        msaaColorView,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        ...({ bufferPool, atlas } as any),
+      } as FrameResources;
+
+      // Recreate environment renderer
+      if (environmentRenderer) {
+        try {
+          await environmentRenderer.initialize({
+            device: newDevice,
+            presentationFormat: 'rgba16float',
+            sampleCount: renderSettings.msaaSampleCount,
+          });
+        } catch (e) {
+          Logger.warn('Failed to recreate environment renderer', e);
+        }
+      }
+
+      // Recreate water renderer
+      if (waterRenderer) {
+        try {
+          await waterRenderer.initialize({
+            device: newDevice,
+            presentationFormat: 'rgba16float',
+            sampleCount: renderSettings.msaaSampleCount,
+          });
+        } catch (e) {
+          Logger.warn('Failed to recreate water renderer', e);
+        }
+      }
+
+      // Recreate IBL resources (best-effort)
+      if (environmentRenderer) {
+        try {
+          const shadowPlaceholder = newDevice.createTexture({
+            label: 'shadow-atlas-placeholder-r',
+            size: [1, 1, 1],
+            format: 'depth32float',
+            usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.RENDER_ATTACHMENT,
+          });
+          const shadowSamplerCmp = newDevice.createSampler({
+            label: 'shadow-comparison-sampler-r',
+            compare: 'less-equal',
+            magFilter: 'linear',
+            minFilter: 'linear',
+          });
+          const defaultEnv = new EnvironmentComponent();
+          environmentRenderer.updateParams(defaultEnv);
+
+          const { brdfLut, envCube } = await environmentRenderer.prepareIBLResources(defaultEnv, 128);
+          const newBg = newDevice.createBindGroup({
+            label: 'material-atlas-bg+ibl',
+            layout: textureBindGroupLayout,
+            entries: [
+              { binding: 0, resource: sampler },
+              { binding: 1, resource: atlasTexture.createView({ label: 'atlas-texture-view' }) },
+              { binding: 2, resource: normalAtlasTexture.createView({ label: 'atlas-normal-texture-view' }) },
+              { binding: 3, resource: { buffer: atlasMetaBuffer } },
+              { binding: 4, resource: shadowPlaceholder.createView() },
+              { binding: 5, resource: shadowSamplerCmp },
+              { binding: 6, resource: brdfLut.createView() },
+              { binding: 7, resource: envCube.createView({ dimension: 'cube' }) },
+            ],
+          });
+          (frameResources as any).textureBindGroup = newBg;
+        } catch (e) {
+          Logger.debug('IBL resource recreation failed (non-critical)', e);
+        }
+      }
+
+      // Recreate logic connection renderer
+      if (logicConnectionRenderer) {
+        try {
+          await logicConnectionRenderer.initialize(newDevice, presentationFormat);
+        } catch (e) {
+          Logger.warn('Failed to recreate logic connection renderer', e);
+        }
+      }
+
+      // Recreate grid renderer if it exists
+      if (gridRenderer) {
+        try {
+          await gridRenderer.initialize(newDevice, 'rgba16float', 'depth24plus');
+        } catch (e) {
+          Logger.warn('Failed to recreate grid renderer', e);
+        }
+      }
+
+      Logger.info('Frame resources recreated successfully');
+    } catch (err) {
+      Logger.error('Failed to recreate frame resources', err instanceof Error ? err : new Error(String(err)));
+      throw err;
+    }
+  }
 
   /**
    * Attempts to recreate the device and reconfigure the context after device loss.
+   * Implements Tier downgrade strategy: if recreation fails, try lower Tier.
    * This allows the renderer to recover from transient device loss.
    */
-  async function recreateDeviceAndReconfigure(): Promise<GPUDevice | null> {
+  async function recreateDeviceAndReconfigure(downgradeTier = false): Promise<GPUDevice | null> {
     if (isRecreatingDevice || cleanedUp || renderAbortSignal.aborted) {
       return null;
     }
@@ -367,16 +590,44 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
     deviceRecreationAttempts++;
     
     try {
-      Logger.info(`Attempting to recreate device (attempt ${deviceRecreationAttempts}/${MAX_DEVICE_RECREATION_ATTEMPTS})`);
+      Logger.info(`Attempting to recreate device (attempt ${deviceRecreationAttempts}/${MAX_DEVICE_RECREATION_ATTEMPTS}, tier: ${currentTier})`);
       statusEl.textContent = 'Recreating WebGPU device...';
       
-      // Request a new adapter and device
-      const newAdapter = await navigator.gpu.requestAdapter();
+      // Dispose old resources before creating new ones
+      disposeFrameResources();
+      
+      // Use adapter probing with potential Tier downgrade
+      let targetTier = downgradeTier ? Math.max(0, currentTier - 1) : currentTier;
+      const newAdapter = await pickAdapter();
       if (!newAdapter) {
         throw new Error('Failed to acquire GPU adapter');
       }
 
-      const newDevice = await newAdapter.requestDevice({ requiredFeatures });
+      // Probe capabilities
+      const newProbeResult = await probeAdapterCapabilities(newAdapter);
+      
+      // If we're trying to downgrade but adapter supports higher tier, use it
+      if (newProbeResult.tier > targetTier && !downgradeTier) {
+        targetTier = newProbeResult.tier;
+      } else if (newProbeResult.tier < targetTier) {
+        // Adapter doesn't support requested tier, use what's available
+        targetTier = newProbeResult.tier;
+        Logger.warn(`Adapter supports Tier ${newProbeResult.tier}, downgrading from Tier ${currentTier}`);
+      }
+
+      // Build required features based on target tier
+      const newRequiredFeatures: GPUFeatureName[] = [];
+      if (targetTier >= 2 && newProbeResult.timestampQuery) {
+        newRequiredFeatures.push('timestamp-query');
+      }
+
+      const newDevice = await newAdapter.requestDevice({ requiredFeatures: newRequiredFeatures });
+      
+      // Update capabilities
+      const newCapabilities = probeResultToCapabilities(newProbeResult);
+      // Override tier to match what we're actually using
+      newCapabilities.tier = targetTier as FeatureTier;
+      currentTier = targetTier as FeatureTier;
       
       // Reconfigure the context with the new device
       try {
@@ -386,21 +637,44 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
         try {
           webgpuContext.configure({ device: newDevice, format: altFormat, alphaMode: 'opaque' });
           Logger.warn('Canvas configure fallback format used on device recreation:', { from: presentationFormat, to: altFormat });
-          // Note: We don't update presentationFormat here to maintain consistency
         } catch (err2) {
           throw new Error(`Failed to reconfigure canvas: ${err instanceof Error ? err.message : String(err)}`);
         }
       }
 
-      // Update the configured device reference
+      // Update the configured device reference and capabilities
       configuredDevice = newDevice;
+      // Update capabilities object (mutable reference)
+      Object.assign(capabilities, newCapabilities);
       
-      Logger.info('Device recreated and context reconfigured successfully');
-      statusEl.textContent = DEFAULT_STATUS_MESSAGE;
+      // Update texture compression manager with new capabilities
+      textureCompressionManager.updateCapabilities(newCapabilities);
+      
+      // Recreate all frame resources with the new device
+      try {
+        await recreateFrameResources(newDevice, newAdapter);
+        needsResourceRecreation = false; // Resources are now recreated
+        Logger.info(`Device recreated successfully at Tier ${targetTier}`);
+        statusEl.textContent = DEFAULT_STATUS_MESSAGE;
+      } catch (resourceErr) {
+        Logger.error('Failed to recreate frame resources after device recreation', resourceErr instanceof Error ? resourceErr : new Error(String(resourceErr)));
+        // If resource recreation fails, we still have a valid device but no resources
+        // The frame loop will skip rendering until resources are recreated
+        needsResourceRecreation = true;
+        throw resourceErr;
+      }
       
       return newDevice;
     } catch (err) {
       Logger.error('Device recreation failed:', err instanceof Error ? err : new Error(String(err)));
+      
+      // Try downgrade if we haven't already
+      if (!downgradeTier && currentTier > 0) {
+        Logger.info('Attempting Tier downgrade for device recreation');
+        isRecreatingDevice = false; // Reset flag to allow retry
+        return recreateDeviceAndReconfigure(true);
+      }
+      
       statusEl.textContent = 'Failed to recreate WebGPU device. Please reload.';
       return null;
     } finally {
@@ -412,20 +686,25 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
   device.lost
     .then(async (info) => {
       if (!cleanedUp && !renderAbortSignal.aborted) {
-        Logger.error('WebGPU device lost', info as unknown as Error);
+        // Classify device loss reason for telemetry
+        const reason = info.reason || 'unknown';
+        Logger.error('WebGPU device lost', {
+          reason,
+          message: info.message || 'No message provided',
+        } as unknown as Error);
         
         // Attempt to recreate the device if the loss was transient (reason: 'destroyed')
-        // Permanent losses (e.g., GPU crash) won't be recoverable
-        if (info.reason === 'destroyed') {
+        // Permanent losses (e.g., GPU crash, out-of-memory) may be recoverable with downgrade
+        if (reason === 'destroyed' || reason === 'unknown') {
           const newDevice = await recreateDeviceAndReconfigure();
           if (newDevice) {
-            // Update the device reference - resources will need to be recreated on next frame
-            // Mark that frameResources are now invalid (they were created with old device)
+            // Device and resources are now recreated
             device = newDevice;
             frameResourcesDevice = newDevice;
-            Logger.info('Device recreated successfully, rendering will skip until resources are recreated');
+            Logger.info('Device recreated successfully');
           } else {
             // Recreation failed - cleanup and show error
+            statusEl.textContent = 'WebGPU device lost. Please reload the page.';
             try {
               cleanup();
             } catch (cleanupErr) {
@@ -433,17 +712,32 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
             }
           }
         } else {
-          // Permanent device loss - cleanup immediately
-          statusEl.textContent = 'WebGPU device lost. Please reload.';
-          try {
-            cleanup();
-          } catch (cleanupErr) {
-            Logger.warn('Cleanup after device loss threw', cleanupErr);
+          // Permanent device loss (e.g., 'out-of-memory') - try recovery with downgrade
+          Logger.warn(`Permanent device loss detected (${reason}), attempting recovery with Tier downgrade`);
+          const newDevice = await recreateDeviceAndReconfigure(true); // Force downgrade
+          if (newDevice) {
+            device = newDevice;
+            frameResourcesDevice = newDevice;
+            Logger.info('Device recovered with Tier downgrade');
+          } else {
+            statusEl.textContent = 'WebGPU device lost. Please reload the page.';
+            try {
+              cleanup();
+            } catch (cleanupErr) {
+              Logger.warn('Cleanup after device loss threw', cleanupErr);
+            }
           }
         }
       }
     })
     .catch((err) => Logger.error('device.lost failed', err as unknown as Error));
+
+  // Also handle uncaptured errors
+  device.addEventListener('uncapturederror', (event) => {
+    Logger.error('WebGPU uncaptured error', (event as any).error);
+    // Don't trigger device recreation for uncaptured errors - they're usually shader/validation errors
+    // But log them for debugging
+  });
 
   let resizeObserver: ResizeObserver | null = null;
   let animationFrameHandle: number | null = null;
@@ -455,6 +749,8 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
   let logicCubeSystem: LogicCubeSystem | null = null;
   let logicConnectionRenderer: LogicConnectionRenderer | null = null;
   let lastFrameTimeMs: number | null = null;
+  let uniformManager: UniformManager;
+  let cameraSystem: CameraSystem;
 
   // Prepare geometry from scene or use default
   let geometry = options.geometry ?? DEFAULT_GEOMETRY;
@@ -534,8 +830,8 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
     const msaaColorView = msaaColorTexture.createView({ label: 'frame-msaa-color-view' });
 
     // Initialize rendering systems
-    const uniformManager = new UniformManager(device, uniformResources.uniformBuffer);
-    const cameraSystem = new CameraSystem();
+    uniformManager = new UniformManager(device, uniformResources.uniformBuffer);
+    cameraSystem = new CameraSystem();
     frameRenderer = new FrameRenderer(geometry.instanceCount);
     
     // Initialize static uniforms once
@@ -744,7 +1040,7 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
 
       // Optional timestamp tracking for render pass
       let passDesc: GPURenderPassDescriptor | undefined;
-      if (supportsTimestampQueries && frameResources.timestampQuerySet) {
+      if (capabilities.features.timestampQuery && frameResources.timestampQuerySet) {
         passDesc = {
           timestampWrites: {
             querySet: frameResources.timestampQuerySet,
@@ -759,10 +1055,6 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
     // This prevents WebGPU errors like "texture view associated with different device"
     if (device !== configuredDevice) {
       Logger.warn('Device mismatch detected - skipping frame render. Device may have been recreated.');
-      // If device was recreated, frameResources and other GPU resources are now invalid
-      // because they were created with the old device. Skip this frame to avoid errors.
-      // TODO: Full resource recreation would be needed for proper device recovery
-      // This would require recreating all buffers, textures, pipelines, etc. with the new device
       scheduleNextFrame();
       return;
     }
@@ -803,7 +1095,7 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
         time: currentTime,
         configuredDevice, // Pass the device that configured the context for validation
         frameResourcesDevice, // Pass the device that created frameResources for validation
-        ...(gpuTimingListeners.length
+        ...(gpuTimingListeners.length && capabilities.features.timestampQuery && frameResources.timestampQuerySet
           ? {
               onGpuTimings: (timings) => {
                 for (const listener of gpuTimingListeners) {
@@ -1030,6 +1322,13 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       renderSettings = { ...renderSettings, ...settings };
     },
     getRenderSettings: () => ({ ...renderSettings }),
+    getTextureCompressionManager: () => textureCompressionManager,
+    setTextureCompressionFormat: (format: CompressionFormat | null) => {
+      textureCompressionManager.setForceFormat(format);
+    },
+    setTextureCompressionEnabled: (enabled: boolean) => {
+      textureCompressionManager.setEnabled(enabled);
+    },
   };
 }
 

@@ -1318,17 +1318,40 @@ export function createTextureFromData(
   width: number,
   height: number,
   data: Uint8Array,
-  label: string
+  label: string,
+  format?: GPUTextureFormat
 ): GPUTexture {
-  const texture = device.createTexture({
-    label,
-    size: { width, height },
-    format: 'rgba8unorm-srgb',
-    usage:
-      GPUTextureUsage.TEXTURE_BINDING |
-      GPUTextureUsage.COPY_DST |
-      GPUTextureUsage.RENDER_ATTACHMENT,
-  });
+  // Use provided format or fallback to uncompressed RGBA
+  const textureFormat = format ?? 'rgba8unorm-srgb';
+  
+  // Try to create texture with requested format, fallback to uncompressed on error
+  let texture: GPUTexture;
+  try {
+    texture = device.createTexture({
+      label,
+      size: { width, height },
+      format: textureFormat,
+      usage:
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.COPY_DST |
+        GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+  } catch (err) {
+    // Fallback to uncompressed if compressed format fails
+    Logger.warn(
+      `Failed to create texture '${label}' with format '${textureFormat}', falling back to uncompressed`,
+      err instanceof Error ? err : new Error(String(err))
+    );
+    texture = device.createTexture({
+      label: `${label}-fallback`,
+      size: { width, height },
+      format: 'rgba8unorm-srgb',
+      usage:
+        GPUTextureUsage.TEXTURE_BINDING |
+        GPUTextureUsage.COPY_DST |
+        GPUTextureUsage.RENDER_ATTACHMENT,
+    });
+  }
   const queueAny = device.queue as unknown as { writeTexture?: Function; writeBuffer: Function; submit: Function };
   if (typeof queueAny.writeTexture === 'function') {
     queueAny.writeTexture(

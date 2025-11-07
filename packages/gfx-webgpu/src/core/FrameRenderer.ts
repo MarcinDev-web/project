@@ -1025,11 +1025,22 @@ export class FrameRenderer {
     frameResources: FrameResources,
     callback: (timings: { label: string; timeMs: number }[]) => void
   ): void {
+    // Guard: ensure timestamp queries are available
+    if (
+      !frameResources.timestampQuerySet ||
+      !frameResources.timestampResolveBuffer ||
+      !frameResources.timestampReadBuffer
+    ) {
+      // Timestamp queries not available - call callback with empty timings
+      callback([]);
+      return;
+    }
+
     if (this.pendingTimestampRead) {
       return;
     }
     this.pendingTimestampRead = true;
-    const readBuffer = frameResources.timestampReadBuffer!;
+    const readBuffer = frameResources.timestampReadBuffer;
     device.queue
       .onSubmittedWorkDone()
       .then(() => readBuffer.mapAsync(GPUMapMode.READ))

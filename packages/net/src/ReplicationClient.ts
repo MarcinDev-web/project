@@ -100,6 +100,8 @@ export class ReplicationClient {
       ? wsUrl
       : wsUrl.replace(/^http/, 'ws');
     this.enableTransportNegotiation = options?.enableTransportNegotiation ?? true;
+    // Use timestamp-based ID for client (non-deterministic IDs are acceptable for client IDs)
+    // eslint-disable-next-line no-restricted-syntax
     this.clientId = options?.clientId || `client_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
     this.iceServers = options?.iceServers;
   }

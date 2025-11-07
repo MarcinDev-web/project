@@ -195,7 +195,8 @@ export class StatusEffectSystem {
       entity.addComponent(statusEffect);
     }
 
-    // Generate unique effect ID
+    // Generate unique effect ID (non-deterministic IDs are acceptable for effect tracking)
+    // eslint-disable-next-line no-restricted-syntax
     const effectId = `${type}_${entity.id}_${this.currentTime}_${Math.random().toString(36).substring(2, 9)}`;
 
     const shouldTrackTicks = type === 'damage_over_time' || type === 'heal_over_time';

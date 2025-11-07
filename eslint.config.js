@@ -38,6 +38,15 @@ export default tseslint.config(
           ],
         },
       ],
+      // Ban Math.random() for determinism - use SeededRNG instead
+      'no-restricted-syntax': [
+        'error',
+        {
+          selector: 'MemberExpression[object.name="Math"][property.name="random"]',
+          message:
+            'Math.random() is forbidden for determinism. Use SeededRNG from @engine/core/utils instead. Example: getGlobalRNG().random() or new SeededRNG(seed).random()',
+        },
+      ],
     },
   },
   // Relaksacja reguł dla testów
@@ -53,6 +62,8 @@ export default tseslint.config(
       '@typescript-eslint/no-unsafe-return': 'off',
       '@typescript-eslint/unbound-method': 'off',
       'no-console': 'off',
+      // Allow Math.random() in tests for test data generation
+      'no-restricted-syntax': 'off',
     },
   },
   {

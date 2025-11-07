@@ -123,9 +123,9 @@ export class WebRTCTransportServer implements TransportServer {
         this.logger.error('WebSocket error for client', clientId, err);
       });
       });
-      } catch (err) {
-        reject(err as Error);
-      }
+    } catch (err) {
+      reject(err as Error);
+    }
     });
   }
 

@@ -154,13 +154,13 @@ export class LogicConnectionRenderer {
           position: sourcePos,
           color,
           thickness: 0.1,
-          animationOffset: Math.random() * 10,
+          animationOffset: 0, // Animation offset removed for determinism
         },
         {
           position: targetPos,
           color,
           thickness: 0.1,
-          animationOffset: Math.random() * 10,
+          animationOffset: 0, // Animation offset removed for determinism
         }
       );
     }

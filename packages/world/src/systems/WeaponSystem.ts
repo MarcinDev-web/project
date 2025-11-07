@@ -17,6 +17,7 @@ import { getAmmoType } from '../data/ammo.js';
 import { normalizeVec3Out, crossVec3Out, transformVec3ByQuatOut } from '@engine/core/math';
 import { quatFromAxisAngleOut } from '@engine/core/math';
 import type { StatusEffectSystem } from './StatusEffectSystem.js';
+import { getGlobalRNG, type SeededRNG } from '@engine/core';
 
 /**
  * Configuration for WeaponSystem
@@ -449,9 +450,51 @@ export class WeaponSystem {
   private applySpread(direction: Vec3, spread: number): void {
     if (spread <= 0) return;
 
-    // Generate random angles
-    const theta = (Math.random() * 2 - 1) * spread; // Angle around up axis
-    const phi = Math.random() * Math.PI * 2; // Random rotation around forward
+    // Use seeded RNG for deterministic spread
+    let rng: SeededRNG;
+    try {
+      rng = getGlobalRNG();
+    } catch {
+      // Fallback to Math.random() if global RNG not initialized (with warning)
+      console.warn(
+        'WeaponSystem: Global RNG not initialized. Using Math.random() fallback. Initialize with initGlobalRNG(seed) for determinism.'
+      );
+      // Generate random angles (non-deterministic fallback)
+      const theta = (Math.random() * 2 - 1) * spread; // Angle around up axis
+      const phi = Math.random() * Math.PI * 2; // Random rotation around forward
+      
+      // Calculate up and right vectors
+      const up: Vec3 = [0, 1, 0];
+      const right: Vec3 = [0, 0, 0];
+      
+      // Cross product: right = direction × up
+      crossVec3Out(right, direction, up);
+      
+      const rightLength = Math.hypot(right[0], right[1], right[2]);
+      if (rightLength < 1e-6) {
+        // Direction is parallel to up, use different right vector
+        right[0] = 1;
+        right[1] = 0;
+        right[2] = 0;
+      } else {
+        normalizeVec3Out(right, right);
+      }
+      
+      // Rotate direction around right by theta
+      quatFromAxisAngleOut(this.scratchQuat, right, theta);
+      transformVec3ByQuatOut(direction, direction, this.scratchQuat);
+      
+      // Rotate around forward by phi
+      quatFromAxisAngleOut(this.scratchQuat, direction, phi);
+      transformVec3ByQuatOut(direction, direction, this.scratchQuat);
+      
+      normalizeVec3Out(direction, direction);
+      return;
+    }
+
+    // Generate random angles using seeded RNG
+    const theta = (rng.randomFloat(-1, 1)) * spread; // Angle around up axis
+    const phi = rng.randomFloat(0, Math.PI * 2); // Random rotation around forward
 
     // Calculate up and right vectors
     const up: Vec3 = [0, 1, 0];

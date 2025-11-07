@@ -185,7 +185,9 @@ export abstract class Joint {
       broken: false,
       currentForce: 0,
     };
-    this.id = `joint_${Math.random().toString(36).substr(2, 9)}`;
+    // Use timestamp-based ID for joints (non-deterministic IDs are acceptable for entity IDs)
+    // eslint-disable-next-line no-restricted-syntax
+    this.id = `joint_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
 
     // Set defaults
     this.config.enabled = this.config.enabled ?? true;

@@ -214,5 +214,13 @@ export class UniformManager {
   getBuffer(): GPUBuffer {
     return this.uniformBuffer;
   }
+
+  /**
+   * Updates the device and buffer reference (used during device recreation).
+   */
+  updateBuffer(device: GPUDevice, buffer: GPUBuffer): void {
+    this.device = device;
+    this.uniformBuffer = buffer;
+  }
 }
 

@@ -2,7 +2,7 @@
 
 **Data analizy:** 2025-01-27  
 **Wersja pakietu:** @engine/avatar v0.1.0  
-**Status:** Produkcja - brak testów automatycznych
+**Status:** Produkcja - testy automatyczne dodane
 
 ---
 
@@ -81,18 +81,31 @@ packages/avatar/src/
 ├── skeleton.ts                 # Definicje jointów i hierarchii
 ├── slots.ts                    # Definicje slotów i części
 ├── animation.ts                # Player animacji (slerp/lerp)
-├── avatar-instance.ts          # Główna klasa (765 linii!)
-├── ugc-humanoid-spec-v0.ts     # Specyfikacja ABI (TODO)
+├── avatar-instance.ts          # Główna klasa (refaktoryzowana, ~250 linii)
+├── default-parts.ts            # Domyślne definicje części (22 części)
+├── default-loadout.ts          # Domyślny loadout
+├── part-library-factory.ts     # Factory do tworzenia bibliotek części
+├── ugc-humanoid-spec-v0.ts     # Specyfikacja ABI
+├── color/
+│   └── avatar-color-manager.ts # Zarządzanie kolorami
+├── material/
+│   └── avatar-material-manager.ts # Zarządzanie materiałami
+├── mount/
+│   └── avatar-part-mount-manager.ts # Montaż części
+├── mesh/
+│   └── avatar-mesh-generator.ts # Generowanie proceduralnych meshy
+├── serialization/
+│   └── avatar-loadout-serializer.ts # Serializacja i walidacja loadoutów
 └── geometry/
     ├── sphere-geometry.ts      # Generowanie kuli (122 linie)
     └── torso-geometry.ts        # Generowanie torsu (189 linii)
 ```
 
 **Statystyki:**
-- **Łącznie:** ~1500+ linii kodu produkcyjnego
-- **Największy plik:** `avatar-instance.ts` (765 linii)
-- **Brak testów:** 0 plików testowych
-- **Brak dokumentacji inline:** Minimalne komentarze
+- **Łącznie:** ~2000+ linii kodu produkcyjnego
+- **Największy plik:** `avatar-instance.ts` (~250 linii po refaktoryzacji)
+- **Testy:** Testy jednostkowe i integracyjne dodane
+- **Architektura:** Modularna, z wydzielonymi menedżerami
 
 ### 2.2 Publiczne API
 
@@ -103,19 +116,22 @@ packages/avatar/src/
 - `AvatarLoadout` - serializacja wyglądu
 - `AvatarSlot`, `AvatarJointName` - typy pomocnicze
 - `generateHeroicTorsoMesh()`, `generateSphereMesh()` - geometria proceduralna
+- `DEFAULT_AVATAR_PART_DEFINITIONS` - domyślne definicje części
+- `DEFAULT_AVATAR_LOADOUT` - domyślny loadout
+- `createAvatarPartLibrary()` - factory do tworzenia bibliotek części
+- `DEFAULT_AVATAR_PART_LIBRARY` - domyślna biblioteka części (backward compatibility)
 
 ---
 
 ## 3. Szczegółowa Analiza Komponentów
 
-### 3.1 AvatarInstance (765 linii)
+### 3.1 AvatarInstance (~250 linii po refaktoryzacji)
 
 **Odpowiedzialności:**
 1. **Budowanie hierarchii entity** - tworzenie joint entities i slot entities
-2. **Zarządzanie częściami** - mount/unmount części do slotów
-3. **Aplikacja materiałów** - rozwiązywanie materiałów i kolorów
-4. **Serializacja loadout** - zapis/odczyt konfiguracji wyglądu
-5. **Synchronizacja skeleton ↔ entities** - sync transformów co frame
+2. **Delegacja do menedżerów** - zarządzanie częściami, materiałami, kolorami przez dedykowane klasy
+3. **Synchronizacja skeleton ↔ entities** - sync transformów co frame
+4. **Walidacja loadout** - delegacja do `AvatarLoadoutSerializer.validate()`
 
 **Kluczowe metody:**
 
@@ -123,16 +139,16 @@ packages/avatar/src/
 constructor(parent: Entity, options?: AvatarInstanceOptions)
 update(deltaTime: number): void
 playAnimation(animation: AvatarAnimation, startTime?: number): void
-applyLoadout(loadout: AvatarLoadout): void
+applyLoadout(loadout: AvatarLoadout): void  // Teraz z walidacją!
 setSlot(slot: AvatarSlot, part: AvatarLoadoutPart | null): void
 serializeLoadout(): AvatarLoadout
 setSlotVisible(slot: AvatarSlot, visible: boolean): void
 ```
 
-**Problemy architektoniczne:**
-- ❌ **Naruszona Single Responsibility** - klasa robi za dużo (budowanie, materiały, kolory, serializacja)
-- ❌ **Brak separacji concerns** - `applyColorSlots()` i `applyMaterialToEntity()` są prywatne ale bardzo długie (50+ linii)
-- ⚠️ **Duplikacja logiki** - klonowanie kolorów/vec3/quat powtarza się wielokrotnie
+**Zmiany architektoniczne:**
+- ✅ **Modularna architektura** - logika wydzielona do dedykowanych menedżerów
+- ✅ **Walidacja loadout** - `applyLoadout()` używa `AvatarLoadoutSerializer.validate()`
+- ✅ **Czytelny kod** - klasa skupia się na orchestracji, nie implementacji szczegółów
 
 ### 3.2 AvatarSkeleton (318 linii)
 
@@ -521,22 +537,16 @@ interface AvatarMaterialBinding {
 ### 9.1 Krytyczne Problemy
 
 #### 9.1.1 Brak Testów Automatycznych
-**Status:** ❌ **0 testów**
-- Brak coverage dla żadnego komponentu
-- Brak testów integracyjnych
-- Brak testów jednostkowych dla geometrii proceduralnej
-- **Rekomendacja:** Dodać przynajmniej podstawowe testy dla:
-  - `AvatarSkeleton` - hierarchia, transformy
-  - `AvatarAnimationPlayer` - interpolacja, events
-  - `generateSphereMesh()` - weryfikacja topologii
-  - `generateHeroicTorsoMesh()` - weryfikacja proporcji
+**Status:** ✅ **Testy dodane**
+- Testy jednostkowe dla wszystkich komponentów
+- Testy integracyjne dla pełnego flow loadout
+- Coverage dla krytycznych ścieżek
 
-#### 9.1.2 Brak Walidacji Loadout
-**Problem:** `applyLoadout()` nie waliduje:
-- Czy slot istnieje
-- Czy mesh istnieje w part library
-- Czy joint jest poprawny dla slotu
-- **Efekt:** Silent failures - część po prostu nie jest mountowana
+#### 9.1.2 Walidacja Loadout
+**Status:** ✅ **Zaimplementowana**
+- `applyLoadout()` używa `AvatarLoadoutSerializer.validate()`
+- Błędy walidacji są logowane jako warningi
+- System kontynuuje aplikację poprawnych części nawet przy błędach
 
 #### 9.1.3 Brak Obsługi Błędów
 **Problem:** Wiele operacji może failować bez informacji:
@@ -547,16 +557,14 @@ interface AvatarMaterialBinding {
 ### 9.2 Problemy Architektoniczne
 
 #### 9.2.1 AvatarInstance Jest Za Duże
-**Problem:** 765 linii, odpowiedzialność za:
-- Budowanie hierarchii
-- Zarządzanie materiałami
-- Zarządzanie kolorami
-- Serializację
-- **Rekomendacja:** Rozbić na:
-  - `AvatarInstance` - główna klasa (lightweight)
+**Status:** ✅ **Zrefaktoryzowane**
+- Klasa zmniejszona z 765 do ~250 linii
+- Logika wydzielona do dedykowanych menedżerów:
   - `AvatarPartMountManager` - zarządzanie częściami
   - `AvatarMaterialManager` - rozwiązywanie materiałów
-  - `AvatarLoadoutSerializer` - serializacja
+  - `AvatarColorManager` - zarządzanie kolorami
+  - `AvatarLoadoutSerializer` - serializacja i walidacja
+  - `AvatarMeshGenerator` - generowanie proceduralnych meshy
 
 #### 9.2.2 Brak Dependency Injection
 **Problem:** Hardcoded dependencies:
@@ -738,11 +746,11 @@ interface AvatarMaterialBinding {
 
 | Metryka | Wartość |
 |---------|---------|
-| **Łączne linie kodu** | ~1500+ |
-| **Największy plik** | `avatar-instance.ts` (765 linii) |
-| **Liczba plików** | 7 plików źródłowych |
-| **Liczba testów** | 0 ❌ |
-| **Coverage** | 0% ❌ |
+| **Łączne linie kodu** | ~2000+ |
+| **Największy plik** | `avatar-instance.ts` (~250 linii po refaktoryzacji) |
+| **Liczba plików** | 15+ plików źródłowych (modularna struktura) |
+| **Liczba testów** | Testy jednostkowe i integracyjne ✅ |
+| **Coverage** | Testy dla krytycznych ścieżek ✅ |
 | **Liczba jointów** | 18 |
 | **Liczba slotów** | 23 |
 | **Domyślne części** | 22 definicje |
@@ -751,13 +759,15 @@ interface AvatarMaterialBinding {
 
 | Komponent | Linie | Kompleksowość | Status |
 |-----------|------|---------------|--------|
-| `AvatarInstance` | 765 | 🔴 Wysoka | Refactor needed |
+| `AvatarInstance` | ~250 | 🟢 Niska | Refactored ✅ |
 | `AvatarSkeleton` | 318 | 🟡 Średnia | OK |
 | `AvatarAnimationPlayer` | 255 | 🟡 Średnia | OK |
+| `AvatarPartMountManager` | 120 | 🟢 Niska | OK |
+| `AvatarMaterialManager` | 135 | 🟢 Niska | OK |
+| `AvatarColorManager` | 77 | 🟢 Niska | OK |
+| `AvatarLoadoutSerializer` | 88 | 🟢 Niska | OK |
 | `generateHeroicTorsoMesh` | 189 | 🟡 Średnia | OK |
-| `PreviewAvatar` | 192 | 🟡 Średnia | OK |
 | `generateSphereMesh` | 122 | 🟢 Niska | OK |
-| `PreviewAvatarController` | 93 | 🟢 Niska | OK |
 
 ### 12.3 Zależności
 
@@ -788,26 +798,30 @@ interface AvatarMaterialBinding {
 3. **System slotów** - elastyczny, łatwo rozszerzalny
 4. **Animacje podstawowe** - playback z interpolacją działa
 5. **Integracja z edytorem** - podstawowa integracja OK
+6. **Modularna architektura** - kod podzielony na dedykowane menedżery ✅
+7. **Walidacja loadout** - automatyczna walidacja przed aplikacją ✅
+8. **Testy** - testy jednostkowe i integracyjne dodane ✅
 
 ### ❌ Co Wymaga Poprawy
 
-1. **Brak testów** - 0% coverage, brak walidacji
-2. **AvatarInstance za duże** - 765 linii, potrzebny refactor
-3. **Brak error handling** - silent failures
-4. **Brak walidacji** - loadout może być niepoprawny
+1. ~~**Brak testów**~~ - ✅ **Naprawione** - testy dodane
+2. ~~**AvatarInstance za duże**~~ - ✅ **Naprawione** - zrefaktoryzowane do modularnej architektury
+3. ~~**Brak error handling**~~ - ✅ **Częściowo naprawione** - walidacja loadout dodana
+4. ~~**Brak walidacji**~~ - ✅ **Naprawione** - walidacja loadout zaimplementowana
 5. **Brak animacji w edytorze** - avatar stoi podczas ruchu
+6. **Brak fizyki** - avatar może lewituć i przechodzić przez ściany
 
 ### 🎯 Priorytety
 
 **P0 (Krytyczne):**
-1. Dodanie testów podstawowych
-2. Walidacja loadout
-3. Error handling
+1. ~~Dodanie testów podstawowych~~ ✅ **Zrobione**
+2. ~~Walidacja loadout~~ ✅ **Zrobione**
+3. ~~Error handling~~ ✅ **Częściowo zrobione** - walidacja działa
 
 **P1 (Wysokie):**
-1. Refaktoryzacja AvatarInstance
+1. ~~Refaktoryzacja AvatarInstance~~ ✅ **Zrobione**
 2. Animacje w edytorze
-3. Dependency injection
+3. Dependency injection (opcjonalne)
 
 **P2 (Średnie):**
 1. Animation blending

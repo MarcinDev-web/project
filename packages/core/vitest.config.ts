@@ -10,7 +10,7 @@ export default defineConfig({
         return false; // silence expected error output validated by tests
       }
     },
-    include: ['__tests__/**/*.test.ts'],
+    include: ['__tests__/**/*.test.ts', 'src/**/*.test.ts'],
   },
 });
 

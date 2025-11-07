@@ -12,6 +12,8 @@
  */
 
 import { Logger } from '@engine/core/utils';
+import { createTextureSafe, type SafeTextureCreationOptions } from './TextureCreationHelpers';
+import type { TextureCompressionManager } from './TextureCompressionManager';
 
 export type TextureLOD = 'low' | 'medium' | 'high' | 'ultra';
 
@@ -67,15 +69,28 @@ export interface LoadRequest {
 export class TextureStreamingManager {
   private config: TextureStreamingConfig;
   private device: GPUDevice;
+  private compressionManager?: TextureCompressionManager;
   private textures = new Map<string, TextureEntry>();
   private loadQueue: LoadRequest[] = [];
   private activeLoads = new Set<string>();
   private currentMemoryUsage = 0;
   private frameCount = 0;
 
-  constructor(device: GPUDevice, config?: Partial<TextureStreamingConfig>) {
+  constructor(
+    device: GPUDevice,
+    config?: Partial<TextureStreamingConfig>,
+    compressionManager?: TextureCompressionManager
+  ) {
     this.device = device;
     this.config = { ...DEFAULT_CONFIG, ...config };
+    this.compressionManager = compressionManager;
+  }
+
+  /**
+   * Updates the compression manager (called when device is recreated)
+   */
+  setCompressionManager(compressionManager?: TextureCompressionManager): void {
+    this.compressionManager = compressionManager;
   }
 
   /**
@@ -339,13 +354,30 @@ export class TextureStreamingManager {
     const blob = await response.blob();
     const imageBitmap = await createImageBitmap(blob);
 
-    // Create texture
-    const texture = this.device.createTexture({
-      label: `streamed-texture-${lod}`,
-      size: { width: imageBitmap.width, height: imageBitmap.height },
-      format: 'rgba8unorm',
-      usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
-    });
+    // Determine format based on compression manager
+    let format: GPUTextureFormat = 'rgba8unorm';
+    const safeOptions: SafeTextureCreationOptions | undefined = this.compressionManager
+      ? {
+          compressionManager: this.compressionManager,
+          type: 'color',
+        }
+      : undefined;
+
+    if (this.compressionManager) {
+      format = this.compressionManager.getTextureFormat();
+    }
+
+    // Create texture with compression fallback
+    const texture = createTextureSafe(
+      this.device,
+      {
+        label: `streamed-texture-${lod}`,
+        size: { width: imageBitmap.width, height: imageBitmap.height },
+        format,
+        usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST | GPUTextureUsage.RENDER_ATTACHMENT,
+      },
+      safeOptions
+    );
 
     // Upload image data
     this.device.queue.copyExternalImageToTexture(

@@ -77,7 +77,11 @@ export interface TextureCompressionSupport {
   astc: boolean;
 }
 
+export type FeatureTier = 0 | 1 | 2;
+
 export interface RendererCapabilities {
+  /** Feature tier: 0=baseline, 1=preferred, 2=enhanced */
+  tier: FeatureTier;
   adapterName?: string;
   adapterInfo?: {
     vendor?: string;
@@ -90,6 +94,8 @@ export interface RendererCapabilities {
     occlusionQuery: boolean;
     compute: boolean;
     textureCompression: TextureCompressionSupport;
+    /** Shader F16 support (Tier 2) */
+    shaderF16?: boolean;
   };
   limits: {
     maxTextureDimension2D: number;
@@ -101,4 +107,6 @@ export interface RendererCapabilities {
     maxComputeWorkgroupSizeY?: number;
     maxComputeWorkgroupSizeZ?: number;
   };
+  /** Selected texture compression format (or 'none') */
+  textureCompression?: 'bc' | 'etc2' | 'astc' | 'none';
 }

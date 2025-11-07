@@ -2,9 +2,11 @@ import { ScriptComponent } from '../components/ScriptComponent.js';
 import { SceneScriptContextBuilder } from '../services/SceneScriptContextBuilder.js';
 import { BehaviorRegistry } from '../behavior/BehaviorRegistry.js';
 import { CoroutineScheduler } from '../coroutine/CoroutineScheduler.js';
+import { CapabilityManager } from '../security/CapabilityToken.js';
 /**
  * Runs Behavior instances on entities with ScriptComponent.
  * Also supports hot-reload by monitoring registry changes via a simple version.
+ * Supports capability-based access control when permissions are provided.
  */
 export class ScriptSystem {
     scene;
@@ -14,9 +16,17 @@ export class ScriptSystem {
     fixedDeltaTime = 1 / 60; // default 60 Hz
     maxFixedStepsPerUpdate = 10;
     enabled = true;
-    constructor(scene) {
+    capabilityManager;
+    constructor(scene, options) {
         this.scene = scene;
-        const contextBuilder = new SceneScriptContextBuilder(scene);
+        // Create capability manager if permissions provided
+        if (options?.permissions) {
+            this.capabilityManager = new CapabilityManager();
+        }
+        const contextBuilder = new SceneScriptContextBuilder(scene, {
+            capabilityManager: this.capabilityManager,
+            permissions: options?.permissions,
+        });
         this.runtime = {
             scheduler: new CoroutineScheduler(),
             behaviors: new Set(),

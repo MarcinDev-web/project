@@ -13,3 +13,6 @@ export * from './connection/index.js';
 export { VariableStorage } from './storage/VariableStorage.js'; // Named to avoid VariableData conflict
 export * from './services/index.js';
 export * from './signals/index.js';
+export * from './security/CapabilityToken.js';
+export * from './security/CapabilityTypes.js';
+export * from './services/CapabilityScriptServices.js';

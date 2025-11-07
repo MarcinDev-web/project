@@ -1,11 +1,13 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Entity } from '@engine/world';
-import { AvatarInstance, DEFAULT_AVATAR_PART_LIBRARY } from './avatar-instance';
+import { AvatarInstance } from './avatar-instance';
 import type { AvatarLoadout, AvatarMaterialResolver } from './avatar-instance';
 import type { AvatarAnimation } from './animation';
 import type { AvatarSlot, AvatarPartLibrary } from './slots';
 import type { RgbaColor } from '@engine/world';
 import type { AvatarJointName } from './skeleton';
+import { DEFAULT_AVATAR_PART_DEFINITIONS } from './default-parts';
+import { createAvatarPartLibrary } from './part-library-factory';
 
 describe('AvatarInstance', () => {
   let parentEntity: Entity;
@@ -316,8 +318,9 @@ describe('AvatarInstance', () => {
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
       // Create custom library with wrong slot - use existing part but wrong slot
+      const defaultLibrary = createAvatarPartLibrary(DEFAULT_AVATAR_PART_DEFINITIONS);
       const customLibrary: AvatarPartLibrary = {
-        ...DEFAULT_AVATAR_PART_LIBRARY,
+        ...defaultLibrary,
         head_wrong_slot: {
           id: 'head_wrong_slot',
           displayName: 'Head Wrong Slot',
