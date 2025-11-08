@@ -9,12 +9,13 @@ import { ScriptSystem } from '../src/runtime/ScriptSystem';
 import { Scene } from '@engine/world';
 import { ScriptComponent } from '../src/components/ScriptComponent';
 import { BehaviorInstance } from '../src/behavior/Behavior';
+import { BehaviorRegistry } from '../src/behavior/BehaviorRegistry';
 import { initGlobalRNG, resetGlobalRNG } from '@engine/core/utils/SeededRNG';
 import {
   expectDeterministicSnapshot,
   sanitizeForDeterminism,
   createDeterministicTestContext,
-} from '@engine/test-utils/determinism';
+} from '@engine/test-utils';
 
 describe('ScriptSystem Determinism', () => {
   let scene: Scene;
@@ -32,7 +33,7 @@ describe('ScriptSystem Determinism', () => {
       initGlobalRNG(seed);
       const system1 = new ScriptSystem(scene);
       const entity1 = scene.createEntity();
-      const comp1 = entity1.addComponent(ScriptComponent);
+      const comp1 = entity1.addComponent(new ScriptComponent());
 
       // Create a simple behavior that uses RNG
       class TestBehavior extends BehaviorInstance {
@@ -54,7 +55,9 @@ describe('ScriptSystem Determinism', () => {
         }
       }
 
-      comp1.addBehavior('TestBehavior', TestBehavior, {});
+      // Register and add behavior via new API
+      BehaviorRegistry.register('TestBehavior', TestBehavior);
+      comp1.addScript({ name: 'TestBehavior', params: {} });
       system1.update(0.016); // One frame
 
       const result1 = sanitizeForDeterminism({
@@ -67,9 +70,9 @@ describe('ScriptSystem Determinism', () => {
       const scene2 = new Scene();
       const system2 = new ScriptSystem(scene2);
       const entity2 = scene2.createEntity();
-      const comp2 = entity2.addComponent(ScriptComponent);
+      const comp2 = entity2.addComponent(new ScriptComponent());
 
-      comp2.addBehavior('TestBehavior', TestBehavior, {});
+      comp2.addScript({ name: 'TestBehavior', params: {} });
       system2.update(0.016);
 
       const result2 = sanitizeForDeterminism({
@@ -101,8 +104,9 @@ describe('ScriptSystem Determinism', () => {
       }
 
       const entity1 = scene.createEntity();
-      const comp1 = entity1.addComponent(ScriptComponent);
-      comp1.addBehavior('FixedUpdateBehavior', FixedUpdateBehavior, {});
+      const comp1 = entity1.addComponent(new ScriptComponent());
+      BehaviorRegistry.register('FixedUpdateBehavior', FixedUpdateBehavior);
+      comp1.addScript({ name: 'FixedUpdateBehavior', params: {} });
 
       // Simulate 1 second at 60 FPS
       for (let i = 0; i < 60; i++) {
@@ -120,8 +124,8 @@ describe('ScriptSystem Determinism', () => {
       system2.setFixedTimeStep(1 / 60);
 
       const entity2 = scene2.createEntity();
-      const comp2 = entity2.addComponent(ScriptComponent);
-      comp2.addBehavior('FixedUpdateBehavior', FixedUpdateBehavior, {});
+      const comp2 = entity2.addComponent(new ScriptComponent());
+      comp2.addScript({ name: 'FixedUpdateBehavior', params: {} });
 
       for (let i = 0; i < 60; i++) {
         system2.update(1 / 60);

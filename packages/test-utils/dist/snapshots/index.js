@@ -7,7 +7,7 @@ import { expect } from 'vitest';
  * Removes non-deterministic fields and sorts data
  */
 export function normalizeForSnapshot(obj, options = {}) {
-    const { exclude = [], replacements = {}, sortArrays = true } = options;
+    const { exclude = [], replacements = {}, sortArrays = true, normalizeEntityIds = true, normalizeRngState = true, } = options;
     if (obj === null || obj === undefined) {
         return obj;
     }
@@ -16,7 +16,8 @@ export function normalizeForSnapshot(obj, options = {}) {
         return sortArrays ? normalized.sort() : normalized;
     }
     if (obj instanceof Date) {
-        return replacements.Date ?? '<Date>';
+        const dateReplacement = replacements.Date;
+        return typeof dateReplacement === 'string' ? dateReplacement : '<Date>';
     }
     if (typeof obj === 'object') {
         const normalized = {};
@@ -35,9 +36,42 @@ export function normalizeForSnapshot(obj, options = {}) {
                 normalized[key] = '<timestamp>';
                 continue;
             }
+            // Normalize entity IDs
+            if (normalizeEntityIds && (key.toLowerCase().includes('id') || key === 'entityId' || key === 'entity')) {
+                if (typeof value === 'string' && (value.length > 20 || /^entity_\d+$/.test(value))) {
+                    normalized[key] = '<entity-id>';
+                    continue;
+                }
+                // Also handle nested entity references
+                if (typeof value === 'object' && value !== null && 'id' in value) {
+                    const nested = normalizeForSnapshot(value, options);
+                    normalized[key] = nested;
+                    continue;
+                }
+            }
+            // Normalize RNG state
+            if (normalizeRngState && (key === 'state' || key === 'rngState' || key === 'seed')) {
+                if (typeof value === 'number') {
+                    normalized[key] = '<rng-state>';
+                    continue;
+                }
+                // Handle SeededRNG.getState() return value
+                if (typeof value === 'object' && value !== null && 'state' in value) {
+                    normalized[key] = { state: '<rng-state>' };
+                    continue;
+                }
+            }
+            // Handle UUIDs and long IDs
             if (key.toLowerCase().includes('id') && typeof value === 'string' && value.length > 20) {
                 normalized[key] = '<uuid>';
                 continue;
+            }
+            // Handle random values in arrays/objects (common in test data)
+            if (key.toLowerCase().includes('random') || key.toLowerCase().includes('rng')) {
+                if (typeof value === 'number' && value >= 0 && value < 1) {
+                    normalized[key] = '<random-value>';
+                    continue;
+                }
             }
             // Recursively normalize
             normalized[key] = normalizeForSnapshot(value, options);

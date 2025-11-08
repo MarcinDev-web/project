@@ -75,20 +75,32 @@ export function parseHdrFile(arrayBuffer: ArrayBuffer): {
 /**
  * Loads an HDR file from URL or File and parses it
  */
-export async function loadHdrFile(source: string | File): Promise<{
+export async function loadHdrFile(source: string | Blob): Promise<{
   width: number;
   height: number;
   data: Float32Array;
 }> {
   let arrayBuffer: ArrayBuffer;
 
-  if (source instanceof File) {
-    arrayBuffer = await source.arrayBuffer();
-  } else {
+  if (typeof source === 'string') {
     const response = await fetch(source);
     if (!response.ok) {
       throw new Error(`Failed to load HDR file: ${response.statusText}`);
     }
+    arrayBuffer = await response.arrayBuffer();
+  } else {
+    const anySource = source as unknown as { arrayBuffer?: () => Promise<ArrayBuffer> };
+    if (typeof anySource.arrayBuffer === 'function') {
+      try {
+        arrayBuffer = await anySource.arrayBuffer!();
+        // Try parse directly; if it fails due to header issues, fall back to Response path
+        return parseHdrFile(arrayBuffer);
+      } catch {
+        // ignore and try Response fallback
+      }
+    }
+    // Fallback for environments where File/Blob arrayBuffer is missing or unreliable
+    const response = new Response(source);
     arrayBuffer = await response.arrayBuffer();
   }
 

@@ -1,16 +1,40 @@
+export interface TonemapConfig {
+  /** Quantization steps (0 = disabled, >0 = number of color bands for NPR effect) */
+  quantizeSteps?: number;
+}
+
 export class TonemapLutPass {
   private device: GPUDevice;
   private pipeline: GPURenderPipeline | null = null;
   private bindGroupLayout: GPUBindGroupLayout | null = null;
+  private configLayout: GPUBindGroupLayout | null = null;
   private sampler: GPUSampler | null = null;
   private lutTexture: GPUTexture | null = null;
+  private configBuffer: GPUBuffer | null = null;
   private cachedBindGroup: GPUBindGroup | null = null;
+  private cachedConfigBindGroup: GPUBindGroup | null = null;
   private cachedSrcView: GPUTextureView | null = null;
   private cachedBloomView: GPUTextureView | null = null;
   private cachedSSAOView: GPUTextureView | null = null;
+  private quantizeSteps: number = 0;
 
   constructor(device: GPUDevice) {
     this.device = device;
+  }
+
+  /**
+   * Sets quantization steps for NPR color banding (0 = disabled)
+   */
+  setQuantizeSteps(steps: number): void {
+    this.quantizeSteps = Math.max(0, Math.floor(steps));
+    this.updateConfigBuffer();
+  }
+
+  /**
+   * Gets current quantization steps
+   */
+  getQuantizeSteps(): number {
+    return this.quantizeSteps;
   }
 
   private createIdentityLUT(size = 16): Uint8Array {
@@ -76,12 +100,30 @@ export class TonemapLutPass {
       });
     }
 
+    if (!this.configLayout) {
+      this.configLayout = this.device.createBindGroupLayout({
+        label: 'tonemap-config-bgl',
+        entries: [
+          { binding: 0, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
+        ],
+      });
+    }
+
+    if (!this.configBuffer) {
+      this.configBuffer = this.device.createBuffer({
+        label: 'tonemap-config',
+        size: 4, // f32 quantizeSteps
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
+      this.updateConfigBuffer();
+    }
+
     if (!this.pipeline) {
       // Load code from file path in build systems; here we inline compile by importing via bundler
       // In this environment, we expect bundler to resolve shader code from file system.
       const layout = this.device.createPipelineLayout({
         label: 'tonemap-lut-pl',
-        bindGroupLayouts: [this.bindGroupLayout],
+        bindGroupLayouts: [this.bindGroupLayout, this.configLayout],
       });
       this.pipeline = this.device.createRenderPipeline({
         label: 'tonemap-lut-pipeline',
@@ -101,6 +143,12 @@ struct VSOut { @builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32> };
 @group(0) @binding(2) var lut3d : texture_3d<f32>;
 @group(0) @binding(3) var bloomTex : texture_2d<f32>;
 @group(0) @binding(4) var ssaoTex : texture_2d<f32>;
+
+struct TonemapConfig {
+  quantizeSteps: f32,
+}
+
+@group(1) @binding(0) var<uniform> config: TonemapConfig;
 
 // Dithering function (blue noise approximation)
 fn dither(uv: vec2<f32>) -> f32 {
@@ -132,14 +180,23 @@ fn ACESFilm(x: vec3<f32>) -> vec3<f32> {
   hdr *= mix(1.0, ssao, 0.5);
   
   // Apply ACES tonemapping (handles HDR -> LDR conversion)
-  let aces = ACESFilm(hdr);
+  var aces = ACESFilm(hdr);
+  
+  // Apply quantization for NPR effect if enabled
+  if (config.quantizeSteps > 0.5) {
+    let step = 1.0 / config.quantizeSteps;
+    aces = floor(aces / step + 0.5) * step;
+  }
   
   // Gamma correction (sRGB)
   let ldr = pow(aces, vec3<f32>(1.0/2.2));
   
-  // Apply dithering to reduce banding (subtle)
-  let ditherValue = dither(pos.xy * 0.25) * 0.01;
-  let finalColor = clamp(ldr + vec3<f32>(ditherValue), vec3<f32>(0.0), vec3<f32>(1.0));
+  // Apply dithering to reduce banding (subtle, skip if quantizing)
+  var finalColor = ldr;
+  if (config.quantizeSteps < 0.5) {
+    let ditherValue = dither(pos.xy * 0.25) * 0.01;
+    finalColor = clamp(ldr + vec3<f32>(ditherValue), vec3<f32>(0.0), vec3<f32>(1.0));
+  }
   
   return vec4<f32>(finalColor, 1.0);
 }
@@ -222,6 +279,16 @@ fn ACESFilm(x: vec3<f32>) -> vec3<f32> {
       // Note: placeholderSSAO will be reused across frames if ssaoView is null
       // It's acceptable to keep it alive for the lifetime of TonemapLutPass
     }
+
+    if (!this.cachedConfigBindGroup) {
+      this.cachedConfigBindGroup = this.device.createBindGroup({
+        label: 'tonemap-config-bg',
+        layout: this.configLayout!,
+        entries: [
+          { binding: 0, resource: { buffer: this.configBuffer! } },
+        ],
+      });
+    }
     const passDesc: GPURenderPassDescriptor = {
       label: 'tonemap-pass',
       colorAttachments: [{ view: dstView, loadOp: 'clear', storeOp: 'store' }],
@@ -238,8 +305,19 @@ fn ACESFilm(x: vec3<f32>) -> vec3<f32> {
     const pass = encoder.beginRenderPass(passDesc);
     pass.setPipeline(this.pipeline);
     pass.setBindGroup(0, this.cachedBindGroup!);
+    pass.setBindGroup(1, this.cachedConfigBindGroup!);
     pass.draw(3, 1, 0, 0);
     pass.end();
+  }
+
+  /**
+   * Updates config buffer with current quantization settings
+   */
+  private updateConfigBuffer(): void {
+    if (!this.configBuffer) return;
+    const data = new Float32Array(1);
+    data[0] = this.quantizeSteps;
+    this.device.queue.writeBuffer(this.configBuffer, 0, data);
   }
 
   dispose(): void {
@@ -251,8 +329,12 @@ fn ACESFilm(x: vec3<f32>) -> vec3<f32> {
     this.lutTexture = null;
     this.pipeline = null;
     this.bindGroupLayout = null;
+    this.configLayout = null;
     this.sampler = null;
+    this.configBuffer?.destroy();
+    this.configBuffer = null;
     this.cachedBindGroup = null;
+    this.cachedConfigBindGroup = null;
     this.cachedSrcView = null;
     this.cachedBloomView = null;
     this.cachedSSAOView = null;

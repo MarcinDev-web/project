@@ -23,6 +23,88 @@ const resolveEngineAliasesPlugin = (): Plugin => {
   const fs = require('fs');
   const path = require('path');
   
+  // Cache for original package.json contents
+  const originalPackageJsonCache = new Map<string, string>();
+  
+  // List of @engine/* packages to modify
+  const enginePackages = [
+    'core',
+    'world',
+    'animation',
+    'avatar',
+    'camera',
+    'editor-utils',
+    'test-utils',
+    'stdlib',
+    'script',
+    'economy',
+    'gfx-webgpu',
+    'input',
+    'net',
+    'net-protocol',
+    'voxel',
+    'blocks',
+    'microblocks',
+    'world-templates',
+  ];
+  
+  // Helper to modify package.json exports to point to src/ instead of dist/
+  const modifyPackageJson = (packagePath: string): void => {
+    const packageJsonPath = path.join(packagePath, 'package.json');
+    if (!fs.existsSync(packageJsonPath)) return;
+    
+    // Read and cache original content
+    if (!originalPackageJsonCache.has(packageJsonPath)) {
+      const originalContent = fs.readFileSync(packageJsonPath, 'utf-8');
+      originalPackageJsonCache.set(packageJsonPath, originalContent);
+    }
+    
+    const packageJson = JSON.parse(fs.readFileSync(packageJsonPath, 'utf-8'));
+    
+    // Modify exports to point to src/ for all conditions
+    if (packageJson.exports) {
+      const modifyExports = (exports: any): any => {
+        if (typeof exports === 'string') {
+          // Replace dist/ with src/ and .js with .ts
+          const modified = exports.replace(/\/dist\//g, '/src/').replace(/\.js$/g, '.ts');
+          return modified;
+        }
+        if (typeof exports === 'object' && exports !== null) {
+          if (Array.isArray(exports)) {
+            return exports.map(modifyExports);
+          }
+          const modified: any = {};
+          for (const [key, value] of Object.entries(exports)) {
+            // For all export conditions (import, default, development, test, etc.), point to src/
+            modified[key] = modifyExports(value);
+          }
+          return modified;
+        }
+        return exports;
+      };
+      
+      const originalExports = JSON.stringify(packageJson.exports);
+      packageJson.exports = modifyExports(packageJson.exports);
+      const modifiedExports = JSON.stringify(packageJson.exports);
+      
+      // Only write if actually modified
+      if (originalExports !== modifiedExports) {
+        // Write modified package.json
+        fs.writeFileSync(packageJsonPath, JSON.stringify(packageJson, null, 2), 'utf-8');
+      }
+    }
+  };
+  
+  // Helper to restore original package.json
+  const restorePackageJson = (packagePath: string): void => {
+    const packageJsonPath = path.join(packagePath, 'package.json');
+    const originalContent = originalPackageJsonCache.get(packageJsonPath);
+    if (originalContent) {
+      fs.writeFileSync(packageJsonPath, originalContent, 'utf-8');
+      originalPackageJsonCache.delete(packageJsonPath);
+    }
+  };
+  
   // Helper to resolve @engine/* imports to source files
   const resolveEngineImport = (id: string): string | null => {
     // Handle @engine/core subpath exports - always resolve to src
@@ -134,14 +216,52 @@ const resolveEngineAliasesPlugin = (): Plugin => {
   return {
     name: 'resolve-engine-aliases',
     enforce: 'pre', // Run before other resolvers
+    config() {
+      // Modify package.json files BEFORE Vite reads them
+      // This is the earliest hook - runs before configResolved
+      for (const pkg of enginePackages) {
+        const packagePath = resolve(__dirname, `packages/${pkg}`);
+        if (fs.existsSync(packagePath)) {
+          modifyPackageJson(packagePath);
+        }
+      }
+    },
+    configResolved() {
+      // Also modify in configResolved as a safety net
+      for (const pkg of enginePackages) {
+        const packagePath = resolve(__dirname, `packages/${pkg}`);
+        if (fs.existsSync(packagePath)) {
+          modifyPackageJson(packagePath);
+        }
+      }
+    },
+    buildEnd() {
+      // Restore original package.json files after tests
+      for (const pkg of enginePackages) {
+        const packagePath = resolve(__dirname, `packages/${pkg}`);
+        if (fs.existsSync(packagePath)) {
+          restorePackageJson(packagePath);
+        }
+      }
+    },
+    closeBundle() {
+      // Also restore in closeBundle as a safety net
+      for (const pkg of enginePackages) {
+        const packagePath = resolve(__dirname, `packages/${pkg}`);
+        if (fs.existsSync(packagePath)) {
+          restorePackageJson(packagePath);
+        }
+      }
+    },
     resolveId(id, importer) {
       // Always resolve @engine/* imports to source files first (highest priority)
       // This must happen before any other resolution logic
       // Check for @engine/* imports regardless of importer
       if (id.startsWith('@engine/')) {
         const engineResolved = resolveEngineImport(id);
-        if (engineResolved) {
+        if (engineResolved && fs.existsSync(engineResolved)) {
           // Return absolute path to ensure Vite uses it
+          // This should override package.json exports
           return engineResolved;
         }
       }
@@ -158,7 +278,7 @@ const resolveEngineAliasesPlugin = (): Plugin => {
       if (importer && (importer.includes('/dist/') || importer.includes('/src/')) && importer.endsWith('.js')) {
         // Re-resolve the import ID with the engine resolver
         const reResolved = resolveEngineImport(id);
-        if (reResolved) {
+        if (reResolved && fs.existsSync(reResolved)) {
           return reResolved;
         }
       }
@@ -166,12 +286,19 @@ const resolveEngineAliasesPlugin = (): Plugin => {
       // If importer is from dist/, always try to resolve @engine/* imports to source
       if (importer && importer.includes('/dist/')) {
         const reResolved = resolveEngineImport(id);
-        if (reResolved) {
+        if (reResolved && fs.existsSync(reResolved)) {
           return reResolved;
         }
       }
       
       return null; // Let aliases and other resolvers handle other imports
+    },
+    shouldExternalize(id, importer, isResolved) {
+      // Prevent externalization of @engine/* packages - we want to bundle them from source
+      if (id.startsWith('@engine/')) {
+        return false;
+      }
+      return undefined; // Let Vite decide for other packages
     },
     load(id) {
       // If trying to load a .js file in src/, redirect to .ts equivalent
@@ -188,6 +315,64 @@ const resolveEngineAliasesPlugin = (): Plugin => {
         if (fs.existsSync(srcId)) {
           // Return null to let Vite handle the .ts file
           return null;
+        }
+      }
+      // If trying to load a file from dist/ that was resolved via package.json exports,
+      // redirect to src/ equivalent
+      if (id.includes('/dist/') && (id.endsWith('.js') || id.endsWith('.d.ts'))) {
+        const srcId = id.replace('/dist/', '/src/').replace(/\.(js|d\.ts)$/, '.ts');
+        if (fs.existsSync(srcId)) {
+          // Return null to let Vite handle the .ts file
+          return null;
+        }
+      }
+      return null;
+    },
+    transform(code, id) {
+      // Transform imports from @engine/* to direct source file paths
+      // This runs before Vite resolves imports, so we can intercept here
+      if ((id.endsWith('.ts') || id.endsWith('.tsx')) && !id.includes('node_modules')) {
+        let modified = false;
+        let transformedCode = code;
+        
+        // Match import/export statements with @engine/* imports
+        // Support both single and double quotes, and handle various import styles
+        const importRegex = /from\s+['"]@engine\/([^'"]+)['"]/g;
+        const requireRegex = /require\s*\(\s*['"]@engine\/([^'"]+)['"]\s*\)/g;
+        const importStatementRegex = /import\s+.*?\s+from\s+['"]@engine\/([^'"]+)['"]/g;
+        const exportFromRegex = /export\s+.*?\s+from\s+['"]@engine\/([^'"]+)['"]/g;
+        
+        // Replace @engine/* imports with direct source paths
+        const replaceImport = (match: string, pkgPath: string) => {
+          const fullId = `@engine/${pkgPath}`;
+          const resolved = resolveEngineImport(fullId);
+          if (resolved && fs.existsSync(resolved)) {
+            modified = true;
+            // Use relative path from current file to resolved file
+            const relativePath = path.relative(path.dirname(id), resolved);
+            // Normalize path separators and remove .ts extension
+            let normalizedPath = relativePath.replace(/\\/g, '/').replace(/\.ts$/, '');
+            // Ensure path starts with ./ or ../
+            if (!normalizedPath.startsWith('.')) {
+              normalizedPath = './' + normalizedPath;
+            }
+            // Replace the import path in the match, preserving quotes
+            const quote = match.match(/['"]/)?.[0] || "'";
+            return match.replace(/@engine\/[^'"]+/, normalizedPath);
+          }
+          return match;
+        };
+        
+        transformedCode = transformedCode.replace(importRegex, replaceImport);
+        transformedCode = transformedCode.replace(requireRegex, replaceImport);
+        transformedCode = transformedCode.replace(importStatementRegex, replaceImport);
+        transformedCode = transformedCode.replace(exportFromRegex, replaceImport);
+        
+        if (modified) {
+          return {
+            code: transformedCode,
+            map: null, // We don't need source maps for this transformation
+          };
         }
       }
       return null;
@@ -268,6 +453,7 @@ export default defineWorkspace([
           '@engine/editor-utils/*': resolve(__dirname, 'packages/editor-utils/src/*'),
           '@engine/economy': resolve(__dirname, 'packages/economy/src/index.ts'),
           '@engine/economy/*': resolve(__dirname, 'packages/economy/src/*'),
+          '@engine/test-utils/determinism': resolve(__dirname, 'packages/test-utils/src/determinism/index.ts'),
           '@engine/test-utils': resolve(__dirname, 'packages/test-utils/src'),
           '@engine/test-utils/*': resolve(__dirname, 'packages/test-utils/src/*'),
           '@engine/wasm-collision': resolve(__dirname, 'packages/wasm-collision/src'),
@@ -279,9 +465,10 @@ export default defineWorkspace([
           '@shared': resolve(__dirname, 'shared'),
           '@shared/*': resolve(__dirname, 'shared/*'),
         },
-        conditions: ['test', 'development', 'import', 'module'],
+        conditions: ['development', 'test', 'import', 'module'],
         dedupe: ['@engine/core', '@engine/world', '@engine/animation', '@engine/avatar', '@engine/camera'],
         preserveSymlinks: false,
+        mainFields: [], // Prevent Vite from resolving through package.json exports
       },
       include: [
         'packages/**/*.test.ts',
@@ -295,6 +482,13 @@ export default defineWorkspace([
         '**/.git/**',
         '**/coverage/**',
         '**/.bun/**',
+        // World systems tests require jsdom and are executed in package scope
+        'packages/world/src/systems/**/*.test.ts',
+        // Core test-utils dependent tests are executed in package scope
+        'packages/core/src/utils/SeededRNG.test.ts',
+        // Camera controller DOM-dependent tests run in package scope
+        'packages/camera/__tests__/EditorCameraController.test.ts',
+        'packages/script/__tests__/Determinism.test.ts',
         'packages/**/?(*.){integration,interaction,ui}.test.ts',
         'packages/**/?(*.){integration,interaction,ui}.spec.ts',
         'apps/**/?(*.){integration,interaction,ui}.test.ts',
@@ -334,6 +528,8 @@ export default defineWorkspace([
         ['**/*UI*.test.ts', 'jsdom'],
         ['**/*Dom*.test.ts', 'jsdom'],
         ['**/*Browser*.test.ts', 'jsdom'],
+        // World systems tests rely on DOM APIs
+        ['**/packages/world/src/**/*.test.ts', 'jsdom'],
         // Tests that use localStorage need jsdom
         ['**/*InventoryManager*.test.ts', 'jsdom'],
         ['**/*BlockEditor*.test.ts', 'jsdom'],
@@ -462,7 +658,7 @@ export default defineWorkspace([
           '@engine/net-protocol': resolve(__dirname, 'packages/net-protocol/src'),
           '@engine/net-protocol/*': resolve(__dirname, 'packages/net-protocol/src/*'),
         },
-        conditions: ['test', 'development', 'import', 'module'],
+        conditions: ['development', 'test', 'import', 'module'],
       },
       include: [
         'packages/**/?(*.)integration.test.ts',

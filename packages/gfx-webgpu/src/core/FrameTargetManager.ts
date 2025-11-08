@@ -9,6 +9,7 @@ export interface FrameTargetConfig {
   enableBloom: boolean;
   enableSSAO: boolean;
   enableFXAA: boolean;
+  enableOutlines?: boolean;
   sampleCount: number;
 }
 
@@ -63,6 +64,8 @@ export class FrameTargetManager {
     const enableBloom = config.enableBloom ?? ctx.featureFlags?.enableBloom !== false;
     const enableSSAO = config.enableSSAO ?? ctx.featureFlags?.enableSSAO !== false;
     const enableFXAA = config.enableFXAA ?? ctx.featureFlags?.enableFXAA === true;
+    const enableOutlines = config.enableOutlines ?? ctx.featureFlags?.enableOutlines === true;
+    const needsNormalTexture = enableSSAO || enableOutlines;
 
     const sizeChanged = this.size.width !== canvas.width || this.size.height !== canvas.height;
 
@@ -152,7 +155,7 @@ export class FrameTargetManager {
       this.releaseHdrResources();
     }
 
-    if (enableSSAO) {
+    if (needsNormalTexture) {
       if (!this.normalTexture || !this.sameSize(this.normalSize, this.size)) {
         this.queueDestroy(this.normalTexture);
         this.normalTexture = device.createTexture({
@@ -167,7 +170,11 @@ export class FrameTargetManager {
       } else if (!this.normalTextureView) {
         this.normalTextureView = this.normalTexture.createView();
       }
+    } else {
+      this.releaseNormalResources();
+    }
 
+    if (enableSSAO) {
       if (!this.ssaoTexture || !this.sameSize(this.ssaoSize, this.size)) {
         this.queueDestroy(this.ssaoTexture);
         this.ssaoTexture = device.createTexture({
@@ -233,7 +240,7 @@ export class FrameTargetManager {
       Logger.warn('Bloom requested without HDR; ignoring bloom target allocation.');
     }
 
-    const needsDepthStore = enableSSAO || Boolean(ctx.waterRenderer);
+    const needsDepthStore = enableSSAO || enableOutlines || Boolean(ctx.waterRenderer);
 
     return {
       msaaView: frameResources.msaaColorView,
@@ -284,8 +291,8 @@ export class FrameTargetManager {
 
   dispose(): void {
     this.releaseHdrResources();
+    this.releaseNormalResources();
     this.releaseSsaoResources();
-    this.queueDestroy(this.resolvedDepthTexture);
     this.queueDestroy(this.tonemapTexture);
     this.flushImmediate();
     this.resolvedDepthTexture = null;
@@ -326,18 +333,27 @@ export class FrameTargetManager {
     }
   }
 
-  private releaseSsaoResources(): void {
+  private releaseNormalResources(): void {
     if (this.normalTexture) {
       this.queueDestroy(this.normalTexture);
       this.normalTexture = null;
-      this.normalTextureView = null;
-      this.normalSize = null;
     }
+    this.normalTextureView = null;
+    this.normalSize = null;
+  }
+
+  private releaseSsaoResources(): void {
     if (this.ssaoTexture) {
       this.queueDestroy(this.ssaoTexture);
       this.ssaoTexture = null;
       this.ssaoTextureView = null;
       this.ssaoSize = null;
     }
+    if (this.resolvedDepthTexture) {
+      this.queueDestroy(this.resolvedDepthTexture);
+      this.resolvedDepthTexture = null;
+    }
+    this.resolvedDepthView = null;
+    this.resolvedDepthSize = null;
   }
 }

@@ -2,6 +2,35 @@ import { Component } from './Component.js';
 import { registerComponent } from './registry.js';
 import type { Vec3 } from '@engine/core/math';
 
+const LEGACY_SKY_COLORS: ReadonlyArray<readonly [number, number, number]> = [
+  [0.4, 0.6, 0.9],
+  [0.05, 0.08, 0.12],
+];
+
+const LEGACY_HORIZON_COLORS: ReadonlyArray<readonly [number, number, number]> = [
+  [0.8, 0.85, 0.9],
+  [0.15, 0.18, 0.22],
+];
+
+const LEGACY_GROUND_COLORS: ReadonlyArray<readonly [number, number, number]> = [
+  [0.3, 0.35, 0.4],
+  [0.05, 0.06, 0.08],
+];
+
+const LEGACY_SUN_COLORS: ReadonlyArray<readonly [number, number, number]> = [[1.0, 0.95, 0.8]];
+
+const LEGACY_SUN_INTENSITIES: ReadonlyArray<number> = [1.0];
+const LEGACY_AMBIENT_INTENSITIES: ReadonlyArray<number> = [0.6, 0.3];
+
+const NEW_DEFAULT_SKY_COLOR: readonly [number, number, number] = [0.2, 0.33, 0.62];
+const NEW_DEFAULT_HORIZON_COLOR: readonly [number, number, number] = [0.32, 0.45, 0.68];
+const NEW_DEFAULT_GROUND_COLOR: readonly [number, number, number] = [0.08, 0.1, 0.16];
+const NEW_DEFAULT_SUN_COLOR: readonly [number, number, number] = [1.05, 1.0, 0.9];
+const NEW_DEFAULT_SUN_INTENSITY = 1.1;
+const NEW_DEFAULT_AMBIENT_INTENSITY = 0.35;
+const DEFAULT_CLOUD_DENSITY = 0.55;
+const DEFAULT_CLOUD_SPEED = 0.04;
+
 // WebGPU types (available in browser/WebGPU environment)
 declare global {
   // eslint-disable-next-line @typescript-eslint/no-empty-object-type
@@ -17,6 +46,11 @@ export type SkyboxType = 'solid' | 'gradient' | 'procedural-sky' | 'cubemap';
  * Fog modes for distance-based atmosphere
  */
 export type FogMode = 'none' | 'linear' | 'exponential' | 'exponential-squared';
+
+/**
+ * Visual presets for environment rendering
+ */
+export type VisualPreset = 'stylized-balanced' | 'cinematic' | 'low';
 
 export interface EnvironmentComponentJSON {
   skyboxType?: SkyboxType;
@@ -34,6 +68,10 @@ export interface EnvironmentComponentJSON {
   ambientIntensity?: number;
   exposure?: number;
   enabled?: boolean;
+  cloudsEnabled?: boolean;
+  cloudDensity?: number;
+  cloudSpeed?: number;
+  visualPreset?: VisualPreset;
 }
 
 /**
@@ -47,22 +85,22 @@ export class EnvironmentComponent extends Component {
   skyboxType: SkyboxType = 'procedural-sky';
 
   /** Sky color (top) for gradient and procedural sky */
-  skyColor: Vec3 = [0.05, 0.08, 0.12];
+  skyColor: Vec3 = [...NEW_DEFAULT_SKY_COLOR] as Vec3;
 
   /** Horizon color for gradient and procedural sky */
-  horizonColor: Vec3 = [0.15, 0.18, 0.22];
+  horizonColor: Vec3 = [...NEW_DEFAULT_HORIZON_COLOR] as Vec3;
 
   /** Ground color (bottom) for gradient mode */
-  groundColor: Vec3 = [0.05, 0.06, 0.08];
+  groundColor: Vec3 = [...NEW_DEFAULT_GROUND_COLOR] as Vec3;
 
   /** Sun direction (normalized) for procedural sky */
   private _sunDirection: Vec3 = [0.3, 0.7, 0.5];
 
   /** Sun color for procedural sky */
-  sunColor: Vec3 = [1.0, 0.95, 0.8];
+  sunColor: Vec3 = [...NEW_DEFAULT_SUN_COLOR] as Vec3;
 
   /** Sun intensity multiplier */
-  private _sunIntensity: number = 1.0;
+  private _sunIntensity: number = NEW_DEFAULT_SUN_INTENSITY;
 
   /** Fog rendering mode */
   fogMode: FogMode = 'none';
@@ -80,13 +118,39 @@ export class EnvironmentComponent extends Component {
   fogDensity: number = 0.02;
 
   /** Ambient light intensity from environment */
-  private _ambientIntensity: number = 0.3;
+  private _ambientIntensity: number = NEW_DEFAULT_AMBIENT_INTENSITY;
 
   /** Exposure adjustment for HDR environments */
   private _exposure: number = 1.0;
 
   /** Whether environment rendering is enabled */
   enabled: boolean = true;
+
+  /** Whether clouds are enabled in procedural sky */
+  cloudsEnabled: boolean = true;
+
+  /** Cloud density (0.0 - 1.0) */
+  cloudDensity: number = DEFAULT_CLOUD_DENSITY;
+
+  /** Cloud animation speed */
+  cloudSpeed: number = DEFAULT_CLOUD_SPEED;
+
+  /** Visual preset for rendering quality/features */
+  private _visualPreset: VisualPreset | undefined;
+  get visualPreset(): VisualPreset | undefined {
+    return this._visualPreset;
+  }
+
+  set visualPreset(value: VisualPreset | undefined) {
+    if (value === undefined) {
+      this._visualPreset = undefined;
+      return;
+    }
+    if (value === 'stylized-balanced' || value === 'cinematic' || value === 'low') {
+      this._visualPreset = value;
+    }
+  }
+
 
   /** Cubemap texture resource (set by renderer, not serialized) */
   cubemapTexture?: GPUTexture;
@@ -216,6 +280,49 @@ export class EnvironmentComponent extends Component {
     }
   }
 
+  private upgradeLegacyDefaults(): void {
+    const approxEqual = (a: number, b: number) => Math.abs(a - b) < 0.0005;
+    const matchesColor = (value: Vec3, candidates: ReadonlyArray<readonly [number, number, number]>) =>
+      candidates.some((candidate) =>
+        approxEqual(value[0], candidate[0]) &&
+        approxEqual(value[1], candidate[1]) &&
+        approxEqual(value[2], candidate[2])
+      );
+
+    if (matchesColor(this.skyColor, LEGACY_SKY_COLORS)) {
+      this.skyColor = [...NEW_DEFAULT_SKY_COLOR] as Vec3;
+    }
+    if (matchesColor(this.horizonColor, LEGACY_HORIZON_COLORS)) {
+      this.horizonColor = [...NEW_DEFAULT_HORIZON_COLOR] as Vec3;
+    }
+    if (matchesColor(this.groundColor, LEGACY_GROUND_COLORS)) {
+      this.groundColor = [...NEW_DEFAULT_GROUND_COLOR] as Vec3;
+    }
+    if (matchesColor(this.sunColor, LEGACY_SUN_COLORS)) {
+      this.sunColor = [...NEW_DEFAULT_SUN_COLOR] as Vec3;
+    }
+    if (LEGACY_SUN_INTENSITIES.some((value) => approxEqual(this._sunIntensity, value))) {
+      this._sunIntensity = NEW_DEFAULT_SUN_INTENSITY;
+    }
+    if (LEGACY_AMBIENT_INTENSITIES.some((value) => approxEqual(this._ambientIntensity, value))) {
+      this._ambientIntensity = NEW_DEFAULT_AMBIENT_INTENSITY;
+    }
+    if (!Number.isFinite(this.cloudDensity)) {
+      this.cloudDensity = DEFAULT_CLOUD_DENSITY;
+    }
+    if (!Number.isFinite(this.cloudSpeed)) {
+      this.cloudSpeed = DEFAULT_CLOUD_SPEED;
+    }
+    if (
+      this._visualPreset !== undefined &&
+      this._visualPreset !== 'stylized-balanced' &&
+      this._visualPreset !== 'cinematic' &&
+      this._visualPreset !== 'low'
+    ) {
+      this._visualPreset = undefined;
+    }
+  }
+
   /**
    * Sets time of day (0-24 hours) and updates sun position accordingly
    */
@@ -236,20 +343,23 @@ export class EnvironmentComponent extends Component {
     // Adjust colors based on time of day
     if (hours < 6 || hours > 20) {
       // Night
-      this.skyColor = [0.01, 0.02, 0.05];
-      this.horizonColor = [0.05, 0.05, 0.1];
+      this.skyColor = [0.015, 0.035, 0.09];
+      this.horizonColor = [0.06, 0.08, 0.16];
+      this.sunColor = [0.4, 0.45, 0.6];
       this._sunIntensity = 0.0;
     } else if (hours < 8 || hours > 18) {
       // Dawn/Dusk
       const t = hours < 8 ? (hours - 6) / 2 : (20 - hours) / 2;
-      this.skyColor = [0.4 * t, 0.3 * t, 0.5 * t];
-      this.horizonColor = [1.0, 0.5 + 0.3 * t, 0.3 + 0.5 * t];
-      this._sunIntensity = t * 0.8;
+      this.skyColor = [0.06 + 0.18 * t, 0.1 + 0.24 * t, 0.22 + 0.42 * t];
+      this.horizonColor = [0.28 + 0.44 * t, 0.2 + 0.4 * t, 0.2 + 0.42 * t];
+      this.sunColor = [1.25, 0.65 + 0.35 * t, 0.4 + 0.5 * t];
+      this._sunIntensity = t * 1.1;
     } else {
       // Day
-      this.skyColor = [0.1, 0.15, 0.2];
-      this.horizonColor = [0.2, 0.25, 0.3];
-      this._sunIntensity = 1.0;
+      this.skyColor = [0.2, 0.33, 0.62];
+      this.horizonColor = [0.32, 0.45, 0.68];
+      this.sunColor = [1.05, 1.0, 0.9];
+      this._sunIntensity = 1.1;
     }
   }
 
@@ -270,11 +380,15 @@ export class EnvironmentComponent extends Component {
     clone._ambientIntensity = this._ambientIntensity;
     clone._exposure = this._exposure;
     clone.enabled = this.enabled;
+    clone.cloudsEnabled = this.cloudsEnabled;
+    clone.cloudDensity = this.cloudDensity;
+    clone.cloudSpeed = this.cloudSpeed;
+    clone._visualPreset = this._visualPreset;
     return clone;
   }
 
   override toJSON(): EnvironmentComponentJSON {
-    return {
+    const json: EnvironmentComponentJSON = {
       skyboxType: this.skyboxType,
       skyColor: [...this.skyColor] as Vec3,
       horizonColor: [...this.horizonColor] as Vec3,
@@ -290,7 +404,16 @@ export class EnvironmentComponent extends Component {
       ambientIntensity: this.ambientIntensity,
       exposure: this.exposure,
       enabled: this.enabled,
+      cloudsEnabled: this.cloudsEnabled,
+      cloudDensity: this.cloudDensity,
+      cloudSpeed: this.cloudSpeed,
     };
+
+    if (this._visualPreset !== undefined) {
+      json.visualPreset = this._visualPreset;
+    }
+
+    return json;
   }
 
   fromJSON(data: EnvironmentComponentJSON): void {
@@ -323,6 +446,20 @@ export class EnvironmentComponent extends Component {
     if (typeof data.exposure === 'number' && data.exposure > 0)
       this._exposure = Math.min(10, data.exposure);
     if (typeof data.enabled === 'boolean') this.enabled = data.enabled;
+    if (typeof data.cloudsEnabled === 'boolean') this.cloudsEnabled = data.cloudsEnabled;
+    if (typeof data.cloudDensity === 'number')
+      this.cloudDensity = Math.max(0, Math.min(1, data.cloudDensity));
+    if (typeof data.cloudSpeed === 'number')
+      this.cloudSpeed = Math.max(0, Math.min(1, data.cloudSpeed));
+    if (
+      data.visualPreset === 'stylized-balanced' ||
+      data.visualPreset === 'cinematic' ||
+      data.visualPreset === 'low'
+    ) {
+      this.visualPreset = data.visualPreset;
+    }
+
+    this.upgradeLegacyDefaults();
   }
 }
 

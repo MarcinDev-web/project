@@ -1,0 +1,1 @@
+{"version":3,"file":"Swarm.d.ts","sourceRoot":"","sources":["../../src/bots/Swarm.ts"],"names":[],"mappings":"AAAA,MAAM,WAAW,SAAS;IACxB,KAAK,EAAE,MAAM,CAAC;CACf;AAED,qBAAa,QAAQ;IACP,OAAO,CAAC,QAAQ,CAAC,MAAM;gBAAN,MAAM,EAAE,SAAS;IAC9C,KAAK,IAAI,IAAI;CAMd"}
