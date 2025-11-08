@@ -14,7 +14,7 @@
     "build": "pnpm -r build",
     "dev": "pnpm --filter @apps/editor dev",
     "test": "pnpm -r test",
-    "lint": "pnpm -r lint",
+    "lint": "pnpm --filter '!@engine/test-utils' -r lint",
     "clean": "pnpm -r clean && rm -rf node_modules",
     "build:wasm": "wasm-pack build crates/collision --target bundler --out-dir ../../packages/wasm-collision/pkg",
     "dev:editor": "pnpm --filter @apps/editor dev",

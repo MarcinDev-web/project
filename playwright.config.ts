@@ -18,10 +18,9 @@ export default defineConfig({
   snapshotPathTemplate: '{testDir}/{testFile}-snapshots/{arg}{ext}',
   projects: [
     {
-      name: 'chrome',
+      name: 'chromium',
       use: {
-        // Use system Chrome channel to ensure DXC/DXIL availability on Windows
-        channel: 'chrome',
+        browserName: 'chromium',
         headless: true,
         launchOptions: {
           args: ['--enable-unsafe-webgpu'],

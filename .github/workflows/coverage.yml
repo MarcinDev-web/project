@@ -39,7 +39,7 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          files: ./coverage/coverage-final.json,./coverage-integration/coverage-final.json
+          files: ./coverage/unit/coverage-final.json,./coverage/integration/coverage-final.json
           token: ${{ secrets.CODECOV_TOKEN }}
           fail_ci_if_error: false
           verbose: true
@@ -49,10 +49,10 @@ jobs:
           echo "## 📊 Coverage Report" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Unit Tests" >> $GITHUB_STEP_SUMMARY
-          cat coverage/coverage-summary.json | jq -r '.total | "- **Lines**: \(.lines.pct)%\n- **Statements**: \(.statements.pct)%\n- **Functions**: \(.functions.pct)%\n- **Branches**: \(.branches.pct)%"' >> $GITHUB_STEP_SUMMARY
+          cat coverage/unit/coverage-summary.json | jq -r '.total | "- **Lines**: \(.lines.pct)%\n- **Statements**: \(.statements.pct)%\n- **Functions**: \(.functions.pct)%\n- **Branches**: \(.branches.pct)%"' >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           echo "### Integration Tests" >> $GITHUB_STEP_SUMMARY
-          cat coverage-integration/coverage-summary.json | jq -r '.total | "- **Lines**: \(.lines.pct)%\n- **Statements**: \(.statements.pct)%\n- **Functions**: \(.functions.pct)%\n- **Branches**: \(.branches.pct)%"' >> $GITHUB_STEP_SUMMARY
+          cat coverage/integration/coverage-summary.json | jq -r '.total | "- **Lines**: \(.lines.pct)%\n- **Statements**: \(.statements.pct)%\n- **Functions**: \(.functions.pct)%\n- **Branches**: \(.branches.pct)%"' >> $GITHUB_STEP_SUMMARY
 
       - name: Comment PR with coverage
         uses: davelosert/vitest-coverage-report-action@v2
