@@ -11,7 +11,8 @@
   "scripts": {
     "prebuild": "node -e \"console.log('Warning: Skipping wasm-pack installation, will use pre-built WASM files')\"",
     "postinstall": "node -e \"\"",
-    "build": "pnpm -r build",
+    "build": "pnpm -w --filter @engine/core build && pnpm -w --filter @engine/world build && pnpm -w --filter \"@apps/net-server...\" --filter \"!@engine/test-utils\" --filter \"!@engine/gateway\" --filter \"!@engine/script\" --filter \"!@engine/camera\" --filter \"!@engine/editor-utils\" build",
+    "build:all": "pnpm -r build",
     "dev": "pnpm --filter @apps/editor dev",
     "test": "pnpm -r test",
     "lint": "pnpm --filter '!@engine/test-utils' -r lint",
