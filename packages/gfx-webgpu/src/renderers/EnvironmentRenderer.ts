@@ -154,7 +154,67 @@ fn atmosphericScattering(viewDir: vec3f, sunDir: vec3f, skyColor: vec3f, horizon
 `;
 
 /**
- * Procedural sky fragment shader with atmospheric scattering approximation
+ * Simple 2D noise function for clouds
+ */
+const CLOUD_NOISE_FUNCTION = /* wgsl */ `
+// Simple hash function for pseudo-random values
+fn hash(p: vec2<f32>) -> f32 {
+  var p2 = fract(p * vec2<f32>(233.34, 441.33));
+  let d = dot(p2, p2 + vec2<f32>(23.45, 23.45));
+  p2 = p2 + vec2<f32>(d, d);
+  return fract(p2.x * p2.y);
+}
+
+// 2D noise function
+fn noise(p: vec2<f32>) -> f32 {
+  let i = floor(p);
+  var f = fract(p);
+  f = f * f * (3.0 - 2.0 * f);
+  
+  let a = hash(i);
+  let b = hash(i + vec2<f32>(1.0, 0.0));
+  let c = hash(i + vec2<f32>(0.0, 1.0));
+  let d = hash(i + vec2<f32>(1.0, 1.0));
+  
+  return mix(mix(a, b, f.x), mix(c, d, f.x), f.y);
+}
+
+// Fractal noise for cloud-like patterns
+fn fbm(p: vec2<f32>) -> f32 {
+  var value = 0.0;
+  var amplitude = 0.5;
+  var frequency = 1.0;
+  
+  for (var i = 0u; i < 4u; i++) {
+    value += amplitude * noise(p * frequency);
+    frequency *= 2.0;
+    amplitude *= 0.5;
+  }
+  
+  return value;
+}
+
+// Generate cloud coverage based on view direction
+fn generateClouds(viewDir: vec3<f32>, cloudDensity: f32, cloudSpeed: f32, time: f32) -> f32 {
+  // Project view direction onto horizontal plane for UV
+  let uv = vec2<f32>(viewDir.xz) * 0.5 + 0.5;
+  
+  // Animate clouds
+  let animatedUV = uv + vec2<f32>(time * cloudSpeed, time * cloudSpeed * 0.7);
+  
+  // Generate cloud pattern (higher elevation = more clouds)
+  let elevationFactor = pow(max(viewDir.y, 0.0), 0.65);
+  var cloudPattern = clamp(fbm(animatedUV * 2.0) * 1.1, 0.0, 1.0);
+  
+  // Combine with density and elevation
+  let cloudCoverage = cloudPattern * cloudDensity * elevationFactor;
+  
+  return smoothstep(0.2, 0.65, cloudCoverage);
+}
+`;
+
+/**
+ * Procedural sky fragment shader with atmospheric scattering approximation and clouds
  */
 const SKYBOX_PROCEDURAL_FRAGMENT_SHADER = /* wgsl */ `
 struct FragmentInput {
@@ -170,18 +230,32 @@ struct SkyboxParams {
   _pad2: f32,
   sunColor: vec3f,
   sunIntensity: f32,
+  cloudsEnabled: f32,
+  cloudDensity: f32,
+  cloudSpeed: f32,
+  cloudTime: f32,
 }
 
 @group(1) @binding(0) var<uniform> params: SkyboxParams;
 
 ${ATMOSPHERIC_SCATTERING_FUNCTION}
+${CLOUD_NOISE_FUNCTION}
 
 @fragment
 fn fragmentMain(input: FragmentInput) -> @location(0) vec4f {
   let viewDir = normalize(input.viewDirection);
   let sunDir = normalize(params.sunDirection);
   
-  let color = atmosphericScattering(viewDir, sunDir, params.skyColor, params.horizonColor, params.sunColor, params.sunIntensity);
+  var color = atmosphericScattering(viewDir, sunDir, params.skyColor, params.horizonColor, params.sunColor, params.sunIntensity);
+  
+  // Add clouds if enabled
+  if (params.cloudsEnabled > 0.5) {
+    let cloudCoverage = generateClouds(viewDir, params.cloudDensity, params.cloudSpeed, params.cloudTime);
+    // Cloud color (slightly brighter than sky, with sun influence)
+    let cloudColor = mix(color * 1.1, params.sunColor * params.sunIntensity * 0.4 + color * 1.3, 0.55);
+    // Blend clouds with sky
+    color = mix(color, cloudColor, cloudCoverage * 0.85);
+  }
   
   return vec4f(color, 1.0);
 }
@@ -225,9 +299,12 @@ export class EnvironmentRenderer {
   private paramsDirty = false;
   // Pipeline descriptor cache (for faster re-initialization)
   private pipelineDescriptorsCache: Map<string, GPURenderPipelineDescriptor> = new Map();
+  // Cloud animation time
+  private cloudTimeStart: number = 0;
 
   constructor() {
     this.device = null!; // Will be set in initialize
+    this.cloudTimeStart = performance.now() / 1000.0; // Start time in seconds
   }
 
   /**
@@ -304,10 +381,10 @@ export class EnvironmentRenderer {
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
-    // Params buffer: varies by skybox type, max 112 bytes (7 vec4s for procedural sky)
+    // Params buffer: varies by skybox type, max 128 bytes (8 vec4s for procedural sky with clouds)
     this.paramsBuffer = this.device.createBuffer({
       label: 'environment-params-buffer',
-      size: 112,
+      size: 128,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
 
@@ -453,6 +530,9 @@ export class EnvironmentRenderer {
       `${environment.sunDirection[0]},${environment.sunDirection[1]},${environment.sunDirection[2]}`,
       `${environment.sunColor[0]},${environment.sunColor[1]},${environment.sunColor[2]}`,
       `${environment.sunIntensity}`,
+      `${environment.cloudsEnabled ? 1 : 0}`,
+      `${environment.cloudDensity}`,
+      `${environment.cloudSpeed}`,
     ];
     return parts.join('|');
   }
@@ -531,7 +611,7 @@ export class EnvironmentRenderer {
     this.paramsDirty = true;
 
     const type = environment.skyboxType;
-    const data = new Float32Array(28); // 112 bytes max
+    const data = new Float32Array(32); // 128 bytes max (8 vec4s)
     let offset = 0;
 
     switch (type) {
@@ -593,6 +673,12 @@ export class EnvironmentRenderer {
         data[offset++] = sunColor[1];
         data[offset++] = sunColor[2];
         data[offset++] = sunIntensity;
+        // Cloud parameters (cloudsEnabled, cloudDensity, cloudSpeed, cloudTime)
+        const cloudTime = (performance.now() / 1000.0) - this.cloudTimeStart;
+        data[offset++] = environment.cloudsEnabled ? 1.0 : 0.0;
+        data[offset++] = Math.max(0, Math.min(1, environment.cloudDensity));
+        data[offset++] = Math.max(0, Math.min(1, environment.cloudSpeed));
+        data[offset++] = cloudTime;
         break;
       }
 
@@ -1150,7 +1236,7 @@ struct VSOut { @builtin(position) pos: vec4f, @location(0) uv: vec2f };
 @vertex fn vs(@builtin(vertex_index) vid:u32)->VSOut{
   var o:VSOut; let x=f32((vid<<1u)&2u); let y=f32(vid&2u); o.pos=vec4f(x*2.0-1.0, y*-2.0+1.0, 0.0, 1.0); o.uv=vec2f(x,y); return o;
 }
-struct SkyboxParams { skyColor: vec3f, _p0:f32, horizonColor: vec3f, _p1:f32, sunDirection: vec3f, _p2:f32, sunColor: vec3f, sunIntensity: f32 };
+struct SkyboxParams { skyColor: vec3f, _p0:f32, horizonColor: vec3f, _p1:f32, sunDirection: vec3f, _p2:f32, sunColor: vec3f, sunIntensity: f32, cloudsEnabled: f32, cloudDensity: f32, cloudSpeed: f32, cloudTime: f32 };
 @group(0) @binding(0) var<uniform> params: SkyboxParams;
 struct FaceInfo { faceIndex: u32, _pad: vec3<u32> };
 @group(1) @binding(0) var<uniform> face: FaceInfo;
@@ -1168,10 +1254,19 @@ fn faceUVToDir(faceIndex:u32, uv: vec2<f32>) -> vec3<f32> {
 }
 
 ${ATMOSPHERIC_SCATTERING_FUNCTION}
+${CLOUD_NOISE_FUNCTION}
 
 @fragment fn fs(@location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
   let dir = faceUVToDir(face.faceIndex, uv);
-  let color = atmosphericScattering(normalize(dir), normalize(params.sunDirection), params.skyColor, params.horizonColor, params.sunColor, params.sunIntensity);
+  var color = atmosphericScattering(normalize(dir), normalize(params.sunDirection), params.skyColor, params.horizonColor, params.sunColor, params.sunIntensity);
+  
+  // Add clouds if enabled
+  if (params.cloudsEnabled > 0.5) {
+    let cloudCoverage = generateClouds(normalize(dir), params.cloudDensity, params.cloudSpeed, params.cloudTime);
+    let cloudColor = mix(color * 1.1, params.sunColor * params.sunIntensity * 0.4 + color * 1.3, 0.55);
+    color = mix(color, cloudColor, cloudCoverage * 0.85);
+  }
+  
   return vec4<f32>(color, 1.0);
 }
 `,
@@ -1193,6 +1288,17 @@ ${ATMOSPHERIC_SCATTERING_FUNCTION}
     // Face uniform buffer (32 bytes to satisfy uniform binding padding requirements)
     const faceBuffer = this.device.createBuffer({ label: 'ibl-face-ubo', size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     const faceLayout = (pipeline.getBindGroupLayout(1));
+
+    // Write cloud params with time=0 for static IBL capture
+    if (environment.skyboxType === 'procedural-sky') {
+      const cloudParamsData = new Float32Array(4);
+      cloudParamsData[0] = environment.cloudsEnabled ? 1.0 : 0.0;
+      cloudParamsData[1] = Math.max(0, Math.min(1, environment.cloudDensity));
+      cloudParamsData[2] = Math.max(0, Math.min(1, environment.cloudSpeed));
+      cloudParamsData[3] = 0.0; // Static time for IBL
+      // Write to params buffer at offset 24 (after sunColor + sunIntensity)
+      this.device.queue.writeBuffer(this.paramsBuffer, 24 * 4, cloudParamsData.buffer, cloudParamsData.byteOffset, cloudParamsData.byteLength);
+    }
 
     for (let face = 0; face < 6; face++) {
       const view = this.envCube.createView({ baseArrayLayer: face, arrayLayerCount: 1 });

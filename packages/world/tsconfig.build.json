@@ -1,0 +1,21 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "moduleResolution": "bundler",
+    "module": "ESNext",
+    "paths": {
+      "@engine/animation": ["../animation/src"],
+      "@engine/animation/*": ["../animation/src/*"]
+    }
+  },
+  "references": [
+    { "path": "../core/tsconfig.build.json" },
+    { "path": "../animation" },
+    { "path": "../blocks" },
+    { "path": "../economy" }
+    // Note: script is excluded here to handle circular dependency
+    // Script is built separately before world, then world is rebuilt with script reference
+  ]
+}
+

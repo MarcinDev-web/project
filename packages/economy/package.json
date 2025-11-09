@@ -6,8 +6,18 @@
   "main": "./dist/src/index.js",
   "types": "./dist/src/index.d.ts",
   "exports": {
-    ".": "./dist/src/index.js",
-    "./examples": "./dist/src/examples/CurrencySystemExample.js"
+    ".": {
+      "import": "./dist/src/index.js",
+      "development": "./src/index.ts",
+      "test": "./src/index.ts",
+      "default": "./dist/src/index.js"
+    },
+    "./examples": {
+      "import": "./dist/src/examples/CurrencySystemExample.js",
+      "development": "./src/examples/CurrencySystemExample.ts",
+      "test": "./src/examples/CurrencySystemExample.ts",
+      "default": "./dist/src/examples/CurrencySystemExample.js"
+    }
   },
   "scripts": {
     "build": "tsc -b",

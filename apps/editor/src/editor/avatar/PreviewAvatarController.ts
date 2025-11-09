@@ -45,6 +45,18 @@ export class PreviewAvatarController {
     const move = inputState.moveDirection;
     const hasMovement = Math.abs(move[0]) > 1e-3 || Math.abs(move[2]) > 1e-3;
 
+    // Update animations based on movement state
+    if (hasMovement) {
+      // Use walk for normal movement, run for sprint
+      if (inputState.sprint) {
+        this.avatar.playRunAnimation();
+      } else {
+        this.avatar.playWalkAnimation();
+      }
+    } else {
+      this.avatar.playIdleAnimation();
+    }
+
     if (!hasMovement) {
       if (params.mode === 'fps') {
         return { yaw: params.cameraYaw };

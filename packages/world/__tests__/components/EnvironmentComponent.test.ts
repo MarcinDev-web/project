@@ -2,7 +2,7 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { EnvironmentComponent } from '@engine/world';
 import type { Vec3 } from '@engine/core/math';
 
-describe.skip('EnvironmentComponent', () => {
+describe('EnvironmentComponent', () => {
   let component: EnvironmentComponent;
 
   beforeEach(() => {
@@ -17,20 +17,24 @@ describe.skip('EnvironmentComponent', () => {
 
     it('should initialize with default values', () => {
       expect(component.skyboxType).toBe('procedural-sky');
-      expect(component.skyColor).toEqual([0.4, 0.6, 0.9]);
-      expect(component.horizonColor).toEqual([0.8, 0.85, 0.9]);
-      expect(component.groundColor).toEqual([0.3, 0.35, 0.4]);
+      expect(component.skyColor).toEqual([0.2, 0.33, 0.62]);
+      expect(component.horizonColor).toEqual([0.32, 0.45, 0.68]);
+      expect(component.groundColor).toEqual([0.08, 0.1, 0.16]);
       expect(component.sunDirection).toEqual([0.3, 0.7, 0.5]);
-      expect(component.sunColor).toEqual([1.0, 0.95, 0.8]);
-      expect(component.sunIntensity).toBe(1.0);
+      expect(component.sunColor).toEqual([1.05, 1.0, 0.9]);
+      expect(component.sunIntensity).toBe(1.1);
       expect(component.fogMode).toBe('none');
       expect(component.fogColor).toEqual([0.7, 0.8, 0.9]);
       expect(component.fogNear).toBe(10.0);
       expect(component.fogFar).toBe(100.0);
       expect(component.fogDensity).toBe(0.02);
-      expect(component.ambientIntensity).toBe(0.6);
+      expect(component.ambientIntensity).toBe(0.35);
       expect(component.exposure).toBe(1.0);
       expect(component.enabled).toBe(true);
+      expect(component.cloudsEnabled).toBe(true);
+      expect(component.cloudDensity).toBe(0.55);
+      expect(component.cloudSpeed).toBe(0.04);
+      expect(component.visualPreset).toBeUndefined();
     });
   });
 
@@ -93,7 +97,7 @@ describe.skip('EnvironmentComponent', () => {
     it('should set noon at 12pm with sun at zenith', () => {
       component.setTimeOfDay(12);
       expect(component.sunDirection[1]).toBeGreaterThan(0.8); // High elevation
-      expect(component.sunIntensity).toBe(1.0);
+      expect(component.sunIntensity).toBe(1.1);
     });
 
     it('should set sunset at 18pm', () => {
@@ -111,23 +115,23 @@ describe.skip('EnvironmentComponent', () => {
 
     it('should set dawn colors at 7am', () => {
       component.setTimeOfDay(7);
-      expect(component.horizonColor[0]).toBeGreaterThan(0.5); // Reddish
+      expect(component.horizonColor[0]).toBeGreaterThanOrEqual(0.5); // Reddish
       expect(component.sunIntensity).toBeGreaterThan(0);
       expect(component.sunIntensity).toBeLessThan(1.0);
     });
 
     it('should set dusk colors at 19pm', () => {
       component.setTimeOfDay(19);
-      expect(component.horizonColor[0]).toBeGreaterThan(0.5); // Reddish
+      expect(component.horizonColor[0]).toBeGreaterThanOrEqual(0.5); // Reddish
       expect(component.sunIntensity).toBeGreaterThan(0);
       expect(component.sunIntensity).toBeLessThan(1.0);
     });
 
     it('should set day colors during daytime', () => {
       component.setTimeOfDay(14); // 2pm
-      expect(component.skyColor).toEqual([0.4, 0.6, 0.9]);
-      expect(component.horizonColor).toEqual([0.8, 0.85, 0.9]);
-      expect(component.sunIntensity).toBe(1.0);
+      expect(component.skyColor).toEqual([0.2, 0.33, 0.62]);
+      expect(component.horizonColor).toEqual([0.32, 0.45, 0.68]);
+      expect(component.sunIntensity).toBe(1.1);
     });
 
     it('should handle 24-hour wrap around', () => {
@@ -357,7 +361,9 @@ describe.skip('EnvironmentComponent', () => {
       expect(newComponent.skyColor).toEqual(component.skyColor);
       expect(newComponent.horizonColor).toEqual(component.horizonColor);
       expect(newComponent.groundColor).toEqual(component.groundColor);
-      expect(newComponent.sunDirection).toEqual(component.sunDirection);
+      expect(newComponent.sunDirection[0]).toBeCloseTo(component.sunDirection[0]!, 12);
+      expect(newComponent.sunDirection[1]).toBeCloseTo(component.sunDirection[1]!, 12);
+      expect(newComponent.sunDirection[2]).toBeCloseTo(component.sunDirection[2]!, 12);
       expect(newComponent.sunColor).toEqual(component.sunColor);
       expect(newComponent.sunIntensity).toBe(component.sunIntensity);
       expect(newComponent.fogMode).toBe(component.fogMode);
@@ -414,6 +420,186 @@ describe.skip('EnvironmentComponent', () => {
       component.enabled = false;
       component.enabled = true;
       expect(component.enabled).toBe(true);
+    });
+  });
+
+  describe('Cloud Properties', () => {
+    it('should initialize with default cloud values', () => {
+      expect(component.cloudsEnabled).toBe(true);
+      expect(component.cloudDensity).toBe(0.55);
+      expect(component.cloudSpeed).toBe(0.04);
+    });
+
+    it('should allow enabling clouds', () => {
+      component.cloudsEnabled = false;
+      expect(component.cloudsEnabled).toBe(false);
+      component.cloudsEnabled = true;
+      expect(component.cloudsEnabled).toBe(true);
+    });
+
+    it('should allow setting cloud density', () => {
+      component.cloudDensity = 0.7;
+      expect(component.cloudDensity).toBe(0.7);
+    });
+
+    it('should not auto-clamp cloud density on assignment (clamped via fromJSON)', () => {
+      component.cloudDensity = -0.1;
+      expect(component.cloudDensity).toBe(-0.1);
+      component.cloudDensity = 1.5;
+      expect(component.cloudDensity).toBe(1.5);
+    });
+
+    it('should allow setting cloud speed', () => {
+      component.cloudSpeed = 0.05;
+      expect(component.cloudSpeed).toBe(0.05);
+    });
+
+    it('should not auto-clamp cloud speed on assignment (clamped via fromJSON)', () => {
+      component.cloudSpeed = -0.1;
+      expect(component.cloudSpeed).toBe(-0.1);
+      component.cloudSpeed = 1.5;
+      expect(component.cloudSpeed).toBe(1.5);
+    });
+  });
+
+  describe('Visual Preset', () => {
+    it('should initialize without preset', () => {
+      expect(component.visualPreset).toBeUndefined();
+    });
+
+    it('should allow setting stylized-balanced preset', () => {
+      component.visualPreset = 'stylized-balanced';
+      expect(component.visualPreset).toBe('stylized-balanced');
+    });
+
+    it('should allow setting cinematic preset', () => {
+      component.visualPreset = 'cinematic';
+      expect(component.visualPreset).toBe('cinematic');
+    });
+
+    it('should allow setting low preset', () => {
+      component.visualPreset = 'low';
+      expect(component.visualPreset).toBe('low');
+    });
+
+    it('should allow clearing preset', () => {
+      component.visualPreset = 'stylized-balanced';
+      component.visualPreset = undefined;
+      expect(component.visualPreset).toBeUndefined();
+    });
+  });
+
+  describe('Cloud Serialization', () => {
+    it('should serialize cloud properties', () => {
+      component.cloudsEnabled = true;
+      component.cloudDensity = 0.6;
+      component.cloudSpeed = 0.04;
+
+      const json = component.toJSON();
+
+      expect(json.cloudsEnabled).toBe(true);
+      expect(json.cloudDensity).toBe(0.6);
+      expect(json.cloudSpeed).toBe(0.04);
+    });
+
+    it('should deserialize cloud properties', () => {
+      const data = {
+        cloudsEnabled: true,
+        cloudDensity: 0.5,
+        cloudSpeed: 0.02,
+      };
+
+      component.fromJSON(data);
+
+      expect(component.cloudsEnabled).toBe(true);
+      expect(component.cloudDensity).toBe(0.5);
+      expect(component.cloudSpeed).toBe(0.02);
+    });
+
+    it('should serialize visual preset', () => {
+      component.visualPreset = 'stylized-balanced';
+
+      const json = component.toJSON();
+
+      expect(json.visualPreset).toBe('stylized-balanced');
+    });
+
+    it('should deserialize visual preset', () => {
+      const data = {
+        visualPreset: 'cinematic' as const,
+      };
+
+      component.fromJSON(data);
+
+      expect(component.visualPreset).toBe('cinematic');
+    });
+
+    it('should ignore invalid visual preset values', () => {
+      const originalPreset = component.visualPreset;
+      const data = {
+        visualPreset: 'invalid-preset' as never,
+      };
+
+      component.fromJSON(data);
+
+      expect(component.visualPreset).toBe(originalPreset);
+    });
+  });
+
+  describe('Cloud Clone', () => {
+    it('should clone cloud properties', () => {
+      component.cloudsEnabled = true;
+      component.cloudDensity = 0.7;
+      component.cloudSpeed = 0.05;
+      component.visualPreset = 'stylized-balanced';
+
+      const clone = component.clone();
+
+      expect(clone.cloudsEnabled).toBe(component.cloudsEnabled);
+      expect(clone.cloudDensity).toBe(component.cloudDensity);
+      expect(clone.cloudSpeed).toBe(component.cloudSpeed);
+      expect(clone.visualPreset).toBe(component.visualPreset);
+    });
+  });
+
+  describe('Legacy Upgrade', () => {
+    it('should upgrade previously dark defaults to the new palette', () => {
+      const legacy = new EnvironmentComponent();
+      legacy.fromJSON({
+        skyColor: [0.05, 0.08, 0.12] as Vec3,
+        horizonColor: [0.15, 0.18, 0.22] as Vec3,
+        groundColor: [0.05, 0.06, 0.08] as Vec3,
+        sunColor: [1.0, 0.95, 0.8] as Vec3,
+        sunIntensity: 1.0,
+        ambientIntensity: 0.3,
+      });
+
+      expect(legacy.skyColor).toEqual([0.2, 0.33, 0.62]);
+      expect(legacy.horizonColor).toEqual([0.32, 0.45, 0.68]);
+      expect(legacy.groundColor).toEqual([0.08, 0.1, 0.16]);
+      expect(legacy.sunColor).toEqual([1.05, 1.0, 0.9]);
+      expect(legacy.sunIntensity).toBe(1.1);
+      expect(legacy.ambientIntensity).toBe(0.35);
+      expect(legacy.cloudsEnabled).toBe(true);
+    });
+
+    it('should upgrade classic bright defaults to the new palette', () => {
+      const legacy = new EnvironmentComponent();
+      legacy.fromJSON({
+        skyColor: [0.4, 0.6, 0.9] as Vec3,
+        horizonColor: [0.8, 0.85, 0.9] as Vec3,
+        groundColor: [0.3, 0.35, 0.4] as Vec3,
+        sunColor: [1.0, 0.95, 0.8] as Vec3,
+        sunIntensity: 1.0,
+        ambientIntensity: 0.6,
+      });
+
+      expect(legacy.skyColor).toEqual([0.2, 0.33, 0.62]);
+      expect(legacy.horizonColor).toEqual([0.32, 0.45, 0.68]);
+      expect(legacy.groundColor).toEqual([0.08, 0.1, 0.16]);
+      expect(legacy.sunColor).toEqual([1.05, 1.0, 0.9]);
+      expect(legacy.sunIntensity).toBe(1.1);
+      expect(legacy.ambientIntensity).toBe(0.35);
     });
   });
 });

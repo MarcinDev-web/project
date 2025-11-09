@@ -248,7 +248,8 @@ export class KeyboardHandler {
 
     this.registerCommand('e', {
       shortcut: 'e',
-      canExecute: () => state.cameraMode.value !== 'free-fly',
+      preventDefault: true,
+      canExecute: () => true,
       execute: async () => {
         if (placementMode?.isActive()) {
           await placementMode.rotatePreview(1);
@@ -350,7 +351,7 @@ export class KeyboardHandler {
     this.registerCommand('q', {
       shortcut: 'q',
       preventDefault: true,
-      canExecute: () => !!placementMode?.isActive() && state.cameraMode.value !== 'free-fly',
+      canExecute: () => !!placementMode?.isActive(),
       execute: async () => {
         await placementMode?.rotatePreview(-1);
         this.options.statusEl.textContent = 'Rotated CCW';

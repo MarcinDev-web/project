@@ -61,6 +61,15 @@ export class CollaborationManager {
   private onPlayModeRequestedHandlers: Array<(fromUser: PublicUser, requestId: string) => void> = [];
   private onPlayModeStartedHandlers: Array<() => void> = [];
 
+  // UI follow handlers
+  private onFollowUserHandler: ((userId: string) => void) | null = null;
+  private onStopFollowHandler: (() => void) | null = null;
+
+  // Presenter mode state and handlers
+  private presenterUserId: string | null = null;
+  private onPresenterChangedHandlers: Array<(userId: string | null) => void> = [];
+  private onTogglePresenterHandler: ((active: boolean) => void) | null = null;
+
   constructor(config: CollaborationManagerConfig) {
     this.config = config;
   }
@@ -82,12 +91,32 @@ export class CollaborationManager {
       onStopSession: () => {
         this.stopCollaboration();
       },
+      onFollowUser: (userId) => this.onFollowUserHandler?.(userId),
+      onStopFollow: () => this.onStopFollowHandler?.(),
+      onTogglePresenter: (active) => this.onTogglePresenterHandler?.(active),
     });
 
     // Create conflict resolver
     this.conflictResolver = new ConflictResolver({
       strategy: ConflictResolutionStrategy.LastWriteWins,
       enableLogging: true,
+    });
+
+    // Track presenter via player-update state
+    this.replicationClient.onPlayerUpdate((message) => {
+      const state = (message as any).state as Record<string, unknown> | undefined;
+      if (!state || typeof state.presenter !== 'boolean') return;
+      const sender = (message as any).userId as string | undefined;
+      const playerId = (message as any).playerId as string | undefined;
+      const userId = sender || playerId || null;
+      if (!userId) return;
+      if (state.presenter === true) {
+        this.setPresenterInternal(userId);
+      } else {
+        if (this.presenterUserId === userId) {
+          this.setPresenterInternal(null);
+        }
+      }
     });
   }
 
@@ -466,6 +495,81 @@ export class CollaborationManager {
     this.conflictResolver = null;
     this.onPlayModeRequestedHandlers = [];
     this.onPlayModeStartedHandlers = [];
+  }
+
+  /** Wire follow/stop-follow actions from UI */
+  setFollowHandlers(onFollowUser: (userId: string) => void, onStopFollow: () => void): void {
+    this.onFollowUserHandler = onFollowUser;
+    this.onStopFollowHandler = onStopFollow;
+  }
+
+  /** Update panel with current following state */
+  setFollowingUser(userId: string | null): void {
+    this.collaborationPanel?.setFollowing(userId);
+  }
+
+  // ===== Presenter Mode API =====
+  enablePresenterMode(): void {
+    if (!this.isActive || !this.replicationClient) return;
+    const localId = this.replicationClient.getLocalUserId();
+    if (!localId) return;
+    this.sendPresenterState(true, localId);
+    this.setPresenterInternal(localId);
+  }
+
+  disablePresenterMode(): void {
+    if (!this.isActive || !this.replicationClient) return;
+    const localId = this.replicationClient.getLocalUserId();
+    if (!localId) return;
+    this.sendPresenterState(false, localId);
+    if (this.presenterUserId === localId) {
+      this.setPresenterInternal(null);
+    }
+  }
+
+  onPresenterChanged(callback: (userId: string | null) => void): () => void {
+    this.onPresenterChangedHandlers.push(callback);
+    return () => {
+      const idx = this.onPresenterChangedHandlers.indexOf(callback);
+      if (idx >= 0) this.onPresenterChangedHandlers.splice(idx, 1);
+    };
+  }
+
+  setPresenterToggleHandler(handler: (active: boolean) => void): void {
+    this.onTogglePresenterHandler = handler;
+  }
+
+  getPresenterUserId(): string | null {
+    return this.presenterUserId;
+  }
+
+  getLocalUserId(): string | null {
+    try {
+      return this.replicationClient?.getLocalUserId?.() ?? null;
+    } catch {
+      return null;
+    }
+  }
+
+  setPresenterOnPanel(userId: string | null): void {
+    this.collaborationPanel?.setPresenter(userId);
+  }
+
+  private sendPresenterState(active: boolean, playerId: string): void {
+    try {
+      this.replicationClient.sendPlayerUpdate({
+        playerId,
+        state: { presenter: active },
+      } as any);
+    } catch {
+      // ignore send errors
+    }
+  }
+
+  private setPresenterInternal(userId: string | null): void {
+    this.presenterUserId = userId;
+    this.setPresenterOnPanel(userId);
+    this.onPresenterChangedHandlers.forEach((cb) => cb(userId));
   }
 }
 

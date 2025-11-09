@@ -20,7 +20,54 @@ import {
 import type { FrameResources, GeometryData } from '../resources/resources';
 import { GPUBufferPool } from './bufferPool';
 import type { Scene, Entity } from '@engine/world';
-import { EnvironmentComponent } from '@engine/world';
+import { EnvironmentComponent, type VisualPreset } from '@engine/world';
+
+/**
+ * Maps visual preset to render settings
+ */
+function applyVisualPreset(preset: VisualPreset | undefined): Partial<{
+  enableHDR: boolean;
+  enableBloom: boolean;
+  enableSSAO: boolean;
+  enableFXAA: boolean;
+  enableOutlines: boolean;
+  outlineQuality: 'low' | 'med';
+  shadowQuality: 'low' | 'med' | 'high' | 'ultra';
+}> {
+  switch (preset) {
+    case 'stylized-balanced':
+      return {
+        enableHDR: true,
+        enableBloom: true,
+        enableSSAO: true,
+        enableFXAA: true,
+        enableOutlines: true,
+        outlineQuality: 'med',
+        shadowQuality: 'med',
+      };
+    case 'cinematic':
+      return {
+        enableHDR: true,
+        enableBloom: true,
+        enableSSAO: true,
+        enableFXAA: true,
+        enableOutlines: true,
+        outlineQuality: 'med',
+        shadowQuality: 'high',
+      };
+    case 'low':
+      return {
+        enableHDR: false,
+        enableBloom: false,
+        enableSSAO: false,
+        enableFXAA: false,
+        enableOutlines: false,
+        shadowQuality: 'low',
+      };
+    default:
+      return {};
+  }
+}
 import { LightManager } from '../lighting/LightManager';
 import { ScriptSystem } from '@engine/script';
 import { LogicCubeSystem } from '@engine/script';
@@ -150,6 +197,8 @@ export interface Renderer {
     shadowQuality: 'low' | 'med' | 'high' | 'ultra';
     enableComputePrepass: boolean;
     msaaSampleCount: 1 | 2 | 4;
+    enableOutlines?: boolean;
+    outlineQuality?: 'low' | 'med';
   }>): void;
   getRenderSettings(): Readonly<{
     enableHDR: boolean;
@@ -162,6 +211,8 @@ export interface Renderer {
     shadowQuality: 'low' | 'med' | 'high' | 'ultra';
     enableComputePrepass: boolean;
     msaaSampleCount: 1 | 2 | 4;
+    enableOutlines: boolean;
+    outlineQuality: 'low' | 'med';
   }>;
   /** Texture compression debug controls */
   getTextureCompressionManager(): TextureCompressionManager;
@@ -200,6 +251,8 @@ interface RendererOptions {
   enableShadows?: boolean;
   enableSSAO?: boolean; // Screen Space Ambient Occlusion
   shadowQuality?: 'low' | 'med' | 'high' | 'ultra';
+  enableOutlines?: boolean;
+  outlineQuality?: 'low' | 'med';
   enableComputePrepass?: boolean;
   msaaSampleCount?: 1 | 2 | 4;
 }
@@ -210,6 +263,7 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
   const onFrameUpdateFn = options.onFrameUpdate;
   const currentScene = options.scene ?? null;
   let currentCameraEntity = options.cameraEntity ?? null;
+  let lastAppliedPreset: VisualPreset | undefined = undefined;
 
   // Resolve render settings with defaults (mutable for runtime updates)
   let renderSettings = {
@@ -223,6 +277,8 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
     shadowQuality: (options.shadowQuality ?? 'med') as 'low' | 'med' | 'high' | 'ultra',
     enableComputePrepass: options.enableComputePrepass !== false,
     msaaSampleCount: (options.msaaSampleCount ?? MSAA_SAMPLE_COUNT) as 1 | 2 | 4,
+    enableOutlines: options.enableOutlines ?? false,
+    outlineQuality: (options.outlineQuality ?? 'med') as 'low' | 'med',
   };
 
   // Initialize light manager for the scene
@@ -1059,6 +1115,23 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       return;
     }
 
+    // Apply visual preset from environment component if changed
+    if (currentScene) {
+      const environmentEntities = currentScene.queryEntities(EnvironmentComponent);
+      const environmentEntity = environmentEntities.find((entity: Entity) => entity.active);
+      if (environmentEntity) {
+        const envComponent = environmentEntity.getComponent(EnvironmentComponent);
+        if (envComponent && envComponent.visualPreset && envComponent.visualPreset !== lastAppliedPreset) {
+          const presetSettings = applyVisualPreset(envComponent.visualPreset);
+          renderSettings = { ...renderSettings, ...presetSettings };
+          lastAppliedPreset = envComponent.visualPreset;
+        } else if (!envComponent?.visualPreset && lastAppliedPreset !== undefined) {
+          // Reset to defaults if preset removed
+          lastAppliedPreset = undefined;
+        }
+      }
+    }
+
     // Render frame (handles all rendering operations)
     // Calculate time for animations
     const currentTime = typeof performance !== 'undefined' && typeof performance.now === 'function'
@@ -1087,10 +1160,12 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
           enableHDR: renderSettings.enableHDR,
           enableSSAO: renderSettings.enableSSAO,
           enableFXAA: renderSettings.enableFXAA,
+          enableOutlines: renderSettings.enableOutlines,
           enableForwardPlus: renderSettings.enableForwardPlus,
           enableScreenLOD: renderSettings.enableScreenLOD,
         },
         shadowQuality: renderSettings.shadowQuality,
+        outlineQuality: renderSettings.outlineQuality,
         msaaSampleCount: renderSettings.msaaSampleCount,
         time: currentTime,
         configuredDevice, // Pass the device that configured the context for validation

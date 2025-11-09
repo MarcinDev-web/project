@@ -314,3 +314,78 @@ export class OnPlayerLeaveTrigger extends LogicCube {
     return null;
   }
 }
+
+/**
+ * OnInteract Trigger - Fires when the entity is interacted with (E key)
+ */
+export class OnInteractTrigger extends LogicCube {
+  getMetadata(): LogicCubeMetadata {
+    return {
+      type: 'onInteractTrigger',
+      displayName: 'On Interact',
+      category: 'trigger',
+      description: 'Triggers when player interacts with this entity (E key)',
+      icon: 'hand-pointer',
+      inputs: [
+        {
+          id: 'trigger',
+          type: 'trigger',
+          direction: 'input',
+          label: 'Trigger',
+          description: 'Receives interaction signal from InteractionSystem',
+        },
+      ],
+      outputs: [
+        {
+          id: 'output',
+          type: 'trigger',
+          direction: 'output',
+          label: 'On Interact',
+          description: 'Fires when interacted with',
+        },
+      ],
+      parameters: [
+        {
+          key: 'cooldown',
+          label: 'Cooldown (seconds)',
+          type: 'number',
+          defaultValue: 0,
+          min: 0,
+          max: 60,
+          description: 'Minimum time between triggers',
+        },
+      ],
+      color: [0.8, 0.4, 1], // Purple
+    };
+  }
+
+  override onInit(): void {
+    // Listen for interaction signals from InteractionSystem
+    // The signal is emitted via scene.events.emit('logic:signal', ...)
+    // LogicCubeSystem will route it to this cube's onSignalReceived
+  }
+
+  onSignalReceived(portId: string, signal: LogicSignal): Map<string, LogicSignal> | null {
+    if (portId !== 'trigger') return null;
+
+    if (!this.enabled || this.isOnCooldown()) {
+      return null;
+    }
+
+    const cooldownDuration = this.getConfig<number>('cooldown', 0);
+    if (cooldownDuration > 0) {
+      this.setCooldown(cooldownDuration);
+    }
+
+    // Forward the signal to output
+    const outputSignal: LogicSignal = {
+      type: 'trigger',
+      sourceEntityId: this.entity.id,
+      timestamp: signal.timestamp ?? Date.now(),
+    };
+
+    const outputs = new Map<string, LogicSignal>();
+    outputs.set('output', outputSignal);
+    return outputs;
+  }
+}

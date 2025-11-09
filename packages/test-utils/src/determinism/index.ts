@@ -1,13 +1,13 @@
 /**
  * Determinism Test Utilities
- * 
+ *
  * Provides utilities for testing deterministic behavior in simulations.
  * Ensures that same inputs produce same outputs across runs.
  */
 
 import { expect } from 'vitest';
 import { normalizeForSnapshot, type SnapshotOptions } from '../snapshots/index.js';
-import type { SeededRNG } from '@engine/core/utils/SeededRNG';
+import type { SeededRNG } from '@engine/core/utils';
 
 /**
  * Options for determinism testing
@@ -204,4 +204,3 @@ export function expectCloneProducesIdenticalSequence(
     expect(value1).toBeCloseTo(value2, 1e-10);
   }
 }
-

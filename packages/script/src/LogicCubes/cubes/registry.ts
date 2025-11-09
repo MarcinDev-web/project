@@ -7,6 +7,7 @@ import {
   OnGameStartTrigger,
   OnPlayerEnterTrigger,
   OnPlayerLeaveTrigger,
+  OnInteractTrigger,
 } from './TriggerCubes.js';
 
 import {
@@ -46,6 +47,7 @@ export function registerBuiltInLogicCubes(): void {
   LogicCubeRegistry.register('onGameStartTrigger', OnGameStartTrigger);
   LogicCubeRegistry.register('onPlayerEnterTrigger', OnPlayerEnterTrigger);
   LogicCubeRegistry.register('onPlayerLeaveTrigger', OnPlayerLeaveTrigger);
+  LogicCubeRegistry.register('onInteractTrigger', OnInteractTrigger);
 
   // Actions
   LogicCubeRegistry.register('sendMessageAction', SendMessageAction);

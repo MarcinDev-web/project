@@ -79,7 +79,10 @@ export function normalizeForSnapshot<T>(obj: T, options: SnapshotOptions = {}): 
       }
 
       // Normalize entity IDs
-      if (normalizeEntityIds && (key.toLowerCase().includes('id') || key === 'entityId' || key === 'entity')) {
+      if (
+        normalizeEntityIds &&
+        (key.toLowerCase().includes('id') || key === 'entityId' || key === 'entity')
+      ) {
         if (typeof value === 'string' && (value.length > 20 || /^entity_\d+$/.test(value))) {
           normalized[key] = '<entity-id>';
           continue;

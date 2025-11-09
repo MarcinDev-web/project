@@ -14,6 +14,7 @@ import { initializeBaseColor } from '../visuals/SelectionVisuals';
 import { Logger } from '../../utils/logger';
 import { getBlock } from '@engine/blocks';
 import { PlacementAnimator } from './PlacementAnimator';
+import { warmupCollisionWorker } from '../../wasm/collisionWorkerClient';
 
 /**
  * State of the placement preview
@@ -77,7 +78,8 @@ const DEFAULT_CONFIG: PlacementModeConfig = {
   invalidColor: [1.0, 0.2, 0.2, 0.6], // Red with alpha
   ghostOpacity: 0.6,
   rotationIncrement: Math.PI / 4, // 45 degrees
-  contactTolerance: 0.001,
+  // Slightly larger default tolerance to better treat face contact as non-collision
+  contactTolerance: 0.005,
 };
 
 /**
@@ -130,6 +132,9 @@ export class PlacementMode {
   startPlacement(asset: AssetPreset): void {
     // Cancel any existing placement
     this.cancelPlacement();
+
+    // Warm up collision worker early to avoid first-use stall when rotating/checking
+    try { warmupCollisionWorker(); } catch {}
 
     // Create preview entity
     const previewEntity = new Entity(`${asset.name}_preview`);
@@ -267,9 +272,9 @@ export class PlacementMode {
     // Animate rotation smoothly
     this.animator.animateRotation(this.preview.previewEntity, targetQuat);
 
-    // Re-check collision after rotation (await to ensure color updates correctly)
+    // Re-check collision after rotation; fire-and-forget to keep UI responsive
     if (this.preview.position) {
-      await this.updatePreviewPosition(this.preview.position);
+      void this.updatePreviewPosition(this.preview.position);
     }
 
     // Force any renderer to pick up rotation change (handled by owner UI)

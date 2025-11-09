@@ -384,6 +384,49 @@ describe('EditorCameraController', () => {
     });
   });
 
+  describe('movement - Space/C vertical (RMB gated)', () => {
+    beforeEach(() => {
+      camera.enable();
+      // Simulate right mouse button down to enable vertical keys capture
+      const mouseDownEvent = new MouseEvent('mousedown', {
+        button: 2,
+        clientX: 100,
+        clientY: 100,
+      });
+      canvas.dispatchEvent(mouseDownEvent);
+    });
+
+    it('should move up with Space key when RMB held', () => {
+      const positionBefore = camera.getPosition();
+
+      const keyDownEvent = new KeyboardEvent('keydown', { key: ' ' });
+      window.dispatchEvent(keyDownEvent);
+
+      camera.update(1.0);
+
+      const positionAfter = camera.getPosition();
+      const moveSpeed = camera.getMoveSpeed();
+
+      expect(positionAfter[1]).toBeGreaterThan(positionBefore[1]);
+      expect(positionAfter[1] - positionBefore[1]).toBeCloseTo(moveSpeed, 1);
+    });
+
+    it('should move down with C key when RMB held', () => {
+      const positionBefore = camera.getPosition();
+
+      const keyDownEvent = new KeyboardEvent('keydown', { key: 'c' });
+      window.dispatchEvent(keyDownEvent);
+
+      camera.update(1.0);
+
+      const positionAfter = camera.getPosition();
+      const moveSpeed = camera.getMoveSpeed();
+
+      expect(positionAfter[1]).toBeLessThan(positionBefore[1]);
+      expect(positionBefore[1] - positionAfter[1]).toBeCloseTo(moveSpeed, 1);
+    });
+  });
+
   describe('speed modifiers', () => {
     beforeEach(() => {
       camera.enable();

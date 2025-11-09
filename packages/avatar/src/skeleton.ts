@@ -118,6 +118,7 @@ export class AvatarSkeleton {
   private readonly nameToIndex: Map<AvatarJointName, number>;
   private readonly jointNames: AvatarJointName[];
   private worldDirty = true;
+  private readonly jointDirty: boolean[];
 
   constructor(definitions: readonly AvatarJointDefinition[] = DEFAULT_AVATAR_JOINTS) {
     if (definitions.length === 0) {
@@ -125,6 +126,7 @@ export class AvatarSkeleton {
     }
     this.nameToIndex = new Map();
     this.jointNames = definitions.map((def) => def.name);
+    this.jointDirty = new Array(definitions.length).fill(true); // All joints dirty initially
     this.joints = definitions.map((definition, index) => {
       if (this.nameToIndex.has(definition.name)) {
         throw new Error(`Duplicate joint name "${definition.name}"`);
@@ -156,7 +158,54 @@ export class AvatarSkeleton {
       copyVec3(joint.localPosition, joint.defaultPosition);
       copyQuat(joint.localRotation, joint.defaultRotation);
     }
+    this.markAllDirty();
+  }
+
+  /**
+   * Mark all joints as dirty (for full sync).
+   */
+  markAllDirty(): void {
     this.worldDirty = true;
+    for (let i = 0; i < this.jointDirty.length; i++) {
+      this.jointDirty[i] = true;
+    }
+  }
+
+  /**
+   * Check if a joint is dirty.
+   */
+  isJointDirty(name: AvatarJointName): boolean {
+    const index = this.nameToIndex.get(name);
+    if (index === undefined) {
+      return false;
+    }
+    return this.jointDirty[index] ?? false;
+  }
+
+  /**
+   * Mark a joint as clean (not dirty).
+   */
+  markJointClean(name: AvatarJointName): void {
+    const index = this.nameToIndex.get(name);
+    if (index !== undefined) {
+      this.jointDirty[index] = false;
+    }
+  }
+
+  /**
+   * Get all dirty joint names.
+   */
+  getDirtyJoints(): readonly AvatarJointName[] {
+    const dirty: AvatarJointName[] = [];
+    for (let i = 0; i < this.jointDirty.length; i++) {
+      if (this.jointDirty[i]) {
+        const joint = this.joints[i];
+        if (joint) {
+          dirty.push(joint.name);
+        }
+      }
+    }
+    return dirty;
   }
 
   getJointNames(): readonly AvatarJointName[] {
@@ -186,13 +235,13 @@ export class AvatarSkeleton {
   setLocalPosition(name: AvatarJointName, position: Vec3): void {
     const joint = this.getJoint(name);
     copyVec3(joint.localPosition, position);
-    this.worldDirty = true;
+    this.markJointDirty(name);
   }
 
   setLocalRotation(name: AvatarJointName, rotation: Quat): void {
     const joint = this.getJoint(name);
     copyQuat(joint.localRotation, normalizeQuat(rotation));
-    this.worldDirty = true;
+    this.markJointDirty(name);
   }
 
   applyLocalPose(pose: Partial<Record<AvatarJointName, Partial<AvatarJointTransform>>>): void {
@@ -251,6 +300,26 @@ export class AvatarSkeleton {
       throw new Error(`Joint data missing for "${name}"`);
     }
     return joint;
+  }
+
+  private markJointDirty(name: AvatarJointName): void {
+    const index = this.nameToIndex.get(name);
+    if (index !== undefined) {
+      this.jointDirty[index] = true;
+      this.worldDirty = true;
+      // Mark all descendants as dirty too (since world transforms depend on parents)
+      this.markDescendantsDirty(index);
+    }
+  }
+
+  private markDescendantsDirty(parentIndex: number): void {
+    for (let i = 0; i < this.joints.length; i++) {
+      const joint = this.joints[i];
+      if (joint && joint.parentIndex === parentIndex) {
+        this.jointDirty[i] = true;
+        this.markDescendantsDirty(i); // Recursively mark children
+      }
+    }
   }
 
   private updateWorldTransforms(): void {

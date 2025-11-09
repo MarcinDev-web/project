@@ -71,7 +71,7 @@ import type { PhysicsWorld } from '@engine/world';
 import type { CharacterControllerSystem } from '@engine/stdlib/CharacterController';
 import type { BlockBehaviorSystem } from '@engine/world/systems';
 import { CharacterInputHandler } from '@engine/input';
-import { EditorCameraController } from '@engine/camera';
+import { EditorCameraController, FPSCamera } from '@engine/camera';
 import { PauseMenu } from './PauseMenu';
 import { TemplatePickerModal } from './TemplatePickerModal';
 import { CollaborationManager } from '../managers/CollaborationManager';
@@ -154,6 +154,7 @@ export class EditorUI {
   private easyPlaceController: EasyPlaceController | null = null;
   private characterInput: CharacterInputHandler | null = null;
   private editorCamera: EditorCameraController | null = null;
+  private fpsCamera: FPSCamera | null = null;
 
   constructor(private readonly config: EditorUIConfig) {}
 
@@ -303,6 +304,10 @@ export class EditorUI {
       });
       this.disposables.add(() => this.editorCamera?.dispose());
     }
+    if (!this.fpsCamera) {
+      this.fpsCamera = new FPSCamera(this.config.canvas);
+      this.disposables.add(() => this.fpsCamera?.dispose());
+    }
 
     this.modeManager = new EditorModeManager({
       scene: this.config.scene,
@@ -323,7 +328,7 @@ export class EditorUI {
       characterSystem,
       blockBehaviorSystem,
       characterInput: this.characterInput,
-      fpsCamera: null, // Not used in editor - only in play mode
+      fpsCamera: this.fpsCamera,
       editorCamera: this.editorCamera,
       thirdPersonCamera: null, // Not used in editor - only in play mode
       getRendererReady: () => this.config.getRenderer() !== null,
@@ -755,6 +760,7 @@ export class EditorUI {
           );
         }
       },
+      getRemoteCursors: () => this.collaborationManager?.getRemoteCursors() ?? new Map(),
     });
     void this.visualManager.initialize();
     this.disposables.add(() => this.visualManager?.dispose());
@@ -866,6 +872,52 @@ export class EditorUI {
           unsubscribeRequested();
           unsubscribeStarted();
         });
+
+        // Wire follow/stop-follow actions to ModeManager camera follow
+        if (this.modeManager) {
+          this.collaborationManager.setFollowHandlers(
+            (userId: string) => {
+              this.modeManager?.followUser(userId);
+              this.collaborationManager?.setFollowingUser(userId);
+              this.setStatusMessage(`Following ${userId}`, 1200);
+            },
+            () => {
+              this.modeManager?.stopFollowingUser();
+              this.collaborationManager?.setFollowingUser(null);
+              this.setStatusMessage('Stopped following', 800);
+            }
+          );
+
+          // Wire presenter toggle handler
+          this.collaborationManager.setPresenterToggleHandler((active: boolean) => {
+            if (active) {
+              this.collaborationManager?.enablePresenterMode();
+            } else {
+              this.collaborationManager?.disablePresenterMode();
+            }
+          });
+
+          // React to presenter changes: auto-follow presenter on non-presenters
+          const unbindPresenter = this.collaborationManager.onPresenterChanged((userId) => {
+            const presenterId = userId;
+            if (!presenterId) {
+              this.modeManager?.stopFollowingUser();
+              this.collaborationManager?.setFollowingUser(null);
+              this.setStatusMessage('Presenter mode off', 1000);
+              return;
+            }
+            // If presenter is someone else, follow
+            try {
+              const rid = this.collaborationManager?.getLocalUserId() ?? null;
+              if (!rid || presenterId !== rid) {
+                this.modeManager?.followUser(presenterId);
+                this.collaborationManager?.setFollowingUser(presenterId);
+                this.setStatusMessage('Presenter mode on', 1000);
+              }
+            } catch {}
+          });
+          this.disposables.add(unbindPresenter);
+        }
       }
       
       this.disposables.add(() => {

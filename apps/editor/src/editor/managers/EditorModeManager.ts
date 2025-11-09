@@ -61,7 +61,7 @@ export interface EditorModeManagerConfig {
   characterSystem?: CharacterControllerSystem | null;
   blockBehaviorSystem?: BlockBehaviorSystem | null;
   characterInput?: CharacterInputHandler | null;
-  fpsCamera?: any | null; // FPSCamera - not used in editor, only in play mode
+  fpsCamera?: FPSCamera | null;
   editorCamera?: EditorCameraController | null;
   thirdPersonCamera?: any | null; // ThirdPersonCamera - not used in editor, only in play mode
   getRendererReady?: () => boolean;
@@ -115,6 +115,9 @@ export class EditorModeManager {
   private readonly _cameraPosScratch: Vec3 = [0, 0, 0] as Vec3;
   private readonly _cameraRotScratch: [number, number, number, number] = [0, 0, 0, 1];
 
+  // Follow camera (collaboration): userId being followed (remote cursor)
+  private followingUserId: string | null = null;
+
   constructor(private readonly config: EditorModeManagerConfig) {
     this.physicsWorld = config.physicsWorld ?? null;
     this.characterSystem = config.characterSystem ?? null;
@@ -127,9 +130,9 @@ export class EditorModeManager {
     this.worldManager = new WorldManager(config.scene);
     this.cameraDirector = new CameraDirector({
       orbitControls: config.controls,
-      fpsCamera: null, // Not used in editor - only in play mode
+      fpsCamera: config.fpsCamera ?? null,
       editorCamera: config.editorCamera ?? null,
-      thirdPersonCamera: null, // Not used in editor - only in play mode
+      thirdPersonCamera: null,
       canvas: config.canvas,
       scene: config.scene,
       physicsWorld: this.physicsWorld,
@@ -660,9 +663,26 @@ export class EditorModeManager {
       return;
     }
 
-    // In editor, no avatar preview is used
-    // This method is kept for API compatibility but does nothing
-    // Avatar is only used in play mode
+    // Follow remote user's camera if requested
+    if (this.followingUserId && this.editorCamera && this.config.collaborationManager) {
+      try {
+        const cursors: Map<string, any> = this.config.collaborationManager.getRemoteCursors?.() ?? new Map();
+        const cursor = cursors.get(this.followingUserId);
+        if (cursor && cursor.position) {
+          // Snap editor camera to remote camera pose
+          this.editorCamera.setPosition(cursor.position as Vec3);
+          if (cursor.rotation) {
+            const forward = this.rotateVectorByQuat([0, 0, -1], cursor.rotation);
+            const yaw = Math.atan2(forward[0] ?? 0, -(forward[2] ?? 0));
+            const fy = Math.max(-1, Math.min(1, forward[1] ?? 0));
+            const pitch = Math.asin(fy);
+            this.editorCamera.setOrientation(yaw, pitch);
+          }
+        }
+      } catch {
+        // ignore follow errors
+      }
+    }
   }
 
 
@@ -718,6 +738,35 @@ export class EditorModeManager {
     this.checkpointSystem.dispose();
     this.playerEntity = null;
     // Avatar is not used in editor, no cleanup needed
+  }
+
+  // ========== Collaboration Follow API ==========
+  followUser(userId: string): void {
+    this.followingUserId = userId;
+    // Ensure editor camera mode is active
+    this.cameraDirector.setMode('free-fly');
+  }
+
+  stopFollowingUser(): void {
+    this.followingUserId = null;
+  }
+
+  getFollowingUserId(): string | null {
+    return this.followingUserId;
+  }
+
+  private rotateVectorByQuat(v: [number, number, number], q: [number, number, number, number]): [number, number, number] {
+    const [x, y, z] = v;
+    const [qx, qy, qz, qw] = q;
+    // t = 2 * cross(q.xyz, v)
+    const tx = 2 * (qy * z - qz * y);
+    const ty = 2 * (qz * x - qx * z);
+    const tz = 2 * (qx * y - qy * x);
+    // v' = v + qw * t + cross(q.xyz, t)
+    const vx = x + qw * tx + (qy * tz - qz * ty);
+    const vy = y + qw * ty + (qz * tx - qx * tz);
+    const vz = z + qw * tz + (qx * ty - qy * tx);
+    return [vx, vy, vz];
   }
 
   private configureController(manifest: PlayManifest): void {

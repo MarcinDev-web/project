@@ -38,3 +38,4 @@ export * from './UICanvasComponent.js';
 export * from './UIElementComponent.js';
 export * from './NpcComponent.js';
 export * from './StatusEffectComponent.js';
+export * from './InteractableComponent.js';

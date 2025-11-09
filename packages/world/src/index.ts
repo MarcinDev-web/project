@@ -85,6 +85,12 @@ export {
 } from './systems/Selection.js';
 export { WeaponSystem } from './systems/WeaponSystem.js';
 export { InventorySystem } from './systems/InventorySystem.js';
+export { InteractionSystem } from './systems/InteractionSystem.js';
+export type { InteractionSystemConfig } from './systems/InteractionSystem.js';
+export { InteractableComponent } from './components/InteractableComponent.js';
+export type { InteractableComponentJSON } from './components/InteractableComponent.js';
+export { InteractionPromptUI } from './systems/InteractionPromptUI.js';
+export type { InteractionPromptUIStyle } from './systems/InteractionPromptUI.js';
 
 // Physics (selective to avoid duplicates with systems)
 export { PhysicsWorld } from './physics/PhysicsWorld.js';

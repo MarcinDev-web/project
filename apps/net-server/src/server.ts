@@ -61,6 +61,7 @@ import { BlockedUsersStorage } from './storage/BlockedUsersStorage.js';
 import { NotificationsStorage } from './storage/NotificationsStorage.js';
 import { UserSettingsStorage } from './storage/UserSettingsStorage.js';
 import { ForumStorage } from './storage/ForumStorage.js';
+import { ForumStorageDB } from './storage/ForumStorageDB.js';
 import { ShopStorage } from './storage/ShopStorage.js';
 import { ShopStorageDB } from './storage/ShopStorageDB.js';
 import { AssetStorage } from './storage/AssetStorage.js';
@@ -200,9 +201,10 @@ const messagesStorage = new MessagesStorage(DATA_DIR);
 const blockedUsersStorage = new BlockedUsersStorage(DATA_DIR);
 const notificationsStorage = new NotificationsStorage(DATA_DIR);
 const userSettingsStorage = new UserSettingsStorage(DATA_DIR);
-const forumStorage = new ForumStorage(DATA_DIR);
+// Use database storage if available, otherwise fallback to JSON
+const forumStorage = dbPool ? new ForumStorageDB(dbPool) : new ForumStorage(DATA_DIR);
 const messageHandler = new MessageHandler(messagesStorage, sessionManager);
-const forumHandler = new ForumHandler(sessionManager, forumStorage);
+const forumHandler = new ForumHandler(sessionManager, forumStorage as unknown as ForumStorage);
 
 // Shop storage (use database if available, otherwise JSON)
 const shopStorage = dbPool ? new ShopStorageDB(dbPool) : new ShopStorage(DATA_DIR);
@@ -517,7 +519,7 @@ const routeDeps: RouteDependencies = {
   blockedUsersStorage,
   notificationsStorage,
   userSettingsStorage,
-  forumStorage,
+  forumStorage: forumStorage as unknown as ForumStorage,
   shopStorage: shopStorage as unknown as ShopStorage,
   assetStorage: assetStorage as unknown as AssetStorage,
   purchaseStorage: purchaseStorage as unknown as PurchaseStorage,

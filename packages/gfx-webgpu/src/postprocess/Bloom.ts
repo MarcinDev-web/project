@@ -423,27 +423,27 @@ struct BlurParams {
       const outputView = i === 0 ? dstView : upsampleTempTex.createView();
       tempTextures.push(upsampleTempTex);
 
-      const upsampleKey = `upsample-${i}-${lowResView}-${highResView}`;
-      let upsampleBg = this.cachedBindGroups.get(upsampleKey);
-      if (!upsampleBg && this.upsampleLayout) {
-        upsampleBg = this.device.createBindGroup({
-          label: `bloom-upsample-bg-${i}`,
-          layout: this.upsampleLayout,
-          entries: [
-            { binding: 0, resource: lowResView },
-            { binding: 1, resource: highResView },
-            { binding: 2, resource: this.sampler },
-          ],
-        });
-        this.cachedBindGroups.set(upsampleKey, upsampleBg);
+      // Do not cache upsample bind groups: they reference per-frame temporary textures (lowRes/highRes views).
+      // Caching risks reusing stale views across frames, leading to WebGPU validation errors.
+      if (!this.upsampleLayout) {
+        continue;
       }
+      const upsampleBg = this.device.createBindGroup({
+        label: `bloom-upsample-bg-${i}`,
+        layout: this.upsampleLayout,
+        entries: [
+          { binding: 0, resource: lowResView },
+          { binding: 1, resource: highResView },
+          { binding: 2, resource: this.sampler },
+        ],
+      });
 
       const upsample = encoder.beginRenderPass({
         label: `bloom-upsample-${i}`,
         colorAttachments: [{ view: outputView, loadOp: i === 0 ? 'clear' : 'load', storeOp: 'store' }],
       });
       upsample.setPipeline(this.upsamplePipeline);
-      upsample.setBindGroup(0, upsampleBg!);
+      upsample.setBindGroup(0, upsampleBg);
       upsample.draw(3, 1, 0, 0);
       upsample.end();
       

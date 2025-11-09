@@ -34,6 +34,14 @@ export interface EditorVisualManagerConfig {
   setControlsEnabled: (enabled: boolean) => void;
   /** Called when transform changes (for replication) */
   onTransformChanged?: (entity: Entity) => void;
+  /** Optional provider for remote cursors (for collaboration camera markers) */
+  getRemoteCursors?: () => Map<string, {
+    userId: string;
+    user: { id: string; email: string };
+    position: Vec3;
+    rotation?: [number, number, number, number];
+    color: string;
+  }>; 
 }
 
 /**
@@ -45,6 +53,10 @@ export class EditorVisualManager {
   private gridRenderer: GridRenderer | null = null;
   private gizmoController: GizmoController | null = null;
   private animationFrameHandle: number | null = null;
+  
+  // Remote camera markers overlay
+  private remoteOverlayRoot: HTMLElement | null = null;
+  private remoteMarkers = new Map<string, HTMLElement>();
 
   constructor(private readonly config: EditorVisualManagerConfig) {}
 
@@ -60,6 +72,9 @@ export class EditorVisualManager {
 
     // Setup reactive updates AFTER grid renderer is initialized
     this.setupReactivity();
+
+    // Initialize remote cursors overlay
+    this.initializeRemoteOverlay();
 
     // Start animation loop for gizmo updates
     this.startAnimationLoop();
@@ -136,6 +151,106 @@ export class EditorVisualManager {
     });
   }
 
+  /** Initialize DOM overlay for remote cursor/camera markers */
+  private initializeRemoteOverlay(): void {
+    if (typeof document === 'undefined') return;
+    if (this.remoteOverlayRoot) return;
+
+    const root = document.createElement('div');
+    root.style.position = 'fixed';
+    root.style.left = '0';
+    root.style.top = '0';
+    root.style.pointerEvents = 'none';
+    root.style.zIndex = '999';
+    document.body.appendChild(root);
+    this.remoteOverlayRoot = root;
+
+    // Cleanup on dispose
+    this.disposables.add(() => {
+      if (this.remoteOverlayRoot && this.remoteOverlayRoot.parentNode) {
+        this.remoteOverlayRoot.parentNode.removeChild(this.remoteOverlayRoot);
+      }
+      this.remoteOverlayRoot = null;
+      this.remoteMarkers.clear();
+    });
+  }
+
+  /** Update remote cursor markers each frame */
+  private updateRemoteCursorsOverlay(): void {
+    if (!this.remoteOverlayRoot || !this.config.getRemoteCursors) return;
+
+    const cursors = this.config.getRemoteCursors();
+    if (!cursors || cursors.size === 0) {
+      // Hide all existing markers
+      for (const el of this.remoteMarkers.values()) {
+        el.style.display = 'none';
+      }
+      return;
+    }
+
+    const rect = this.config.canvas.getBoundingClientRect();
+
+    // Track which markers were updated to hide stale ones
+    const updated = new Set<string>();
+
+    for (const [userId, cursor] of cursors.entries()) {
+      // Project world to screen
+      const screen = this.config.projectWorldToScreen(cursor.position);
+      let el = this.remoteMarkers.get(userId);
+      if (!el) {
+        el = this.createRemoteMarker(cursor.user.email, cursor.color);
+        this.remoteOverlayRoot.appendChild(el);
+        this.remoteMarkers.set(userId, el);
+      }
+      updated.add(userId);
+
+      if (!screen) {
+        el.style.display = 'none';
+        continue;
+      }
+
+      el.style.display = 'flex';
+      el.style.transform = `translate(${Math.round(rect.left + screen.x)}px, ${Math.round(rect.top + screen.y)}px)`;
+    }
+
+    // Hide markers for users not in this frame
+    for (const [userId, el] of this.remoteMarkers.entries()) {
+      if (!updated.has(userId)) {
+        el.style.display = 'none';
+      }
+    }
+  }
+
+  private createRemoteMarker(label: string, color: string): HTMLElement {
+    const container = document.createElement('div');
+    container.style.position = 'absolute';
+    container.style.transform = 'translate(-50%, -100%)';
+    container.style.display = 'flex';
+    container.style.alignItems = 'center';
+    container.style.gap = '6px';
+    container.style.pointerEvents = 'none';
+
+    const dot = document.createElement('div');
+    dot.style.width = '10px';
+    dot.style.height = '10px';
+    dot.style.borderRadius = '50%';
+    dot.style.background = color || '#4a9eff';
+    dot.style.boxShadow = '0 0 6px rgba(0,0,0,0.4)';
+
+    const text = document.createElement('div');
+    text.textContent = label;
+    text.style.fontSize = '11px';
+    text.style.fontWeight = '600';
+    text.style.padding = '2px 6px';
+    text.style.borderRadius = '4px';
+    text.style.background = 'rgba(0,0,0,0.6)';
+    text.style.color = '#fff';
+    text.style.textShadow = '0 1px 2px rgba(0,0,0,0.5)';
+
+    container.appendChild(dot);
+    container.appendChild(text);
+    return container;
+  }
   /**
    * Sets up reactive bindings for visual updates.
    */
@@ -202,6 +317,7 @@ export class EditorVisualManager {
 
     const tick = () => {
       this.updateGizmoOverlay();
+      this.updateRemoteCursorsOverlay();
       this.animationFrameHandle = raf(tick);
     };
     this.animationFrameHandle = raf(tick);

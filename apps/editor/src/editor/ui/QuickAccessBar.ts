@@ -49,7 +49,7 @@ export class QuickAccessBar {
 
   constructor(private readonly config: QuickAccessBarConfig) {
     this.root = document.createElement('div');
-    this.root.className = 'inspector-quick-access';
+    this.root.className = 'quick-access-bar';
     this.root.setAttribute('role', 'region');
     this.root.setAttribute('aria-label', 'Quick Access Properties');
 

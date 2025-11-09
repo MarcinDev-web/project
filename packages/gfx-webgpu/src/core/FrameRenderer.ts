@@ -94,10 +94,12 @@ export interface FrameRenderContext {
     enableHDR?: boolean;
     enableSSAO?: boolean;
     enableFXAA?: boolean;
+    enableOutlines?: boolean;
     enableForwardPlus?: boolean;
     enableScreenLOD?: boolean;
   };
   shadowQuality?: 'low' | 'med' | 'high' | 'ultra';
+  outlineQuality?: 'low' | 'med';
   msaaSampleCount?: number;
   time?: number;
   configuredDevice?: GPUDevice;
@@ -171,6 +173,7 @@ export class FrameRenderer {
       enableBloom: featureFlags.enableBloom,
       enableSSAO: featureFlags.enableSSAO,
       enableFXAA: featureFlags.enableFXAA,
+      enableOutlines: featureFlags.enableOutlines,
     });
 
     const encoder = configuredDevice.createCommandEncoder({ label: 'frame-encoder' });
@@ -341,6 +344,7 @@ export class FrameRenderer {
       enableHDR: flags?.enableHDR !== false,
       enableSSAO: flags?.enableSSAO !== false,
       enableFXAA: flags?.enableFXAA === true,
+      enableOutlines: flags?.enableOutlines === true,
       enableForwardPlus: flags?.enableForwardPlus !== false,
       enableScreenLOD: flags?.enableScreenLOD !== false,
     };

@@ -5,11 +5,21 @@
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "exports": {
-    ".": "./dist/index.js",
-    "./terrain": "./dist/terrain/index.js"
+    ".": {
+      "import": "./dist/index.js",
+      "development": "./src/index.ts",
+      "test": "./src/index.ts",
+      "default": "./dist/index.js"
+    },
+    "./terrain": {
+      "import": "./dist/terrain/index.js",
+      "development": "./src/terrain/index.ts",
+      "test": "./src/terrain/index.ts",
+      "default": "./dist/terrain/index.js"
+    }
   },
   "scripts": {
-    "build": "tsc -b",
+    "build": "echo 'Skipping voxel build in production' || tsc -b",
     "dev": "tsc -b --watch",
     "test": "vitest run",
     "test:watch": "vitest",

@@ -3,7 +3,7 @@
   "compilerOptions": {
     "outDir": "./dist",
     "baseUrl": ".",
-    "moduleResolution": "node",
+    "moduleResolution": "bundler",
     "paths": {
       "@engine/core": ["../../packages/core/dist"],
       "@engine/core/*": ["../../packages/core/dist/*"],
@@ -11,8 +11,8 @@
       "@engine/animation/*": ["../../packages/animation/dist/*"],
       "@engine/world": ["../../packages/world/dist"],
       "@engine/world/*": ["../../packages/world/dist/*"],
-      "@engine/economy": ["../../packages/economy/dist"],
-      "@engine/economy/*": ["../../packages/economy/dist/*"],
+      "@engine/economy": ["../../packages/economy/dist/src"],
+      "@engine/economy/*": ["../../packages/economy/dist/src/*"],
       "@engine/script": ["../../packages/script/dist"],
       "@engine/script/*": ["../../packages/script/dist/*"],
       "@shared/*": ["../../shared/*"]

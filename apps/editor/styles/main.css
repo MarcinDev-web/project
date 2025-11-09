@@ -45,6 +45,7 @@
 @import './editor/inspector.css';
 @import './editor/inspector-animations.css';
 @import './editor/inspector-responsive.css';
+@import './editor/quick-actions-panel.css';
 @import './editor/logic-panel.css';
 @import './editor/asset-palette.css';
 @import './editor/asset-palette-simple.css';

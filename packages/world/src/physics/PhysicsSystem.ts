@@ -14,7 +14,7 @@ import { ObjectPool } from '@engine/core/utils';
 import { Octree, type OctreeConfig, DEFAULT_OCTREE_CONFIG } from './Octree.js';
 import { BoundingVolume } from './BoundingVolume.js';
 import type { Joint } from './Joint.js';
-import { ScriptComponent } from '@engine/script';
+// Avoid static import from '@engine/script' to prevent world↔script circular dependency during build
 
 /**
  * Collision event data
@@ -246,24 +246,26 @@ export class PhysicsSystem {
   }
 
   private runScriptFixedUpdate(dt: number): void {
-    // Query entities with ScriptComponent - use getAllEntities and filter
-    // because ScriptComponent from @engine/script may not match ComponentClass type exactly
+    // Query entities for any component that exposes getInstances() (ScriptComponent)
     const allEntities = this.scene.getAllEntities();
     for (const entity of allEntities) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
-      const scriptComp = entity.getComponent(ScriptComponent as any);
-      if (!scriptComp) continue;
-      // TypeScript doesn't know getInstances() exists on Component, but it does on ScriptComponent
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
-      const instances = (scriptComp as any).getInstances();
-      for (const behavior of instances) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-        if (!behavior.enabled) continue;
-        try {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
-          behavior.onFixedUpdate(dt);
-        } catch {
-          // ignore behavior errors to keep physics running
+      // Scan present component constructors on the entity
+      const componentTypes = entity.getComponentTypes();
+      for (const ctor of componentTypes) {
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
+        const comp: any = entity.getComponent(ctor as never);
+        if (!comp || typeof comp.getInstances !== 'function') continue;
+        // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
+        const instances = comp.getInstances();
+        for (const behavior of instances) {
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+          if (!behavior.enabled) continue;
+          try {
+            // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
+            behavior.onFixedUpdate(dt);
+          } catch {
+            // ignore behavior errors to keep physics running
+          }
         }
       }
     }

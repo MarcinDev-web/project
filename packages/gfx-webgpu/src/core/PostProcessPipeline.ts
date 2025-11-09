@@ -7,6 +7,7 @@ import { TonemapLutPass } from '../postprocess/TonemapLut';
 import { BloomPass } from '../postprocess/Bloom';
 import { FXAAPass } from '../postprocess/FXAAPass';
 import { SSAOPass } from '../postprocess/SSAO';
+import { OutlinePass } from '../postprocess/OutlinePass';
 import { NormalRenderPass } from './NormalRenderPass';
 import { TIMESTAMP_INDICES } from '../config';
 
@@ -15,6 +16,7 @@ export interface PostProcessFeatureFlags {
   enableBloom: boolean;
   enableSSAO: boolean;
   enableFXAA: boolean;
+  enableOutlines?: boolean;
 }
 
 export interface PostProcessInputs {
@@ -43,6 +45,7 @@ export class PostProcessPipeline {
   private bloomPass: BloomPass | null = null;
   private fxaaPass: FXAAPass | null = null;
   private ssaoPass: SSAOPass | null = null;
+  private outlinePass: OutlinePass | null = null;
   private normalRenderPass: NormalRenderPass | null = null;
   private depthResolvePipeline: GPURenderPipeline | null = null;
   private depthResolveLayout: GPUBindGroupLayout | null = null;
@@ -69,6 +72,7 @@ export class PostProcessPipeline {
     const enableBloom = featureFlags.enableBloom && enableHDR;
     const enableSSAO = featureFlags.enableSSAO;
     const enableFXAA = featureFlags.enableFXAA && enableHDR;
+    const enableOutlines = featureFlags.enableOutlines === true;
 
     const hdrView = targets.hdrView;
     const bloomView = targets.bloomView;
@@ -146,13 +150,16 @@ export class PostProcessPipeline {
       );
     }
 
+    // Determine target for tonemap (before outlines)
+    const tonemapTarget = enableOutlines || enableFXAA ? tonemapIntermediateView ?? swapChainView : swapChainView;
+
     if (enableHDR && hdrView) {
       this.ensureTonemapPass(device, ctx.presentationFormat);
       this.tonemapPass?.render(
         encoder,
         hdrView,
         enableBloom ? bloomView : null,
-        enableFXAA ? tonemapIntermediateView ?? swapChainView : swapChainView,
+        tonemapTarget,
         ssaoView ?? null,
         frameResources.timestampQuerySet
           ? {
@@ -164,8 +171,19 @@ export class PostProcessPipeline {
       );
     }
 
+    // Apply outlines after tonemap, before FXAA
+    if (enableOutlines && tonemapTarget && normalView && depthView) {
+      this.ensureOutlinePass(device);
+      // Outline reads from tonemap output and writes to intermediate (or swapchain if no FXAA)
+      const outlineTarget = enableFXAA ? tonemapIntermediateView ?? swapChainView : swapChainView;
+      if (outlineTarget) {
+        this.outlinePass?.apply(encoder, tonemapTarget, outlineTarget, normalView, depthView, ctx.canvas.width, ctx.canvas.height);
+      }
+    }
+
     if (enableFXAA && tonemapIntermediateView) {
       this.ensureFxaaPass(device);
+      // FXAA reads from intermediate (which may have outlines) and writes to swapchain
       this.fxaaPass?.apply(encoder, tonemapIntermediateView, swapChainView);
     }
   }
@@ -179,6 +197,8 @@ export class PostProcessPipeline {
     this.fxaaPass = null;
     this.ssaoPass?.dispose?.();
     this.ssaoPass = null;
+    this.outlinePass?.dispose?.();
+    this.outlinePass = null;
     this.normalRenderPass?.dispose();
     this.normalRenderPass = null;
     try {
@@ -220,6 +240,12 @@ export class PostProcessPipeline {
     if (!this.ssaoPass) {
       this.ssaoPass = new SSAOPass(device);
       this.ssaoPass.initialize('rgba16float');
+    }
+  }
+
+  private ensureOutlinePass(device: GPUDevice): void {
+    if (!this.outlinePass) {
+      this.outlinePass = new OutlinePass(device);
     }
   }
 

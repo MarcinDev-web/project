@@ -16,6 +16,7 @@
    QUICK ACCESS BAR RESPONSIVE
    ============================================ */
 
+.quick-access-bar,
 .inspector-quick-access {
   min-width: 0;
 }
@@ -29,9 +30,14 @@
 }
 
 @media (max-width: 768px) {
+  .quick-access-bar,
   .inspector-quick-access {
     border-radius: var(--radius-lg);
     margin-bottom: var(--spacing-3);
+  }
+  
+  .quick-actions-panel .quick-access-bar {
+    margin: var(--spacing-3);
   }
 
   .quick-access-header {

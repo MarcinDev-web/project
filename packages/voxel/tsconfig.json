@@ -19,7 +19,7 @@
   "include": ["src/**/*"],
   "exclude": ["__tests__", "dist", "node_modules", "../core/src", "../world/src"],
   "references": [
-    { "path": "../core" },
+    { "path": "../core/tsconfig.build.json" },
     { "path": "../world" }
   ]
 }

@@ -8,6 +8,8 @@
     "skipLibCheck": true,
     "skipDefaultLibCheck": true,
     "paths": {
+      "@engine/core": ["../core/dist"],
+      "@engine/core/*": ["../core/dist/*"],
       "@engine/world": ["../world/dist"],
       "@engine/world/*": ["../world/dist/*"],
       "@engine/animation": ["../animation/dist"],
@@ -25,7 +27,7 @@
     "../animation/src"
   ],
   "references": [
-    { "path": "../core" },
+    { "path": "../core/tsconfig.build.json" },
     { "path": "../animation" }
   ]
 }

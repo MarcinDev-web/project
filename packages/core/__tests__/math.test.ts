@@ -9,7 +9,7 @@ import {
   quatNormalize,
   quatMultiply,
   type Mat4,
-} from '@engine/core/math';
+} from '@engine/core';
 
 function makeMat(): Mat4 {
   return new Float32Array(16);

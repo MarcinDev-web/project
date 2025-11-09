@@ -6,27 +6,15 @@ import { LogicCubeLibrary } from '@engine/editor-utils';
 import { ensureWasmCollisionInit } from './wasm/collision';
 import { warmupCollisionWorker } from './wasm/collisionWorkerClient';
 import { login, createReplicationClient, createSession, saveSnapshot, loadLatestSnapshot } from './editor/net/collab';
-import { runIntro } from './intro';
 
 export async function bootstrap(): Promise<void> {
   const { canvas, statusEl } = requireEditorDom();
 
   // Parse URL params once
   const urlParams = new URLSearchParams(window.location.search);
-  const skipIntro = urlParams.get('skipIntro') === 'true';
   const shareToken = urlParams.get('share');
   const collabSession = urlParams.get('session');
   const projectId = urlParams.get('project') || 'default-project';
-
-  // 🎬 EPIC INTRO SEQUENCE
-  // Show cinematic intro unless explicitly skipped via URL param
-  if (!skipIntro) {
-    try {
-      await runIntro(canvas, 5); // 5 second intro
-    } catch (error) {
-      Logger.warn('Intro sequence failed, continuing to app:', error as Error);
-    }
-  }
 
   // Removed: Asset Registry initialization (no longer needed)
 

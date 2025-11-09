@@ -207,15 +207,34 @@ export class AvatarInstance {
   }
 
   syncJointEntities(): void {
-    this.skeleton.forEachJoint((name) => {
-      const jointEntity = this.jointEntities.get(name);
-      if (!jointEntity) {
-        return;
+    // Get dirty joints from skeleton
+    const dirtyJoints = this.skeleton.getDirtyJoints();
+    
+    // If all joints are dirty, sync all (optimization: avoid per-joint checks)
+    if (dirtyJoints.length === this.skeleton.getJointNames().length) {
+      this.skeleton.forEachJoint((name) => {
+        const jointEntity = this.jointEntities.get(name);
+        if (!jointEntity) {
+          return;
+        }
+        const local = this.skeleton.getLocalTransform(name);
+        jointEntity.transform.position = local.position;
+        jointEntity.transform.rotation = local.rotation;
+        this.skeleton.markJointClean(name);
+      });
+    } else {
+      // Only sync dirty joints
+      for (const name of dirtyJoints) {
+        const jointEntity = this.jointEntities.get(name);
+        if (!jointEntity) {
+          continue;
+        }
+        const local = this.skeleton.getLocalTransform(name);
+        jointEntity.transform.position = local.position;
+        jointEntity.transform.rotation = local.rotation;
+        this.skeleton.markJointClean(name);
       }
-      const local = this.skeleton.getLocalTransform(name);
-      jointEntity.transform.position = local.position;
-      jointEntity.transform.rotation = local.rotation;
-    });
+    }
   }
 
   private buildSkeletonEntities(): void {

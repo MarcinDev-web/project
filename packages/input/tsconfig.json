@@ -28,8 +28,7 @@
     "../world-server/src"
   ],
   "references": [
-    { "path": "../camera" },
-    { "path": "../core" },
+    { "path": "../core/tsconfig.build.json" },
     { "path": "../world" }
   ]
 }

@@ -11,7 +11,7 @@ import {
   expectDifferentSeedsProduceDifferentSequences,
   expectStateSerializationPreservesDeterminism,
   expectCloneProducesIdenticalSequence,
-} from '@engine/test-utils/determinism';
+} from '@engine/test-utils';
 
 describe('SeededRNG', () => {
   describe('determinism', () => {
@@ -284,4 +284,3 @@ describe('SeededRNG', () => {
     });
   });
 });
-

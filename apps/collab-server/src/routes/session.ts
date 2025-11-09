@@ -1,5 +1,6 @@
 import type { FastifyInstance } from 'fastify';
-import type { PrismaClient, Prisma } from '@prisma/client';
+import type { PrismaClient } from '../../node_modules/.prisma/collab-client/index.js';
+import { Prisma } from '../../node_modules/.prisma/collab-client/index.js';
 import { z } from 'zod';
 import { randomUUID } from 'node:crypto';
 import { verifyJwtFromRequest } from './auth.js';

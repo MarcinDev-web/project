@@ -3,6 +3,11 @@ import { Entity, type Scene } from '@engine/world';
 import {
   AvatarInstance,
   DEFAULT_AVATAR_LOADOUT,
+  IDLE_ANIMATION,
+  RUN_ANIMATION,
+  WALK_ANIMATION,
+  JUMP_ANIMATION,
+  type AvatarAnimation,
   type AvatarLoadout,
 } from '@engine/avatar';
 import { MeshComponent } from '@engine/world/components/MeshComponent';
@@ -33,6 +38,7 @@ export class PreviewAvatar {
   private readonly visualRoot: Entity;
   private readonly avatar: AvatarInstance;
   private yaw = 0;
+  private currentAnimation: AvatarAnimation | null = null;
 
   constructor(scene: Scene, options: PreviewAvatarOptions = {}) {
     this.scene = scene;
@@ -46,6 +52,8 @@ export class PreviewAvatar {
       name: 'EditorPreviewAvatarBody',
       loadout,
     });
+    // Start with idle animation
+    this.playIdleAnimation();
   }
 
   dispose(): void {
@@ -75,6 +83,56 @@ export class PreviewAvatar {
 
   update(deltaTime: number): void {
     this.avatar.update(deltaTime);
+  }
+
+  /**
+   * Play idle animation (standing still).
+   */
+  playIdleAnimation(): void {
+    if (this.currentAnimation !== IDLE_ANIMATION) {
+      this.avatar.playAnimation(IDLE_ANIMATION);
+      this.currentAnimation = IDLE_ANIMATION;
+    }
+  }
+
+  /**
+   * Play run animation (movement).
+   */
+  playRunAnimation(): void {
+    if (this.currentAnimation !== RUN_ANIMATION) {
+      this.avatar.playAnimation(RUN_ANIMATION);
+      this.currentAnimation = RUN_ANIMATION;
+    }
+  }
+
+  /**
+   * Play walk animation (slower movement).
+   */
+  playWalkAnimation(): void {
+    if (this.currentAnimation !== WALK_ANIMATION) {
+      this.avatar.playAnimation(WALK_ANIMATION);
+      this.currentAnimation = WALK_ANIMATION;
+    }
+  }
+
+  /**
+   * Play jump animation (one-time, non-looping).
+   */
+  playJumpAnimation(): void {
+    if (this.currentAnimation !== JUMP_ANIMATION) {
+      this.avatar.playAnimation(JUMP_ANIMATION);
+      this.currentAnimation = JUMP_ANIMATION;
+      // Jump animation emits 'finished' event, so we'll reset to idle when done
+      // Note: This would require listening to animation events, which is a future enhancement
+    }
+  }
+
+  /**
+   * Stop current animation and reset to default pose.
+   */
+  stopAnimation(): void {
+    this.avatar.stopAnimation();
+    this.currentAnimation = null;
   }
 
   ownsEntity(entity: Entity | null | undefined): boolean {

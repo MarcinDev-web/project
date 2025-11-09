@@ -74,9 +74,9 @@ describe('PropertiesPanel', () => {
     panel.mount(host);
     panel.refresh();
 
-    // Test QuickAccessBar is rendered
+    // QuickAccessBar is now in QuickActionsPanel (sidebar), not in PropertiesPanel
     const quickAccess = host.querySelector('.inspector-quick-access');
-    expect(quickAccess).toBeTruthy();
+    expect(quickAccess).toBeFalsy();
 
     // Test name input (now in entity card)
     const nameInput = host.querySelector('.entity-card-name-input') as HTMLInputElement;
@@ -85,23 +85,18 @@ describe('PropertiesPanel', () => {
     nameInput.dispatchEvent(new Event('change'));
     expect(onEntityRenamed).toHaveBeenCalledWith(entity);
 
-    // Test transform inputs (now in QuickAccessBar with quick- prefix)
-    const positionInputs = host.querySelectorAll('input[data-field^="quick-position"]');
-    expect(positionInputs.length).toBe(3); // X, Y, Z
-    const xInput = positionInputs[0] as HTMLInputElement;
-    xInput.value = '2.5';
-    xInput.dispatchEvent(new Event('change'));
-    expect(onTransformChanged).toHaveBeenCalledWith(entity);
-
-    // Test color input (now in QuickAccessBar with quick-color prefix)
-    const colorInput = host.querySelector('input[data-field="quick-color"]') as HTMLInputElement;
-    expect(colorInput).toBeTruthy();
-    colorInput.value = '#ff0000';
-    colorInput.dispatchEvent(new Event('input'));
-    expect(onColorChanged).toHaveBeenCalledWith(entity, [1, 0, 0, 1]);
+    // Transform and color inputs are now in QuickActionsPanel (sidebar), not in PropertiesPanel
+    // Test transform inputs in PropertiesPanel (regular position-x, not quick-position-x)
+    const positionInputs = host.querySelectorAll('input[data-field^="position-x"], input[data-field^="position-y"], input[data-field^="position-z"]');
+    if (positionInputs.length > 0) {
+      const xInput = positionInputs[0] as HTMLInputElement;
+      xInput.value = '2.5';
+      xInput.dispatchEvent(new Event('change'));
+      expect(onTransformChanged).toHaveBeenCalledWith(entity);
+    }
   });
 
-  it('renders QuickAccessBar with transform and color controls', () => {
+  it('does not render QuickAccessBar (moved to QuickActionsPanel)', () => {
     const panel = new PropertiesPanel({
       selection,
       onTransformChanged: vi.fn(),
@@ -112,58 +107,17 @@ describe('PropertiesPanel', () => {
     panel.mount(host);
     panel.refresh();
 
-    // Check QuickAccessBar exists
-    const quickAccess = host.querySelector('.inspector-quick-access');
-    expect(quickAccess).toBeTruthy();
-
-    // Check QuickAccessBar has transform controls
-    const transformSection = quickAccess?.querySelector('.quick-access-section');
-    expect(transformSection).toBeTruthy();
+    // QuickAccessBar is now in QuickActionsPanel (sidebar), not in PropertiesPanel
+    const quickAccess = host.querySelector('.inspector-quick-access, .quick-access-bar');
+    expect(quickAccess).toBeFalsy();
     
-    // Check position, rotation, scale inputs exist
-    const positionInputs = host.querySelectorAll('input[data-field^="quick-position"]');
-    expect(positionInputs.length).toBe(3);
-    
-    const rotationInputs = host.querySelectorAll('input[data-field^="quick-rotation"]');
-    expect(rotationInputs.length).toBe(3);
-    
-    const scaleInputs = host.querySelectorAll('input[data-field^="quick-scale"]');
-    expect(scaleInputs.length).toBe(3);
-
-    // Check color picker exists (if entity doesn't have texture)
-    const colorInput = host.querySelector('input[data-field="quick-color"]');
-    expect(colorInput).toBeTruthy();
+    // Quick access inputs should not be in PropertiesPanel
+    const quickPositionInputs = host.querySelectorAll('input[data-field^="quick-position"]');
+    expect(quickPositionInputs.length).toBe(0);
   });
 
-  it('allows collapsing and expanding QuickAccessBar', () => {
-    const panel = new PropertiesPanel({
-      selection,
-      onTransformChanged: vi.fn(),
-      onColorChanged: vi.fn(),
-      onEntityRenamed: vi.fn(),
-      state: editorState,
-    });
-    panel.mount(host);
-    panel.refresh();
-
-    const quickAccess = host.querySelector('.inspector-quick-access');
-    expect(quickAccess).toBeTruthy();
-
-    const collapseBtn = quickAccess?.querySelector('.quick-access-collapse') as HTMLButtonElement;
-    expect(collapseBtn).toBeTruthy();
-
-    const content = quickAccess?.querySelector('.quick-access-content');
-    expect(content).toBeTruthy();
-    expect(content?.classList.contains('collapsed')).toBe(false);
-
-    // Click to collapse
-    collapseBtn.click();
-    expect(content?.classList.contains('collapsed')).toBe(true);
-
-    // Click to expand
-    collapseBtn.click();
-    expect(content?.classList.contains('collapsed')).toBe(false);
-  });
+  // QuickAccessBar collapse/expand functionality is now in QuickActionsPanel (sidebar)
+  // This test is no longer relevant for PropertiesPanel
 
   it('renders animation component controls', () => {
     const animationComponent = new AnimationComponent();

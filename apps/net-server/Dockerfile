@@ -25,7 +25,30 @@ COPY pnpm-lock.yaml pnpm-workspace.yaml package.json tsconfig.json ./
 COPY apps/net-server/package.json apps/net-server/package.json
 
 # Copy package.json files from all packages (for dependency resolution)
-COPY packages/*/package.json ./packages/
+# Preserve directory structure by copying each package directory's package.json
+COPY packages/core/package.json ./packages/core/
+COPY packages/world/package.json ./packages/world/
+COPY packages/animation/package.json ./packages/animation/
+COPY packages/economy/package.json ./packages/economy/
+COPY packages/blocks/package.json ./packages/blocks/
+COPY packages/gfx-webgpu/package.json ./packages/gfx-webgpu/
+COPY packages/input/package.json ./packages/input/
+COPY packages/stdlib/package.json ./packages/stdlib/
+COPY packages/editor-utils/package.json ./packages/editor-utils/
+COPY packages/test-utils/package.json ./packages/test-utils/
+COPY packages/net-protocol/package.json ./packages/net-protocol/
+COPY packages/net-server/package.json ./packages/net-server/
+COPY packages/gateway/package.json ./packages/gateway/
+COPY packages/script/package.json ./packages/script/
+COPY packages/camera/package.json ./packages/camera/
+COPY packages/voxel/package.json ./packages/voxel/
+COPY packages/world-server/package.json ./packages/world-server/
+COPY packages/brand/package.json ./packages/brand/
+COPY packages/wasm-collision/package.json ./packages/wasm-collision/
+COPY packages/avatar/package.json ./packages/avatar/
+COPY packages/microblocks/package.json ./packages/microblocks/
+COPY packages/net/package.json ./packages/net/
+COPY packages/world-templates/package.json ./packages/world-templates/
 
 # Install dependencies (production + dev for build)
 RUN pnpm install --no-frozen-lockfile --prefer-offline
@@ -43,11 +66,17 @@ RUN pnpm install --no-frozen-lockfile --prefer-offline
 RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" pnpm -C apps/net-server db:generate
 
 # Build TypeScript (required for Railway deployment)
-# Build core and world first (foundation), then the app (which will build its dependencies)
-# Exclude test-utils, gateway, script, camera, and editor-utils from build as they're not needed in production
-RUN pnpm -w --filter @engine/core build && \
-    pnpm -w --filter @engine/world build && \
-    pnpm -w --filter '@apps/net-server...' --filter '!@engine/test-utils' --filter '!@engine/gateway' --filter '!@engine/script' --filter '!@engine/camera' --filter '!@engine/editor-utils' build
+# Clean dist folders and build info files first to avoid overwrite errors
+# Use pnpm filters to build dependencies, then handle circular dependency with script
+# Build world without script reference (tsconfig.build.json), then rebuild script with world available
+RUN find packages -type d -name dist -exec rm -rf {} + 2>/dev/null || true && \
+    find packages -name "*.tsbuildinfo" -delete 2>/dev/null || true && \
+    pnpm --filter @engine/core build && \
+    pnpm --filter @engine/animation build && \
+    pnpm --filter @engine/blocks build && \
+    pnpm --filter @engine/economy build && \
+    (cd packages/world && pnpm exec tsc -b tsconfig.build.json) && \
+    pnpm -C apps/net-server build
 
 # Replace TypeScript path aliases with relative paths using tsc-alias
 # Also fix Prisma imports to use correct relative paths for dist structure

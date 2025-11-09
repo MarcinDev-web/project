@@ -86,6 +86,7 @@ export { BrdfLutPass } from './postprocess/BrdfLut';
 export { PrefilterEnvPass } from './postprocess/PrefilterEnv';
 export { BloomPass } from './postprocess/BloomPass';
 export { FXAAPass } from './postprocess/FXAAPass';
+export { OutlinePass } from './postprocess/OutlinePass';
 export { EnvironmentRenderer } from './renderers/EnvironmentRenderer';
 
 // Lighting

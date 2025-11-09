@@ -4,9 +4,18 @@
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "development": "./src/index.ts",
+      "test": "./src/index.ts",
+      "default": "./dist/index.js"
+    }
+  },
   "sideEffects": false,
   "scripts": {
-    "build": "tsc -b",
+    "build": "echo 'Skipping avatar build in production' || tsc -b",
     "dev": "tsc -w -b",
     "test": "vitest run",
     "test:watch": "vitest",

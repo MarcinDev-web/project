@@ -37,7 +37,9 @@ import { TerrainPanel } from '../terrain/ui/TerrainPanel';
 import type { TerrainBuilderStudio } from '../terrain/TerrainBuilderStudio';
 import { RenderSettingsPanel } from './RenderSettingsPanel';
 import { SettingsPanel } from './SettingsPanel';
+import { QuickActionsPanel } from './QuickActionsPanel';
 import { hydrateScene, resolveEntityByPath, type SceneSnapshot } from '@engine/editor-utils';
+import { MaterialComponent } from '@engine/world/components/MaterialComponent';
 
 export interface PanelVisibility {
   sidebar?: boolean;
@@ -97,6 +99,7 @@ export class EditorPanelManager {
   private terrainPanel: TerrainPanel | null = null;
   private renderSettingsPanel: RenderSettingsPanel | null = null;
   private settingsPanel: SettingsPanel | null = null;
+  private quickActionsPanel: QuickActionsPanel | null = null;
   private assetPalette: AssetPalette | null = null;
   private assetBrowserWrapper: { refresh: () => void } | null = null;
   private resizableSidebar: ResizableSidebar | null = null;
@@ -378,7 +381,33 @@ export class EditorPanelManager {
       });
     }
 
-    // Add tabs to sidebar
+    // Initialize Quick Actions Panel
+    this.quickActionsPanel = new QuickActionsPanel({
+      selection: this.config.selection,
+      onTransformChanged: this.config.onTransformChanged,
+      onColorChanged: this.config.onColorChanged,
+      getSnapConfig: () => this.getSnapConfig(),
+      roundToIncrement: (value, increment) => this.roundToIncrement(value, increment),
+      entityHasTexture: (entity, materialComp) => this.entityHasTexture(entity, materialComp),
+      setManagedTimeout: (fn, ms) => window.setTimeout(fn, ms),
+      registerUndo: (action) => {
+        this.config.state.history.pushSnapshot();
+        this.config.state.history.registerUndo(action);
+      },
+      announce: (message) => {
+        // Could integrate with status message system
+        console.log('[QuickActions]', message);
+      },
+      state: this.config.state,
+    });
+
+    // Add tabs to sidebar (Quick Actions first)
+    this.sidebarTabs.addTab({
+      id: 'quick-actions',
+      label: 'Quick Actions',
+      icon: 'sparkle',
+      content: this.quickActionsPanel.element,
+    });
     this.sidebarTabs.addTab({
       id: 'layers',
       label: 'Layers',
@@ -521,6 +550,7 @@ export class EditorPanelManager {
       onColorChanged: this.config.onColorChanged,
       onEntityRenamed: this.config.onEntityRenamed,
       ...(this.config.onOpenScriptWorkbench && { onOpenScriptWorkbench: this.config.onOpenScriptWorkbench }),
+      ...(this.config.getRenderer && { getRenderer: this.config.getRenderer }),
     };
     this.propertiesPanel = new PropertiesPanel(propertiesPanelConfig);
     this.propertiesPanel.mount(inspectorContainer);
@@ -569,6 +599,7 @@ export class EditorPanelManager {
    */
   refreshProperties(): void {
     this.propertiesPanel?.refresh();
+    this.quickActionsPanel?.refresh();
     this.logicPanel?.refresh();
     this.weaponPanel?.refresh();
   }
@@ -781,6 +812,57 @@ export class EditorPanelManager {
   }
 
   /**
+   * Gets snap configuration from state.
+   */
+  private getSnapConfig(): {
+    enabled: boolean;
+    increment: number;
+    axes: { x: boolean; y: boolean; z: boolean };
+    rotationIncrement: number;
+    scaleIncrement: number;
+    minScale: number;
+  } | null {
+    const cfg = this.config.state.snapConfig.value;
+    if (!cfg || !cfg.enabled) return null;
+    return cfg;
+  }
+
+  /**
+   * Rounds a value to the nearest increment.
+   */
+  private roundToIncrement(value: number, increment: number): number {
+    if (!Number.isFinite(value) || !Number.isFinite(increment) || increment <= 0) return value;
+    return Math.round(value / increment) * increment;
+  }
+
+  /**
+   * Checks if entity has a texture (and thus color picker should be hidden).
+   */
+  private entityHasTexture(entity: Entity, materialComp: MaterialComponent | null): boolean {
+    if (!materialComp) {
+      // No material component = custom entity with solid color
+      return false;
+    }
+
+    const matId = materialComp.materialId;
+    
+    // Plastic blocks (10-13) are solid color and can be tinted
+    if (matId >= 10 && matId <= 13) {
+      return false;
+    }
+
+    // materialId 0 = default/custom entity without specific texture
+    // Allow color change unless it has blockId/asset indicating it uses texture atlas
+    if (matId === 0) {
+      const hasBlockId = entity.userData.blockId || entity.userData.asset;
+      return !!hasBlockId;
+    }
+
+    // All other materialIds use texture atlas
+    return true;
+  }
+
+  /**
    * Checks if panels are mounted.
    */
   isMounted(): boolean {
@@ -816,6 +898,9 @@ export class EditorPanelManager {
 
     this.uiPanel?.dispose();
     this.uiPanel = null;
+
+    this.quickActionsPanel?.dispose();
+    this.quickActionsPanel = null;
 
     this.terrainPanel?.dispose();
     this.terrainPanel = null;

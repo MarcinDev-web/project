@@ -2,12 +2,14 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
+    "rootDir": "./src",
+    "baseUrl": ".",
     "composite": true,
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
     "skipLibCheck": true,
-    // Use bundler module resolution (matching root tsconfig)
+    // Use bundler module resolution (matching root tsconfig) with baseUrl for Docker compatibility
     // Note: .js extensions in imports are still required for Node.js ES modules
     "module": "ESNext",
     "moduleResolution": "bundler",
@@ -40,9 +42,11 @@
     "../voxel/src"
   ],
   "references": [
-    { "path": "../core" },
+    { "path": "../core/tsconfig.build.json" },
     { "path": "../animation" },
-    { "path": "../blocks" }
+    { "path": "../blocks" },
+    { "path": "../economy" },
+    { "path": "../script" }
   ]
 }
 

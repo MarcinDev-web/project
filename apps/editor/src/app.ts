@@ -1,7 +1,7 @@
 import { createOrbitControls, type OrbitControls } from '@engine/camera';
 import { initRenderer, type Renderer } from '@engine/gfx-webgpu';
 import { Scene, Raycaster, SelectionManager } from '@engine/world';
-import { mat4LookAt, mat4Multiply, mat4Perspective, type Mat4, type Vec3 } from '@engine/core/math';
+import { mat4LookAt, mat4Multiply, mat4Perspective, mat4Invert, mat4GetTranslationOut, mat4GetRotationOut, type Mat4, type Vec3 } from '@engine/core/math';
 import { FOV_RADIANS, Z_FAR, Z_NEAR } from '@engine/gfx-webgpu/config';
 import { EditorUI } from './editor/ui/EditorUI';
 import { Logger } from './utils/logger';
@@ -104,6 +104,20 @@ export class EditorApp {
               if (modeManager) {
                 modeManager.updateEditPreview(deltaTime);
                 modeManager.getCameraDirector().update(deltaTime);
+
+                // Send camera presence to collaboration (throttled by CursorTracker internally)
+                try {
+                  const cameraDirector = modeManager.getCameraDirector();
+                  const view = cameraDirector.getViewMatrix();
+                  // world = inverse(view)
+                  const world = new Float32Array(16) as Mat4;
+                  mat4Invert(world, view as Mat4);
+                  const pos: Vec3 = [0, 0, 0];
+                  const rot: [number, number, number, number] = [0, 0, 0, 1];
+                  mat4GetTranslationOut(pos as unknown as Float32Array, world as Float32Array);
+                  mat4GetRotationOut(rot as unknown as Float32Array, world as Float32Array);
+                  this.editor?.getCollaborationManager()?.updateCursor(pos, rot);
+                } catch {}
               }
             } catch (err) {
               // Ignore edit mode update errors

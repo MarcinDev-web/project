@@ -5,16 +5,66 @@
     "main":  "./dist/index.js",
     "types":  "./dist/index.d.ts",
     "exports":  {
-                    ".":  "./dist/index.js",
-                    "./core":  "./dist/core/index.js",
-                    "./config":  "./dist/config.js",
-                    "./materials":  "./dist/materials/index.js",
-                    "./textures":  "./dist/textures/index.js",
-                    "./textures/*":  "./dist/textures/*.js",
-                    "./blocks/BlockLibrary":  "./dist/blocks/BlockLibrary.js",
-                    "./lighting/LightManager":  "./dist/lighting/LightManager.js",
-                    "./shadows":  "./dist/shadows/index.js",
-                    "./postprocess":  "./dist/postprocess/index.js"
+                    ".":  {
+                        "import": "./dist/index.js",
+                        "development": "./src/index.ts",
+                        "test": "./src/index.ts",
+                        "default": "./dist/index.js"
+                    },
+                    "./core":  {
+                        "import": "./dist/core/index.js",
+                        "development": "./src/core/index.ts",
+                        "test": "./src/core/index.ts",
+                        "default": "./dist/core/index.js"
+                    },
+                    "./config":  {
+                        "import": "./dist/config.js",
+                        "development": "./src/config.ts",
+                        "test": "./src/config.ts",
+                        "default": "./dist/config.js"
+                    },
+                    "./materials":  {
+                        "import": "./dist/materials/index.js",
+                        "development": "./src/materials/index.ts",
+                        "test": "./src/materials/index.ts",
+                        "default": "./dist/materials/index.js"
+                    },
+                    "./textures":  {
+                        "import": "./dist/textures/index.js",
+                        "development": "./src/textures/index.ts",
+                        "test": "./src/textures/index.ts",
+                        "default": "./dist/textures/index.js"
+                    },
+                    "./textures/*":  {
+                        "import": "./dist/textures/*.js",
+                        "development": "./src/textures/*.ts",
+                        "test": "./src/textures/*.ts",
+                        "default": "./dist/textures/*.js"
+                    },
+                    "./blocks/BlockLibrary":  {
+                        "import": "./dist/blocks/BlockLibrary.js",
+                        "development": "./src/blocks/BlockLibrary.ts",
+                        "test": "./src/blocks/BlockLibrary.ts",
+                        "default": "./dist/blocks/BlockLibrary.js"
+                    },
+                    "./lighting/LightManager":  {
+                        "import": "./dist/lighting/LightManager.js",
+                        "development": "./src/lighting/LightManager.ts",
+                        "test": "./src/lighting/LightManager.ts",
+                        "default": "./dist/lighting/LightManager.js"
+                    },
+                    "./shadows":  {
+                        "import": "./dist/shadows/index.js",
+                        "development": "./src/shadows/index.ts",
+                        "test": "./src/shadows/index.ts",
+                        "default": "./dist/shadows/index.js"
+                    },
+                    "./postprocess":  {
+                        "import": "./dist/postprocess/index.js",
+                        "development": "./src/postprocess/index.ts",
+                        "test": "./src/postprocess/index.ts",
+                        "default": "./dist/postprocess/index.js"
+                    }
                 },
     "scripts":  {
                     "build":  "tsc",

@@ -5,14 +5,40 @@
     "main":  "./dist/index.js",
     "types":  "./dist/index.d.ts",
     "exports":  {
-                    ".":  "./dist/index.js",
-                    "./LogicCubes":  "./dist/LogicCubes/index.js",
-                    "./runtime":  "./dist/runtime/index.js",
-                    "./behavior":  "./dist/behavior/index.js",
-                    "./Behavior":  "./dist/behavior/Behavior.js"
+                    ".":  {
+                        "import": "./dist/index.js",
+                        "development": "./src/index.ts",
+                        "test": "./src/index.ts",
+                        "default": "./dist/index.js"
+                    },
+                    "./LogicCubes":  {
+                        "import": "./dist/LogicCubes/index.js",
+                        "development": "./src/LogicCubes/index.ts",
+                        "test": "./src/LogicCubes/index.ts",
+                        "default": "./dist/LogicCubes/index.js"
+                    },
+                    "./runtime":  {
+                        "import": "./dist/runtime/index.js",
+                        "development": "./src/runtime/index.ts",
+                        "test": "./src/runtime/index.ts",
+                        "default": "./dist/runtime/index.js"
+                    },
+                    "./behavior":  {
+                        "import": "./dist/behavior/index.js",
+                        "development": "./src/behavior/index.ts",
+                        "test": "./src/behavior/index.ts",
+                        "default": "./dist/behavior/index.js"
+                    },
+                    "./Behavior":  {
+                        "import": "./dist/behavior/Behavior.js",
+                        "development": "./src/behavior/Behavior.ts",
+                        "test": "./src/behavior/Behavior.ts",
+                        "default": "./dist/behavior/Behavior.js"
+                    }
                 },
     "scripts":  {
-                    "build":  "tsc",
+                    "build":  "tsc -b",
+                    "build:skip-lib-check":  "tsc -b --skipLibCheck",
                     "dev":  "tsc --watch",
                     "test":  "vitest run",
                     "test:watch":  "vitest",

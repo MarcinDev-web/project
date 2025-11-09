@@ -4,13 +4,49 @@
     "main":  "./dist/index.js",
     "types":  "./dist/index.d.ts",
     "exports":  {
-                    ".":  "./dist/index.js",
-                    "./Animation":  "./dist/Animation/index.js",
-                    "./Animation/AnimationClip":  "./dist/Animation/AnimationClip.js",
-                    "./Animation/*":  "./dist/Animation/*.js",
-                    "./Audio":  "./dist/Audio/index.js",
-                    "./CharacterController":  "./dist/CharacterController/index.js",
-                    "./MovementProfiles":  "./dist/MovementProfiles/index.js"
+                    ".":  {
+                        "import": "./dist/index.js",
+                        "development": "./src/index.ts",
+                        "test": "./src/index.ts",
+                        "default": "./dist/index.js"
+                    },
+                    "./Animation":  {
+                        "types": "./dist/Animation/index.d.ts",
+                        "import": "./dist/Animation/index.js",
+                        "development": "./src/Animation/index.ts",
+                        "test": "./src/Animation/index.ts",
+                        "default": "./dist/Animation/index.js"
+                    },
+                    "./Animation/AnimationClip":  {
+                        "import": "./dist/Animation/AnimationClip.js",
+                        "development": "./src/Animation/AnimationClip.ts",
+                        "test": "./src/Animation/AnimationClip.ts",
+                        "default": "./dist/Animation/AnimationClip.js"
+                    },
+                    "./Animation/*":  {
+                        "import": "./dist/Animation/*.js",
+                        "development": "./src/Animation/*.ts",
+                        "test": "./src/Animation/*.ts",
+                        "default": "./dist/Animation/*.js"
+                    },
+                    "./Audio":  {
+                        "import": "./dist/Audio/index.js",
+                        "development": "./src/Audio/index.ts",
+                        "test": "./src/Audio/index.ts",
+                        "default": "./dist/Audio/index.js"
+                    },
+                    "./CharacterController":  {
+                        "import": "./dist/CharacterController/index.js",
+                        "development": "./src/CharacterController/index.ts",
+                        "test": "./src/CharacterController/index.ts",
+                        "default": "./dist/CharacterController/index.js"
+                    },
+                    "./MovementProfiles":  {
+                        "import": "./dist/MovementProfiles/index.js",
+                        "development": "./src/MovementProfiles/index.ts",
+                        "test": "./src/MovementProfiles/index.ts",
+                        "default": "./dist/MovementProfiles/index.js"
+                    }
                 },
     "scripts":  {
                     "build":  "tsc -b",

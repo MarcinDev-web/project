@@ -2,12 +2,13 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
-    "composite": false,
+    "baseUrl": ".",
+    "composite": true,
     "skipLibCheck": true,
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    // Use bundler module resolution (matching root tsconfig)
+    // Use bundler module resolution (matching root tsconfig) with baseUrl for Docker compatibility
     // Note: .js extensions in imports are still required for Node.js ES modules
     "module": "ESNext",
     "moduleResolution": "bundler",
@@ -16,6 +17,7 @@
       "@engine/core/*": ["../core/dist/*"],
       "@engine/world": ["../world/dist"],
       "@engine/world/*": ["../world/dist/*"],
+      "@engine/stdlib/Animation": ["../stdlib/dist/Animation"],
       "@engine/stdlib": ["../stdlib/dist"],
       "@engine/stdlib/*": ["../stdlib/dist/*"]
     }
@@ -30,8 +32,7 @@
     "../stdlib/src"
   ],
   "references": [
-    { "path": "../core" },
-    { "path": "../world" }
+    { "path": "../core/tsconfig.build.json" }
   ]
 }
 

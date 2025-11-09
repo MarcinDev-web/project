@@ -42,6 +42,11 @@ export class EconomyPanel {
 
   async refresh(): Promise<void> {
     try {
+      const token = localStorage.getItem('forge_token');
+      if (!token) {
+        this.balancesContainer.innerHTML = `<div class="panel-hint">Login to view wallet</div>`;
+        return;
+      }
       const data: GetWalletResponse = await this.client.getWallet();
       this.renderBalances(data);
     } catch (e) {

@@ -87,6 +87,16 @@
    QUICK ACCESS BAR
    ============================================ */
 
+.quick-access-bar {
+  background: linear-gradient(135deg, var(--color-accent-400), var(--color-accent-600));
+  border-radius: var(--radius-xl);
+  border: 2px solid var(--color-accent-500);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3), 0 0 0 1px rgba(255, 255, 255, 0.1) inset;
+  margin: var(--spacing-4);
+  transition: all var(--transition-smooth);
+}
+
+/* Legacy class name for backward compatibility */
 .inspector-quick-access {
   position: sticky;
   top: 0;

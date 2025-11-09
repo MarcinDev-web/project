@@ -432,5 +432,123 @@ describe('AvatarSkeleton', () => {
       expect(order[2]).toBe('Spine');
     });
   });
+
+  describe('dirty flags', () => {
+    it('should mark all joints dirty initially', () => {
+      const skeleton = new AvatarSkeleton();
+      const dirtyJoints = skeleton.getDirtyJoints();
+
+      expect(dirtyJoints.length).toBeGreaterThan(0);
+      expect(dirtyJoints.length).toBe(skeleton.getJointNames().length);
+    });
+
+    it('should mark joint dirty when position changes', () => {
+      const skeleton = new AvatarSkeleton();
+      
+      // Clear all dirty flags first
+      skeleton.markAllDirty();
+      for (const name of skeleton.getJointNames()) {
+        skeleton.markJointClean(name);
+      }
+
+      // Change position
+      skeleton.setLocalPosition('Head', [1, 0, 0]);
+
+      expect(skeleton.isJointDirty('Head')).toBe(true);
+    });
+
+    it('should mark joint dirty when rotation changes', () => {
+      const skeleton = new AvatarSkeleton();
+      
+      // Clear all dirty flags first
+      skeleton.markAllDirty();
+      for (const name of skeleton.getJointNames()) {
+        skeleton.markJointClean(name);
+      }
+
+      // Change rotation
+      skeleton.setLocalRotation('Head', [0, 0, 0, 1]);
+
+      expect(skeleton.isJointDirty('Head')).toBe(true);
+    });
+
+    it('should mark descendants dirty when parent changes', () => {
+      const skeleton = new AvatarSkeleton();
+      
+      // Clear all dirty flags first
+      skeleton.markAllDirty();
+      for (const name of skeleton.getJointNames()) {
+        skeleton.markJointClean(name);
+      }
+
+      // Change parent joint (Chest)
+      skeleton.setLocalPosition('Chest', [1, 0, 0]);
+
+      // Child joints should be dirty too
+      expect(skeleton.isJointDirty('Chest')).toBe(true);
+      expect(skeleton.isJointDirty('Neck')).toBe(true);
+      expect(skeleton.isJointDirty('Head')).toBe(true);
+    });
+
+    it('should mark joint clean after sync', () => {
+      const skeleton = new AvatarSkeleton();
+      
+      // Clear all dirty flags first
+      skeleton.markAllDirty();
+      for (const name of skeleton.getJointNames()) {
+        skeleton.markJointClean(name);
+      }
+
+      skeleton.setLocalPosition('Head', [1, 0, 0]);
+      expect(skeleton.isJointDirty('Head')).toBe(true);
+
+      skeleton.markJointClean('Head');
+      expect(skeleton.isJointDirty('Head')).toBe(false);
+    });
+
+    it('should mark all joints dirty with markAllDirty', () => {
+      const skeleton = new AvatarSkeleton();
+      
+      // Clear all dirty flags first
+      skeleton.markAllDirty();
+      for (const name of skeleton.getJointNames()) {
+        skeleton.markJointClean(name);
+      }
+
+      skeleton.markAllDirty();
+      const dirtyJoints = skeleton.getDirtyJoints();
+      expect(dirtyJoints.length).toBe(skeleton.getJointNames().length);
+    });
+
+    it('should return empty array when no joints are dirty', () => {
+      const skeleton = new AvatarSkeleton();
+      
+      // Clear all dirty flags
+      skeleton.markAllDirty();
+      for (const name of skeleton.getJointNames()) {
+        skeleton.markJointClean(name);
+      }
+
+      const dirtyJoints = skeleton.getDirtyJoints();
+      expect(dirtyJoints.length).toBe(0);
+    });
+
+    it('should return only dirty joints', () => {
+      const skeleton = new AvatarSkeleton();
+      
+      // Clear all dirty flags first
+      skeleton.markAllDirty();
+      for (const name of skeleton.getJointNames()) {
+        skeleton.markJointClean(name);
+      }
+
+      // Mark only Head as dirty
+      skeleton.setLocalPosition('Head', [1, 0, 0]);
+
+      const dirtyJoints = skeleton.getDirtyJoints();
+      expect(dirtyJoints).toContain('Head');
+      expect(dirtyJoints.length).toBeGreaterThan(0);
+    });
+  });
 });
 

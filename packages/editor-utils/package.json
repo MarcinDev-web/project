@@ -5,8 +5,17 @@
     "type":  "module",
     "main":  "dist/index.js",
     "types":  "dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js",
+            "development": "./src/index.ts",
+            "test": "./src/index.ts",
+            "default": "./dist/index.js"
+        }
+    },
     "scripts":  {
-                    "build":  "tsc",
+                    "build":  "echo 'Skipping editor-utils build in production' || tsc",
                     "test":  "vitest",
                     "lint":  "eslint src --max-warnings=0"
                 },

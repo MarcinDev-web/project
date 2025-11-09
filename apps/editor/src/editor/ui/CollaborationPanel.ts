@@ -12,6 +12,12 @@ export interface CollaborationPanelConfig {
   onStartSession?: (sessionId: string) => void;
   /** Callback when collaboration session stops. */
   onStopSession?: () => void;
+  /** Optional: Follow a user's camera */
+  onFollowUser?: (userId: string) => void;
+  /** Optional: Stop following */
+  onStopFollow?: () => void;
+  /** Optional: Toggle presenter mode for local user */
+  onTogglePresenter?: (active: boolean) => void;
 }
 
 /**
@@ -30,6 +36,11 @@ export class CollaborationPanel {
   private statusEl: HTMLElement | null = null;
   private users = new Map<string, PublicUser>();
   private isCollaborating = false;
+  private followingUserId: string | null = null;
+  private stopFollowButton: HTMLButtonElement | null = null;
+  private presenterToggleButton: HTMLButtonElement | null = null;
+  private presenterInfoEl: HTMLElement | null = null;
+  private presenterUserId: string | null = null;
 
   constructor(private readonly config: CollaborationPanelConfig) {
     // Subscribe to user events
@@ -102,6 +113,19 @@ export class CollaborationPanel {
       color: #aaa;
     `;
     panel.appendChild(this.statusEl);
+
+    // Presenter info
+    this.presenterInfoEl = document.createElement('div');
+    this.presenterInfoEl.textContent = 'Presenter: none';
+    this.presenterInfoEl.style.cssText = `
+      margin-bottom: 12px;
+      padding: 6px 8px;
+      background: rgba(120, 120, 120, 0.15);
+      border-radius: 4px;
+      font-size: 12px;
+      color: #ccc;
+    `;
+    panel.appendChild(this.presenterInfoEl);
 
     // Start button
     this.startButton = document.createElement('button');
@@ -186,6 +210,68 @@ export class CollaborationPanel {
       overflow-y: auto;
     `;
     panel.appendChild(this.usersList);
+
+    // Stop follow button (shown only when following)
+    this.stopFollowButton = document.createElement('button');
+    this.stopFollowButton.textContent = 'Stop Following';
+    this.stopFollowButton.style.cssText = `
+      width: 100%;
+      padding: 8px;
+      background: #666;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      font-weight: 500;
+      margin-top: 8px;
+      display: none;
+    `;
+    this.stopFollowButton.addEventListener('click', () => {
+      this.setFollowing(null);
+      this.config.onStopFollow?.();
+    });
+    panel.appendChild(this.stopFollowButton);
+
+    // Presenter toggle button
+    this.presenterToggleButton = document.createElement('button');
+    this.presenterToggleButton.textContent = 'Enable Presenter Mode';
+    this.presenterToggleButton.style.cssText = `
+      width: 100%;
+      padding: 10px;
+      background: #8a5ef1;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      margin-top: 4px;
+      transition: background 0.2s;
+    `;
+    this.presenterToggleButton.addEventListener('mouseenter', () => {
+      if (this.presenterToggleButton) {
+        this.presenterToggleButton.style.background = '#784ae8';
+      }
+    });
+    this.presenterToggleButton.addEventListener('mouseleave', () => {
+      if (this.presenterToggleButton) {
+        this.presenterToggleButton.style.background = '#8a5ef1';
+      }
+    });
+    this.presenterToggleButton.addEventListener('click', () => {
+      const localId = this.config.replicationClient.getLocalUserId?.() ?? null;
+      const isLocalPresenter = localId && this.presenterUserId === localId;
+      const next = !isLocalPresenter;
+      this.config.onTogglePresenter?.(next);
+      // Optimistic UI update; authoritative update comes from network
+      if (next && localId) {
+        this.setPresenter(localId);
+      } else if (!next && localId && this.presenterUserId === localId) {
+        this.setPresenter(null);
+      }
+    });
+    panel.appendChild(this.presenterToggleButton);
 
     container.appendChild(panel);
     this.root = panel;
@@ -348,6 +434,7 @@ export class CollaborationPanel {
         display: flex;
         align-items: center;
         gap: 8px;
+        justify-content: space-between;
       `;
 
       // User avatar/indicator
@@ -385,6 +472,49 @@ export class CollaborationPanel {
       info.appendChild(name);
       userItem.appendChild(info);
 
+      // Actions
+      const actions = document.createElement('div');
+      actions.style.display = 'flex';
+      actions.style.gap = '6px';
+      const followBtn = document.createElement('button');
+      followBtn.textContent = this.followingUserId === user.id ? 'Following' : 'Follow';
+      followBtn.disabled = this.followingUserId === user.id;
+      followBtn.style.cssText = `
+        padding: 6px 10px;
+        background: #4a9eff;
+        color: #fff;
+        border: none;
+        border-radius: 4px;
+        cursor: pointer;
+        font-size: 12px;
+      `;
+      const localId = this.config.replicationClient.getLocalUserId?.() ?? null;
+      if (localId && user.id === localId) {
+        followBtn.style.display = 'none';
+      } else {
+        followBtn.addEventListener('click', () => {
+          this.setFollowing(user.id);
+          this.config.onFollowUser?.(user.id);
+        });
+      }
+      actions.appendChild(followBtn);
+
+      // Presenter badge
+      if (this.presenterUserId && user.id === this.presenterUserId) {
+        const badge = document.createElement('span');
+        badge.textContent = 'Presenter';
+        badge.style.cssText = `
+          padding: 4px 6px;
+          background: #8a5ef1;
+          color: #fff;
+          border-radius: 4px;
+          font-size: 11px;
+          font-weight: 600;
+        `;
+        actions.appendChild(badge);
+      }
+      userItem.appendChild(actions);
+
       this.usersList.appendChild(userItem);
     }
   }
@@ -402,6 +532,38 @@ export class CollaborationPanel {
   dispose(): void {
     this.disposables.dispose();
     this.unmount();
+  }
+
+  /** Update following state (controls buttons visibility/labels) */
+  setFollowing(userId: string | null): void {
+    this.followingUserId = userId;
+    if (this.stopFollowButton) {
+      this.stopFollowButton.style.display = this.followingUserId ? 'block' : 'none';
+    }
+    this.updateUsersList();
+  }
+
+  /** Update current presenter and UI */
+  setPresenter(userId: string | null): void {
+    this.presenterUserId = userId;
+    const localId = this.config.replicationClient.getLocalUserId?.() ?? null;
+    const text = userId
+      ? (userId === localId ? 'Presenter: you' : `Presenter: ${this.users.get(userId)?.email ?? userId}`)
+      : 'Presenter: none';
+    if (this.presenterInfoEl) {
+      this.presenterInfoEl.textContent = text;
+    }
+    if (this.presenterToggleButton) {
+      const isLocalPresenter = !!localId && userId === localId;
+      this.presenterToggleButton.textContent = isLocalPresenter ? 'Disable Presenter Mode' : 'Enable Presenter Mode';
+    }
+    // If presenter exists and is not local, reflect following state
+    if (userId && localId && userId !== localId) {
+      this.setFollowing(userId);
+    } else if (!userId) {
+      this.setFollowing(null);
+    }
+    this.updateUsersList();
   }
 }
 

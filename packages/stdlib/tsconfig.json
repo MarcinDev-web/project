@@ -9,8 +9,8 @@
   },
   "include": ["src/**/*"],
   "references": [
-    { "path": "../core" },
-    { "path": "../world" }
+    { "path": "../core/tsconfig.build.json" },
+    { "path": "../world/tsconfig.build.json" }
   ]
 }
 

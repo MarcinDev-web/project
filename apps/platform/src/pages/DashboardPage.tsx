@@ -65,67 +65,76 @@ export function DashboardPage() {
   return (
     <Layout>
       <div className="page-container">
+        {/* Hero Section with Stats */}
+        <div className="dashboard-hero">
         <div className="dashboard-header">
-          <h1 className="dashboard-title">Dashboard</h1>
-          <p className="dashboard-subtitle">Welcome back to Forge World</p>
+            <div>
+              <h1 className="dashboard-title">
+                Welcome back, <span className="gradient-text">{user?.email?.split('@')[0] || 'Creator'}</span>
+              </h1>
+              <p className="dashboard-subtitle">
+                Ready to build something amazing? Let's continue your journey.
+              </p>
         </div>
-
         {user && (
-          <div className="dashboard-welcome">
-            <Card>
-              <div className="welcome-content">
-                <div className="welcome-avatar">
-                  <span className="avatar-icon">👤</span>
-                </div>
-                <div className="welcome-info">
-                  <h2 className="welcome-name">Welcome, {user.email}!</h2>
-                  <p className="welcome-meta">
+              <div className="dashboard-meta">
+                <span className="meta-badge">
+                  <span className="badge-icon">✨</span>
                     Member since {new Date(user.createdAt).toLocaleDateString('en-US', {
-                      month: 'long',
-                      day: 'numeric',
+                    month: 'short',
                       year: 'numeric'
                     })}
-                  </p>
-                </div>
+                </span>
               </div>
-            </Card>
+            )}
           </div>
-        )}
 
-        {/* Stats Grid */}
-        <section className="dashboard-section">
-          <h2 className="section-title">Your Stats</h2>
-          <div className="stats-grid">
-            {stats.map((stat) => (
-              <Card key={stat.label}>
-                <div className="stat-card">
-                  <span className="stat-icon">{stat.icon}</span>
-                  <div className="stat-content">
-                    <div className="stat-value">{stat.value}</div>
-                    <div className="stat-label">{stat.label}</div>
+          {/* Stats Grid - Premium Design */}
+          <div className="stats-grid-modern">
+            {stats.map((stat, index) => (
+              <div 
+                key={stat.label} 
+                className="stat-card-modern"
+                style={{ animationDelay: `${index * 0.1}s` }}
+              >
+                <div className="stat-card-inner">
+                  <div className="stat-icon-wrapper">
+                    <span className="stat-icon-modern">{stat.icon}</span>
+                  </div>
+                  <div className="stat-details">
+                    <div className="stat-value-modern">{stat.value}</div>
+                    <div className="stat-label-modern">{stat.label.toUpperCase()}</div>
                   </div>
                 </div>
-              </Card>
+                <div className="stat-card-glow"></div>
+              </div>
             ))}
           </div>
-        </section>
+        </div>
 
-        {/* Actions */}
+        {/* Quick Actions - Card Grid */}
         <section className="dashboard-section">
-          <h2 className="section-title">Quick Actions</h2>
-          <div className="actions-list">
-            {actions.map((action) => (
+          <h2 className="section-title">
+            <span className="title-icon">⚡</span>
+            Quick Actions
+          </h2>
+          <div className="actions-grid-modern">
+            {actions.map((action, index) => (
               <Link 
                 key={action.title} 
                 to={action.link} 
-                className={`action-item ${action.variant === 'primary' ? 'action-primary' : ''}`}
+                className={`action-card-modern ${action.variant === 'primary' ? 'action-card-primary' : ''}`}
+                style={{ animationDelay: `${index * 0.1}s` }}
               >
-                <span style={{ fontSize: '2rem' }}>{action.icon}</span>
-                <div className="action-content">
-                  <h3 className="action-title">{action.title}</h3>
-                  <p className="action-description">{action.description}</p>
+                <div className="action-card-background"></div>
+                <div className="action-card-content">
+                  <div className="action-icon-modern">{action.icon}</div>
+                  <h3 className="action-title-modern">{action.title}</h3>
+                  <p className="action-description-modern">{action.description}</p>
+                  <span className="action-arrow-modern">
+                    <span>→</span>
+                  </span>
                 </div>
-                <span className="action-arrow">→</span>
               </Link>
             ))}
           </div>
@@ -133,107 +142,74 @@ export function DashboardPage() {
 
         {/* My Projects */}
         <section className="dashboard-section">
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 'var(--spacing-6)' }}>
-            <h2 className="section-title">My Projects</h2>
-            <Link to="/editor" style={{
-              padding: 'var(--spacing-2) var(--spacing-4)',
-              background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-              color: 'white',
-              textDecoration: 'none',
-              borderRadius: 'var(--radius-lg)',
-              fontSize: 'var(--text-sm)',
-              fontWeight: 'var(--font-semibold)',
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 'var(--spacing-2)',
-            }}>
-              <span>➕</span>
+          <div className="section-header">
+            <h2 className="section-title">
+              <span className="title-icon">📁</span>
+              My Projects
+            </h2>
+            <Link to="/editor" className="new-project-button">
+              <span className="button-icon">➕</span>
               <span>New Project</span>
             </Link>
           </div>
           {loading ? (
-            <div style={{ textAlign: 'center', padding: 'var(--spacing-10)', color: 'var(--text-2)' }}>
-              Loading projects...
+            <div className="loading-state">
+              <div className="loading-spinner"></div>
+              <p>Loading your projects...</p>
             </div>
           ) : myBuilds.length === 0 ? (
             <Card>
-              <div style={{ textAlign: 'center', padding: 'var(--spacing-10)' }}>
-                <div style={{ fontSize: '4rem', marginBottom: 'var(--spacing-4)' }}>🎨</div>
-                <h3 style={{ marginBottom: 'var(--spacing-2)', color: 'var(--text-1)' }}>No projects yet</h3>
-                <p style={{ color: 'var(--text-2)', marginBottom: 'var(--spacing-6)' }}>
-                  Start creating your first 3D scene
+              <div className="empty-state-modern">
+                <div className="empty-icon-modern">🎨</div>
+                <h3 className="empty-title">No projects yet</h3>
+                <p className="empty-description">
+                  Start creating your first 3D scene and bring your ideas to life
                 </p>
-                <Link
-                  to="/editor"
-                  style={{
-                    padding: 'var(--spacing-3) var(--spacing-6)',
-                    background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
-                    color: 'white',
-                    textDecoration: 'none',
-                    borderRadius: 'var(--radius-lg)',
-                    fontSize: 'var(--text-base)',
-                    fontWeight: 'var(--font-semibold)',
-                    display: 'inline-block',
-                  }}
-                >
-                  Launch Editor
+                <Link to="/editor" className="empty-cta-button">
+                  <span>🚀</span>
+                  <span>Launch Editor</span>
                 </Link>
               </div>
             </Card>
           ) : (
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))',
-              gap: 'var(--spacing-4)',
-            }}>
-              {myBuilds.slice(0, 6).map((build) => (
+            <div className="projects-grid-modern">
+              {myBuilds.slice(0, 6).map((build, index) => (
                 <Link
                   key={build.id}
                   to={`/marketplace/${build.id}`}
-                  style={{ textDecoration: 'none', color: 'inherit' }}
+                  className="project-card-modern"
+                  style={{ animationDelay: `${index * 0.1}s` }}
                 >
-                  <Card>
-                    <div style={{
-                      width: '100%',
-                      aspectRatio: '16/9',
-                      background: 'linear-gradient(135deg, rgba(102, 126, 234, 0.2) 0%, rgba(118, 75, 162, 0.2) 100%)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: '3rem',
-                      marginBottom: 'var(--spacing-3)',
-                      borderRadius: 'var(--radius-md)',
-                    }}>
+                  <div className="project-thumbnail">
                       {build.thumbnailUrl ? (
-                        <img src={build.thumbnailUrl} alt={build.title} style={{
-                          width: '100%',
-                          height: '100%',
-                          objectFit: 'cover',
-                          borderRadius: 'var(--radius-md)',
-                        }} />
-                      ) : '🎮'}
+                      <img 
+                        src={build.thumbnailUrl} 
+                        alt={build.title}
+                        className="project-image"
+                      />
+                    ) : (
+                      <div className="project-placeholder">🎮</div>
+                    )}
+                    <div className="project-overlay">
+                      <span className="overlay-text">View Project</span>
                     </div>
-                    <h3 style={{
-                      fontSize: 'var(--text-base)',
-                      fontWeight: 'var(--font-semibold)',
-                      marginBottom: 'var(--spacing-2)',
-                      overflow: 'hidden',
-                      textOverflow: 'ellipsis',
-                      whiteSpace: 'nowrap',
-                    }}>
-                      {build.title}
-                    </h3>
-                    <div style={{
-                      display: 'flex',
-                      justifyContent: 'space-between',
-                      fontSize: 'var(--text-xs)',
-                      color: 'var(--text-3)',
-                    }}>
-                      <span>👁️ {build.downloads || 0}</span>
-                      <span>❤️ {build.likes || 0}</span>
-                      <span>{build.public ? '🟢 Published' : '🟡 Draft'}</span>
+                  </div>
+                  <div className="project-info">
+                    <h3 className="project-title">{build.title}</h3>
+                    <div className="project-meta">
+                      <span className="meta-item">
+                        <span className="meta-icon">👁️</span>
+                        {build.downloads || 0}
+                      </span>
+                      <span className="meta-item">
+                        <span className="meta-icon">❤️</span>
+                        {build.likes || 0}
+                      </span>
+                      <span className={`status-badge ${build.public ? 'status-published' : 'status-draft'}`}>
+                        {build.public ? '🟢 Published' : '🟡 Draft'}
+                      </span>
                     </div>
-                  </Card>
+                  </div>
                 </Link>
               ))}
             </div>
@@ -243,4 +219,5 @@ export function DashboardPage() {
     </Layout>
   );
 }
+
 

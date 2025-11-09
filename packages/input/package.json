@@ -3,6 +3,15 @@
     "version":  "0.1.0",
     "main":  "./dist/index.js",
     "types":  "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "types": "./dist/index.d.ts",
+            "import": "./dist/index.js",
+            "development": "./src/index.ts",
+            "test": "./src/index.ts",
+            "default": "./dist/index.js"
+        }
+    },
     "scripts":  {
                     "build":  "tsc",
                     "dev":  "tsc --watch",

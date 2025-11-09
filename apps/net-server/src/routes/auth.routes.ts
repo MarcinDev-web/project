@@ -20,8 +20,8 @@ export async function createAuthRoutes(
   const { authManager, authMiddleware, profileStorage, authLimiter, isProduction, securityLogger } =
     opts.dependencies;
 
-  // Register rate limiter for auth routes (skip in tests)
-  if (process.env.NODE_ENV !== 'test' && !process.env.VITEST) {
+  // Register rate limiter for auth routes only in production (skip in dev/test)
+  if (isProduction) {
     await app.register(rateLimit, authLimiter);
   }
 

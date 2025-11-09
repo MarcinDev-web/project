@@ -1,10 +1,19 @@
 {
   "extends": "../../tsconfig.json",
   "compilerOptions": {
-    "outDir": "dist",
-    "noEmit": false
+    "outDir": "./dist",
+    "baseUrl": ".",
+    "moduleResolution": "bundler",
+    "paths": {
+      "@engine/core": ["../../packages/core/dist"],
+      "@engine/core/*": ["../../packages/core/dist/*"],
+      "@engine/world": ["../../packages/world/dist"],
+      "@engine/world/*": ["../../packages/world/dist/*"],
+      "@shared/*": ["../../shared/*"]
+    }
   },
-  "include": ["src/**/*"]
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "__tests__"]
 }
 
 

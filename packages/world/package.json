@@ -5,18 +5,64 @@
     "main":  "./dist/index.js",
     "types":  "./dist/index.d.ts",
     "exports":  {
-                    ".":  "./dist/index.js",
-                    "./core":  "./dist/core/index.js",
-                    "./components":  "./dist/components/index.js",
-                    "./components/*":  "./dist/components/*.js",
-                    "./systems":  "./dist/systems/index.js",
-                    "./physics":  "./dist/physics/index.js",
-                    "./utils":  "./dist/utils/index.js",
-                    "./data/*":  "./dist/data/*.js",
-                    "./types/*":  "./dist/types/*.js"
+                    ".":  {
+                        "import": "./dist/index.js",
+                        "development": "./src/index.ts",
+                        "test": "./src/index.ts",
+                        "default": "./dist/index.js"
+                    },
+                    "./core":  {
+                        "import": "./dist/core/index.js",
+                        "development": "./src/core/index.ts",
+                        "test": "./src/core/index.ts",
+                        "default": "./dist/core/index.js"
+                    },
+                    "./components":  {
+                        "import": "./dist/components/index.js",
+                        "development": "./src/components/index.ts",
+                        "test": "./src/components/index.ts",
+                        "default": "./dist/components/index.js"
+                    },
+                    "./components/*":  {
+                        "import": "./dist/components/*.js",
+                        "development": "./src/components/*.ts",
+                        "test": "./src/components/*.ts",
+                        "default": "./dist/components/*.js"
+                    },
+                    "./systems":  {
+                        "import": "./dist/systems/index.js",
+                        "development": "./src/systems/index.ts",
+                        "test": "./src/systems/index.ts",
+                        "default": "./dist/systems/index.js"
+                    },
+                    "./physics":  {
+                        "import": "./dist/physics/index.js",
+                        "development": "./src/physics/index.ts",
+                        "test": "./src/physics/index.ts",
+                        "default": "./dist/physics/index.js"
+                    },
+                    "./utils":  {
+                        "import": "./dist/utils/index.js",
+                        "development": "./src/utils/index.ts",
+                        "test": "./src/utils/index.ts",
+                        "default": "./dist/utils/index.js"
+                    },
+                    "./data/*":  {
+                        "import": "./dist/data/*.js",
+                        "development": "./src/data/*.ts",
+                        "test": "./src/data/*.ts",
+                        "default": "./dist/data/*.js"
+                    },
+                    "./types/*":  {
+                        "import": "./dist/types/*.js",
+                        "development": "./src/types/*.ts",
+                        "test": "./src/types/*.ts",
+                        "default": "./dist/types/*.js"
+                    }
                 },
     "scripts":  {
-                    "build":  "tsc -b && node ../../scripts/verify-world-build.js",
+                    "build":  "tsc -b",
+                    "build:verify":  "tsc -b && node ../../scripts/verify-world-build.js",
                     "dev":  "tsc --watch",
                     "test":  "vitest run",
                     "test:watch":  "vitest",

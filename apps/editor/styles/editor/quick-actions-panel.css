@@ -1,0 +1,52 @@
+/**
+ * Quick Actions Panel Styles
+ * 
+ * Styles for QuickActionsPanel in the sidebar
+ */
+
+.quick-actions-panel {
+  display: flex;
+  flex-direction: column;
+  padding: var(--spacing-4);
+  gap: var(--spacing-4);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+.quick-actions-empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  padding: var(--spacing-8);
+  text-align: center;
+  color: var(--color-text-secondary);
+}
+
+.quick-actions-empty-icon {
+  width: 48px;
+  height: 48px;
+  margin-bottom: var(--spacing-4);
+  color: var(--color-text-tertiary);
+  opacity: 0.5;
+}
+
+.quick-actions-empty-title {
+  font-size: var(--text-lg);
+  font-weight: var(--font-semibold);
+  color: var(--color-text-primary);
+  margin-bottom: var(--spacing-2);
+}
+
+.quick-actions-empty-text {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+}
+
+/* Quick Access Bar in sidebar context */
+.quick-actions-panel .quick-access-bar {
+  margin: 0;
+  flex-shrink: 0;
+}
+

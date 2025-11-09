@@ -39,7 +39,6 @@ import { UIElementProperties } from '../ui/UIElementProperties';
 import { MovementProfileRegistry, PRESET_PROFILES, type MovementProfileExtension } from '@engine/stdlib/MovementProfiles';
 import { showCustomProfileEditor } from '../ui/CustomProfileEditor';
 import { getAllNpcUnitTypes, getAllNpcBehaviors, getAllNpcFactions } from '@engine/editor-utils';
-import { QuickAccessBar } from '../ui/QuickAccessBar';
 
 const MIN_SCALE = 0.001;
 
@@ -50,6 +49,7 @@ interface PropertiesPanelConfig {
   onEntityRenamed: (entity: Entity) => void;
   onOpenScriptWorkbench?: () => void;
   state?: EditorState;
+  getRenderer?: () => { updateRenderSettings?: (settings: any) => void; getRenderSettings?: () => any } | null;
 }
 
 
@@ -96,7 +96,6 @@ export class PropertiesPanel {
   };
   private availableSections: string[] = [];
   private sectionsWrapper: HTMLElement | null = null;
-  private quickAccessBar: QuickAccessBar | null = null;
 
   constructor(private readonly config: PropertiesPanelConfig) {
     this.root = document.createElement('section');
@@ -203,25 +202,6 @@ export class PropertiesPanel {
     this.sectionElements.clear();
     this.renderedEntityId = selected.id;
 
-    // Create Quick Access Bar
-    if (this.quickAccessBar) {
-      this.quickAccessBar.dispose();
-    }
-    this.quickAccessBar = new QuickAccessBar({
-      entity: selected,
-      onTransformChanged: this.config.onTransformChanged,
-      onColorChanged: this.config.onColorChanged,
-      getSnapConfig: () => this.getSnapConfig(),
-      roundToIncrement: (value, increment) => this.roundToIncrement(value, increment),
-      entityHasTexture: (entity, materialComp) => this.entityHasTexture(entity, materialComp),
-      abortSignal: this.refreshAbort!.signal,
-      setManagedTimeout: (fn, ms) => this.setManagedTimeout(fn, ms),
-      registerUndo: (action) => this.registerUndo(action),
-      announce: (message) => this.announce(message),
-      refresh: () => this.refresh(),
-    });
-    this.content.appendChild(this.quickAccessBar.element);
-
     // Create sections wrapper
     const sectionsWrapper = document.createElement('div');
     sectionsWrapper.className = 'inspector-sections';
@@ -260,10 +240,6 @@ export class PropertiesPanel {
       window.clearTimeout(timeoutId);
     }
     this.activeTimeouts.clear();
-    if (this.quickAccessBar) {
-      this.quickAccessBar.dispose();
-      this.quickAccessBar = null;
-    }
     this.sectionElements.clear();
     this.content.innerHTML = '';
     this.root.remove();
@@ -331,12 +307,6 @@ export class PropertiesPanel {
 
   private tryUpdateExistingValues(entity: Entity): boolean {
     let anyUpdated = false;
-
-    // Update QuickAccessBar if it exists
-    if (this.quickAccessBar) {
-      this.quickAccessBar.updateEntity(entity);
-      anyUpdated = true;
-    }
 
     // Position (check both old and new field names for backward compatibility)
     const pos = entity.transform.position;
@@ -1950,6 +1920,177 @@ export class PropertiesPanel {
           )
         );
       }
+    }
+
+    // Cloud controls (for procedural-sky)
+    if (environment.skyboxType === 'procedural-sky') {
+      // Clouds Enabled Toggle
+      const cloudsEnabledRow = document.createElement('div');
+      cloudsEnabledRow.className = 'property-row';
+      
+      const cloudsEnabledLabel = document.createElement('label');
+      cloudsEnabledLabel.className = 'property-label-v2';
+      cloudsEnabledLabel.textContent = 'Clouds Enabled';
+      
+      const cloudsEnabledToggle = document.createElement('input');
+      cloudsEnabledToggle.type = 'checkbox';
+      cloudsEnabledToggle.className = 'property-toggle-v2';
+      cloudsEnabledToggle.checked = environment.cloudsEnabled;
+      cloudsEnabledToggle.addEventListener('change', () => {
+        environment.cloudsEnabled = cloudsEnabledToggle.checked;
+        this.refresh();
+      }, { signal: this.refreshAbort!.signal });
+      
+      cloudsEnabledRow.appendChild(cloudsEnabledLabel);
+      cloudsEnabledRow.appendChild(cloudsEnabledToggle);
+      container.appendChild(cloudsEnabledRow);
+
+      if (environment.cloudsEnabled) {
+        // Cloud Density
+        container.appendChild(
+          this.createNumberPropertyV2(
+            'Cloud Density',
+            environment.cloudDensity,
+            (value) => {
+              if (!Number.isFinite(value) || value < 0 || value > 1) return;
+              environment.cloudDensity = value;
+            },
+            '',
+            0,
+            1,
+            0.01
+          )
+        );
+
+        // Cloud Speed
+        container.appendChild(
+          this.createNumberPropertyV2(
+            'Cloud Speed',
+            environment.cloudSpeed,
+            (value) => {
+              if (!Number.isFinite(value) || value < 0 || value > 1) return;
+              environment.cloudSpeed = value;
+            },
+            '',
+            0,
+            1,
+            0.01
+          )
+        );
+      }
+    }
+
+    // Visual Preset dropdown
+    const presetRow = document.createElement('div');
+    presetRow.className = 'property-row';
+    
+    const presetLabel = document.createElement('label');
+    presetLabel.className = 'property-label-v2';
+    presetLabel.textContent = 'Visual Preset';
+    
+    const presetSelect = document.createElement('select');
+    presetSelect.className = 'property-select-v2';
+    const presets = ['', 'stylized-balanced', 'cinematic', 'low'];
+    for (const preset of presets) {
+      const option = document.createElement('option');
+      option.value = preset;
+      option.textContent = preset === '' ? 'Custom' : preset.split('-').map((word) => word.charAt(0).toUpperCase() + word.slice(1)).join(' ');
+      if (environment.visualPreset === preset || (!environment.visualPreset && preset === '')) {
+        option.selected = true;
+      }
+      presetSelect.appendChild(option);
+    }
+    presetSelect.addEventListener('change', () => {
+      if (presetSelect.value === '') {
+        environment.visualPreset = undefined;
+      } else {
+        environment.visualPreset = presetSelect.value as 'stylized-balanced' | 'cinematic' | 'low';
+      }
+      this.refresh();
+    }, { signal: this.refreshAbort!.signal });
+    
+    presetRow.appendChild(presetLabel);
+    presetRow.appendChild(presetSelect);
+    container.appendChild(presetRow);
+
+    // Post-FX Controls (if renderer available)
+    const renderer = this.config.getRenderer?.();
+    if (renderer && renderer.getRenderSettings) {
+      const settings = renderer.getRenderSettings();
+      
+      // Post-FX Section Header
+      const fxHeader = document.createElement('div');
+      fxHeader.className = 'property-section-header';
+      fxHeader.textContent = 'Post-Processing';
+      container.appendChild(fxHeader);
+
+      // Bloom Toggle
+      const bloomRow = document.createElement('div');
+      bloomRow.className = 'property-row';
+      const bloomLabel = document.createElement('label');
+      bloomLabel.className = 'property-label-v2';
+      bloomLabel.textContent = 'Bloom';
+      const bloomToggle = document.createElement('input');
+      bloomToggle.type = 'checkbox';
+      bloomToggle.className = 'property-toggle-v2';
+      bloomToggle.checked = settings.enableBloom ?? false;
+      bloomToggle.addEventListener('change', () => {
+        renderer.updateRenderSettings?.({ enableBloom: bloomToggle.checked });
+      }, { signal: this.refreshAbort!.signal });
+      bloomRow.appendChild(bloomLabel);
+      bloomRow.appendChild(bloomToggle);
+      container.appendChild(bloomRow);
+
+      // SSAO Toggle
+      const ssaoRow = document.createElement('div');
+      ssaoRow.className = 'property-row';
+      const ssaoLabel = document.createElement('label');
+      ssaoLabel.className = 'property-label-v2';
+      ssaoLabel.textContent = 'SSAO';
+      const ssaoToggle = document.createElement('input');
+      ssaoToggle.type = 'checkbox';
+      ssaoToggle.className = 'property-toggle-v2';
+      ssaoToggle.checked = settings.enableSSAO ?? false;
+      ssaoToggle.addEventListener('change', () => {
+        renderer.updateRenderSettings?.({ enableSSAO: ssaoToggle.checked });
+      }, { signal: this.refreshAbort!.signal });
+      ssaoRow.appendChild(ssaoLabel);
+      ssaoRow.appendChild(ssaoToggle);
+      container.appendChild(ssaoRow);
+
+      // FXAA Toggle
+      const fxaaRow = document.createElement('div');
+      fxaaRow.className = 'property-row';
+      const fxaaLabel = document.createElement('label');
+      fxaaLabel.className = 'property-label-v2';
+      fxaaLabel.textContent = 'FXAA';
+      const fxaaToggle = document.createElement('input');
+      fxaaToggle.type = 'checkbox';
+      fxaaToggle.className = 'property-toggle-v2';
+      fxaaToggle.checked = settings.enableFXAA ?? false;
+      fxaaToggle.addEventListener('change', () => {
+        renderer.updateRenderSettings?.({ enableFXAA: fxaaToggle.checked });
+      }, { signal: this.refreshAbort!.signal });
+      fxaaRow.appendChild(fxaaLabel);
+      fxaaRow.appendChild(fxaaToggle);
+      container.appendChild(fxaaRow);
+
+      // Outlines Toggle
+      const outlinesRow = document.createElement('div');
+      outlinesRow.className = 'property-row';
+      const outlinesLabel = document.createElement('label');
+      outlinesLabel.className = 'property-label-v2';
+      outlinesLabel.textContent = 'Outlines';
+      const outlinesToggle = document.createElement('input');
+      outlinesToggle.type = 'checkbox';
+      outlinesToggle.className = 'property-toggle-v2';
+      outlinesToggle.checked = settings.enableOutlines ?? false;
+      outlinesToggle.addEventListener('change', () => {
+        renderer.updateRenderSettings?.({ enableOutlines: outlinesToggle.checked });
+      }, { signal: this.refreshAbort!.signal });
+      outlinesRow.appendChild(outlinesLabel);
+      outlinesRow.appendChild(outlinesToggle);
+      container.appendChild(outlinesRow);
     }
 
     return container;

@@ -1,5 +1,5 @@
 import type { FastifyInstance, FastifyRequest } from 'fastify';
-import type { PrismaClient, User } from '@prisma/client';
+import type { PrismaClient, User } from '../../node_modules/.prisma/collab-client/index.js';
 import { z } from 'zod';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';

@@ -40,6 +40,7 @@ function clamp(value: number, min: number, max: number): number {
  * - WASD movement (with Shift to sprint, Alt to slow down)
  * - Right mouse button + drag for look
  * - Q/E for vertical movement (up/down)
+ * - Space/C as intuitive alternatives for up/down
  * - Mouse wheel to zoom (move forward/backward)
  * - Ctrl+Mouse wheel to adjust movement speed
  * - No collision, can fly through anything
@@ -233,11 +234,21 @@ export class EditorCameraController {
     this.scratch.movement[1] += (this.forward[1] * forwardAmount + this.right[1] * rightAmount) * moveAmount;
     this.scratch.movement[2] += (this.forward[2] * forwardAmount + this.right[2] * rightAmount) * moveAmount;
 
-    // Q/E for vertical movement (world up/down)
-    if (this.keysPressed.has('e') || this.keysPressed.has('E')) {
+    // Q/E or Space/C for vertical movement (world up/down)
+    if (
+      this.keysPressed.has('e') ||
+      this.keysPressed.has('E') ||
+      this.keysPressed.has(' ') /* Space */ ||
+      this.keysPressed.has('space')
+    ) {
       this.scratch.movement[1] += moveAmount;
     }
-    if (this.keysPressed.has('q') || this.keysPressed.has('Q')) {
+    if (
+      this.keysPressed.has('q') ||
+      this.keysPressed.has('Q') ||
+      this.keysPressed.has('c') ||
+      this.keysPressed.has('C')
+    ) {
       this.scratch.movement[1] -= moveAmount;
     }
 
@@ -368,7 +379,7 @@ export class EditorCameraController {
 
     // Don't capture if typing in input/textarea
     const target = event.target as HTMLElement;
-    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') {
+    if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.isContentEditable === true) {
       return;
     }
 
@@ -388,11 +399,14 @@ export class EditorCameraController {
     
     // Only capture movement keys (store both lowercase and original case for compatibility)
     const keyLower = key.toLowerCase();
-    if (['w', 'a', 's', 'd', 'q', 'e'].includes(keyLower)) {
+    const isSpace = key === ' ';
+    const isVerticalKey = keyLower === 'q' || keyLower === 'e' || keyLower === 'c' || isSpace;
+    const isMovementKey = keyLower === 'w' || keyLower === 'a' || keyLower === 's' || keyLower === 'd';
+    // Gate vertical movement (Q/E) to when RMB-look is active to reduce conflicts with editor shortcuts
+    if (isMovementKey || (isVerticalKey && this.isRightMouseDown)) {
       this.keysPressed.add(key); // Store original key for Shift/Alt detection
       this.keysPressed.add(keyLower); // Store lowercase for movement detection
       event.preventDefault();
-      event.stopPropagation(); // Stop event from reaching KeyboardHandler
     }
   }
 
@@ -413,7 +427,7 @@ export class EditorCameraController {
     }
     
     const keyLower = key.toLowerCase();
-    if (['w', 'a', 's', 'd', 'q', 'e'].includes(keyLower)) {
+    if (['w', 'a', 's', 'd', 'q', 'e', 'c'].includes(keyLower) || key === ' ') {
       // Remove both original and lowercase versions
       this.keysPressed.delete(key);
       this.keysPressed.delete(keyLower);

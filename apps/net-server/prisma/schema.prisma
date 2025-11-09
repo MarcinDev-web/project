@@ -1,7 +1,8 @@
 // Prisma schema for net-server
 generator client {
-  provider = "prisma-client-js"
-  output   = "../node_modules/.prisma/net-client"
+  provider      = "prisma-client-js"
+  output        = "../node_modules/.prisma/net-client"
+  binaryTargets = ["native", "linux-musl-openssl-3.0.x"]
 }
 
 datasource db {
@@ -305,5 +306,123 @@ model TokenBlacklist {
 
   @@index([expiresAt])
   @@map("token_blacklist")
+}
+
+// Forum
+model ForumCategory {
+  id          String   @id
+  name        String
+  description String
+  icon        String?
+  color       String?
+  order       Int      @default(999)
+  isLocked    Boolean  @default(false) @map("is_locked")
+
+  threads ForumThread[]
+
+  @@index([order])
+  @@map("forum_categories")
+}
+
+model ForumThread {
+  id               String   @id
+  categoryId       String   @map("category_id")
+  authorId         String   @map("author_id")
+  title            String
+  content          String   // First post content
+  isPinned         Boolean  @default(false) @map("is_pinned")
+  isLocked         Boolean  @default(false) @map("is_locked")
+  tags             String[] @default([])
+  marketplaceItemId String?  @map("marketplace_item_id")
+  projectToken     String?   @map("project_token")
+  createdAt        DateTime  @default(now()) @map("created_at")
+  updatedAt        DateTime  @default(now()) @updatedAt @map("updated_at")
+
+  category ForumCategory @relation(fields: [categoryId], references: [id], onDelete: Cascade)
+  posts    ForumPost[]
+  reactions ForumThreadReaction[]
+  votes    ForumThreadVote[]
+
+  @@index([categoryId])
+  @@index([authorId])
+  @@index([createdAt(sort: Desc)])
+  @@index([isPinned, createdAt(sort: Desc)])
+  @@index([tags], type: Gin)
+  @@map("forum_threads")
+}
+
+model ForumPost {
+  id        String   @id
+  threadId  String   @map("thread_id")
+  authorId  String   @map("author_id")
+  content   String
+  mentions  String[] @default([])
+  editedAt  DateTime? @map("edited_at")
+  createdAt DateTime  @default(now()) @map("created_at")
+
+  thread     ForumThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+  reactions  ForumPostReaction[]
+  votes      ForumPostVote[]
+
+  @@index([threadId])
+  @@index([authorId])
+  @@index([createdAt(sort: Desc)])
+  @@map("forum_posts")
+}
+
+model ForumThreadReaction {
+  threadId  String   @map("thread_id")
+  emoji     String
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  thread ForumThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@id([threadId, emoji, userId])
+  @@index([threadId])
+  @@index([userId])
+  @@map("forum_thread_reactions")
+}
+
+model ForumPostReaction {
+  postId    String   @map("post_id")
+  emoji     String
+  userId    String   @map("user_id")
+  createdAt DateTime @default(now()) @map("created_at")
+
+  post ForumPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@id([postId, emoji, userId])
+  @@index([postId])
+  @@index([userId])
+  @@map("forum_post_reactions")
+}
+
+model ForumThreadVote {
+  threadId  String   @map("thread_id")
+  userId    String   @map("user_id")
+  vote      String   // 'up' | 'down'
+  createdAt DateTime @default(now()) @map("created_at")
+
+  thread ForumThread @relation(fields: [threadId], references: [id], onDelete: Cascade)
+
+  @@id([threadId, userId])
+  @@index([threadId])
+  @@index([userId])
+  @@map("forum_thread_votes")
+}
+
+model ForumPostVote {
+  postId    String   @map("post_id")
+  userId    String   @map("user_id")
+  vote      String   // 'up' | 'down'
+  createdAt DateTime @default(now()) @map("created_at")
+
+  post ForumPost @relation(fields: [postId], references: [id], onDelete: Cascade)
+
+  @@id([postId, userId])
+  @@index([postId])
+  @@index([userId])
+  @@map("forum_post_votes")
 }
 

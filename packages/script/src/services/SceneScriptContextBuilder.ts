@@ -40,8 +40,12 @@ export class SceneScriptContextBuilder {
     }
   ) {
     this.scene = scene;
-    this.capabilityManager = options?.capabilityManager;
-    this.permissions = options?.permissions;
+    if (options?.capabilityManager !== undefined) {
+      this.capabilityManager = options.capabilityManager;
+    }
+    if (options?.permissions !== undefined) {
+      this.permissions = options.permissions;
+    }
 
     // Grant capabilities based on permissions if manager is provided
     if (this.capabilityManager && this.permissions) {

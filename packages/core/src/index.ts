@@ -12,3 +12,12 @@ export * from './job';
 export * from './utils';
 export * from './script';
 export * from './memory';
+
+// Explicit re-exports for better bundler compatibility
+export {
+  getGlobalRNG,
+  initGlobalRNG,
+  resetGlobalRNG,
+  isGlobalRNGInitialized,
+  SeededRNG,
+} from './utils/SeededRNG';
