@@ -30,6 +30,20 @@ if [ -n "$AUTH_RATE_LIMIT_MAX" ]; then
   echo "INFO: AUTH_RATE_LIMIT_MAX=$AUTH_RATE_LIMIT_MAX"
 fi
 
+# Run database migrations in production
+if [ "$NODE_ENV" = "production" ] && [ -n "$DATABASE_URL" ]; then
+  echo "Running database migrations..."
+  cd /app/apps/net-server
+  if command -v prisma >/dev/null 2>&1; then
+    prisma migrate deploy --schema=./prisma/schema.prisma || {
+      echo "WARN: Migration failed or prisma not available, continuing..."
+    }
+  else
+    echo "WARN: Prisma CLI not available, skipping migrations"
+    echo "INFO: Make sure migrations are run manually or via CI/CD"
+  fi
+fi
+
 # Exec the actual server command (from CMD)
 exec "$@"
 

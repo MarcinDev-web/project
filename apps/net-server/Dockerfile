@@ -130,15 +130,21 @@ COPY --from=builder --chown=nodejs:nodejs /app/shared ./shared
 
 # Install production dependencies and rebuild native modules
 # Install build tools temporarily for native module compilation (bcrypt)
+# Also install Prisma CLI for migrations
 # pnpm ignores build scripts by default in CI, so we rebuild bcrypt manually
 RUN apk add --no-cache --virtual .build-deps python3 make g++ && \
     CI=true pnpm install --no-frozen-lockfile --prod && \
+    pnpm add -g prisma@^5.22.0 || npm install -g prisma@^5.22.0 || true && \
     pnpm rebuild bcrypt --prod || find /app/node_modules/.pnpm -name "bcrypt" -type d -path "*/bcrypt@*/node_modules/bcrypt" -exec sh -c 'cd "{}" && npm rebuild' \; || true && \
     apk del .build-deps
 
 # Copy generated Prisma client from builder stage
 # Prisma client is generated at apps/net-server/node_modules/.prisma/net-client (relative to prisma folder)
 COPY --from=builder --chown=nodejs:nodejs /app/apps/net-server/node_modules/.prisma ./apps/net-server/node_modules/.prisma
+
+# Copy Prisma migrations for runtime migration execution
+COPY --from=builder --chown=nodejs:nodejs /app/apps/net-server/prisma/migrations ./apps/net-server/prisma/migrations
+COPY --from=builder --chown=nodejs:nodejs /app/apps/net-server/prisma/schema.prisma ./apps/net-server/prisma/schema.prisma
 
 # Copy built application from builder stage
 COPY --from=builder --chown=nodejs:nodejs /app/apps/net-server/dist ./apps/net-server/dist
