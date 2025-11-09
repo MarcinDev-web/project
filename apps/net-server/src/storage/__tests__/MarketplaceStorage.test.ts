@@ -214,6 +214,16 @@ describe('MarketplaceStorage', () => {
       }
     });
 
+    it('enforces maximum limit of 100', async () => {
+      const items = await storage.getItems({ limit: 1000 }); // Request more than max
+      expect(items.length).toBeLessThanOrEqual(100);
+    });
+
+    it('enforces maximum limit when limit is exactly 100', async () => {
+      const items = await storage.getItems({ limit: 100 });
+      expect(items.length).toBeLessThanOrEqual(100);
+    });
+
     it('combines multiple filters', async () => {
       const items = await storage.getItems({
         type: 'build',
@@ -288,6 +298,74 @@ describe('MarketplaceStorage', () => {
       expect(retrieved?.createdAt).toBe(originalCreatedAt);
       expect(retrieved?.authorId).toBe(originalAuthorId);
     });
+
+    it('validates update data - rejects negative downloads', async () => {
+      const item = await storage.createItem({
+        type: 'build',
+        title: 'Test',
+        authorId: 'user1',
+        fileUrl: '/api/marketplace/item1/build',
+        tags: [],
+        public: true,
+      });
+
+      await expect(
+        storage.updateItem(item.id, {
+          downloads: -1,
+        } as any)
+      ).rejects.toThrow();
+    });
+
+    it('validates update data - rejects negative likes', async () => {
+      const item = await storage.createItem({
+        type: 'build',
+        title: 'Test',
+        authorId: 'user1',
+        fileUrl: '/api/marketplace/item1/build',
+        tags: [],
+        public: true,
+      });
+
+      await expect(
+        storage.updateItem(item.id, {
+          likes: -5,
+        } as any)
+      ).rejects.toThrow();
+    });
+
+    it('validates update data - rejects empty title', async () => {
+      const item = await storage.createItem({
+        type: 'build',
+        title: 'Test',
+        authorId: 'user1',
+        fileUrl: '/api/marketplace/item1/build',
+        tags: [],
+        public: true,
+      });
+
+      await expect(
+        storage.updateItem(item.id, {
+          title: '',
+        } as any)
+      ).rejects.toThrow();
+    });
+
+    it('validates update data - rejects non-integer downloads', async () => {
+      const item = await storage.createItem({
+        type: 'build',
+        title: 'Test',
+        authorId: 'user1',
+        fileUrl: '/api/marketplace/item1/build',
+        tags: [],
+        public: true,
+      });
+
+      await expect(
+        storage.updateItem(item.id, {
+          downloads: 1.5,
+        } as any)
+      ).rejects.toThrow();
+    });
   });
 
   describe('deleteItem', () => {
@@ -356,6 +434,30 @@ describe('MarketplaceStorage', () => {
     it('does nothing for non-existent item', async () => {
       // Should not throw
       await expect(storage.incrementDownloads('nonexistent')).resolves.not.toThrow();
+    });
+
+    it('handles concurrent increments correctly (race condition test)', async () => {
+      const item = await storage.createItem({
+        type: 'build',
+        title: 'Concurrent Test Build',
+        authorId: 'user1',
+        fileUrl: '/api/marketplace/concurrent/build',
+        tags: [],
+        public: true,
+      });
+
+      expect(item.downloads).toBe(0);
+
+      // Perform 20 concurrent increments
+      const concurrentIncrements = Array.from({ length: 20 }, () =>
+        storage.incrementDownloads(item.id)
+      );
+
+      await Promise.all(concurrentIncrements);
+
+      // Verify all increments were applied (no lost updates)
+      const updated = await storage.getItem(item.id);
+      expect(updated?.downloads).toBe(20);
     });
   });
 });

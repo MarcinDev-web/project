@@ -80,6 +80,22 @@ model MarketplaceLike {
   @@map("marketplace_likes")
 }
 
+model MarketplaceResaleListing {
+  id            String    @id @default(uuid())
+  marketplaceId String    @map("marketplace_id")
+  sellerId      String    @map("seller_id")
+  priceCurrency String    @map("price_currency")
+  priceAmount   Decimal   @map("price_amount") @db.Decimal
+  createdAt     DateTime  @default(now()) @map("created_at")
+  expiresAt     DateTime? @map("expires_at")
+
+  @@unique([marketplaceId, sellerId])
+  @@index([marketplaceId])
+  @@index([sellerId])
+  @@index([expiresAt])
+  @@map("marketplace_resale_listings")
+}
+
 model GameSession {
   gameId  String   @map("game_id")
   userId  String   @map("user_id")

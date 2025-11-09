@@ -129,6 +129,52 @@ export const searchQuerySchema = z.object({
 });
 
 /**
+ * Update marketplace item schema (for updateItem method).
+ */
+export const updateItemSchema = z.object({
+  title: trimmedStringSchema(200).min(1).optional(),
+  description: trimmedStringSchema(5000).optional(),
+  authorName: trimmedStringSchema(100).optional(),
+  thumbnailUrl: fileUrlSchema.optional(),
+  fileUrl: fileUrlSchema.optional(),
+  tags: arraySchema(tagSchema, 20).optional(),
+  downloads: z.number().int().nonnegative().optional(),
+  likes: z.number().int().nonnegative().optional(),
+  public: z.boolean().optional(),
+  price: z
+    .object({
+      currency: currencySchema,
+      amount: positiveNumberSchema,
+    })
+    .optional()
+    .nullable(),
+  forumThreadId: uuidSchema.or(z.string().min(1)).optional().nullable(),
+});
+
+/**
+ * Marketplace query params schema (for list endpoints).
+ */
+export const marketplaceQuerySchema = z.object({
+  type: marketplaceItemTypeSchema.optional(),
+  tags: z
+    .string()
+    .optional()
+    .transform((val) => (val ? val.split(',').map((t) => t.trim()) : undefined))
+    .pipe(arraySchema(tagSchema, 20).optional()),
+  limit: z
+    .string()
+    .optional()
+    .transform((val) => (val ? parseInt(val, 10) : undefined))
+    .pipe(z.number().int().positive().max(100).optional()),
+  offset: z
+    .string()
+    .optional()
+    .transform((val) => (val ? parseInt(val, 10) : undefined))
+    .pipe(z.number().int().nonnegative().optional()),
+  sortBy: z.enum(['newest', 'popular', 'downloads', 'likes']).optional(),
+});
+
+/**
  * Marketplace item ID param schema.
  */
 export const marketplaceItemIdParamSchema = z.object({
@@ -143,5 +189,6 @@ export type UpdatePriceRequest = z.infer<typeof updatePriceSchema>;
 export type ResaleListingRequest = z.infer<typeof resaleListingSchema>;
 export type BuyResaleRequest = z.infer<typeof buyResaleSchema>;
 export type SearchQueryRequest = z.infer<typeof searchQuerySchema>;
+export type UpdateItemRequest = z.infer<typeof updateItemSchema>;
 export type MarketplaceItemIdParam = z.infer<typeof marketplaceItemIdParamSchema>;
 

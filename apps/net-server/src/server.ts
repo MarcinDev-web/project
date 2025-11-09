@@ -55,6 +55,7 @@ import {
   DatabaseError,
 } from './errors/MarketplaceErrors.js';
 import { LikesStorage } from './storage/LikesStorage.js';
+import { ResaleStorage } from './storage/ResaleStorage.js';
 import { FriendsStorage } from './storage/FriendsStorage.js';
 import { MessagesStorage } from './storage/MessagesStorage.js';
 import { BlockedUsersStorage } from './storage/BlockedUsersStorage.js';
@@ -203,6 +204,8 @@ const buildStorage = dbPool ? new BuildStorage(dbPool) : null;
 const likesStorage = dbPool
   ? new LikesStorage(dbPool)
   : new LikesStorage(DATA_DIR, marketplaceStorage as MarketplaceStorage);
+const resaleStorage = dbPool ? new ResaleStorage(dbPool) : null;
+
 const friendsStorage = new FriendsStorage(DATA_DIR);
 const messagesStorage = new MessagesStorage(DATA_DIR);
 const blockedUsersStorage = new BlockedUsersStorage(DATA_DIR);
@@ -303,6 +306,7 @@ const userCarts = new Map<
 >();
 
 // In-memory secondary resale listings (keyed by marketplace item id)
+// DEPRECATED: Use resaleStorage instead (only available when dbPool is set)
 type ResaleListing = { sellerId: string; price: CurrencyAmount; createdAt: number };
 const resaleListings = new Map<string, ResaleListing[]>();
 
@@ -383,10 +387,24 @@ const publishLimiterConfig = {
   }),
 };
 
+// Rate limiting configuration for marketplace like endpoint
+const marketplaceLikeLimiterConfig = {
+  max: parseInt(process.env.MARKETPLACE_LIKE_RATE_LIMIT_MAX || '20', 10),
+  timeWindow: '1 minute',
+  errorResponseBuilder: (request: any) => {
+    const ip = request.ip || 'unknown';
+    securityLogger.logRateLimitViolation(ip, '/api/marketplace/*/like', marketplaceLikeLimiterConfig.max);
+    return {
+      error: 'Too many like requests, please slow down.',
+    };
+  },
+};
+
 // Export rate limiter configs for use in routes
 export const authLimiter = authLimiterConfig;
 export const economyLimiter = economyLimiterConfig;
 export const publishLimiter = publishLimiterConfig;
+export const marketplaceLikeLimiter = marketplaceLikeLimiterConfig;
 
 // Initialize storage on startup
 void storage.initialize().then(() => {
@@ -411,6 +429,21 @@ void authManager.initialize().then(async () => {
   await profileStorage.initialize();
   await marketplaceStorage.initialize();
   await likesStorage.initialize();
+  if (resaleStorage) {
+    await resaleStorage.initialize();
+    
+    // Cleanup expired resale listings every hour
+    setInterval(async () => {
+      try {
+        const deleted = await resaleStorage!.cleanupExpired();
+        if (deleted > 0) {
+          console.log(`Cleaned up ${deleted} expired resale listings`);
+        }
+      } catch (error) {
+        console.error('Failed to cleanup expired resale listings:', error);
+      }
+    }, 60 * 60 * 1000); // 1 hour
+  }
   await friendsStorage.initialize();
   await messagesStorage.initialize();
   await blockedUsersStorage.initialize();
@@ -555,11 +588,13 @@ const routeDeps: RouteDependencies = {
   // In-memory stores
   userCarts,
   resaleListings,
+  resaleStorage,
 
   // Rate limiters
   authLimiter,
   economyLimiter,
   publishLimiter,
+  marketplaceLikeLimiter,
 
   // Security
   securityLogger,

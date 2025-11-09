@@ -9,6 +9,7 @@ import type { MarketplaceStorage } from '../storage/MarketplaceStorage.js';
 import type { MarketplaceStorageDB } from '../storage/MarketplaceStorageDB.js';
 import type { BuildStorage } from '../storage/BuildStorage.js';
 import type { LikesStorage } from '../storage/LikesStorage.js';
+import type { ResaleStorage } from '../storage/ResaleStorage.js';
 import type { FriendsStorage } from '../storage/FriendsStorage.js';
 import type { MessagesStorage } from '../storage/MessagesStorage.js';
 import type { BlockedUsersStorage } from '../storage/BlockedUsersStorage.js';
@@ -48,6 +49,7 @@ export interface RouteDependencies {
   marketplaceStorage: MarketplaceStorage | MarketplaceStorageDB;
   buildStorage: BuildStorage | null;
   likesStorage: LikesStorage;
+  resaleStorage: ResaleStorage | null;
   friendsStorage: FriendsStorage;
   messagesStorage: MessagesStorage;
   blockedUsersStorage: BlockedUsersStorage;
@@ -106,6 +108,11 @@ export interface RouteDependencies {
     max: number;
     timeWindow: string;
     errorResponseBuilder: () => { error: string };
+  };
+  marketplaceLikeLimiter: {
+    max: number;
+    timeWindow: string;
+    errorResponseBuilder: (request: FastifyRequest) => { error: string };
   };
 
   // Security

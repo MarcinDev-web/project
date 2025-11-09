@@ -5,8 +5,35 @@
 import type { PrismaClient as PrismaClientType } from '../../node_modules/.prisma/net-client/index.js';
 import { Prisma } from '../../node_modules/.prisma/net-client/index.js';
 import type { MarketplaceItem } from './MarketplaceStorage.js';
+import { updateItemSchema } from '../validation/schemas/marketplace.js';
+
+/**
+ * Interface for raw SQL search results from PostgreSQL
+ */
+interface SearchResultRow {
+  id: string;
+  type: string;
+  title: string;
+  description: string | null;
+  author_id: string;
+  author_name: string | null;
+  thumbnail_url: string | null;
+  file_url: string;
+  tags: string[];
+  created_at: Date;
+  updated_at: Date;
+  downloads: number;
+  likes: number;
+  public: boolean;
+  price_currency?: string | null;
+  price_amount?: number | null;
+  forum_thread_id?: string | null;
+}
 
 export class MarketplaceStorageDB {
+  // Maximum limit for pagination to prevent DoS attacks
+  private static readonly MAX_LIMIT = 100;
+
   constructor(private readonly prisma: PrismaClientType) {}
 
   async initialize(): Promise<void> {
@@ -68,7 +95,7 @@ export class MarketplaceStorageDB {
       sortBy?: 'newest' | 'popular' | 'downloads' | 'likes';
     } = {}
   ): Promise<MarketplaceItem[]> {
-    const limit = options.limit ?? 100;
+    const limit = Math.min(options.limit ?? 50, MarketplaceStorageDB.MAX_LIMIT);
     const offset = options.offset ?? 0;
 
     // Build where clause for Prisma
@@ -123,25 +150,7 @@ export class MarketplaceStorageDB {
           LIMIT ${limit} OFFSET ${offset}
         `;
 
-        const results = (await this.prisma.$queryRaw(rawQuery)) as Array<{
-          id: string;
-          type: string;
-          title: string;
-          description: string | null;
-          author_id: string;
-          author_name: string | null;
-          thumbnail_url: string | null;
-          file_url: string;
-          tags: string[];
-          created_at: Date;
-          updated_at: Date;
-          downloads: number;
-          likes: number;
-          public: boolean;
-          price_currency?: string | null;
-          price_amount?: number | null;
-          forum_thread_id?: string | null;
-        }>;
+        const results = (await this.prisma.$queryRaw(rawQuery)) as SearchResultRow[];
 
         return results.map((row) => this.mapRowToItem(row));
       }
@@ -185,6 +194,12 @@ export class MarketplaceStorageDB {
     updates: Partial<Omit<MarketplaceItem, 'id' | 'createdAt' | 'authorId'>>,
     tx?: PrismaClientType
   ): Promise<MarketplaceItem | null> {
+    // Validate updates before applying
+    const validationResult = updateItemSchema.safeParse(updates);
+    if (!validationResult.success) {
+      throw new Error(`Invalid update data: ${validationResult.error.message}`);
+    }
+
     const client = tx ?? this.prisma;
 
     // Build update data
@@ -350,25 +365,7 @@ export class MarketplaceStorageDB {
   /**
    * Maps database row (from raw SQL) to MarketplaceItem
    */
-  private mapRowToItem(row: {
-    id: string;
-    type: string;
-    title: string;
-    description: string | null;
-    author_id: string;
-    author_name: string | null;
-    thumbnail_url: string | null;
-    file_url: string;
-    tags: string[];
-    created_at: Date;
-    updated_at: Date;
-    downloads: number;
-    likes: number;
-    public: boolean;
-    price_currency?: string | null;
-    price_amount?: number | null;
-    forum_thread_id?: string | null;
-  }): MarketplaceItem {
+  private mapRowToItem(row: SearchResultRow): MarketplaceItem {
     const item: MarketplaceItem = {
       id: row.id,
       type: row.type as 'build' | 'avatar',

@@ -5,6 +5,7 @@
 import { promises as fs } from 'fs';
 import path from 'path';
 import type { CurrencyAmount } from '@engine/economy';
+import { updateItemSchema } from '../validation/schemas/marketplace.js';
 
 export interface MarketplaceItem {
   id: string;
@@ -28,6 +29,10 @@ export interface MarketplaceItem {
 export class MarketplaceStorage {
   private readonly dataDir: string;
   private readonly itemsFile: string;
+  private writeQueue: Promise<void> = Promise.resolve();
+
+  // Maximum limit for pagination to prevent DoS attacks
+  private static readonly MAX_LIMIT = 100;
 
   constructor(dataDir: string) {
     this.dataDir = dataDir;
@@ -54,7 +59,11 @@ export class MarketplaceStorage {
   }
 
   private async writeItems(items: Record<string, MarketplaceItem>): Promise<void> {
-    await fs.writeFile(this.itemsFile, JSON.stringify(items, null, 2));
+    // Serialize write operations to prevent race conditions
+    this.writeQueue = this.writeQueue.then(async () => {
+      await fs.writeFile(this.itemsFile, JSON.stringify(items, null, 2));
+    });
+    await this.writeQueue;
   }
 
   async createItem(
@@ -154,7 +163,7 @@ export class MarketplaceStorage {
     }
 
     const offset = options.offset ?? 0;
-    const limit = options.limit ?? 100;
+    const limit = Math.min(options.limit ?? 50, MarketplaceStorage.MAX_LIMIT);
 
     return filtered.slice(offset, offset + limit);
   }
@@ -163,6 +172,12 @@ export class MarketplaceStorage {
     id: string,
     updates: Partial<Omit<MarketplaceItem, 'id' | 'createdAt' | 'authorId'>>
   ): Promise<MarketplaceItem | null> {
+    // Validate updates before applying
+    const validationResult = updateItemSchema.safeParse(updates);
+    if (!validationResult.success) {
+      throw new Error(`Invalid update data: ${validationResult.error.message}`);
+    }
+
     const items = await this.readItems();
     const item = items[id];
 
@@ -197,13 +212,17 @@ export class MarketplaceStorage {
   }
 
   async incrementDownloads(id: string): Promise<void> {
-    const items = await this.readItems();
-    const item = items[id];
+    // Serialize write operations to prevent race conditions
+    this.writeQueue = this.writeQueue.then(async () => {
+      const items = await this.readItems();
+      const item = items[id];
 
-    if (item) {
-      item.downloads++;
-      await this.writeItems(items);
-    }
+      if (item) {
+        item.downloads++;
+        await fs.writeFile(this.itemsFile, JSON.stringify(items, null, 2));
+      }
+    });
+    await this.writeQueue;
   }
 }
 
