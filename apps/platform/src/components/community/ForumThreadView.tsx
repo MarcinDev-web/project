@@ -1,10 +1,13 @@
 import { useState, useEffect, useRef } from 'react';
 import { Card } from '../shared/Card';
 import { Button } from '../shared/Button';
+import { VotingButtons } from './VotingButtons';
 import { ForumPostEditor } from './ForumPostEditor';
 import { ForumReactions } from './ForumReactions';
 import { ThreadBadges } from './ThreadBadges';
+import { ThreadActions } from './ThreadActions';
 import { PostContent } from './PostContent';
+import { PostCard } from './PostCard';
 import { forumApi, type ForumThread, type ForumPost } from '../../api/forum';
 import { useAuth } from '../../contexts/AuthContext';
 import { profilesApi, type UserProfile } from '../../api/profiles';
@@ -35,223 +38,6 @@ function formatTimeAgo(timestamp: number): string {
   return 'just now';
 }
 
-function PostCard({ post, onUpdate }: { post: ForumPost; onUpdate: () => void }) {
-  const { user } = useAuth();
-  const [userProfile, setUserProfile] = useState<UserProfile | null>(null);
-  const [isEditing, setIsEditing] = useState(false);
-  const [editContent, setEditContent] = useState(post.content);
-  const [postScore, setPostScore] = useState({ score: post.score || 0, upvotes: post.upvotes || 0, downvotes: post.downvotes || 0 });
-  const [userVote, setUserVote] = useState<'up' | 'down' | null>(post.userVote || null);
-  const [currentPost, setCurrentPost] = useState(post);
-
-  // Sync local state with post prop when post changes (from WebSocket updates)
-  useEffect(() => {
-    setCurrentPost(post);
-    setPostScore({ 
-      score: post.score || 0, 
-      upvotes: post.upvotes || 0, 
-      downvotes: post.downvotes || 0 
-    });
-    setUserVote(post.userVote || null);
-    if (!isEditing) {
-      setEditContent(post.content);
-    }
-  }, [post.id, post.score, post.upvotes, post.downvotes, post.userVote, post.reactions, isEditing]);
-
-  useEffect(() => {
-    void profilesApi.getProfile(post.authorId)
-      .then(setUserProfile)
-      .catch(() => setUserProfile(null));
-  }, [post.authorId]);
-
-  const handleVote = async (vote: 'up' | 'down') => {
-    if (!user) return;
-    
-    try {
-      if (userVote === vote) {
-        // Remove vote
-        const result = await forumApi.removePostVote(currentPost.id);
-        setPostScore(result);
-        setUserVote(null);
-      } else {
-        // Change or add vote
-        const result = await forumApi.votePost(currentPost.id, vote);
-        setPostScore(result);
-        setUserVote(vote);
-      }
-    } catch (error) {
-      console.error('Failed to vote:', error);
-    }
-  };
-
-  const handleSaveEdit = async () => {
-    try {
-      await forumApi.updatePost(currentPost.id, editContent);
-      setIsEditing(false);
-      onUpdate();
-    } catch (error) {
-      console.error('Failed to update post:', error);
-    }
-  };
-
-  const handleDelete = async () => {
-    if (!confirm('Are you sure you want to delete this post?')) return;
-    try {
-      await forumApi.deletePost(currentPost.id);
-      onUpdate();
-    } catch (error) {
-      console.error('Failed to delete post:', error);
-    }
-  };
-
-  const displayName = userProfile?.displayName || userProfile?.email?.split('@')[0] || `User ${currentPost.authorId.substring(0, 8)}`;
-
-  return (
-    <Card>
-      <div style={{ display: 'flex', gap: 'var(--spacing-4)' }}>
-        {/* Voting section */}
-        <div style={{ 
-          display: 'flex', 
-          flexDirection: 'column', 
-          alignItems: 'center',
-          gap: 'var(--spacing-1)',
-          minWidth: '40px',
-        }}>
-          <button
-            onClick={() => handleVote('up')}
-            disabled={!user}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              cursor: user ? 'pointer' : 'default',
-              color: userVote === 'up' ? '#4ade80' : 'var(--text-3)',
-              fontSize: '1.2em',
-              padding: 0,
-              display: 'flex',
-              alignItems: 'center',
-            }}
-          >
-            ▲
-          </button>
-          <div style={{
-            fontSize: 'var(--text-base)',
-            fontWeight: 'var(--font-semibold)',
-            color: postScore.score > 0 ? '#4ade80' : postScore.score < 0 ? '#ef4444' : 'var(--text-2)',
-          }}>
-            {postScore.score}
-          </div>
-          <button
-            onClick={() => handleVote('down')}
-            disabled={!user}
-            style={{
-              background: 'transparent',
-              border: 'none',
-              cursor: user ? 'pointer' : 'default',
-              color: userVote === 'down' ? '#ef4444' : 'var(--text-3)',
-              fontSize: '1.2em',
-              padding: 0,
-              display: 'flex',
-              alignItems: 'center',
-            }}
-          >
-            ▼
-          </button>
-        </div>
-
-        {/* Post content */}
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)', marginBottom: 'var(--spacing-2)' }}>
-            <Link
-              to={`/profile/${currentPost.authorId}`}
-              style={{
-                fontWeight: 'var(--font-semibold)',
-                color: 'var(--text-1)',
-                textDecoration: 'none',
-              }}
-            >
-              {displayName}
-            </Link>
-            <span style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)' }}>
-              {formatTimeAgo(currentPost.createdAt)}
-              {currentPost.editedAt && ' (edited)'}
-            </span>
-            {user && (user.id === currentPost.authorId || user.role === 'admin' || user.role === 'moderator') && (
-              <>
-                <button
-                  onClick={() => setIsEditing(!isEditing)}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: 'var(--text-2)',
-                    cursor: 'pointer',
-                    fontSize: 'var(--text-xs)',
-                    padding: 0,
-                  }}
-                >
-                  Edit
-                </button>
-                <button
-                  onClick={handleDelete}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: 'var(--color-error)',
-                    cursor: 'pointer',
-                    fontSize: 'var(--text-xs)',
-                    padding: 0,
-                  }}
-                >
-                  Delete
-                </button>
-              </>
-            )}
-          </div>
-
-          {isEditing ? (
-            <div>
-              <textarea
-                value={editContent}
-                onChange={(e) => setEditContent(e.target.value)}
-                style={{
-                  width: '100%',
-                  minHeight: '100px',
-                  padding: 'var(--spacing-2)',
-                  background: 'var(--bg-button)',
-                  border: '1px solid var(--border-default)',
-                  borderRadius: 'var(--radius-md)',
-                  color: 'var(--text-1)',
-                  fontFamily: 'inherit',
-                  fontSize: 'var(--text-sm)',
-                  resize: 'vertical',
-                }}
-              />
-              <div style={{ display: 'flex', gap: 'var(--spacing-2)', marginTop: 'var(--spacing-2)' }}>
-                <Button size="small" onClick={handleSaveEdit}>Save</Button>
-                <Button size="small" variant="secondary" onClick={() => { setIsEditing(false); setEditContent(currentPost.content); }}>Cancel</Button>
-              </div>
-            </div>
-          ) : (
-            <>
-              <div style={{ marginBottom: 'var(--spacing-3)' }}>
-                <PostContent content={currentPost.content} />
-              </div>
-              <ForumReactions
-                reactions={currentPost.reactions}
-                onAddReaction={(emoji) => {
-                  forumApi.addPostReaction(currentPost.id, emoji).then(() => onUpdate()).catch(console.error);
-                }}
-                onRemoveReaction={(emoji) => {
-                  forumApi.removePostReaction(currentPost.id, emoji).then(() => onUpdate()).catch(console.error);
-                }}
-                disabled={!user}
-              />
-            </>
-          )}
-        </div>
-      </div>
-    </Card>
-  );
-}
 
 export function ForumThreadView({ thread, posts, userVote: initialUserVote, onThreadUpdate }: ForumThreadViewProps) {
   const { user } = useAuth();
@@ -413,63 +199,31 @@ export function ForumThreadView({ thread, posts, userVote: initialUserVote, onTh
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-4)' }}>
       {/* Thread header */}
-      <Card>
+      <Card variant="post">
         <div style={{ display: 'flex', gap: 'var(--spacing-4)' }}>
           {/* Voting section */}
-          <div style={{ 
-            display: 'flex', 
-            flexDirection: 'column', 
-            alignItems: 'center',
-            gap: 'var(--spacing-1)',
-            minWidth: '40px',
-          }}>
-            <button
-              onClick={() => handleThreadVote('up')}
+          <div className="forum-post__voting">
+            <VotingButtons
+              score={threadScore.score}
+              userVote={userVote}
+              onVote={handleThreadVote}
+              size="lg"
+              variant="thread"
               disabled={!user}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                cursor: user ? 'pointer' : 'default',
-                color: userVote === 'up' ? '#4ade80' : 'var(--text-3)',
-                fontSize: '1.5em',
-                padding: 0,
-                display: 'flex',
-                alignItems: 'center',
-              }}
-            >
-              ▲
-            </button>
-            <div style={{
-              fontSize: 'var(--text-lg)',
-              fontWeight: 'var(--font-bold)',
-              color: threadScore.score > 0 ? '#4ade80' : threadScore.score < 0 ? '#ef4444' : 'var(--text-2)',
-            }}>
-              {threadScore.score}
-            </div>
-            <button
-              onClick={() => handleThreadVote('down')}
-              disabled={!user}
-              style={{
-                background: 'transparent',
-                border: 'none',
-                cursor: user ? 'pointer' : 'default',
-                color: userVote === 'down' ? '#ef4444' : 'var(--text-3)',
-                fontSize: '1.5em',
-                padding: 0,
-                display: 'flex',
-                alignItems: 'center',
-              }}
-            >
-              ▼
-            </button>
+            />
           </div>
 
           {/* Thread content */}
           <div style={{ flex: 1, minWidth: 0 }}>
-            <ThreadBadges isPinned={currentThread.isPinned} isLocked={currentThread.isLocked} tags={currentThread.tags} />
+            <ThreadBadges 
+              isPinned={currentThread.isPinned} 
+              isLocked={currentThread.isLocked} 
+              tags={currentThread.tags}
+              isSolved={currentThread.isSolved}
+            />
             <h1 style={{
               margin: 'var(--spacing-2) 0',
-              fontSize: 'var(--text-2xl)',
+              fontSize: 'var(--forum-title-xl)',
               fontWeight: 'var(--font-bold)',
               color: 'var(--text-1)',
             }}>
@@ -481,25 +235,43 @@ export function ForumThreadView({ thread, posts, userVote: initialUserVote, onTh
             <div style={{
               display: 'flex',
               alignItems: 'center',
+              justifyContent: 'space-between',
               gap: 'var(--spacing-2)',
-              fontSize: 'var(--text-sm)',
-              color: 'var(--text-3)',
+              flexWrap: 'wrap',
             }}>
-              <span>by</span>
-              <Link
-                to={`/profile/${currentThread.authorId}`}
-                style={{
-                  fontWeight: 'var(--font-semibold)',
-                  color: 'var(--text-1)',
-                  textDecoration: 'none',
-                }}
-              >
-                {displayName}
-              </Link>
-              <span>•</span>
-              <span>{formatTimeAgo(currentThread.createdAt)}</span>
-              <span>•</span>
-              <span>{currentThread.postCount} {currentThread.postCount === 1 ? 'reply' : 'replies'}</span>
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: 'var(--spacing-2)',
+                fontSize: 'var(--text-sm)',
+                color: 'var(--text-3)',
+              }}>
+                <span>by</span>
+                <Link
+                  to={`/profile/${currentThread.authorId}`}
+                  style={{
+                    fontWeight: 'var(--font-semibold)',
+                    color: 'var(--text-1)',
+                    textDecoration: 'none',
+                  }}
+                >
+                  {displayName}
+                </Link>
+                <span>•</span>
+                <span>{formatTimeAgo(currentThread.createdAt)}</span>
+                <span>•</span>
+                <span>{currentThread.postCount} {currentThread.postCount === 1 ? 'reply' : 'replies'}</span>
+              </div>
+              {user && (
+                <ThreadActions
+                  threadId={currentThread.id}
+                  isFollowed={currentThread.isFollowed}
+                  isBookmarked={currentThread.isBookmarked}
+                  isSolved={currentThread.isSolved}
+                  isAuthor={user.id === currentThread.authorId}
+                  onUpdate={onThreadUpdate}
+                />
+              )}
             </div>
             <ForumReactions
               reactions={currentThread.reactions}
@@ -517,7 +289,12 @@ export function ForumThreadView({ thread, posts, userVote: initialUserVote, onTh
 
       {/* Posts */}
       {currentPosts.map(post => (
-        <PostCard key={post.id} post={post} onUpdate={onThreadUpdate} />
+        <PostCard 
+          key={post.id} 
+          post={post} 
+          threadAuthorId={currentThread.authorId}
+          onUpdate={onThreadUpdate} 
+        />
       ))}
 
       {/* Reply editor */}

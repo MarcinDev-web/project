@@ -304,6 +304,14 @@ export class AuthManager {
   }
 
   /**
+   * Get all users (for friend suggestions and admin purposes).
+   */
+  async getAllUsers(): Promise<PublicUser[]> {
+    const users = await this.userStorage.getAllUsers();
+    return users.map(user => this.toPublicUser(user));
+  }
+
+  /**
    * Create a new session for a user.
    */
   private async createSession(user: User): Promise<Session> {

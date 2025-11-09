@@ -40,7 +40,16 @@ export async function createFriendsRoutes(
         friendIds.map(async (id) => {
           const user = await authManager.getUserById(id);
           const profile = await profileStorage.getProfile(id);
-          return profile ?? user;
+          // Ensure we always return data with id field
+          const data = profile ?? user;
+          if (!data) {
+            return null;
+          }
+          // Ensure id is set (in case profile uses userId instead of id)
+          return {
+            ...data,
+            id: data.id || id,
+          };
         })
       );
 
@@ -353,10 +362,43 @@ export async function createFriendsRoutes(
         }
       }
 
+      // If no suggestions from mutual friends, suggest random users
+      if (suggestions.size === 0) {
+        console.log('No mutual friends found, falling back to random user suggestions');
+        try {
+          // Get all users from storage (fallback for new users)
+          const allUsers = await authManager.getAllUsers();
+          console.log(`Found ${allUsers.length} total users in database`);
+          
+          // Shuffle and take random users
+          const shuffled = allUsers
+            .filter(u => 
+              u.id !== request.user!.id &&
+              !blockedUsersSet.has(u.id)
+            )
+            .sort(() => Math.random() - 0.5)
+            .slice(0, 20);
+
+          console.log(`Adding ${shuffled.length} random user suggestions`);
+
+          for (const user of shuffled) {
+            suggestions.set(user.id, {
+              userId: user.id,
+              score: 1, // Low score for random suggestions
+              mutualFriends: 0,
+            });
+          }
+        } catch (error) {
+          console.error('Error getting all users for suggestions:', error);
+        }
+      }
+
       // Convert to array and sort by score
       const suggestionsArray = Array.from(suggestions.values())
         .sort((a, b) => b.score - a.score)
         .slice(0, 20); // Top 20 suggestions
+
+      console.log(`Returning ${suggestionsArray.length} friend suggestions`);
 
       // Get profiles for suggestions
       const suggestionsWithProfiles = await Promise.all(
@@ -365,9 +407,15 @@ export async function createFriendsRoutes(
             const user = await authManager.getUserById(userId);
             const profile = await profileStorage.getProfile(userId);
             const isOnline = sessionManager.isUserOnline(userId);
+            const data = profile ?? user;
+            
+            if (!data) {
+              return null;
+            }
 
             return {
-              ...(profile ?? user),
+              ...data,
+              id: data.id || userId,
               isOnline,
               mutualFriends,
             };

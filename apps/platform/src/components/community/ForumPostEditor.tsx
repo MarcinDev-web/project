@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Button } from '../shared/Button';
+import { RichTextEditor } from './RichTextEditor';
 import { forumApi } from '../../api/forum';
 
 interface ForumPostEditorProps {
@@ -36,34 +37,14 @@ export function ForumPostEditor({ threadId, initialContent = '', onPostCreated, 
   };
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-3)' }}>
-      <textarea
-        value={content}
-        onChange={(e) => setContent(e.target.value)}
-        placeholder="Write your reply... (Markdown supported)"
-        style={{
-          width: '100%',
-          minHeight: '150px',
-          padding: 'var(--spacing-3)',
-          background: 'var(--bg-button)',
-          border: '1px solid var(--border-default)',
-          borderRadius: 'var(--radius-md)',
-          color: 'var(--text-1)',
-          fontFamily: 'inherit',
-          fontSize: 'var(--text-sm)',
-          resize: 'vertical',
-        }}
-      />
-      <div style={{ display: 'flex', gap: 'var(--spacing-2)', justifyContent: 'flex-end' }}>
-        {onCancel && (
-          <Button variant="secondary" onClick={onCancel} disabled={isSubmitting}>
-            Cancel
-          </Button>
-        )}
-        <Button onClick={handleSubmit} disabled={!content.trim() || isSubmitting}>
-          {isSubmitting ? 'Posting...' : initialContent ? 'Update' : 'Post'}
-        </Button>
-      </div>
-    </div>
+    <RichTextEditor
+      value={content}
+      onChange={setContent}
+      placeholder="Write your reply... (Markdown supported)"
+      minHeight={150}
+      autoSaveKey={threadId}
+      onSave={handleSubmit}
+      onCancel={onCancel}
+    />
   );
 }

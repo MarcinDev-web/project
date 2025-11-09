@@ -35,7 +35,7 @@ export function LoginForm() {
     }
   }, []);
 
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/dashboard';
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname || '/';
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -67,10 +67,10 @@ export function LoginForm() {
 
   return (
     <Card>
-      <h2 style={{ marginTop: 0, marginBottom: 'var(--spacing-6)' }}>Login</h2>
+      <h2 className="auth-form-title">Login</h2>
       <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: 'var(--spacing-4)' }}>
-          <label htmlFor="email" style={{ display: 'block', marginBottom: 'var(--spacing-2)' }}>
+        <div className="auth-form-group">
+          <label htmlFor="email" className="auth-form-label">
             Email
           </label>
           <input
@@ -79,18 +79,11 @@ export function LoginForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            style={{
-              width: '100%',
-              padding: 'var(--spacing-2)',
-              background: 'var(--bg-button)',
-              border: '1px solid var(--border-default)',
-              borderRadius: 'var(--radius-md)',
-              color: 'var(--text-1)',
-            }}
+            className="auth-form-input"
           />
         </div>
-        <div style={{ marginBottom: 'var(--spacing-4)' }}>
-          <label htmlFor="password" style={{ display: 'block', marginBottom: 'var(--spacing-2)' }}>
+        <div className="auth-form-group">
+          <label htmlFor="password" className="auth-form-label">
             Password
           </label>
           <input
@@ -99,41 +92,27 @@ export function LoginForm() {
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             required
-            style={{
-              width: '100%',
-              padding: 'var(--spacing-2)',
-              background: 'var(--bg-button)',
-              border: '1px solid var(--border-default)',
-              borderRadius: 'var(--radius-md)',
-              color: 'var(--text-1)',
-            }}
+            className="auth-form-input"
           />
         </div>
-        <div style={{ marginBottom: 'var(--spacing-6)', display: 'flex', alignItems: 'center' }}>
+        <div className="auth-form-checkbox-group">
           <input
             id="rememberMe"
             type="checkbox"
             checked={rememberMe}
             onChange={(e) => setRememberMe(e.target.checked)}
-            style={{
-              marginRight: 'var(--spacing-2)',
-              cursor: 'pointer',
-            }}
+            className="auth-form-checkbox"
           />
-          <label htmlFor="rememberMe" style={{ cursor: 'pointer', fontSize: 'var(--text-sm)' }}>
+          <label htmlFor="rememberMe" className="auth-form-checkbox-label">
             Zapamiętaj mnie
           </label>
         </div>
         {error && (
-          <div style={{ 
-            marginBottom: 'var(--spacing-4)', 
-            color: 'var(--color-error)',
-            fontSize: 'var(--text-sm)',
-          }}>
+          <div className="auth-form-error">
             {error}
           </div>
         )}
-        <Button type="submit" disabled={isLoading}>
+        <Button type="submit" disabled={isLoading} className="auth-form-submit">
           {isLoading ? 'Logging in...' : 'Login'}
         </Button>
       </form>

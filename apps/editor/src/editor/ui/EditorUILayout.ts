@@ -91,51 +91,84 @@ export class EditorUILayout {
     this.inspector.className = 'editor-inspector custom-scrollbar';
     this.inspector.setAttribute('aria-label', 'Properties Inspector');
 
-    // Status bar (minimal, bottom-right)
+    // Status bar (full-width footer - Forge World style)
     const statusBar = document.createElement('div');
     statusBar.className = 'status-bar';
-    
-    // Core status element (always visible)
-    statusBar.appendChild(this.config.statusEl);
 
-    // Add scene metrics to status bar (always visible - most important)
+    // Left: Project info
+    const projectSection = document.createElement('div');
+    projectSection.className = 'status-bar-section left';
+    projectSection.innerHTML = `
+      <div class="status-bar-item">
+        <svg class="status-icon" width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M2 2h12v12H2z"/>
+        </svg>
+        <span class="status-label">Project:</span>
+        <span id="project-name" class="status-value">Untitled</span>
+      </div>
+      <div class="status-bar-divider"></div>
+      <div class="status-bar-item">
+        <span id="save-status" class="status-badge">Saved</span>
+      </div>
+    `;
+
+    // Center: Performance metrics
+    const metricsSection = document.createElement('div');
+    metricsSection.className = 'status-bar-section center';
+    metricsSection.innerHTML = `
+      <div class="status-bar-item">
+        <span class="status-label">FPS:</span>
+        <span id="fps-value" class="status-value metric">60</span>
+      </div>
+      <div class="status-bar-divider"></div>
+      <div class="status-bar-item">
+        <span class="status-label">△:</span>
+        <span id="triangles-value" class="status-value metric">0</span>
+      </div>
+      <div class="status-bar-divider"></div>
+      <div class="status-bar-item">
+        <span class="status-label">Entities:</span>
+        <span id="entities-value" class="status-value metric">0</span>
+      </div>
+    `;
+
+    // Right: System info
+    const systemSection = document.createElement('div');
+    systemSection.className = 'status-bar-section right';
+    systemSection.innerHTML = `
+      <div class="status-bar-item">
+        <span class="status-label">Canvas:</span>
+        <span id="canvas-dimensions" class="status-value">1920×1080</span>
+      </div>
+      <div class="status-bar-divider"></div>
+      <div class="status-bar-item">
+        <svg class="status-icon webgpu" width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
+          <path d="M8 2l6 4v6l-6 4-6-4V6z"/>
+        </svg>
+        <span class="status-value">WebGPU</span>
+      </div>
+      <div class="status-bar-divider"></div>
+      <button class="shortcuts-help-button">
+        <span>?</span>
+      </button>
+    `;
+
+    statusBar.appendChild(projectSection);
+    statusBar.appendChild(metricsSection);
+    statusBar.appendChild(systemSection);
+
+    // Add keyboard shortcuts button handler
+    const shortcutsButton = systemSection.querySelector('.shortcuts-help-button') as HTMLButtonElement;
+    if (shortcutsButton) {
+      shortcutsButton.addEventListener('click', () => this.toggleShortcutsOverlay());
+    }
+
+    // Store references for metrics updates
     if (this.config.sceneMetricsProvider) {
-      const metricsDivider = document.createElement('div');
-      metricsDivider.className = 'status-bar-divider';
-      statusBar.appendChild(metricsDivider);
-
-      this.sceneMetricsEl = document.createElement('div');
-      this.sceneMetricsEl.className = 'status-bar-item';
-      this.sceneMetricsEl.innerHTML = `
-        <span id="scene-metrics"></span>
-      `;
-      statusBar.appendChild(this.sceneMetricsEl);
-
+      this.sceneMetricsEl = metricsSection.querySelector('#fps-value')?.parentElement as HTMLElement;
       // Start metrics update loop
       this.metricsUpdateInterval = window.setInterval(() => this.updateSceneMetrics(), 500);
     }
-
-    // Add canvas info to status bar (expandable - show on hover)
-    const canvasDivider = document.createElement('div');
-    canvasDivider.className = 'status-bar-divider expandable';
-    statusBar.appendChild(canvasDivider);
-
-    const canvasInfo = document.createElement('div');
-    canvasInfo.className = 'status-bar-item expandable';
-    canvasInfo.innerHTML = `
-      <span class="text-3">Canvas:</span>
-      <span id="canvas-dimensions"></span>
-    `;
-    statusBar.appendChild(canvasInfo);
-
-    // Add keyboard shortcuts help button (inside status bar, show on hover)
-    const shortcutsButton = document.createElement('button');
-    shortcutsButton.className = 'shortcuts-help-button';
-    shortcutsButton.setAttribute('aria-label', 'Keyboard Shortcuts (?)');
-    shortcutsButton.setAttribute('title', 'Keyboard Shortcuts (?)');
-    shortcutsButton.textContent = '?';
-    shortcutsButton.addEventListener('click', () => this.toggleShortcutsOverlay());
-    statusBar.appendChild(shortcutsButton);
 
     // Create breadcrumbs bar
     this.breadcrumbs = document.createElement('div');
@@ -328,32 +361,35 @@ export class EditorUILayout {
 
   /**
    * Updates scene metrics display in status bar.
-   * Compact format: shows FPS and triangle count.
+   * Updates FPS, triangles, and entities separately.
    */
   private updateSceneMetrics(): void {
     // In headless/test environments, window/document may be unavailable
     // or the layout already disposed.
     if (typeof document === 'undefined' || !this.config.sceneMetricsProvider) return;
-    const metricsEl = document.getElementById('scene-metrics');
-    if (!metricsEl) return;
 
     const metrics = this.config.sceneMetricsProvider();
-    const parts: string[] = [];
 
-    // Primary metric: FPS (always show if available - most important for performance)
-    if (metrics.fps !== undefined) {
-      parts.push(`${Math.round(metrics.fps)} fps`);
+    // Update FPS
+    const fpsEl = document.getElementById('fps-value');
+    if (fpsEl && metrics.fps !== undefined) {
+      fpsEl.textContent = Math.round(metrics.fps).toString();
     }
-    
-    // Tertiary metrics: triangles (compact format, show on hover context)
-    if (metrics.triangles !== undefined) {
+
+    // Update triangles
+    const trianglesEl = document.getElementById('triangles-value');
+    if (trianglesEl && metrics.triangles !== undefined) {
       const triStr = metrics.triangles > 1000 
         ? `${(metrics.triangles / 1000).toFixed(1)}k` 
         : metrics.triangles.toString();
-      parts.push(`${triStr}△`);
+      trianglesEl.textContent = triStr;
     }
 
-    metricsEl.textContent = parts.join(' · ');
+    // Update entities
+    const entitiesEl = document.getElementById('entities-value');
+    if (entitiesEl && metrics.entityCount !== undefined) {
+      entitiesEl.textContent = metrics.entityCount.toString();
+    }
   }
 
   /**

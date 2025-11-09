@@ -36,6 +36,9 @@ export interface ForumThread {
   lastPostBy: string;
   isPinned: boolean;
   isLocked: boolean;
+  isSolved?: boolean;
+  isFollowed?: boolean;
+  isBookmarked?: boolean;
   createdAt: number;
   updatedAt: number;
   reactions: Reaction[];
@@ -190,5 +193,30 @@ export const forumApi = {
 
   async search(query: string): Promise<SearchResponse> {
     return apiClient.get<SearchResponse>(`/forum/search?q=${encodeURIComponent(query)}`);
+  },
+
+  // Engagement features
+  async followThread(threadId: string): Promise<void> {
+    return apiClient.post(`/forum/threads/${threadId}/follow`);
+  },
+
+  async unfollowThread(threadId: string): Promise<void> {
+    return apiClient.delete(`/forum/threads/${threadId}/follow`);
+  },
+
+  async bookmarkThread(threadId: string): Promise<void> {
+    return apiClient.post(`/forum/threads/${threadId}/save`);
+  },
+
+  async unbookmarkThread(threadId: string): Promise<void> {
+    return apiClient.delete(`/forum/threads/${threadId}/save`);
+  },
+
+  async markThreadSolved(threadId: string): Promise<void> {
+    return apiClient.post(`/forum/threads/${threadId}/mark-solved`);
+  },
+
+  async acceptAnswer(postId: string): Promise<void> {
+    return apiClient.post(`/forum/posts/${postId}/accept`);
   },
 };

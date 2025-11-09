@@ -183,7 +183,7 @@ export function FriendsPage() {
                       <Link to={`/profile/${friend.id}`} style={{ flex: 1 }}>
                         <Button variant="secondary" style={{ width: '100%' }}>View Profile</Button>
                       </Link>
-                      <Link to={`/messages`} style={{ flex: 1 }}>
+                      <Link to={`/community-hub?tab=messages`} style={{ flex: 1 }}>
                         <Button variant="primary" style={{ width: '100%' }}>Message</Button>
                       </Link>
                     </div>

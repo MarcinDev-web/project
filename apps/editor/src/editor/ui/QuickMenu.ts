@@ -31,6 +31,10 @@ export interface QuickMenuConfig {
   onGizmoModeChange: (mode: 'translate' | 'rotate' | 'scale') => void;
   onRotationSnapChange: (mode: 'free' | '15deg' | '45deg' | '90deg') => void;
   onCameraChange?: (type: CameraType) => void;
+  onLogin?: () => void;
+  onRegister?: () => void;
+  isUserLoggedIn?: () => boolean;
+  getUserName?: () => string | null;
 }
 
 export class QuickMenu {
@@ -59,15 +63,11 @@ export class QuickMenu {
     const left = this.createLeftSection();
     root.appendChild(left);
 
-    // Center: search - REMOVED for cleaner UI
-    // const center = this.createCenterSection();
-    // root.appendChild(center);
+    // Center: Transform tools section
+    const center = this.createCenterSection();
+    root.appendChild(center);
 
-    // New: Transform tools section
-    const transformTools = this.createTransformToolsSection();
-    root.appendChild(transformTools);
-
-    // Right: actions
+    // Right: auth buttons + actions
     const right = this.createRightSection();
     root.appendChild(right);
 
@@ -112,15 +112,17 @@ export class QuickMenu {
     const left = document.createElement('div');
     left.className = 'top-bar-left';
 
-    // Brand
+    // Brand (Forge style)
     const brand = document.createElement('a');
     brand.className = 'top-bar-logo';
     brand.href = '#';
-    const icon = createIcon('cube', 18);
-    icon.classList.add('top-bar-logo-icon');
+    // Icon with fire emoji style
+    const icon = document.createElement('span');
+    icon.className = 'top-bar-logo-icon';
+    icon.textContent = '⚡'; // Lightning bolt like Forge
     const text = document.createElement('span');
     text.className = 'top-bar-logo-text';
-    text.textContent = 'Scene Editor';
+    text.textContent = 'FORGE';
     brand.appendChild(icon);
     brand.appendChild(text);
     left.appendChild(brand);
@@ -138,34 +140,9 @@ export class QuickMenu {
     return left;
   }
 
-  // REMOVED - Searchbar disabled for cleaner UI
-  // private createCenterSection(): HTMLElement {
-  //   const center = document.createElement('div');
-  //   center.className = 'top-bar-center';
-
-  //   const search = document.createElement('div');
-  //   search.className = 'top-bar-search';
-
-  //   const searchIcon = createIcon('search', 14);
-  //   searchIcon.classList.add('top-bar-search-icon');
-  //   const input = document.createElement('input');
-  //   input.type = 'search';
-  //   input.className = 'top-bar-search-input';
-  //   input.placeholder = 'Search entities... (Ctrl+K)';
-  //   input.addEventListener('input', () => {
-  //     this.config.onSearch?.(input.value);
-  //   });
-
-  //   search.appendChild(searchIcon);
-  //   search.appendChild(input);
-  //   center.appendChild(search);
-  //   this.searchInput = input;
-  //   return center;
-  // }
-
-  private createTransformToolsSection(): HTMLElement {
+  private createCenterSection(): HTMLElement {
     const section = document.createElement('div');
-    section.className = 'top-bar-transform-tools';
+    section.className = 'top-bar-center';
 
     // Transform Mode Group
     const transformGroup = document.createElement('div');
@@ -291,9 +268,44 @@ export class QuickMenu {
     return section;
   }
 
+  private createAuthButtons(): HTMLElement {
+    const authContainer = document.createElement('div');
+    authContainer.className = 'top-bar-auth-group';
+
+    if (this.config.isUserLoggedIn?.()) {
+      // User logged in - show avatar/name
+      const userButton = document.createElement('button');
+      userButton.className = 'top-bar-user-button';
+      const userName = this.config.getUserName?.() || 'User';
+      userButton.textContent = userName.charAt(0).toUpperCase();
+      userButton.title = userName;
+      authContainer.appendChild(userButton);
+    } else {
+      // Not logged in - show Login + Register
+      const loginBtn = document.createElement('button');
+      loginBtn.className = 'top-bar-auth-button';
+      loginBtn.textContent = 'Login';
+      loginBtn.addEventListener('click', () => this.config.onLogin?.());
+      
+      const registerBtn = document.createElement('button');
+      registerBtn.className = 'top-bar-auth-button primary';
+      registerBtn.textContent = 'Register';
+      registerBtn.addEventListener('click', () => this.config.onRegister?.());
+      
+      authContainer.appendChild(loginBtn);
+      authContainer.appendChild(registerBtn);
+    }
+
+    return authContainer;
+  }
+
   private createRightSection(): HTMLElement {
     const right = document.createElement('div');
     right.className = 'top-bar-right';
+
+    // Auth buttons
+    const authButtons = this.createAuthButtons();
+    right.appendChild(authButtons);
 
     // Undo / Redo
     this.btnUndo = document.createElement('button');

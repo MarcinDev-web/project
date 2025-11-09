@@ -171,7 +171,7 @@ export class UserStorageDB {
       createdAt: prismaUser.createdAt.getTime(),
       updatedAt: prismaUser.updatedAt.getTime(),
       active: prismaUser.active,
-      role: prismaUser.role as 'user' | 'moderator' | 'admin',
+      role: prismaUser.role as 'user' | 'moderator' | 'admin' | 'root',
     };
   }
 }

@@ -1,18 +1,26 @@
 import { useState, useEffect } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { Layout } from '../components/layout/Layout';
+import { ForumLayout } from '../components/community/ForumLayout';
+import { ForumSidebar } from '../components/community/ForumSidebar';
 import { ForumThreadView } from '../components/community/ForumThreadView';
-import { forumApi, type ForumThread, type ForumPost } from '../api/forum';
+import { Card } from '../components/shared/Card';
+import { forumApi, type ForumThread, type ForumPost, type ForumCategory } from '../api/forum';
 import { useWebSocket, type WebSocketMessage } from '../hooks/useWebSocket';
 
 export function ThreadPage() {
   const { id } = useParams<{ id: string }>();
   const [searchParams, setSearchParams] = useSearchParams();
   const [thread, setThread] = useState<ForumThread | null>(null);
+  const [categories, setCategories] = useState<ForumCategory[]>([]);
   const [posts, setPosts] = useState<ForumPost[]>([]);
   const [userVote, setUserVote] = useState<'up' | 'down' | null>(null);
   const [loading, setLoading] = useState(true);
   const sortBy = (searchParams.get('sort') as 'new' | 'top') || 'new';
+
+  useEffect(() => {
+    void forumApi.getCategories().then(setCategories).catch(console.error);
+  }, []);
 
   useEffect(() => {
     if (id) {
@@ -135,11 +143,11 @@ export function ThreadPage() {
   if (loading) {
     return (
       <Layout>
-        <div className="page-container">
+        <ForumLayout sidebar={<ForumSidebar categories={categories} />}>
           <div style={{ textAlign: 'center', padding: 'var(--spacing-12)', color: 'var(--text-2)' }}>
             Loading thread...
           </div>
-        </div>
+        </ForumLayout>
       </Layout>
     );
   }
@@ -147,72 +155,79 @@ export function ThreadPage() {
   if (!thread) {
     return (
       <Layout>
-        <div className="page-container">
+        <ForumLayout sidebar={<ForumSidebar categories={categories} />}>
           <div style={{ textAlign: 'center', padding: 'var(--spacing-12)', color: 'var(--text-2)' }}>
             Thread not found
           </div>
-        </div>
+        </ForumLayout>
       </Layout>
     );
   }
 
   return (
     <Layout>
-      <div className="page-container">
-        <div style={{ marginBottom: 'var(--spacing-4)' }}>
-          <Link
-            to={`/community/category/${thread.categoryId}`}
-            style={{
-              color: 'var(--text-2)',
-              textDecoration: 'none',
-              fontSize: 'var(--text-sm)',
-            }}
-          >
-            ← Back to Category
-          </Link>
-        </div>
+      <ForumLayout
+        sidebar={<ForumSidebar categories={categories} activeCategoryId={thread.categoryId} />}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-4)' }}>
+          {/* Breadcrumbs */}
+          <div>
+            <Link
+              to={`/community/category/${thread.categoryId}`}
+              style={{
+                color: 'var(--text-2)',
+                textDecoration: 'none',
+                fontSize: 'var(--text-sm)',
+              }}
+            >
+              ← Back to Category
+            </Link>
+          </div>
 
-        {/* Sort buttons */}
-        <div style={{ display: 'flex', gap: 'var(--spacing-2)', marginBottom: 'var(--spacing-4)' }}>
-          <button
-            onClick={() => handleSortChange('new')}
-            style={{
-              padding: 'var(--spacing-2) var(--spacing-4)',
-              background: sortBy === 'new' ? 'var(--bg-button-primary)' : 'var(--bg-button)',
-              color: sortBy === 'new' ? 'white' : 'var(--text-1)',
-              border: 'none',
-              borderRadius: 'var(--radius-md)',
-              cursor: 'pointer',
-              fontSize: 'var(--text-sm)',
-              fontWeight: sortBy === 'new' ? 'var(--font-semibold)' : 'var(--font-medium)',
-            }}
-          >
-            New
-          </button>
-          <button
-            onClick={() => handleSortChange('top')}
-            style={{
-              padding: 'var(--spacing-2) var(--spacing-4)',
-              background: sortBy === 'top' ? 'var(--bg-button-primary)' : 'var(--bg-button)',
-              color: sortBy === 'top' ? 'white' : 'var(--text-1)',
-              border: 'none',
-              borderRadius: 'var(--radius-md)',
-              cursor: 'pointer',
-              fontSize: 'var(--text-sm)',
-              fontWeight: sortBy === 'top' ? 'var(--font-semibold)' : 'var(--font-medium)',
-            }}
-          >
-            Top
-          </button>
-        </div>
+          {/* Sort buttons */}
+          <Card>
+            <div style={{ display: 'flex', gap: 'var(--spacing-2)' }}>
+              <button
+                onClick={() => handleSortChange('new')}
+                style={{
+                  padding: 'var(--spacing-2) var(--spacing-4)',
+                  background: sortBy === 'new' ? 'var(--bg-button-primary)' : 'var(--bg-button)',
+                  color: sortBy === 'new' ? 'white' : 'var(--text-1)',
+                  border: 'none',
+                  borderRadius: 'var(--radius-md)',
+                  cursor: 'pointer',
+                  fontSize: 'var(--text-sm)',
+                  fontWeight: sortBy === 'new' ? 'var(--font-semibold)' : 'var(--font-medium)',
+                }}
+              >
+                New
+              </button>
+              <button
+                onClick={() => handleSortChange('top')}
+                style={{
+                  padding: 'var(--spacing-2) var(--spacing-4)',
+                  background: sortBy === 'top' ? 'var(--bg-button-primary)' : 'var(--bg-button)',
+                  color: sortBy === 'top' ? 'white' : 'var(--text-1)',
+                  border: 'none',
+                  borderRadius: 'var(--radius-md)',
+                  cursor: 'pointer',
+                  fontSize: 'var(--text-sm)',
+                  fontWeight: sortBy === 'top' ? 'var(--font-semibold)' : 'var(--font-medium)',
+                }}
+              >
+                Top
+              </button>
+            </div>
+          </Card>
 
-        <ForumThreadView
-          thread={thread}
-          posts={posts}
-          userVote={userVote}
-          onThreadUpdate={handleThreadUpdate}
-        />
-      </div>
+          <ForumThreadView
+            thread={thread}
+            posts={posts}
+            userVote={userVote}
+            onThreadUpdate={handleThreadUpdate}
+          />
+        </div>
+      </ForumLayout>
     </Layout>
   );
 }

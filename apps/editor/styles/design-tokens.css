@@ -96,6 +96,59 @@
   --color-accent-alpha-10: rgba(14, 165, 233, 0.1);
   --color-accent-alpha-30: rgba(14, 165, 233, 0.3);
   
+  /* ============================================
+     FORGE WORLD THEME - Industrial Sci-Fi
+     Inspired by Forge gaming platform aesthetic
+     ============================================ */
+
+  /* Base - Deep dark like Forge World */
+  --fw-base-darker: #0a0c10;      /* Deep void - almost black */
+  --fw-base-dark: #1a1d24;        /* Primary background - dark slate */
+  --fw-base-medium: #23262e;      /* Elevated surfaces */
+  --fw-base-light: #2d3139;       /* Hover states */
+
+  /* Metallic - Cool steel grays (Forge navigation style) */
+  --fw-metal-steel-dark: #3d4148;
+  --fw-metal-steel: #545964;
+  --fw-metal-steel-light: #7a8090;
+  --fw-metal-bronze-dark: #8a5a2d;
+  --fw-metal-bronze: #d4893d;     /* Warmer bronze for accents */
+  --fw-metal-bronze-light: #e9a860;
+  --fw-metal-copper: #d4893d;
+
+  /* Accent - Forge orange/amber (from logo 🔥) */
+  --fw-accent-primary: #e67e22;   /* Forge orange */
+  --fw-accent-secondary: #f39c12; /* Bright amber */
+  --fw-accent-glow: #ff9a3d;      /* Hot glow */
+
+  /* Status colors - Industrial themed */
+  --fw-status-active: #e67e22;
+  --fw-status-success: #27ae60;   /* Modern green */
+  --fw-status-warning: #f39c12;
+  --fw-status-danger: #e74c3c;    /* Modern red */
+  --fw-status-info: #3498db;      /* Modern blue */
+
+  /* Borders - Heavy industrial lines */
+  --fw-border-heavy: 2px;
+  --fw-border-medium: 1px;
+  --fw-border-color-dark: rgba(35, 38, 46, 0.9);
+  --fw-border-color-medium: rgba(61, 65, 72, 0.7);
+  --fw-border-color-light: rgba(84, 89, 100, 0.5);
+  --fw-border-accent: var(--fw-accent-primary);
+
+  /* Shadows - Subtle depth (Forge style) */
+  --fw-shadow-deep: 0 4px 0 rgba(10, 12, 16, 1), 0 8px 24px rgba(0, 0, 0, 0.7);
+  --fw-shadow-medium: 0 3px 0 rgba(10, 12, 16, 1), 0 6px 16px rgba(0, 0, 0, 0.6);
+  --fw-shadow-light: 0 2px 0 rgba(10, 12, 16, 1), 0 4px 10px rgba(0, 0, 0, 0.5);
+  --fw-shadow-inset: inset 0 2px 4px rgba(0, 0, 0, 0.5);
+  --fw-shadow-glow: 0 0 20px rgba(230, 126, 34, 0.4);
+
+  /* Gradients - Metallic effects (cooler tones) */
+  --fw-gradient-steel: linear-gradient(180deg, #545964 0%, #3d4148 100%);
+  --fw-gradient-bronze: linear-gradient(180deg, #e9a860 0%, #d4893d 100%);
+  --fw-gradient-dark: linear-gradient(180deg, #23262e 0%, #1a1d24 100%);
+  --fw-gradient-accent: linear-gradient(135deg, #e67e22 0%, #f39c12 100%);
+  
   /* Borders - Chunky, defined */
   --color-border-subtle: rgba(70, 80, 95, 0.5);
   --color-border-medium: rgba(70, 80, 95, 0.8);

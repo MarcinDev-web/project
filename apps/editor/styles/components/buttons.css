@@ -193,3 +193,43 @@
   height: var(--button-height-lg);
   padding: 0;
 }
+
+/* ============================================
+   FORGE WORLD BUTTON VARIANTS
+   ============================================ */
+
+.btn-forge {
+  background: var(--fw-gradient-steel);
+  border: 2px solid var(--fw-metal-steel-dark);
+  color: var(--fw-metal-steel-light);
+  box-shadow: var(--fw-shadow-medium);
+}
+
+.btn-forge:hover:not(:disabled) {
+  background: var(--fw-gradient-bronze);
+  border-color: var(--fw-metal-bronze-dark);
+  color: var(--fw-metal-bronze-light);
+  transform: translateY(-2px);
+  box-shadow: var(--fw-shadow-deep);
+}
+
+.btn-forge:active:not(:disabled) {
+  transform: translateY(0);
+  box-shadow: var(--fw-shadow-medium);
+}
+
+.btn-forge.primary {
+  background: var(--fw-gradient-accent);
+  border-color: var(--fw-accent-primary);
+  color: white;
+  box-shadow: var(--fw-shadow-deep), var(--fw-shadow-glow);
+}
+
+.btn-forge.primary:hover:not(:disabled) {
+  filter: brightness(1.1);
+  box-shadow: var(--fw-shadow-deep), 0 0 20px rgba(225, 123, 58, 0.5);
+}
+
+.btn-forge.primary:active:not(:disabled) {
+  box-shadow: var(--fw-shadow-medium), var(--fw-shadow-glow);
+}

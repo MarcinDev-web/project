@@ -2,7 +2,7 @@
  * Shared authentication types used by platform and net-server
  */
 
-export type UserRole = 'user' | 'moderator' | 'admin';
+export type UserRole = 'user' | 'moderator' | 'admin' | 'root';
 
 export interface PublicUser {
   id: string;

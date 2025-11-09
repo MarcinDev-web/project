@@ -160,6 +160,35 @@ export function ForumManagementPage() {
     }
   };
 
+  const handlePurgeForum = async () => {
+    const confirmMessage = '⚠️ WARNING: This will DELETE ALL forum threads and posts!\n\n' +
+      'This action cannot be undone. Are you absolutely sure?';
+    
+    if (!confirm(confirmMessage)) {
+      return;
+    }
+
+    // Double confirmation
+    if (!confirm('Are you REALLY sure? This will permanently delete all forum content.')) {
+      return;
+    }
+
+    try {
+      setLoading(true);
+      const result = await adminApi.purgeForum();
+      alert(`Success: ${result.message}`);
+      // Reload stats and data
+      await loadStats();
+      await loadThreads();
+      await loadPosts();
+    } catch (error) {
+      console.error('Failed to purge forum:', error);
+      alert(error instanceof Error ? error.message : 'Failed to purge forum');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   return (
     <Layout>
       <div style={{ padding: '2rem', maxWidth: '1400px', margin: '0 auto' }}>
@@ -210,24 +239,42 @@ export function ForumManagementPage() {
 
         {/* Stats */}
         {stats && activeTab === 'categories' && (
-          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
-            <Card>
-              <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{stats.categories.total}</div>
-              <div style={{ color: 'var(--text-secondary, #666)' }}>Categories</div>
-            </Card>
-            <Card>
-              <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{stats.threads.total}</div>
-              <div style={{ color: 'var(--text-secondary, #666)' }}>Threads</div>
-            </Card>
-            <Card>
-              <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{stats.posts.total}</div>
-              <div style={{ color: 'var(--text-secondary, #666)' }}>Posts</div>
-            </Card>
-            <Card>
-              <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{stats.threads.last24h}</div>
-              <div style={{ color: 'var(--text-secondary, #666)' }}>New Threads (24h)</div>
-            </Card>
-          </div>
+          <>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: '1rem', marginBottom: '1.5rem' }}>
+              <Card>
+                <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{stats.categories.total}</div>
+                <div style={{ color: 'var(--text-secondary, #666)' }}>Categories</div>
+              </Card>
+              <Card>
+                <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{stats.threads.total}</div>
+                <div style={{ color: 'var(--text-secondary, #666)' }}>Threads</div>
+              </Card>
+              <Card>
+                <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{stats.posts.total}</div>
+                <div style={{ color: 'var(--text-secondary, #666)' }}>Posts</div>
+              </Card>
+              <Card>
+                <div style={{ fontSize: '2rem', fontWeight: 'bold' }}>{stats.threads.last24h}</div>
+                <div style={{ color: 'var(--text-secondary, #666)' }}>New Threads (24h)</div>
+              </Card>
+            </div>
+            <div style={{ marginTop: '1.5rem', display: 'flex', justifyContent: 'flex-end' }}>
+              <Button
+                variant="secondary"
+                onClick={handlePurgeForum}
+                disabled={loading}
+                style={{
+                  background: 'var(--bg-error, #ffebee)',
+                  color: 'var(--color-error, #c62828)',
+                  border: '1px solid var(--color-error, #c62828)',
+                  fontSize: '0.875rem',
+                  padding: '0.5rem 1rem',
+                }}
+              >
+                {loading ? 'Purging...' : '⚠️ Purge All Forum Content'}
+              </Button>
+            </div>
+          </>
         )}
 
         {/* Categories Tab */}

@@ -11,7 +11,7 @@ export interface AdminUser {
   createdAt: number;
   updatedAt: number;
   active: boolean;
-  role: 'user' | 'moderator' | 'admin';
+  role: 'user' | 'moderator' | 'admin' | 'root';
 }
 
 export interface AdminUsersResponse {
@@ -30,6 +30,7 @@ export interface AdminStats {
       user: number;
       moderator: number;
       admin: number;
+      root: number;
     };
   };
   marketplace: {
@@ -336,6 +337,17 @@ export const adminApi = {
    */
   async deleteForumPost(id: string): Promise<void> {
     return apiClient.delete(`/admin/forum/posts/${id}`);
+  },
+
+  /**
+   * Purge all forum threads and posts (admin only)
+   */
+  async purgeForum(): Promise<{
+    success: boolean;
+    message: string;
+    deletedThreads: number;
+  }> {
+    return apiClient.post('/admin/forum/purge');
   },
 };
 

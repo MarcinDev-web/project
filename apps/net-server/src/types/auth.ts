@@ -5,7 +5,7 @@
 /**
  * User role type.
  */
-export type UserRole = 'user' | 'moderator' | 'admin';
+export type UserRole = 'user' | 'moderator' | 'admin' | 'root';
 
 /**
  * User account data.

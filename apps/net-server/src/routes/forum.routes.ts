@@ -261,7 +261,7 @@ export async function createForumRoutes(
           return reply.code(404).send({ error: 'Thread not found' });
         }
 
-        const isModerator = request.user.role === 'admin' || request.user.role === 'moderator';
+        const isModerator = request.user.role === 'admin' || request.user.role === 'moderator' || request.user.role === 'root';
         if (thread.authorId !== request.user.id && !isModerator) {
           return reply.code(403).send({ error: 'Forbidden' });
         }
@@ -307,7 +307,7 @@ export async function createForumRoutes(
           return reply.code(404).send({ error: 'Thread not found' });
         }
 
-        const isModerator = request.user.role === 'admin' || request.user.role === 'moderator';
+        const isModerator = request.user.role === 'admin' || request.user.role === 'moderator' || request.user.role === 'root';
         if (thread.authorId !== request.user.id && !isModerator) {
           return reply.code(403).send({ error: 'Forbidden' });
         }

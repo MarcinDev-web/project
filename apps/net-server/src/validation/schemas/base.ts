@@ -175,7 +175,7 @@ export const currencySchema = z.enum(['credits', 'tokens', 'coins']).or(z.string
 /**
  * User role schema.
  */
-export const userRoleSchema = z.enum(['user', 'moderator', 'admin']);
+export const userRoleSchema = z.enum(['user', 'moderator', 'admin', 'root']);
 
 /**
  * ISO 8601 date string schema.

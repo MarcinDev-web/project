@@ -1,0 +1,129 @@
+/**
+ * Forum Design Tokens - Reddit/Discourse-inspired
+ * 
+ * Dedicated color palette and design system for Community OS forum
+ */
+
+:root {
+  /* ============================================
+     FORUM COLOR PALETTE
+     ============================================ */
+  
+  /* Backgrounds */
+  --forum-bg-primary: #0f1419;        /* Główne tło */
+  --forum-bg-secondary: #16181d;      /* Karty, elevated surfaces */
+  --forum-bg-card: #1a1d23;           /* Thread cards */
+  --forum-bg-card-hover: #21242b;     /* Hover state */
+  --forum-bg-sidebar: #15191f;        /* Sidebar background */
+  --forum-bg-input: #1c2128;          /* Input fields */
+  --forum-bg-input-focus: #252c35;    /* Input focus state */
+
+  /* Reddit-style voting colors */
+  --forum-upvote: #ff4500;            /* Orange upvote */
+  --forum-upvote-hover: #ff5722;
+  --forum-upvote-active: #ff4500;
+  --forum-downvote: #7193ff;          /* Blue downvote */
+  --forum-downvote-hover: #5a75ff;
+  --forum-downvote-active: #7193ff;
+  --forum-vote-neutral: var(--text-3); /* Neutral vote color */
+
+  /* Category colors (8 predefined) */
+  --forum-cat-discussion: #3b82f6;
+  --forum-cat-help: #10b981;
+  --forum-cat-showcase: #f59e0b;
+  --forum-cat-feedback: #8b5cf6;
+  --forum-cat-announcements: #ef4444;
+  --forum-cat-bugs: #f43f5e;
+  --forum-cat-docs: #06b6d4;
+  --forum-cat-general: #6b7280;
+
+  /* User reputation/karma */
+  --forum-karma-low: #6b7280;
+  --forum-karma-medium: #3b82f6;
+  --forum-karma-high: #f59e0b;
+  --forum-karma-expert: #8b5cf6;
+  --forum-karma-legend: #f43f5e;
+
+  /* Badges & Tags */
+  --forum-badge-admin: #ef4444;
+  --forum-badge-mod: #10b981;
+  --forum-badge-contributor: #f59e0b;
+  --forum-badge-verified: #3b82f6;
+  --forum-badge-op: #8b5cf6;         /* Original Poster */
+  --forum-badge-solved: #10b981;      /* Solved thread */
+
+  /* Borders */
+  --forum-border-default: rgba(70, 80, 95, 0.3);
+  --forum-border-hover: rgba(70, 80, 95, 0.5);
+  --forum-border-active: rgba(70, 80, 95, 0.8);
+  --forum-border-category: rgba(70, 80, 95, 0.2);
+
+  /* Shadows */
+  --forum-shadow-card: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --forum-shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.4);
+  --forum-shadow-sidebar: 2px 0 8px rgba(0, 0, 0, 0.2);
+
+  /* ============================================
+     FORUM TYPOGRAPHY
+     ============================================ */
+  
+  --forum-title-xl: 1.875rem;      /* Thread titles (30px) */
+  --forum-title-lg: 1.5rem;        /* Category headers (24px) */
+  --forum-title-md: 1.25rem;       /* Card titles (20px) */
+  --forum-body: 0.9375rem;         /* Post content (15px) */
+  --forum-meta: 0.8125rem;         /* Timestamps, stats (13px) */
+  --forum-small: 0.75rem;          /* Small text (12px) */
+
+  /* Line heights */
+  --forum-line-tight: 1.3;
+  --forum-line-normal: 1.5;
+  --forum-line-relaxed: 1.7;
+
+  /* ============================================
+     FORUM SPACING
+     ============================================ */
+  
+  --forum-spacing-card: var(--spacing-4);      /* Card padding */
+  --forum-spacing-card-gap: var(--spacing-3); /* Gap between cards */
+  --forum-spacing-sidebar: var(--spacing-4);   /* Sidebar padding */
+  --forum-spacing-post: var(--spacing-4);       /* Post padding */
+  --forum-spacing-vote: var(--spacing-2);      /* Voting section width */
+
+  /* ============================================
+     FORUM LAYOUT
+     ============================================ */
+  
+  --forum-sidebar-width: 240px;
+  --forum-sidebar-width-collapsed: 60px;
+  --forum-right-sidebar-width: 280px;
+  --forum-content-max-width: 1200px;
+  --forum-card-border-radius: var(--radius-md);
+
+  /* ============================================
+     FORUM ANIMATIONS
+     ============================================ */
+  
+  --forum-transition-fast: 0.15s ease;
+  --forum-transition-base: 0.2s ease;
+  --forum-transition-slow: 0.3s ease;
+}
+
+/* ============================================
+   SEMANTIC ALIASES
+   ============================================ */
+
+:root {
+  /* Category color mapping */
+  --forum-category-color-default: var(--forum-cat-general);
+}
+
+/* Helper function to get category color */
+.forum-category-discussion { --forum-category-color: var(--forum-cat-discussion); }
+.forum-category-help { --forum-category-color: var(--forum-cat-help); }
+.forum-category-showcase { --forum-category-color: var(--forum-cat-showcase); }
+.forum-category-feedback { --forum-category-color: var(--forum-cat-feedback); }
+.forum-category-announcements { --forum-category-color: var(--forum-cat-announcements); }
+.forum-category-bugs { --forum-category-color: var(--forum-cat-bugs); }
+.forum-category-docs { --forum-category-color: var(--forum-cat-docs); }
+.forum-category-general { --forum-category-color: var(--forum-cat-general); }
+

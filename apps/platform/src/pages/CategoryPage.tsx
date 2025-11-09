@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { useParams, useSearchParams, Link } from 'react-router-dom';
 import { Layout } from '../components/layout/Layout';
+import { ForumLayout } from '../components/community/ForumLayout';
+import { ForumSidebar } from '../components/community/ForumSidebar';
 import { ForumThreadList } from '../components/community/ForumThreadList';
 import { Button } from '../components/shared/Button';
 import { Card } from '../components/shared/Card';
@@ -13,15 +15,29 @@ export function CategoryPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const { user } = useAuth();
   const [category, setCategory] = useState<ForumCategory | null>(null);
+  const [categories, setCategories] = useState<ForumCategory[]>([]);
   const [threads, setThreads] = useState<ForumThread[]>([]);
   const [loading, setLoading] = useState(true);
   const sortBy = (searchParams.get('sort') as 'hot' | 'new' | 'top') || 'hot';
+
+  useEffect(() => {
+    void loadCategories();
+  }, []);
 
   useEffect(() => {
     if (id) {
       void loadCategory();
     }
   }, [id, sortBy]);
+
+  const loadCategories = async () => {
+    try {
+      const data = await forumApi.getCategories();
+      setCategories(data);
+    } catch (error) {
+      console.error('Failed to load categories:', error);
+    }
+  };
 
   // Handle WebSocket updates
   const handleWebSocketMessage = (message: WebSocketMessage) => {
@@ -69,19 +85,13 @@ export function CategoryPage() {
     setSearchParams({ sort: newSort });
   };
 
-  if (!category) {
+  if (!category && !loading) {
     return (
       <Layout>
         <div className="page-container">
-          {loading ? (
-            <div style={{ textAlign: 'center', padding: 'var(--spacing-12)', color: 'var(--text-2)' }}>
-              Loading...
-            </div>
-          ) : (
-            <div style={{ textAlign: 'center', padding: 'var(--spacing-12)', color: 'var(--text-2)' }}>
-              Category not found
-            </div>
-          )}
+          <div style={{ textAlign: 'center', padding: 'var(--spacing-12)', color: 'var(--text-2)' }}>
+            Category not found
+          </div>
         </div>
       </Layout>
     );
@@ -89,99 +99,114 @@ export function CategoryPage() {
 
   return (
     <Layout>
-      <div className="page-container">
-        <div style={{ marginBottom: 'var(--spacing-6)' }}>
-          <Link
-            to="/community"
-            style={{
-              color: 'var(--text-2)',
-              textDecoration: 'none',
-              fontSize: 'var(--text-sm)',
-              marginBottom: 'var(--spacing-2)',
-              display: 'inline-block',
-            }}
-          >
-            ← Back to Community
-          </Link>
-          <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginTop: 'var(--spacing-4)' }}>
-            <div>
-              {category.icon && (
-                <span style={{ fontSize: '2em', marginRight: 'var(--spacing-2)', color: category.color }}>
-                  {category.icon}
-                </span>
-              )}
-              <h1 style={{ display: 'inline', margin: 0 }}>{category.name}</h1>
-              <p style={{ marginTop: 'var(--spacing-2)', color: 'var(--text-2)' }}>
-                {category.description}
-              </p>
+      <ForumLayout
+        sidebar={<ForumSidebar categories={categories} activeCategoryId={id} />}
+      >
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-4)' }}>
+          {/* Breadcrumbs */}
+          <div>
+            <Link
+              to="/community-hub?tab=community"
+              style={{
+                color: 'var(--text-2)',
+                textDecoration: 'none',
+                fontSize: 'var(--text-sm)',
+                marginBottom: 'var(--spacing-2)',
+                display: 'inline-block',
+              }}
+            >
+              ← Back to Community
+            </Link>
+          </div>
+
+          {/* Category Header */}
+          {category && (
+            <div style={{ marginBottom: 'var(--spacing-4)' }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--spacing-4)' }}>
+                <div>
+                  {category.icon && (
+                    <span style={{ fontSize: '2em', marginRight: 'var(--spacing-2)', color: category.color }}>
+                      {category.icon}
+                    </span>
+                  )}
+                  <h1 style={{ display: 'inline', margin: 0, fontSize: 'var(--forum-title-lg)' }}>{category.name}</h1>
+                  <p style={{ marginTop: 'var(--spacing-2)', color: 'var(--text-2)' }}>
+                    {category.description}
+                  </p>
+                  <div style={{ marginTop: 'var(--spacing-2)', fontSize: 'var(--forum-meta)', color: 'var(--text-3)' }}>
+                    {category.threadCount} threads • {category.postCount} posts
+                  </div>
+                </div>
+                {user && (
+                  <Link to={`/community/new-thread?category=${id}`}>
+                    <Button>New Thread</Button>
+                  </Link>
+                )}
+              </div>
             </div>
-            {user && (
-              <Link to={`/community/new-thread?category=${id}`}>
-                <Button>New Thread</Button>
-              </Link>
-            )}
-          </div>
+          )}
+
+          {/* Sort buttons */}
+          <Card>
+            <div style={{ display: 'flex', gap: 'var(--spacing-2)' }}>
+              <button
+                onClick={() => handleSortChange('hot')}
+                style={{
+                  padding: 'var(--spacing-2) var(--spacing-4)',
+                  background: sortBy === 'hot' ? 'var(--bg-button-primary)' : 'var(--bg-button)',
+                  color: sortBy === 'hot' ? 'white' : 'var(--text-1)',
+                  border: 'none',
+                  borderRadius: 'var(--radius-md)',
+                  cursor: 'pointer',
+                  fontSize: 'var(--text-sm)',
+                  fontWeight: sortBy === 'hot' ? 'var(--font-semibold)' : 'var(--font-medium)',
+                }}
+              >
+                Hot
+              </button>
+              <button
+                onClick={() => handleSortChange('new')}
+                style={{
+                  padding: 'var(--spacing-2) var(--spacing-4)',
+                  background: sortBy === 'new' ? 'var(--bg-button-primary)' : 'var(--bg-button)',
+                  color: sortBy === 'new' ? 'white' : 'var(--text-1)',
+                  border: 'none',
+                  borderRadius: 'var(--radius-md)',
+                  cursor: 'pointer',
+                  fontSize: 'var(--text-sm)',
+                  fontWeight: sortBy === 'new' ? 'var(--font-semibold)' : 'var(--font-medium)',
+                }}
+              >
+                New
+              </button>
+              <button
+                onClick={() => handleSortChange('top')}
+                style={{
+                  padding: 'var(--spacing-2) var(--spacing-4)',
+                  background: sortBy === 'top' ? 'var(--bg-button-primary)' : 'var(--bg-button)',
+                  color: sortBy === 'top' ? 'white' : 'var(--text-1)',
+                  border: 'none',
+                  borderRadius: 'var(--radius-md)',
+                  cursor: 'pointer',
+                  fontSize: 'var(--text-sm)',
+                  fontWeight: sortBy === 'top' ? 'var(--font-semibold)' : 'var(--font-medium)',
+                }}
+              >
+                Top
+              </button>
+            </div>
+          </Card>
+
+          {/* Thread list */}
+          {loading ? (
+            <div style={{ textAlign: 'center', padding: 'var(--spacing-12)', color: 'var(--text-2)' }}>
+              Loading threads...
+            </div>
+          ) : (
+            <ForumThreadList threads={threads} onThreadUpdate={loadCategory} />
+          )}
         </div>
-
-        {/* Sort buttons */}
-        <Card>
-          <div style={{ display: 'flex', gap: 'var(--spacing-2)' }}>
-            <button
-              onClick={() => handleSortChange('hot')}
-              style={{
-                padding: 'var(--spacing-2) var(--spacing-4)',
-                background: sortBy === 'hot' ? 'var(--bg-button-primary)' : 'var(--bg-button)',
-                color: sortBy === 'hot' ? 'white' : 'var(--text-1)',
-                border: 'none',
-                borderRadius: 'var(--radius-md)',
-                cursor: 'pointer',
-                fontSize: 'var(--text-sm)',
-                fontWeight: sortBy === 'hot' ? 'var(--font-semibold)' : 'var(--font-medium)',
-              }}
-            >
-              Hot
-            </button>
-            <button
-              onClick={() => handleSortChange('new')}
-              style={{
-                padding: 'var(--spacing-2) var(--spacing-4)',
-                background: sortBy === 'new' ? 'var(--bg-button-primary)' : 'var(--bg-button)',
-                color: sortBy === 'new' ? 'white' : 'var(--text-1)',
-                border: 'none',
-                borderRadius: 'var(--radius-md)',
-                cursor: 'pointer',
-                fontSize: 'var(--text-sm)',
-                fontWeight: sortBy === 'new' ? 'var(--font-semibold)' : 'var(--font-medium)',
-              }}
-            >
-              New
-            </button>
-            <button
-              onClick={() => handleSortChange('top')}
-              style={{
-                padding: 'var(--spacing-2) var(--spacing-4)',
-                background: sortBy === 'top' ? 'var(--bg-button-primary)' : 'var(--bg-button)',
-                color: sortBy === 'top' ? 'white' : 'var(--text-1)',
-                border: 'none',
-                borderRadius: 'var(--radius-md)',
-                cursor: 'pointer',
-                fontSize: 'var(--text-sm)',
-                fontWeight: sortBy === 'top' ? 'var(--font-semibold)' : 'var(--font-medium)',
-              }}
-            >
-              Top
-            </button>
-          </div>
-        </Card>
-
-        {loading ? (
-          <div style={{ textAlign: 'center', padding: 'var(--spacing-12)', color: 'var(--text-2)' }}>
-            Loading threads...
-          </div>
-        ) : (
-          <ForumThreadList threads={threads} />
-        )}
-      </div>
+      </ForumLayout>
     </Layout>
   );
 }

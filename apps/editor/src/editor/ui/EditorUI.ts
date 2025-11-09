@@ -589,6 +589,18 @@ export class EditorUI {
         
         this.setStatusMessage('Camera: Free Fly', 1000);
       },
+      onLogin: () => {
+        console.log('[EditorUI] Login requested');
+        // TODO: Open login modal when auth system is ready
+        this.setStatusMessage('Login feature coming soon', 2000);
+      },
+      onRegister: () => {
+        console.log('[EditorUI] Register requested');
+        // TODO: Open register modal when auth system is ready
+        this.setStatusMessage('Register feature coming soon', 2000);
+      },
+      isUserLoggedIn: () => false, // Mock for now
+      getUserName: () => null,
     });
     this.quickMenu.mount();
     this.quickMenu.setPlayMode(this.state.editorMode.value === 'play');

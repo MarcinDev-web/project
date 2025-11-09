@@ -40,7 +40,7 @@ export function AdminRoute({ children }: ProtectedRouteProps) {
   }
 
   if (!isAdmin) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;
@@ -62,7 +62,7 @@ export function ModeratorRoute({ children }: ProtectedRouteProps) {
   }
 
   if (!isModerator) {
-    return <Navigate to="/dashboard" replace />;
+    return <Navigate to="/" replace />;
   }
 
   return <>{children}</>;

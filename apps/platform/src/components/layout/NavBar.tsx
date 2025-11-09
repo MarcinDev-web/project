@@ -11,9 +11,6 @@ export const NavBar = memo(function NavBar() {
   const location = useLocation();
 
   const isActive = (path: string) => {
-    if (path === '/dashboard') {
-      return location.pathname === '/dashboard';
-    }
     return location.pathname.startsWith(path);
   };
 
@@ -29,9 +26,6 @@ export const NavBar = memo(function NavBar() {
       <div className="navbar-nav">
         {isAuthenticated ? (
           <>
-            <NavLink to="/dashboard" icon="🏠" isActive={isActive('/dashboard')}>
-              Dashboard
-            </NavLink>
             <NavLink to="/marketplace" icon="🛒" isActive={isActive('/marketplace')}>
               Marketplace
             </NavLink>
@@ -41,14 +35,8 @@ export const NavBar = memo(function NavBar() {
             <NavLink to="/avatar-builder" icon="🎨" isActive={isActive('/avatar-builder')}>
               Avatar Builder
             </NavLink>
-            <NavLink to="/community" icon="💬" isActive={isActive('/community')}>
-              Community
-            </NavLink>
-            <NavLink to="/messages" icon="💬" isActive={isActive('/messages')}>
-              Messages
-            </NavLink>
-            <NavLink to="/friends" icon="👥" isActive={isActive('/friends')}>
-              Friends
+            <NavLink to="/community-hub" icon="💬" isActive={isActive('/community-hub')}>
+              Community OS
             </NavLink>
 
             {/* Admin/Moderator Links */}

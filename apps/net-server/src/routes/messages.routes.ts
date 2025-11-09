@@ -30,6 +30,7 @@ export async function createMessagesRoutes(
     memberId?: string;
     action: 'add' | 'remove';
   };
+  type BroadcastMessageBody = { content: string };
 
   /**
    * GET /api/messages
@@ -587,6 +588,122 @@ export async function createMessagesRoutes(
         console.error('Mark message read error:', error);
         reply.code(500).send({
           error: 'Failed to mark message as read',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  );
+
+  /**
+   * POST /api/messages/broadcast
+   * Send a message to all users (admin/root only).
+   */
+  app.post<{ Body: BroadcastMessageBody }>(
+    '/broadcast',
+    {
+      preHandler: [authMiddleware],
+      schema: {
+        body: {
+          type: 'object',
+          required: ['content'],
+          properties: {
+            content: { type: 'string' },
+          },
+        },
+      },
+    },
+    async (request, reply) => {
+      try {
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
+        }
+
+        // Check if user is admin or root
+        if (request.user.role !== 'admin' && request.user.role !== 'root') {
+          return reply.code(403).send({ error: 'Forbidden: Admin or root access required' });
+        }
+
+        const { content } = request.body;
+
+        if (!content || !content.trim()) {
+          return reply.code(400).send({ error: 'Content is required' });
+        }
+
+        // Get all users
+        const allUsers = await authManager.getAllUsers();
+
+        // Filter out the sender
+        const recipients = allUsers.filter((user) => user.id !== request.user!.id);
+
+        if (recipients.length === 0) {
+          return reply.send({ sent: 0 });
+        }
+
+        const fromUser = await authManager.getUserById(request.user.id);
+        let sentCount = 0;
+
+        // Send message to each recipient
+        for (const recipient of recipients) {
+          try {
+            // Check if user is blocked (skip blocked users)
+            const isBlocked = await blockedUsersStorage.isBlocked(request.user.id, recipient.id);
+            const isBlockedBy = await blockedUsersStorage.isBlockedBy(request.user.id, recipient.id);
+
+            if (isBlocked || isBlockedBy) {
+              continue;
+            }
+
+            // Create message
+            const message = await messagesStorage.createMessage(request.user.id, recipient.id, content);
+
+            // Create notification if user wants notifications
+            const wantsNotifications = await userSettingsStorage.getNotificationPreference(
+              recipient.id,
+              'messages'
+            );
+
+            if (wantsNotifications) {
+              await notificationsStorage.createNotification({
+                userId: recipient.id,
+                type: 'message',
+                title: 'New Message',
+                message: `${fromUser?.username || fromUser?.email || 'Admin'}: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
+                link: `/messages`,
+                metadata: { conversationId: message.conversationId, messageId: message.id },
+              });
+
+              // Send notification via WebSocket
+              const notification = await notificationsStorage.getNotifications(recipient.id, 1).then((n) => n[0]);
+              if (notification) {
+                sessionManager.sendToUser(recipient.id, {
+                  type: 'notification:new',
+                  timestamp: Date.now(),
+                  notification: {
+                    id: notification.id,
+                    type: notification.type,
+                    title: notification.title,
+                    message: notification.message,
+                    createdAt: notification.createdAt,
+                    link: notification.link,
+                  },
+                });
+              }
+            }
+
+            // Notify recipient via WebSocket
+            await messageHandler.handleNewMessage(message);
+            sentCount++;
+          } catch (error) {
+            console.error(`Failed to send message to user ${recipient.id}:`, error);
+            // Continue with other users even if one fails
+          }
+        }
+
+        reply.send({ sent: sentCount });
+      } catch (error) {
+        console.error('Broadcast message error:', error);
+        reply.code(500).send({
+          error: 'Failed to broadcast message',
           message: error instanceof Error ? error.message : String(error),
         });
       }

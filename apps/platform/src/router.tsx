@@ -1,15 +1,12 @@
-import { createBrowserRouter } from 'react-router-dom';
+import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
-import { DashboardPage } from './pages/DashboardPage';
 import { MarketplacePage } from './pages/MarketplacePage';
 import { MarketplaceItemPage } from './pages/MarketplaceItemPage';
 import { ProfilePage } from './pages/ProfilePage';
-import { MessagesPage } from './pages/MessagesPage';
 import { EditorPage } from './pages/EditorPage';
 import { PlayerPage } from './pages/PlayerPage';
-import { FriendsPage } from './pages/FriendsPage';
 import { NotificationsPage } from './pages/NotificationsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { AdminPage } from './pages/AdminPage';
@@ -18,7 +15,7 @@ import { UsersManagementPage } from './pages/admin/UsersManagementPage';
 import { StatsPage } from './pages/admin/StatsPage';
 import { MarketplaceModerationPage as AdminMarketplacePage } from './pages/admin/MarketplaceModerationPage';
 import { MarketplaceModerationPage } from './pages/moderator/MarketplaceModerationPage';
-import { CommunityPage } from './pages/CommunityPage';
+import { CommunityHubPage } from './pages/CommunityHubPage';
 import { CategoryPage } from './pages/CategoryPage';
 import { ThreadPage } from './pages/ThreadPage';
 import { NewThreadPage } from './pages/NewThreadPage';
@@ -44,14 +41,6 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
   {
     path: '/register',
     element: <RegisterPage />,
-  },
-  {
-    path: '/dashboard',
-    element: (
-      <ProtectedRoute>
-        <DashboardPage />
-      </ProtectedRoute>
-    ),
   },
   {
     path: '/editor',
@@ -82,20 +71,20 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
     ),
   },
   {
-    path: '/messages',
+    path: '/community-hub',
     element: (
       <ProtectedRoute>
-        <MessagesPage />
+        <CommunityHubPage />
       </ProtectedRoute>
     ),
   },
   {
+    path: '/messages',
+    element: <Navigate to="/community-hub?tab=messages" replace />,
+  },
+  {
     path: '/friends',
-    element: (
-      <ProtectedRoute>
-        <FriendsPage />
-      </ProtectedRoute>
-    ),
+    element: <Navigate to="/community-hub?tab=friends" replace />,
   },
   {
     path: '/notifications',
@@ -187,7 +176,7 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
   },
   {
     path: '/community',
-    element: <CommunityPage />,
+    element: <Navigate to="/community-hub?tab=community" replace />,
   },
   {
     path: '/community/category/:id',

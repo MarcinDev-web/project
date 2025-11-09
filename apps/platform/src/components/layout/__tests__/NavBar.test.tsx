@@ -88,7 +88,6 @@ describe('NavBar', () => {
         </RouterWrapper>
       );
 
-      expect(screen.queryByText('Dashboard')).not.toBeInTheDocument();
       expect(screen.queryByText('Marketplace')).not.toBeInTheDocument();
     });
 
@@ -125,13 +124,10 @@ describe('NavBar', () => {
         </RouterWrapper>
       );
 
-      expect(screen.getByText('Dashboard')).toBeInTheDocument();
       expect(screen.getByText('Marketplace')).toBeInTheDocument();
       expect(screen.getByText('Shop')).toBeInTheDocument();
       expect(screen.getByText('Avatar Builder')).toBeInTheDocument();
-      expect(screen.getByText('Community')).toBeInTheDocument();
-      expect(screen.getByText('Messages')).toBeInTheDocument();
-      expect(screen.getByText('Friends')).toBeInTheDocument();
+      expect(screen.getByText('Community OS')).toBeInTheDocument();
     });
 
     it('should not display admin or moderator links', () => {

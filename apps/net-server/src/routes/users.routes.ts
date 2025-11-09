@@ -11,7 +11,7 @@ export async function createUsersRoutes(
   app: FastifyInstance,
   opts: { dependencies: RouteDependencies }
 ): Promise<void> {
-  const { authMiddleware, profileStorage, marketplaceStorage } = opts.dependencies;
+  const { authMiddleware, profileStorage, marketplaceStorage, authManager } = opts.dependencies;
 
   type UserIdParams = z.infer<typeof userIdParamSchema>;
   type UpdateProfileBody = z.infer<typeof updateProfileSchema>;
@@ -29,9 +29,15 @@ export async function createUsersRoutes(
       try {
         const { id } = (request.params as UserIdParams);
         const profile = await profileStorage.getProfile(id);
-
+        
+        // If profile doesn't exist, try to get basic user data
         if (!profile) {
-          return reply.code(404).send({ error: 'User not found' });
+          const user = await authManager.getUserById(id);
+          if (!user) {
+            return reply.code(404).send({ error: 'User not found' });
+          }
+          // Return basic user data (PublicUser) as fallback
+          return reply.send(user);
         }
 
         reply.send(profile);

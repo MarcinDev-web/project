@@ -273,7 +273,7 @@ export const ProfileActivitySection = memo(function ProfileActivitySection({
       )}
 
       <div style={{ marginTop: 'var(--spacing-4)', textAlign: 'center' }}>
-        <Link to={`/community?author=${userId}`}>
+        <Link to={`/community-hub?tab=community&author=${userId}`}>
           <button style={{
             padding: 'var(--spacing-2) var(--spacing-4)',
             background: 'transparent',

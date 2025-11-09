@@ -65,13 +65,13 @@ export const ProfileStats = memo(function ProfileStats({
     {
       label: 'Wątki',
       value: socialStats.forumThreadsCount,
-      link: `/community?author=${userId}`,
+      link: `/community-hub?tab=community&author=${userId}`,
       icon: '💬',
     },
     {
       label: 'Posty',
       value: socialStats.forumPostsCount,
-      link: `/community?author=${userId}`,
+      link: `/community-hub?tab=community&author=${userId}`,
       icon: '📝',
     },
     {

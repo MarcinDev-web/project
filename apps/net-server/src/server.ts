@@ -131,7 +131,14 @@ if (!process.env.JWT_REFRESH_SECRET && !isProduction) {
 // Set default FRONTEND_URL for development/test to avoid warnings
 // Must be set BEFORE validateConfig() is called
 if (!process.env.FRONTEND_URL && !isProduction) {
-  process.env.FRONTEND_URL = 'http://localhost:5173';
+  // Allow common Vite dev ports (5173/5174) and localhost/127.0.0.1
+  process.env.FRONTEND_URL =
+    'http://localhost:5173 http://localhost:5174 http://127.0.0.1:5173 http://127.0.0.1:5174';
+}
+// Provide additional allowlist origins in dev by default
+if (!process.env.CORS_ALLOWED_ORIGINS && !isProduction) {
+  process.env.CORS_ALLOWED_ORIGINS =
+    'http://localhost:5173 http://localhost:5174 http://127.0.0.1:5173 http://127.0.0.1:5174';
 }
 
 // Economy configuration (basic feature flags / anti-abuse controls)

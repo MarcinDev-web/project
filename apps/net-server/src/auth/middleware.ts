@@ -61,7 +61,7 @@ export function requireAdmin() {
       return;
     }
 
-    if (request.user.role !== 'admin') {
+    if (request.user.role !== 'admin' && request.user.role !== 'root') {
       reply.code(403).send({ error: 'Forbidden: Admin access required' });
       return;
     }
@@ -78,7 +78,7 @@ export function requireModerator() {
       return;
     }
 
-    if (request.user.role !== 'admin' && request.user.role !== 'moderator') {
+    if (request.user.role !== 'admin' && request.user.role !== 'moderator' && request.user.role !== 'root') {
       reply.code(403).send({ error: 'Forbidden: Moderator access required' });
       return;
     }
@@ -96,8 +96,8 @@ export function requireRole(role: UserRole) {
     }
 
     if (request.user.role !== role) {
-      // Admin can access everything
-      if (request.user.role === 'admin') {
+      // Root and admin can access everything
+      if (request.user.role === 'root' || request.user.role === 'admin') {
         return;
       }
 

@@ -41,7 +41,7 @@ export function RegisterForm() {
 
     try {
       await register(email, username, password);
-      navigate('/dashboard', { replace: true });
+      navigate('/', { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
     } finally {
@@ -51,10 +51,10 @@ export function RegisterForm() {
 
   return (
     <Card>
-      <h2 style={{ marginTop: 0, marginBottom: 'var(--spacing-6)' }}>Create Account</h2>
+      <h2 className="auth-form-title">Create Account</h2>
       <form onSubmit={handleSubmit}>
-        <div style={{ marginBottom: 'var(--spacing-4)' }}>
-          <label htmlFor="email" style={{ display: 'block', marginBottom: 'var(--spacing-2)' }}>
+        <div className="auth-form-group">
+          <label htmlFor="email" className="auth-form-label">
             Email
           </label>
           <input
@@ -63,18 +63,11 @@ export function RegisterForm() {
             value={email}
             onChange={(e) => setEmail(e.target.value)}
             required
-            style={{
-              width: '100%',
-              padding: 'var(--spacing-2)',
-              background: 'var(--bg-button)',
-              border: '1px solid var(--border-default)',
-              borderRadius: 'var(--radius-md)',
-              color: 'var(--text-1)',
-            }}
+            className="auth-form-input"
           />
         </div>
-        <div style={{ marginBottom: 'var(--spacing-4)' }}>
-          <label htmlFor="username" style={{ display: 'block', marginBottom: 'var(--spacing-2)' }}>
+        <div className="auth-form-group">
+          <label htmlFor="username" className="auth-form-label">
             Username
           </label>
           <input
@@ -87,21 +80,14 @@ export function RegisterForm() {
             maxLength={20}
             pattern="[a-zA-Z0-9_]+"
             title="Username can only contain letters, numbers, and underscores"
-            style={{
-              width: '100%',
-              padding: 'var(--spacing-2)',
-              background: 'var(--bg-button)',
-              border: '1px solid var(--border-default)',
-              borderRadius: 'var(--radius-md)',
-              color: 'var(--text-1)',
-            }}
+            className="auth-form-input"
           />
-          <small style={{ display: 'block', marginTop: 'var(--spacing-1)', color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }}>
+          <small className="auth-form-hint">
             3-20 characters, letters, numbers, and underscores only
           </small>
         </div>
-        <div style={{ marginBottom: 'var(--spacing-4)' }}>
-          <label htmlFor="password" style={{ display: 'block', marginBottom: 'var(--spacing-2)' }}>
+        <div className="auth-form-group">
+          <label htmlFor="password" className="auth-form-label">
             Password
           </label>
           <input
@@ -111,18 +97,11 @@ export function RegisterForm() {
             onChange={(e) => setPassword(e.target.value)}
             required
             minLength={6}
-            style={{
-              width: '100%',
-              padding: 'var(--spacing-2)',
-              background: 'var(--bg-button)',
-              border: '1px solid var(--border-default)',
-              borderRadius: 'var(--radius-md)',
-              color: 'var(--text-1)',
-            }}
+            className="auth-form-input"
           />
         </div>
-        <div style={{ marginBottom: 'var(--spacing-6)' }}>
-          <label htmlFor="confirmPassword" style={{ display: 'block', marginBottom: 'var(--spacing-2)' }}>
+        <div className="auth-form-group">
+          <label htmlFor="confirmPassword" className="auth-form-label">
             Confirm Password
           </label>
           <input
@@ -132,26 +111,15 @@ export function RegisterForm() {
             onChange={(e) => setConfirmPassword(e.target.value)}
             required
             minLength={6}
-            style={{
-              width: '100%',
-              padding: 'var(--spacing-2)',
-              background: 'var(--bg-button)',
-              border: '1px solid var(--border-default)',
-              borderRadius: 'var(--radius-md)',
-              color: 'var(--text-1)',
-            }}
+            className="auth-form-input"
           />
         </div>
         {error && (
-          <div style={{ 
-            marginBottom: 'var(--spacing-4)', 
-            color: 'var(--color-error)',
-            fontSize: 'var(--text-sm)',
-          }}>
+          <div className="auth-form-error">
             {error}
           </div>
         )}
-        <Button type="submit" disabled={isLoading}>
+        <Button type="submit" disabled={isLoading} className="auth-form-submit">
           {isLoading ? 'Creating account...' : 'Register'}
         </Button>
       </form>

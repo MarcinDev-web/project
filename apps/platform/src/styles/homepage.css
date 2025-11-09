@@ -1,0 +1,278 @@
+/**
+ * HomePage Styles - Forge World Industrial Aesthetic
+ */
+
+/* ============================================
+   SEARCH & FILTERS BAR
+   ============================================ */
+
+.homepage-header {
+  display: flex;
+  gap: var(--spacing-4);
+  margin-bottom: var(--spacing-6);
+  flex-wrap: wrap;
+  align-items: center;
+}
+
+.homepage-search {
+  flex: 1;
+  min-width: 300px;
+  position: relative;
+}
+
+.homepage-search-input {
+  width: 100%;
+  padding: var(--spacing-3) var(--spacing-4);
+  padding-left: var(--spacing-10);
+  background: rgba(35, 38, 46, 0.6);
+  border: 1px solid var(--fw-border-color-medium);
+  border-radius: 6px;
+  color: rgba(200, 210, 220, 0.9);
+  font-size: var(--text-base);
+  font-weight: 500;
+  transition: all var(--transition-fast);
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.homepage-search-input::placeholder {
+  color: rgba(130, 140, 155, 0.7);
+}
+
+.homepage-search-input:hover {
+  border-color: var(--fw-border-color-light);
+  background: rgba(45, 48, 56, 0.7);
+}
+
+.homepage-search-input:focus {
+  outline: none;
+  border-color: var(--fw-accent-primary);
+  background: rgba(45, 48, 56, 0.8);
+  box-shadow: 0 0 0 3px rgba(230, 126, 34, 0.2), inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.homepage-search-icon {
+  position: absolute;
+  left: var(--spacing-3);
+  top: 50%;
+  transform: translateY(-50%);
+  font-size: 1.25rem;
+  color: var(--fw-metal-steel-light);
+  pointer-events: none;
+}
+
+.homepage-sort-select {
+  padding: var(--spacing-3) var(--spacing-4);
+  padding-right: var(--spacing-8);
+  background: rgba(35, 38, 46, 0.6);
+  border: 1px solid var(--fw-border-color-medium);
+  border-radius: 6px;
+  color: rgba(200, 210, 220, 0.9);
+  font-size: var(--text-base);
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--transition-fast);
+  appearance: none;
+  background-image: url('data:image/svg+xml;utf8,<svg xmlns="http://www.w3.org/2000/svg" width="12" height="12" viewBox="0 0 12 12"><path fill="%23a0aab9" d="M6 8L2 4h8z"/></svg>');
+  background-repeat: no-repeat;
+  background-position: right var(--spacing-3) center;
+  box-shadow: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.homepage-sort-select:hover {
+  border-color: var(--fw-border-color-light);
+  background-color: rgba(45, 48, 56, 0.7);
+}
+
+.homepage-sort-select:focus {
+  outline: none;
+  border-color: var(--fw-accent-primary);
+  box-shadow: 0 0 0 3px rgba(230, 126, 34, 0.2), inset 0 2px 4px rgba(0, 0, 0, 0.3);
+}
+
+.homepage-sort-select option {
+  background: var(--fw-base-dark);
+  color: rgba(200, 210, 220, 0.9);
+  padding: var(--spacing-2);
+}
+
+/* ============================================
+   GAME GRID
+   ============================================ */
+
+.games-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: var(--spacing-4);
+}
+
+.game-card {
+  background: var(--fw-base-medium);
+  border: 1px solid var(--fw-border-color-medium);
+  border-radius: 8px;
+  overflow: hidden;
+  transition: all var(--transition-fast);
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.game-card:hover {
+  background: var(--fw-base-light);
+  border-color: var(--fw-accent-primary);
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(0, 0, 0, 0.6), 0 0 16px rgba(230, 126, 34, 0.2);
+}
+
+.game-card__thumbnail {
+  width: 100%;
+  aspect-ratio: 16/9;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: rgba(130, 140, 155, 0.6);
+  font-size: 3rem;
+  position: relative;
+  overflow: hidden;
+}
+
+.game-card__thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.game-card__content {
+  padding: var(--spacing-4);
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.game-card__title {
+  margin: 0 0 var(--spacing-2) 0;
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: #ffffff;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.game-card__description {
+  margin: 0 0 var(--spacing-3) 0;
+  font-size: var(--text-sm);
+  color: rgba(180, 190, 205, 0.9);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  min-height: 2.5em;
+  line-height: 1.4;
+}
+
+.game-card__meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: var(--text-xs);
+  color: rgba(150, 160, 175, 0.8);
+  margin-bottom: var(--spacing-3);
+}
+
+.game-card__author {
+  font-weight: 600;
+}
+
+.game-card__stats {
+  display: flex;
+  gap: var(--spacing-3);
+  align-items: center;
+}
+
+.game-card__stat {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
+}
+
+.game-card__stat--online {
+  color: var(--fw-status-success);
+  font-weight: 600;
+}
+
+.game-card__actions {
+  padding: 0 var(--spacing-4) var(--spacing-4);
+}
+
+.game-card__play-button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  padding: var(--spacing-2-5) var(--spacing-4);
+  background: var(--fw-gradient-accent);
+  border: 1px solid var(--fw-accent-primary);
+  color: white;
+  border-radius: 6px;
+  text-decoration: none;
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  transition: all var(--transition-fast);
+  box-shadow: 0 2px 8px rgba(230, 126, 34, 0.3);
+}
+
+.game-card__play-button:hover {
+  filter: brightness(1.15);
+  box-shadow: 0 4px 12px rgba(230, 126, 34, 0.5);
+  transform: translateY(-1px);
+}
+
+.game-card__play-button:active {
+  transform: translateY(0);
+  box-shadow: 0 2px 6px rgba(230, 126, 34, 0.3);
+}
+
+/* ============================================
+   LOADING & EMPTY STATES
+   ============================================ */
+
+.homepage-loading,
+.homepage-empty {
+  text-align: center;
+  padding: var(--spacing-16);
+  color: rgba(150, 160, 175, 0.8);
+  font-size: var(--text-base);
+}
+
+.homepage-empty {
+  background: rgba(35, 38, 46, 0.3);
+  border: 1px dashed var(--fw-border-color-medium);
+  border-radius: 8px;
+  padding: var(--spacing-12);
+}
+
+/* ============================================
+   RESPONSIVE
+   ============================================ */
+
+@media (max-width: 768px) {
+  .games-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  .homepage-header {
+    flex-direction: column;
+  }
+  
+  .homepage-search {
+    width: 100%;
+  }
+  
+  .homepage-sort-select {
+    width: 100%;
+  }
+}
+

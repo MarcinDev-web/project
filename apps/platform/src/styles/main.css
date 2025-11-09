@@ -34,4 +34,10 @@
 /* Platform-specific styles */
 @import './platform.css';
 @import './blocks-models-studio.css';
+@import './homepage.css';
+@import './auth.css';
+
+/* Forum styles */
+@import './forum-tokens.css';
+@import './forum.css';
 

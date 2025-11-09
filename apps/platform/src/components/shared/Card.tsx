@@ -4,27 +4,24 @@ interface CardProps extends HTMLAttributes<HTMLDivElement> {
   children: ReactNode;
   className?: string;
   hoverable?: boolean;
+  variant?: 'default' | 'thread' | 'post' | 'category';
 }
 
-export function Card({ children, className = '', hoverable = true, style, ...props }: CardProps) {
-  const baseStyle: React.CSSProperties = {
-    background: 'var(--bg-panel)',
-    border: '1px solid var(--border-default)',
-    borderRadius: 'var(--radius-lg)',
-    padding: 'var(--spacing-6)',
-    boxShadow: 'var(--shadow-md)',
-    transition: 'all var(--transition-base)',
-    ...style,
-  };
-
-  const hoverStyle: React.CSSProperties = hoverable ? {
-    cursor: 'pointer',
-  } : {};
+export function Card({ 
+  children, 
+  className = '', 
+  hoverable = true, 
+  variant = 'default',
+  style, 
+  ...props 
+}: CardProps) {
+  const baseClasses = variant === 'default' ? 'forge-card' : `forum-${variant === 'thread' ? 'thread-card' : variant === 'post' ? 'post' : 'category-card'}`;
+  const classes = `${baseClasses} ${hoverable && variant === 'default' ? 'forge-card--hoverable' : ''} ${className}`.trim();
 
   return (
     <div 
-      style={{ ...baseStyle, ...hoverStyle }}
-      className={className}
+      style={style}
+      className={classes}
       {...props}
     >
       {children}

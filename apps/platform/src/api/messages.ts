@@ -84,5 +84,10 @@ export const messagesApi = {
   async leaveGroup(groupId: string): Promise<void> {
     return apiClient.delete(`/messages/groups/${groupId}/leave`);
   },
+
+  // Broadcast message to all users (admin/root only)
+  async sendMessageToAll(content: string): Promise<{ sent: number }> {
+    return apiClient.post<{ sent: number }>('/messages/broadcast', { content });
+  },
 };
 

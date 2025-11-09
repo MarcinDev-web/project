@@ -16,9 +16,13 @@ class ApiClient {
   ): Promise<T> {
     const { token } = getTokens();
     const headers: Record<string, string> = {
-      'Content-Type': 'application/json',
       ...(options.headers as Record<string, string> | undefined),
     };
+
+    // Only set Content-Type if there's a body
+    if (options.body !== undefined) {
+      headers['Content-Type'] = 'application/json';
+    }
 
     if (token) {
       headers['Authorization'] = `Bearer ${token}`;

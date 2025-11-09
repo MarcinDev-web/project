@@ -16,69 +16,69 @@ describe('NavLink', () => {
   it('should render link with correct text and icon', () => {
     render(
       <RouterWrapper>
-        <NavLink to="/dashboard" icon="🏠">
-          Dashboard
+        <NavLink to="/marketplace" icon="🛒">
+          Marketplace
         </NavLink>
       </RouterWrapper>
     );
 
-    const link = screen.getByRole('link', { name: /dashboard/i });
+    const link = screen.getByRole('link', { name: /marketplace/i });
     expect(link).toBeInTheDocument();
-    expect(link).toHaveAttribute('href', '/dashboard');
-    expect(link).toHaveTextContent('🏠');
+    expect(link).toHaveAttribute('href', '/marketplace');
+    expect(link).toHaveTextContent('🛒');
   });
 
   it('should apply active class when isActive is true', () => {
     render(
       <RouterWrapper>
-        <NavLink to="/dashboard" icon="🏠" isActive={true}>
-          Dashboard
+        <NavLink to="/marketplace" icon="🛒" isActive={true}>
+          Marketplace
         </NavLink>
       </RouterWrapper>
     );
 
-    const link = screen.getByRole('link', { name: /dashboard/i });
+    const link = screen.getByRole('link', { name: /marketplace/i });
     expect(link).toHaveClass('nav-link--active');
   });
 
   it('should not apply active class when isActive is false', () => {
     render(
       <RouterWrapper>
-        <NavLink to="/dashboard" icon="🏠" isActive={false}>
-          Dashboard
+        <NavLink to="/marketplace" icon="🛒" isActive={false}>
+          Marketplace
         </NavLink>
       </RouterWrapper>
     );
 
-    const link = screen.getByRole('link', { name: /dashboard/i });
+    const link = screen.getByRole('link', { name: /marketplace/i });
     expect(link).not.toHaveClass('nav-link--active');
   });
 
   it('should always have nav-link class', () => {
     render(
       <RouterWrapper>
-        <NavLink to="/dashboard" icon="🏠">
-          Dashboard
+        <NavLink to="/marketplace" icon="🛒">
+          Marketplace
         </NavLink>
       </RouterWrapper>
     );
 
-    const link = screen.getByRole('link', { name: /dashboard/i });
+    const link = screen.getByRole('link', { name: /marketplace/i });
     expect(link).toHaveClass('nav-link');
   });
 
   it('should render icon in span with correct class', () => {
     const { container } = render(
       <RouterWrapper>
-        <NavLink to="/dashboard" icon="🏠">
-          Dashboard
+        <NavLink to="/marketplace" icon="🛒">
+          Marketplace
         </NavLink>
       </RouterWrapper>
     );
 
     const iconSpan = container.querySelector('.nav-link__icon');
     expect(iconSpan).toBeInTheDocument();
-    expect(iconSpan).toHaveTextContent('🏠');
+    expect(iconSpan).toHaveTextContent('🛒');
   });
 });
 

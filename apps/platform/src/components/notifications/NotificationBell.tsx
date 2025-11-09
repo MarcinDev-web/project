@@ -65,7 +65,7 @@ export function NotificationBell() {
   };
 
   return (
-    <div style={{ position: 'relative' }}>
+    <div className="notification-bell">
       <button
         onClick={() => {
           setIsOpen(!isOpen);
@@ -73,33 +73,11 @@ export function NotificationBell() {
             loadNotifications();
           }
         }}
-        style={{
-          position: 'relative',
-          background: 'transparent',
-          border: 'none',
-          color: 'var(--text-2)',
-          cursor: 'pointer',
-          fontSize: 'var(--text-lg)',
-          padding: 'var(--spacing-2)',
-        }}
+        className="notification-bell__button"
       >
         🔔
         {unreadCount > 0 && (
-          <span style={{
-            position: 'absolute',
-            top: 0,
-            right: 0,
-            background: 'var(--bg-button-primary)',
-            color: 'white',
-            borderRadius: '50%',
-            minWidth: '18px',
-            height: '18px',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: 'var(--text-xs)',
-            fontWeight: 'bold',
-          }}>
+          <span className="notification-bell__badge">
             {unreadCount > 99 ? '99+' : unreadCount}
           </span>
         )}
@@ -108,64 +86,24 @@ export function NotificationBell() {
       {isOpen && (
         <>
           <div
-            style={{
-              position: 'fixed',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              zIndex: 998,
-            }}
+            className="user-menu__backdrop"
             onClick={() => setIsOpen(false)}
           />
-          <div style={{
-            position: 'absolute',
-            top: 'calc(100% + var(--spacing-2))',
-            right: 0,
-            width: '350px',
-            maxHeight: '500px',
-            background: 'var(--bg-panel)',
-            border: '1px solid var(--border-default)',
-            borderRadius: 'var(--radius-md)',
-            boxShadow: '0 4px 12px rgba(0, 0, 0, 0.15)',
-            zIndex: 999,
-            overflow: 'hidden',
-            display: 'flex',
-            flexDirection: 'column',
-          }}>
-            <div style={{
-              padding: 'var(--spacing-4)',
-              borderBottom: '1px solid var(--border-default)',
-              display: 'flex',
-              justifyContent: 'space-between',
-              alignItems: 'center',
-            }}>
-              <h3 style={{ margin: 0, fontSize: 'var(--text-lg)' }}>Notifications</h3>
+          <div className="notification-bell__dropdown">
+            <div className="notification-bell__header">
+              <h3 className="notification-bell__title">Notifications</h3>
               {unreadCount > 0 && (
                 <button
                   onClick={handleMarkAllAsRead}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: 'var(--text-2)',
-                    cursor: 'pointer',
-                    fontSize: 'var(--text-sm)',
-                  }}
+                  className="notification-bell__mark-all"
                 >
                   Mark all as read
                 </button>
               )}
             </div>
-            <div style={{
-              overflowY: 'auto',
-              flex: 1,
-            }}>
+            <div className="notification-bell__list">
               {notifications.length === 0 ? (
-                <div style={{
-                  padding: 'var(--spacing-8)',
-                  textAlign: 'center',
-                  color: 'var(--text-2)',
-                }}>
+                <div className="notification-bell__empty">
                   No notifications
                 </div>
               ) : (
@@ -180,37 +118,32 @@ export function NotificationBell() {
                         handleMarkAsRead(notif.id);
                       }
                     }}
-                    style={{
-                      padding: 'var(--spacing-4)',
-                      borderBottom: '1px solid var(--border-default)',
-                      background: notif.read ? 'transparent' : 'var(--bg-button)',
-                      cursor: notif.link ? 'pointer' : 'default',
-                    }}
+                    className={`notification-item ${!notif.read ? 'notification-item--unread' : ''} ${notif.link ? 'notification-item--clickable' : ''}`}
                   >
                     {notif.link ? (
                       <Link
                         to={notif.link}
                         style={{ textDecoration: 'none', color: 'inherit' }}
                       >
-                        <div style={{ fontWeight: notif.read ? 'normal' : 'bold', fontSize: 'var(--text-sm)' }}>
+                        <div className={`notification-item__title ${!notif.read ? 'notification-item__title--unread' : ''}`}>
                           {notif.title}
                         </div>
-                        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-2)', marginTop: 'var(--spacing-1)' }}>
+                        <div className="notification-item__message">
                           {notif.message}
                         </div>
-                        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)', marginTop: 'var(--spacing-1)' }}>
+                        <div className="notification-item__time">
                           {new Date(notif.createdAt).toLocaleDateString()} {new Date(notif.createdAt).toLocaleTimeString()}
                         </div>
                       </Link>
                     ) : (
                       <>
-                        <div style={{ fontWeight: notif.read ? 'normal' : 'bold', fontSize: 'var(--text-sm)' }}>
+                        <div className={`notification-item__title ${!notif.read ? 'notification-item__title--unread' : ''}`}>
                           {notif.title}
                         </div>
-                        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-2)', marginTop: 'var(--spacing-1)' }}>
+                        <div className="notification-item__message">
                           {notif.message}
                         </div>
-                        <div style={{ fontSize: 'var(--text-xs)', color: 'var(--text-3)', marginTop: 'var(--spacing-1)' }}>
+                        <div className="notification-item__time">
                           {new Date(notif.createdAt).toLocaleDateString()} {new Date(notif.createdAt).toLocaleTimeString()}
                         </div>
                       </>
@@ -219,18 +152,10 @@ export function NotificationBell() {
                 ))
               )}
             </div>
-            <div style={{
-              padding: 'var(--spacing-3)',
-              borderTop: '1px solid var(--border-default)',
-              textAlign: 'center',
-            }}>
+            <div className="notification-bell__footer">
               <Link
                 to="/notifications"
-                style={{
-                  color: 'var(--text-2)',
-                  textDecoration: 'none',
-                  fontSize: 'var(--text-sm)',
-                }}
+                className="notification-bell__view-all"
                 onClick={() => setIsOpen(false)}
               >
                 View all notifications

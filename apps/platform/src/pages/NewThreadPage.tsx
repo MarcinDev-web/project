@@ -175,7 +175,7 @@ export function NewThreadPage() {
             </div>
 
             <div style={{ display: 'flex', gap: 'var(--spacing-2)', justifyContent: 'flex-end' }}>
-              <Button variant="secondary" onClick={() => navigate('/community')}>
+              <Button variant="secondary" onClick={() => navigate('/community-hub?tab=community')}>
                 Cancel
               </Button>
               <Button onClick={handleSubmit} disabled={isSubmitting}>

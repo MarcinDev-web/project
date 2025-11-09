@@ -2,48 +2,37 @@ interface ThreadBadgesProps {
   isPinned: boolean;
   isLocked: boolean;
   tags: string[];
+  isSolved?: boolean;
+  isHot?: boolean;
 }
 
-export function ThreadBadges({ isPinned, isLocked, tags }: ThreadBadgesProps) {
+export function ThreadBadges({ isPinned, isLocked, tags, isSolved = false, isHot = false }: ThreadBadgesProps) {
   return (
-    <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-2)', flexWrap: 'wrap' }}>
+    <div className="forum-thread-badges">
       {isPinned && (
-        <span style={{
-          fontSize: 'var(--text-xs)',
-          background: 'var(--bg-button-primary)',
-          color: 'white',
-          padding: '2px 6px',
-          borderRadius: 'var(--radius-sm)',
-          fontWeight: 'var(--font-medium)',
-        }}>
-          PINNED
+        <span className="forum-thread-badge forum-thread-badge--pinned">
+          📌 Pinned
         </span>
       )}
       {isLocked && (
-        <span style={{
-          fontSize: 'var(--text-xs)',
-          background: 'var(--bg-button)',
-          color: 'var(--text-2)',
-          padding: '2px 6px',
-          borderRadius: 'var(--radius-sm)',
-          fontWeight: 'var(--font-medium)',
-        }}>
-          LOCKED
+        <span className="forum-thread-badge forum-thread-badge--locked">
+          🔒 Locked
+        </span>
+      )}
+      {isSolved && (
+        <span className="forum-thread-badge forum-thread-badge--solved">
+          ✓ Solved
+        </span>
+      )}
+      {isHot && (
+        <span className="forum-thread-badge forum-thread-badge--hot">
+          🔥 Hot
         </span>
       )}
       {tags.length > 0 && (
         <>
-          {tags.map(tag => (
-            <span
-              key={tag}
-              style={{
-                fontSize: 'var(--text-xs)',
-                background: 'var(--bg-button)',
-                color: 'var(--text-2)',
-                padding: '2px 6px',
-                borderRadius: 'var(--radius-sm)',
-              }}
-            >
+          {tags.slice(0, 3).map(tag => (
+            <span key={tag} className="forum-thread-badge">
               {tag}
             </span>
           ))}

@@ -153,10 +153,20 @@ export async function createAdminRoutes(
           return reply.code(400).send({ error: 'Cannot change your own role' });
         }
 
-        const updates: { active?: boolean; role?: 'user' | 'moderator' | 'admin' } = {};
+        // Check if trying to modify a root user
+        const targetUser = await authManager['userStorage'].findUserById(id);
+        if (targetUser && targetUser.role === 'root' && request.user.role !== 'root') {
+          return reply.code(403).send({ error: 'Cannot modify root users' });
+        }
+
+        const updates: { active?: boolean; role?: 'user' | 'moderator' | 'admin' | 'root' } = {};
         if (active !== undefined) updates.active = active;
-        if (role && ['user', 'moderator', 'admin'].includes(role)) {
-          updates.role = role as 'user' | 'moderator' | 'admin';
+        if (role && ['user', 'moderator', 'admin', 'root'].includes(role)) {
+          // Only root can assign root role
+          if (role === 'root' && request.user.role !== 'root') {
+            return reply.code(403).send({ error: 'Only root users can assign root role' });
+          }
+          updates.role = role as 'user' | 'moderator' | 'admin' | 'root';
         }
 
         const updated = await authManager['userStorage'].updateUserById(id, updates);
@@ -200,6 +210,7 @@ export async function createAdminRoutes(
             user: allUsers.filter((u) => (u.role ?? 'user') === 'user').length,
             moderator: allUsers.filter((u) => u.role === 'moderator').length,
             admin: allUsers.filter((u) => u.role === 'admin').length,
+            root: allUsers.filter((u) => u.role === 'root').length,
           },
         },
         marketplace: {
@@ -522,8 +533,8 @@ export async function createAdminRoutes(
         const { reason } = request.body as { reason?: string };
 
         const user = await authManager['userStorage'].findUserById(id);
-        if (user && user.role === 'admin') {
-          return reply.code(403).send({ error: 'Cannot ban admin users' });
+        if (user && (user.role === 'admin' || user.role === 'root')) {
+          return reply.code(403).send({ error: 'Cannot ban admin or root users' });
         }
 
         const updated = await authManager['userStorage'].updateUserById(id, { active: false });
@@ -963,7 +974,7 @@ export async function createAdminRoutes(
   });
 
   app.get(
-    '/admin/forum/stats',
+    '/forum/stats',
     { preHandler: [authMiddleware, requireAdmin()] },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
@@ -984,7 +995,7 @@ export async function createAdminRoutes(
   );
 
   app.get(
-    '/admin/forum/categories',
+    '/forum/categories',
     { preHandler: [authMiddleware, requireAdmin()] },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
@@ -1005,7 +1016,7 @@ export async function createAdminRoutes(
   );
 
   app.put<{ Params: { id: string }; Body: Partial<ForumCategory> }>(
-    '/admin/forum/categories/:id',
+    '/forum/categories/:id',
     { preHandler: [authMiddleware, requireAdmin()] },
     async (request, reply) => {
       try {
@@ -1036,7 +1047,7 @@ export async function createAdminRoutes(
   );
 
   app.delete<{ Params: { id: string } }>(
-    '/admin/forum/categories/:id',
+    '/forum/categories/:id',
     { preHandler: [authMiddleware, requireAdmin()] },
     async (request, reply) => {
       try {
@@ -1072,7 +1083,7 @@ export async function createAdminRoutes(
   );
 
   app.get(
-    '/admin/forum/threads',
+    '/forum/threads',
     { preHandler: [authMiddleware, requireAdmin()] },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
@@ -1123,7 +1134,7 @@ export async function createAdminRoutes(
   );
 
   app.delete<{ Params: { id: string } }>(
-    '/admin/forum/threads/:id',
+    '/forum/threads/:id',
     { preHandler: [authMiddleware, requireAdmin()] },
     async (request, reply) => {
       try {
@@ -1158,7 +1169,7 @@ export async function createAdminRoutes(
   );
 
   app.get(
-    '/admin/forum/posts',
+    '/forum/posts',
     { preHandler: [authMiddleware, requireAdmin()] },
     async (request: FastifyRequest, reply: FastifyReply) => {
       try {
@@ -1204,7 +1215,7 @@ export async function createAdminRoutes(
   );
 
   app.delete<{ Params: { id: string } }>(
-    '/admin/forum/posts/:id',
+    '/forum/posts/:id',
     { preHandler: [authMiddleware, requireAdmin()] },
     async (request, reply) => {
       try {
@@ -1234,6 +1245,59 @@ export async function createAdminRoutes(
         console.error('Admin delete forum post error:', error);
         reply.code(500).send({
           error: 'Failed to delete forum post',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  );
+
+  // PURGE ALL FORUM DATA
+  app.post(
+    '/forum/purge',
+    { preHandler: [authMiddleware, requireAdmin()] },
+    async (request, reply) => {
+      try {
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
+        }
+
+        // Check if using database or JSON storage
+        if (process.env.DATABASE_URL) {
+          // Use Prisma to delete all threads (cascades to posts, reactions, votes)
+          const { getPrismaClient } = await import('../lib/db.js');
+          const prisma = await getPrismaClient();
+          try {
+            const { count } = await prisma.forumThread.deleteMany({});
+            reply.send({
+              success: true,
+              message: `Deleted ${count} forum threads (posts/reactions/votes cascaded)`,
+              deletedThreads: count,
+            });
+          } finally {
+            // Don't disconnect - Prisma client is shared and reused
+            // await disconnectPrisma();
+          }
+        } else {
+          // Use JSON storage - delete all threads
+          const threads = await forumStorage.getAllThreads({ limit: 100000 });
+          let deletedCount = 0;
+          for (const thread of threads.threads) {
+            const deleted = await forumStorage.deleteThread(thread.id, request.user.id, true);
+            if (deleted) {
+              deletedCount++;
+              await forumHandler.handleThreadDeleted(thread.id, thread.categoryId);
+            }
+          }
+          reply.send({
+            success: true,
+            message: `Deleted ${deletedCount} forum threads`,
+            deletedThreads: deletedCount,
+          });
+        }
+      } catch (error) {
+        console.error('Admin purge forum error:', error);
+        reply.code(500).send({
+          error: 'Failed to purge forum',
           message: error instanceof Error ? error.message : String(error),
         });
       }

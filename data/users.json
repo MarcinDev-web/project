@@ -1,0 +1,11 @@
+{
+  "root@example.com": {
+    "id": "8d8083e9e1b9f00c3311f983860f5d10",
+    "email": "root@example.com",
+    "passwordHash": "$2b$12$IPC37bxSzdofGdESZ4U6Gu16kBIejwlYlud3pdMmiXgQzFkAnnQKy",
+    "createdAt": 1762726667170,
+    "updatedAt": 1762726667170,
+    "role": "root",
+    "active": true
+  }
+}

@@ -74,8 +74,8 @@ export const ProfileSocialActions = memo(function ProfileSocialActions({
   };
 
   const handleSendMessage = () => {
-    // Navigate to messages page - the MessagesPage will handle creating conversation if needed
-    navigate(`/messages?user=${userId}`);
+    // Navigate to messages page - the MessagesTab will handle creating conversation if needed
+    navigate(`/community-hub?tab=messages&user=${userId}`);
   };
 
   const getFriendButtonText = (): string => {
@@ -135,7 +135,7 @@ export const ProfileSocialActions = memo(function ProfileSocialActions({
         </Button>
       )}
 
-      <Link to={`/community?author=${userId}`}>
+      <Link to={`/community-hub?tab=community&author=${userId}`}>
         <Button variant="secondary">
           Posty na forum
         </Button>
