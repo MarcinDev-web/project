@@ -2,13 +2,15 @@
   "extends": "./tsconfig.json",
   "compilerOptions": {
     "composite": true,
+    "baseUrl": ".",
     "moduleResolution": "bundler",
     "module": "ESNext",
+    "skipLibCheck": true,
     "paths": {
       "@engine/core": ["../core/dist"],
       "@engine/core/*": ["../core/dist/*"],
-      "@engine/animation": ["../animation/dist"],
-      "@engine/animation/*": ["../animation/dist/*"],
+      "@engine/animation": ["../animation/dist/src"],
+      "@engine/animation/*": ["../animation/dist/src/*"],
       "@engine/economy": ["../economy/dist/src"],
       "@engine/economy/*": ["../economy/dist/src/*"],
       "@engine/world-server": ["../world-server/dist"],
@@ -23,7 +25,7 @@
   },
   "references": [
     { "path": "../core/tsconfig.build.json" },
-    { "path": "../animation" },
+    { "path": "../animation/tsconfig.json" },
     { "path": "../blocks" },
     { "path": "../economy" }
     // Note: script is excluded here to handle circular dependency

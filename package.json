@@ -37,7 +37,8 @@
     "test:headless": "cd packages/world && pnpm test",
     "test:bench": "tsx packages/core/__benchmarks__/vec3.bench.ts && tsx packages/core/__benchmarks__/mat4.bench.ts && tsx packages/world/__benchmarks__/ecs.bench.ts",
     "measure:heap": "node --expose-gc --import tsx scripts/measure-heap.ts",
-    "measure:heap:60s": "node --expose-gc --import tsx scripts/measure-heap.ts --duration=60 --entities=1000"
+    "measure:heap:60s": "node --expose-gc --import tsx scripts/measure-heap.ts --duration=60 --entities=1000",
+    "docker:push": "powershell -ExecutionPolicy Bypass -File scripts/docker-push.ps1"
   },
   "keywords": [],
   "author": "",

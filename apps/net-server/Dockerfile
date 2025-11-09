@@ -49,6 +49,7 @@ COPY packages/avatar/package.json ./packages/avatar/
 COPY packages/microblocks/package.json ./packages/microblocks/
 COPY packages/net/package.json ./packages/net/
 COPY packages/world-templates/package.json ./packages/world-templates/
+COPY shared/package.json ./shared/
 
 # Install dependencies (production + dev for build)
 RUN pnpm install --no-frozen-lockfile --prefer-offline
@@ -72,7 +73,7 @@ RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" pnpm -C apps/ne
 RUN find packages -type d -name dist -exec rm -rf {} + 2>/dev/null || true && \
     find packages -name "*.tsbuildinfo" -delete 2>/dev/null || true && \
     pnpm --filter @engine/core build && \
-    pnpm --filter @engine/animation build && \
+    (cd packages/animation && pnpm exec tsc -b) && \
     pnpm --filter @engine/blocks build && \
     pnpm --filter @engine/economy build && \
     (cd packages/world && pnpm exec tsc -b tsconfig.build.json) && \

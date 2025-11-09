@@ -49,8 +49,14 @@ export function normalizeOrigin(origin: string): string | null {
     return null;
   }
 
+  // Auto-add https:// if protocol is missing
+  let urlToParse = trimmed;
+  if (!trimmed.match(/^https?:\/\//i)) {
+    urlToParse = `https://${trimmed}`;
+  }
+
   try {
-    const parsed = new URL(trimmed);
+    const parsed = new URL(urlToParse);
     if (parsed.protocol !== 'http:' && parsed.protocol !== 'https:') {
       return null;
     }
