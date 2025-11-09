@@ -61,8 +61,8 @@
                     }
                 },
     "scripts":  {
-                    "build":  "tsc -b",
-                    "build:verify":  "tsc -b && node ../../scripts/verify-world-build.js",
+                    "build":  "tsc -b tsconfig.build.json",
+                    "build:verify":  "tsc -b tsconfig.build.json && node ../../scripts/verify-world-build.js",
                     "dev":  "tsc --watch",
                     "test":  "vitest run",
                     "test:watch":  "vitest",

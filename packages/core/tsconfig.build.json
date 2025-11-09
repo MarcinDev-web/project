@@ -10,7 +10,10 @@
     "**/__tests__/**",
     "__tests__",
     "dist",
-    "node_modules"
+    "node_modules",
+    "**/test-utils",
+    "src/**/*.test.ts",
+    "src/**/*.spec.ts"
   ]
 }
 

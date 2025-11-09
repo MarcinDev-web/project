@@ -5,8 +5,20 @@
     "moduleResolution": "bundler",
     "module": "ESNext",
     "paths": {
-      "@engine/animation": ["../animation/src"],
-      "@engine/animation/*": ["../animation/src/*"]
+      "@engine/core": ["../core/dist"],
+      "@engine/core/*": ["../core/dist/*"],
+      "@engine/animation": ["../animation/dist"],
+      "@engine/animation/*": ["../animation/dist/*"],
+      "@engine/economy": ["../economy/dist/src"],
+      "@engine/economy/*": ["../economy/dist/src/*"],
+      "@engine/world-server": ["../world-server/dist"],
+      "@engine/world-server/*": ["../world-server/dist/*"],
+      "@engine/script": ["../script/dist"],
+      "@engine/script/*": ["../script/dist/*"],
+      "@engine/stdlib": ["../stdlib/dist"],
+      "@engine/stdlib/*": ["../stdlib/dist/*"],
+      "@engine/voxel": ["../voxel/dist"],
+      "@engine/voxel/*": ["../voxel/dist/*"]
     }
   },
   "references": [
