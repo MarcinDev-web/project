@@ -39,7 +39,7 @@ export function ModeratorPage() {
         <div style={{ marginBottom: '2rem' }}>
           <h1 style={{ fontSize: '2rem', marginBottom: '0.5rem' }}>Moderator Panel</h1>
           <p style={{ color: 'var(--text-secondary, #666)' }}>
-            Welcome, {user?.email}. Moderate platform content from here.
+            Welcome, {user?.username || user?.email}. Moderate platform content from here.
           </p>
         </div>
 

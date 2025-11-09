@@ -17,10 +17,21 @@ const passwordSchema = z
   .max(128, 'Password is too long');
 
 /**
+ * Username validation schema.
+ * Requirements: 3-20 chars, only letters, digits, underscores.
+ */
+const usernameSchema = z
+  .string()
+  .min(3, 'Username must be at least 3 characters long')
+  .max(20, 'Username must be at most 20 characters long')
+  .regex(/^[a-zA-Z0-9_]+$/, 'Username can only contain letters, numbers, and underscores');
+
+/**
  * Register request schema.
  */
 export const registerSchema = z.object({
   email: emailSchema,
+  username: usernameSchema,
   password: passwordSchema,
 });
 

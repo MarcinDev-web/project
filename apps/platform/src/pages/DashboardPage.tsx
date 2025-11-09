@@ -70,7 +70,7 @@ export function DashboardPage() {
         <div className="dashboard-header">
             <div>
               <h1 className="dashboard-title">
-                Welcome back, <span className="gradient-text">{user?.email?.split('@')[0] || 'Creator'}</span>
+                Welcome back, <span className="gradient-text">{user?.username || user?.email?.split('@')[0] || 'Creator'}</span>
               </h1>
               <p className="dashboard-subtitle">
                 Ready to build something amazing? Let's continue your journey.

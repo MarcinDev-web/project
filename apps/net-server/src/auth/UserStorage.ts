@@ -13,6 +13,7 @@ export class UserStorage {
   private readonly dataFile: string;
   private storage: Map<string, User> = new Map();
   private idIndex: Map<string, string> = new Map(); // userId -> email lookup
+  private usernameIndex: Map<string, string> = new Map(); // username -> email lookup
   private initialized = false;
 
   constructor(dataDir = './data') {
@@ -38,10 +39,13 @@ export class UserStorage {
         const parsed = JSON.parse(data) as Record<string, User>;
         this.storage = new Map(Object.entries(parsed));
 
-        // Build ID index and migrate roles
+        // Build ID index and username index, migrate roles
         let needsMigration = false;
         for (const [email, user] of this.storage.entries()) {
           this.idIndex.set(user.id, email);
+          if (user.username) {
+            this.usernameIndex.set(user.username.toLowerCase(), email);
+          }
           // Migrate: set default role if missing
           if (!user.role) {
             user.role = 'user';
@@ -75,7 +79,7 @@ export class UserStorage {
   /**
    * Save a user account.
    */
-  async saveUser(email: string, passwordHash: string): Promise<User> {
+  async saveUser(email: string, username: string, passwordHash: string): Promise<User> {
     if (!this.initialized) {
       await this.initialize();
     }
@@ -85,10 +89,16 @@ export class UserStorage {
       throw new Error('User with this email already exists');
     }
 
+    // Check if username already exists
+    if (this.usernameIndex.has(username.toLowerCase())) {
+      throw new Error('Username is already taken');
+    }
+
     const now = Date.now();
     const user: User = {
       id: this.generateUserId(),
       email: email.toLowerCase(),
+      username,
       passwordHash,
       createdAt: now,
       updatedAt: now,
@@ -98,6 +108,7 @@ export class UserStorage {
 
     this.storage.set(user.email, user);
     this.idIndex.set(user.id, user.email);
+    this.usernameIndex.set(username.toLowerCase(), user.email);
     await this.persist();
 
     return user;
@@ -209,6 +220,17 @@ export class UserStorage {
     }
 
     return this.storage.has(email.toLowerCase());
+  }
+
+  /**
+   * Check if username is already taken.
+   */
+  async usernameExists(username: string): Promise<boolean> {
+    if (!this.initialized) {
+      await this.initialize();
+    }
+
+    return this.usernameIndex.has(username.toLowerCase());
   }
 
   /**

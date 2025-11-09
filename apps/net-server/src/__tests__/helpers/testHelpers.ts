@@ -17,9 +17,11 @@ const JWT_SECRET = process.env.JWT_SECRET || 'test-secret-key';
 export async function createTestUser(
   authManager: AuthManager,
   email = `test_${Date.now()}@example.com`,
-  password = 'TestPassword123'
+  password = 'TestPassword123',
+  username?: string
 ): Promise<{ userId: string; email: string; token: string }> {
-  const result = await authManager.register(email, password);
+  const finalUsername = username || `testuser_${Date.now()}`;
+  const result = await authManager.register(email, finalUsername, password);
   const token = result.session.token;
 
   return {

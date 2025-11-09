@@ -39,9 +39,9 @@ export async function createAuthRoutes(
       const userAgent = request.headers['user-agent'] || 'unknown';
 
       try {
-        const body = request.body as { email: string; password: string };
+        const body = request.body as { email: string; username: string; password: string };
 
-        const result = await authManager.register(body.email, body.password);
+        const result = await authManager.register(body.email, body.username, body.password);
 
         // Log successful registration
         securityLogger.logAuthSuccess(result.user.id, result.user.email, ip, userAgent);

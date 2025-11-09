@@ -25,20 +25,30 @@ export class UserStorageDB {
   /**
    * Save a new user account.
    */
-  async saveUser(email: string, passwordHash: string): Promise<User> {
+  async saveUser(email: string, username: string, passwordHash: string): Promise<User> {
     // Check if email already exists
-    const existing = await this.prisma.user.findUnique({
+    const existingEmail = await this.prisma.user.findUnique({
       where: { email: email.toLowerCase() },
     });
 
-    if (existing) {
+    if (existingEmail) {
       throw new Error('User with this email already exists');
+    }
+
+    // Check if username already exists
+    const existingUsername = await this.prisma.user.findUnique({
+      where: { username: username },
+    });
+
+    if (existingUsername) {
+      throw new Error('Username is already taken');
     }
 
     const user = await this.prisma.user.create({
       data: {
         id: this.generateUserId(),
         email: email.toLowerCase(),
+        username,
         passwordHash,
         active: true,
         role: 'user',
@@ -139,12 +149,24 @@ export class UserStorageDB {
   }
 
   /**
+   * Check if username is already taken.
+   */
+  async usernameExists(username: string): Promise<boolean> {
+    const count = await this.prisma.user.count({
+      where: { username: username },
+    });
+
+    return count > 0;
+  }
+
+  /**
    * Map Prisma User model to our User interface
    */
   private mapPrismaToUser(prismaUser: any): User {
     return {
       id: prismaUser.id,
       email: prismaUser.email,
+      username: prismaUser.username ?? undefined,
       passwordHash: prismaUser.passwordHash,
       createdAt: prismaUser.createdAt.getTime(),
       updatedAt: prismaUser.updatedAt.getTime(),

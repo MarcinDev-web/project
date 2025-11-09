@@ -10,6 +10,7 @@ import { Card } from '../../components/shared/Card';
 
 export function RegisterForm() {
   const [email, setEmail] = useState('');
+  const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -21,6 +22,16 @@ export function RegisterForm() {
     e.preventDefault();
     setError(null);
 
+    // Validate username
+    if (!username || username.length < 3 || username.length > 20) {
+      setError('Username must be between 3 and 20 characters long');
+      return;
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      setError('Username can only contain letters, numbers, and underscores');
+      return;
+    }
+
     if (password !== confirmPassword) {
       setError('Passwords do not match');
       return;
@@ -29,7 +40,7 @@ export function RegisterForm() {
     setIsLoading(true);
 
     try {
-      await register(email, password);
+      await register(email, username, password);
       navigate('/dashboard', { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
@@ -61,6 +72,33 @@ export function RegisterForm() {
               color: 'var(--text-1)',
             }}
           />
+        </div>
+        <div style={{ marginBottom: 'var(--spacing-4)' }}>
+          <label htmlFor="username" style={{ display: 'block', marginBottom: 'var(--spacing-2)' }}>
+            Username
+          </label>
+          <input
+            id="username"
+            type="text"
+            value={username}
+            onChange={(e) => setUsername(e.target.value)}
+            required
+            minLength={3}
+            maxLength={20}
+            pattern="[a-zA-Z0-9_]+"
+            title="Username can only contain letters, numbers, and underscores"
+            style={{
+              width: '100%',
+              padding: 'var(--spacing-2)',
+              background: 'var(--bg-button)',
+              border: '1px solid var(--border-default)',
+              borderRadius: 'var(--radius-md)',
+              color: 'var(--text-1)',
+            }}
+          />
+          <small style={{ display: 'block', marginTop: 'var(--spacing-1)', color: 'var(--text-secondary)', fontSize: 'var(--text-sm)' }}>
+            3-20 characters, letters, numbers, and underscores only
+          </small>
         </div>
         <div style={{ marginBottom: 'var(--spacing-4)' }}>
           <label htmlFor="password" style={{ display: 'block', marginBottom: 'var(--spacing-2)' }}>

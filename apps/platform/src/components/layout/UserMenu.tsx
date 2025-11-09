@@ -23,7 +23,7 @@ export const UserMenu = memo(function UserMenu() {
       >
         <span className="user-menu__button-icon">👤</span>
         <span className="user-menu__button-text">
-          {user.email.split('@')[0]}
+          {user.username || user.email.split('@')[0]}
         </span>
         <span className="user-menu__button-arrow">▼</span>
       </button>
@@ -37,7 +37,7 @@ export const UserMenu = memo(function UserMenu() {
           <div className="user-menu__dropdown">
             <div className="user-menu__header">
               <div className="user-menu__header-name">
-                {user.email.split('@')[0]}
+                {user.username || user.email.split('@')[0]}
               </div>
               <div className="user-menu__header-email">
                 {user.email}

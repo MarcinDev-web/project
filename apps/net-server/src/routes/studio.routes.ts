@@ -323,7 +323,8 @@ export async function createStudioRoutes(
         }
 
         const profile = await profileStorage.getProfile(request.user.id);
-        const authorName = profile?.displayName || request.user.email;
+        const user = await authManager.getUserById(request.user.id);
+        const authorName = user?.username || profile?.displayName || user?.email || request.user.email;
 
         const marketplaceItemInput: Omit<
           MarketplaceItem,
@@ -841,7 +842,7 @@ export async function createStudioRoutes(
           const profile = user ? await profileStorage.getProfile(m.userId) : null;
           return {
             ...m,
-            userName: profile?.displayName || user?.email,
+            userName: user?.username || profile?.displayName || user?.email,
             userEmail: user?.email,
           };
         })

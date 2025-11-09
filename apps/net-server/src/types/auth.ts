@@ -13,6 +13,7 @@ export type UserRole = 'user' | 'moderator' | 'admin';
 export interface User {
   id: string;
   email: string;
+  username?: string;
   passwordHash: string; // bcrypt hash
   createdAt: number;
   updatedAt: number;
@@ -26,6 +27,7 @@ export interface User {
 export interface PublicUser {
   id: string;
   email: string;
+  username?: string;
   createdAt: number;
   role?: UserRole;
 }
@@ -35,6 +37,7 @@ export interface PublicUser {
  */
 export interface RegisterRequest {
   email: string;
+  username: string;
   password: string;
 }
 

@@ -4,6 +4,7 @@ import { app, authManager } from '../../server.js';
 
 describe('Auth API', () => {
   const email = `auth_test_${Date.now()}@example.com`;
+  const username = `authtest_${Date.now()}`;
   const password = 'StrongPass1';
 
   beforeAll(async () => {
@@ -18,12 +19,13 @@ describe('Auth API', () => {
     const registerRes = await app.inject({
       method: 'POST',
       url: '/api/auth/register',
-      payload: { email, password },
+      payload: { email, username, password },
     });
     expect(registerRes.statusCode).toBe(201);
 
     const registerBody = JSON.parse(registerRes.body);
     expect(registerBody.user.email).toBe(email.toLowerCase());
+    expect(registerBody.user.username).toBe(username);
     expect(typeof registerBody.session.token).toBe('string');
     expect(typeof registerBody.session.refreshToken).toBe('string');
 
@@ -97,11 +99,12 @@ describe('Auth API', () => {
   it('enforces admin-only access and respects role changes', async () => {
     // Register a fresh user
     const email2 = `auth_admin_${Date.now()}@example.com`;
+    const username2 = `authadmin_${Date.now()}`;
     const password2 = 'StrongPass2';
     const reg = await app.inject({
       method: 'POST',
       url: '/api/auth/register',
-      payload: { email: email2, password: password2 },
+      payload: { email: email2, username: username2, password: password2 },
     });
     expect(reg.statusCode).toBe(201);
 
@@ -135,7 +138,7 @@ describe('Auth API', () => {
     const weakRes = await app.inject({
       method: 'POST',
       url: '/api/auth/register',
-      payload: { email: `weak_${Date.now()}@example.com`, password: 'weakpass' },
+      payload: { email: `weak_${Date.now()}@example.com`, username: `weakuser_${Date.now()}`, password: 'weakpass' },
     });
     expect(weakRes.statusCode).toBe(400);
   });

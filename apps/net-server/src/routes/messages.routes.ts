@@ -197,7 +197,7 @@ export async function createMessagesRoutes(
                   userId: memberId,
                   type: 'message',
                   title: `New message in ${conversation.groupName ?? 'group'}`,
-                  message: `${fromUser?.email ?? 'Someone'}: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
+                  message: `${fromUser?.username || fromUser?.email || 'Someone'}: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
                   link: `/messages`,
                   metadata: { conversationId: message.conversationId, messageId: message.id },
                 });
@@ -232,7 +232,7 @@ export async function createMessagesRoutes(
               userId: toUserId,
               type: 'message',
               title: 'New Message',
-              message: `${fromUser?.email ?? 'Someone'}: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
+              message: `${fromUser?.username || fromUser?.email || 'Someone'}: ${content.substring(0, 50)}${content.length > 50 ? '...' : ''}`,
               link: `/messages`,
               metadata: { conversationId: message.conversationId, messageId: message.id },
             });

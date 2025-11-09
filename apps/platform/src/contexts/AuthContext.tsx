@@ -15,7 +15,7 @@ interface AuthContextType {
   isAdmin: boolean;
   isModerator: boolean;
   login: (email: string, password: string) => Promise<void>;
-  register: (email: string, password: string) => Promise<void>;
+  register: (email: string, username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -67,8 +67,8 @@ export function AuthProvider({ children }: AuthProviderProps) {
     setUser(response.user);
   };
 
-  const register = async (email: string, password: string) => {
-    const response = await authApi.register({ email, password });
+  const register = async (email: string, username: string, password: string) => {
+    const response = await authApi.register({ email, username, password });
     setTokens(response.session.token, response.session.refreshToken);
     setUser(response.user);
   };

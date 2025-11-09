@@ -107,7 +107,7 @@ export async function createFriendsRoutes(
             userId: toUserId,
             type: 'friend_request',
             title: 'New Friend Request',
-            message: `${fromUser?.email ?? 'Someone'} sent you a friend request`,
+            message: `${fromUser?.username || fromUser?.email || 'Someone'} sent you a friend request`,
             link: '/friends',
             metadata: { requestId: request_.id, fromUserId: request.user.id },
           });
@@ -221,7 +221,7 @@ export async function createFriendsRoutes(
                 userId: request_.fromUserId,
                 type: 'friend_accepted',
                 title: 'Friend Request Accepted',
-                message: `${toUser?.email ?? 'Someone'} accepted your friend request`,
+                message: `${toUser?.username || toUser?.email || 'Someone'} accepted your friend request`,
                 link: '/friends',
                 metadata: { userId: request.user.id },
               });

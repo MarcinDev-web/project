@@ -59,10 +59,21 @@ export class AuthManager {
   /**
    * Register a new user account.
    */
-  async register(email: string, password: string): Promise<AuthResponse> {
+  async register(email: string, username: string, password: string): Promise<AuthResponse> {
     // Validate input
     if (!email || typeof email !== 'string' || !email.includes('@')) {
       throw new Error('Invalid email address');
+    }
+
+    // Validate username
+    if (!username || typeof username !== 'string') {
+      throw new Error('Username is required');
+    }
+    if (username.length < 3 || username.length > 20) {
+      throw new Error('Username must be between 3 and 20 characters long');
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      throw new Error('Username can only contain letters, numbers, and underscores');
     }
 
     // Validate password strength
@@ -76,11 +87,16 @@ export class AuthManager {
       throw new Error('User with this email already exists');
     }
 
+    // Check if username already exists
+    if (await this.userStorage.usernameExists(username)) {
+      throw new Error('Username is already taken');
+    }
+
     // Hash password
     const passwordHash = await bcrypt.hash(password, BCRYPT_ROUNDS);
 
     // Create user
-    const user = await this.userStorage.saveUser(email, passwordHash);
+    const user = await this.userStorage.saveUser(email, username, passwordHash);
 
     // Create session
     const session = await this.createSession(user);
@@ -366,6 +382,7 @@ export class AuthManager {
     return {
       id: user.id,
       email: user.email,
+      ...(user.username && { username: user.username }),
       createdAt: user.createdAt,
       role: user.role ?? 'user',
     };
