@@ -1,0 +1,23 @@
+{
+  "name": "@shared",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": {
+    "./config/cors": {
+      "types": "./config/cors.d.ts",
+      "import": "./config/cors.js",
+      "default": "./config/cors.js"
+    },
+    "./types/auth": {
+      "types": "./types/auth.d.ts",
+      "import": "./types/auth.js",
+      "default": "./types/auth.js"
+    },
+    "./types/profiles": {
+      "types": "./types/profiles.d.ts",
+      "import": "./types/profiles.js",
+      "default": "./types/profiles.js"
+    }
+  }
+}
+

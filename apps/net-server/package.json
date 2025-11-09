@@ -2,12 +2,12 @@
   "name": "@apps/net-server",
   "version": "0.1.0",
   "type": "module",
-  "main": "./dist/apps/net-server/src/server.js",
+  "main": "./dist/server.js",
   "scripts": {
     "dev": "tsx watch src/server.ts",
     "prebuild": "pnpm run db:generate",
     "build": "tsc",
-    "start": "node dist/apps/net-server/src/server.js",
+    "start": "node dist/server.js",
     "test": "vitest run",
     "test:watch": "vitest",
     "lint": "eslint src --max-warnings=0",
@@ -25,6 +25,7 @@
   "dependencies": {
     "@engine/economy": "workspace:*",
     "@engine/world": "workspace:*",
+    "@shared": "workspace:*",
     "@fastify/cookie": "^11.0.0",
     "@fastify/cors": "^11.0.0",
     "@fastify/multipart": "^9.0.0",
