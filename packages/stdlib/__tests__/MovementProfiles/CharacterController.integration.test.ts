@@ -54,6 +54,30 @@ describe('CharacterController - Movement Profiles Integration', () => {
       }).toThrow('MovementProfile "test" missing config');
     });
 
+    it('should throw error when config is not an object', () => {
+      const invalidProfile = {
+        id: 'test',
+        name: 'Test',
+        config: 'not-an-object',
+      } as any;
+      
+      expect(() => {
+        controller.applyProfile(invalidProfile);
+      }).toThrow('config must be an object');
+    });
+
+    it('should throw error when config is an array', () => {
+      const invalidProfile = {
+        id: 'test',
+        name: 'Test',
+        config: [],
+      } as any;
+      
+      expect(() => {
+        controller.applyProfile(invalidProfile);
+      }).toThrow('config must be an object');
+    });
+
     it('should throw error when moveSpeed is not positive', () => {
       const invalidProfile = MovementProfile.create({
         id: 'test',
