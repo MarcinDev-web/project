@@ -1,5 +1,6 @@
 import { Entity } from '@engine/world';
 import { AnimationComponent } from '@engine/stdlib/Animation';
+import { getVec3Pool } from '@engine/core/utils/Vec3Pool';
 import { AvatarAnimationPlayer, type AvatarAnimation } from './animation';
 import { avatarAnimationToClip } from './animation-adapter';
 import { avatarSkeletonToSkeleton } from './skeleton-adapter';
@@ -329,6 +330,7 @@ export class AvatarInstance {
   syncJointEntities(): void {
     // Get dirty joints from skeleton
     const dirtyJoints = this.skeleton.getDirtyJoints();
+    const pool = getVec3Pool();
     
     // If all joints are dirty, sync all (optimization: avoid per-joint checks)
     if (dirtyJoints.length === this.skeleton.getJointNames().length) {
@@ -340,6 +342,8 @@ export class AvatarInstance {
         const local = this.skeleton.getLocalTransform(name);
         jointEntity.transform.position = local.position;
         jointEntity.transform.rotation = local.rotation;
+        // Release pooled Vec3 after assignment (setter clones it internally)
+        pool.release(local.position);
         this.skeleton.markJointClean(name);
       });
     } else {
@@ -352,18 +356,23 @@ export class AvatarInstance {
         const local = this.skeleton.getLocalTransform(name);
         jointEntity.transform.position = local.position;
         jointEntity.transform.rotation = local.rotation;
+        // Release pooled Vec3 after assignment (setter clones it internally)
+        pool.release(local.position);
         this.skeleton.markJointClean(name);
       }
     }
   }
 
   private buildSkeletonEntities(): void {
+    const pool = getVec3Pool();
     this.skeleton.forEachJoint((name, parentName) => {
       const entity = new Entity(`AvatarJoint:${name}`);
       entity.userData.avatarJoint = name;
       const local = this.skeleton.getLocalTransform(name);
       entity.transform.position = local.position;
       entity.transform.rotation = local.rotation;
+      // Release pooled Vec3 after assignment (setter clones it internally)
+      pool.release(local.position);
       entity.transform.scale = [1, 1, 1];
 
       if (parentName) {

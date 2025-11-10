@@ -1,5 +1,6 @@
 import { EventBus, type Unsubscribe } from '@engine/core/event/EventBus';
 import { quatSlerpOut, type Quat, type Vec3 } from '@engine/core/math';
+import { getVec3Pool } from '@engine/core/utils/Vec3Pool';
 import type { AvatarJointName, AvatarSkeleton } from './skeleton';
 
 export interface AvatarJointKeyframe {
@@ -127,10 +128,13 @@ export class AvatarAnimationPlayer {
   }
 
   private sampleAndApply(time: number): void {
+    const pool = getVec3Pool();
     for (const [jointName, track] of this.tracks.entries()) {
       const sample = sampleTrack(track, time);
       if (sample.position) {
         this.skeleton.setLocalPosition(jointName, sample.position);
+        // Release pooled Vec3 after setLocalPosition copies it internally
+        pool.release(sample.position);
       }
       if (sample.rotation) {
         this.skeleton.setLocalRotation(jointName, sample.rotation);
@@ -250,12 +254,21 @@ function sampleTrack(track: PreparedTrack, time: number): SampleResult {
   const t = span > 1e-5 ? (time - prev.time) / span : 0;
 
   const result: SampleResult = {};
+  const pool = getVec3Pool();
   if (prev.position && next.position) {
     result.position = lerpVec3(prev.position, next.position, t);
   } else if (next.position) {
-    result.position = [...next.position] as Vec3;
+    const vec = pool.acquire();
+    vec[0] = next.position[0];
+    vec[1] = next.position[1];
+    vec[2] = next.position[2];
+    result.position = vec;
   } else if (prev.position) {
-    result.position = [...prev.position] as Vec3;
+    const vec = pool.acquire();
+    vec[0] = prev.position[0];
+    vec[1] = prev.position[1];
+    vec[2] = prev.position[2];
+    result.position = vec;
   }
 
   if (prev.rotation && next.rotation) {
@@ -271,10 +284,21 @@ function sampleTrack(track: PreparedTrack, time: number): SampleResult {
   return result;
 }
 
+/**
+ * Clone a frame's position and rotation.
+ * 
+ * Returns pooled Vec3 that must be released after use.
+ * The caller is responsible for releasing Vec3 back to the pool.
+ */
 function cloneFrame(frame: PreparedJointKeyframe): SampleResult {
   const result: SampleResult = {};
   if (frame.position) {
-    result.position = [...frame.position] as Vec3;
+    const pool = getVec3Pool();
+    const vec = pool.acquire();
+    vec[0] = frame.position[0];
+    vec[1] = frame.position[1];
+    vec[2] = frame.position[2];
+    result.position = vec;
   }
   if (frame.rotation) {
     result.rotation = [...frame.rotation] as Quat;
@@ -282,12 +306,19 @@ function cloneFrame(frame: PreparedJointKeyframe): SampleResult {
   return result;
 }
 
+/**
+ * Linear interpolation between two Vec3 values.
+ * 
+ * Returns a pooled Vec3 that must be released after use.
+ * The caller is responsible for releasing the Vec3 back to the pool.
+ */
 function lerpVec3(a: Vec3, b: Vec3, t: number): Vec3 {
-  return [
-    a[0] + (b[0] - a[0]) * t,
-    a[1] + (b[1] - a[1]) * t,
-    a[2] + (b[2] - a[2]) * t,
-  ] as Vec3;
+  const pool = getVec3Pool();
+  const out = pool.acquire();
+  out[0] = a[0] + (b[0] - a[0]) * t;
+  out[1] = a[1] + (b[1] - a[1]) * t;
+  out[2] = a[2] + (b[2] - a[2]) * t;
+  return out;
 }
 
 function clamp(value: number, min: number, max: number): number {

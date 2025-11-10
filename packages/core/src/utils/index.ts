@@ -14,3 +14,7 @@ export {
   isGlobalRNGInitialized,
   SeededRNG,
 } from './SeededRNG';
+export {
+  getVec3Pool,
+  Vec3Pool,
+} from './Vec3Pool';

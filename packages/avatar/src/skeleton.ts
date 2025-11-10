@@ -6,6 +6,7 @@ import {
   type Quat,
   type Vec3,
 } from '@engine/core/math';
+import { getVec3Pool } from '@engine/core/utils/Vec3Pool';
 
 export type AvatarJointName =
   | 'Root'
@@ -224,10 +225,24 @@ export class AvatarSkeleton {
     return parent.name;
   }
 
+  /**
+   * Get local transform (position and rotation) for a joint.
+   * 
+   * Returns pooled Vec3/Quat that may be reused. If you need to keep the values
+   * long-term, clone them immediately after calling this method.
+   * 
+   * @param name - Joint name
+   * @returns Transform with pooled Vec3/Quat (clone if keeping long-term)
+   */
   getLocalTransform(name: AvatarJointName): AvatarJointTransform {
     const joint = this.getJoint(name);
+    const pool = getVec3Pool();
+    const position = pool.acquire();
+    position[0] = joint.localPosition[0];
+    position[1] = joint.localPosition[1];
+    position[2] = joint.localPosition[2];
     return {
-      position: [...joint.localPosition],
+      position,
       rotation: [...joint.localRotation],
     };
   }
@@ -259,11 +274,25 @@ export class AvatarSkeleton {
     }
   }
 
+  /**
+   * Get world transform (position and rotation) for a joint.
+   * 
+   * Returns pooled Vec3/Quat that may be reused. If you need to keep the values
+   * long-term, clone them immediately after calling this method.
+   * 
+   * @param name - Joint name
+   * @returns Transform with pooled Vec3/Quat (clone if keeping long-term)
+   */
   getWorldTransform(name: AvatarJointName): AvatarJointTransform {
     const joint = this.getJoint(name);
     this.updateWorldTransforms();
+    const pool = getVec3Pool();
+    const position = pool.acquire();
+    position[0] = joint.worldPosition[0];
+    position[1] = joint.worldPosition[1];
+    position[2] = joint.worldPosition[2];
     return {
-      position: [...joint.worldPosition],
+      position,
       rotation: [...joint.worldRotation],
     };
   }
