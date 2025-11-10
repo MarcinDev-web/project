@@ -1,6 +1,8 @@
 import type { CharacterInput } from '@engine/world';
 import { ReplicationClient } from '../ReplicationClient';
 import type { InputMessage } from '../types/replication';
+import { ErrorHandler, type ErrorCallback } from './ErrorHandler';
+import { NetworkError, ValidationError, ErrorFactory } from './errors';
 
 /**
  * Input event for replication.
@@ -32,6 +34,8 @@ export interface InputReplicatorConfig {
   bufferSize?: number; // Default: 50
   /** Enable timestamp synchronization. */
   enableTimestampSync?: boolean; // Default: true
+  /** Error handler for error reporting (optional, creates default if not provided). */
+  errorHandler?: ErrorHandler;
 }
 
 /**
@@ -43,19 +47,32 @@ export interface InputReplicatorConfig {
  * - Lag compensation via buffering
  */
 export class InputReplicator {
-  private readonly config: Required<InputReplicatorConfig>;
+  private readonly config: Required<Omit<InputReplicatorConfig, 'errorHandler'>> & { errorHandler: ErrorHandler };
   private inputBuffer: BufferedInputEvent[] = [];
   private sequenceNumber = 0;
   private lastSentInput: CharacterInput | null = null;
   private lastSendTime = 0;
   private readonly sendThrottle = 50; // Minimum 50ms between sends (20 updates/second)
+  private errorCallbacks: ErrorCallback[] = [];
 
   constructor(config: InputReplicatorConfig) {
+    // Create or use provided error handler
+    const errorHandler = config.errorHandler ?? new ErrorHandler();
+    
+    // Validate config
+    if (!config.replicationClient) {
+      throw ErrorFactory.missingField('replicationClient');
+    }
+    if (config.bufferSize !== undefined && (config.bufferSize <= 0 || !Number.isFinite(config.bufferSize))) {
+      throw ErrorFactory.invalidInput('bufferSize', config.bufferSize, 'must be a positive finite number');
+    }
+
     this.config = {
       enableBuffering: config.enableBuffering ?? true,
       bufferSize: config.bufferSize ?? 50,
       enableTimestampSync: config.enableTimestampSync ?? true,
-      ...config,
+      errorHandler,
+      replicationClient: config.replicationClient,
     };
   }
 
@@ -182,6 +199,7 @@ export class InputReplicator {
   /**
    * Send input event via replication client.
    * Uses dedicated InputMessage type instead of operations.
+   * Includes retry logic for network failures.
    */
   private sendInputEvent(event: BufferedInputEvent): void {
     const message: Omit<InputMessage, 'type' | 'timestamp' | 'sessionId' | 'userId'> = {
@@ -192,7 +210,52 @@ export class InputReplicator {
       ...(event.cameraRight && { cameraRight: event.cameraRight }),
     };
     
-    this.config.replicationClient.sendInput(message);
+    // Use error handler's retry logic for network operations
+    this.config.errorHandler.executeWithRetry(
+      async () => {
+        this.config.replicationClient.sendInput(message);
+      },
+      {
+        onRetry: (attempt, error) => {
+          this.config.errorHandler.handleError(
+            new NetworkError(`Failed to send input event, retrying (attempt ${attempt})`, {
+              code: 'NETWORK_SEND_INPUT',
+              context: { sequence: event.sequence, attempt },
+              retryable: true,
+              cause: error,
+            })
+          );
+        },
+      }
+    ).catch((error) => {
+      // Final failure after retries
+      this.config.errorHandler.handleError(
+        new NetworkError('Failed to send input event after retries', {
+          code: 'NETWORK_SEND_INPUT_FAILED',
+          context: { sequence: event.sequence },
+          retryable: false,
+          cause: error,
+        })
+      );
+    });
+  }
+
+  /**
+   * Subscribe to error events.
+   * Returns unsubscribe function.
+   */
+  onError(callback: ErrorCallback): () => void {
+    this.errorCallbacks.push(callback);
+    // Also subscribe to error handler
+    const unsubscribe = this.config.errorHandler.onError(callback);
+    
+    return () => {
+      const index = this.errorCallbacks.indexOf(callback);
+      if (index >= 0) {
+        this.errorCallbacks.splice(index, 1);
+      }
+      unsubscribe();
+    };
   }
 
   /**
