@@ -30,8 +30,8 @@ if [ -n "$AUTH_RATE_LIMIT_MAX" ]; then
   echo "INFO: AUTH_RATE_LIMIT_MAX=$AUTH_RATE_LIMIT_MAX"
 fi
 
-# Run database migrations in production
-if [ "$NODE_ENV" = "production" ] && [ -n "$DATABASE_URL" ]; then
+# Run database migrations when a database URL is provided (dev or prod)
+if [ -n "$DATABASE_URL" ]; then
   echo "Running database migrations..."
   cd /app/apps/net-server
   if command -v prisma >/dev/null 2>&1; then
