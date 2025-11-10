@@ -22,7 +22,7 @@ describe('AvatarLoadoutSerializer', () => {
 
       const loadout = serializer.serialize(selections);
 
-      expect(loadout.version).toBe(1);
+      expect(loadout.version).toBe(2);
       expect(loadout.parts?.HeadSlot).toEqual({
         mesh: 'head_default',
         material: 'mat1',

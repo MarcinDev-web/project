@@ -80,33 +80,7 @@ RUN find packages -type d -name dist -exec rm -rf {} + 2>/dev/null || true && \
     pnpm --filter @engine/net-server build && \
     pnpm -C apps/collab-server build
 
-# Replace TypeScript path aliases with relative paths using tsc-alias
-# Also fix Prisma imports to use correct relative paths for dist structure
-# From src/lib/ (../../) to dist/lib/ (../../../../)
-# Also add .js extensions to relative imports that are missing them
-RUN pnpm add -D -w tsc-alias && \
-    pnpm exec tsc-alias -p apps/collab-server/tsconfig.json --resolve-full-paths && \
-    find apps/collab-server/dist -name "*.js" -type f -exec sed -i "s|from '../../node_modules/.prisma/collab-client/index.js'|from '../../../../node_modules/.prisma/collab-client/index.js'|g" {} \; && \
-    find apps/collab-server/dist -name "*.js" -type f -exec sed -i "s|from '../../../node_modules/.prisma/collab-client/index.js'|from '../../../../../node_modules/.prisma/collab-client/index.js'|g" {} \; && \
-    find apps/collab-server/dist -name "*.js" -type f -exec sed -i "s|from '../index'|from '../index.js'|g" {} \; && \
-    find apps/collab-server/dist -name "*.js" -type f -exec sed -i "s|from '../../index'|from '../../index.js'|g" {} \; && \
-    find apps/collab-server/dist -name "*.js" -type f -exec sed -i "s|from '../../../index'|from '../../../index.js'|g" {} \; && \
-    pnpm remove -w tsc-alias
-
-# Also fix imports in packages (they might be imported by the app)
-# Fix missing .js extensions in relative imports
-RUN find packages -name "*.js" -type f -path "*/dist/*" -exec sed -i "s|from './index'|from './index.js'|g" {} \; && \
-    find packages -name "*.js" -type f -path "*/dist/*" -exec sed -i "s|from '../index'|from '../index.js'|g" {} \; && \
-    find packages -name "*.js" -type f -path "*/dist/*" -exec sed -i "s|from '../../index'|from '../../index.js'|g" {} \; && \
-    find packages -name "*.js" -type f -path "*/dist/*" -exec sed -i "s|from '../../../index'|from '../../../index.js'|g" {} \; && \
-    find packages -name "*.js" -type f -path "*/dist/*" -exec sed -i "s|from './events'|from './events.js'|g" {} \; && \
-    find packages -name "*.js" -type f -path "*/dist/*" -exec sed -i "s|from '../events'|from '../events.js'|g" {} \; && \
-    find packages -name "*.js" -type f -path "*/dist/*" -exec sed -i "s|from '../../events'|from '../../events.js'|g" {} \; && \
-    find packages -name "*.js" -type f -path "*/dist/*" -exec sed -i "s|from '../../../events'|from '../../../events.js'|g" {} \; && \
-    find packages -name "*.js" -type f -path "*/dist/*" -exec sed -i "s|from './types'|from './types.js'|g" {} \; && \
-    find packages -name "*.js" -type f -path "*/dist/*" -exec sed -i "s|from '../types'|from '../types.js'|g" {} \; && \
-    find packages -name "*.js" -type f -path "*/dist/*" -exec sed -i "s|from '../../types'|from '../../types.js'|g" {} \; && \
-    find packages -name "*.js" -type f -path "*/dist/*" -exec sed -i "s|from '../../../types'|from '../../../types.js'|g" {} \;
+# Note: bundling with tsup produces correct ESM with .js extensions and avoids alias rewriting
 
 # Production image - minimal dependencies
 FROM base AS runner

@@ -1,0 +1,52 @@
+import path from 'path';
+import fs from 'fs';
+import { fileURLToPath } from 'url';
+
+const pickPackagesRoot = (rootDir: string): string => {
+	const candidates = [
+		path.resolve(rootDir, 'packages'),
+		path.resolve(rootDir, '../packages'),
+		path.resolve(rootDir, '../../packages'),
+	];
+	for (const candidate of candidates) {
+		if (fs.existsSync(candidate)) return candidate;
+	}
+	// Fallback: assume two levels up (apps/* case)
+	return path.resolve(rootDir, '../../packages');
+};
+
+/**
+ * Returns Vite/Vitest-compatible alias map for @engine/* packages
+ * Pass __dirname of the consuming config file.
+ */
+export const engineAliases = (rootDir: string): Record<string, string> => {
+	const pkgs = pickPackagesRoot(rootDir);
+	const p = (...segs: string[]) => path.resolve(pkgs, ...segs);
+	return {
+		'@engine/core': p('core/src'),
+		'@engine/animation': p('animation/src'),
+		'@engine/avatar': p('avatar/src'),
+		'@engine/camera': p('camera/src'),
+		'@engine/editor-utils': p('editor-utils/src'),
+		'@engine/stdlib': p('stdlib/src'),
+		'@engine/world': p('world/src'),
+		'@engine/world/components': p('world/src/components'),
+		'@engine/world/physics': p('world/src/physics'),
+		// Prefer explicit file mapping for reliability on Windows
+		'@engine/world-templates': p('world-templates/src/index.ts'),
+		'@engine/world-templates/*': p('world-templates/src/*'),
+		'@engine/gfx-webgpu': p('gfx-webgpu/src'),
+		'@engine/script': p('script/src'),
+		'@engine/input': p('input/src'),
+		'@engine/economy': p('economy/src'),
+		'@engine/blocks': p('blocks/src'),
+		'@engine/microblocks': p('microblocks/src'),
+		'@engine/net': p('net/src'),
+		'@engine/net-protocol': p('net-protocol/src'),
+		'@engine/voxel': p('voxel/src'),
+		'@engine/voxel/terrain': p('voxel/src/terrain'),
+		'@engine/wasm-collision': p('wasm-collision/src'),
+	};
+};
+
+

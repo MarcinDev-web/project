@@ -92,3 +92,17 @@ docker-compose build net-server
 - Używasz Railway z Docker Hub jako źródła
 - Masz CI/CD który pushuje do Docker Hub
 
+---
+
+## 🔐 Sekrety i zmienne środowiskowe (PROD)
+
+- Nie używaj wartości domyślnych z `docker-compose.yml` w produkcji (np. `JWT_SECRET`, `DATABASE_URL`).
+- Dla Railway: ustaw sekrety w Project → Variables (np. `JWT_SECRET`, `JWT_REFRESH_SECRET`, `DATABASE_URL`).
+- Dla Vercel: Project Settings → Environment Variables.
+- Dla własnej infrastruktury: użyj `docker run -e ...` lub `docker-compose.override.yml` z `.env` poza repo.
+- Minimalny zestaw zmiennych dla serwerów:
+  - `JWT_SECRET`, `JWT_REFRESH_SECRET`
+  - `DATABASE_URL`
+  - `CORS_ALLOWED_ORIGINS`, `ALLOWED_ORIGINS`
+  - `PORT`, `WS_PORT` (jeśli dotyczy)
+

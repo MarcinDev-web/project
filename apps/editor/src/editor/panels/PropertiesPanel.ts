@@ -1055,62 +1055,76 @@ export class PropertiesPanel {
     // Draw simple wireframe preview
     const ctx = canvas.getContext('2d');
     if (ctx) {
-      // Background gradient
-      const gradient = ctx.createLinearGradient(0, 0, 0, 180);
-      gradient.addColorStop(0, '#1a2332');
-      gradient.addColorStop(1, '#0f1419');
-      ctx.fillStyle = gradient;
-      ctx.fillRect(0, 0, 320, 180);
+      try {
+        // Background gradient
+        if (typeof ctx.createLinearGradient === 'function') {
+          const gradient = ctx.createLinearGradient(0, 0, 0, 180);
+          gradient.addColorStop(0, '#1a2332');
+          gradient.addColorStop(1, '#0f1419');
+          ctx.fillStyle = gradient;
+        } else {
+          // Fallback for environments without full canvas support (e.g., jsdom)
+          ctx.fillStyle = '#1a2332';
+        }
+        ctx.fillRect(0, 0, 320, 180);
 
-      // Grid
-      ctx.strokeStyle = 'rgba(59, 130, 246, 0.15)';
-      ctx.lineWidth = 1;
-      for (let i = 0; i <= 320; i += 40) {
+        // Grid
+        ctx.strokeStyle = 'rgba(59, 130, 246, 0.15)';
+        ctx.lineWidth = 1;
+        for (let i = 0; i <= 320; i += 40) {
+          ctx.beginPath();
+          ctx.moveTo(i, 0);
+          ctx.lineTo(i, 180);
+          ctx.stroke();
+        }
+        for (let i = 0; i <= 180; i += 40) {
+          ctx.beginPath();
+          ctx.moveTo(0, i);
+          ctx.lineTo(320, i);
+          ctx.stroke();
+        }
+
+        // Center crosshair
+        ctx.strokeStyle = 'rgba(14, 165, 233, 0.6)';
+        ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(i, 0);
-        ctx.lineTo(i, 180);
+        ctx.moveTo(160, 80);
+        ctx.lineTo(160, 100);
+        ctx.moveTo(150, 90);
+        ctx.lineTo(170, 90);
         ctx.stroke();
-      }
-      for (let i = 0; i <= 180; i += 40) {
+
+        // FOV indicator (simple frustum)
+        const fovFactor = camera.fov / (Math.PI / 2); // Normalize to 90°
+        const spreadX = 60 * fovFactor;
+        const spreadY = 40 * fovFactor;
+        
+        ctx.strokeStyle = 'rgba(14, 165, 233, 0.4)';
+        ctx.lineWidth = 2;
         ctx.beginPath();
-        ctx.moveTo(0, i);
-        ctx.lineTo(320, i);
+        ctx.moveTo(160, 90);
+        ctx.lineTo(160 - spreadX, 90 - spreadY);
+        ctx.moveTo(160, 90);
+        ctx.lineTo(160 + spreadX, 90 - spreadY);
+        ctx.moveTo(160, 90);
+        ctx.lineTo(160 - spreadX, 90 + spreadY);
+        ctx.moveTo(160, 90);
+        ctx.lineTo(160 + spreadX, 90 + spreadY);
         ctx.stroke();
+
+        // FOV text
+        ctx.fillStyle = 'rgba(14, 165, 233, 0.8)';
+        ctx.font = 'bold 12px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(`${fovDeg}°`, 160, 20);
+      } catch (error) {
+        // If canvas operations fail (e.g., in test environment), just fill with solid color
+        // Only try to fill if ctx and fillRect are available
+        if (ctx && typeof ctx.fillRect === 'function') {
+          ctx.fillStyle = '#1a2332';
+          ctx.fillRect(0, 0, 320, 180);
+        }
       }
-
-      // Center crosshair
-      ctx.strokeStyle = 'rgba(14, 165, 233, 0.6)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(160, 80);
-      ctx.lineTo(160, 100);
-      ctx.moveTo(150, 90);
-      ctx.lineTo(170, 90);
-      ctx.stroke();
-
-      // FOV indicator (simple frustum)
-      const fovFactor = camera.fov / (Math.PI / 2); // Normalize to 90°
-      const spreadX = 60 * fovFactor;
-      const spreadY = 40 * fovFactor;
-      
-      ctx.strokeStyle = 'rgba(14, 165, 233, 0.4)';
-      ctx.lineWidth = 2;
-      ctx.beginPath();
-      ctx.moveTo(160, 90);
-      ctx.lineTo(160 - spreadX, 90 - spreadY);
-      ctx.moveTo(160, 90);
-      ctx.lineTo(160 + spreadX, 90 - spreadY);
-      ctx.moveTo(160, 90);
-      ctx.lineTo(160 - spreadX, 90 + spreadY);
-      ctx.moveTo(160, 90);
-      ctx.lineTo(160 + spreadX, 90 + spreadY);
-      ctx.stroke();
-
-      // FOV text
-      ctx.fillStyle = 'rgba(14, 165, 233, 0.8)';
-      ctx.font = 'bold 12px monospace';
-      ctx.textAlign = 'center';
-      ctx.fillText(`${fovDeg}°`, 160, 20);
     }
 
     preview.appendChild(previewHeader);
@@ -1279,54 +1293,67 @@ export class PropertiesPanel {
     // Draw skybox preview based on type
     const ctx = canvas.getContext('2d');
     if (ctx) {
-      if (environment.skyboxType === 'solid') {
-        // Solid color fill
-        ctx.fillStyle = `rgb(${environment.skyColor[0] * 255}, ${environment.skyColor[1] * 255}, ${environment.skyColor[2] * 255})`;
-        ctx.fillRect(0, 0, 320, 180);
-      } else if (environment.skyboxType === 'gradient') {
-        // Gradient from sky to horizon to ground
-        const gradient = ctx.createLinearGradient(0, 0, 0, 180);
-        gradient.addColorStop(0, `rgb(${environment.skyColor[0] * 255}, ${environment.skyColor[1] * 255}, ${environment.skyColor[2] * 255})`);
-        gradient.addColorStop(0.5, `rgb(${environment.horizonColor[0] * 255}, ${environment.horizonColor[1] * 255}, ${environment.horizonColor[2] * 255})`);
-        gradient.addColorStop(1, `rgb(${environment.groundColor[0] * 255}, ${environment.groundColor[1] * 255}, ${environment.groundColor[2] * 255})`);
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, 320, 180);
-      } else if (environment.skyboxType === 'procedural-sky') {
-        // Procedural sky with sun
-        const gradient = ctx.createLinearGradient(0, 0, 0, 180);
-        gradient.addColorStop(0, `rgb(${environment.skyColor[0] * 255}, ${environment.skyColor[1] * 255}, ${environment.skyColor[2] * 255})`);
-        gradient.addColorStop(1, `rgb(${environment.horizonColor[0] * 255}, ${environment.horizonColor[1] * 255}, ${environment.horizonColor[2] * 255})`);
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, 320, 180);
-
-        // Draw sun
-        const sunX = 160 + environment.sunDirection[0] * 100;
-        const sunY = 90 - environment.sunDirection[1] * 60;
-        
-        // Sun glow
-        const sunGlow = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, 40);
-        sunGlow.addColorStop(0, `rgba(${environment.sunColor[0] * 255}, ${environment.sunColor[1] * 255}, ${environment.sunColor[2] * 255}, ${environment.sunIntensity * 0.3})`);
-        sunGlow.addColorStop(0.5, `rgba(${environment.sunColor[0] * 255}, ${environment.sunColor[1] * 255}, ${environment.sunColor[2] * 255}, ${environment.sunIntensity * 0.1})`);
-        sunGlow.addColorStop(1, 'rgba(255, 255, 255, 0)');
-        ctx.fillStyle = sunGlow;
-        ctx.fillRect(0, 0, 320, 180);
-
-        // Sun disc
-        ctx.beginPath();
-        ctx.arc(sunX, sunY, 15, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(${environment.sunColor[0] * 255}, ${environment.sunColor[1] * 255}, ${environment.sunColor[2] * 255}, ${environment.sunIntensity})`;
-        ctx.fill();
-      } else if (environment.skyboxType === 'cubemap') {
-        // Cubemap preview
-        const cubemapPath = (environment as any).cubemapPath;
-        if (cubemapPath) {
-          // Show loaded cubemap info
-          ctx.fillStyle = '#1a1a2e';
+      try {
+        if (environment.skyboxType === 'solid') {
+          // Solid color fill
+          ctx.fillStyle = `rgb(${environment.skyColor[0] * 255}, ${environment.skyColor[1] * 255}, ${environment.skyColor[2] * 255})`;
           ctx.fillRect(0, 0, 320, 180);
-          ctx.fillStyle = '#4ade80';
-          ctx.font = '12px monospace';
-          ctx.textAlign = 'center';
-          ctx.textBaseline = 'middle';
+        } else if (environment.skyboxType === 'gradient') {
+          // Gradient from sky to horizon to ground
+          if (typeof ctx.createLinearGradient === 'function') {
+            const gradient = ctx.createLinearGradient(0, 0, 0, 180);
+            gradient.addColorStop(0, `rgb(${environment.skyColor[0] * 255}, ${environment.skyColor[1] * 255}, ${environment.skyColor[2] * 255})`);
+            gradient.addColorStop(0.5, `rgb(${environment.horizonColor[0] * 255}, ${environment.horizonColor[1] * 255}, ${environment.horizonColor[2] * 255})`);
+            gradient.addColorStop(1, `rgb(${environment.groundColor[0] * 255}, ${environment.groundColor[1] * 255}, ${environment.groundColor[2] * 255})`);
+            ctx.fillStyle = gradient;
+          } else {
+            // Fallback for environments without full canvas support (e.g., jsdom)
+            ctx.fillStyle = `rgb(${environment.skyColor[0] * 255}, ${environment.skyColor[1] * 255}, ${environment.skyColor[2] * 255})`;
+          }
+          ctx.fillRect(0, 0, 320, 180);
+        } else if (environment.skyboxType === 'procedural-sky') {
+          // Procedural sky with sun
+          if (typeof ctx.createLinearGradient === 'function') {
+            const gradient = ctx.createLinearGradient(0, 0, 0, 180);
+            gradient.addColorStop(0, `rgb(${environment.skyColor[0] * 255}, ${environment.skyColor[1] * 255}, ${environment.skyColor[2] * 255})`);
+            gradient.addColorStop(1, `rgb(${environment.horizonColor[0] * 255}, ${environment.horizonColor[1] * 255}, ${environment.horizonColor[2] * 255})`);
+            ctx.fillStyle = gradient;
+          } else {
+            // Fallback for environments without full canvas support (e.g., jsdom)
+            ctx.fillStyle = `rgb(${environment.skyColor[0] * 255}, ${environment.skyColor[1] * 255}, ${environment.skyColor[2] * 255})`;
+          }
+          ctx.fillRect(0, 0, 320, 180);
+
+          // Draw sun
+          const sunX = 160 + environment.sunDirection[0] * 100;
+          const sunY = 90 - environment.sunDirection[1] * 60;
+          
+          // Sun glow
+          if (typeof ctx.createRadialGradient === 'function') {
+            const sunGlow = ctx.createRadialGradient(sunX, sunY, 0, sunX, sunY, 40);
+            sunGlow.addColorStop(0, `rgba(${environment.sunColor[0] * 255}, ${environment.sunColor[1] * 255}, ${environment.sunColor[2] * 255}, ${environment.sunIntensity * 0.3})`);
+            sunGlow.addColorStop(0.5, `rgba(${environment.sunColor[0] * 255}, ${environment.sunColor[1] * 255}, ${environment.sunColor[2] * 255}, ${environment.sunIntensity * 0.1})`);
+            sunGlow.addColorStop(1, 'rgba(255, 255, 255, 0)');
+            ctx.fillStyle = sunGlow;
+            ctx.fillRect(0, 0, 320, 180);
+          }
+
+          // Sun disc
+          ctx.beginPath();
+          ctx.arc(sunX, sunY, 15, 0, Math.PI * 2);
+          ctx.fillStyle = `rgba(${environment.sunColor[0] * 255}, ${environment.sunColor[1] * 255}, ${environment.sunColor[2] * 255}, ${environment.sunIntensity})`;
+          ctx.fill();
+        } else if (environment.skyboxType === 'cubemap') {
+          // Cubemap preview
+          const cubemapPath = (environment as any).cubemapPath;
+          if (cubemapPath) {
+            // Show loaded cubemap info
+            ctx.fillStyle = '#1a1a2e';
+            ctx.fillRect(0, 0, 320, 180);
+            ctx.fillStyle = '#4ade80';
+            ctx.font = '12px monospace';
+            ctx.textAlign = 'center';
+            ctx.textBaseline = 'middle';
           ctx.fillText('Cubemap Loaded', 160, 80);
           ctx.fillStyle = 'rgba(148, 163, 184, 0.7)';
           ctx.font = '10px monospace';
@@ -1349,6 +1376,14 @@ export class PropertiesPanel {
           ctx.textAlign = 'center';
           ctx.textBaseline = 'middle';
           ctx.fillText('Cubemap', 160, 90);
+        }
+      }
+      } catch (error) {
+        // If canvas operations fail (e.g., in test environment), just fill with solid color
+        // Only try to fill if ctx and fillRect are available
+        if (ctx && typeof ctx.fillRect === 'function') {
+          ctx.fillStyle = '#1a2332';
+          ctx.fillRect(0, 0, 320, 180);
         }
       }
     }

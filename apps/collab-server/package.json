@@ -4,12 +4,6 @@
   "private": true,
   "type": "module",
   "main": "dist/index.js",
-  "scripts": {
-    "dev": "tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.json",
-    "start": "node dist/index.js",
-    "lint": "eslint src --max-warnings=0"
-  },
   "dependencies": {
     "@engine/net-server": "workspace:*",
     "@fastify/cors": "^11.0.0",
@@ -31,9 +25,10 @@
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",
-    "build": "tsc -p tsconfig.json",
+    "build": "tsup",
     "start": "node dist/index.js",
     "lint": "eslint src --max-warnings=0",
+    "prebuild": "pnpm run db:generate",
     "db:generate": "prisma generate",
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",

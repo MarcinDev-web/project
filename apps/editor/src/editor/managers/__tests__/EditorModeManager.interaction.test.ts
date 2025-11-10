@@ -91,7 +91,7 @@ function createMockEditorCamera(): EditorCameraController {
   } as unknown as EditorCameraController;
 }
 
-describe.skip('EditorModeManager – regresyjne scenariusze', () => {
+describe('EditorModeManager – regresyjne scenariusze', () => {
   let scene: Scene;
   let state: EditorState;
   let selection: SelectionManager;
@@ -249,7 +249,7 @@ describe.skip('EditorModeManager – regresyjne scenariusze', () => {
   });
 });
 
-describe.skip('ReturnState – zarządzanie kontekstem wejścia', () => {
+describe('ReturnState – zarządzanie kontekstem wejścia', () => {
   const createContext = (): PlayModeContext => ({
     authoringSnapshot: null,
     selectionPath: null,

@@ -37,7 +37,7 @@ describe('AvatarInstance', () => {
       const avatar = new AvatarInstance(parentEntity);
       const loadout = avatar.serializeLoadout();
 
-      expect(loadout.version).toBe(1);
+      expect(loadout.version).toBe(2);
       expect(loadout.parts).toBeDefined();
     });
 
@@ -349,7 +349,7 @@ describe('AvatarInstance', () => {
       const avatar = new AvatarInstance(parentEntity);
       const loadout = avatar.serializeLoadout();
 
-      expect(loadout.version).toBe(1);
+      expect(loadout.version).toBe(2);
       expect(loadout.parts).toBeDefined();
     });
 

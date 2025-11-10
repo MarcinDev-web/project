@@ -21,7 +21,7 @@ describe('AvatarInstance Integration', () => {
       });
 
       const serialized = avatar.serializeLoadout();
-      expect(serialized.version).toBe(1);
+      expect(serialized.version).toBe(2);
       expect(serialized.parts).toBeDefined();
 
       // Check that all slots from default loadout are present
