@@ -18,6 +18,7 @@ export interface AvatarCustomizationPanelProps {
   onSave: () => void;
   isSaving?: boolean;
   builderCore?: AvatarBuilderCore | null;
+  validationErrors?: string[];
 }
 
 /**
@@ -30,6 +31,7 @@ export function AvatarCustomizationPanel({
   onSave,
   isSaving = false,
   builderCore,
+  validationErrors = [],
 }: AvatarCustomizationPanelProps) {
   const [selectedSlot, setSelectedSlot] = useState<AvatarSlot | null>(null);
   const [activeTab, setActiveTab] = useState<'parts' | 'colors' | 'materials'>('parts');
@@ -97,11 +99,26 @@ export function AvatarCustomizationPanel({
     <div className="avatar-customization-panel">
       <div className="avatar-panel-header">
         <h2>Avatar Customization</h2>
+        {validationErrors.length > 0 && (
+          <div className="avatar-validation-errors">
+            <div className="avatar-validation-title">Validation Errors:</div>
+            <ul className="avatar-validation-list">
+              {validationErrors.map((error, index) => (
+                <li key={index}>{error}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         <div className="avatar-panel-actions">
           <button onClick={onReset} disabled={isSaving} className="btn-secondary">
             Reset
           </button>
-          <button onClick={onSave} disabled={isSaving} className="btn-primary">
+          <button 
+            onClick={onSave} 
+            disabled={isSaving || validationErrors.length > 0} 
+            className="btn-primary"
+            title={validationErrors.length > 0 ? 'Please fix validation errors before saving' : undefined}
+          >
             {isSaving ? 'Saving...' : 'Save'}
           </button>
         </div>
@@ -168,6 +185,7 @@ export function AvatarCustomizationPanel({
                 slot={selectedSlot}
                 {...(selectedPart?.material !== undefined && { currentMaterial: selectedPart.material })}
                 onMaterialChange={handleMaterialChange}
+                availableMaterials={builderCore?.getAvailableMaterials()}
               />
             )}
           </div>
@@ -184,6 +202,10 @@ export function AvatarCustomizationPanel({
         onResetCamera={() => builderCore?.resetCamera()}
         onRotateLeft={() => builderCore?.rotateLeft()}
         onRotateRight={() => builderCore?.rotateRight()}
+        onPlayAnimation={(animation) => builderCore?.playAnimation(animation)}
+        onResetPose={() => builderCore?.resetPose()}
+        availableAnimations={builderCore?.getAvailableAnimations()}
+        currentAnimation={builderCore?.getAvatarInstance()?.getAnimator()?.getCurrentAnimation() || null}
       />
     </div>
   );

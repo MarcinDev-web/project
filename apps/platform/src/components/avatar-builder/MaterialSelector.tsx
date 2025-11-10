@@ -8,22 +8,21 @@ export interface MaterialSelectorProps {
   slot: AvatarSlot;
   currentMaterial?: string;
   onMaterialChange: (materialId: string) => void;
+  availableMaterials?: Array<{ id: string; name: string }>;
 }
 
 /**
  * Material selector component for choosing materials
- * 
- * Note: In a full implementation, this would query available materials
- * from the material resolver. For now, we provide basic options.
+ * Uses available materials from MaterialResolver if provided, otherwise falls back to default list
  */
 export function MaterialSelector({
   slot: _slot,
   currentMaterial,
   onMaterialChange,
+  availableMaterials,
 }: MaterialSelectorProps) {
-  // Basic material options - in full implementation, this would come from MaterialResolver
-  // Note: slot parameter reserved for future use to filter materials per slot
-  const materialOptions = [
+  // Use provided materials or fallback to default list
+  const materialOptions = availableMaterials ?? [
     { id: 'mat_default', name: 'Default' },
     { id: 'mat_glossy', name: 'Glossy' },
     { id: 'mat_matte', name: 'Matte' },

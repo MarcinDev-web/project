@@ -10,10 +10,20 @@ import { createOrbitControls, type OrbitControls } from '@engine/camera';
 import {
   AvatarInstance,
   DEFAULT_AVATAR_LOADOUT,
+  DEFAULT_AVATAR_PART_LIBRARY,
+  IDLE_ANIMATION,
+  RUN_ANIMATION,
+  WALK_ANIMATION,
   type AvatarLoadout,
   type AvatarSlot,
+  type AvatarMaterialResolver,
+  type AvatarMaterialBinding,
+  type AvatarAnimation,
 } from '@engine/avatar';
+import { AvatarLoadoutSerializer } from '@engine/avatar/serialization/avatar-loadout-serializer';
+import type { ValidationResult } from '@engine/avatar/serialization/avatar-loadout-serializer';
 import type { RgbaColor } from '@engine/world';
+import { materialCatalogService, type MaterialMetadata } from './MaterialCatalogService';
 
 export interface AvatarBuilderCoreOptions {
   canvas: HTMLCanvasElement;
@@ -38,6 +48,8 @@ export class AvatarBuilderCore {
   private readonly canvas: HTMLCanvasElement;
   private readonly statusEl: HTMLElement | null;
   private readonly onLoadoutChange: ((loadout: AvatarLoadout) => void) | undefined;
+  private readonly materialResolver: AvatarMaterialResolver;
+  private readonly serializer: AvatarLoadoutSerializer;
 
   constructor(options: AvatarBuilderCoreOptions) {
     this.canvas = options.canvas;
@@ -54,6 +66,12 @@ export class AvatarBuilderCore {
     // Setup environment and lighting
     this.setupEnvironment();
 
+    // Create material resolver
+    this.materialResolver = this.createMaterialResolver();
+    
+    // Create serializer for validation
+    this.serializer = new AvatarLoadoutSerializer();
+
     // Create root entity for avatar
     const avatarRoot = new Entity('AvatarRoot');
     avatarRoot.transform.position = [0, 0, 0];
@@ -64,7 +82,95 @@ export class AvatarBuilderCore {
     this.avatar = new AvatarInstance(avatarRoot, {
       name: 'BuilderAvatar',
       loadout,
+      materialResolver: this.materialResolver,
     });
+  }
+
+  /**
+   * Create material resolver using Material Catalog Service
+   */
+  private createMaterialResolver(): AvatarMaterialResolver {
+    return materialCatalogService.getResolver();
+  }
+
+  /**
+   * Get available materials from catalog service
+   */
+  getAvailableMaterials(): Array<{ id: string; name: string }> {
+    return materialCatalogService.getAllMaterials().map((m) => ({
+      id: m.id,
+      name: m.name,
+    }));
+  }
+
+  /**
+   * Get material metadata by ID
+   */
+  getMaterialMetadata(id: string): MaterialMetadata | undefined {
+    return materialCatalogService.getMaterial(id);
+  }
+
+  /**
+   * Search materials by query
+   */
+  searchMaterials(query: string): MaterialMetadata[] {
+    return materialCatalogService.searchMaterials(query);
+  }
+
+  /**
+   * Get materials by category
+   */
+  getMaterialsByCategory(category: MaterialMetadata['category']): MaterialMetadata[] {
+    return materialCatalogService.getMaterialsByCategory(category);
+  }
+
+  /**
+   * Play animation on avatar
+   */
+  playAnimation(animation: AvatarAnimation): void {
+    if (!this.avatar) {
+      throw new Error('Avatar not initialized');
+    }
+    this.avatar.playAnimation(animation);
+  }
+
+  /**
+   * Stop current animation
+   */
+  stopAnimation(resetPose = false): void {
+    if (!this.avatar) {
+      throw new Error('Avatar not initialized');
+    }
+    this.avatar.stopAnimation();
+    if (resetPose) {
+      // Reset pose by playing idle animation from start
+      this.avatar.playAnimation(IDLE_ANIMATION, 0);
+    }
+  }
+
+  /**
+   * Reset avatar pose to default
+   */
+  resetPose(): void {
+    this.stopAnimation(true);
+  }
+
+  /**
+   * Get available animations
+   */
+  getAvailableAnimations(): Array<{ animation: AvatarAnimation; name: string }> {
+    return [
+      { animation: IDLE_ANIMATION, name: 'Idle' },
+      { animation: WALK_ANIMATION, name: 'Walk' },
+      { animation: RUN_ANIMATION, name: 'Run' },
+    ];
+  }
+
+  /**
+   * Validate a loadout against the part library
+   */
+  validateLoadout(loadout: AvatarLoadout): ValidationResult {
+    return this.serializer.validate(loadout, DEFAULT_AVATAR_PART_LIBRARY);
   }
 
   /**
@@ -143,6 +249,11 @@ export class AvatarBuilderCore {
       this.isInitialized = true;
       this.lastFrameTime = performance.now();
       this.startGameLoop();
+      
+      // Start idle animation
+      if (this.avatar) {
+        this.avatar.playAnimation(IDLE_ANIMATION);
+      }
     } catch (error) {
       // Provide more specific error messages with better formatting
       let errorMessage = 'Failed to initialize WebGPU renderer';

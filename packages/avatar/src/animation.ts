@@ -98,6 +98,13 @@ export class AvatarAnimationPlayer {
     });
   }
 
+  /**
+   * Get current animation
+   */
+  getCurrentAnimation(): AvatarAnimation | null {
+    return this.animation;
+  }
+
   onceFinished(handler: (event: AvatarAnimationFinishedEvent) => void): Unsubscribe {
     return this.events.once<AvatarAnimationFinishedEvent>('finished', (event) => {
       if (event) {

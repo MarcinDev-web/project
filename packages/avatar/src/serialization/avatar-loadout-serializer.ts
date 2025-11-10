@@ -37,7 +37,7 @@ export class AvatarLoadoutSerializer {
       parts[slot] = entry;
     }
     return {
-      version: 1,
+      version: 2, // Current version
       parts,
     };
   }

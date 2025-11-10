@@ -1,7 +1,7 @@
 import type { AvatarLoadout } from './avatar-instance';
 
 export const DEFAULT_AVATAR_LOADOUT: AvatarLoadout = {
-  version: 1,
+  version: 2, // Current version
   parts: {
     HeadSlot: { mesh: 'head_default' },
     FaceOverlaySlot: { mesh: 'face_overlay_default', colors: { primary: [0, 0, 0, 0.85] } },

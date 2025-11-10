@@ -10,6 +10,7 @@ import { AvatarBuilderViewport } from '../components/avatar-builder/AvatarBuilde
 import { AvatarCustomizationPanel } from '../components/avatar-builder/AvatarCustomizationPanel';
 import { profilesApi } from '../api/profiles';
 import { DEFAULT_AVATAR_LOADOUT, type AvatarLoadout } from '@engine/avatar';
+import { AvatarLoadoutMigrator } from '../components/avatar-builder/AvatarLoadoutMigrator';
 import type { AvatarBuilderCore } from '../components/avatar-builder/AvatarBuilderCore';
 
 /**
@@ -22,6 +23,7 @@ export function AvatarBuilderStudioPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [builderCore, setBuilderCore] = useState<AvatarBuilderCore | null>(null);
+  const [validationErrors, setValidationErrors] = useState<string[]>([]);
 
   // Load saved loadout on mount
   useEffect(() => {
@@ -34,7 +36,16 @@ export function AvatarBuilderStudioPage() {
       try {
         const savedLoadout = await profilesApi.loadAvatarLoadout(user.id);
         if (savedLoadout) {
-          setLoadout(savedLoadout);
+          // Migrate loadout to current version if needed
+          const migrationResult = AvatarLoadoutMigrator.migrate(savedLoadout);
+          if (migrationResult.migrated) {
+            console.log(
+              `[AvatarBuilder] Migrated loadout from v${migrationResult.fromVersion} to v${migrationResult.toVersion}`
+            );
+            // Optionally save migrated loadout back to server
+            // await profilesApi.saveAvatarLoadout(user.id, migrationResult.loadout);
+          }
+          setLoadout(migrationResult.loadout);
         } else {
           // Explicitly use default loadout when no saved loadout exists (404)
           setLoadout(DEFAULT_AVATAR_LOADOUT);
@@ -57,9 +68,23 @@ export function AvatarBuilderStudioPage() {
     loadSavedLoadout();
   }, [user?.id, showToast]);
 
+  // Validate loadout when builderCore is ready
+  useEffect(() => {
+    if (builderCore) {
+      const validation = builderCore.validateLoadout(loadout);
+      setValidationErrors(validation.valid ? [] : [...validation.errors]);
+    }
+  }, [builderCore, loadout]);
+
   const handleLoadoutChange = useCallback((newLoadout: AvatarLoadout) => {
     setLoadout(newLoadout);
-  }, []);
+    
+    // Validate loadout when it changes
+    if (builderCore) {
+      const validation = builderCore.validateLoadout(newLoadout);
+      setValidationErrors(validation.valid ? [] : [...validation.errors]);
+    }
+  }, [builderCore]);
 
   const handleSave = useCallback(async () => {
     if (!user?.id) {
@@ -67,20 +92,34 @@ export function AvatarBuilderStudioPage() {
       return;
     }
 
+    // Validate before saving
+    if (builderCore) {
+      const validation = builderCore.validateLoadout(loadout);
+      if (!validation.valid) {
+        setValidationErrors([...validation.errors]);
+        showToast('Cannot save: Avatar loadout has validation errors. Please fix them before saving.', 'warning');
+        return;
+      }
+    }
+
     setIsSaving(true);
     try {
       await profilesApi.saveAvatarLoadout(user.id, loadout);
       showToast('Avatar saved successfully!', 'success');
+      // Clear validation errors on successful save
+      setValidationErrors([]);
     } catch (error) {
       console.error('Failed to save avatar loadout:', error);
       showToast('Failed to save avatar', 'error');
     } finally {
       setIsSaving(false);
     }
-  }, [user?.id, loadout, showToast]);
+  }, [user?.id, loadout, showToast, builderCore]);
 
   const handleReset = useCallback(() => {
     setLoadout(DEFAULT_AVATAR_LOADOUT);
+    // Clear validation errors on reset
+    setValidationErrors([]);
   }, []);
 
   if (isLoading) {
@@ -105,6 +144,7 @@ export function AvatarBuilderStudioPage() {
               onSave={handleSave}
               isSaving={isSaving}
               builderCore={builderCore}
+              validationErrors={validationErrors}
             />
           </div>
           <div className="avatar-builder-viewport">

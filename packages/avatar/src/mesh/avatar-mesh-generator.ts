@@ -1,6 +1,7 @@
 import type { CustomMeshData } from '@engine/world';
 import { generateHeroicTorsoMesh } from '../geometry/torso-geometry';
 import { generateSphereMesh } from '../geometry/sphere-geometry';
+import { generateCapsuleY } from '../geometry/capsule-geometry';
 
 export interface AvatarMeshGeneratorOptions {
   sphereSegments?: number;
@@ -20,7 +21,7 @@ export class AvatarMeshGenerator {
   /**
    * Generate mesh data for a procedural mesh type.
    * 
-   * @param meshType - Type of mesh to generate ('avatar_torso' or 'sphere')
+   * @param meshType - Type of mesh to generate ('avatar_torso' | 'sphere' | 'capsule_y')
    * @param partId - ID of the part (for error messages)
    * @returns Mesh data or null if the mesh type is not procedural or generation failed
    */
@@ -29,6 +30,8 @@ export class AvatarMeshGenerator {
       return this.generateTorsoMesh(partId);
     } else if (meshType === 'sphere') {
       return this.generateSphereMesh(partId);
+    } else if (meshType === 'capsule_y') {
+      return this.generateCapsuleY(partId);
     }
     // Not a procedural mesh type - return null
     return null;
@@ -66,6 +69,25 @@ export class AvatarMeshGenerator {
     } catch (error) {
       console.error(
         `[AvatarMeshGenerator] Failed to generate sphere mesh for part "${partId}":`,
+        error,
+      );
+      return null;
+    }
+  }
+
+  private generateCapsuleY(partId: string): CustomMeshData | null {
+    try {
+      const mesh = generateCapsuleY(0.5, 1.0, Math.max(8, this.sphereSegments), Math.max(4, Math.floor(this.sphereSegments / 2)));
+      if (!mesh.vertices || !mesh.indices) {
+        console.error(
+          `[AvatarMeshGenerator] Generated invalid capsule_y mesh for part "${partId}" - missing vertices or indices`,
+        );
+        return null;
+      }
+      return mesh;
+    } catch (error) {
+      console.error(
+        `[AvatarMeshGenerator] Failed to generate capsule_y mesh for part "${partId}":`,
         error,
       );
       return null;
