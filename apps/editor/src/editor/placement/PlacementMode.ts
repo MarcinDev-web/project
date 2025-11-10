@@ -173,6 +173,11 @@ export class PlacementMode {
 
   /**
    * Updates the preview position based on world position (e.g., from raycast).
+   * 
+   * Race condition protection: Uses request ID tracking to prevent stale collision
+   * results from overwriting newer ones. If multiple updates are triggered rapidly
+   * (e.g., fast mouse movement), only the latest collision check result is applied.
+   * 
    * @param worldPosition - Target position in world space
    */
   async updatePreviewPosition(
@@ -184,6 +189,7 @@ export class PlacementMode {
     }
 
     // Increment update ID to track the latest request
+    // This prevents race conditions where old collision checks complete after new ones
     const updateId = ++this.lastUpdateId;
 
     // Lazily add preview to scene on first valid update to avoid flashing at origin
@@ -232,6 +238,8 @@ export class PlacementMode {
     );
 
     // Ignore stale results from previous update requests
+    // This check prevents race conditions: if a newer update started while this collision
+    // check was running, we discard this result to avoid overwriting newer state
     if (updateId !== this.lastUpdateId || !this.preview.active || !this.preview.previewEntity) {
       return;
     }
@@ -272,7 +280,11 @@ export class PlacementMode {
     // Animate rotation smoothly
     this.animator.animateRotation(this.preview.previewEntity, targetQuat);
 
-    // Re-check collision after rotation; fire-and-forget to keep UI responsive
+    // Re-check collision after rotation
+    // Note: This is intentionally fire-and-forget (void) to keep rotation UI responsive.
+    // The request ID tracking in updatePreviewPosition ensures stale collision results
+    // are ignored if the user rotates again quickly. The collision check will complete
+    // asynchronously and update the preview color when done.
     if (this.preview.position) {
       void this.updatePreviewPosition(this.preview.position);
     }

@@ -38,7 +38,7 @@ function createMockControls(): OrbitControls {
   } as OrbitControls;
 }
 
-describe.skip('EditorPlacementController', () => {
+describe('EditorPlacementController', () => {
   let canvas: HTMLCanvasElement;
   let controls: OrbitControls;
   let scene: Scene;

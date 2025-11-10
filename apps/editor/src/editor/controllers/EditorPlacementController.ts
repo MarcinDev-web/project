@@ -14,7 +14,7 @@
 
 import type { OrbitControls, CameraDirector } from '@engine/camera';
 import type { Scene, Entity } from '@engine/world';
-import { CameraComponent } from '@engine/world';
+import { CameraComponent, TerrainComponent } from '@engine/world';
 import type { SelectionManager } from '@engine/world';
 import type { EditorState } from '../core/state';
 import type { PlacementMode } from '../placement/PlacementMode';
@@ -242,6 +242,12 @@ export class EditorPlacementController {
 
   /**
    * Creates a world-space ray from a mouse event.
+   * 
+   * Uses CameraDirector matrices if available (supports free-fly/FPS/third-person),
+   * falls back to OrbitControls-derived matrices if CameraDirector is unavailable
+   * or matrices are invalid.
+   * 
+   * @returns Ray with origin and direction, or null if ray creation fails
    */
   private createRayFromMouseEvent(event: MouseEvent): { origin: Vec3; direction: Vec3 } | null {
     const rect = this.config.canvas.getBoundingClientRect();
@@ -262,48 +268,77 @@ export class EditorPlacementController {
       
       // Validate matrices before using
       if (!viewMatrix || !projectionMatrix) {
-        Logger.warn('EditorPlacementController: Invalid camera matrices, falling back to orbit controls');
-        // Explicitly fall through to orbit controls fallback
+        Logger.warn(
+          'EditorPlacementController: CameraDirector matrices are null/undefined',
+          { hasView: !!viewMatrix, hasProjection: !!projectionMatrix }
+        );
+        // Fall through to orbit controls fallback
       } else {
-        // Additional validation: check if matrices are valid arrays
+        // Additional validation: check if matrices are valid arrays with correct dimensions
         if (viewMatrix.length === 16 && projectionMatrix.length === 16) {
-          return this.raycaster.createRayFromScreen(
-            mouseX,
-            mouseY,
-            canvasInternalWidth,
-            canvasInternalHeight,
-            viewMatrix,
-            projectionMatrix
-          );
+          // Verify matrices contain valid numbers (not NaN or Infinity)
+          let isValid = true;
+          for (let i = 0; i < 16; i++) {
+            if (!Number.isFinite(viewMatrix[i]!) || !Number.isFinite(projectionMatrix[i]!)) {
+              isValid = false;
+              break;
+            }
+          }
+          
+          if (isValid) {
+            return this.raycaster.createRayFromScreen(
+              mouseX,
+              mouseY,
+              canvasInternalWidth,
+              canvasInternalHeight,
+              viewMatrix,
+              projectionMatrix
+            );
+          } else {
+            Logger.warn(
+              'EditorPlacementController: CameraDirector matrices contain invalid values (NaN/Infinity)',
+              { viewMatrix, projectionMatrix }
+            );
+            // Fall through to orbit controls fallback
+          }
         } else {
-          Logger.warn('EditorPlacementController: Invalid matrix dimensions, falling back to orbit controls');
+          Logger.warn(
+            'EditorPlacementController: CameraDirector matrices have invalid dimensions',
+            { viewLength: viewMatrix.length, projectionLength: projectionMatrix.length }
+          );
           // Fall through to orbit controls fallback
         }
       }
     }
 
     // Fallback to legacy orbit-controls derived matrices
-    const { yaw, pitch, distance } = this.config.controls.getState();
-    const aspect = canvasInternalWidth / canvasInternalHeight;
+    // This is always available as controls is required in config
+    try {
+      const { yaw, pitch, distance } = this.config.controls.getState();
+      const aspect = canvasInternalWidth / canvasInternalHeight;
 
-    const projectionMatrix = new Float32Array(16) as Mat4;
-    const viewMatrix = new Float32Array(16) as Mat4;
+      const projectionMatrix = new Float32Array(16) as Mat4;
+      const viewMatrix = new Float32Array(16) as Mat4;
 
-    mat4Perspective(projectionMatrix, FOV_RADIANS, aspect, Z_NEAR, Z_FAR);
+      mat4Perspective(projectionMatrix, FOV_RADIANS, aspect, Z_NEAR, Z_FAR);
 
-    const eyeX = Math.cos(pitch) * Math.sin(yaw) * distance;
-    const eyeY = Math.sin(pitch) * distance;
-    const eyeZ = Math.cos(pitch) * Math.cos(yaw) * distance;
-    mat4LookAt(viewMatrix, [eyeX, eyeY, eyeZ], [0, 0, 0], [0, 1, 0]);
+      const eyeX = Math.cos(pitch) * Math.sin(yaw) * distance;
+      const eyeY = Math.sin(pitch) * distance;
+      const eyeZ = Math.cos(pitch) * Math.cos(yaw) * distance;
+      mat4LookAt(viewMatrix, [eyeX, eyeY, eyeZ], [0, 0, 0], [0, 1, 0]);
 
-    return this.raycaster.createRayFromScreen(
-      mouseX,
-      mouseY,
-      canvasInternalWidth,
-      canvasInternalHeight,
-      viewMatrix,
-      projectionMatrix
-    );
+      return this.raycaster.createRayFromScreen(
+        mouseX,
+        mouseY,
+        canvasInternalWidth,
+        canvasInternalHeight,
+        viewMatrix,
+        projectionMatrix
+      );
+    } catch (error) {
+      Logger.error('EditorPlacementController: Failed to create ray from orbit controls', error);
+      return null;
+    }
   }
 
   /**
@@ -542,7 +577,12 @@ export class EditorPlacementController {
   }
 
   /**
-   * Raycasts to find ground position. Tries terrain entities first, falls back to y=0 plane.
+   * Raycasts to find ground position. Prioritizes terrain entities, falls back to y=0 plane.
+   * 
+   * Strategy:
+   * 1. First, try raycasting to entities with TerrainComponent (prioritized)
+   * 2. Then, try raycasting to other scene entities (ground meshes, etc.)
+   * 3. Finally, fallback to y=0 plane only if no terrain entities exist
    */
   private raycastToGroundPlane(ray: { origin: Vec3; direction: Vec3 }): Vec3 | null {
     const { origin, direction } = ray;
@@ -551,48 +591,89 @@ export class EditorPlacementController {
       return null;
     }
 
-    // Try raycasting to scene entities first (terrain, ground meshes, etc.)
     const preview = this.config.placementMode.getPreviewEntity();
-    const entities = this.config.scene
+    const allEntities = this.config.scene
       .getActiveEntities()
       .filter((e) => e !== preview && !e.userData.isPreview);
 
-    if (entities.length > 0) {
-      const hit = this.raycaster.raycastClosest(ray as any, entities);
-      if (hit && hit.point[1] >= -0.1) {
-        // Use hit point if it's near ground level (allow slight below ground)
-        // Position placement above the hit surface
-        const hitY = hit.point[1];
-        const previewScale = preview?.transform.scale ?? [1, 1, 1];
-        const placementY = hitY + Math.max(0.001, Math.abs(previewScale[1]) / 2);
-        return [hit.point[0], placementY, hit.point[2]];
+    // Separate terrain entities from other entities
+    const terrainEntities: Entity[] = [];
+    const otherEntities: Entity[] = [];
+    
+    for (const entity of allEntities) {
+      try {
+        if (entity.hasComponent(TerrainComponent)) {
+          terrainEntities.push(entity);
+        } else {
+          otherEntities.push(entity);
+        }
+      } catch {
+        // If component check fails, treat as other entity
+        otherEntities.push(entity);
       }
     }
 
-    // Fallback: raycast to y=0 plane (ground plane)
-    const dy = direction[1];
-    if (!Number.isFinite(dy) || Math.abs(dy) < 0.0001) {
-      return null;
+    // Priority 1: Raycast to terrain entities first
+    if (terrainEntities.length > 0) {
+      const terrainHit = this.raycaster.raycastClosest(ray as any, terrainEntities);
+      if (terrainHit && terrainHit.point) {
+        // Use terrain hit point regardless of Y height (terrain can be at any elevation)
+        const hitY = terrainHit.point[1];
+        const previewScale = preview?.transform.scale ?? [1, 1, 1];
+        const placementY = hitY + Math.max(0.001, Math.abs(previewScale[1]) / 2);
+        return [terrainHit.point[0], placementY, terrainHit.point[2]];
+      }
     }
 
-    const t = -origin[1] / dy;
-
-    if (!Number.isFinite(t) || t < 0) {
-      return null;
+    // Priority 2: Raycast to other scene entities (ground meshes, etc.)
+    if (otherEntities.length > 0) {
+      const hit = this.raycaster.raycastClosest(ray as any, otherEntities);
+      if (hit && hit.point) {
+        // Use hit point if it's below the ray origin (downward raycast)
+        // This ensures we're hitting a surface below, not above
+        const hitY = hit.point[1];
+        const originY = origin[1];
+        
+        // Accept hit if it's below the origin or very close (within 0.1 units)
+        // This handles both downward rays and near-horizontal rays
+        if (hitY <= originY + 0.1) {
+          const previewScale = preview?.transform.scale ?? [1, 1, 1];
+          const placementY = hitY + Math.max(0.001, Math.abs(previewScale[1]) / 2);
+          return [hit.point[0], placementY, hit.point[2]];
+        }
+      }
     }
 
-    const x = origin[0] + t * direction[0];
-    const z = origin[2] + t * direction[2];
-    
-    if (!Number.isFinite(x) || !Number.isFinite(z)) {
-      return null;
+    // Priority 3: Fallback to y=0 plane only if no terrain entities exist
+    // If terrain exists, we should have hit it above, so this is a last resort
+    if (terrainEntities.length === 0) {
+      const dy = direction[1];
+      if (!Number.isFinite(dy) || Math.abs(dy) < 0.0001) {
+        return null;
+      }
+
+      const t = -origin[1] / dy;
+
+      if (!Number.isFinite(t) || t < 0) {
+        return null;
+      }
+
+      const x = origin[0] + t * direction[0];
+      const z = origin[2] + t * direction[2];
+      
+      if (!Number.isFinite(x) || !Number.isFinite(z)) {
+        return null;
+      }
+
+      // Place above ground plane based on preview scale
+      const previewScale = preview?.transform.scale ?? [1, 1, 1];
+      const placementY = Math.max(0.001, Math.abs(previewScale[1]) / 2);
+
+      return [x, placementY, z];
     }
 
-    // Place above ground plane based on preview scale
-    const previewScale = preview?.transform.scale ?? [1, 1, 1];
-    const placementY = Math.max(0.001, Math.abs(previewScale[1]) / 2);
-
-    return [x, placementY, z];
+    // If terrain exists but we didn't hit it, return null (don't use y=0 fallback)
+    return null;
   }
 
   /**
