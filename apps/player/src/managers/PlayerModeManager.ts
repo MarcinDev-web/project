@@ -1,8 +1,8 @@
 /**
  * PlayerModeManager - Manages player runtime for published builds
  * 
- * Simplified version of EditorModeManager - no edit state, history, or UI panels.
- * Only handles: Loading scene -> Playing -> Exit
+ * Advanced version with state machine architecture for better organization
+ * and support for multiplayer, visual scripting, and advanced features.
  */
 
 import { Scene, Entity } from '@engine/world';
@@ -19,8 +19,8 @@ import { HealthComponent } from '@engine/world/components/HealthComponent';
 import { DefaultControllerFactory, PlayerSession } from '@engine/stdlib/CharacterController';
 import { hydrateScene } from '@engine/editor-utils';
 import type { Vec3 } from '@engine/core/math';
-import { Logger } from './utils/logger';
-import { loadBuildData } from './utils/loadBuildData';
+import { Logger } from '../utils/logger';
+import { loadBuildData } from '../utils/loadBuildData';
 import {
   AvatarInstance,
   DEFAULT_AVATAR_LOADOUT,
@@ -30,9 +30,14 @@ import {
   RUN_ANIMATION,
   JUMP_ANIMATION,
 } from '@engine/avatar';
+import { PlayerStateMachine, PlayerStateType, type PlayerContext } from '../core/PlayerStateMachine.js';
+import { LoadingState } from '../core/states/LoadingState.js';
+import { ConnectingState } from '../core/states/ConnectingState.js';
+import { PlayingState } from '../core/states/PlayingState.js';
+import { PausedState } from '../core/states/PausedState.js';
+import { DisconnectedState } from '../core/states/DisconnectedState.js';
 
-// PlayManifest is not exported from @engine/world, we'll define a simple interface
-// or use the one from editor (but we don't want to depend on editor)
+// PlayManifest interface
 interface PlayManifest {
   version: number;
   timestamp: number;
@@ -51,6 +56,7 @@ interface PlayManifest {
     enablePhysics: boolean;
     enableAI: boolean;
     enableScripts: boolean;
+    enableMultiplayer?: boolean;
   };
   controller: {
     preferences: {
@@ -132,6 +138,7 @@ function createDefaultManifest(): PlayManifest {
       enablePhysics: true,
       enableAI: true,
       enableScripts: true,
+      enableMultiplayer: false,
     },
     controller: {
       preferences: {
@@ -203,6 +210,12 @@ export interface PlayerModeManagerConfig {
   characterSystem: CharacterControllerSystem;
   characterInput: CharacterInputHandler;
   fpsCamera: FPSCamera;
+  /** Callback for loading progress updates */
+  onLoadingProgress?: (step: string, percentage: number, message?: string) => void;
+  /** Callback for pause menu visibility */
+  onPauseMenuVisibilityChange?: (visible: boolean) => void;
+  /** Callback for disconnect UI visibility */
+  onDisconnectUIVisibilityChange?: (visible: boolean) => void;
 }
 
 export class PlayerModeManager {
@@ -216,6 +229,7 @@ export class PlayerModeManager {
   
   private cameraDirector: CameraDirector;
   private inputContext: InputContextManager;
+  private stateMachine: PlayerStateMachine;
   
   private playerEntity: Entity | null = null;
   private playerSession: PlayerSession | null = null;
@@ -227,8 +241,12 @@ export class PlayerModeManager {
   private buildId: string | null = null;
   
   private isInitialized = false;
-  private isPlaying = false;
   private accumulator = 0;
+  private timeScale = 1.0;
+  
+  // State references for external control
+  private playingState: PlayingState | null = null;
+  private pausedState: PausedState | null = null;
   
   constructor(config: PlayerModeManagerConfig) {
     this.canvas = config.canvas;
@@ -240,7 +258,6 @@ export class PlayerModeManager {
     this.fpsCamera = config.fpsCamera;
     
     // Initialize managers
-    // Create a minimal mock orbitControls for CameraDirector (required but not used in fps mode)
     const mockOrbitControls = {
       getState: () => ({
         position: [0, 0, 5] as [number, number, number],
@@ -258,8 +275,8 @@ export class PlayerModeManager {
     this.cameraDirector = new CameraDirector({
       orbitControls: mockOrbitControls,
       fpsCamera: this.fpsCamera,
-      editorCamera: null, // Not used in player mode
-      thirdPersonCamera: null, // Not used in player mode (yet)
+      editorCamera: null,
+      thirdPersonCamera: null,
       canvas: this.canvas,
       scene: this.scene,
       physicsWorld: this.physicsWorld,
@@ -269,14 +286,100 @@ export class PlayerModeManager {
       },
     });
     
-    // Set fps mode immediately (before any update calls)
     this.cameraDirector.setMode('fps');
     
     this.inputContext = new InputContextManager(this.canvas);
+    
+    // Initialize state machine
+    this.stateMachine = new PlayerStateMachine();
+    this.setupStates(config);
   }
   
   /**
-   * Initialize player mode with build data
+   * Setup state machine with all states
+   */
+  private setupStates(config: PlayerModeManagerConfig): void {
+    // Loading state
+    const loadingState = new LoadingState({
+      loadBuildData: async (buildId: string) => {
+        return await loadBuildData(buildId);
+      },
+      onStarted: () => {
+        Logger.info('Loading build data...');
+      },
+      onProgress: (step: string, percentage: number, message?: string) => {
+        config.onLoadingProgress?.(step, percentage, message);
+      },
+      onCompleted: (success: boolean) => {
+        if (success) {
+          Logger.info('Build data loaded');
+        } else {
+          Logger.error('Failed to load build data');
+        }
+      },
+    });
+    
+    // Connecting state (placeholder for now - will be implemented with multiplayer)
+    const connectingState = new ConnectingState({
+      connect: async (buildId: string) => {
+        // TODO: Implement multiplayer connection
+        Logger.info(`Connecting to multiplayer server for build ${buildId}...`);
+        await new Promise(resolve => setTimeout(resolve, 500)); // Simulate connection
+      },
+      onStarted: () => {
+        Logger.info('Connecting to server...');
+      },
+      onProgress: (message: string) => {
+        Logger.debug(message);
+      },
+      onCompleted: (success: boolean) => {
+        if (success) {
+          Logger.info('Connected to server');
+        } else {
+          Logger.error('Failed to connect to server');
+        }
+      },
+    });
+    
+    // Playing state
+    this.playingState = new PlayingState({
+      updateGame: (deltaTime: number) => {
+        this.updateGameLoop(deltaTime);
+      },
+    });
+    
+    // Paused state
+    this.pausedState = new PausedState({
+      setTimeScale: (scale: number) => {
+        this.timeScale = scale;
+      },
+      setPauseMenuVisible: (visible: boolean) => {
+        config.onPauseMenuVisibilityChange?.(visible);
+      },
+    });
+    
+    // Disconnected state
+    const disconnectedState = new DisconnectedState({
+      setDisconnectUIVisible: (visible: boolean) => {
+        config.onDisconnectUIVisibilityChange?.(visible);
+      },
+      reconnect: async () => {
+        // TODO: Implement reconnection
+        Logger.info('Attempting to reconnect...');
+        await new Promise(resolve => setTimeout(resolve, 1000));
+      },
+    });
+    
+    // Register all states
+    this.stateMachine.registerState(loadingState);
+    this.stateMachine.registerState(connectingState);
+    this.stateMachine.registerState(this.playingState);
+    this.stateMachine.registerState(this.pausedState);
+    this.stateMachine.registerState(disconnectedState);
+  }
+  
+  /**
+   * Initialize player mode with build ID
    */
   async initialize(buildId: string): Promise<void> {
     if (this.isInitialized) {
@@ -285,37 +388,92 @@ export class PlayerModeManager {
     }
     
     this.buildId = buildId;
+    const context = this.stateMachine.getMutableContext();
+    context.buildId = buildId;
+    
+    // Initialize state machine to LOADING
+    this.stateMachine.initialize(PlayerStateType.LOADING);
+    
+    // Setup input context for pause
+    this.inputContext.push({
+      ...GameplayInputContext,
+      onAction: (action) => {
+        if (action === 'pause') {
+          this.requestPause();
+        }
+      },
+    });
+    
+    this.isInitialized = true;
+    Logger.info('PlayerModeManager initialized');
+  }
+  
+  /**
+   * Update - call each frame
+   */
+  update(deltaTime: number): void {
+    if (!this.isInitialized) {
+      return;
+    }
+    
+    // Update state machine
+    this.stateMachine.update(deltaTime * this.timeScale);
+    
+    // Handle state-specific logic
+    const currentState = this.stateMachine.getCurrentStateType();
+    if (currentState === PlayerStateType.PLAYING) {
+      // Game loop is handled by PlayingState.updateGame
+      // But we still need to check for exit requests from paused state
+      this.checkForExitRequest();
+    } else if (currentState === PlayerStateType.PAUSED) {
+      this.checkForExitRequest();
+    } else if (currentState === PlayerStateType.LOADING) {
+      // Loading is async, handled by LoadingState
+      this.handleLoadingComplete();
+    } else if (currentState === PlayerStateType.CONNECTING) {
+      // Connecting is async, handled by ConnectingState
+      this.handleConnectingComplete();
+    }
+  }
+  
+  /**
+   * Handle loading completion - initialize game systems
+   */
+  private handleLoadingComplete(): void {
+    const context = this.stateMachine.getContext();
+    if (context.buildData && context.manifest && !this.playerEntity) {
+      // Loading completed, initialize game
+      void this.initializeGame();
+    }
+  }
+  
+  /**
+   * Handle connecting completion
+   */
+  private handleConnectingComplete(): void {
+    // Connection completed, game will start automatically via state transition
+  }
+  
+  /**
+   * Initialize game systems after loading
+   */
+  private async initializeGame(): Promise<void> {
+    const context = this.stateMachine.getContext();
+    if (!context.buildData || !context.manifest) {
+      return;
+    }
     
     try {
-      // Load build data from API
-      Logger.info(`Loading build: ${buildId}`);
-      const buildData = await loadBuildData(buildId);
-
-      // Begin fetching user's avatar loadout in parallel (best-effort)
-      const userLoadoutPromise = this.fetchUserAvatarLoadout().catch(() => null);
+      const buildData = context.buildData;
+      const manifest = context.manifest as PlayManifest;
+      this.manifest = manifest;
       
-      // Use manifest from build data or default, ensure all required fields are present
-      const defaultManifest = createDefaultManifest();
-      if (buildData.manifest) {
-        // Merge with defaults to ensure all required fields exist
-        this.manifest = {
-          ...defaultManifest,
-          ...buildData.manifest,
-          timestamp: (buildData.manifest as { timestamp?: number }).timestamp ?? Date.now(),
-        } as PlayManifest;
-      } else {
-        this.manifest = defaultManifest;
-      }
-      
-      // Load scene from buildData
+      // Load scene
       Logger.info('Loading scene...');
-      if (typeof buildData.sceneJSON !== 'string') {
-        throw new Error('Invalid build data: sceneJSON must be a string');
+      if (typeof buildData.sceneJSON === 'string') {
+        hydrateScene(this.scene, buildData.sceneJSON);
+        this.renderer.updateScene();
       }
-      hydrateScene(this.scene, buildData.sceneJSON);
-      
-      // Update scene buffers
-      this.renderer.updateScene();
       
       // Setup physics
       Logger.info('Setting up physics...');
@@ -324,13 +482,13 @@ export class PlayerModeManager {
       // Spawn player
       Logger.info('Spawning player...');
       const playerStart = buildData.playerStart ?? null;
-      const startPos = playerStart?.position ?? this.manifest.playerStart.position;
-      const startRot = playerStart?.rotation ?? this.manifest.playerStart.rotation;
+      const startPos = playerStart?.position ?? manifest.playerStart.position;
+      const startRot = playerStart?.rotation ?? manifest.playerStart.rotation;
       await this.spawnPlayer(startPos, startRot);
-
-      // Apply user avatar loadout if available
+      
+      // Fetch and apply user avatar loadout
       try {
-        const userLoadout = await userLoadoutPromise;
+        const userLoadout = await this.fetchUserAvatarLoadout();
         if (userLoadout && this.avatarInstance) {
           this.avatarInstance.applyLoadout(userLoadout);
         }
@@ -338,47 +496,26 @@ export class PlayerModeManager {
         // Ignore errors - default loadout already applied
       }
       
-      // Configure controller - manifest is guaranteed to be non-null here
-      if (!this.manifest) {
-        throw new Error('Manifest is null after initialization');
-      }
-      this.configureController(this.manifest);
+      // Configure controller
+      this.configureController(manifest);
       
       // Enable input
       this.characterInput.enable();
       this.fpsCamera.enable();
-      
-      // Set camera mode
       this.cameraDirector.setMode('fps');
       
-      // Push player input context
-      this.inputContext.push({
-        ...GameplayInputContext,
-        onAction: (action) => {
-          if (action === 'pause') {
-            void this.exit();
-          }
-        },
-      });
-      
-      this.isInitialized = true;
-      this.isPlaying = true;
-      
-      Logger.info('Player mode initialized successfully');
+      Logger.info('Game initialized successfully');
     } catch (error) {
-      Logger.error('Failed to initialize player mode:', error as Error);
-      throw error;
+      Logger.error('Failed to initialize game:', error as unknown as Error);
+      const context = this.stateMachine.getMutableContext();
+      context.errors.push(`Game initialization failed: ${error instanceof Error ? error.message : String(error)}`);
     }
   }
   
   /**
-   * Update game loop - call each frame
+   * Update game loop (called by PlayingState)
    */
-  update(deltaTime: number): void {
-    if (!this.isPlaying || !this.isInitialized) {
-      return;
-    }
-    
+  private updateGameLoop(deltaTime: number): void {
     // Update camera director
     this.cameraDirector.update(deltaTime);
     
@@ -412,12 +549,41 @@ export class PlayerModeManager {
     
     // Update FPS camera
     this.fpsCamera.update();
-
+    
     // Update avatar visuals and animation
     this.updateAvatar(deltaTime);
     
-    // Update scene buffers (renderer handles rendering automatically)
+    // Update scene buffers
     this.renderer.updateScene();
+  }
+  
+  /**
+   * Request pause
+   */
+  requestPause(): void {
+    const currentState = this.stateMachine.getCurrentStateType();
+    if (currentState === PlayerStateType.PLAYING && this.playingState) {
+      this.playingState.pause();
+    }
+  }
+  
+  /**
+   * Request resume
+   */
+  requestResume(): void {
+    const currentState = this.stateMachine.getCurrentStateType();
+    if (currentState === PlayerStateType.PAUSED && this.pausedState) {
+      this.pausedState.resume();
+    }
+  }
+  
+  /**
+   * Check for exit request from paused state
+   */
+  private checkForExitRequest(): void {
+    if (this.pausedState?.isExitRequested()) {
+      void this.exit();
+    }
   }
   
   /**
@@ -430,8 +596,6 @@ export class PlayerModeManager {
     
     Logger.info('Exiting player mode...');
     
-    this.isPlaying = false;
-    
     // Call leaveGame API if buildId exists
     if (this.buildId) {
       try {
@@ -439,7 +603,7 @@ export class PlayerModeManager {
           method: 'POST',
         });
       } catch (error) {
-        Logger.warn('Failed to call leaveGame API:', error as Error);
+        Logger.warn('Failed to call leaveGame API:', error as unknown as Error);
       }
     }
     
@@ -455,6 +619,7 @@ export class PlayerModeManager {
    */
   dispose(): void {
     this.cleanup();
+    this.stateMachine.dispose();
     this.cameraDirector.dispose();
     this.inputContext.dispose();
   }
@@ -471,6 +636,13 @@ export class PlayerModeManager {
    */
   getPlayerPosition(): Vec3 | null {
     return this.playerEntity?.transform.position ?? null;
+  }
+  
+  /**
+   * Get current state
+   */
+  getCurrentState(): PlayerStateType | null {
+    return this.stateMachine.getCurrentStateType();
   }
   
   private async spawnPlayer(position: Vec3, rotation: number): Promise<void> {
@@ -535,8 +707,12 @@ export class PlayerModeManager {
     // Add to scene
     this.scene.addEntity(player);
     this.playerEntity = player;
-
-    // Attach visual avatar under the player entity
+    
+    // Store in context
+    const context = this.stateMachine.getMutableContext();
+    context.data.set('playerEntity', player);
+    
+    // Attach visual avatar
     this.attachAvatarToPlayer();
     
     // Initialize FPS camera
@@ -544,14 +720,10 @@ export class PlayerModeManager {
     
     Logger.info(`Player spawned at position: ${position[0]}, ${position[1]}, ${position[2]}`);
   }
-
-  /**
-   * Create and attach AvatarInstance visuals under the player entity,
-   * offset so feet are on the ground and hide obstructing FPS parts.
-   */
+  
   private attachAvatarToPlayer(): void {
     if (!this.playerEntity) return;
-
+    
     // Cleanup previous visuals if any
     if (this.avatarInstance) {
       try {
@@ -569,26 +741,24 @@ export class PlayerModeManager {
       }
     }
     this.avatarVisualRoot = null;
-
+    
     const visualRoot = new Entity('PlayerAvatarVisual');
     visualRoot.userData.isPlayerAvatarVisual = true;
-
-    // Offset avatar so feet align with ground: use collider center Y from manifest
+    
     const centerY = this.manifest?.pawn.physics.collider.center[1] ?? 0.85;
     visualRoot.transform.position = [0, -centerY, 0];
     visualRoot.transform.scale = [1, 1, 1];
-
+    
     this.playerEntity.addChild(visualRoot);
     this.avatarVisualRoot = visualRoot;
-
-    // Instantiate avatar with default loadout for now (can be replaced with user profile later)
+    
     const avatar = new AvatarInstance(visualRoot, {
       name: 'PlayerAvatar',
       loadout: DEFAULT_AVATAR_LOADOUT,
       strictMode: true,
     });
-
-    // Hide head-related slots for FPS to avoid clipping
+    
+    // Hide head-related slots for FPS
     try {
       avatar.setSlotVisible('HeadSlot', false);
       avatar.setSlotVisible('HairSlot', false);
@@ -596,24 +766,19 @@ export class PlayerModeManager {
     } catch {
       // non-fatal
     }
-
+    
     this.avatarInstance = avatar;
     this.lastPlayedAnim = null;
   }
-
-  /**
-   * Update avatar visuals and drive animations based on CharacterController state.
-   */
+  
   private updateAvatar(deltaTime: number): void {
     if (!this.avatarInstance || !this.playerEntity) return;
-
-    // Tick avatar internal animator
+    
     this.avatarInstance.update(deltaTime);
-
-    // Drive animation from character state
+    
     const controller = this.playerEntity.getComponent(CharacterController);
     if (!controller) return;
-
+    
     let desired: 'idle' | 'walk' | 'run' | 'jump' = 'idle';
     switch (controller.state) {
       case CharacterState.Running:
@@ -632,7 +797,7 @@ export class PlayerModeManager {
         desired = 'idle';
         break;
     }
-
+    
     if (desired !== this.lastPlayedAnim) {
       switch (desired) {
         case 'run':
@@ -652,11 +817,7 @@ export class PlayerModeManager {
       this.lastPlayedAnim = desired;
     }
   }
-
-  /**
-   * Fetch current user's avatar loadout from API (authenticated).
-   * Returns null when unauthenticated or loadout not found.
-   */
+  
   private async fetchUserAvatarLoadout(): Promise<AvatarLoadout | null> {
     interface AvatarLoadoutData {
       version: number;
@@ -670,8 +831,7 @@ export class PlayerModeManager {
         }
       >;
     }
-
-    // Get current user
+    
     let userId: string | null = null;
     try {
       const meResp = await fetch('/api/auth/me', { credentials: 'include' });
@@ -682,20 +842,19 @@ export class PlayerModeManager {
     } catch {
       return null;
     }
-
-    // Get avatar loadout
+    
     try {
       const resp = await fetch(`/api/users/${encodeURIComponent(userId)}/avatar-loadout`, {
         credentials: 'include',
       });
-      if (!resp.ok) return null; // Includes 404 (no saved loadout)
+      if (!resp.ok) return null;
       const data = (await resp.json()) as AvatarLoadoutData;
       return this.convertAvatarLoadoutData(data);
     } catch {
       return null;
     }
   }
-
+  
   private convertAvatarLoadoutData(data: {
     version: number;
     parts: Record<
@@ -735,24 +894,20 @@ export class PlayerModeManager {
   }
   
   private cleanup(): void {
-    // Stop physics
     this.physicsWorld.stop();
     
-    // Disable input
     this.characterInput.disable();
     this.fpsCamera.disable();
     
-    // Cleanup player
     if (this.playerEntity) {
       try {
         this.scene.removeEntity(this.playerEntity);
       } catch (error) {
-        Logger.warn('Error removing player entity:', error as Error);
+        Logger.warn('Error removing player entity:', error as unknown as Error);
       }
       this.playerEntity = null;
     }
-
-    // Cleanup avatar visuals
+    
     if (this.avatarInstance) {
       try {
         this.avatarInstance.dispose();
@@ -766,7 +921,6 @@ export class PlayerModeManager {
     
     this.playerSession = null;
     this.isInitialized = false;
-    this.isPlaying = false;
     
     Logger.debug('Player mode cleaned up');
   }

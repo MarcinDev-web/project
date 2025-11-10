@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { PlayerModeManager } from '../PlayerModeManager';
+import { PlayerModeManager } from '../managers/PlayerModeManager.js';
 import { Scene } from '@engine/world';
 import { PhysicsWorld } from '@engine/world';
 import { CharacterControllerSystem } from '@engine/stdlib/CharacterController';

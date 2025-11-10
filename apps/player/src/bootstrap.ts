@@ -8,7 +8,8 @@ import { PhysicsWorld } from '@engine/world';
 import { CharacterControllerSystem } from '@engine/stdlib/CharacterController';
 import { FPSCamera } from '@engine/camera';
 import { CharacterInputHandler } from '@engine/input';
-import { PlayerModeManager } from './PlayerModeManager';
+import { PlayerModeManager } from './managers/PlayerModeManager.js';
+import { PlayerStateType } from './core/PlayerStateMachine.js';
 import { Logger } from './utils/logger';
 import { requirePlayerDom } from './utils/dom';
 
@@ -82,20 +83,36 @@ export async function bootstrap(): Promise<void> {
       characterSystem,
       characterInput,
       fpsCamera,
+      onLoadingProgress: (step: string, percentage: number, message?: string) => {
+        if (dom.statusEl) {
+          dom.statusEl.textContent = `${step} ${percentage}%${message ? ` - ${message}` : ''}`;
+        }
+      },
+      onPauseMenuVisibilityChange: (visible: boolean) => {
+        // TODO: Show/hide pause menu UI
+        Logger.debug(`Pause menu visibility: ${visible}`);
+      },
+      onDisconnectUIVisibilityChange: (visible: boolean) => {
+        // TODO: Show/hide disconnect UI
+        Logger.debug(`Disconnect UI visibility: ${visible}`);
+      },
     });
     
     // Initialize player mode (loads build data, spawns player, etc.)
     await playerManager.initialize(buildId);
     
-    // Hide loading
-    if (dom.loadingEl) {
-      dom.loadingEl.style.display = 'none';
-    }
-    
-    if (dom.statusEl) {
-      dom.statusEl.textContent = 'Playing...';
-      dom.statusEl.style.display = 'none'; // Hide status after loading
-    }
+    // Hide loading when state changes to PLAYING
+    const checkState = () => {
+      const state = playerManager.getCurrentState();
+      if (state === PlayerStateType.PLAYING) {
+        if (dom.loadingEl) {
+          dom.loadingEl.style.display = 'none';
+        }
+        if (dom.statusEl) {
+          dom.statusEl.style.display = 'none';
+        }
+      }
+    };
     
     // Show exit button
     if (dom.exitButton) {
@@ -105,10 +122,15 @@ export async function bootstrap(): Promise<void> {
       });
     }
     
-    // Setup exit on Escape key
+    // Setup pause/resume on Escape key
     document.addEventListener('keydown', (event) => {
       if (event.key === 'Escape') {
-        void playerManager.exit();
+        const state = playerManager.getCurrentState();
+        if (state === PlayerStateType.PLAYING) {
+          playerManager.requestPause();
+        } else if (state === PlayerStateType.PAUSED) {
+          playerManager.requestResume();
+        }
       }
     });
     
@@ -120,6 +142,7 @@ export async function bootstrap(): Promise<void> {
       
       try {
         playerManager.update(deltaTime);
+        checkState(); // Check for state changes to hide loading
       } catch (error) {
         Logger.error('Game loop error:', error as Error);
       }
