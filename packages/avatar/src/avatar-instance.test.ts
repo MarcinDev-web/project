@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { Entity } from '@engine/world';
+import { AnimationComponent } from '@engine/stdlib/Animation';
 import { AvatarInstance } from './avatar-instance';
 import type { AvatarLoadout, AvatarMaterialResolver } from './avatar-instance';
 import type { AvatarAnimation } from './animation';
@@ -77,7 +78,7 @@ describe('AvatarInstance', () => {
   });
 
   describe('getAnimator', () => {
-    it('should return the animator instance', () => {
+    it('should return the animator instance (deprecated)', () => {
       const avatar = new AvatarInstance(parentEntity);
       const animator = avatar.getAnimator();
 
@@ -85,10 +86,77 @@ describe('AvatarInstance', () => {
     });
   });
 
-  describe('update', () => {
-    it('should update animator and sync joint entities', () => {
+  describe('getAnimationComponent', () => {
+    it('should return null when AnimationComponent does not exist', () => {
       const avatar = new AvatarInstance(parentEntity);
+      const component = avatar.getAnimationComponent();
 
+      expect(component).toBeNull();
+    });
+
+    it('should return AnimationComponent from root entity', () => {
+      const avatar = new AvatarInstance(parentEntity);
+      const component = avatar.getOrCreateAnimationComponent();
+
+      expect(component).toBeDefined();
+      expect(avatar.getAnimationComponent()).toBe(component);
+    });
+
+    it('should return AnimationComponent from parent entity', () => {
+      const avatar = new AvatarInstance(parentEntity);
+      const parentComponent = new AnimationComponent();
+      parentEntity.addComponent(parentComponent);
+
+      const component = avatar.getAnimationComponent();
+      expect(component).toBe(parentComponent);
+    });
+  });
+
+  describe('getOrCreateAnimationComponent', () => {
+    it('should create AnimationComponent if it does not exist', () => {
+      const avatar = new AvatarInstance(parentEntity);
+      const component = avatar.getOrCreateAnimationComponent();
+
+      expect(component).toBeDefined();
+      expect(avatar.getRootEntity().getComponent(component.constructor as any)).toBe(component);
+    });
+
+    it('should configure skeleton when creating component', () => {
+      const avatar = new AvatarInstance(parentEntity);
+      const component = avatar.getOrCreateAnimationComponent();
+
+      expect(component.skeleton).toBeDefined();
+      expect(component.pose).toBeDefined();
+    });
+
+    it('should return existing component if already created', () => {
+      const avatar = new AvatarInstance(parentEntity);
+      const component1 = avatar.getOrCreateAnimationComponent();
+      const component2 = avatar.getOrCreateAnimationComponent();
+
+      expect(component1).toBe(component2);
+    });
+  });
+
+  describe('update', () => {
+    it('should sync pose from AnimationComponent and sync joint entities', () => {
+      const avatar = new AvatarInstance(parentEntity);
+      const animation: AvatarAnimation = {
+        name: 'test',
+        length: 1.0,
+        loop: false,
+        frames: [
+          {
+            time: 0,
+            joints: {
+              Head: { rotation: [0, 0, 0, 1] },
+            },
+          },
+        ],
+      };
+
+      avatar.playAnimation(animation);
+      
       // Should not throw
       expect(() => {
         avatar.update(0.016); // ~60fps
@@ -105,10 +173,44 @@ describe('AvatarInstance', () => {
       // Should still be valid
       expect(avatar.getRootEntity()).toBeDefined();
     });
+
+    it('should sync pose from AnimationComponent when it exists', () => {
+      const avatar = new AvatarInstance(parentEntity);
+      const component = avatar.getOrCreateAnimationComponent();
+      const animation: AvatarAnimation = {
+        name: 'test',
+        length: 1.0,
+        loop: false,
+        frames: [
+          {
+            time: 0,
+            joints: {
+              Head: { rotation: [0, 0, 0, 1] },
+            },
+          },
+        ],
+      };
+
+      avatar.playAnimation(animation);
+      
+      // Update AnimationComponent pose manually (simulating AnimationSystem)
+      if (component.pose && component.skeleton) {
+        const headIndex = component.skeleton.findBoneIndex('Head');
+        if (headIndex !== -1 && component.pose[headIndex]) {
+          component.pose[headIndex].rotation = [0, 0, 0.707, 0.707]; // Different rotation
+        }
+      }
+
+      avatar.update(0.016);
+      
+      // AvatarSkeleton should be synced with pose
+      const headTransform = avatar.getSkeleton().getLocalTransform('Head');
+      expect(headTransform.rotation).toBeDefined();
+    });
   });
 
   describe('playAnimation', () => {
-    it('should play animation', () => {
+    it('should play animation using AnimationComponent', () => {
       const avatar = new AvatarInstance(parentEntity);
       const animation: AvatarAnimation = {
         name: 'test',
@@ -127,6 +229,11 @@ describe('AvatarInstance', () => {
       expect(() => {
         avatar.playAnimation(animation, 0);
       }).not.toThrow();
+
+      const component = avatar.getAnimationComponent();
+      expect(component).toBeDefined();
+      expect(component?.clips.has('test')).toBe(true);
+      expect(component?.getActiveState()).toBe('test');
     });
 
     it('should play animation with custom start time', () => {
@@ -154,11 +261,12 @@ describe('AvatarInstance', () => {
       expect(() => {
         avatar.playAnimation(animation, 0.5);
       }).not.toThrow();
-    });
-  });
 
-  describe('stopAnimation', () => {
-    it('should stop animation', () => {
+      const component = avatar.getAnimationComponent();
+      expect(component?.getActiveState()).toBe('test');
+    });
+
+    it('should add clip to AnimationComponent if not already added', () => {
       const avatar = new AvatarInstance(parentEntity);
       const animation: AvatarAnimation = {
         name: 'test',
@@ -175,6 +283,67 @@ describe('AvatarInstance', () => {
       };
 
       avatar.playAnimation(animation);
+      const component = avatar.getAnimationComponent();
+      expect(component?.clips.has('test')).toBe(true);
+
+      // Play again - should not duplicate
+      avatar.playAnimation(animation);
+      expect(component?.clips.size).toBe(1);
+    });
+  });
+
+  describe('stopAnimation', () => {
+    it('should stop animation using AnimationComponent', () => {
+      const avatar = new AvatarInstance(parentEntity);
+      const animation: AvatarAnimation = {
+        name: 'test',
+        length: 1.0,
+        loop: false,
+        frames: [
+          {
+            time: 0,
+            joints: {
+              Head: { rotation: [0, 0, 0, 1] },
+            },
+          },
+        ],
+      };
+
+      avatar.playAnimation(animation);
+      const component = avatar.getAnimationComponent();
+      expect(component?.getActiveState()).toBe('test');
+
+      avatar.stopAnimation();
+      
+      // After stop, controllers should be stopped
+      // Note: getActiveState() may still return the state name, but controllers are stopped
+      const controller = component?.getController('test');
+      expect(controller).toBeDefined();
+      // Check that controller is stopped (time should not advance)
+      const timeBefore = controller?.time.value ?? 0;
+      controller?.update(0.1);
+      const timeAfter = controller?.time.value ?? 0;
+      expect(timeAfter).toBe(timeBefore); // Time should not advance when stopped
+    });
+
+    it('should fallback to old animator if AnimationComponent does not exist', () => {
+      const avatar = new AvatarInstance(parentEntity);
+      const animation: AvatarAnimation = {
+        name: 'test',
+        length: 1.0,
+        loop: false,
+        frames: [
+          {
+            time: 0,
+            joints: {
+              Head: { rotation: [0, 0, 0, 1] },
+            },
+          },
+        ],
+      };
+
+      // Use old animator directly
+      avatar.getAnimator().play(animation);
       expect(() => {
         avatar.stopAnimation();
       }).not.toThrow();

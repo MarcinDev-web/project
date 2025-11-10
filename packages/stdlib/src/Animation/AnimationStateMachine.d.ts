@@ -1,5 +1,5 @@
 import { AnimationController } from './AnimationController';
-import type { AnimationParameter, AnimationParameters, AnimationParameterValue, TransitionCondition } from './types';
+import type { AnimationParameter, AnimationParameters, AnimationParameterValue, TransitionCondition, AnimationEasing } from './types';
 export interface AnimationStateConfig {
     name: string;
     controller: AnimationController;
@@ -8,6 +8,7 @@ export interface AnimationStateConfig {
 export interface AnimationTransitionConfig {
     to: string;
     blendDuration?: number;
+    blendEasing?: AnimationEasing;
     condition?: () => boolean;
     conditions?: TransitionCondition[];
 }
@@ -38,6 +39,7 @@ export declare class AnimationStateMachine {
     requestBlendTo(name: string, blendDuration: number, options?: {
         resetTime?: boolean;
         autoPlay?: boolean;
+        easing?: AnimationEasing;
     }): void;
     setParameterDefinitions(parameters: AnimationParameter[]): void;
     getParameterDefinitions(): AnimationParameter[];

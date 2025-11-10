@@ -14,6 +14,7 @@ import type {
   AnimationStateJSON,
   AnimationTransitionJSON,
   AnimationParameters,
+  AnimationEasing,
 } from './types';
 
 export class AnimationComponent extends Component {
@@ -112,7 +113,7 @@ export class AnimationComponent extends Component {
     return this.stateMachine.getCurrentStateName();
   }
 
-  setActiveState(name: string | null, blendTime?: number): void {
+  setActiveState(name: string | null, blendTime?: number, blendEasing?: AnimationEasing): void {
     if (!name) {
       this.activeStateName = null;
       return;
@@ -120,7 +121,14 @@ export class AnimationComponent extends Component {
     try {
       const current = this.stateMachine.getCurrentStateName();
       if (current && current !== name && typeof blendTime === 'number' && blendTime > 0) {
-        this.stateMachine.requestBlendTo(name, blendTime, { resetTime: false, autoPlay: true });
+        const options: { resetTime: boolean; autoPlay: boolean; easing?: AnimationEasing } = {
+          resetTime: false,
+          autoPlay: true,
+        };
+        if (blendEasing !== undefined) {
+          options.easing = blendEasing;
+        }
+        this.stateMachine.requestBlendTo(name, blendTime, options);
       } else {
         this.stateMachine.setState(name, { resetTime: false, autoPlay: true });
       }
@@ -306,6 +314,7 @@ export class AnimationComponent extends Component {
     return {
       to: transition.to,
       ...(transition.blendDuration !== undefined ? { blendDuration: transition.blendDuration } : {}),
+      ...(transition.blendEasing !== undefined ? { blendEasing: transition.blendEasing } : {}),
       ...(conditions && conditions.length > 0 ? { conditions } : {}),
     };
   }
@@ -333,6 +342,7 @@ export class AnimationComponent extends Component {
       const mapped: AnimationTransitionConfig = {
         to: transition.to,
         ...(transition.blendDuration !== undefined ? { blendDuration: transition.blendDuration } : {}),
+        ...(transition.blendEasing !== undefined ? { blendEasing: transition.blendEasing } : {}),
         ...(transition.conditions
           ? {
               conditions: transition.conditions.map((condition) => ({
@@ -353,6 +363,7 @@ export class AnimationComponent extends Component {
     return transitions.map((transition) => ({
       to: transition.to,
       ...(transition.blendDuration !== undefined ? { blendDuration: transition.blendDuration } : {}),
+      ...(transition.blendEasing !== undefined ? { blendEasing: transition.blendEasing } : {}),
       ...(typeof transition.condition === 'function' ? { condition: transition.condition } : {}),
       ...(transition.conditions
         ? {

@@ -1,5 +1,8 @@
 import { Entity } from '@engine/world';
+import { AnimationComponent } from '@engine/stdlib/Animation';
 import { AvatarAnimationPlayer, type AvatarAnimation } from './animation';
+import { avatarAnimationToClip } from './animation-adapter';
+import { avatarSkeletonToSkeleton } from './skeleton-adapter';
 import {
   AVATAR_SLOTS,
   type AvatarPartDefinition,
@@ -58,7 +61,7 @@ export interface AvatarInstanceOptions {
 export class AvatarInstance {
   private readonly root: Entity;
   private readonly skeleton: AvatarSkeleton;
-  private readonly animator: AvatarAnimationPlayer;
+  private readonly animator: AvatarAnimationPlayer; // Deprecated: kept for backward compatibility
   private readonly partLibrary: AvatarPartLibrary;
   private readonly jointEntities = new Map<AvatarJointName, Entity>();
   private readonly slotEntities = new Map<AvatarSlot, Entity>();
@@ -105,22 +108,122 @@ export class AvatarInstance {
     return this.skeleton;
   }
 
+  /**
+   * @deprecated Use getAnimationComponent() instead. This method is kept for backward compatibility.
+   */
   getAnimator(): AvatarAnimationPlayer {
     return this.animator;
   }
 
+  /**
+   * Get AnimationComponent from the root entity or parent entity.
+   * Returns null if not found.
+   */
+  getAnimationComponent(): AnimationComponent | null {
+    // Check root entity first
+    let component = this.root.getComponent(AnimationComponent);
+    if (component) {
+      return component;
+    }
+    // Check parent entity
+    const parent = this.root.parent;
+    if (parent) {
+      component = parent.getComponent(AnimationComponent);
+      if (component) {
+        return component;
+      }
+    }
+    return null;
+  }
+
+  /**
+   * Get or create AnimationComponent for this avatar instance.
+   * If component doesn't exist, creates it on the root entity and configures it with skeleton.
+   */
+  getOrCreateAnimationComponent(): AnimationComponent {
+    let component = this.getAnimationComponent();
+    if (!component) {
+      component = new AnimationComponent();
+      this.root.addComponent(component);
+      // Configure skeleton
+      const skeleton = avatarSkeletonToSkeleton(this.skeleton);
+      component.setSkeleton(skeleton);
+    }
+    return component;
+  }
+
   update(deltaTime: number): void {
-    this.animator.update(deltaTime);
+    // AnimationComponent is updated by AnimationSystem, so we don't need to call animator.update()
+    // But we keep it for backward compatibility if someone is using the old animator directly
+    // this.animator.update(deltaTime); // Removed - AnimationSystem handles this
+    
+    // Sync pose from AnimationComponent to AvatarSkeleton
+    this.syncPoseFromAnimationComponent();
+    
+    // Sync joint entities from skeleton (which is updated by AnimationSystem)
     this.syncJointEntities();
   }
 
+  /**
+   * Synchronize pose from AnimationComponent to AvatarSkeleton.
+   * This bridges the gap between AnimationComponent's generic Skeleton and AvatarSkeleton.
+   */
+  private syncPoseFromAnimationComponent(): void {
+    const component = this.getAnimationComponent();
+    if (!component || !component.skeleton || !component.pose) {
+      return;
+    }
+
+    // Update AvatarSkeleton with pose data from AnimationComponent
+    const jointNames = this.skeleton.getJointNames();
+    for (let i = 0; i < jointNames.length; i++) {
+      const jointName = jointNames[i];
+      const boneIndex = component.skeleton.findBoneIndex(jointName);
+      if (boneIndex === -1) continue;
+      
+      const poseBone = component.pose[boneIndex];
+      if (!poseBone) continue;
+
+      if (poseBone.position) {
+        this.skeleton.setLocalPosition(jointName, poseBone.position);
+      }
+      if (poseBone.rotation) {
+        this.skeleton.setLocalRotation(jointName, poseBone.rotation);
+      }
+      // Note: AvatarSkeleton doesn't support scale, so we skip it
+    }
+  }
+
   playAnimation(animation: AvatarAnimation, startTime = 0): void {
-    this.animator.play(animation, startTime);
+    const component = this.getOrCreateAnimationComponent();
+    const clip = avatarAnimationToClip(animation);
+    
+    // Add clip if it doesn't exist
+    if (!component.clips.has(clip.name)) {
+      component.addClip(clip);
+    }
+    
+    // Set active state
+    component.setActiveState(animation.name);
+    
+    // Sync immediately
     this.syncJointEntities();
   }
 
   stopAnimation(): void {
-    this.animator.stop();
+    const component = this.getAnimationComponent();
+    if (component) {
+      // Stop all controllers instead of setting state to null
+      // (AnimationStateMachine doesn't support null state)
+      for (const controller of component.controllers.values()) {
+        controller.stop();
+      }
+      // Clear active state name
+      component.setActiveState(null);
+    } else {
+      // Fallback to old animator for backward compatibility
+      this.animator.stop();
+    }
   }
 
   dispose(): void {

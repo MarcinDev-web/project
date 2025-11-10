@@ -1,11 +1,12 @@
 import type { Scene, Entity } from '@engine/world';
-import { CharacterController, type CharacterInput, CharacterState, type MovementProfile } from '@engine/world';
+import { CharacterController, type CharacterInput, CharacterState } from '@engine/world';
 import type { PhysicsWorld } from '@engine/world';
 import type { Vec3 } from '@engine/core/math';
 import { MovementProfileRegistry } from '../MovementProfiles/MovementProfileRegistry';
 import { AnimationComponent } from '../Animation';
-import { GroundDetectionCache } from './GroundDetectionCache';
+import { GroundDetectionSystem } from './GroundDetectionSystem';
 import { AnimationStateName } from './AnimationStateName';
+import { AnimationBlendConfig } from './AnimationBlendConfig';
 
 interface IntentFrame {
   move: [number, number];
@@ -38,15 +39,20 @@ const STATE_TO_ANIMATION: Record<CharacterState, AnimationStateName> = {
  */
 export class CharacterControllerSystem {
   private scene: Scene;
-  private physics: PhysicsWorld;
   private intentBuffer = new Map<CharacterController, IntentFrame>();
   private groundDetection: GroundDetectionSystem;
-  private readonly vec3Pool = getVec3Pool();
+  private readonly blendConfig: AnimationBlendConfig;
 
-  constructor(scene: Scene, physics: PhysicsWorld, cacheCellSize = 0.5, cacheMaxAge = 0.1) {
+  constructor(scene: Scene, physics: PhysicsWorld, options?: {
+    cacheCellSize?: number;
+    cacheMaxAge?: number;
+    blendConfig?: AnimationBlendConfig;
+  }) {
     this.scene = scene;
-    this.physics = physics;
+    const cacheCellSize = options?.cacheCellSize ?? 0.5;
+    const cacheMaxAge = options?.cacheMaxAge ?? 0.1;
     this.groundDetection = new GroundDetectionSystem(physics, cacheCellSize, cacheMaxAge);
+    this.blendConfig = options?.blendConfig ?? new AnimationBlendConfig();
   }
 
   /**
@@ -73,10 +79,6 @@ export class CharacterControllerSystem {
           cameraRight: bufferedIntent.right,
         };
         controller.setInput(input);
-
-        // Release Vec3 arrays back to pool
-        this.vec3Pool.release(bufferedIntent.forward);
-        this.vec3Pool.release(bufferedIntent.right);
 
         this.intentBuffer.delete(controller);
       }
@@ -129,25 +131,16 @@ export class CharacterControllerSystem {
     cameraForward: Vec3,
     cameraRight: Vec3
   ): void {
-    // Acquire Vec3 arrays from pool
-    const forward = this.vec3Pool.acquire();
-    const right = this.vec3Pool.acquire();
-    
-    // Copy values
-    forward[0] = cameraForward[0];
-    forward[1] = cameraForward[1];
-    forward[2] = cameraForward[2];
-    
-    right[0] = cameraRight[0];
-    right[1] = cameraRight[1];
-    right[2] = cameraRight[2];
+    // Create copies of Vec3 arrays
+    const forward: Vec3 = [cameraForward[0], cameraForward[1], cameraForward[2]];
+    const right: Vec3 = [cameraRight[0], cameraRight[1], cameraRight[2]];
     
     this.intentBuffer.set(controller, {
       move: [intent.move[0], intent.move[1]],
       jump: intent.jump,
       sprint: intent.sprint,
-      forward: forward as Vec3,
-      right: right as Vec3,
+      forward: forward,
+      right: right,
     });
   }
 
@@ -180,6 +173,8 @@ export class CharacterControllerSystem {
    * - Falling → AnimationStateName.Fall ("fall" animation)
    * - Landing → AnimationStateName.Land ("land" animation)
    * 
+   * Uses AnimationBlendConfig for intelligent blend times and easing functions.
+   * 
    * Public for testing purposes.
    */
   syncAnimation(controller: CharacterController): void {
@@ -202,9 +197,12 @@ export class CharacterControllerSystem {
       return;
     }
 
-    // Switch to the appropriate animation state with a small blend for smoothness
-    const DEFAULT_BLEND_TIME = 0.12; // seconds
-    animationComponent.setActiveState(animationStateName, DEFAULT_BLEND_TIME);
+    // Get intelligent blend time and easing from config
+    const blendTime = this.blendConfig.getBlendTime(currentState, animationStateName);
+    const blendEasing = this.blendConfig.getBlendEasing(currentState, animationStateName);
+    
+    // Switch to the appropriate animation state with intelligent blending
+    animationComponent.setActiveState(animationStateName, blendTime, blendEasing);
   }
 }
 

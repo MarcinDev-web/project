@@ -5,6 +5,7 @@ import type {
   AnimationParameters,
   AnimationParameterValue,
   TransitionCondition,
+  AnimationEasing,
 } from './types';
 
 export interface AnimationStateConfig {
@@ -16,6 +17,7 @@ export interface AnimationStateConfig {
 export interface AnimationTransitionConfig {
   to: string;
   blendDuration?: number;
+  blendEasing?: AnimationEasing;
   condition?: () => boolean;
   conditions?: TransitionCondition[];
 }
@@ -23,6 +25,7 @@ export interface AnimationTransitionConfig {
 interface CompiledTransition {
   to: string;
   blendDuration: number;
+  blendEasing?: AnimationEasing;
   evaluate: () => boolean;
   consumeTriggers: string[];
   source: AnimationTransitionConfig;
@@ -42,6 +45,7 @@ export class AnimationStateMachine {
     target: CompiledState;
     duration: number;
     elapsed: number;
+    easing?: AnimationEasing;
   } | null = null;
 
   private parameterDefs = new Map<string, AnimationParameter>();
@@ -63,11 +67,13 @@ export class AnimationStateMachine {
       this.currentState = compiled;
     }
     if (this.blendState?.target.name === compiled.name) {
-      this.blendState = {
+      const blendState = {
         target: compiled,
         duration: this.blendState.duration,
         elapsed: this.blendState.elapsed,
+        ...(this.blendState.easing !== undefined ? { easing: this.blendState.easing } : {}),
       };
+      this.blendState = blendState;
     }
     if (!this.currentState) {
       this.setState(compiled.name, { resetTime: true, autoPlay: false });
@@ -90,7 +96,7 @@ export class AnimationStateMachine {
       if (!target) {
         continue;
       }
-      this.startTransition(target, transition.blendDuration, transition.consumeTriggers);
+      this.startTransition(target, transition.blendDuration, transition.consumeTriggers, transition.blendEasing);
       break;
     }
     if (this.blendState) {
@@ -105,8 +111,9 @@ export class AnimationStateMachine {
     if (!this.blendState) {
       return { primary: this.currentState.controller, secondary: null, blendWeight: 0 };
     }
-    const { duration, elapsed, target } = this.blendState;
-    const weight = duration > 0 ? Math.min(1, elapsed / duration) : 1;
+    const { duration, elapsed, target, easing } = this.blendState;
+    const rawWeight = duration > 0 ? Math.min(1, elapsed / duration) : 1;
+    const weight = this.applyBlendEasing(rawWeight, easing);
     return { primary: this.currentState.controller, secondary: target.controller, blendWeight: weight };
   }
 
@@ -293,6 +300,7 @@ export class AnimationStateMachine {
       return {
         to: transition.to,
         blendDuration,
+        ...(transition.blendEasing !== undefined ? { blendEasing: transition.blendEasing } : {}),
         evaluate: transition.condition,
         consumeTriggers: [],
         source: transition,
@@ -315,6 +323,7 @@ export class AnimationStateMachine {
     return {
       to: transition.to,
       blendDuration,
+      ...(transition.blendEasing !== undefined ? { blendEasing: transition.blendEasing } : {}),
       evaluate,
       consumeTriggers,
       source: transition,
@@ -461,15 +470,29 @@ export class AnimationStateMachine {
     }
   }
 
-  private sanitizeBlendDuration(duration?: number): number {
-    if (!Number.isFinite(duration)) return 0;
-    return Math.max(0, duration ?? 0);
+  private applyBlendEasing(weight: number, easing?: AnimationEasing): number {
+    if (!Number.isFinite(weight)) return 0;
+    const clamped = Math.min(1, Math.max(0, weight));
+    if (!easing || easing === 'linear') {
+      return clamped;
+    }
+    switch (easing) {
+      case 'ease-in':
+        return clamped * clamped;
+      case 'ease-out':
+        return clamped * (2 - clamped);
+      case 'ease-in-out':
+        return clamped < 0.5 ? 2 * clamped * clamped : -1 + (4 - 2 * clamped) * clamped;
+      default:
+        return clamped;
+    }
   }
 
   private startTransition(
     target: CompiledState,
     blendDuration: number,
-    consumeTriggers: readonly string[]
+    consumeTriggers: readonly string[],
+    blendEasing?: AnimationEasing
   ): void {
     if (this.currentState === target) return;
     if (this.blendState && this.blendState.target === target) return;
@@ -484,7 +507,7 @@ export class AnimationStateMachine {
       return;
     }
 
-    this.blendState = { target, duration: blendDuration, elapsed: 0 };
+    this.blendState = { target, duration: blendDuration, elapsed: 0, ...(blendEasing !== undefined ? { easing: blendEasing } : {}) };
   }
 
   private finishTransition(): void {
@@ -512,7 +535,7 @@ export class AnimationStateMachine {
    * Request an immediate transition to the target state with a given blend duration.
    * If there is no current state, behaves like setState().
    */
-  requestBlendTo(name: string, blendDuration: number, options?: { resetTime?: boolean; autoPlay?: boolean }): void {
+  requestBlendTo(name: string, blendDuration: number, options?: { resetTime?: boolean; autoPlay?: boolean; easing?: AnimationEasing }): void {
     const target = this.states.get(name);
     if (!target) {
       throw new Error(`AnimationStateMachine: unknown state "${name}"`);
@@ -534,12 +557,20 @@ export class AnimationStateMachine {
       target.controller.play();
     }
     // Start blend
-    this.blendState = duration > 0 ? { target, duration, elapsed: 0 } : null;
+    const blendState = duration > 0 
+      ? { target, duration, elapsed: 0, ...(options?.easing !== undefined ? { easing: options.easing } : {}) }
+      : null;
+    this.blendState = blendState;
     if (!this.blendState) {
       // Immediate switch
       this.currentState.controller.pause();
       this.currentState = target;
     }
+  }
+
+  private sanitizeBlendDuration(duration?: number): number {
+    if (!Number.isFinite(duration)) return 0;
+    return Math.max(0, duration ?? 0);
   }
 
   private cloneStateConfig(state: AnimationStateConfig): AnimationStateConfig {
@@ -553,6 +584,9 @@ export class AnimationStateMachine {
         to: transition.to,
         ...(transition.blendDuration !== undefined
           ? { blendDuration: transition.blendDuration }
+          : {}),
+        ...(transition.blendEasing !== undefined
+          ? { blendEasing: transition.blendEasing }
           : {}),
         ...(typeof transition.condition === 'function'
           ? { condition: transition.condition }

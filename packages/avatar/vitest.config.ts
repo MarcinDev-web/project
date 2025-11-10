@@ -10,6 +10,8 @@ export default defineConfig({
       '@engine/core': resolve(__dirname, '../core/src'),
       '@engine/world': resolve(__dirname, '../world/src'),
       '@engine/world/*': resolve(__dirname, '../world/src/*'),
+      '@engine/stdlib': resolve(__dirname, '../stdlib/src'),
+      '@engine/stdlib/*': resolve(__dirname, '../stdlib/src/*'),
     },
   },
   test: {

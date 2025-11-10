@@ -1,5 +1,4 @@
 import type { Vec3 } from '@engine/core/math';
-import type { CharacterController } from '@engine/world';
 
 /**
  * Result of ground detection raycast

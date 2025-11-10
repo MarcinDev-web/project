@@ -93,6 +93,7 @@ export interface AnimationTransitionJSON {
   to: string;
   conditions?: TransitionCondition[];
   blendDuration?: number;
+  blendEasing?: AnimationEasing;
 }
 
 export interface AnimationClipJSON {
