@@ -22,6 +22,7 @@ import type { PurchaseStorage } from '../storage/PurchaseStorage.js';
 import type { StudioProjectsStorage } from '../storage/StudioProjectsStorage.js';
 import type { StudioTeamStorage } from '../storage/StudioTeamStorage.js';
 import type { StudioSettingsStorage } from '../storage/StudioSettingsStorage.js';
+import type { AvatarStorage } from '../storage/AvatarStorage.js';
 import type { CurrencyService } from '../services/CurrencyService.js';
 import type { PurchaseService } from '../services/PurchaseService.js';
 import type { LedgerService } from '../services/LedgerService.js';
@@ -62,6 +63,7 @@ export interface RouteDependencies {
   studioProjectsStorage: StudioProjectsStorage;
   studioTeamStorage: StudioTeamStorage;
   studioSettingsStorage: StudioSettingsStorage;
+  avatarStorage: AvatarStorage;
 
   // Services
   currencyService: CurrencyService;
@@ -76,7 +78,8 @@ export interface RouteDependencies {
     thumbnailDir: string,
     itemId: string,
     title: string,
-    tags: string[]
+    tags: string[],
+    type?: 'build' | 'avatar'
   ) => Promise<string>;
   dbPool: PrismaClient | null;
   path: typeof import('path');

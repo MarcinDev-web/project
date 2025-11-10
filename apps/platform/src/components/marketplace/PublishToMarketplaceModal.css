@@ -1,0 +1,181 @@
+/* Publish to Marketplace Modal Styles */
+.publish-to-marketplace-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(4px);
+}
+
+.publish-to-marketplace-modal {
+  width: 90%;
+  max-width: 600px;
+  max-height: 90vh;
+  overflow-y: auto;
+  padding: 0;
+  background: var(--bg-panel);
+  border: 1px solid var(--border-default);
+  box-shadow: var(--shadow-2xl);
+}
+
+.publish-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: var(--spacing-6);
+  border-bottom: 1px solid var(--border-default);
+}
+
+.publish-modal-title {
+  margin: 0;
+  font-size: var(--text-2xl);
+  font-weight: var(--font-bold);
+  color: var(--text-1);
+}
+
+.publish-modal-close {
+  background: transparent;
+  border: none;
+  font-size: 2rem;
+  color: var(--text-2);
+  cursor: pointer;
+  padding: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-md);
+  transition: background var(--transition-fast);
+}
+
+.publish-modal-close:hover {
+  background: var(--bg-hover);
+  color: var(--text-1);
+}
+
+.publish-to-marketplace-modal form {
+  padding: var(--spacing-6);
+}
+
+.publish-modal-field {
+  margin-bottom: var(--spacing-5);
+}
+
+.publish-modal-label {
+  display: block;
+  margin-bottom: var(--spacing-2);
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--text-1);
+}
+
+.publish-modal-label .required {
+  color: var(--color-error);
+}
+
+.publish-modal-input,
+.publish-modal-textarea,
+.publish-modal-select {
+  width: 100%;
+  padding: var(--spacing-3);
+  background: var(--bg-button);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-1);
+  font-size: var(--text-base);
+  font-family: var(--font-sans);
+  transition: border-color var(--transition-fast);
+}
+
+.publish-modal-input:focus,
+.publish-modal-textarea:focus,
+.publish-modal-select:focus {
+  outline: none;
+  border-color: var(--color-accent-400);
+  box-shadow: 0 0 0 3px var(--color-accent-alpha-10);
+}
+
+.publish-modal-input:disabled,
+.publish-modal-textarea:disabled,
+.publish-modal-select:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.publish-modal-textarea {
+  resize: vertical;
+  min-height: 100px;
+}
+
+.publish-modal-select {
+  cursor: pointer;
+}
+
+.publish-modal-hint {
+  display: block;
+  margin-top: var(--spacing-1);
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+
+.publish-modal-error {
+  padding: var(--spacing-3);
+  margin-bottom: var(--spacing-4);
+  background: var(--color-error-bg);
+  border: 1px solid var(--color-error-border);
+  border-radius: var(--radius-md);
+  color: var(--color-error);
+  font-size: var(--text-sm);
+}
+
+.publish-modal-loading,
+.publish-modal-empty,
+.publish-modal-info {
+  padding: var(--spacing-4);
+  text-align: center;
+  color: var(--text-2);
+  background: var(--bg-elevated);
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-default);
+}
+
+.publish-modal-actions {
+  display: flex;
+  gap: var(--spacing-3);
+  justify-content: flex-end;
+  margin-top: var(--spacing-6);
+  padding-top: var(--spacing-4);
+  border-top: 1px solid var(--border-default);
+}
+
+/* Mobile responsive */
+@media (max-width: 768px) {
+  .publish-to-marketplace-modal {
+    width: 95%;
+    padding: 0;
+  }
+
+  .publish-modal-header {
+    padding: var(--spacing-4);
+  }
+
+  .publish-to-marketplace-modal form {
+    padding: var(--spacing-4);
+  }
+
+  .publish-modal-actions {
+    flex-direction: column-reverse;
+  }
+
+  .publish-modal-actions button {
+    width: 100%;
+  }
+}
+

@@ -760,25 +760,37 @@ export async function createMarketplaceRoutes(
         return reply.code(400).send({ error: 'Item ID required' });
       }
 
-      const thumbnailPath = path.join(THUMBNAIL_DIR, `${id}.svg`);
-
-      // Check if thumbnail exists
+      // Try to find thumbnail with different extensions (uploaded images take priority)
+      const possibleExtensions = ['png', 'jpg', 'jpeg', 'svg'];
+      let thumbnailPath = '';
       let thumbnailExists = false;
-      try {
-        await fs.access(thumbnailPath);
-        thumbnailExists = true;
-      } catch {
+      
+      for (const ext of possibleExtensions) {
+        const testPath = path.join(THUMBNAIL_DIR, `${id}.${ext}`);
+        try {
+          await fs.access(testPath);
+          thumbnailPath = testPath;
+          thumbnailExists = true;
+          break;
+        } catch {
+          // File doesn't exist, try next extension
+        }
+      }
+      
+      if (!thumbnailExists) {
         // Thumbnail doesn't exist - try to generate it
         try {
           const item = await marketplaceStorage.getItem(id);
           if (item) {
-            await generateAndSaveThumbnail(THUMBNAIL_DIR, item.id, item.title, item.tags);
+            await generateAndSaveThumbnail(THUMBNAIL_DIR, item.id, item.title, item.tags, item.type);
             // Update item with thumbnail URL if missing
             if (!item.thumbnailUrl) {
               await marketplaceStorage.updateItem(item.id, {
                 thumbnailUrl: `/api/marketplace/thumbnails/${item.id}`,
               });
             }
+            // Set path to generated SVG
+            thumbnailPath = path.join(THUMBNAIL_DIR, `${id}.svg`);
             thumbnailExists = true;
           }
         } catch (genError) {
@@ -788,10 +800,27 @@ export async function createMarketplaceRoutes(
 
       if (thumbnailExists) {
         try {
-          reply.header('Content-Type', 'image/svg+xml');
+          // Determine content type based on file extension
+          const ext = path.extname(thumbnailPath).toLowerCase();
+          let contentType = 'image/svg+xml';
+          
+          if (ext === '.png') {
+            contentType = 'image/png';
+          } else if (ext === '.jpg' || ext === '.jpeg') {
+            contentType = 'image/jpeg';
+          }
+          
+          reply.header('Content-Type', contentType);
           reply.header('Cache-Control', 'public, max-age=3600'); // Cache for 1 hour
-          const svg = await fs.readFile(thumbnailPath, 'utf-8');
-          reply.send(svg);
+          
+          // For SVG, read as text; for images, read as buffer
+          if (ext === '.svg') {
+            const svg = await fs.readFile(thumbnailPath, 'utf-8');
+            reply.send(svg);
+          } else {
+            const buffer = await fs.readFile(thumbnailPath);
+            reply.send(buffer);
+          }
         } catch (readError) {
           console.error(`Failed to read thumbnail ${id}:`, readError);
           reply.code(500).send({ error: 'Failed to read thumbnail' });
@@ -804,6 +833,132 @@ export async function createMarketplaceRoutes(
       console.error('Get thumbnail error:', error);
       reply.code(500).send({
         error: 'Failed to get thumbnail',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  /**
+   * POST /api/marketplace/:id/thumbnail
+   * Upload custom thumbnail for marketplace item
+   * Requires auth - only item owner can upload thumbnail
+   */
+  app.post(
+    '/:id/thumbnail',
+    { preHandler: [authMiddleware] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        const { id } = request.params as { id?: string };
+        if (!id) {
+          return reply.code(400).send({ error: 'Item ID required' });
+        }
+
+        // Verify item exists and user is owner
+        const item = await marketplaceStorage.getItem(id);
+        if (!item) {
+          return reply.code(404).send({ error: 'Item not found' });
+        }
+
+        if (item.authorId !== request.user!.id) {
+          return reply.code(403).send({ error: 'Only item owner can upload thumbnail' });
+        }
+
+        // Get uploaded file
+        const data = await request.file();
+        if (!data) {
+          return reply.code(400).send({ error: 'No file uploaded' });
+        }
+
+        // Validate file type
+        const allowedMimeTypes = ['image/jpeg', 'image/png', 'image/jpg'];
+        if (!allowedMimeTypes.includes(data.mimetype)) {
+          return reply.code(400).send({
+            error: 'Invalid file type. Only JPEG and PNG images are allowed.',
+          });
+        }
+
+        // Read file buffer
+        const buffer = await data.toBuffer();
+
+        // Validate file size (already enforced by multipart plugin, but double-check)
+        const maxSize = 2 * 1024 * 1024; // 2MB
+        if (buffer.length > maxSize) {
+          return reply.code(400).send({
+            error: 'File too large. Maximum size is 2MB.',
+          });
+        }
+
+        // Save thumbnail to disk
+        await fs.mkdir(THUMBNAIL_DIR, { recursive: true });
+
+        // Determine extension from mimetype
+        const ext = data.mimetype === 'image/png' ? 'png' : 'jpg';
+        const filename = `${id}.${ext}`;
+        const filepath = path.join(THUMBNAIL_DIR, filename);
+
+        await fs.writeFile(filepath, buffer);
+
+        // Update item with new thumbnail URL
+        const thumbnailUrl = `/api/marketplace/thumbnails/${id}`;
+        await marketplaceStorage.updateItem(id, {
+          thumbnailUrl,
+        });
+
+        reply.send({
+          success: true,
+          thumbnailUrl,
+          message: 'Thumbnail uploaded successfully',
+        });
+      } catch (error) {
+        console.error('Upload thumbnail error:', error);
+        reply.code(500).send({
+          error: 'Failed to upload thumbnail',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  );
+
+  /**
+   * GET /api/marketplace/avatars/:id
+   * Get avatar data for a marketplace item.
+   * Returns the AvatarLoadout data that can be used to create an avatar.
+   * NOTE: This route must be registered BEFORE /:id/build to avoid routing conflicts.
+   */
+  app.get('/avatars/:id', async (request: FastifyRequest, reply: FastifyReply) => {
+    try {
+      const { id } = (request.params as { id?: string });
+      if (!id) {
+        return reply.code(400).send({ error: 'Item ID required' });
+      }
+
+      const item = await marketplaceStorage.getItem(id);
+      if (!item) {
+        return reply.code(404).send({ error: 'Item not found' });
+      }
+
+      if (item.type !== 'avatar') {
+        return reply.code(400).send({ error: 'Item is not an avatar' });
+      }
+
+      // Load avatar data from database
+      if (dbPool) {
+        const avatarData = await dbPool.marketplaceAvatar.findUnique({
+          where: { marketplaceId: id },
+        });
+
+        if (avatarData) {
+          const jsonData = avatarData.avatarData.toString('utf-8');
+          const loadout = JSON.parse(jsonData) as Record<string, unknown>;
+          return reply.send(loadout);
+        }
+      }
+
+      return reply.code(404).send({ error: 'Avatar data not found' });
+    } catch (error) {
+      console.error('Get avatar data error:', error);
+      reply.code(500).send({
+        error: 'Failed to get avatar data',
         message: error instanceof Error ? error.message : String(error),
       });
     }

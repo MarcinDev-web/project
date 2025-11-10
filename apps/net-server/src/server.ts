@@ -1,6 +1,7 @@
 import Fastify, { type FastifyInstance } from 'fastify';
 import cors from '@fastify/cors';
 import cookie from '@fastify/cookie';
+import multipart from '@fastify/multipart';
 import {
   getCorsConfig,
   isOriginAllowed,
@@ -72,6 +73,7 @@ import { PurchaseStorageDB } from './storage/PurchaseStorageDB.js';
 import { StudioProjectsStorage, StudioProjectsStorageDB } from './storage/StudioProjectsStorage.js';
 import { StudioSettingsStorage, StudioSettingsStorageDB } from './storage/StudioSettingsStorage.js';
 import { StudioTeamStorage, StudioTeamStorageDB } from './storage/StudioTeamStorage.js';
+import { AvatarStorage } from './storage/AvatarStorage.js';
 import { CurrencyService } from './services/CurrencyService.js';
 import { PurchaseService } from './services/PurchaseService.js';
 import { LedgerService } from './services/LedgerService.js';
@@ -236,6 +238,12 @@ const studioSettingsStorage = dbPool
   ? new StudioSettingsStorageDB(dbPool)
   : new StudioSettingsStorage(DATA_DIR);
 
+// Avatar presets storage (PostgreSQL only)
+const avatarStorage = dbPool ? new AvatarStorage(dbPool) : null;
+if (!dbPool && !avatarStorage) {
+  console.warn('AvatarStorage requires PostgreSQL database. Avatar presets will not be available.');
+}
+
 // Initialize shop storage (only for JSON storage)
 if (!dbPool) {
   if ('initialize' in shopStorage) {
@@ -255,6 +263,9 @@ if (!dbPool) {
   }
   if ('initialize' in studioSettingsStorage) {
     await (studioSettingsStorage as StudioSettingsStorage).initialize();
+  }
+  if (avatarStorage && 'initialize' in avatarStorage) {
+    await avatarStorage.initialize();
   }
 }
 
@@ -316,6 +327,12 @@ const allowedOriginsDescription = describeAllowedOrigins(corsConfig);
 
 // Register plugins
 await app.register(cookie);
+await app.register(multipart, {
+  limits: {
+    fileSize: 2 * 1024 * 1024, // 2MB max file size
+    files: 1, // Max 1 file per request
+  },
+});
 await app.register(cors, {
   origin: (origin, cb) => {
     // Allow requests with no origin (like mobile apps, curl, Postman)
@@ -474,7 +491,7 @@ void authManager.initialize().then(async () => {
       for (const item of existingItems) {
         // Always regenerate thumbnail to ensure latest format (no "GAME" badge)
         try {
-          await generateAndSaveThumbnail(THUMBNAIL_DIR, item.id, item.title, item.tags);
+          await generateAndSaveThumbnail(THUMBNAIL_DIR, item.id, item.title, item.tags, item.type);
           const thumbnailUrl = `/api/marketplace/thumbnails/${item.id}`;
           await marketplaceStorage.updateItem(item.id, { thumbnailUrl });
           console.log(`  → ${item.title}: Regenerated thumbnail`);
@@ -566,6 +583,17 @@ const routeDeps: RouteDependencies = {
   studioProjectsStorage: studioProjectsStorage as unknown as StudioProjectsStorage,
   studioTeamStorage: studioTeamStorage as unknown as StudioTeamStorage,
   studioSettingsStorage: studioSettingsStorage as unknown as StudioSettingsStorage,
+  avatarStorage: avatarStorage || (() => {
+    // Return a mock/stub implementation that throws helpful errors
+    return {
+      initialize: async () => {},
+      createPreset: async () => { throw new Error('AvatarStorage requires PostgreSQL database. Set DATABASE_URL environment variable.'); },
+      getPreset: async () => null,
+      getPresets: async () => [],
+      updatePreset: async () => { throw new Error('AvatarStorage requires PostgreSQL database. Set DATABASE_URL environment variable.'); },
+      deletePreset: async () => { throw new Error('AvatarStorage requires PostgreSQL database. Set DATABASE_URL environment variable.'); },
+    } as unknown as AvatarStorage;
+  })(),
 
   // Services
   currencyService,

@@ -3,9 +3,10 @@ import { Link } from 'react-router-dom';
 import { Layout } from '../components/layout/Layout';
 import { Card } from '../components/shared/Card';
 import { Button } from '../components/shared/Button';
-import { studioApi, type StudioProject, type StudioStats as StudioStatsType } from '../api/studio';
+import { studioApi, type StudioProject, type StudioStats as StudioStatsType, type AvatarPreset } from '../api/studio';
 import { useToast } from '../contexts/ToastContext';
 import { ProjectsList } from '../components/studio/ProjectsList';
+import { AvatarsList } from '../components/studio/AvatarsList';
 import { StudioStats } from '../components/studio/StudioStats';
 import { StudioLeaderboard } from '../components/studio/StudioLeaderboard';
 import { TeamManagement } from '../components/studio/TeamManagement';
@@ -13,14 +14,18 @@ import { StudioHealthCard } from '../components/studio/StudioHealthCard';
 import { RevenueCard } from '../components/studio/RevenueCard';
 import { StudioFocusGoals } from '../components/studio/StudioFocusGoals';
 import { InsightsList } from '../components/studio/InsightsList';
+import { PublishModal } from '../components/studio/PublishModal';
 import '../styles/studio.css';
 
 export function StudioPage() {
   const { showToast } = useToast();
   const [projects, setProjects] = useState<StudioProject[]>([]);
+  const [avatars, setAvatars] = useState<AvatarPreset[]>([]);
   const [stats, setStats] = useState<StudioStatsType | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'projects' | 'stats' | 'leaderboard' | 'team'>('projects');
+  const [activeTab, setActiveTab] = useState<'projects' | 'avatars' | 'stats' | 'leaderboard' | 'team'>('projects');
+  const [publishModalProject, setPublishModalProject] = useState<StudioProject | null>(null);
+  const [publishModalAvatar, setPublishModalAvatar] = useState<AvatarPreset | null>(null);
 
   useEffect(() => {
     void loadData();
@@ -29,12 +34,14 @@ export function StudioPage() {
   const loadData = async () => {
     try {
       setLoading(true);
-      const [projectsResponse, statsResponse] = await Promise.all([
+      const [projectsResponse, statsResponse, avatarsResponse] = await Promise.all([
         studioApi.getProjects(),
         studioApi.getStats(),
+        studioApi.getAvatarPresets().catch(() => ({ presets: [] })), // Gracefully handle if API not available
       ]);
       setProjects(projectsResponse.projects);
       setStats(statsResponse);
+      setAvatars(avatarsResponse.presets);
     } catch (error) {
       console.error('Failed to load studio data:', error);
       showToast('Nie udało się załadować danych studia', 'error');
@@ -62,42 +69,45 @@ export function StudioPage() {
   const handlePublishProject = async (id: string) => {
     const project = projects.find((p) => p.id === id);
     if (!project) return;
+    
+    // Show modal instead of prompt
+    setPublishModalProject(project);
+  };
 
-    const title = window.prompt('Podaj tytuł dla publikacji:', project.name);
-    if (!title || !title.trim()) {
-      return;
-    }
-
-    const description = window.prompt('Opis (opcjonalnie):', project.description || '');
-    const tagsInput = window.prompt('Tagi (oddzielone przecinkami):', (project.tags || []).join(', '));
-
-    try {
-      const trimmedDescription = description?.trim();
-      const publishData: { title: string; description?: string; tags?: string[] } = {
-        title: title.trim(),
-      };
-      
-      if (trimmedDescription && trimmedDescription.length > 0) {
-        publishData.description = trimmedDescription;
+  const handlePublishSubmit = async (data: { title: string; description?: string; tags?: string[] }) => {
+    if (publishModalProject) {
+      try {
+        await studioApi.publishProject(publishModalProject.id, data);
+        showToast('Projekt opublikowany!', 'success');
+        setPublishModalProject(null);
+        void loadData(); // Refresh projects and stats
+      } catch (error) {
+        console.error('Failed to publish project:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Nie udało się opublikować projektu';
+        showToast(errorMessage, 'error');
+        throw error; // Re-throw so modal can handle it
       }
-      
-      if (tagsInput) {
-        const parsedTags = tagsInput
-          .split(',')
-          .map((t) => t.trim())
-          .filter((t) => t.length > 0);
-        if (parsedTags.length > 0) {
-          publishData.tags = parsedTags;
-        }
+    } else if (publishModalAvatar) {
+      try {
+        await studioApi.publishAvatarPreset(publishModalAvatar.id, data);
+        showToast('Avatar opublikowany!', 'success');
+        setPublishModalAvatar(null);
+        void loadData(); // Refresh avatars
+      } catch (error) {
+        console.error('Failed to publish avatar:', error);
+        const errorMessage = error instanceof Error ? error.message : 'Nie udało się opublikować avatar';
+        showToast(errorMessage, 'error');
+        throw error; // Re-throw so modal can handle it
       }
-
-      await studioApi.publishProject(id, publishData);
-      showToast('Projekt opublikowany!', 'success');
-      void loadData(); // Refresh projects and stats
-    } catch (error) {
-      console.error('Failed to publish project:', error);
-      showToast('Nie udało się opublikować projektu', 'error');
     }
+  };
+
+  const handlePublishAvatar = async (preset: AvatarPreset) => {
+    setPublishModalAvatar(preset);
+  };
+
+  const handleDeleteAvatar = async (id: string) => {
+    setAvatars(avatars.filter((a) => a.id !== id));
   };
 
   if (loading) {
@@ -168,6 +178,12 @@ export function StudioPage() {
             Projekty
           </button>
           <button
+            className={`studio-tab ${activeTab === 'avatars' ? 'active' : ''}`}
+            onClick={() => setActiveTab('avatars')}
+          >
+            Avatary
+          </button>
+          <button
             className={`studio-tab ${activeTab === 'stats' ? 'active' : ''}`}
             onClick={() => setActiveTab('stats')}
           >
@@ -199,6 +215,17 @@ export function StudioPage() {
             </div>
           )}
 
+          {activeTab === 'avatars' && (
+            <div className="studio-avatars-section">
+              <AvatarsList
+                presets={avatars}
+                onDelete={handleDeleteAvatar}
+                onPublish={handlePublishAvatar}
+                loading={loading}
+              />
+            </div>
+          )}
+
           {activeTab === 'stats' && (
             <div className="studio-stats-section">
               <div className="stats-grid" style={{ display: 'grid', gap: '1rem' }}>
@@ -224,6 +251,27 @@ export function StudioPage() {
           )}
         </div>
       </div>
+      
+      {publishModalProject && (
+        <PublishModal
+          title="Opublikuj Projekt"
+          defaultTitle={publishModalProject.name}
+          defaultDescription={publishModalProject.description}
+          defaultTags={publishModalProject.tags}
+          onPublish={handlePublishSubmit}
+          onCancel={() => setPublishModalProject(null)}
+        />
+      )}
+      {publishModalAvatar && (
+        <PublishModal
+          title="Opublikuj Avatar"
+          defaultTitle={publishModalAvatar.name}
+          defaultDescription={publishModalAvatar.description}
+          defaultTags={publishModalAvatar.tags}
+          onPublish={handlePublishSubmit}
+          onCancel={() => setPublishModalAvatar(null)}
+        />
+      )}
     </Layout>
   );
 }

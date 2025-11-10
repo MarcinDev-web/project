@@ -46,6 +46,7 @@ model MarketplaceItem {
   forumThreadId String?   @map("forum_thread_id")
 
   build     MarketplaceBuild?
+  avatar    MarketplaceAvatar?
   itemLikes MarketplaceLike[]
 
   @@index([type])
@@ -65,6 +66,36 @@ model MarketplaceBuild {
   marketplaceItem MarketplaceItem @relation(fields: [marketplaceId], references: [id], onDelete: Cascade)
 
   @@map("marketplace_builds")
+}
+
+model MarketplaceAvatar {
+  marketplaceId String   @id @map("marketplace_id")
+  avatarData    Bytes    @map("avatar_data") // AvatarLoadout serialized as JSON
+  version       Int      @default(1)
+  createdAt     DateTime @default(now()) @map("created_at")
+  updatedAt     DateTime @default(now()) @updatedAt @map("updated_at")
+
+  marketplaceItem MarketplaceItem @relation(fields: [marketplaceId], references: [id], onDelete: Cascade)
+
+  @@map("marketplace_avatars")
+}
+
+// Studio Avatar Presets
+model UserAvatarPreset {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  name        String
+  description String?
+  avatarData  Bytes    @map("avatar_data") // AvatarLoadout serialized as JSON
+  thumbnailUrl String? @map("thumbnail_url")
+  tags        String[] @default([])
+  isPublished Boolean  @default(false) @map("is_published")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([userId])
+  @@index([isPublished])
+  @@map("user_avatar_presets")
 }
 
 model MarketplaceLike {

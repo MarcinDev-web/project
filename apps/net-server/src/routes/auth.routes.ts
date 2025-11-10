@@ -89,6 +89,11 @@ export async function createAuthRoutes(
 
       try {
         const body = request.body as { email: string; password: string };
+        
+        // Debug logging in development
+        if (!isProduction) {
+          console.log('[Login] Request body:', { email: body?.email, passwordLength: body?.password?.length });
+        }
 
         const result = await authManager.login(body.email, body.password);
 

@@ -6,21 +6,39 @@ import { Button } from '../components/shared/Button';
 import { marketplaceApi, type MarketplaceItem } from '../api/marketplace';
 import { apiClient } from '../api/client';
 import { useToast } from '../contexts/ToastContext';
+import { getTokens } from '../utils/storage';
 
 function LikeButton({ item, onToggle }: { item: MarketplaceItem; onToggle: () => void }) {
   const [liked, setLiked] = useState(item.liked ?? false);
   const [likes, setLikes] = useState(item.likes);
   const [loading, setLoading] = useState(false);
+  const { showToast } = useToast();
 
   const handleLike = async () => {
+    // Check if user is logged in
+    const { token } = getTokens();
+    if (!token) {
+      showToast('Musisz być zalogowany, aby polubić item', 'error');
+      return;
+    }
+
     setLoading(true);
     try {
       const result = await marketplaceApi.likeItem(item.id);
       setLiked(result.liked);
       setLikes(result.likes);
       onToggle();
+      
+      showToast(
+        result.liked 
+          ? `Polubiono "${item.title}"` 
+          : `Usunięto polubienie "${item.title}"`,
+        'success'
+      );
     } catch (error) {
       console.error('Failed to like item:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Nie udało się polubić itemu';
+      showToast(errorMessage, 'error');
     } finally {
       setLoading(false);
     }
@@ -30,6 +48,8 @@ function LikeButton({ item, onToggle }: { item: MarketplaceItem; onToggle: () =>
     <button
       onClick={handleLike}
       disabled={loading}
+      aria-label={liked ? `Unlike ${item.title}. Current likes: ${likes}` : `Like ${item.title}. Current likes: ${likes}`}
+      aria-busy={loading}
       style={{
         display: 'flex',
         alignItems: 'center',
@@ -44,7 +64,7 @@ function LikeButton({ item, onToggle }: { item: MarketplaceItem; onToggle: () =>
       }}
       title={liked ? 'Unlike' : 'Like'}
     >
-      <span>{liked ? '❤️' : '🤍'}</span>
+      <span aria-hidden="true">{liked ? '❤️' : '🤍'}</span>
       <span>{likes}</span>
     </button>
   );
@@ -261,14 +281,6 @@ export function MarketplaceItemPage() {
                 )}
               </div>
               <div style={{ display: 'flex', gap: 'var(--spacing-3)', alignItems: 'center', flexWrap: 'wrap' }}>
-                <Link
-                  to={`/player/${item.id}`}
-                  style={{ textDecoration: 'none' }}
-                >
-                  <Button variant="primary">
-                    Play
-                  </Button>
-                </Link>
                 <Button 
                   variant="secondary" 
                   onClick={handlePurchase}

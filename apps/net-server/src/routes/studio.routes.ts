@@ -3,6 +3,7 @@ import type { RouteDependencies } from './index.js';
 import type { StudioProject } from '../storage/StudioProjectsStorage.js';
 import type { ProjectTeamAccess } from '../storage/StudioTeamStorage.js';
 import type { MarketplaceItem } from '../storage/MarketplaceStorage.js';
+import type { CreateAvatarPresetRequest } from '../storage/AvatarStorage.js';
 import type { ProjectData } from '../types.js';
 
 /**
@@ -24,6 +25,7 @@ export async function createStudioRoutes(
     authManager,
     friendsStorage,
     notificationsStorage,
+    avatarStorage,
     cacheGet,
     cacheSet,
     dbPool,
@@ -1594,6 +1596,244 @@ export async function createStudioRoutes(
       console.error('Get studio insights error:', error);
       reply.code(500).send({
         error: 'Failed to get insights',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  // STUDIO AVATAR PRESETS ROUTES
+  app.get('/avatars', { preHandler: [authMiddleware] }, async (request, reply) => {
+    try {
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
+      }
+
+      const presets = await avatarStorage.getPresets(request.user.id, false);
+      reply.send({ presets });
+    } catch (error) {
+      console.error('Get avatar presets error:', error);
+      reply.code(500).send({
+        error: 'Failed to get avatar presets',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  app.post('/avatars', { preHandler: [authMiddleware] }, async (request, reply) => {
+    try {
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
+      }
+
+      const body = request.body as {
+        name: string;
+        description?: string;
+        avatarData: Record<string, unknown>;
+        thumbnailUrl?: string;
+        tags?: string[];
+      };
+
+      if (!body.name || !body.avatarData) {
+        return reply.code(400).send({ error: 'Name and avatarData are required' });
+      }
+
+      const presetData: CreateAvatarPresetRequest = {
+        name: body.name,
+        avatarData: body.avatarData,
+        tags: body.tags || [],
+      };
+      if (body.description) {
+        presetData.description = body.description;
+      }
+      if (body.thumbnailUrl) {
+        presetData.thumbnailUrl = body.thumbnailUrl;
+      }
+
+      const preset = await avatarStorage.createPreset(request.user.id, presetData);
+
+      reply.code(201).send(preset);
+    } catch (error) {
+      console.error('Create avatar preset error:', error);
+      reply.code(500).send({
+        error: 'Failed to create avatar preset',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  app.get('/avatars/:id', { preHandler: [authMiddleware] }, async (request, reply) => {
+    try {
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
+      }
+
+      const { id } = request.params as { id?: string };
+      if (!id) {
+        return reply.code(400).send({ error: 'Avatar preset ID required' });
+      }
+
+      const preset = await avatarStorage.getPreset(request.user.id, id);
+      if (!preset) {
+        return reply.code(404).send({ error: 'Avatar preset not found' });
+      }
+
+      reply.send(preset);
+    } catch (error) {
+      console.error('Get avatar preset error:', error);
+      reply.code(500).send({
+        error: 'Failed to get avatar preset',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  app.put('/avatars/:id', { preHandler: [authMiddleware] }, async (request, reply) => {
+    try {
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
+      }
+
+      const { id } = request.params as { id?: string };
+      if (!id) {
+        return reply.code(400).send({ error: 'Avatar preset ID required' });
+      }
+
+      const body = request.body as {
+        name?: string;
+        description?: string;
+        avatarData?: Record<string, unknown>;
+        thumbnailUrl?: string;
+        tags?: string[];
+        isPublished?: boolean;
+      };
+
+      const preset = await avatarStorage.updatePreset(request.user.id, id, body);
+      reply.send(preset);
+    } catch (error) {
+      console.error('Update avatar preset error:', error);
+      reply.code(500).send({
+        error: 'Failed to update avatar preset',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  app.delete('/avatars/:id', { preHandler: [authMiddleware] }, async (request, reply) => {
+    try {
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
+      }
+
+      const { id } = request.params as { id?: string };
+      if (!id) {
+        return reply.code(400).send({ error: 'Avatar preset ID required' });
+      }
+
+      await avatarStorage.deletePreset(request.user.id, id);
+      reply.code(204).send();
+    } catch (error) {
+      console.error('Delete avatar preset error:', error);
+      reply.code(500).send({
+        error: 'Failed to delete avatar preset',
+        message: error instanceof Error ? error.message : String(error),
+      });
+    }
+  });
+
+  app.post('/avatars/:id/publish', { preHandler: [authMiddleware] }, async (request, reply) => {
+    try {
+      if (!request.user) {
+        return reply.code(401).send({ error: 'Unauthorized' });
+      }
+
+      const { id } = request.params as { id?: string };
+      if (!id) {
+        return reply.code(400).send({ error: 'Avatar preset ID required' });
+      }
+
+      const body = request.body as {
+        title: string;
+        description?: string;
+        tags?: string[];
+      };
+
+      if (!body.title) {
+        return reply.code(400).send({ error: 'Title is required' });
+      }
+
+      const preset = await avatarStorage.getPreset(request.user.id, id);
+      if (!preset) {
+        return reply.code(404).send({ error: 'Avatar preset not found' });
+      }
+
+      // Create marketplace item
+      const user = await authManager.getUserById(request.user.id);
+      const authorName = user?.username || user?.email || 'Unknown';
+
+      const itemData: Omit<MarketplaceItem, 'id' | 'createdAt' | 'updatedAt' | 'downloads' | 'likes'> = {
+        type: 'avatar',
+        title: body.title,
+        authorId: request.user.id,
+        fileUrl: '', // Will be updated after item creation
+        tags: body.tags || preset.tags || [],
+        public: true,
+      };
+      if (authorName) {
+        itemData.authorName = authorName;
+      }
+      if (preset.thumbnailUrl) {
+        itemData.thumbnailUrl = preset.thumbnailUrl;
+      }
+      if (body.description || preset.description) {
+        const desc = body.description || preset.description;
+        if (desc) {
+          itemData.description = desc;
+        }
+      }
+
+      const marketplaceItem = await marketplaceStorage.createItem(itemData);
+
+      const itemId = marketplaceItem.id;
+      
+      // Update fileUrl with correct itemId
+      await marketplaceStorage.updateItem(itemId, {
+        fileUrl: `/api/marketplace/avatars/${itemId}`,
+        thumbnailUrl: preset.thumbnailUrl || `/api/marketplace/thumbnails/${itemId}`,
+      });
+
+      // Store avatar data
+      if (dbPool) {
+        const jsonData = JSON.stringify(preset.avatarData);
+        const buffer = Buffer.from(jsonData, 'utf-8');
+        await dbPool.marketplaceAvatar.create({
+          data: {
+            marketplaceId: itemId,
+            avatarData: buffer,
+            version: 1,
+          },
+        });
+      }
+
+      // Generate thumbnail if not provided
+      if (!preset.thumbnailUrl) {
+        const { generateAndSaveThumbnail, THUMBNAIL_DIR } = opts.dependencies;
+        await generateAndSaveThumbnail(
+          THUMBNAIL_DIR,
+          itemId,
+          body.title,
+          body.tags || preset.tags || [],
+          'avatar'
+        );
+      }
+
+      // Mark preset as published
+      await avatarStorage.updatePreset(request.user.id, id, { isPublished: true });
+
+      reply.code(201).send(marketplaceItem);
+    } catch (error) {
+      console.error('Publish avatar preset error:', error);
+      reply.code(500).send({
+        error: 'Failed to publish avatar preset',
         message: error instanceof Error ? error.message : String(error),
       });
     }

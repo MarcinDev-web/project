@@ -192,6 +192,36 @@ export interface SaveBlocksRequest {
   }>;
 }
 
+export interface AvatarPreset {
+  id: string;
+  userId: string;
+  name: string;
+  description?: string;
+  avatarData: Record<string, unknown>; // AvatarLoadout
+  thumbnailUrl?: string;
+  tags: string[];
+  isPublished: boolean;
+  createdAt: number;
+  updatedAt: number;
+}
+
+export interface CreateAvatarPresetRequest {
+  name: string;
+  description?: string;
+  avatarData: Record<string, unknown>; // AvatarLoadout
+  thumbnailUrl?: string;
+  tags?: string[];
+}
+
+export interface UpdateAvatarPresetRequest {
+  name?: string;
+  description?: string;
+  avatarData?: Record<string, unknown>; // AvatarLoadout
+  thumbnailUrl?: string;
+  tags?: string[];
+  isPublished?: boolean;
+}
+
 export const studioApi = {
   /**
    * Get all projects for the current user
@@ -426,6 +456,54 @@ export const studioApi = {
    */
   async getSavedBlocks(): Promise<{ blocks: SavedBlock[] }> {
     return apiClient.get<{ blocks: SavedBlock[] }>('/studio/blocks');
+  },
+
+  /**
+   * ========================================
+   * AVATAR PRESETS API
+   * ========================================
+   */
+
+  /**
+   * Get avatar presets for current user
+   */
+  async getAvatarPresets(): Promise<{ presets: AvatarPreset[] }> {
+    return apiClient.get<{ presets: AvatarPreset[] }>('/studio/avatars');
+  },
+
+  /**
+   * Create a new avatar preset
+   */
+  async createAvatarPreset(data: CreateAvatarPresetRequest): Promise<AvatarPreset> {
+    return apiClient.post<AvatarPreset>('/studio/avatars', data);
+  },
+
+  /**
+   * Get a single avatar preset
+   */
+  async getAvatarPreset(id: string): Promise<AvatarPreset> {
+    return apiClient.get<AvatarPreset>(`/studio/avatars/${id}`);
+  },
+
+  /**
+   * Update an avatar preset
+   */
+  async updateAvatarPreset(id: string, data: UpdateAvatarPresetRequest): Promise<AvatarPreset> {
+    return apiClient.put<AvatarPreset>(`/studio/avatars/${id}`, data);
+  },
+
+  /**
+   * Delete an avatar preset
+   */
+  async deleteAvatarPreset(id: string): Promise<void> {
+    return apiClient.delete(`/studio/avatars/${id}`);
+  },
+
+  /**
+   * Publish an avatar preset to marketplace
+   */
+  async publishAvatarPreset(id: string, data: { title: string; description?: string; tags?: string[] }): Promise<void> {
+    return apiClient.post(`/studio/avatars/${id}/publish`, data);
   },
 };
 

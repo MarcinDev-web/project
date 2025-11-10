@@ -303,6 +303,67 @@ select.forge-select option {
   }
 }
 
+/* Marketplace typography styles */
+.marketplace-card-title {
+  margin-top: 0;
+  margin-bottom: var(--spacing-2);
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--text-1);
+}
+
+.marketplace-card-description {
+  color: var(--text-2);
+  font-size: var(--text-sm);
+  margin-bottom: var(--spacing-4);
+  line-height: var(--leading-normal);
+}
+
+.marketplace-card-meta {
+  font-size: var(--text-sm);
+  color: var(--text-2);
+}
+
+.marketplace-card-author {
+  margin: 0;
+  margin-bottom: var(--spacing-1);
+}
+
+.marketplace-card-likes {
+  display: flex;
+  gap: var(--spacing-2);
+  align-items: center;
+  margin-top: var(--spacing-1);
+}
+
+.marketplace-card-actions {
+  display: flex;
+  gap: var(--spacing-2);
+  align-items: center;
+}
+
+.marketplace-card-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: var(--spacing-4);
+}
+
+.marketplace-card-thumbnail {
+  width: 100%;
+  aspect-ratio: 16/9;
+  margin-bottom: var(--spacing-4);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--color-base-200);
+}
+
+.marketplace-card-thumbnail img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
 /* Profile page specific styles */
 .profile-avatar {
   width: 80px;
@@ -327,6 +388,23 @@ select.forge-select option {
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .profile-builds-grid {
+    grid-template-columns: 1fr;
+  }
+  
+  /* Marketplace mobile responsive */
+  .marketplace-grid {
+    grid-template-columns: 1fr !important;
+  }
+  
+  .marketplace-search {
+    max-width: 100% !important;
+  }
+  
+  .marketplace-tabs {
+    justify-content: center;
+  }
+  
+  .shop-items-grid {
     grid-template-columns: 1fr;
   }
 }
