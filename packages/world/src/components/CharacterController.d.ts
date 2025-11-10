@@ -1,6 +1,7 @@
 import { Component } from './Component.js';
 import type { Vec3 } from '@engine/core/math';
 import type { MovementController, MovementInput } from '../movement/MovementInterface.js';
+import type { MovementProfile } from '../movement/MovementProfile.js';
 /**
  * Character controller state
  */
@@ -59,6 +60,17 @@ export interface CharacterInput {
     cameraForward?: Vec3;
     /** Camera right direction (for camera-relative movement) */
     cameraRight?: Vec3;
+}
+/**
+ * Serialized data for CharacterController component
+ */
+export interface CharacterControllerData {
+    type: string;
+    config: CharacterControllerConfig;
+    state: CharacterState;
+    isGrounded: boolean;
+    velocity: Vec3;
+    profileId?: string;
 }
 /**
  * Character Controller Component
@@ -202,13 +214,13 @@ export declare class CharacterController extends Component implements MovementCo
      *
      * @param profile - Movement profile to apply
      */
-    applyProfile(profile: any): void;
+    applyProfile(profile: MovementProfile): void;
     /**
      * Get the current movement profile
      *
      * @returns Current profile or null if none applied
      */
-    getCurrentProfile(): any | null;
+    getCurrentProfile(): MovementProfile | null;
     /**
      * Clone this component
      */
@@ -216,10 +228,10 @@ export declare class CharacterController extends Component implements MovementCo
     /**
      * Serialize the component
      */
-    serialize(): any;
+    serialize(): CharacterControllerData;
     /**
      * Deserialize the component
      */
-    static deserialize(data: any): CharacterController;
+    static deserialize(data: CharacterControllerData): CharacterController;
 }
 //# sourceMappingURL=CharacterController.d.ts.map

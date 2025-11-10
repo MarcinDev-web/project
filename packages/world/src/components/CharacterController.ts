@@ -81,6 +81,18 @@ export interface CharacterInput {
 }
 
 /**
+ * Serialized data for CharacterController component
+ */
+export interface CharacterControllerData {
+  type: string;
+  config: CharacterControllerConfig;
+  state: CharacterState;
+  isGrounded: boolean;
+  velocity: Vec3;
+  profileId?: string;
+}
+
+/**
  * Character Controller Component
  *
  * Provides character movement with physics integration, including:
@@ -641,6 +653,9 @@ export class CharacterController extends Component implements MovementController
     if (!profile.config) {
       throw new Error(`MovementProfile "${profile.id}" missing config`);
     }
+    if (typeof profile.config !== 'object' || Array.isArray(profile.config)) {
+      throw new Error(`MovementProfile "${profile.id}": config must be an object, got ${typeof profile.config}`);
+    }
 
     // Validate config values
     if (profile.config.moveSpeed <= 0) {
@@ -716,10 +731,8 @@ export class CharacterController extends Component implements MovementController
   /**
    * Serialize the component
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  serialize(): any {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const result: any = {
+  serialize(): CharacterControllerData {
+    const result: CharacterControllerData = {
       type: this.getType(),
       config: this.config,
       state: this.state,
@@ -738,15 +751,10 @@ export class CharacterController extends Component implements MovementController
   /**
    * Deserialize the component
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  static deserialize(data: any): CharacterController {
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-unsafe-member-access
+  static deserialize(data: CharacterControllerData): CharacterController {
     const controller = new CharacterController(data.config);
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     controller.state = data.state;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     controller.isGrounded = data.isGrounded;
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     controller.velocity = data.velocity;
 
     // Load profile if profileId is provided

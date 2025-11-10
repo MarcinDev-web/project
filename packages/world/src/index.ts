@@ -14,7 +14,7 @@ export * from './core/index.js';
 export { Component } from './components/Component.js';
 export { registerComponent, getComponentConstructor } from './components/registry.js';
 export { CameraComponent } from './components/CameraComponent.js';
-export { CharacterController, type CharacterInput } from './components/CharacterController.js';
+export { CharacterController, type CharacterInput, type CharacterControllerData } from './components/CharacterController.js';
 
 // Movement interfaces
 export * from './movement/MovementInterface.js';
