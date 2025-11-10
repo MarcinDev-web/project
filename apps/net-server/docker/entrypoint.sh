@@ -44,6 +44,9 @@ if [ "$NODE_ENV" = "production" ] && [ -n "$DATABASE_URL" ]; then
   fi
 fi
 
+# Return to the working directory set by Dockerfile (where server.js is located)
+cd /app/apps/net-server/dist
+
 # Exec the actual server command (from CMD)
 exec "$@"
 
