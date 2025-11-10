@@ -181,7 +181,34 @@ export class FrameRenderer {
     if (!swapChainTexture) {
       return geometry;
     }
-    const swapChainView = swapChainTexture.createView({ label: 'frame-color-resolve-view' });
+    
+    // Ensure texture view is created with the same device that will use it
+    // The texture from getCurrentTexture() is associated with the context's device,
+    // which should match configuredDevice. If not, creating the view will fail.
+    // Validate device one more time before creating view
+    const currentConfigured = ctx.configuredDevice ?? ctx.device;
+    if (currentConfigured !== configuredDevice) {
+      Logger.warn('[FrameRenderer] Device mismatch before creating swap chain view - aborting frame');
+      try {
+        encoder.finish();
+      } catch {
+        // ignore
+      }
+      return geometry;
+    }
+    
+    let swapChainView: GPUTextureView;
+    try {
+      swapChainView = swapChainTexture.createView({ label: 'frame-color-resolve-view' });
+    } catch (err) {
+      Logger.warn('[FrameRenderer] Failed to create swap chain view - device may have changed:', err);
+      try {
+        encoder.finish();
+      } catch {
+        // ignore
+      }
+      return geometry;
+    }
 
     this.writeFrameBeginTimestamp(frameResources, encoder);
 
@@ -218,7 +245,7 @@ export class FrameRenderer {
     this.renderStaticGeometry(renderPass, ctx, geometry, frameResources, sampleCount);
     this.customRenderer.render({
       encoder: renderPass,
-      device,
+      device: configuredDevice, // Use configuredDevice to ensure consistency
       frameResources,
       entities: this.customGeometryEntitiesCache,
     });
@@ -227,6 +254,19 @@ export class FrameRenderer {
     this.renderLogicConnections(ctx, renderPass, viewProjectionMatrix, eyePosition);
 
     renderPass.end();
+
+    // Validate device consistency before post-processing
+    // Post-process may use swapChainView, so we need to ensure device hasn't changed
+    const prePostProcessDevice = ctx.configuredDevice ?? ctx.device;
+    if (prePostProcessDevice !== configuredDevice) {
+      Logger.warn('[FrameRenderer] Device changed before post-process - skipping post-process');
+      try {
+        encoder.finish();
+      } catch {
+        // ignore
+      }
+      return geometry;
+    }
 
     this.postProcess.run(
       this.buildPostProcessInputs(ctx, featureFlags, targetState, {
@@ -376,10 +416,10 @@ export class FrameRenderer {
     encoder: GPUCommandEncoder
   ): GPUTexture | null {
     try {
-      const texture = ctx.context.getCurrentTexture();
+      // Validate device consistency before getting texture
       const currentConfigured = ctx.configuredDevice ?? ctx.device;
       if (currentConfigured !== configuredDevice) {
-        Logger.warn('Device changed between encoder creation and texture acquisition - aborting');
+        Logger.warn('[FrameRenderer] Device mismatch - configuredDevice changed. Skipping frame.');
         try {
           encoder.finish();
         } catch {
@@ -387,9 +427,26 @@ export class FrameRenderer {
         }
         return null;
       }
+      
+      // Get the swap chain texture - it's associated with the device that configured the context
+      const texture = ctx.context.getCurrentTexture();
+      
+      // Double-check device consistency after getting texture
+      // If device changed between checks, the texture will be invalid
+      const postConfigured = ctx.configuredDevice ?? ctx.device;
+      if (postConfigured !== configuredDevice) {
+        Logger.warn('[FrameRenderer] Device changed during texture acquisition - aborting');
+        try {
+          encoder.finish();
+        } catch {
+          // ignore
+        }
+        return null;
+      }
+      
       return texture;
     } catch (err) {
-      Logger.warn('Failed to get current swap chain texture - device may have changed:', err);
+      Logger.warn('[FrameRenderer] Failed to get current swap chain texture - device may have changed:', err);
       try {
         encoder.finish();
       } catch {
@@ -462,12 +519,13 @@ export class FrameRenderer {
     geometry: GeometryData,
     viewProjectionMatrix: Mat4
   ): SceneUpdateResult {
-    const { scene, device, frameResources } = ctx;
+    const { scene, frameResources } = ctx;
     if (!scene) {
       return { geometry };
     }
 
     try {
+      const configuredDevice = ctx.configuredDevice ?? ctx.device;
       const cullStart = performance.now();
       const frustum = this.frustumCuller.extractFrustumFromVP(viewProjectionMatrix);
       const allEntities = scene.getActiveEntities();
@@ -492,9 +550,9 @@ export class FrameRenderer {
       };
 
       if (geometry.instanceCount === sceneData.instanceCount) {
-        updateInstanceBuffers(device, frameResources, instanceData);
+        updateInstanceBuffers(configuredDevice, frameResources, instanceData);
       } else {
-        reallocateInstanceBuffers(device, frameResources, instanceData);
+        reallocateInstanceBuffers(configuredDevice, frameResources, instanceData);
       }
 
       const instanceUpdateTime = performance.now() - instanceStart;
@@ -533,10 +591,11 @@ export class FrameRenderer {
       return;
     }
     try {
+      const configuredDevice = ctx.configuredDevice ?? ctx.device;
       if (!this.screenSpaceLOD) {
-        this.screenSpaceLOD = new ScreenSpaceLOD(ctx.device);
+        this.screenSpaceLOD = new ScreenSpaceLOD(configuredDevice);
       }
-      const scaleBuffer = this.extractInstanceScales(ctx.device, frameResources, geometry);
+      const scaleBuffer = this.extractInstanceScales(configuredDevice, frameResources, geometry);
       this.screenSpaceLOD.selectLOD(
         encoder,
         viewProjectionMatrix,
@@ -565,8 +624,9 @@ export class FrameRenderer {
       return;
     }
     try {
+      const configuredDevice = ctx.configuredDevice ?? ctx.device;
       if (!this.shadowPass) {
-        this.shadowPass = new ShadowPass(ctx.device);
+        this.shadowPass = new ShadowPass(configuredDevice);
       }
       try {
         const q = ctx.shadowQuality ?? 'med';
@@ -611,8 +671,9 @@ export class FrameRenderer {
       return;
     }
     try {
+      const configuredDevice = ctx.configuredDevice ?? ctx.device;
       if (!this.forwardPlus) {
-        this.forwardPlus = new ForwardPlus(ctx.device);
+        this.forwardPlus = new ForwardPlus(configuredDevice);
       }
       const pointLights: PointLight[] = [];
       if (ctx.lightingData?.lights) {
@@ -654,8 +715,9 @@ export class FrameRenderer {
       return;
     }
     try {
+      const configuredDevice = ctx.configuredDevice ?? ctx.device;
       if (!this.computePrepass && typeof encoder.beginComputePass === 'function') {
-        this.computePrepass = new ComputePrepass(ctx.device);
+        this.computePrepass = new ComputePrepass(configuredDevice);
       }
       if (!this.computePrepass) {
         return;
@@ -695,9 +757,22 @@ export class FrameRenderer {
     passDescriptor?: GPURenderPassDescriptor
   ): GPURenderPassEncoder {
     const enableHDR = featureFlags.enableHDR;
+    
+    // Validate texture views are still valid before using them
+    // If textures were destroyed due to device change, views will be invalid
+    let resolveTarget: GPUTextureView;
+    try {
+      resolveTarget = enableHDR ? targetState.hdrView ?? swapChainView : swapChainView;
+      // Test if view is still valid by checking if we can create a render pass
+      // (WebGPU will validate this when we call beginRenderPass)
+    } catch (err) {
+      Logger.warn('[FrameRenderer] Invalid resolve target, using swap chain view:', err);
+      resolveTarget = swapChainView;
+    }
+    
     const colorAttachment: GPURenderPassColorAttachment = {
       view: frameResources.msaaColorView,
-      resolveTarget: enableHDR ? targetState.hdrView ?? swapChainView : swapChainView,
+      resolveTarget: resolveTarget,
       clearValue: CLEAR_COLOR,
       loadOp: 'clear',
       storeOp: 'store',

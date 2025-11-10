@@ -47,8 +47,15 @@ export function generateCapsuleY(
 	}
 
 	// Build vertices
-	// 1) Top hemisphere (from 0..pi/2), starting at very top
-	for (let h = 0; h <= hemisphereSegments; h++) {
+	// 1) Top pole (single vertex)
+	const topPoleY = halfCyl + radius;
+	positions.push(0, topPoleY, 0);
+	normals.push(0, 1, 0); // Point straight up
+	uvs.push(0.5, 0); // Center of top UV
+	const topPoleIndex = 0;
+
+	// 2) Top hemisphere (from pi/2..0, excluding pole)
+	for (let h = 1; h <= hemisphereSegments; h++) {
 		const t = h / hemisphereSegments; // 0..1
 		const phi = (t * Math.PI) / 2; // 0..pi/2
 		const ringR = radius * Math.cos(phi);
@@ -59,7 +66,7 @@ export function generateCapsuleY(
 		pushRing(y, ringR, v, ny);
 	}
 
-	// 2) Bottom hemisphere (from pi/2..0), mirrored
+	// 3) Bottom hemisphere (from 0..pi/2, excluding pole)
 	for (let h = 1; h <= hemisphereSegments; h++) {
 		const t = h / hemisphereSegments; // 0..1
 		const phi = (t * Math.PI) / 2; // 0..pi/2
@@ -70,12 +77,31 @@ export function generateCapsuleY(
 		pushRing(y, ringR, v, ny);
 	}
 
-	// Generate indices by connecting consecutive rings
-	const rings = hemisphereSegments + 1 + hemisphereSegments; // (top hemi rings) + (bottom hemi rings)
-	for (let r = 0; r < rings; r++) {
-		const currStart = r * radialSegments;
-		const nextStart = (r + 1) * radialSegments;
-		if (nextStart >= positions.length / 3) break;
+	// 4) Bottom pole (single vertex)
+	const bottomPoleY = -halfCyl - radius;
+	const bottomPoleIndex = positions.length / 3;
+	positions.push(0, bottomPoleY, 0);
+	normals.push(0, -1, 0); // Point straight down
+	uvs.push(0.5, 1); // Center of bottom UV
+
+	// Generate indices
+	// Top pole cap: connect top pole to first ring
+	const firstRingStart = 1; // After top pole vertex
+	for (let i = 0; i < radialSegments; i++) {
+		const i0 = topPoleIndex;
+		const i1 = firstRingStart + i;
+		const i2 = firstRingStart + ((i + 1) % radialSegments);
+		indices.push(i0, i1, i2);
+	}
+
+	// Connect rings (excluding poles)
+	// Top hemisphere has hemisphereSegments rings (h=1 to hemisphereSegments)
+	// Bottom hemisphere has hemisphereSegments rings (h=1 to hemisphereSegments)
+	const rings = hemisphereSegments + hemisphereSegments; // Excluding poles
+	for (let r = 0; r < rings - 1; r++) {
+		const currStart = firstRingStart + r * radialSegments;
+		const nextStart = firstRingStart + (r + 1) * radialSegments;
+		if (nextStart >= bottomPoleIndex) break;
 		for (let i = 0; i < radialSegments; i++) {
 			const i0 = currStart + i;
 			const i1 = currStart + ((i + 1) % radialSegments);
@@ -84,6 +110,15 @@ export function generateCapsuleY(
 			indices.push(i0, i1, i2);
 			indices.push(i1, i3, i2);
 		}
+	}
+
+	// Bottom pole cap: connect last ring to bottom pole
+	const lastRingStart = bottomPoleIndex - radialSegments;
+	for (let i = 0; i < radialSegments; i++) {
+		const i0 = lastRingStart + i;
+		const i1 = lastRingStart + ((i + 1) % radialSegments);
+		const i2 = bottomPoleIndex;
+		indices.push(i0, i1, i2);
 	}
 
 	// Convert to typed arrays and interleave

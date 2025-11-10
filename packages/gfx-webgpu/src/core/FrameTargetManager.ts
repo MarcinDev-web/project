@@ -57,6 +57,22 @@ export class FrameTargetManager {
     config: Partial<FrameTargetConfig> = {}
   ): FrameTargetState {
     const device = ctx.device;
+    const configuredDevice = ctx.configuredDevice ?? device;
+    
+    // Ensure device matches - if not, textures from previous device are invalid
+    if (device !== configuredDevice) {
+      Logger.warn('[FrameTargetManager] Device mismatch - clearing all targets');
+      this.flushImmediate(); // Destroy all textures immediately
+      this.releaseHdrResources();
+      this.releaseNormalResources();
+      this.releaseSsaoResources();
+      this.queueDestroy(this.tonemapTexture);
+      this.tonemapTexture = null;
+      this.tonemapView = null;
+      this.tonemapSize = null;
+      this.size = { width: 0, height: 0 };
+    }
+    
     const canvas = ctx.canvas;
 
     const sampleCount = config.sampleCount ?? ctx.msaaSampleCount ?? MSAA_SAMPLE_COUNT;
@@ -70,6 +86,8 @@ export class FrameTargetManager {
     const sizeChanged = this.size.width !== canvas.width || this.size.height !== canvas.height;
 
     if (sizeChanged) {
+      // Queue old textures for destruction AFTER current frame completes
+      // Don't destroy immediately as they might still be in use
       this.queueDestroy(frameResources.depthTexture);
       this.queueDestroy(frameResources.msaaColorTexture);
       this.queueDestroy(this.hdrColorTexture);
@@ -78,6 +96,8 @@ export class FrameTargetManager {
       this.queueDestroy(this.ssaoTexture);
       this.queueDestroy(this.resolvedDepthTexture);
       this.queueDestroy(this.tonemapTexture);
+      
+      // Clear references immediately so new textures are created
       this.hdrColorTexture = null;
       this.hdrColorView = null;
       this.hdrSize = null;
@@ -97,12 +117,13 @@ export class FrameTargetManager {
       this.tonemapView = null;
       this.tonemapSize = null;
 
-      frameResources.depthTexture = createDepthTexture(device, canvas, sampleCount);
+      // Create new textures with current device
+      frameResources.depthTexture = createDepthTexture(configuredDevice, canvas, sampleCount);
       frameResources.depthTextureView = frameResources.depthTexture.createView({
         label: 'frame-depth-view',
       });
       frameResources.msaaColorTexture = createMsaaColorTarget(
-        device,
+        configuredDevice,
         canvas,
         'rgba16float',
         sampleCount
@@ -119,7 +140,7 @@ export class FrameTargetManager {
         if (this.hdrColorTexture && this.hdrColorTexture !== frameResources.msaaColorTexture) {
           this.queueDestroy(this.hdrColorTexture);
         }
-        this.hdrColorTexture = createHdrColorTarget(device, canvas);
+        this.hdrColorTexture = createHdrColorTarget(configuredDevice, canvas);
         this.hdrColorView = this.hdrColorTexture.createView({ label: 'frame-hdr-view' });
         this.hdrSize = { ...this.size };
       }
@@ -130,7 +151,7 @@ export class FrameTargetManager {
         };
         if (!this.bloomTexture || !this.sameSize(this.bloomSize, bloomSize)) {
           this.queueDestroy(this.bloomTexture);
-          this.bloomTexture = device.createTexture({
+          this.bloomTexture = configuredDevice.createTexture({
             label: 'frame-bloom-texture',
             size: {
               width: bloomSize.width,
@@ -158,7 +179,7 @@ export class FrameTargetManager {
     if (needsNormalTexture) {
       if (!this.normalTexture || !this.sameSize(this.normalSize, this.size)) {
         this.queueDestroy(this.normalTexture);
-        this.normalTexture = device.createTexture({
+        this.normalTexture = configuredDevice.createTexture({
           label: 'frame-normal-texture',
           size: { width: canvas.width, height: canvas.height, depthOrArrayLayers: 1 },
           format: 'rgba16float',
@@ -177,7 +198,7 @@ export class FrameTargetManager {
     if (enableSSAO) {
       if (!this.ssaoTexture || !this.sameSize(this.ssaoSize, this.size)) {
         this.queueDestroy(this.ssaoTexture);
-        this.ssaoTexture = device.createTexture({
+        this.ssaoTexture = configuredDevice.createTexture({
           label: 'frame-ssao-texture',
           size: { width: canvas.width, height: canvas.height, depthOrArrayLayers: 1 },
           format: 'rgba16float',
@@ -195,7 +216,7 @@ export class FrameTargetManager {
           !this.sameSize(this.resolvedDepthSize, this.size)
         ) {
           this.queueDestroy(this.resolvedDepthTexture);
-          this.resolvedDepthTexture = createDepthTexture(device, canvas, 1);
+          this.resolvedDepthTexture = createDepthTexture(configuredDevice, canvas, 1);
           this.resolvedDepthView = this.resolvedDepthTexture.createView({
             label: 'resolved-depth-view',
           });
@@ -218,7 +239,7 @@ export class FrameTargetManager {
     if (enableHDR && enableFXAA) {
       if (!this.tonemapTexture || !this.sameSize(this.tonemapSize, this.size)) {
         this.queueDestroy(this.tonemapTexture);
-        this.tonemapTexture = device.createTexture({
+        this.tonemapTexture = configuredDevice.createTexture({
           label: 'tonemap-output',
           size: { width: canvas.width, height: canvas.height, depthOrArrayLayers: 1 },
           format: 'bgra8unorm',
@@ -270,20 +291,23 @@ export class FrameTargetManager {
         try {
           texture.destroy();
         } catch (err) {
-          Logger.warn('Failed to destroy texture during cleanup:', err);
+          // Texture might already be destroyed or device lost
+          // This is expected in some cases, so we just log and continue
+          Logger.warn('[FrameTargetManager] Failed to destroy texture during cleanup (may be already destroyed):', err);
         }
       }
     };
     // Wait for GPU work to complete before destroying textures
-    // Use a longer delay as fallback to ensure textures are safe to destroy
+    // This ensures textures aren't destroyed while still referenced in command buffers
     queue
       .onSubmittedWorkDone()
       .then(() => {
         // Add small delay to ensure all GPU work is truly complete
+        // This gives WebGPU time to finish processing command buffers
         setTimeout(destroyTextures, 16); // ~1 frame at 60fps
       })
       .catch((err) => {
-        Logger.warn('Failed to wait for GPU work completion during cleanup:', err);
+        Logger.warn('[FrameTargetManager] Failed to wait for GPU work completion during cleanup:', err);
         // Use longer fallback delay to be safe
         setTimeout(destroyTextures, 100);
       });

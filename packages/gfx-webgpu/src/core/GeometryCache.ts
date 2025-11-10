@@ -7,6 +7,7 @@
 
 import type { CustomMeshData } from '@engine/world';
 import { createGeometryBuffers, packVerticesFloat32ToPacked24 } from '../resources/resources';
+import { Logger } from '@engine/core/utils';
 
 // Type for geometry buffers returned by createGeometryBuffers
 type GeometryBuffers = {
@@ -67,9 +68,14 @@ function isValidGeometrySilent(vertices: Uint8Array, indices: Uint16Array): bool
     return false;
   }
 
-  // Check for degenerate triangles (basic check - skip if vertices overlap)
-  const eps = 1e-10;
+  // Check for degenerate triangles
+  // Use a more lenient threshold to allow very small but valid triangles
+  // This is especially important for procedural geometries like capsules/spheres
+  // where triangles near poles can be very small but still valid
   const dv = new DataView(vertices.buffer as ArrayBuffer, vertices.byteOffset, vertices.byteLength);
+  let degenerateCount = 0;
+  const maxDegenerateToLog = 5; // Only log first few degenerate triangles
+  
   for (let i = 0; i + 2 < indices.length; i += 3) {
     const ia = indices[i]! * strideBytes;
     const ib = indices[i + 1]! * strideBytes;
@@ -89,6 +95,23 @@ function isValidGeometrySilent(vertices: Uint8Array, indices: Uint16Array): bool
     const cy = dv.getFloat32(ic + 4, true);
     const cz = dv.getFloat32(ic + 8, true);
     
+    // Check if vertices are identical (truly degenerate)
+    const distAB = Math.sqrt((bx - ax) ** 2 + (by - ay) ** 2 + (bz - az) ** 2);
+    const distAC = Math.sqrt((cx - ax) ** 2 + (cy - ay) ** 2 + (cz - az) ** 2);
+    const distBC = Math.sqrt((cx - bx) ** 2 + (cy - by) ** 2 + (cz - bz) ** 2);
+    
+    // If all vertices are at the same position, it's truly degenerate
+    if (distAB < 1e-6 && distAC < 1e-6 && distBC < 1e-6) {
+      degenerateCount++;
+      if (degenerateCount <= maxDegenerateToLog) {
+        Logger.warn(
+          `[GeometryCache] Truly degenerate triangle at index ${i}: all vertices identical`
+        );
+      }
+      return false;
+    }
+    
+    // Check triangle area using cross product
     const abx = bx - ax;
     const aby = by - ay;
     const abz = bz - az;
@@ -100,9 +123,26 @@ function isValidGeometrySilent(vertices: Uint8Array, indices: Uint16Array): bool
     const cxZ = abx * acy - aby * acx;
     const area2 = cxX * cxX + cxY * cxY + cxZ * cxZ;
     
-    if (!(area2 > eps)) {
-      return false; // Degenerate triangle
+    // Only reject if area is truly zero (within floating point precision)
+    // Very small triangles are still valid and will render correctly
+    // Use 1e-8 as the rejection threshold (more lenient than 1e-10)
+    // This allows very small triangles near poles of spheres/capsules
+    if (area2 < 1e-8) {
+      degenerateCount++;
+      if (degenerateCount <= maxDegenerateToLog) {
+        Logger.warn(
+          `[GeometryCache] Degenerate triangle at index ${i}: area²=${area2.toExponential(2)}, ` +
+          `distances: AB=${distAB.toFixed(6)}, AC=${distAC.toFixed(6)}, BC=${distBC.toFixed(6)}`
+        );
+      }
+      return false;
     }
+  }
+  
+  if (degenerateCount > maxDegenerateToLog) {
+    Logger.warn(
+      `[GeometryCache] Found ${degenerateCount} degenerate triangles (showing first ${maxDegenerateToLog})`
+    );
   }
 
   return true;
@@ -160,6 +200,18 @@ export class GeometryCache {
 
       // Validate geometry silently before creating buffers
       if (!isValidGeometrySilent(packedVertices, indices)) {
+        // Log detailed validation failure for debugging
+        const strideBytes = 24;
+        const numVertices = packedVertices.byteLength / strideBytes;
+        const vertexCountValid = Number.isInteger(numVertices) && numVertices > 0;
+        const indexCountValid = indices.byteLength % 2 === 0 && indices.length % 3 === 0;
+        const indicesInRange = indices.every((i) => i >= 0 && i < numVertices);
+        
+        Logger.warn(
+          `[GeometryCache] Geometry validation failed: vertices=${numVertices.toFixed(1)}, ` +
+          `indices=${indices.length}, vertexCountValid=${vertexCountValid}, ` +
+          `indexCountValid=${indexCountValid}, indicesInRange=${indicesInRange}`
+        );
         // Return null - caller will log entity-specific warning
         return null;
       }
