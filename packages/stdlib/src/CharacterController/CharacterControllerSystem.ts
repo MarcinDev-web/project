@@ -1,10 +1,11 @@
 import type { Scene, Entity } from '@engine/world';
-import { CharacterController, type CharacterInput, CharacterState } from '@engine/world';
+import { CharacterController, type CharacterInput, CharacterState, type MovementProfile } from '@engine/world';
 import type { PhysicsWorld } from '@engine/world';
 import type { Vec3 } from '@engine/core/math';
-import { distanceVec3 } from '@engine/core/math';
 import { MovementProfileRegistry } from '../MovementProfiles/MovementProfileRegistry';
 import { AnimationComponent } from '../Animation';
+import { GroundDetectionCache } from './GroundDetectionCache';
+import { AnimationStateName } from './AnimationStateName';
 
 interface IntentFrame {
   move: [number, number];
@@ -14,22 +15,16 @@ interface IntentFrame {
   right: Vec3;
 }
 
-interface GroundDetectionCache {
-  lastPosition: Vec3;
-  lastIsGrounded: boolean;
-  lastGroundNormal: Vec3;
-}
-
 /**
  * Maps CharacterState to animation state names
  */
-const STATE_TO_ANIMATION: Record<CharacterState, string> = {
-  [CharacterState.Idle]: 'idle',
-  [CharacterState.Walking]: 'walk',
-  [CharacterState.Running]: 'run',
-  [CharacterState.Jumping]: 'jump',
-  [CharacterState.Falling]: 'fall',
-  [CharacterState.Landing]: 'land',
+const STATE_TO_ANIMATION: Record<CharacterState, AnimationStateName> = {
+  [CharacterState.Idle]: AnimationStateName.Idle,
+  [CharacterState.Walking]: AnimationStateName.Walk,
+  [CharacterState.Running]: AnimationStateName.Run,
+  [CharacterState.Jumping]: AnimationStateName.Jump,
+  [CharacterState.Falling]: AnimationStateName.Fall,
+  [CharacterState.Landing]: AnimationStateName.Land,
 };
 
 /**
@@ -45,11 +40,13 @@ export class CharacterControllerSystem {
   private scene: Scene;
   private physics: PhysicsWorld;
   private intentBuffer = new Map<CharacterController, IntentFrame>();
-  private groundDetectionCache = new Map<CharacterController, GroundDetectionCache>();
+  private groundDetection: GroundDetectionSystem;
+  private readonly vec3Pool = getVec3Pool();
 
-  constructor(scene: Scene, physics: PhysicsWorld) {
+  constructor(scene: Scene, physics: PhysicsWorld, cacheCellSize = 0.5, cacheMaxAge = 0.1) {
     this.scene = scene;
     this.physics = physics;
+    this.groundDetection = new GroundDetectionSystem(physics, cacheCellSize, cacheMaxAge);
   }
 
   /**
@@ -57,6 +54,7 @@ export class CharacterControllerSystem {
    */
   update(deltaTime: number): void {
     const entities = this.scene.queryEntities(CharacterController);
+    const controllers: CharacterController[] = [];
 
     for (const entity of entities) {
       const controller = entity.getComponent(CharacterController) as CharacterController;
@@ -75,13 +73,22 @@ export class CharacterControllerSystem {
           cameraRight: bufferedIntent.right,
         };
         controller.setInput(input);
+
+        // Release Vec3 arrays back to pool
+        this.vec3Pool.release(bufferedIntent.forward);
+        this.vec3Pool.release(bufferedIntent.right);
+
         this.intentBuffer.delete(controller);
       }
 
-      // Update ground detection using physics raycast
-      // Must be called BEFORE controller.update() to cache position before any potential changes
-      this.updateGroundDetection(controller);
+      controllers.push(controller);
+    }
 
+    // Update ground detection for all controllers (must be before controller.update())
+    this.groundDetection.update(controllers, deltaTime);
+
+    // Update each controller
+    for (const controller of controllers) {
       // Update character controller
       controller.update(deltaTime);
 
@@ -97,11 +104,6 @@ export class CharacterControllerSystem {
           }
         }
       }
-
-      // Cleanup cache if controller entity is removed
-      if (!controller.entity) {
-        this.groundDetectionCache.delete(controller);
-      }
     }
   }
 
@@ -111,7 +113,8 @@ export class CharacterControllerSystem {
   private ensureProfileLoaded(controller: CharacterController): void {
     const currentProfile = controller.getCurrentProfile();
     // Check if profile is just a placeholder (has id but not full profile object)
-    if (currentProfile && typeof currentProfile === 'object' && 'id' in currentProfile && !currentProfile.name) {
+    // Placeholder has id and config but empty name (created in deserialize)
+    if (currentProfile && currentProfile.id && (!currentProfile.name || currentProfile.name === '')) {
       const registry = MovementProfileRegistry.getInstance();
       const profile = registry.get(currentProfile.id);
       if (profile) {
@@ -126,65 +129,28 @@ export class CharacterControllerSystem {
     cameraForward: Vec3,
     cameraRight: Vec3
   ): void {
+    // Acquire Vec3 arrays from pool
+    const forward = this.vec3Pool.acquire();
+    const right = this.vec3Pool.acquire();
+    
+    // Copy values
+    forward[0] = cameraForward[0];
+    forward[1] = cameraForward[1];
+    forward[2] = cameraForward[2];
+    
+    right[0] = cameraRight[0];
+    right[1] = cameraRight[1];
+    right[2] = cameraRight[2];
+    
     this.intentBuffer.set(controller, {
       move: [intent.move[0], intent.move[1]],
       jump: intent.jump,
       sprint: intent.sprint,
-      forward: [...cameraForward] as Vec3,
-      right: [...cameraRight] as Vec3,
+      forward: forward as Vec3,
+      right: right as Vec3,
     });
   }
 
-  /**
-   * Update ground detection for a character using raycasting
-   * Uses caching to avoid unnecessary raycasts when position hasn't changed significantly
-   */
-  private updateGroundDetection(controller: CharacterController): void {
-    if (!controller.entity) return;
-
-    const origin = controller.entity.transform.position;
-    // Create a copy to ensure we're comparing values, not references
-    const originCopy: Vec3 = [origin[0], origin[1], origin[2]];
-    const cache = this.groundDetectionCache.get(controller);
-
-    // Check cache if position hasn't changed significantly
-    // Note: Only use cache if character was NOT grounded last frame, to avoid issues with moving platforms
-    if (cache) {
-      const distance = distanceVec3(originCopy, cache.lastPosition);
-      if (distance < 0.01 && !cache.lastIsGrounded) {
-        // Use cached result only if character was in air (not on potentially moving platform)
-        controller.isGrounded = cache.lastIsGrounded;
-        controller.groundNormal = [...cache.lastGroundNormal] as Vec3;
-        return;
-      }
-    }
-
-    // Position changed significantly or no cache - perform raycast
-    const direction: [number, number, number] = [0, -1, 0];
-
-    // Raycast downward to detect ground
-    const hit = this.physics.raycast(originCopy, direction, {
-      // Use a generous distance to ensure floors slightly below the character are detected in tests
-      maxDistance: Math.max(controller.config.groundCheckDistance, 0.1) + 5.0,
-      ignoreEntities: [controller.entity],
-    });
-
-    // Update controller state
-    if (hit) {
-      controller.isGrounded = true;
-      controller.groundNormal = hit.normal;
-    } else {
-      controller.isGrounded = false;
-      controller.groundNormal = [0, 1, 0];
-    }
-
-    // Update cache with copied position to avoid reference issues
-    this.groundDetectionCache.set(controller, {
-      lastPosition: originCopy,
-      lastIsGrounded: controller.isGrounded,
-      lastGroundNormal: [...controller.groundNormal] as Vec3,
-    });
-  }
 
   /**
    * Set input for a specific character controller
@@ -207,12 +173,12 @@ export class CharacterControllerSystem {
    * Synchronize animation state with character controller state
    * 
    * Automatically switches animation states based on CharacterState:
-   * - Idle → "idle" animation
-   * - Walking → "walk" animation
-   * - Running → "run" animation
-   * - Jumping → "jump" animation
-   * - Falling → "fall" animation
-   * - Landing → "land" animation
+   * - Idle → AnimationStateName.Idle ("idle" animation)
+   * - Walking → AnimationStateName.Walk ("walk" animation)
+   * - Running → AnimationStateName.Run ("run" animation)
+   * - Jumping → AnimationStateName.Jump ("jump" animation)
+   * - Falling → AnimationStateName.Fall ("fall" animation)
+   * - Landing → AnimationStateName.Land ("land" animation)
    * 
    * Public for testing purposes.
    */
@@ -236,8 +202,9 @@ export class CharacterControllerSystem {
       return;
     }
 
-    // Switch to the appropriate animation state
-    animationComponent.setActiveState(animationStateName);
+    // Switch to the appropriate animation state with a small blend for smoothness
+    const DEFAULT_BLEND_TIME = 0.12; // seconds
+    animationComponent.setActiveState(animationStateName, DEFAULT_BLEND_TIME);
   }
 }
 

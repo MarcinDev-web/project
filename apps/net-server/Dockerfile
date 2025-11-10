@@ -81,12 +81,11 @@ RUN find packages -type d -name dist -exec rm -rf {} + 2>/dev/null || true && \
 
 # Replace TypeScript path aliases with relative paths using tsc-alias
 # Also fix Prisma imports to use correct relative paths for dist structure
-# From src/storage/ (../../) to dist/apps/net-server/src/storage/ (../../../../../)
-# Also add .js extensions to relative imports that are missing them
+# ESM resolves relative paths from the importing file, not working directory
+# So from dist/storage/file.js, we need ../../node_modules to reach net-server/node_modules
 RUN pnpm add -D -w tsc-alias && \
     pnpm exec tsc-alias -p apps/net-server/tsconfig.json --resolve-full-paths && \
-    find apps/net-server/dist -name "*.js" -type f -exec sed -i "s|from '../../node_modules/.prisma/net-client/index.js'|from '../../../../../node_modules/.prisma/net-client/index.js'|g" {} \; && \
-    find apps/net-server/dist -name "*.js" -type f -exec sed -i "s|from '../../../node_modules/.prisma/net-client/index.js'|from '../../../../../../node_modules/.prisma/net-client/index.js'|g" {} \; && \
+    node -e "const fs=require('fs'),path=require('path');function fixPrismaImports(dir,baseDir){const files=fs.readdirSync(dir,{withFileTypes:true});for(const file of files){const fullPath=path.join(dir,file.name);if(file.isDirectory())fixPrismaImports(fullPath,baseDir);else if(file.name.endsWith('.js')){let content=fs.readFileSync(fullPath,'utf8');const relativePath=path.relative(baseDir,fullPath);const dirs=relativePath.split(path.sep).slice(0,-1);const depth=dirs.length+1;const prismaPath='../'.repeat(depth)+'node_modules/.prisma/net-client/index.js';content=content.replace(/from\s+['\"](?:\/|\.\.\/)+node_modules\/\.prisma\/net-client\/index\.js['\"]/g,\`from '\${prismaPath}'\`);fs.writeFileSync(fullPath,content);}}}fixPrismaImports('/app/apps/net-server/dist','/app/apps/net-server/dist');" && \
     find apps/net-server/dist -name "*.js" -type f -exec sed -i "s|from './index'|from './index.js'|g" {} \; && \
     find apps/net-server/dist -name "*.js" -type f -exec sed -i "s|from '../index'|from '../index.js'|g" {} \; && \
     find apps/net-server/dist -name "*.js" -type f -exec sed -i "s|from '../../index'|from '../../index.js'|g" {} \; && \

@@ -54,6 +54,21 @@ export function PublishToMarketplaceModal({ type, onClose, onPublished }: Publis
     }
   }, [selectedProjectId, selectedAvatarId, projects, avatars, type]);
 
+  const loadProjects = async () => {
+    try {
+      setLoadingProjects(true);
+      const response = await studioApi.getProjects();
+      // Filter out already published projects
+      const unpublishedProjects = response.projects.filter((p) => !p.isPublished);
+      setProjects(unpublishedProjects);
+    } catch (error) {
+      console.error('Failed to load projects:', error);
+      showToast('Nie udało się załadować projektów', 'error');
+    } finally {
+      setLoadingProjects(false);
+    }
+  };
+
   const loadAvatars = async () => {
     try {
       setLoadingProjects(true);

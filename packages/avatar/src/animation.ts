@@ -176,6 +176,39 @@ export class AvatarAnimationPlayer {
   }
 }
 
+/**
+ * Samples an animation track at a given time using linear interpolation.
+ * 
+ * This function handles keyframe interpolation for a single joint's animation track.
+ * It supports both position (lerp) and rotation (slerp) interpolation.
+ * 
+ * Edge cases handled:
+ * - No frames: returns empty result (no position/rotation change)
+ * - Single frame: returns frame as-is (no interpolation needed)
+ * - Time before first frame: returns first frame (clamp to start)
+ * - Time after last frame: returns last frame (clamp to end)
+ * - Time between frames: interpolates using lerp (position) or slerp (rotation)
+ * 
+ * Interpolation details:
+ * - Position: Linear interpolation (lerp) between prev and next positions
+ * - Rotation: Spherical linear interpolation (slerp) between prev and next quaternions
+ * - If only one frame has position/rotation, uses that frame's value
+ * 
+ * @param track - Prepared animation track with sorted keyframes
+ * @param time - Time to sample at (in seconds, should be within animation length)
+ * @returns Sample result with interpolated position and/or rotation
+ * 
+ * @example
+ * ```typescript
+ * const track = { joint: 'Hand.L', frames: [
+ *   { time: 0.0, position: [0, 0, 0], rotation: [0, 0, 0, 1] },
+ *   { time: 1.0, position: [1, 0, 0], rotation: [0, 0, 0, 1] }
+ * ]};
+ * const result = sampleTrack(track, 0.5);
+ * // result.position ≈ [0.5, 0, 0] (lerped)
+ * // result.rotation ≈ [0, 0, 0, 1] (slerped)
+ * ```
+ */
 function sampleTrack(track: PreparedTrack, time: number): SampleResult {
   const { frames } = track;
   if (frames.length === 0) {

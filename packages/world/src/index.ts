@@ -18,6 +18,7 @@ export { CharacterController, type CharacterInput } from './components/Character
 
 // Movement interfaces
 export * from './movement/MovementInterface.js';
+export type { MovementProfile, MovementProfileExtension } from './movement/MovementProfile.js';
 export { EnvironmentComponent } from './components/EnvironmentComponent.js';
 export { LightComponent, type LightType } from './components/LightComponent.js';
 export { MaterialComponent } from './components/MaterialComponent.js';

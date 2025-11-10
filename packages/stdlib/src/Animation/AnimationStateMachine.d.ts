@@ -35,6 +35,10 @@ export declare class AnimationStateMachine {
     replaceStates(states: AnimationStateConfig[]): void;
     getStateConfigs(): AnimationStateConfig[];
     getStateConfig(name: string): AnimationStateConfig | undefined;
+    requestBlendTo(name: string, blendDuration: number, options?: {
+        resetTime?: boolean;
+        autoPlay?: boolean;
+    }): void;
     setParameterDefinitions(parameters: AnimationParameter[]): void;
     getParameterDefinitions(): AnimationParameter[];
     setParameters(values: AnimationParameters | null | undefined): void;

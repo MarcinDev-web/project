@@ -19,6 +19,131 @@ describe('CharacterController - Movement Profiles Integration', () => {
     scene.addEntity(entity);
   });
 
+  describe('applyProfile validation', () => {
+    it('should throw error when profile is null', () => {
+      expect(() => {
+        controller.applyProfile(null as any);
+      }).toThrow('MovementProfile cannot be null or undefined');
+    });
+
+    it('should throw error when profile is undefined', () => {
+      expect(() => {
+        controller.applyProfile(undefined as any);
+      }).toThrow('MovementProfile cannot be null or undefined');
+    });
+
+    it('should throw error when profile missing id', () => {
+      const invalidProfile = {
+        name: 'Test',
+        config: DEFAULT_CHARACTER_CONFIG,
+      } as any;
+      
+      expect(() => {
+        controller.applyProfile(invalidProfile);
+      }).toThrow('MovementProfile missing id');
+    });
+
+    it('should throw error when profile missing config', () => {
+      const invalidProfile = {
+        id: 'test',
+        name: 'Test',
+      } as any;
+      
+      expect(() => {
+        controller.applyProfile(invalidProfile);
+      }).toThrow('MovementProfile "test" missing config');
+    });
+
+    it('should throw error when moveSpeed is not positive', () => {
+      const invalidProfile = MovementProfile.create({
+        id: 'test',
+        name: 'Test',
+        config: {
+          ...DEFAULT_CHARACTER_CONFIG,
+          moveSpeed: -1,
+        },
+      });
+      
+      expect(() => {
+        controller.applyProfile(invalidProfile);
+      }).toThrow('moveSpeed must be positive');
+    });
+
+    it('should throw error when jumpForce is not positive', () => {
+      const invalidProfile = MovementProfile.create({
+        id: 'test',
+        name: 'Test',
+        config: {
+          ...DEFAULT_CHARACTER_CONFIG,
+          jumpForce: 0,
+        },
+      });
+      
+      expect(() => {
+        controller.applyProfile(invalidProfile);
+      }).toThrow('jumpForce must be positive');
+    });
+
+    it('should throw error when gravityMultiplier is negative', () => {
+      const invalidProfile = MovementProfile.create({
+        id: 'test',
+        name: 'Test',
+        config: {
+          ...DEFAULT_CHARACTER_CONFIG,
+          gravityMultiplier: -1,
+        },
+      });
+      
+      expect(() => {
+        controller.applyProfile(invalidProfile);
+      }).toThrow('gravityMultiplier cannot be negative');
+    });
+
+    it('should throw error when maxSlopeAngle is out of range', () => {
+      const invalidProfile = MovementProfile.create({
+        id: 'test',
+        name: 'Test',
+        config: {
+          ...DEFAULT_CHARACTER_CONFIG,
+          maxSlopeAngle: 100,
+        },
+      });
+      
+      expect(() => {
+        controller.applyProfile(invalidProfile);
+      }).toThrow('maxSlopeAngle must be between 0 and 90 degrees');
+    });
+
+    it('should throw error when airControlMultiplier is out of range', () => {
+      const invalidProfile = MovementProfile.create({
+        id: 'test',
+        name: 'Test',
+        config: {
+          ...DEFAULT_CHARACTER_CONFIG,
+          airControlMultiplier: 1.5,
+        },
+      });
+      
+      expect(() => {
+        controller.applyProfile(invalidProfile);
+      }).toThrow('airControlMultiplier must be between 0 and 1');
+    });
+
+    it('should accept valid profile', () => {
+      const validProfile = MovementProfile.create({
+        id: 'test',
+        name: 'Test',
+        config: DEFAULT_CHARACTER_CONFIG,
+      });
+      
+      expect(() => {
+        controller.applyProfile(validProfile);
+      }).not.toThrow();
+      
+      expect(controller.getCurrentProfile()).toBe(validProfile);
+    });
+  });
+
   describe('applyProfile', () => {
     it('should apply profile config to controller', () => {
       const profile = PRESET_PROFILES.FAST_HUMAN;

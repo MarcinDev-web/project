@@ -58,8 +58,6 @@ export class LocalPlayerController implements PlayerController {
   readonly preferences: ControllerPreferences;
 
   private readonly inputHandler: CharacterInputHandler;
-  // @ts-expect-error - Kept for future use
-  private readonly _cameraDirector: CameraDirector;
   private readonly fpsCamera: FPSCamera | null;
   private readonly characterSystem: CharacterControllerSystem | null;
   private readonly keyInputProvider: KeyInputProvider | null;
@@ -76,7 +74,6 @@ export class LocalPlayerController implements PlayerController {
     this.id = options.id;
     this.preferences = options.preferences;
     this.inputHandler = options.inputHandler;
-    this._cameraDirector = options.cameraDirector;
     this.fpsCamera = options.fpsCamera ?? null;
     this.characterSystem = options.characterSystem ?? null;
     this.keyInputProvider = options.keyInputProvider ?? null;

@@ -50,7 +50,7 @@ export declare class AvatarInstance {
     applyLoadout(loadout: AvatarLoadout): void;
     setSlot(slot: AvatarSlot, part: AvatarLoadoutPart | null): void;
     serializeLoadout(): AvatarLoadout;
-    ownsEntity(entity: Entity | null | undefined): boolean;
+    isEntityPartOfAvatar(entity: Entity | null | undefined): boolean;
     /**
      * Set slot visibility (for hiding head in FPS mode, etc.)
      */

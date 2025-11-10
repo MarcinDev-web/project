@@ -52,6 +52,7 @@ export interface AvatarInstanceOptions {
   readonly partLibrary?: AvatarPartLibrary;
   readonly loadout?: AvatarLoadout;
   readonly materialResolver?: AvatarMaterialResolver;
+  readonly strictMode?: boolean;
 }
 
 export class AvatarInstance {
@@ -67,8 +68,10 @@ export class AvatarInstance {
   private readonly colorManager: AvatarColorManager;
   private readonly mountManager: AvatarPartMountManager;
   private readonly serializer: AvatarLoadoutSerializer;
+  private readonly strictMode: boolean;
 
   constructor(parent: Entity, options: AvatarInstanceOptions = {}) {
+    this.strictMode = options.strictMode ?? false;
     this.root = new Entity(options.name ?? 'AvatarInstanceRoot');
     this.root.userData.isAvatarInstanceRoot = true;
     parent.addChild(this.root);
@@ -135,7 +138,11 @@ export class AvatarInstance {
     // Validate loadout before applying
     const validation = this.serializer.validate(loadout, this.partLibrary);
     if (!validation.valid) {
-      console.warn('[AvatarInstance] Loadout validation failed:', validation.errors);
+      const errorMessage = `[AvatarInstance] Loadout validation failed: ${validation.errors.join(', ')}`;
+      if (this.strictMode) {
+        throw new Error(errorMessage);
+      }
+      console.warn(errorMessage);
       // Continue applying valid parts, but log errors
     }
 
@@ -155,7 +162,11 @@ export class AvatarInstance {
 
     const definition = this.resolveDefinition(slot, part.mesh);
     if (!definition) {
-      console.warn(`[AvatarInstance] Missing definition for slot ${slot} part "${part.mesh}"`);
+      const errorMessage = `[AvatarInstance] Missing definition for slot ${slot} part "${part.mesh}"`;
+      if (this.strictMode) {
+        throw new Error(errorMessage);
+      }
+      console.warn(errorMessage);
       this.selections.delete(slot);
       return;
     }
@@ -176,7 +187,13 @@ export class AvatarInstance {
     return this.serializer.serialize(this.selections);
   }
 
-  ownsEntity(entity: Entity | null | undefined): boolean {
+  /**
+   * Check if an entity is part of this avatar instance hierarchy
+   * 
+   * @param entity - Entity to check
+   * @returns True if entity is the root or a descendant of this avatar instance
+   */
+  isEntityPartOfAvatar(entity: Entity | null | undefined): boolean {
     if (!entity) return false;
     if (entity === this.root) return true;
     let current: Entity | null = entity;

@@ -508,6 +508,40 @@ export class AnimationStateMachine {
     }
   }
 
+  /**
+   * Request an immediate transition to the target state with a given blend duration.
+   * If there is no current state, behaves like setState().
+   */
+  requestBlendTo(name: string, blendDuration: number, options?: { resetTime?: boolean; autoPlay?: boolean }): void {
+    const target = this.states.get(name);
+    if (!target) {
+      throw new Error(`AnimationStateMachine: unknown state "${name}"`);
+    }
+    const duration = this.sanitizeBlendDuration(blendDuration);
+    // If no current state, fallback to setState semantics
+    if (!this.currentState) {
+      this.setState(name, options);
+      return;
+    }
+    // Reset target time if requested
+    if (options?.resetTime) {
+      target.controller.time.value = 0;
+    }
+    // Ensure target playback state per options (default autoPlay=true)
+    if (options?.autoPlay === false) {
+      target.controller.pause();
+    } else {
+      target.controller.play();
+    }
+    // Start blend
+    this.blendState = duration > 0 ? { target, duration, elapsed: 0 } : null;
+    if (!this.blendState) {
+      // Immediate switch
+      this.currentState.controller.pause();
+      this.currentState = target;
+    }
+  }
+
   private cloneStateConfig(state: AnimationStateConfig): AnimationStateConfig {
     const base: AnimationStateConfig = {
       name: state.name,

@@ -385,12 +385,12 @@ describe('AvatarInstance', () => {
     });
   });
 
-  describe('ownsEntity', () => {
+  describe('isEntityPartOfAvatar', () => {
     it('should return true for root entity', () => {
       const avatar = new AvatarInstance(parentEntity);
       const root = avatar.getRootEntity();
 
-      expect(avatar.ownsEntity(root)).toBe(true);
+      expect(avatar.isEntityPartOfAvatar(root)).toBe(true);
     });
 
     it('should return true for child entity', () => {
@@ -402,7 +402,7 @@ describe('AvatarInstance', () => {
       expect(children.length).toBeGreaterThan(0);
 
       if (children.length > 0) {
-        expect(avatar.ownsEntity(children[0])).toBe(true);
+        expect(avatar.isEntityPartOfAvatar(children[0])).toBe(true);
       }
     });
 
@@ -410,14 +410,14 @@ describe('AvatarInstance', () => {
       const avatar = new AvatarInstance(parentEntity);
       const unrelated = new Entity('Unrelated');
 
-      expect(avatar.ownsEntity(unrelated)).toBe(false);
+      expect(avatar.isEntityPartOfAvatar(unrelated)).toBe(false);
     });
 
     it('should return false for null', () => {
       const avatar = new AvatarInstance(parentEntity);
 
-      expect(avatar.ownsEntity(null)).toBe(false);
-      expect(avatar.ownsEntity(undefined)).toBe(false);
+      expect(avatar.isEntityPartOfAvatar(null)).toBe(false);
+      expect(avatar.isEntityPartOfAvatar(undefined)).toBe(false);
     });
   });
 

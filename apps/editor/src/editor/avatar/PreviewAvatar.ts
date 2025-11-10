@@ -138,7 +138,7 @@ export class PreviewAvatar {
   ownsEntity(entity: Entity | null | undefined): boolean {
     if (!entity) return false;
     if (entity === this.root || entity === this.visualRoot) return true;
-    if (this.avatar.ownsEntity(entity)) return true;
+    if (this.avatar.isEntityPartOfAvatar(entity)) return true;
     return this.isDescendantOfVisualRoot(entity);
   }
 

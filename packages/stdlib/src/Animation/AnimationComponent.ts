@@ -112,13 +112,18 @@ export class AnimationComponent extends Component {
     return this.stateMachine.getCurrentStateName();
   }
 
-  setActiveState(name: string | null): void {
+  setActiveState(name: string | null, blendTime?: number): void {
     if (!name) {
       this.activeStateName = null;
       return;
     }
     try {
-      this.stateMachine.setState(name, { resetTime: false, autoPlay: true });
+      const current = this.stateMachine.getCurrentStateName();
+      if (current && current !== name && typeof blendTime === 'number' && blendTime > 0) {
+        this.stateMachine.requestBlendTo(name, blendTime, { resetTime: false, autoPlay: true });
+      } else {
+        this.stateMachine.setState(name, { resetTime: false, autoPlay: true });
+      }
       this.activeStateName = name;
     } catch {
       // Ignore unknown states to avoid crashing the component

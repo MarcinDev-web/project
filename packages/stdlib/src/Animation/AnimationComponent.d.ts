@@ -28,7 +28,7 @@ export declare class AnimationComponent extends Component {
     setStates(states: AnimationStateConfig[]): void;
     getStates(): AnimationStateConfig[];
     getActiveState(): string | null;
-    setActiveState(name: string | null): void;
+    setActiveState(name: string | null, blendTime?: number): void;
     toJSON(): AnimationComponentJSON;
     fromJSON(data: AnimationComponentJSON): void;
     clone(): AnimationComponent;

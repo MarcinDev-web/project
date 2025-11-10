@@ -3,6 +3,7 @@ import type { Vec3 } from '@engine/core/math';
 import { quatFromAxisAngle, quatToEuler } from '@engine/core/math';
 import { PhysicsComponent, RigidbodyType } from './PhysicsComponent.js';
 import type { MovementController, MovementInput } from '../movement/MovementInterface.js';
+import type { MovementProfile } from '../movement/MovementProfile.js';
 
 /**
  * Character controller state
@@ -132,8 +133,7 @@ export class CharacterController extends Component implements MovementController
   private physics: PhysicsComponent | null = null;
 
   /** Current movement profile */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  private currentProfile: any = null; // MovementProfile from @engine/stdlib (using any to avoid circular dependency)
+  private currentProfile: MovementProfile | null = null;
 
   /** Current rotation angle for smooth interpolation (radians) */
   private currentRotationY: number = 0;
@@ -271,24 +271,38 @@ export class CharacterController extends Component implements MovementController
 
     if (!this.physics || !this.entity) return;
 
-    // Update timers
+    this.updateTimers(deltaTime);
+    this.applyMovement(deltaTime);
+    this.applyGravity(deltaTime);
+    this.handleJump();
+    this.applyAirDamping(deltaTime);
+    this.updateState();
+    this.updateRotation(deltaTime);
+    this.resetJumpRequest();
+  }
+
+  /**
+   * Update internal timers
+   */
+  private updateTimers(deltaTime: number): void {
     this.timeSinceGrounded += deltaTime;
     this.timeSinceJumpPressed += deltaTime;
+  }
 
-    // Ground detection is expected to be provided by CharacterControllerSystem.
-    // Do not override isGrounded here to allow tests and external systems to control it.
-
-    // Apply movement
-    this.applyMovement(deltaTime);
-
+  /**
+   * Apply custom gravity when configured
+   */
+  private applyGravity(deltaTime: number): void {
     // Apply custom gravity when configured (base gravity is handled by physics engine in integration tests)
     if (this.config.gravityMultiplier !== 1.0) {
       this.applyCustomGravity(deltaTime);
     }
+  }
 
-    // Handle jumping
-    this.handleJump();
-
+  /**
+   * Apply air damping to upward velocity
+   */
+  private applyAirDamping(deltaTime: number): void {
     // Ensure upward velocity decays when in air to prevent repeated jump force application affecting velocity
     if (!this.isGrounded && this.velocity[1] > 0) {
       // Frame-rate aware damping so velocity decreases slightly on subsequent frames
@@ -298,16 +312,22 @@ export class CharacterController extends Component implements MovementController
         this.physics.velocity[1] = this.velocity[1];
       }
     }
+  }
 
-    // Update state after movement and jump handling so state reflects latest velocities
-    this.updateState();
-
+  /**
+   * Update character rotation to face movement direction
+   */
+  private updateRotation(deltaTime: number): void {
     // Auto-rotate to movement direction if enabled
     if (this.config.autoRotate) {
       this.autoRotateToMovement(deltaTime);
     }
+  }
 
-    // Reset jump request
+  /**
+   * Reset jump request flag
+   */
+  private resetJumpRequest(): void {
     this.jumpRequested = false;
   }
 
@@ -464,7 +484,36 @@ export class CharacterController extends Component implements MovementController
   }
 
   /**
-   * Get camera-relative movement direction
+   * Converts camera-relative input to world-space movement direction.
+   * 
+   * This method transforms input from camera space (where forward/backward/left/right
+   * are relative to camera orientation) to world space (absolute X/Z coordinates).
+   * 
+   * Input format:
+   * - input[0]: left/right movement (-1 to 1, negative = left, positive = right)
+   * - input[1]: up/down movement (typically 0 for ground movement)
+   * - input[2]: forward/backward movement (-1 to 1, negative = backward, positive = forward)
+   * 
+   * Camera directions:
+   * - cameraForward: direction camera is facing (normalized)
+   * - cameraRight: direction to camera's right (normalized)
+   * 
+   * Formula:
+   * worldDir = forwardNorm * input[2] + rightNorm * input[0]
+   * 
+   * Where:
+   * - forwardNorm: cameraForward projected onto horizontal plane (Y=0) and normalized
+   * - rightNorm: cameraRight projected onto horizontal plane (Y=0) and normalized
+   * 
+   * Example:
+   * - Input [0, 0, 1] (forward) with cameraForward [0, 0, -1] → worldDir [0, 0, -1]
+   * - Input [1, 0, 0] (right) with cameraRight [1, 0, 0] → worldDir [1, 0, 0]
+   * - Input [0.707, 0, 0.707] (diagonal) → combines forward and right components
+   * 
+   * @param out - Output vector (will be modified)
+   * @param input - Camera-relative input vector [left/right, up/down, forward/backward]
+   * @param cameraForward - Camera forward direction (normalized)
+   * @param cameraRight - Camera right direction (normalized)
    */
   private getCameraRelativeDirectionOut(
     out: Vec3,
@@ -579,27 +628,47 @@ export class CharacterController extends Component implements MovementController
    * Apply a movement profile to this controller
    *
    * @param profile - Movement profile to apply
+   * @throws Error if profile is invalid or missing required fields
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  applyProfile(profile: any): void {
-    // MovementProfile from @engine/stdlib (using any to avoid circular dependency)
+  applyProfile(profile: MovementProfile): void {
+    // Validate profile
+    if (!profile) {
+      throw new Error('MovementProfile cannot be null or undefined');
+    }
+    if (!profile.id) {
+      throw new Error('MovementProfile missing id');
+    }
+    if (!profile.config) {
+      throw new Error(`MovementProfile "${profile.id}" missing config`);
+    }
+
+    // Validate config values
+    if (profile.config.moveSpeed <= 0) {
+      throw new Error(`MovementProfile "${profile.id}": moveSpeed must be positive, got ${profile.config.moveSpeed}`);
+    }
+    if (profile.config.jumpForce <= 0) {
+      throw new Error(`MovementProfile "${profile.id}": jumpForce must be positive, got ${profile.config.jumpForce}`);
+    }
+    if (profile.config.gravityMultiplier < 0) {
+      throw new Error(`MovementProfile "${profile.id}": gravityMultiplier cannot be negative, got ${profile.config.gravityMultiplier}`);
+    }
+    if (profile.config.maxSlopeAngle < 0 || profile.config.maxSlopeAngle > 90) {
+      throw new Error(`MovementProfile "${profile.id}": maxSlopeAngle must be between 0 and 90 degrees, got ${profile.config.maxSlopeAngle}`);
+    }
+    if (profile.config.airControlMultiplier < 0 || profile.config.airControlMultiplier > 1) {
+      throw new Error(`MovementProfile "${profile.id}": airControlMultiplier must be between 0 and 1, got ${profile.config.airControlMultiplier}`);
+    }
+
     // Apply config from profile
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
     this.config = { ...profile.config };
 
     // Apply extensions
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     if (profile.extensions) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       for (const ext of profile.extensions) {
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         if (ext.onApply) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
           ext.onApply(this);
         }
-        // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
         if (ext.modifyConfig) {
-          // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
           this.config = ext.modifyConfig(this.config);
         }
       }
@@ -613,7 +682,6 @@ export class CharacterController extends Component implements MovementController
       this.config.speedMultiplier = 1.0;
     }
 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
     this.currentProfile = profile;
 
     // Update physics gravity if needed
@@ -628,9 +696,7 @@ export class CharacterController extends Component implements MovementController
    *
    * @returns Current profile or null if none applied
    */
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any, @typescript-eslint/no-redundant-type-constituents
-  getCurrentProfile(): any | null {
-    // MovementProfile from @engine/stdlib (using any to avoid circular dependency)
+  getCurrentProfile(): MovementProfile | null {
     return this.currentProfile;
   }
 
@@ -642,7 +708,6 @@ export class CharacterController extends Component implements MovementController
     clone.state = this.state;
     clone.originalMoveSpeed = this.originalMoveSpeed;
     if (this.currentProfile) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment
       clone.currentProfile = this.currentProfile;
     }
     return clone;
@@ -663,9 +728,7 @@ export class CharacterController extends Component implements MovementController
     };
 
     // Include profile ID if profile is applied
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     if (this.currentProfile?.id) {
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
       result.profileId = this.currentProfile.id;
     }
 
@@ -689,14 +752,12 @@ export class CharacterController extends Component implements MovementController
     // Load profile if profileId is provided
     // Note: This requires @engine/stdlib to be available at runtime
     // Profile loading is deferred to runtime to avoid circular dependency
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
     if (data.profileId) {
       // Profile will be loaded by CharacterControllerSystem.update()
       // This is a placeholder - actual loading happens in CharacterControllerSystem
       // or similar higher-level system that has access to MovementProfileRegistry
       // Store placeholder that will be recognized by ensureProfileLoaded()
-      // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-explicit-any
-      controller.currentProfile = { id: data.profileId, name: '' } as any;
+      controller.currentProfile = { id: data.profileId, name: '', config: DEFAULT_CHARACTER_CONFIG } as MovementProfile;
     }
 
     return controller;
