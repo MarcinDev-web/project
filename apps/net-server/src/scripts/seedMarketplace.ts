@@ -3,6 +3,7 @@
  */
 
 import { MarketplaceStorage } from '../storage/MarketplaceStorage.js';
+import { MarketplaceStorageDB } from '../storage/MarketplaceStorageDB.js';
 import { GameSessionTracker } from '../websocket/GameSessionTracker.js';
 import { generateAndSaveThumbnail } from '../utils/thumbnailGenerator.js';
 import { createDbPool } from '../lib/db.js';
@@ -12,7 +13,6 @@ import path from 'path';
 
 const DATA_DIR = process.env.DATA_DIR || path.join(process.cwd(), 'data');
 const THUMBNAIL_DIR = path.join(DATA_DIR, 'thumbnails');
-const storage = new MarketplaceStorage(DATA_DIR);
 const gameSessionTracker = new GameSessionTracker();
 
 // Mock builds data - buildings and structures only
@@ -245,6 +245,33 @@ const mockAvatars = [
 
 export async function seedMarketplace(tracker?: GameSessionTracker): Promise<void> {
   try {
+    // Initialize database pool if available
+    let dbPool: Awaited<ReturnType<typeof createDbPool>> | null = null;
+    if (process.env.DATABASE_URL) {
+      try {
+        dbPool = await createDbPool();
+        console.log('Database connection established');
+      } catch (error) {
+        console.warn('Failed to connect to database:', error);
+      }
+    }
+
+    // Use database storage if available, otherwise fallback to JSON (same pattern as server.ts)
+    const storage = dbPool
+      ? new MarketplaceStorageDB(dbPool)
+      : new MarketplaceStorage(DATA_DIR);
+
+    // Initialize build storage if database is available
+    let buildStorage: BuildStorage | null = null;
+    if (dbPool) {
+      try {
+        buildStorage = new BuildStorage(dbPool);
+        console.log('Build storage initialized');
+      } catch (error) {
+        console.warn('Failed to initialize build storage:', error);
+      }
+    }
+
     await storage.initialize();
 
     // Check if marketplace already has items
@@ -255,19 +282,6 @@ export async function seedMarketplace(tracker?: GameSessionTracker): Promise<voi
     }
 
     console.log('Seeding marketplace with mock builds and avatars...');
-
-    // Initialize build storage if database is available
-    let buildStorage: BuildStorage | null = null;
-    let dbPool: Awaited<ReturnType<typeof createDbPool>> | null = null;
-    if (process.env.DATABASE_URL) {
-      try {
-        dbPool = await createDbPool();
-        buildStorage = new BuildStorage(dbPool);
-        console.log('Build storage initialized');
-      } catch (error) {
-        console.warn('Failed to initialize build storage:', error);
-      }
-    }
 
     // Use provided tracker or create a new one
     const trackerToUse = tracker ?? gameSessionTracker;

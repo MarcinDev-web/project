@@ -48,6 +48,7 @@ import {
   type InstanceBufferData,
 } from './InstanceBufferUtils';
 import type { GPUBufferPool } from './bufferPool';
+import { DeviceValidator, type DeviceSnapshot } from './DeviceValidator';
 
 interface ResolvedFeatureFlags extends PostProcessFeatureFlags {
   enableComputePrepass: boolean;
@@ -107,7 +108,32 @@ export interface FrameRenderContext {
 }
 
 /**
+ * Error metrics tracked by FrameRenderer for monitoring and debugging.
+ */
+export interface ErrorMetrics {
+  sceneUpdateErrors: number;
+  screenLodErrors: number;
+  shadowPassErrors: number;
+  forwardPlusErrors: number;
+  computePrepassErrors: number;
+  environmentRenderErrors: number;
+  waterRenderErrors: number;
+  gridRenderErrors: number;
+  logicConnectionErrors: number;
+  postProcessErrors: number;
+  deviceValidationErrors: number;
+  lastErrorTime: number;
+}
+
+/**
  * FrameRenderer manages the per-frame rendering operations.
+ *
+ * Key features:
+ * - Centralized device validation via DeviceValidator
+ * - Error metrics tracking for monitoring and debugging
+ * - Cache cleanup to prevent unbounded memory growth
+ * - Accurate custom geometry triangle counting
+ * - Comprehensive error handling with graceful degradation
  */
 export class FrameRenderer {
   private frustumCuller: FrustumCuller;
@@ -118,6 +144,7 @@ export class FrameRenderer {
   private postProcess: PostProcessPipeline;
   private visibleEntitiesCache: Entity[] = [];
   private customGeometryEntitiesCache: CustomGeometryEntity[] = [];
+  private customGeometryTriangleCounts: Map<Entity, number> = new Map();
   private computePrepass: ComputePrepass | null = null;
   private pendingTimestampRead = false;
   private staticBundle: GPURenderBundle | null = null;
@@ -135,6 +162,21 @@ export class FrameRenderer {
   private shadowPass: ShadowPass | null = null;
   private instanceScaleScratch = new Float32Array(0);
   private ownedLodScaleBuffer: GPUBuffer | null = null;
+  private errorMetrics: ErrorMetrics = {
+    sceneUpdateErrors: 0,
+    screenLodErrors: 0,
+    shadowPassErrors: 0,
+    forwardPlusErrors: 0,
+    computePrepassErrors: 0,
+    environmentRenderErrors: 0,
+    waterRenderErrors: 0,
+    gridRenderErrors: 0,
+    logicConnectionErrors: 0,
+    postProcessErrors: 0,
+    deviceValidationErrors: 0,
+    lastErrorTime: 0,
+  };
+  private readonly MAX_VISIBLE_ENTITIES_CACHE_SIZE = 10000;
 
   constructor(initialCapacity = 1000) {
     this.frustumCuller = new FrustumCuller();
@@ -156,13 +198,18 @@ export class FrameRenderer {
     const { device, frameResources } = ctx;
     let geometry = ctx.geometry;
 
-    const configuredDevice = this.validateConfiguredDevice(ctx);
-    if (!configuredDevice) {
+    // Create device snapshot at start of frame for consistent validation
+    const deviceSnapshot = DeviceValidator.createSnapshot(ctx);
+    const deviceValidation = DeviceValidator.validateSnapshot(deviceSnapshot);
+    
+    if (!deviceValidation.valid) {
+      this.errorMetrics.deviceValidationErrors++;
+      this.errorMetrics.lastErrorTime = performance.now();
+      Logger.warn(`[FrameRenderer] ${deviceValidation.error} - skipping frame`);
       return geometry;
     }
-    if (!this.validateFrameResourcesDevice(ctx)) {
-      return geometry;
-    }
+
+    const configuredDevice = deviceSnapshot.configuredDevice;
 
     const featureFlags = this.resolveFeatureFlags(ctx.featureFlags);
     const sampleCount = ctx.msaaSampleCount ?? MSAA_SAMPLE_COUNT;
@@ -177,36 +224,9 @@ export class FrameRenderer {
     });
 
     const encoder = configuredDevice.createCommandEncoder({ label: 'frame-encoder' });
-    const swapChainTexture = this.acquireSwapChainTexture(ctx, configuredDevice, encoder);
-    if (!swapChainTexture) {
-      return geometry;
-    }
     
-    // Ensure texture view is created with the same device that will use it
-    // The texture from getCurrentTexture() is associated with the context's device,
-    // which should match configuredDevice. If not, creating the view will fail.
-    // Validate device one more time before creating view
-    const currentConfigured = ctx.configuredDevice ?? ctx.device;
-    if (currentConfigured !== configuredDevice) {
-      Logger.warn('[FrameRenderer] Device mismatch before creating swap chain view - aborting frame');
-      try {
-        encoder.finish();
-      } catch {
-        // ignore
-      }
-      return geometry;
-    }
-    
-    let swapChainView: GPUTextureView;
-    try {
-      swapChainView = swapChainTexture.createView({ label: 'frame-color-resolve-view' });
-    } catch (err) {
-      Logger.warn('[FrameRenderer] Failed to create swap chain view - device may have changed:', err);
-      try {
-        encoder.finish();
-      } catch {
-        // ignore
-      }
+    const swapChainView = this.setupSwapChain(ctx, configuredDevice, encoder, deviceSnapshot);
+    if (!swapChainView) {
       return geometry;
     }
 
@@ -257,29 +277,51 @@ export class FrameRenderer {
 
     // Validate device consistency before post-processing
     // Post-process may use swapChainView, so we need to ensure device hasn't changed
-    const prePostProcessDevice = ctx.configuredDevice ?? ctx.device;
-    if (prePostProcessDevice !== configuredDevice) {
-      Logger.warn('[FrameRenderer] Device changed before post-process - skipping post-process');
-      try {
-        encoder.finish();
-      } catch {
-        // ignore
-      }
+    if (!this.validateDeviceAndCleanupEncoder(ctx, deviceSnapshot, encoder, 'post-processing')) {
       return geometry;
     }
 
-    this.postProcess.run(
-      this.buildPostProcessInputs(ctx, featureFlags, targetState, {
-        encoder,
-        geometry,
-        frameResources,
-        swapChainView,
-        sampleCount,
-        viewMatrix,
-        projectionMatrix,
-      })
-    );
+    try {
+      this.postProcess.run(
+        this.buildPostProcessInputs(ctx, featureFlags, targetState, {
+          encoder,
+          geometry,
+          frameResources,
+          swapChainView,
+          sampleCount,
+          viewMatrix,
+          projectionMatrix,
+        })
+      );
+    } catch (err) {
+      this.errorMetrics.postProcessErrors++;
+      this.errorMetrics.lastErrorTime = performance.now();
+      Logger.warn('[FrameRenderer] Post-process failed:', err);
+      // Continue with frame submission even if post-process failed
+    }
 
+    this.finalizeFrame(ctx, configuredDevice, encoder, frameResources, geometry, sceneUpdate);
+
+    return geometry;
+  }
+
+  /**
+   * Finalizes frame rendering: timestamps, command buffer submission, callbacks.
+   * @param ctx Frame render context
+   * @param configuredDevice Configured GPU device
+   * @param encoder Command encoder
+   * @param frameResources Frame resources
+   * @param geometry Current geometry data
+   * @param sceneUpdate Scene update result with timings
+   */
+  private finalizeFrame(
+    ctx: FrameRenderContext,
+    configuredDevice: GPUDevice,
+    encoder: GPUCommandEncoder,
+    frameResources: FrameResources,
+    geometry: GeometryData,
+    sceneUpdate: SceneUpdateResult
+  ): void {
     this.writeFrameEndTimestamp(frameResources, encoder);
     this.resolveTimestampQueries(frameResources, encoder);
 
@@ -288,7 +330,7 @@ export class FrameRenderer {
     this.frameTargets.flush(configuredDevice.queue);
     this.postProcess.flush(configuredDevice.queue);
 
-    this.handleTimestampRead(ctx, device, frameResources);
+    this.handleTimestampRead(ctx, ctx.device, frameResources);
 
     if (sceneUpdate.timings && ctx.onCpuTimings) {
       ctx.onCpuTimings(sceneUpdate.timings);
@@ -300,8 +342,6 @@ export class FrameRenderer {
       const triangles = this.calculateTriangles(geometry);
       ctx.onRenderStats({ drawCalls, triangles });
     }
-
-    return geometry;
   }
 
   dispose(): void {
@@ -327,6 +367,10 @@ export class FrameRenderer {
       // ignore
     }
     this.ownedLodScaleBuffer = null;
+    // Cleanup caches
+    this.visibleEntitiesCache = [];
+    this.customGeometryEntitiesCache = [];
+    this.customGeometryTriangleCounts.clear();
   }
 
   /**
@@ -369,9 +413,17 @@ export class FrameRenderer {
     const baseTriangles = geometry.indices.length / 3;
     const instancedTriangles = baseTriangles * geometry.instanceCount;
 
-    // Custom geometry triangles (approximate - each custom geometry entity contributes)
-    // This is a rough estimate since we don't track exact triangle counts for custom geometry
-    const customGeometryTriangles = this.customGeometryEntitiesCache.length * 12; // Estimate: 12 triangles per custom entity
+    // Custom geometry triangles - use tracked counts when available
+    let customGeometryTriangles = 0;
+    for (const { entity } of this.customGeometryEntitiesCache) {
+      const count = this.customGeometryTriangleCounts.get(entity);
+      if (count !== undefined) {
+        customGeometryTriangles += count;
+      } else {
+        // Fallback estimate if count not tracked yet
+        customGeometryTriangles += 12;
+      }
+    }
 
     return Math.round(instancedTriangles + customGeometryTriangles);
   }
@@ -390,36 +442,89 @@ export class FrameRenderer {
     };
   }
 
-  private validateConfiguredDevice(ctx: FrameRenderContext): GPUDevice | null {
-    const configuredDevice = ctx.configuredDevice ?? ctx.device;
-    if (ctx.device !== configuredDevice) {
-      Logger.warn('Device mismatch in FrameRenderer - skipping frame to avoid WebGPU errors');
-      return null;
-    }
-    return configuredDevice;
-  }
-
-  private validateFrameResourcesDevice(ctx: FrameRenderContext): boolean {
-    const frameResourcesDevice = ctx.frameResourcesDevice ?? ctx.device;
-    if (ctx.device !== frameResourcesDevice) {
-      Logger.warn(
-        'FrameResources device mismatch - resources were created with different device. Skipping frame.'
-      );
+  /**
+   * Validates device consistency before an operation and handles cleanup on failure.
+   * @param ctx Frame render context
+   * @param deviceSnapshot Device snapshot from start of frame
+   * @param encoder Command encoder to cleanup on failure
+   * @param operationName Name of operation for logging
+   * @returns true if validation passed, false otherwise
+   */
+  private validateDeviceAndCleanupEncoder(
+    ctx: FrameRenderContext,
+    deviceSnapshot: DeviceSnapshot,
+    encoder: GPUCommandEncoder,
+    operationName: string
+  ): boolean {
+    if (!DeviceValidator.validateBeforeOperation(ctx, deviceSnapshot, operationName)) {
+      this.errorMetrics.deviceValidationErrors++;
+      this.errorMetrics.lastErrorTime = performance.now();
+      try {
+        encoder.finish();
+      } catch {
+        // ignore
+      }
       return false;
     }
     return true;
   }
 
+  /**
+   * Sets up swap chain texture and view with device validation.
+   * @param ctx Frame render context
+   * @param configuredDevice Configured GPU device
+   * @param encoder Command encoder
+   * @param deviceSnapshot Device snapshot from start of frame
+   * @returns GPUTextureView if successful, null otherwise
+   */
+  private setupSwapChain(
+    ctx: FrameRenderContext,
+    configuredDevice: GPUDevice,
+    encoder: GPUCommandEncoder,
+    deviceSnapshot: DeviceSnapshot
+  ): GPUTextureView | null {
+    // Validate device before acquiring swap chain texture
+    if (!this.validateDeviceAndCleanupEncoder(ctx, deviceSnapshot, encoder, 'swap chain texture acquisition')) {
+      return null;
+    }
+    
+    const swapChainTexture = this.acquireSwapChainTexture(ctx, configuredDevice, encoder, deviceSnapshot);
+    if (!swapChainTexture) {
+      return null;
+    }
+    
+    // Validate device before creating swap chain view
+    if (!this.validateDeviceAndCleanupEncoder(ctx, deviceSnapshot, encoder, 'swap chain view creation')) {
+      return null;
+    }
+    
+    let swapChainView: GPUTextureView;
+    try {
+      swapChainView = swapChainTexture.createView({ label: 'frame-color-resolve-view' });
+    } catch (err) {
+      this.errorMetrics.deviceValidationErrors++;
+      this.errorMetrics.lastErrorTime = performance.now();
+      Logger.warn('[FrameRenderer] Failed to create swap chain view - device may have changed:', err);
+      try {
+        encoder.finish();
+      } catch {
+        // ignore
+      }
+      return null;
+    }
+    
+    return swapChainView;
+  }
+
   private acquireSwapChainTexture(
     ctx: FrameRenderContext,
     configuredDevice: GPUDevice,
-    encoder: GPUCommandEncoder
+    encoder: GPUCommandEncoder,
+    deviceSnapshot: DeviceSnapshot
   ): GPUTexture | null {
     try {
       // Validate device consistency before getting texture
-      const currentConfigured = ctx.configuredDevice ?? ctx.device;
-      if (currentConfigured !== configuredDevice) {
-        Logger.warn('[FrameRenderer] Device mismatch - configuredDevice changed. Skipping frame.');
+      if (!DeviceValidator.validateBeforeOperation(ctx, deviceSnapshot, 'getCurrentTexture')) {
         try {
           encoder.finish();
         } catch {
@@ -431,11 +536,8 @@ export class FrameRenderer {
       // Get the swap chain texture - it's associated with the device that configured the context
       const texture = ctx.context.getCurrentTexture();
       
-      // Double-check device consistency after getting texture
-      // If device changed between checks, the texture will be invalid
-      const postConfigured = ctx.configuredDevice ?? ctx.device;
-      if (postConfigured !== configuredDevice) {
-        Logger.warn('[FrameRenderer] Device changed during texture acquisition - aborting');
+      // Validate device consistency after getting texture
+      if (!DeviceValidator.validateBeforeOperation(ctx, deviceSnapshot, 'texture acquisition completion')) {
         try {
           encoder.finish();
         } catch {
@@ -446,6 +548,8 @@ export class FrameRenderer {
       
       return texture;
     } catch (err) {
+      this.errorMetrics.deviceValidationErrors++;
+      this.errorMetrics.lastErrorTime = performance.now();
       Logger.warn('[FrameRenderer] Failed to get current swap chain texture - device may have changed:', err);
       try {
         encoder.finish();
@@ -454,6 +558,68 @@ export class FrameRenderer {
       }
       return null;
     }
+  }
+  
+  /**
+   * Updates custom geometry triangle counts by examining mesh data.
+   */
+  private updateCustomGeometryTriangleCounts(entities: CustomGeometryEntity[]): void {
+    // Clear counts for entities that are no longer in the cache
+    const currentEntitySet = new Set(entities.map(e => e.entity));
+    for (const [entity] of this.customGeometryTriangleCounts) {
+      if (!currentEntitySet.has(entity)) {
+        this.customGeometryTriangleCounts.delete(entity);
+      }
+    }
+    
+    // Update counts for current entities
+    for (const { entity, meshComponent } of entities) {
+      const meshData = meshComponent.meshData;
+      if (meshData?.indices) {
+        // Calculate triangle count from indices
+        const triangleCount = meshData.indices.length / 3;
+        this.customGeometryTriangleCounts.set(entity, triangleCount);
+      }
+    }
+  }
+  
+  /**
+   * Cleans up visible entities cache if it exceeds maximum size.
+   * This prevents unbounded memory growth.
+   */
+  private cleanupVisibleEntitiesCache(): void {
+    if (this.visibleEntitiesCache.length > this.MAX_VISIBLE_ENTITIES_CACHE_SIZE) {
+      // Keep only the most recent entries (half of max size)
+      const keepCount = Math.floor(this.MAX_VISIBLE_ENTITIES_CACHE_SIZE / 2);
+      this.visibleEntitiesCache = this.visibleEntitiesCache.slice(-keepCount);
+    }
+  }
+  
+  /**
+   * Gets current error metrics for monitoring/debugging.
+   */
+  getErrorMetrics(): Readonly<ErrorMetrics> {
+    return { ...this.errorMetrics };
+  }
+  
+  /**
+   * Resets error metrics (useful for testing or periodic resets).
+   */
+  resetErrorMetrics(): void {
+    this.errorMetrics = {
+      sceneUpdateErrors: 0,
+      screenLodErrors: 0,
+      shadowPassErrors: 0,
+      forwardPlusErrors: 0,
+      computePrepassErrors: 0,
+      environmentRenderErrors: 0,
+      waterRenderErrors: 0,
+      gridRenderErrors: 0,
+      logicConnectionErrors: 0,
+      postProcessErrors: 0,
+      deviceValidationErrors: 0,
+      lastErrorTime: 0,
+    };
   }
 
   private writeFrameBeginTimestamp(frameResources: FrameResources, encoder: GPUCommandEncoder): void {
@@ -536,6 +702,12 @@ export class FrameRenderer {
         this.visibleEntitiesCache
       );
       this.customGeometryEntitiesCache = customGeometry;
+      
+      // Update custom geometry triangle counts
+      this.updateCustomGeometryTriangleCounts(customGeometry);
+      
+      // Cleanup visible entities cache if it grows too large
+      this.cleanupVisibleEntitiesCache();
 
       const instanceStart = performance.now();
       const sceneData = this.instanceBuilder.build(defaultGeometry);
@@ -565,6 +737,8 @@ export class FrameRenderer {
         timings: { cullingTime, instanceUpdateTime, totalCPUTime },
       };
     } catch (err) {
+      this.errorMetrics.sceneUpdateErrors++;
+      this.errorMetrics.lastErrorTime = performance.now();
       Logger.warn('Frustum culling/update failed:', err);
       return { geometry };
     }
@@ -607,6 +781,8 @@ export class FrameRenderer {
         geometry.instanceCount
       );
     } catch (err) {
+      this.errorMetrics.screenLodErrors++;
+      this.errorMetrics.lastErrorTime = performance.now();
       Logger.warn('Screen-space LOD selection failed:', err);
     }
   }
@@ -655,6 +831,8 @@ export class FrameRenderer {
         }
       }
     } catch (err) {
+      this.errorMetrics.shadowPassErrors++;
+      this.errorMetrics.lastErrorTime = performance.now();
       Logger.warn('Shadow pass failed:', err);
     }
   }
@@ -701,6 +879,8 @@ export class FrameRenderer {
         );
       }
     } catch (err) {
+      this.errorMetrics.forwardPlusErrors++;
+      this.errorMetrics.lastErrorTime = performance.now();
       Logger.warn('Forward+ light culling failed:', err);
     }
   }
@@ -744,6 +924,8 @@ export class FrameRenderer {
         }
       }
     } catch (err) {
+      this.errorMetrics.computePrepassErrors++;
+      this.errorMetrics.lastErrorTime = performance.now();
       Logger.warn('Compute prepass failed:', err);
     }
   }
@@ -826,6 +1008,8 @@ export class FrameRenderer {
       environmentRenderer.updateParams(envComponent);
       environmentRenderer.render(passEncoder, envComponent);
     } catch (err) {
+      this.errorMetrics.environmentRenderErrors++;
+      this.errorMetrics.lastErrorTime = performance.now();
       Logger.warn('Environment render failed:', err);
     }
   }
@@ -907,6 +1091,8 @@ export class FrameRenderer {
         frameResources.msaaColorTexture
       );
     } catch (err) {
+      this.errorMetrics.waterRenderErrors++;
+      this.errorMetrics.lastErrorTime = performance.now();
       Logger.warn('Water render failed:', err);
     }
   }
@@ -923,6 +1109,8 @@ export class FrameRenderer {
     try {
       gridRenderer.render(passEncoder, viewProjectionMatrix);
     } catch (err) {
+      this.errorMetrics.gridRenderErrors++;
+      this.errorMetrics.lastErrorTime = performance.now();
       Logger.warn('Grid render failed:', err);
     }
   }
@@ -940,6 +1128,8 @@ export class FrameRenderer {
     try {
       logicConnectionRenderer.render(passEncoder, viewProjectionMatrix, eyePosition);
     } catch (err) {
+      this.errorMetrics.logicConnectionErrors++;
+      this.errorMetrics.lastErrorTime = performance.now();
       Logger.warn('Logic connection render failed:', err);
     }
   }
