@@ -20,7 +20,7 @@ import { Entity } from '@engine/world';
 import type { Vec3, Mat4 } from '@engine/core/math';
 import { mat4Invert, mat4GetTranslationOut, mat4GetRotationOut } from '@engine/core/math';
 import type { PhysicsWorld } from '@engine/world';
-import { CharacterController } from '@engine/world/components/CharacterController';
+import { CharacterController, CharacterState } from '@engine/world/components/CharacterController';
 import { PhysicsComponent, RigidbodyType } from '@engine/world/components/PhysicsComponent';
 import { HealthComponent } from '@engine/world/components/HealthComponent';
 import { CameraComponent } from '@engine/world/components/CameraComponent';
@@ -30,6 +30,15 @@ import type { FPSCamera } from '@engine/camera';
 // Note: FPSCamera and ThirdPersonCamera are not used in editor, only in play mode
 import type { CharacterControllerSystem } from '@engine/stdlib/CharacterController';
 import type { CharacterInputHandler } from '@engine/input';
+import {
+  AvatarInstance,
+  DEFAULT_AVATAR_LOADOUT,
+  type AvatarLoadout,
+  IDLE_ANIMATION,
+  RUN_ANIMATION,
+  WALK_ANIMATION,
+  JUMP_ANIMATION,
+} from '@engine/avatar';
 import { PlayModeStateMachine, PlayModeStateType } from '../core/PlayModeStateMachine';
 import { WorldManager } from '../core/WorldManager';
 import { InputContextManager, EditorInputContext } from '@engine/input';
@@ -86,6 +95,9 @@ export class EditorModeManager {
   // Legacy player entity (for compatibility)
   private playerEntity: Entity | null = null;
   private playerSession: PlayerSession | null = null;
+  private avatarInstance: AvatarInstance | null = null;
+  private avatarVisualRoot: Entity | null = null;
+  private lastPlayedAnim: 'idle' | 'walk' | 'run' | 'jump' | null = null;
   
   // Temporary camera entity for edit mode (bridges CameraDirector to renderer)
   private editorCameraEntity: Entity | null = null;
@@ -151,6 +163,7 @@ export class EditorModeManager {
     // Create temporary camera entity for edit mode
     this.setupEditorCamera();
     // Avatar is not used in editor
+    // Note: In play mode we attach a runtime avatar for visuals
     
     // Create state instances
     this.editState = new EditState({
@@ -715,6 +728,9 @@ export class EditorModeManager {
       Logger.warn('Fixed update did not settle after maximum substeps');
       this.playAccumulator = fixedDeltaTime * 0.99;
     }
+
+    // Update avatar visuals and animation
+    this.updateAvatar(deltaTime);
   }
 
   dispose(): void {
@@ -929,6 +945,11 @@ export class EditorModeManager {
     
     this.playerEntity = player;
 
+    // Attach visual avatar under the player for play mode
+    this.attachAvatarToPlayer();
+    // Load and apply user's saved avatar (best-effort, async)
+    void this.loadAndApplyUserAvatar();
+
     // Start multiplayer gameplay if collaboration is active
     if (this.config.collaborationManager?.isCollaborating()) {
       try {
@@ -965,6 +986,18 @@ export class EditorModeManager {
       }
     }
 
+    // Cleanup avatar visuals
+    if (this.avatarInstance) {
+      try {
+        this.avatarInstance.dispose();
+      } catch {
+        // ignore
+      }
+      this.avatarInstance = null;
+    }
+    this.avatarVisualRoot = null;
+    this.lastPlayedAnim = null;
+
     if (this.playerEntity) {
       try {
         const runtimeWorld = this.worldManager.getRuntimeWorld();
@@ -979,6 +1012,191 @@ export class EditorModeManager {
       this.playerEntity = null;
     }
     this.playerSession = null;
+  }
+
+  /**
+   * Create and attach AvatarInstance visuals under the player entity,
+   * offset so feet are on the ground and hide obstructing FPS parts.
+   */
+  private attachAvatarToPlayer(): void {
+    if (!this.playerEntity) return;
+
+    // Cleanup previous visuals if any
+    if (this.avatarInstance) {
+      try {
+        this.avatarInstance.dispose();
+      } catch {
+        // ignore
+      }
+      this.avatarInstance = null;
+    }
+    if (this.avatarVisualRoot && this.avatarVisualRoot.parent) {
+      try {
+        this.avatarVisualRoot.parent.removeChild(this.avatarVisualRoot);
+      } catch {
+        // ignore
+      }
+    }
+    this.avatarVisualRoot = null;
+
+    const visualRoot = new Entity('PlayerAvatarVisual');
+    visualRoot.userData.isPlayerAvatarVisual = true;
+
+    // Offset avatar so feet align with ground: use collider center Y from manifest (or default)
+    const manifest = this.stateMachine.getContext().manifest as PlayManifest | null;
+    const centerY = manifest?.pawn.physics.collider.center[1] ?? 0.85;
+    visualRoot.transform.position = [0, -centerY, 0];
+    visualRoot.transform.scale = [1, 1, 1];
+
+    this.playerEntity.addChild(visualRoot);
+    this.avatarVisualRoot = visualRoot;
+
+    // Instantiate avatar with default loadout for now (can be replaced with user profile later)
+    const avatar = new AvatarInstance(visualRoot, {
+      name: 'EditorPlayModeAvatar',
+      loadout: DEFAULT_AVATAR_LOADOUT,
+      strictMode: true,
+    });
+
+    // Hide head-related slots for FPS to avoid clipping
+    try {
+      avatar.setSlotVisible('HeadSlot', false);
+      avatar.setSlotVisible('HairSlot', false);
+      avatar.setSlotVisible('FaceOverlaySlot', false);
+    } catch {
+      // non-fatal
+    }
+
+    this.avatarInstance = avatar;
+    this.lastPlayedAnim = null;
+  }
+
+  /**
+   * Update avatar visuals and drive animations based on CharacterController state.
+   */
+  private updateAvatar(deltaTime: number): void {
+    if (!this.avatarInstance || !this.playerEntity) return;
+
+    // Tick avatar internal animator
+    this.avatarInstance.update(deltaTime);
+
+    // Drive animation from character state
+    const controller = this.playerEntity.getComponent(CharacterController);
+    if (!controller) return;
+
+    let desired: 'idle' | 'walk' | 'run' | 'jump' = 'idle';
+    switch (controller.state) {
+      case CharacterState.Running:
+        desired = 'run';
+        break;
+      case CharacterState.Walking:
+        desired = 'walk';
+        break;
+      case CharacterState.Jumping:
+      case CharacterState.Falling:
+        desired = 'jump';
+        break;
+      case CharacterState.Idle:
+      case CharacterState.Landing:
+      default:
+        desired = 'idle';
+        break;
+    }
+
+    if (desired !== this.lastPlayedAnim) {
+      switch (desired) {
+        case 'run':
+          this.avatarInstance.playAnimation(RUN_ANIMATION);
+          break;
+        case 'walk':
+          this.avatarInstance.playAnimation(WALK_ANIMATION);
+          break;
+        case 'jump':
+          this.avatarInstance.playAnimation(JUMP_ANIMATION);
+          break;
+        case 'idle':
+        default:
+          this.avatarInstance.playAnimation(IDLE_ANIMATION);
+          break;
+      }
+      this.lastPlayedAnim = desired;
+    }
+  }
+
+  /**
+   * Load user's saved avatar and apply to current avatar instance.
+   */
+  private async loadAndApplyUserAvatar(): Promise<void> {
+    try {
+      const loadout = await this.fetchUserAvatarLoadout();
+      if (loadout && this.avatarInstance) {
+        this.avatarInstance.applyLoadout(loadout);
+      }
+    } catch {
+      // Ignore failures, default avatar remains
+    }
+  }
+
+  /**
+   * Fetch current user's avatar loadout from API.
+   */
+  private async fetchUserAvatarLoadout(): Promise<AvatarLoadout | null> {
+    interface AvatarLoadoutData {
+      version: number;
+      parts: Record<
+        string,
+        {
+          mesh: string;
+          mat?: string;
+          material?: string;
+          colors?: Record<string, [number, number, number, number]>;
+        }
+      >;
+    }
+
+    // Get current user
+    let userId: string | null = null;
+    try {
+      const meResp = await fetch('/api/auth/me', { credentials: 'include' });
+      if (!meResp.ok) return null;
+      const me = (await meResp.json()) as { id?: string };
+      userId = me?.id ?? null;
+      if (!userId) return null;
+    } catch {
+      return null;
+    }
+
+    // Get avatar loadout
+    try {
+      const resp = await fetch(`/api/users/${encodeURIComponent(userId)}/avatar-loadout`, {
+        credentials: 'include',
+      });
+      if (!resp.ok) return null; // Includes 404 (no saved loadout)
+      const data = (await resp.json()) as AvatarLoadoutData;
+      return this.convertAvatarLoadoutData(data);
+    } catch {
+      return null;
+    }
+  }
+
+  private convertAvatarLoadoutData(data: {
+    version: number;
+    parts: Record<
+      string,
+      { mesh: string; mat?: string; material?: string; colors?: Record<string, [number, number, number, number]> }
+    >;
+  }): AvatarLoadout {
+    const parts: AvatarLoadout['parts'] = {};
+    for (const [slot, part] of Object.entries(data.parts || {})) {
+      if (!part) continue;
+      (parts as any)[slot] = {
+        mesh: part.mesh,
+        ...(part.mat && { mat: part.mat }),
+        ...(part.material && { material: part.material }),
+        ...(part.colors && { colors: part.colors }),
+      };
+    }
+    return { version: data.version, parts };
   }
 }
 

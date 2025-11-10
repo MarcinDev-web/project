@@ -13,7 +13,7 @@ import type { CharacterInputHandler } from '@engine/input';
 import type { FPSCamera } from '@engine/camera';
 import { CameraDirector } from '@engine/camera';
 import { InputContextManager, GameplayInputContext } from '@engine/input';
-import { CharacterController } from '@engine/world/components/CharacterController';
+import { CharacterController, CharacterState } from '@engine/world/components/CharacterController';
 import { PhysicsComponent, RigidbodyType } from '@engine/world/components/PhysicsComponent';
 import { HealthComponent } from '@engine/world/components/HealthComponent';
 import { DefaultControllerFactory, PlayerSession } from '@engine/stdlib/CharacterController';
@@ -21,6 +21,15 @@ import { hydrateScene } from '@engine/editor-utils';
 import type { Vec3 } from '@engine/core/math';
 import { Logger } from './utils/logger';
 import { loadBuildData } from './utils/loadBuildData';
+import {
+  AvatarInstance,
+  DEFAULT_AVATAR_LOADOUT,
+  type AvatarLoadout,
+  IDLE_ANIMATION,
+  WALK_ANIMATION,
+  RUN_ANIMATION,
+  JUMP_ANIMATION,
+} from '@engine/avatar';
 
 // PlayManifest is not exported from @engine/world, we'll define a simple interface
 // or use the one from editor (but we don't want to depend on editor)
@@ -210,6 +219,9 @@ export class PlayerModeManager {
   
   private playerEntity: Entity | null = null;
   private playerSession: PlayerSession | null = null;
+  private avatarInstance: AvatarInstance | null = null;
+  private avatarVisualRoot: Entity | null = null;
+  private lastPlayedAnim: 'idle' | 'walk' | 'run' | 'jump' | null = null;
   
   private manifest: PlayManifest | null = null;
   private buildId: string | null = null;
@@ -278,6 +290,9 @@ export class PlayerModeManager {
       // Load build data from API
       Logger.info(`Loading build: ${buildId}`);
       const buildData = await loadBuildData(buildId);
+
+      // Begin fetching user's avatar loadout in parallel (best-effort)
+      const userLoadoutPromise = this.fetchUserAvatarLoadout().catch(() => null);
       
       // Use manifest from build data or default, ensure all required fields are present
       const defaultManifest = createDefaultManifest();
@@ -312,6 +327,16 @@ export class PlayerModeManager {
       const startPos = playerStart?.position ?? this.manifest.playerStart.position;
       const startRot = playerStart?.rotation ?? this.manifest.playerStart.rotation;
       await this.spawnPlayer(startPos, startRot);
+
+      // Apply user avatar loadout if available
+      try {
+        const userLoadout = await userLoadoutPromise;
+        if (userLoadout && this.avatarInstance) {
+          this.avatarInstance.applyLoadout(userLoadout);
+        }
+      } catch {
+        // Ignore errors - default loadout already applied
+      }
       
       // Configure controller - manifest is guaranteed to be non-null here
       if (!this.manifest) {
@@ -387,6 +412,9 @@ export class PlayerModeManager {
     
     // Update FPS camera
     this.fpsCamera.update();
+
+    // Update avatar visuals and animation
+    this.updateAvatar(deltaTime);
     
     // Update scene buffers (renderer handles rendering automatically)
     this.renderer.updateScene();
@@ -507,11 +535,185 @@ export class PlayerModeManager {
     // Add to scene
     this.scene.addEntity(player);
     this.playerEntity = player;
+
+    // Attach visual avatar under the player entity
+    this.attachAvatarToPlayer();
     
     // Initialize FPS camera
     this.fpsCamera.setYawPitch(rotation, 0);
     
     Logger.info(`Player spawned at position: ${position[0]}, ${position[1]}, ${position[2]}`);
+  }
+
+  /**
+   * Create and attach AvatarInstance visuals under the player entity,
+   * offset so feet are on the ground and hide obstructing FPS parts.
+   */
+  private attachAvatarToPlayer(): void {
+    if (!this.playerEntity) return;
+
+    // Cleanup previous visuals if any
+    if (this.avatarInstance) {
+      try {
+        this.avatarInstance.dispose();
+      } catch {
+        // ignore
+      }
+      this.avatarInstance = null;
+    }
+    if (this.avatarVisualRoot && this.avatarVisualRoot.parent) {
+      try {
+        this.avatarVisualRoot.parent.removeChild(this.avatarVisualRoot);
+      } catch {
+        // ignore
+      }
+    }
+    this.avatarVisualRoot = null;
+
+    const visualRoot = new Entity('PlayerAvatarVisual');
+    visualRoot.userData.isPlayerAvatarVisual = true;
+
+    // Offset avatar so feet align with ground: use collider center Y from manifest
+    const centerY = this.manifest?.pawn.physics.collider.center[1] ?? 0.85;
+    visualRoot.transform.position = [0, -centerY, 0];
+    visualRoot.transform.scale = [1, 1, 1];
+
+    this.playerEntity.addChild(visualRoot);
+    this.avatarVisualRoot = visualRoot;
+
+    // Instantiate avatar with default loadout for now (can be replaced with user profile later)
+    const avatar = new AvatarInstance(visualRoot, {
+      name: 'PlayerAvatar',
+      loadout: DEFAULT_AVATAR_LOADOUT,
+      strictMode: true,
+    });
+
+    // Hide head-related slots for FPS to avoid clipping
+    try {
+      avatar.setSlotVisible('HeadSlot', false);
+      avatar.setSlotVisible('HairSlot', false);
+      avatar.setSlotVisible('FaceOverlaySlot', false);
+    } catch {
+      // non-fatal
+    }
+
+    this.avatarInstance = avatar;
+    this.lastPlayedAnim = null;
+  }
+
+  /**
+   * Update avatar visuals and drive animations based on CharacterController state.
+   */
+  private updateAvatar(deltaTime: number): void {
+    if (!this.avatarInstance || !this.playerEntity) return;
+
+    // Tick avatar internal animator
+    this.avatarInstance.update(deltaTime);
+
+    // Drive animation from character state
+    const controller = this.playerEntity.getComponent(CharacterController);
+    if (!controller) return;
+
+    let desired: 'idle' | 'walk' | 'run' | 'jump' = 'idle';
+    switch (controller.state) {
+      case CharacterState.Running:
+        desired = 'run';
+        break;
+      case CharacterState.Walking:
+        desired = 'walk';
+        break;
+      case CharacterState.Jumping:
+      case CharacterState.Falling:
+        desired = 'jump';
+        break;
+      case CharacterState.Idle:
+      case CharacterState.Landing:
+      default:
+        desired = 'idle';
+        break;
+    }
+
+    if (desired !== this.lastPlayedAnim) {
+      switch (desired) {
+        case 'run':
+          this.avatarInstance.playAnimation(RUN_ANIMATION);
+          break;
+        case 'walk':
+          this.avatarInstance.playAnimation(WALK_ANIMATION);
+          break;
+        case 'jump':
+          this.avatarInstance.playAnimation(JUMP_ANIMATION);
+          break;
+        case 'idle':
+        default:
+          this.avatarInstance.playAnimation(IDLE_ANIMATION);
+          break;
+      }
+      this.lastPlayedAnim = desired;
+    }
+  }
+
+  /**
+   * Fetch current user's avatar loadout from API (authenticated).
+   * Returns null when unauthenticated or loadout not found.
+   */
+  private async fetchUserAvatarLoadout(): Promise<AvatarLoadout | null> {
+    interface AvatarLoadoutData {
+      version: number;
+      parts: Record<
+        string,
+        {
+          mesh: string;
+          mat?: string;
+          material?: string;
+          colors?: Record<string, [number, number, number, number]>;
+        }
+      >;
+    }
+
+    // Get current user
+    let userId: string | null = null;
+    try {
+      const meResp = await fetch('/api/auth/me', { credentials: 'include' });
+      if (!meResp.ok) return null;
+      const me = (await meResp.json()) as { id?: string };
+      userId = me?.id ?? null;
+      if (!userId) return null;
+    } catch {
+      return null;
+    }
+
+    // Get avatar loadout
+    try {
+      const resp = await fetch(`/api/users/${encodeURIComponent(userId)}/avatar-loadout`, {
+        credentials: 'include',
+      });
+      if (!resp.ok) return null; // Includes 404 (no saved loadout)
+      const data = (await resp.json()) as AvatarLoadoutData;
+      return this.convertAvatarLoadoutData(data);
+    } catch {
+      return null;
+    }
+  }
+
+  private convertAvatarLoadoutData(data: {
+    version: number;
+    parts: Record<
+      string,
+      { mesh: string; mat?: string; material?: string; colors?: Record<string, [number, number, number, number]> }
+    >;
+  }): AvatarLoadout {
+    const parts: AvatarLoadout['parts'] = {};
+    for (const [slot, part] of Object.entries(data.parts || {})) {
+      if (!part) continue;
+      (parts as any)[slot] = {
+        mesh: part.mesh,
+        ...(part.mat && { mat: part.mat }),
+        ...(part.material && { material: part.material }),
+        ...(part.colors && { colors: part.colors }),
+      };
+    }
+    return { version: data.version, parts };
   }
   
   private configureController(manifest: PlayManifest): void {
@@ -549,6 +751,18 @@ export class PlayerModeManager {
       }
       this.playerEntity = null;
     }
+
+    // Cleanup avatar visuals
+    if (this.avatarInstance) {
+      try {
+        this.avatarInstance.dispose();
+      } catch {
+        // ignore
+      }
+      this.avatarInstance = null;
+    }
+    this.avatarVisualRoot = null;
+    this.lastPlayedAnim = null;
     
     this.playerSession = null;
     this.isInitialized = false;
