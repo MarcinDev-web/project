@@ -160,7 +160,7 @@ RUN CI=true pnpm prune --prod
 USER nodejs
 
 # Change working directory to where server.js is located for correct relative imports
-WORKDIR /app/apps/net-server/dist/apps/net-server/src
+WORKDIR /app/apps/net-server/dist
 
 EXPOSE 3000 3001
 
