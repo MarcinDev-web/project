@@ -6,6 +6,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { BlocksModelsStudioCore } from '../BlocksModelsStudioCore';
 import { Scene } from '@engine/world';
+import { MaterialComponent } from '@engine/world/components/MaterialComponent';
 import type { RgbaColor } from '@engine/blocks';
 
 describe('BlocksModelsStudioCore', () => {
@@ -247,6 +248,99 @@ describe('BlocksModelsStudioCore', () => {
     const hitEntity = core.getBlockEntityAt(ray);
     // Should find the entity (raycasting should work)
     expect(hitEntity).toBeDefined();
+  });
+
+  it('should map block material types to correct material IDs', () => {
+    core = new BlocksModelsStudioCore({
+      canvas,
+    });
+
+    const createBlock = (material: 'solid' | 'glass' | 'metal' | 'wood' | 'stone' | 'plastic' | 'emissive') => ({
+      id: `test_${material}`,
+      name: `Test ${material}`,
+      category: 'basic' as const,
+      material,
+      textures: {
+        top: { color: [1, 1, 1, 1] as RgbaColor, pattern: 'smooth' as const },
+        bottom: { color: [1, 1, 1, 1] as RgbaColor, pattern: 'smooth' as const },
+        sides: { color: [1, 1, 1, 1] as RgbaColor, pattern: 'smooth' as const },
+      },
+      properties: {
+        solid: true,
+        transparent: false,
+        emissive: 0,
+        roughness: 0.5,
+        metallic: 0,
+      },
+    });
+
+    // Test material mappings
+    const solidEntity = core.addBlock(createBlock('solid'), [0, 0, 0]);
+    const glassEntity = core.addBlock(createBlock('glass'), [1, 0, 0]);
+    const metalEntity = core.addBlock(createBlock('metal'), [2, 0, 0]);
+    const woodEntity = core.addBlock(createBlock('wood'), [3, 0, 0]);
+    const stoneEntity = core.addBlock(createBlock('stone'), [4, 0, 0]);
+    const plasticEntity = core.addBlock(createBlock('plastic'), [5, 0, 0]);
+    const emissiveEntity = core.addBlock(createBlock('emissive'), [6, 0, 0]);
+
+    const solidMat = solidEntity.getComponent(MaterialComponent);
+    const glassMat = glassEntity.getComponent(MaterialComponent);
+    const metalMat = metalEntity.getComponent(MaterialComponent);
+    const woodMat = woodEntity.getComponent(MaterialComponent);
+    const stoneMat = stoneEntity.getComponent(MaterialComponent);
+    const plasticMat = plasticEntity.getComponent(MaterialComponent);
+    const emissiveMat = emissiveEntity.getComponent(MaterialComponent);
+
+    expect(solidMat?.materialId).toBe(0); // default
+    expect(glassMat?.materialId).toBe(7); // glass
+    expect(metalMat?.materialId).toBe(3); // metal
+    expect(woodMat?.materialId).toBe(2); // wood
+    expect(stoneMat?.materialId).toBe(1); // stone
+    expect(plasticMat?.materialId).toBe(10); // plastic_red
+    expect(emissiveMat?.materialId).toBe(8); // gold (closest to emissive)
+  });
+
+  it('should toggle grid visibility', () => {
+    core = new BlocksModelsStudioCore({
+      canvas,
+    });
+
+    expect(core.isGridEnabled()).toBe(true);
+
+    core.toggleGrid();
+    expect(core.isGridEnabled()).toBe(false);
+
+    core.toggleGrid();
+    expect(core.isGridEnabled()).toBe(true);
+  });
+
+  it('should set grid renderer and sync visibility', async () => {
+    core = new BlocksModelsStudioCore({
+      canvas,
+    });
+
+    // Mock GridRenderer
+    const mockGridRenderer = {
+      setVisible: vi.fn(),
+      initialize: vi.fn().mockResolvedValue(undefined),
+      render: vi.fn(),
+      dispose: vi.fn(),
+    };
+
+    // Set grid enabled to false first
+    core.toggleGrid();
+    expect(core.isGridEnabled()).toBe(false);
+
+    // Set grid renderer (without renderer initialized, it won't call initializeGridRenderer)
+    core.setGridRenderer(mockGridRenderer as any);
+
+    // Grid visibility should be synced
+    expect(mockGridRenderer.setVisible).toHaveBeenCalledWith(false);
+
+    // Toggle grid
+    core.toggleGrid();
+    expect(mockGridRenderer.setVisible).toHaveBeenCalledWith(true);
+    expect(mockGridRenderer.setVisible).toHaveBeenCalledTimes(2);
   });
 });
 

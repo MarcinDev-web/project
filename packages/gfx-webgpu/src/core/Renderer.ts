@@ -1303,11 +1303,11 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       environmentRenderer = null;
       waterRenderer?.dispose();
       waterRenderer = null;
-      // TODO: Phase 4
-      // logicConnectionRenderer?.dispose();
-      // logicConnectionRenderer = null;
-      // scriptSystem = null;
-      // logicCubeSystem = null;
+      // Phase 4 cleanup
+      logicConnectionRenderer?.dispose();
+      logicConnectionRenderer = null;
+      scriptSystem = null;
+      logicCubeSystem = null;
       lastFrameTimeMs = null;
     } catch (e) {
       Logger.warn('Renderer systems cleanup failed', e);

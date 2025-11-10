@@ -130,6 +130,12 @@ export class VegetationRenderer {
     }>;
   }>();
   
+  /** Texture cache for model URLs */
+  private textureCache = new Map<string, GPUTexture>();
+  
+  /** Pending texture loads to avoid duplicate requests */
+  private pendingTextureLoads = new Map<string, Promise<GPUTexture>>();
+  
   /** Current time for wind animation */
   private currentTime = 0;
   
@@ -759,7 +765,7 @@ fn fragmentMain(
   /**
    * Renders all visible vegetation
    */
-  render(passEncoder: GPURenderPassEncoder): void {
+  async render(passEncoder: GPURenderPassEncoder): Promise<void> {
     if (!this.initialized || !this.billboardPipeline || !this.billboardGeometry) {
       return;
     }
@@ -782,17 +788,17 @@ fn fragmentMain(
 
     // Render 3D models (trees, shrubs)
     if (modelVegetation.length > 0 && this.lodManager) {
-      this.render3DModels(passEncoder, modelVegetation);
+      await this.render3DModels(passEncoder, modelVegetation);
     }
   }
 
   /**
    * Renders 3D model vegetation (trees, shrubs) with LOD support
    */
-  private render3DModels(
+  private async render3DModels(
     passEncoder: GPURenderPassEncoder,
     instances: VegetationInstance[]
-  ): void {
+  ): Promise<void> {
     if (!this.device || !this.lodManager || !this.model3DPipeline) {
       return;
     }
@@ -877,7 +883,7 @@ fn fragmentMain(
         };
 
         // Render this LOD group
-        this.render3DModelGroup(
+        await this.render3DModelGroup(
           passEncoder,
           modelInstances,
           lodGeometry,
@@ -905,9 +911,32 @@ fn fragmentMain(
   }
 
   /**
+   * Gets texture for a model URL, loading it if necessary
+   * @param modelUrl Model URL (may contain texture URL)
+   * @returns GPUTexture or null
+   */
+  private async getTextureForModel(modelUrl: string): Promise<GPUTexture | null> {
+    // Try to extract texture URL from model URL or use model URL as texture URL
+    // For now, assume modelUrl can be used as texture URL if it ends with image extension
+    const imageExtensions = ['.png', '.jpg', '.jpeg', '.webp'];
+    const isImageUrl = imageExtensions.some(ext => modelUrl.toLowerCase().endsWith(ext));
+    
+    if (isImageUrl) {
+      try {
+        return await this.loadTexture(modelUrl);
+      } catch {
+        // Fall back to default
+      }
+    }
+    
+    // Use billboard texture if available, otherwise default white
+    return this.billboardTexture ?? this.defaultWhiteTexture;
+  }
+  
+  /**
    * Renders a group of 3D model instances with the same LOD level
    */
-  private render3DModelGroup(
+  private async render3DModelGroup(
     passEncoder: GPURenderPassEncoder,
     instances: VegetationInstance[],
     geometry: {
@@ -1019,8 +1048,7 @@ fn fragmentMain(
     });
 
     // Use model-specific texture if available, otherwise use default white texture
-    // TODO: In production, load and cache textures per model URL
-    const modelTexture = this.billboardTexture ?? this.defaultWhiteTexture;
+    const modelTexture = await this.getTextureForModel(modelUrl);
     if (!modelTexture) {
       Logger.warn(`[VegetationRenderer] No texture available for 3D model rendering: ${modelUrl}`);
       return;
@@ -1041,10 +1069,71 @@ fn fragmentMain(
   }
 
   /**
-   * Registers a 3D model geometry for vegetation rendering
-   * @param modelUrl Unique identifier/URL for the model
-   * @param geometry Vertex and index buffers for the model
+   * Loads a texture from URL and caches it
+   * @param url Texture URL
+   * @returns Promise resolving to GPUTexture
    */
+  async loadTexture(url: string): Promise<GPUTexture> {
+    if (!this.device) {
+      throw new Error('VegetationRenderer not initialized');
+    }
+    
+    // Check cache first
+    const cached = this.textureCache.get(url);
+    if (cached) {
+      return cached;
+    }
+    
+    // Check if already loading
+    const pending = this.pendingTextureLoads.get(url);
+    if (pending) {
+      return pending;
+    }
+    
+    // Start loading
+    const loadPromise = (async () => {
+      try {
+        // Load image
+        const image = new Image();
+        image.crossOrigin = 'anonymous';
+        
+        await new Promise<void>((resolve, reject) => {
+          image.onload = () => resolve();
+          image.onerror = () => reject(new Error(`Failed to load texture: ${url}`));
+          image.src = url;
+        });
+        
+        // Create texture from image
+        const texture = this.device!.createTexture({
+          label: `vegetation-texture-${url}`,
+          size: [image.width, image.height],
+          format: 'rgba8unorm',
+          usage: GPUTextureUsage.TEXTURE_BINDING | GPUTextureUsage.COPY_DST,
+        });
+        
+        // Upload image data to texture
+        this.device!.queue.copyExternalImageToTexture(
+          { source: image },
+          { texture },
+          { width: image.width, height: image.height }
+        );
+        
+        // Cache texture
+        this.textureCache.set(url, texture);
+        this.pendingTextureLoads.delete(url);
+        
+        return texture;
+      } catch (error) {
+        this.pendingTextureLoads.delete(url);
+        Logger.warn(`[VegetationRenderer] Failed to load texture ${url}:`, error);
+        // Return default white texture on error
+        return this.defaultWhiteTexture!;
+      }
+    })();
+    
+    this.pendingTextureLoads.set(url, loadPromise);
+    return loadPromise;
+  }
   register3DModel(
     modelUrl: string,
     geometry: {
@@ -1196,22 +1285,24 @@ fn fragmentMain(
       entries: [{ binding: 0, resource: { buffer: this.uniformBuffer! } }],
     });
 
-    // TODO: Create texture bind group when billboard texture is loaded
-    // For now, skip texture rendering if not available
-    if (this.billboardTexture) {
-      const textureBindGroup = this.device.createBindGroup({
-        label: 'vegetation-texture-bg',
-        layout: this.textureBindGroupLayout!,
-        entries: [
-          { binding: 0, resource: this.billboardSampler! },
-          { binding: 1, resource: this.billboardTexture.createView() },
-        ],
-      });
-
-      passEncoder.setBindGroup(0, uniformBindGroup);
-      passEncoder.setBindGroup(1, textureBindGroup);
-      passEncoder.drawIndexed(this.billboardGeometry.indexCount, instanceCount, 0, 0, 0);
+    // Create texture bind group when billboard texture is available
+    if (!this.billboardTexture) {
+      // No texture available, skip rendering
+      return;
     }
+    
+    const textureBindGroup = this.device.createBindGroup({
+      label: 'vegetation-texture-bg',
+      layout: this.textureBindGroupLayout!,
+      entries: [
+        { binding: 0, resource: this.billboardSampler! },
+        { binding: 1, resource: this.billboardTexture.createView() },
+      ],
+    });
+
+    passEncoder.setBindGroup(0, uniformBindGroup);
+    passEncoder.setBindGroup(1, textureBindGroup);
+    passEncoder.drawIndexed(this.billboardGeometry.indexCount, instanceCount, 0, 0, 0);
   }
 
   /**
@@ -1274,6 +1365,13 @@ fn fragmentMain(
     this.uniformBuffer?.destroy();
     this.billboardTexture?.destroy();
     this.defaultWhiteTexture?.destroy();
+    
+    // Dispose cached textures
+    for (const texture of this.textureCache.values()) {
+      texture.destroy();
+    }
+    this.textureCache.clear();
+    this.pendingTextureLoads.clear();
 
     // Dispose buffer pool
     this.bufferPool.position?.destroy();

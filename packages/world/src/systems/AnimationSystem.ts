@@ -48,10 +48,12 @@ export class AnimationSystem {
           morph.targetCount = anim.morphClip.targetCount;
           morph.weights = new Float32Array(morph.targetCount);
         }
+        // Update separate morph timer
+        anim.morphTime += deltaSeconds;
         sampleMorphWeightsAt(
           morph.weights,
           anim.morphClip,
-          0 /* TODO: separate morph timer if needed */
+          anim.morphTime
         );
       }
     }

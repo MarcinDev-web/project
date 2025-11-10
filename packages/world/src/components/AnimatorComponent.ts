@@ -19,6 +19,7 @@ export class AnimatorComponent extends Component {
 
   morphClip: MorphTargetClip | null = null;
   morphWeights: Float32Array | null = null; // sized to mesh target count when bound
+  morphTime: number = 0; // Separate timer for morph animations
 
   getType(): string {
     return AnimatorComponent.type;
@@ -41,6 +42,7 @@ export class AnimatorComponent extends Component {
     clone.controller = this.controller;
     clone.morphClip = this.morphClip;
     clone.morphWeights = this.morphWeights;
+    clone.morphTime = this.morphTime;
     return clone;
   }
 }

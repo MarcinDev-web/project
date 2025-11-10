@@ -4,10 +4,10 @@
  */
 
 import { Scene, Entity, EnvironmentComponent, Raycaster, type Ray } from '@engine/world';
-import { initRenderer, type Renderer } from '@engine/gfx-webgpu';
+import { initRenderer, type Renderer, type GridRenderer } from '@engine/gfx-webgpu';
 import { LightManager } from '@engine/gfx-webgpu/lighting/LightManager';
 import { createOrbitControls, type OrbitControls } from '@engine/camera';
-import type { BlockDefinition } from '@engine/blocks';
+import type { BlockDefinition, BlockMaterialType } from '@engine/blocks';
 import { MeshComponent } from '@engine/world/components/MeshComponent';
 import { MaterialComponent } from '@engine/world/components/MaterialComponent';
 import type { Vec3, Quat } from '@engine/core/math';
@@ -39,7 +39,35 @@ export class BlocksModelsStudioCore {
   private blockEntities: Map<string, Entity> = new Map();
   private previewEntity: Entity | null = null;
   private gridEnabled = true;
+  private gridRenderer: GridRenderer | null = null;
   private raycaster: Raycaster;
+
+  /**
+   * Maps BlockMaterialType to material ID in texture atlas
+   * Material IDs: default(0), stone(1), wood(2), metal(3), grass(4), dirt(5), brick(6),
+   * glass(7), gold(8), sand(9), plastic_red(10), plastic_blue(11), plastic_green(12),
+   * plastic_yellow(13), concrete(14), ice(15)
+   */
+  private mapBlockMaterialToMaterialId(materialType: BlockMaterialType): number {
+    switch (materialType) {
+      case 'solid':
+        return 0; // default
+      case 'glass':
+        return 7; // glass
+      case 'metal':
+        return 3; // metal
+      case 'wood':
+        return 2; // wood
+      case 'stone':
+        return 1; // stone
+      case 'plastic':
+        return 10; // plastic_red (default plastic)
+      case 'emissive':
+        return 8; // gold (closest to emissive)
+      default:
+        return 0; // fallback to default
+    }
+  }
 
   constructor(options: BlocksModelsStudioCoreOptions) {
     this.canvas = options.canvas;
@@ -197,8 +225,7 @@ export class BlocksModelsStudioCore {
       this.previewEntity.addComponent(material);
     }
     // Use material ID based on block material type
-    // For now, just use default material (0)
-    material.materialId = 0;
+    material.materialId = this.mapBlockMaterialToMaterialId(block.material);
 
     // Set color from block textures
     const topColor = block.textures.top.color;
@@ -231,8 +258,7 @@ export class BlocksModelsStudioCore {
 
     // Add material component
     const material = new MaterialComponent();
-    // TODO: Map block material type to material ID
-    material.materialId = 0;
+    material.materialId = this.mapBlockMaterialToMaterialId(block.material);
     entity.addComponent(material);
 
     // Set color from block textures
@@ -424,14 +450,29 @@ export class BlocksModelsStudioCore {
    */
   toggleGrid(): void {
     this.gridEnabled = !this.gridEnabled;
-    // TODO: Update renderer grid visibility
+    // Update grid renderer visibility if available
+    if (this.gridRenderer && typeof this.gridRenderer.setVisible === 'function') {
+      this.gridRenderer.setVisible(this.gridEnabled);
+    }
   }
 
   /**
-   * Check if grid is enabled
+   * Set grid renderer for grid visibility control
    */
-  isGridEnabled(): boolean {
-    return this.gridEnabled;
+  setGridRenderer(gridRenderer: GridRenderer | null): void {
+    this.gridRenderer = gridRenderer;
+    if (this.renderer && gridRenderer) {
+      // Initialize grid renderer with renderer
+      this.renderer.initializeGridRenderer(gridRenderer).catch((error) => {
+        console.warn('Failed to initialize grid renderer:', error);
+      });
+    } else if (this.renderer) {
+      // Remove grid renderer
+      this.renderer.setGridRenderer(null);
+    }
+    // Sync visibility state
+    if (this.gridRenderer && typeof this.gridRenderer.setVisible === 'function') {
+      this.gridRenderer.setVisible(this.gridEnabled);
+    }
   }
 }
-

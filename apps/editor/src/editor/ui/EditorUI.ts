@@ -56,6 +56,8 @@ import { EditorVisualManager } from '../visuals/EditorVisualManager';
 import { EditorUILayout } from './EditorUILayout';
 import { QuickMenu } from './QuickMenu';
 import { KeyboardShortcutsModal } from './KeyboardShortcutsModal';
+import { LoginModal } from './LoginModal';
+import { RegisterModal } from './RegisterModal';
 import { WelcomeOverlay, type WelcomeOverlayConfig } from './WelcomeOverlay';
 import { InteractiveTutorial, createEditorTutorial } from './InteractiveTutorial';
 import { QuickStartGuide } from './QuickStartGuide';
@@ -115,6 +117,8 @@ export class EditorUI {
   private visualManager: EditorVisualManager | null = null;
   private quickMenu: QuickMenu | null = null;
   private templatePicker: TemplatePickerModal | null = null;
+  private loginModal: LoginModal | null = null;
+  private registerModal: RegisterModal | null = null;
   private welcomeOverlay: WelcomeOverlay | null = null;
   private interactiveTutorial: InteractiveTutorial | null = null;
   private quickStartGuide: QuickStartGuide | null = null;
@@ -591,13 +595,41 @@ export class EditorUI {
       },
       onLogin: () => {
         console.log('[EditorUI] Login requested');
-        // TODO: Open login modal when auth system is ready
-        this.setStatusMessage('Login feature coming soon', 2000);
+        if (!this.loginModal) {
+          this.loginModal = new LoginModal({
+            onLogin: async (email, password) => {
+              // TODO: Implement actual authentication
+              console.log('[EditorUI] Login attempt:', { email });
+              // For now, just show success message
+              this.setStatusMessage('Login feature coming soon', 2000);
+              // In production, call auth service here
+              // await authService.login(email, password);
+            },
+            onClose: () => {
+              this.loginModal = null;
+            },
+          });
+        }
+        this.loginModal.show();
       },
       onRegister: () => {
         console.log('[EditorUI] Register requested');
-        // TODO: Open register modal when auth system is ready
-        this.setStatusMessage('Register feature coming soon', 2000);
+        if (!this.registerModal) {
+          this.registerModal = new RegisterModal({
+            onRegister: async (email, password) => {
+              // TODO: Implement actual authentication
+              console.log('[EditorUI] Register attempt:', { email });
+              // For now, just show success message
+              this.setStatusMessage('Register feature coming soon', 2000);
+              // In production, call auth service here
+              // await authService.register(email, password);
+            },
+            onClose: () => {
+              this.registerModal = null;
+            },
+          });
+        }
+        this.registerModal.show();
       },
       isUserLoggedIn: () => false, // Mock for now
       getUserName: () => null,
@@ -1820,6 +1852,11 @@ export class EditorUI {
     this.searchManager = null;
     this.placementController = null;
     this.vegetationPaintController = null;
+    // Dispose modals
+    this.loginModal?.hide();
+    this.registerModal?.hide();
+    this.loginModal = null;
+    this.registerModal = null;
   }
 
   /** Returns true when Play Mode is active. */

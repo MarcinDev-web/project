@@ -1,4 +1,5 @@
 export { initRenderer, type Renderer } from './core/Renderer';
+export type { GridRenderer } from './core/Renderer';
 export type { GeometryData } from './resources/resources';
 
 // Adapter probing and capabilities
