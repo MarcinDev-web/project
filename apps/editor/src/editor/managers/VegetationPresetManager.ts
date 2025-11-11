@@ -71,8 +71,9 @@ export class VegetationPresetManager {
     const updated: AssetPreset = {
       ...existing,
       ...updates,
-      // Preserve vegetationConfig if not being updated
-      vegetationConfig: updates.vegetationConfig ?? existing.vegetationConfig,
+      // Only update vegetationConfig if explicitly provided (not undefined)
+      // This preserves existing vegetationConfig when updates don't include it
+      vegetationConfig: updates.vegetationConfig !== undefined ? updates.vegetationConfig : existing.vegetationConfig,
     };
 
     this.presets.set(id, updated);

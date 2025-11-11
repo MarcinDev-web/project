@@ -26,6 +26,16 @@ export interface SnapConfig {
   /** Snap increment for rotation (in radians) */
   rotationIncrement: number;
 
+  /** Per-axis rotation snap configuration (for Euler angles: pitch, yaw, roll) */
+  rotationAxes: {
+    /** Snap pitch (X-axis rotation) */
+    x: boolean;
+    /** Snap yaw (Y-axis rotation) */
+    y: boolean;
+    /** Snap roll (Z-axis rotation) */
+    z: boolean;
+  };
+
   /** Snap increment for scale */
   scaleIncrement: number;
 
@@ -45,6 +55,11 @@ export const DEFAULT_SNAP_CONFIG: SnapConfig = {
     z: true,
   },
   rotationIncrement: 0.5, // ~28.65 degrees
+  rotationAxes: {
+    x: true,
+    y: true,
+    z: true,
+  },
   scaleIncrement: 0.5,
   minScale: 0.001,
 };

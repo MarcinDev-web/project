@@ -10,6 +10,7 @@
     "noUnusedParameters": false,
     "exactOptionalPropertyTypes": false,
     "skipLibCheck": true,
+    "types": ["@webgpu/types", "node"],
     "paths": {
       "@engine/economy": ["../economy/dist"],
       "@engine/economy/*": ["../economy/dist/*"],
@@ -25,6 +26,8 @@
       "@engine/core/*": ["../core/src/*"],
       "@engine/world": ["../world/src"],
       "@engine/world/*": ["../world/src/*"],
+      "@engine/blocks": ["../blocks/src"],
+      "@engine/blocks/*": ["../blocks/src/*"],
       "@engine/test-utils": ["../test-utils/dist"],
       "@engine/test-utils/*": ["../test-utils/dist/*"],
       "@engine/camera": ["../camera/dist"],

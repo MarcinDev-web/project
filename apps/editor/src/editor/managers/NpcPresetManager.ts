@@ -71,8 +71,9 @@ export class NpcPresetManager {
     const updated: AssetPreset = {
       ...existing,
       ...updates,
-      // Preserve npcConfig if not being updated
-      npcConfig: updates.npcConfig ?? existing.npcConfig,
+      // Only update npcConfig if explicitly provided (not undefined)
+      // This preserves existing npcConfig when updates don't include it
+      npcConfig: updates.npcConfig !== undefined ? updates.npcConfig : existing.npcConfig,
     };
 
     this.presets.set(id, updated);

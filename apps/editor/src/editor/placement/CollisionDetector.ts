@@ -56,6 +56,12 @@ const dot = dotVec3;
 export class CollisionDetector {
   private scene: Scene;
 
+  /** Reusable buffers for collision detection (cleared before each use) */
+  private readonly candidateBuffer: Entity[] = [];
+  private readonly positionBuffer: number[] = [];
+  private readonly rotationBuffer: number[] = [];
+  private readonly scaleBuffer: number[] = [];
+
   /** Minimum size for bounding box (prevents zero-size boxes) */
   private static readonly MIN_BOX_SIZE = 0.001;
 
@@ -167,6 +173,23 @@ export class CollisionDetector {
     const rot = quatNormalize(rotation ?? entity.transform.rotation);
     const scl = scale ?? entity.transform.scale;
 
+    // Validate scale: check if all dimensions are zero or invalid
+    if (
+      !Number.isFinite(scl[0]) || !Number.isFinite(scl[1]) || !Number.isFinite(scl[2]) ||
+      scl[0] === 0 && scl[1] === 0 && scl[2] === 0
+    ) {
+      // Return minimal OBB for invalid scale
+      return {
+        center: [pos[0], pos[1], pos[2]],
+        axes: [[1, 0, 0], [0, 1, 0], [0, 0, 1]] as [Vec3, Vec3, Vec3],
+        halfSizes: [
+          CollisionDetector.MIN_BOX_SIZE,
+          CollisionDetector.MIN_BOX_SIZE,
+          CollisionDetector.MIN_BOX_SIZE,
+        ],
+      };
+    }
+
     // Derive orthonormal basis from quaternion
     // Convert quaternion to 3x3 rotation (columns are axis directions)
     const x = rot[0],
@@ -204,6 +227,96 @@ export class CollisionDetector {
       axes: [u0, u1, u2],
       halfSizes,
     };
+  }
+
+  /**
+   * Computes a conservative bounding-sphere AABB for broad-phase collision detection.
+   * Uses bounding sphere radius (hypot of half-sizes) for rotation-invariant broad-phase.
+   * @param entity - Entity to compute broad-phase AABB for
+   * @returns Axis-aligned bounding box enclosing the entity's bounding sphere
+   */
+  private getBroadPhaseAABB(entity: Entity): BoundingBox {
+    const pos = entity.transform.getWorldPosition();
+    const scale = entity.transform.scale;
+    const hx = Math.max(Math.abs(scale[0]) / 2, CollisionDetector.MIN_BOX_SIZE);
+    const hy = Math.max(Math.abs(scale[1]) / 2, CollisionDetector.MIN_BOX_SIZE);
+    const hz = Math.max(Math.abs(scale[2]) / 2, CollisionDetector.MIN_BOX_SIZE);
+    const radius = Math.hypot(hx, hy, hz);
+    return {
+      min: [pos[0] - radius, pos[1] - radius, pos[2] - radius] as Vec3,
+      max: [pos[0] + radius, pos[1] + radius, pos[2] + radius] as Vec3,
+    };
+  }
+
+  /**
+   * Collects candidate entities for collision check using broad-phase filtering.
+   * Populates reusable buffers with candidate data.
+   * @param entity - Entity to check collisions for
+   * @param entityAabb - Broad-phase AABB of the entity
+   * @param excludeEntities - Entities to exclude from check
+   */
+  private collectCandidates(
+    entity: Entity,
+    entityAabb: BoundingBox,
+    excludeEntities?: Set<Entity>
+  ): void {
+    // Clear reusable buffers
+    this.candidateBuffer.length = 0;
+    this.positionBuffer.length = 0;
+    this.rotationBuffer.length = 0;
+    this.scaleBuffer.length = 0;
+
+    const entities = this.scene.getActiveEntities();
+    for (const other of entities) {
+      if (other === entity) continue;
+      if (excludeEntities?.has(other)) continue;
+      if (other.getComponent(CameraComponent)) continue;
+
+      const otherAabb = this.getBroadPhaseAABB(other);
+      if (!CollisionDetector.boxesIntersect(entityAabb, otherAabb)) continue;
+
+      this.candidateBuffer.push(other);
+      const otherPos = other.transform.getWorldPosition();
+      this.positionBuffer.push(otherPos[0], otherPos[1], otherPos[2]);
+      const orot = other.transform.rotation;
+      this.rotationBuffer.push(orot[0], orot[1], orot[2], orot[3]);
+      this.scaleBuffer.push(other.transform.scale[0], other.transform.scale[1], other.transform.scale[2]);
+    }
+  }
+
+  /**
+   * Executes collision check using TypeScript OBB intersection.
+   * @param obb - OBB of the entity being checked
+   * @param candidates - Candidate entities to check against
+   * @returns Array of colliding entities
+   */
+  private executeTypeScriptCollisionCheck(obb: OBB, candidates: Entity[]): Entity[] {
+    const collidingEntities: Entity[] = [];
+    for (let i = 0; i < candidates.length; i++) {
+      const other = candidates[i]!;
+      const otherObb = this.getOBB(other);
+      if (CollisionDetector.obbIntersect(obb, otherObb)) {
+        collidingEntities.push(other);
+      }
+    }
+    return collidingEntities;
+  }
+
+  /**
+   * Logs collision detection performance metrics if debug mode is enabled.
+   * @param path - Execution path identifier ('ts', 'wasm', 'worker', 'fallback-ts')
+   * @param candidateCount - Number of candidates checked
+   * @param startTime - Performance timestamp at start
+   */
+  private logCollisionPerformance(path: string, candidateCount: number, startTime: number): void {
+    // Debug flag injected at runtime for performance profiling
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const debug = (globalThis as any).__COLLISION_DEBUG__ === true;
+    if (debug && typeof performance !== 'undefined') {
+      const t1 = performance.now();
+      // eslint-disable-next-line no-console
+      console.log(`[collision][${path}] candidates:`, candidateCount, 'ms:', (t1 - startTime).toFixed(2));
+    }
   }
 
   /**
@@ -420,43 +533,15 @@ export class CollisionDetector {
     // Broad-phase: use AABB enclosing the OBB of the tested entity
     const entityAabb = CollisionDetector.obbToAABB(obb);
     const wasm = getWasmCollisionSync();
+    // Debug flag injected at runtime for performance profiling (not available in TypeScript types)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const debug = (globalThis as any).__COLLISION_DEBUG__ === true;
     const t0 = debug && typeof performance !== 'undefined' ? performance.now() : 0;
     if (wasm) {
       // Collect candidates passing broad-phase and build TRS SoA for batch check
-      const candidates: Entity[] = [];
-      const positions: number[] = [];
-      const rotations: number[] = [];
-      const scales: number[] = [];
+      this.collectCandidates(entity, entityAabb, excludeEntities);
 
-      const entities = this.scene.getActiveEntities();
-      for (const other of entities) {
-        if (other === entity) continue;
-        if (excludeEntities?.has(other)) continue;
-        
-        // Skip cameras (they are virtual, not physical objects)
-        if (other.getComponent(CameraComponent)) continue;
-        
-        const otherPos = other.transform.getWorldPosition();
-        const otherScale = other.transform.scale;
-        const ohx = Math.max(Math.abs(otherScale[0]) / 2, CollisionDetector.MIN_BOX_SIZE);
-        const ohy = Math.max(Math.abs(otherScale[1]) / 2, CollisionDetector.MIN_BOX_SIZE);
-        const ohz = Math.max(Math.abs(otherScale[2]) / 2, CollisionDetector.MIN_BOX_SIZE);
-        const orad = Math.hypot(ohx, ohy, ohz);
-        const otherAabb = {
-          min: [otherPos[0] - orad, otherPos[1] - orad, otherPos[2] - orad] as Vec3,
-          max: [otherPos[0] + orad, otherPos[1] + orad, otherPos[2] + orad] as Vec3,
-        } satisfies BoundingBox;
-        if (!CollisionDetector.boxesIntersect(entityAabb, otherAabb)) continue;
-
-        candidates.push(other);
-        positions.push(otherPos[0], otherPos[1], otherPos[2]);
-        const orot = other.transform.rotation;
-        rotations.push(orot[0], orot[1], orot[2], orot[3]);
-        scales.push(otherScale[0], otherScale[1], otherScale[2]);
-      }
-
-      if (candidates.length === 0) {
+      if (this.candidateBuffer.length === 0) {
         return { hasCollision: false, collidingEntities: [] };
       }
 
@@ -470,24 +555,13 @@ export class CollisionDetector {
       // - < 64: TypeScript (lower overhead for small batches)
       // - 64-500: Direct WASM (good balance)
       // - > 500: Worker (offload main thread for large scenes)
-      const useWorker = candidates.length > 500;
-      const useWasm = candidates.length >= 64;
+      const useWorker = this.candidateBuffer.length > 500;
+      const useWasm = this.candidateBuffer.length >= 64;
       
       if (!useWasm) {
         // TypeScript path for small batches
-        const collidingEntities: Entity[] = [];
-        for (let i = 0; i < candidates.length; i++) {
-          const other = candidates[i]!;
-          const otherObb = this.getOBB(other);
-          if (CollisionDetector.obbIntersect(obb, otherObb)) {
-            collidingEntities.push(other);
-          }
-        }
-        if (debug && typeof performance !== 'undefined') {
-          const t1 = performance.now();
-          // eslint-disable-next-line no-console
-          console.log('[collision][ts] candidates:', candidates.length, 'ms:', (t1 - (t0 as number)).toFixed(2));
-        }
+        const collidingEntities = this.executeTypeScriptCollisionCheck(obb, this.candidateBuffer);
+        this.logCollisionPerformance('ts', this.candidateBuffer.length, t0);
         return { hasCollision: collidingEntities.length > 0, collidingEntities };
       }
 
@@ -495,9 +569,9 @@ export class CollisionDetector {
         // Worker path for very large batches (>500 objects)
         try {
           const othersTrs: TrsArray = {
-            positions: new Float32Array(positions),
-            rotations: new Float32Array(rotations),
-            scales: new Float32Array(scales),
+            positions: new Float32Array(this.positionBuffer),
+            rotations: new Float32Array(this.rotationBuffer),
+            scales: new Float32Array(this.scaleBuffer),
           };
           
           const idx = await requestCheckTrs(previewTrs, othersTrs, 1000);
@@ -505,14 +579,10 @@ export class CollisionDetector {
           const collidingEntities: Entity[] = [];
           for (let i = 0; i < idx.length; i++) {
             const j = idx[i]!;
-            const ent = candidates[j];
+            const ent = this.candidateBuffer[j];
             if (ent) collidingEntities.push(ent);
           }
-          if (debug && typeof performance !== 'undefined') {
-            const t1 = performance.now();
-            // eslint-disable-next-line no-console
-            console.log('[collision][worker] candidates:', candidates.length, 'ms:', (t1 - (t0 as number)).toFixed(2));
-          }
+          this.logCollisionPerformance('worker', this.candidateBuffer.length, t0);
           return { hasCollision: collidingEntities.length > 0, collidingEntities };
         } catch (error) {
           // Fallback on worker error
@@ -525,30 +595,26 @@ export class CollisionDetector {
       }
 
       // Direct WASM path (64-500 objects, or fallback from worker)
-      const buffers = getTrsBuffers(candidates.length);
+      const buffers = getTrsBuffers(this.candidateBuffer.length);
       try {
         // Copy data into pooled buffers (positions is candidates.length * 3, etc.)
-        buffers.positions.set(positions, 0);
-        buffers.rotations.set(rotations, 0);
-        buffers.scales.set(scales, 0);
+        buffers.positions.set(this.positionBuffer, 0);
+        buffers.rotations.set(this.rotationBuffer, 0);
+        buffers.scales.set(this.scaleBuffer, 0);
 
         const idx = wasm.batchCheckTrs(previewTrs, {
-          positions: buffers.positions.subarray(0, positions.length),
-          rotations: buffers.rotations.subarray(0, rotations.length),
-          scales: buffers.scales.subarray(0, scales.length),
+          positions: buffers.positions.subarray(0, this.positionBuffer.length),
+          rotations: buffers.rotations.subarray(0, this.rotationBuffer.length),
+          scales: buffers.scales.subarray(0, this.scaleBuffer.length),
         } satisfies TrsArray);
 
         const collidingEntities: Entity[] = [];
         for (let i = 0; i < idx.length; i++) {
           const j = idx[i]!;
-          const ent = candidates[j];
+          const ent = this.candidateBuffer[j];
           if (ent) collidingEntities.push(ent);
         }
-        if (debug && typeof performance !== 'undefined') {
-          const t1 = performance.now();
-          // eslint-disable-next-line no-console
-          console.log('[collision][wasm] candidates:', candidates.length, 'ms:', (t1 - (t0 as number)).toFixed(2));
-        }
+        this.logCollisionPerformance('wasm', this.candidateBuffer.length, t0);
         return { hasCollision: collidingEntities.length > 0, collidingEntities };
       } catch (error) {
         // Fallback to TypeScript implementation on WASM error
@@ -561,56 +627,15 @@ export class CollisionDetector {
         releaseTrsBuffers(buffers);
       }
       // Fallback: TypeScript path (also reached if WASM fails)
-      const collidingEntities: Entity[] = [];
-      for (let i = 0; i < candidates.length; i++) {
-        const other = candidates[i]!;
-        const otherObb = this.getOBB(other);
-        if (CollisionDetector.obbIntersect(obb, otherObb)) {
-          collidingEntities.push(other);
-        }
-      }
-      if (debug && typeof performance !== 'undefined') {
-        const t1 = performance.now();
-        // eslint-disable-next-line no-console
-        console.log('[collision][fallback-ts] candidates:', candidates.length, 'ms:', (t1 - (t0 as number)).toFixed(2));
-      }
+      const collidingEntities = this.executeTypeScriptCollisionCheck(obb, this.candidateBuffer);
+      this.logCollisionPerformance('fallback-ts', this.candidateBuffer.length, t0);
       return { hasCollision: collidingEntities.length > 0, collidingEntities };
     } else {
-      // Fallback: original TypeScript path
-    const collidingEntities: Entity[] = [];
-    for (const other of this.scene.getActiveEntities()) {
-      if (other === entity) continue;
-      if (excludeEntities?.has(other)) continue;
-      
-      // Skip cameras (they are virtual, not physical objects)
-      if (other.getComponent(CameraComponent)) continue;
-      
-      // Broad-phase for other entity: use conservative bounding-sphere AABB (rotation-invariant)
-      const otherPos = other.transform.getWorldPosition();
-      const otherScale = other.transform.scale;
-      const ohx = Math.max(Math.abs(otherScale[0]) / 2, CollisionDetector.MIN_BOX_SIZE);
-      const ohy = Math.max(Math.abs(otherScale[1]) / 2, CollisionDetector.MIN_BOX_SIZE);
-      const ohz = Math.max(Math.abs(otherScale[2]) / 2, CollisionDetector.MIN_BOX_SIZE);
-      const orad = Math.hypot(ohx, ohy, ohz);
-      const otherAabb = {
-        min: [otherPos[0] - orad, otherPos[1] - orad, otherPos[2] - orad] as Vec3,
-        max: [otherPos[0] + orad, otherPos[1] + orad, otherPos[2] + orad] as Vec3,
-      } satisfies BoundingBox;
-
-      // Early reject if enclosing AABBs do not intersect
-      if (!CollisionDetector.boxesIntersect(entityAabb, otherAabb)) continue;
-
-      const otherObb = this.getOBB(other);
-      if (CollisionDetector.obbIntersect(obb, otherObb)) {
-        collidingEntities.push(other);
-      }
-    }
-    if (debug && typeof performance !== 'undefined') {
-      const t1 = performance.now();
-      // eslint-disable-next-line no-console
-      console.log('[collision][fallback-ts] ms:', (t1 - (t0 as number)).toFixed(2));
-    }
-    return { hasCollision: collidingEntities.length > 0, collidingEntities };
+      // Fallback: original TypeScript path (WASM not available)
+      this.collectCandidates(entity, entityAabb, excludeEntities);
+      const collidingEntities = this.executeTypeScriptCollisionCheck(obb, this.candidateBuffer);
+      this.logCollisionPerformance('fallback-ts', this.candidateBuffer.length, t0);
+      return { hasCollision: collidingEntities.length > 0, collidingEntities };
     }
   }
 
@@ -724,7 +749,10 @@ export class CollisionDetector {
    * with disposable pattern and future cleanup needs.
    */
   dispose(): void {
-    // No resources to clean up currently, but method provided for consistency
-    // with disposable pattern used throughout the engine
+    // Clear buffers to release references
+    this.candidateBuffer.length = 0;
+    this.positionBuffer.length = 0;
+    this.rotationBuffer.length = 0;
+    this.scaleBuffer.length = 0;
   }
 }

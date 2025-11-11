@@ -6,6 +6,7 @@
  */
 
 import type { Asset, AssetPreset } from '../types/BlockAssetTypes';
+import { validateAssetPreset } from '../types/BlockAssetTypes';
 import type { PlacementMode } from '../placement/PlacementMode';
 import type { Entity } from '@engine/world';
 import { Logger } from '../../utils/logger';
@@ -180,19 +181,32 @@ export class PlacementCoordinator {
 
   /**
    * Converts an Asset to AssetPreset for placement
+   * Validates and normalizes the preset before returning
    */
   private assetToPreset(asset: Asset): AssetPreset {
     // Default scale for blocks is 1x1x1
     const finalScale: [number, number, number] = [1, 1, 1];
 
+    // Ensure color is a valid RGBA tuple
+    // RgbaColor is already [number, number, number, number], but we validate it
+    const color: [number, number, number, number] = Array.isArray(asset.color) && asset.color.length === 4
+      ? [
+          Math.max(0, Math.min(1, asset.color[0] ?? 0.5)),
+          Math.max(0, Math.min(1, asset.color[1] ?? 0.5)),
+          Math.max(0, Math.min(1, asset.color[2] ?? 0.5)),
+          Math.max(0, Math.min(1, asset.color[3] ?? 1)),
+        ]
+      : [0.5, 0.5, 0.5, 1];
+
     const preset: AssetPreset = {
       name: asset.name,
       scale: finalScale,
-      color: asset.color,
+      color,
       ...(asset.blockData?.id && { blockId: asset.blockData.id }),
     };
 
-    return preset;
+    // Validate preset before returning
+    return validateAssetPreset(preset);
   }
 
   /**

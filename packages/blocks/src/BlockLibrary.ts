@@ -374,9 +374,14 @@ export function getBlocksByCategory(category: BlockCategory): BlockDefinition[] 
 }
 
 /**
- * Get block by ID
+ * Get block definition by ID
+ * @param id - Block identifier (e.g., 'grass', 'plastic_red')
+ * @returns Block definition if found, undefined otherwise
  */
 export function getBlock(id: string): BlockDefinition | undefined {
+  if (!id) {
+    return undefined;
+  }
   return BLOCK_LIBRARY[id];
 }
 

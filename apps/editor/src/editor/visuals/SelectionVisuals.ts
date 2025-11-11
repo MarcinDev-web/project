@@ -7,13 +7,16 @@ import { copyRgba, lightenColorInPlace } from '../../utils/colors';
 export const HIGHLIGHT_COLOR_BOOST = 0.3;
 
 export function initializeBaseColor(entity: Entity, baseColor: RgbaColor): void {
-  // Store copies but reuse allocations when possible
-  const stored = (entity.userData.baseColor as RgbaColor | undefined) ?? [1, 1, 1, 1];
-  const colorBuf = entity.color ?? [1, 1, 1, 1];
+  // Reuse or create baseColor storage in userData to avoid allocations
+  let stored = entity.userData.baseColor as RgbaColor | undefined;
+  if (!stored) {
+    stored = [1, 1, 1, 1];
+    entity.userData.baseColor = stored;
+  }
   copyRgba(stored, baseColor);
-  copyRgba(colorBuf, baseColor);
-  entity.userData.baseColor = stored;
-  entity.color = colorBuf;
+
+  // Use setter directly - it handles MaterialComponent creation and copying efficiently
+  entity.color = baseColor;
 }
 
 export function applySelectionVisuals(

@@ -32,6 +32,8 @@
       "@engine/net-protocol/*": ["../../packages/net-protocol/src/*"],
       "@engine/editor-utils": ["../../packages/editor-utils/src"],
       "@engine/editor-utils/*": ["../../packages/editor-utils/src/*"],
+      "@engine/blocks": ["../../packages/blocks/src"],
+      "@engine/blocks/*": ["../../packages/blocks/src/*"],
       "@engine/economy": ["../../packages/economy/src"],
       "@engine/economy/*": ["../../packages/economy/src/*"],
       "@engine/voxel": ["../../packages/voxel/src"],

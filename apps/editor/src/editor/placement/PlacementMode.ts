@@ -10,6 +10,7 @@ import type { Vec3, Quat } from '@engine/core/math';
 import { CollisionDetector } from './CollisionDetector';
 import type { SnapSystem } from '@engine/editor-utils';
 import type { AssetPreset } from '../types/BlockAssetTypes';
+import { validateAssetPreset } from '../types/BlockAssetTypes';
 import { initializeBaseColor } from '../visuals/SelectionVisuals';
 import { Logger } from '../../utils/logger';
 import { getBlock } from '@engine/blocks';
@@ -94,6 +95,8 @@ export class PlacementMode {
   private animator: PlacementAnimator;
   /** Track the latest update request ID to ignore stale collision results */
   private lastUpdateId = 0;
+  /** Reusable temp array for scale calculations (performance optimization) */
+  private readonly tempScale: Vec3 = [0, 0, 0];
 
   constructor(
     scene: Scene,
@@ -127,28 +130,42 @@ export class PlacementMode {
 
   /**
    * Starts placement mode with the given asset.
-   * @param asset - Asset to place
+   * @param asset - Asset to place (will be validated and normalized)
    */
   startPlacement(asset: AssetPreset): void {
+    // Validate and normalize asset using centralized validation
+    let normalizedAsset: AssetPreset;
+    try {
+      normalizedAsset = validateAssetPreset(asset);
+    } catch (error) {
+      Logger.warn('PlacementMode: Invalid asset provided to startPlacement', error);
+      return;
+    }
+
     // Cancel any existing placement
     this.cancelPlacement();
 
     // Warm up collision worker early to avoid first-use stall when rotating/checking
-    try { warmupCollisionWorker(); } catch {}
+    try {
+      warmupCollisionWorker();
+    } catch (error) {
+      // Non-critical: worker initialization failure doesn't prevent placement
+      Logger.debug('PlacementMode: Failed to warmup collision worker', error);
+    }
 
     // Create preview entity (not added to scene - no ghost/preview visible)
-    const previewEntity = new Entity(`${asset.name}_preview`);
+    const previewEntity = new Entity(`${normalizedAsset.name}_preview`);
 
     // Set base color from asset (preserve tuple type)
-    initializeBaseColor(previewEntity, asset.color);
+    initializeBaseColor(previewEntity, normalizedAsset.color);
 
     // Mark as preview (not added to scene - no ghost/preview visible)
     previewEntity.userData.isPreview = true;
-    previewEntity.userData.asset = asset.name;
+    previewEntity.userData.asset = normalizedAsset.name;
 
     // Set initial position and scale (preview is not added to scene - no ghost/preview visible)
     previewEntity.transform.position = [0, -1000, 0];
-    previewEntity.transform.scale = [...asset.scale];
+    previewEntity.transform.scale = [...normalizedAsset.scale];
     
     // Preview entity is NOT added to scene - no ghost/preview rendering
     // It's only used internally for collision detection and position tracking
@@ -157,13 +174,13 @@ export class PlacementMode {
       previewEntity,
       active: true,
       canPlace: false,
-      asset,
+      asset: normalizedAsset,
       rotationAngle: 0,
       position: null,
     };
 
     // Notify listeners that placement has started
-    this.config.onPlacementStart?.(asset, previewEntity);
+    this.config.onPlacementStart?.(normalizedAsset, previewEntity);
   }
 
   /**
@@ -215,11 +232,11 @@ export class PlacementMode {
     // Make contact tolerance scale-aware: treat it as a fraction of the smallest dimension
     const minDim = Math.min(Math.abs(s[0]), Math.abs(s[1]), Math.abs(s[2]));
     const CONTACT_TOLERANCE = Math.max(0, this.config.contactTolerance * (Number.isFinite(minDim) ? minDim : 1));
-    const testScale: Vec3 = [
-      Math.max(0.001, s[0] - CONTACT_TOLERANCE),
-      Math.max(0.001, s[1] - CONTACT_TOLERANCE),
-      Math.max(0.001, s[2] - CONTACT_TOLERANCE),
-    ];
+    // Reuse temp array to avoid allocation in hot path
+    this.tempScale[0] = Math.max(0.001, s[0] - CONTACT_TOLERANCE);
+    this.tempScale[1] = Math.max(0.001, s[1] - CONTACT_TOLERANCE);
+    this.tempScale[2] = Math.max(0.001, s[2] - CONTACT_TOLERANCE);
+    const testScale = this.tempScale;
 
     const collisionResult = await this.collisionDetector.checkCollisionOBB(
       this.preview.previewEntity,
@@ -377,6 +394,24 @@ export class PlacementMode {
   }
 
   /**
+   * Adds a box collider to physics component if none exists.
+   * Reusable helper to avoid code duplication.
+   * @param physics - Physics component
+   * @param entity - Entity to get scale from
+   */
+  private addBoxColliderIfNeeded(physics: PhysicsComponent, entity: Entity): void {
+    if (physics.colliders.length === 0) {
+      const scale = entity.transform.scale;
+      const halfExtents: Vec3 = [
+        Math.abs(scale[0]) / 2,
+        Math.abs(scale[1]) / 2,
+        Math.abs(scale[2]) / 2,
+      ];
+      physics.addBoxCollider(halfExtents, [0, 0, 0], false);
+    }
+  }
+
+  /**
    * Applies special properties for blocks that need them (lights, glass, etc.)
    * @param entity - The entity to apply properties to
    * @param blockId - The block ID from the asset preset
@@ -448,15 +483,7 @@ export class PlacementMode {
       }
 
       // Add box collider matching the entity scale (half extents)
-      if (physics.colliders.length === 0) {
-        const scale = entity.transform.scale;
-        const halfExtents: Vec3 = [
-          Math.abs(scale[0]) / 2,
-          Math.abs(scale[1]) / 2,
-          Math.abs(scale[2]) / 2,
-        ];
-        physics.addBoxCollider(halfExtents, [0, 0, 0], false);
-      }
+      this.addBoxColliderIfNeeded(physics, entity);
     }
 
     // Handle gameplay blocks (ice, slime, lava, poison) - add physics properties
@@ -470,15 +497,7 @@ export class PlacementMode {
       physics.rigidbodyType = RigidbodyType.Static;
 
       // Add box collider for collision detection
-      if (physics.colliders.length === 0) {
-        const scale = entity.transform.scale;
-        const halfExtents: Vec3 = [
-          Math.abs(scale[0]) / 2,
-          Math.abs(scale[1]) / 2,
-          Math.abs(scale[2]) / 2,
-        ];
-        physics.addBoxCollider(halfExtents, [0, 0, 0], false);
-      }
+      this.addBoxColliderIfNeeded(physics, entity);
     }
   }
 
@@ -758,5 +777,15 @@ export class PlacementMode {
    */
   getConfig(): PlacementModeConfig {
     return { ...this.config };
+  }
+
+  /**
+   * Dispose of resources (cleanup).
+   * Cancels any active placement and stops animations.
+   */
+  dispose(): void {
+    this.cancelPlacement(true);
+    // Animator cleanup is handled by cancelPlacement, but ensure it's disposed
+    this.animator.dispose();
   }
 }

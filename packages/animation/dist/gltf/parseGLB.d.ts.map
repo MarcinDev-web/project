@@ -1,1 +1,0 @@
-{"version":3,"file":"parseGLB.d.ts","sourceRoot":"","sources":["../../src/gltf/parseGLB.ts"],"names":[],"mappings":"AAAA;;;GAGG;AACH,MAAM,MAAM,SAAS,GAAG;IACtB,IAAI,EAAE,GAAG,CAAC;IACV,QAAQ,EAAE,WAAW,GAAG,IAAI,CAAC;CAC9B,CAAC;AAEF,wBAAgB,QAAQ,CAAC,MAAM,EAAE,WAAW,GAAG,SAAS,CAiCvD;AAED,wBAAgB,aAAa,CAAC,MAAM,EAAE,WAAW;;;;EAQhD"}

@@ -1,1 +1,0 @@
-{"version":3,"file":"ManifestBindings.js","sourceRoot":"","sources":["../../src/CharacterController/ManifestBindings.ts"],"names":[],"mappings":"AAAA,4EAA4E;AAC5E,4DAA4D;AAqB5D,MAAM,UAAU,yBAAyB,CAAC,QAAsB;IAC9D,OAAO,QAAQ,CAAC,UAAU,CAAC;AAC7B,CAAC;AAED,MAAM,UAAU,iBAAiB,CAAC,QAAsB;IACtD,OAAO,QAAQ,CAAC,IAAI,CAAC;AACvB,CAAC"}

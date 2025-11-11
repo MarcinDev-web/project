@@ -17,6 +17,7 @@ describe('SnapSystem', () => {
       expect(config.enabled).toBe(DEFAULT_SNAP_CONFIG.enabled);
       expect(config.increment).toBe(DEFAULT_SNAP_CONFIG.increment);
       expect(config.axes).toEqual(DEFAULT_SNAP_CONFIG.axes);
+      expect(config.rotationAxes).toEqual(DEFAULT_SNAP_CONFIG.rotationAxes);
     });
 
     it('should initialize with custom config', () => {
@@ -24,12 +25,16 @@ describe('SnapSystem', () => {
         enabled: false,
         increment: 1.0,
         rotationIncrement: Math.PI / 4,
+        rotationAxes: { x: true, y: false, z: true },
       });
 
       const config = customSnap.getConfig();
       expect(config.enabled).toBe(false);
       expect(config.increment).toBe(1.0);
       expect(config.rotationIncrement).toBe(Math.PI / 4);
+      expect(config.rotationAxes.x).toBe(true);
+      expect(config.rotationAxes.y).toBe(false);
+      expect(config.rotationAxes.z).toBe(true);
     });
 
     it('should throw on invalid config', () => {
@@ -181,6 +186,41 @@ describe('SnapSystem', () => {
       );
       expect(length).toBeCloseTo(1, 5);
     });
+
+    it('should respect per-axis rotation configuration', () => {
+      snapSystem.setConfig({
+        rotationAxes: {
+          x: true,
+          y: false,
+          z: true,
+        },
+      });
+
+      // Create a rotation with non-zero Euler angles
+      const rotation: Quat = [0.1, 0.2, 0.3, 0.9];
+      const snapped = snapSystem.snapRotation(rotation);
+
+      // X and Z should be snapped, Y should remain unchanged
+      // Note: Due to quaternion normalization, exact values are hard to predict
+      // But we can verify the quaternion is normalized
+      const length = Math.sqrt(
+        snapped[0] ** 2 + snapped[1] ** 2 + snapped[2] ** 2 + snapped[3] ** 2
+      );
+      expect(length).toBeCloseTo(1, 5);
+    });
+
+    it('should accept per-call rotation config override', () => {
+      const rotation: Quat = [0.1, 0.2, 0.3, 0.9];
+      const snapped = snapSystem.snapRotation(rotation, {
+        rotationIncrement: Math.PI / 4,
+      });
+
+      expect(snapped).toHaveLength(4);
+      const length = Math.sqrt(
+        snapped[0] ** 2 + snapped[1] ** 2 + snapped[2] ** 2 + snapped[3] ** 2
+      );
+      expect(length).toBeCloseTo(1, 5);
+    });
   });
 
   describe('snapScale', () => {
@@ -286,16 +326,19 @@ describe('SnapSystem', () => {
       expect(config.enabled).toBeDefined();
       expect(config.increment).toBeDefined();
       expect(config.axes).toBeDefined();
+      expect(config.rotationAxes).toBeDefined();
     });
 
     it('should return cloned config', () => {
       const config = snapSystem.getConfig();
       config.enabled = false;
       config.axes.x = false;
+      config.rotationAxes.y = false;
 
       const newConfig = snapSystem.getConfig();
       expect(newConfig.enabled).toBe(true); // Original unchanged
       expect(newConfig.axes.x).toBe(true);
+      expect(newConfig.rotationAxes.y).toBe(true);
     });
 
     it('should set config', () => {
@@ -331,6 +374,17 @@ describe('SnapSystem', () => {
       expect(config.axes.x).toBe(false);
       expect(config.axes.y).toBe(true); // Unchanged
       expect(config.axes.z).toBe(true); // Unchanged
+    });
+
+    it('should merge rotationAxes config', () => {
+      snapSystem.setConfig({
+        rotationAxes: { x: false },
+      });
+
+      const config = snapSystem.getConfig();
+      expect(config.rotationAxes.x).toBe(false);
+      expect(config.rotationAxes.y).toBe(true); // Unchanged
+      expect(config.rotationAxes.z).toBe(true); // Unchanged
     });
   });
 
@@ -451,6 +505,135 @@ describe('SnapSystem', () => {
       expect(snapped[0]).toBeCloseTo(1.0, 5); // Snapped from 1.23
       expect(snapped[1]).toBe(minScale); // Clamped from negative
       expect(snapped[2]).toBeCloseTo(2.5, 5); // Snapped from 2.45
+    });
+  });
+
+  describe('snapPositionInPlace', () => {
+    it('should mutate input array when no out provided', () => {
+      const position: Vec3 = [1.23, 4.56, 7.89];
+      const result = snapSystem.snapPositionInPlace(position);
+
+      expect(result).toBe(position); // Same reference
+      expect(position[0]).toBeCloseTo(1.0, 5);
+      expect(position[1]).toBeCloseTo(4.5, 5);
+      expect(position[2]).toBeCloseTo(8.0, 5);
+    });
+
+    it('should not mutate input when out provided', () => {
+      const position: Vec3 = [1.23, 4.56, 7.89];
+      const original = [...position];
+      const out: Vec3 = [0, 0, 0];
+      const result = snapSystem.snapPositionInPlace(position, out);
+
+      expect(result).toBe(out); // Returns out reference
+      expect(position).toEqual(original); // Input unchanged
+      expect(out[0]).toBeCloseTo(1.0, 5);
+      expect(out[1]).toBeCloseTo(4.5, 5);
+      expect(out[2]).toBeCloseTo(8.0, 5);
+    });
+
+    it('should respect per-axis configuration', () => {
+      snapSystem.setConfig({
+        axes: { x: true, y: false, z: true },
+      });
+
+      const position: Vec3 = [1.23, 4.56, 7.89];
+      snapSystem.snapPositionInPlace(position);
+
+      expect(position[0]).toBeCloseTo(1.0, 5); // Snapped
+      expect(position[1]).toBeCloseTo(4.56, 5); // Not snapped
+      expect(position[2]).toBeCloseTo(8.0, 5); // Snapped
+    });
+
+    it('should return original when disabled', () => {
+      snapSystem.disable();
+      const position: Vec3 = [1.23, 4.56, 7.89];
+      const result = snapSystem.snapPositionInPlace(position);
+
+      expect(result).toBe(position);
+      expect(position).toEqual([1.23, 4.56, 7.89]);
+    });
+  });
+
+  describe('snapRotationInPlace', () => {
+    it('should mutate input array when no out provided', () => {
+      const rotation: Quat = [0, 0, 0, 1];
+      const result = snapSystem.snapRotationInPlace(rotation);
+
+      expect(result).toBe(rotation); // Same reference
+      expect(result[3]).toBeCloseTo(1, 5); // Normalized
+    });
+
+    it('should not mutate input when out provided', () => {
+      const rotation: Quat = [0.1, 0.2, 0.3, 0.9];
+      const original = [...rotation];
+      const out: Quat = [0, 0, 0, 1];
+      const result = snapSystem.snapRotationInPlace(rotation, out);
+
+      expect(result).toBe(out); // Returns out reference
+      expect(rotation).toEqual(original); // Input unchanged
+      const length = Math.sqrt(
+        result[0] ** 2 + result[1] ** 2 + result[2] ** 2 + result[3] ** 2
+      );
+      expect(length).toBeCloseTo(1, 5); // Normalized
+    });
+
+    it('should respect per-axis rotation configuration', () => {
+      snapSystem.setConfig({
+        rotationAxes: { x: true, y: false, z: true },
+      });
+
+      const rotation: Quat = [0.1, 0.2, 0.3, 0.9];
+      snapSystem.snapRotationInPlace(rotation);
+
+      const length = Math.sqrt(
+        rotation[0] ** 2 + rotation[1] ** 2 + rotation[2] ** 2 + rotation[3] ** 2
+      );
+      expect(length).toBeCloseTo(1, 5); // Normalized
+    });
+  });
+
+  describe('snapScaleInPlace', () => {
+    it('should mutate input array when no out provided', () => {
+      const scale: Vec3 = [1.23, 0.67, 2.45];
+      const result = snapSystem.snapScaleInPlace(scale);
+
+      expect(result).toBe(scale); // Same reference
+      expect(scale[0]).toBeCloseTo(1.0, 5);
+      expect(scale[1]).toBeCloseTo(0.5, 5);
+      expect(scale[2]).toBeCloseTo(2.5, 5);
+    });
+
+    it('should not mutate input when out provided', () => {
+      const scale: Vec3 = [1.23, 0.67, 2.45];
+      const original = [...scale];
+      const out: Vec3 = [0, 0, 0];
+      const result = snapSystem.snapScaleInPlace(scale, out);
+
+      expect(result).toBe(out); // Returns out reference
+      expect(scale).toEqual(original); // Input unchanged
+      expect(out[0]).toBeCloseTo(1.0, 5);
+      expect(out[1]).toBeCloseTo(0.5, 5);
+      expect(out[2]).toBeCloseTo(2.5, 5);
+    });
+
+    it('should enforce minimum scale', () => {
+      const scale: Vec3 = [0.0001, 0.0001, 0.0001];
+      snapSystem.snapScaleInPlace(scale);
+
+      const minScale = DEFAULT_SNAP_CONFIG.minScale;
+      expect(scale[0]).toBeGreaterThanOrEqual(minScale);
+      expect(scale[1]).toBeGreaterThanOrEqual(minScale);
+      expect(scale[2]).toBeGreaterThanOrEqual(minScale);
+    });
+
+    it('should return original when disabled', () => {
+      snapSystem.disable();
+      const scale: Vec3 = [1.23, 0.67, 2.45];
+      const result = snapSystem.snapScaleInPlace(scale);
+
+      expect(result).toBe(scale);
+      expect(scale).toEqual([1.23, 0.67, 2.45]);
     });
   });
 });

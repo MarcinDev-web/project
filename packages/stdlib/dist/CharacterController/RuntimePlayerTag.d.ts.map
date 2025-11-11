@@ -1,1 +1,0 @@
-{"version":3,"file":"RuntimePlayerTag.d.ts","sourceRoot":"","sources":["../../src/CharacterController/RuntimePlayerTag.ts"],"names":[],"mappings":"AAAA,OAAO,EAAE,SAAS,EAAE,MAAM,eAAe,CAAC;AAG1C,qBAAa,gBAAiB,SAAQ,SAAS;IAC7C,MAAM,CAAC,QAAQ,CAAC,IAAI,sBAAsB;IAE1C,OAAO,IAAI,MAAM;IAIjB,KAAK,IAAI,gBAAgB;CAG1B"}
