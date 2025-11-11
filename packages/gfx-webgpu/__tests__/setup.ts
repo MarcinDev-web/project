@@ -3,6 +3,68 @@
  * Mocks WebGPU globals that are not available in Node.js/jsdom
  */
 
+// Polyfill ImageData if not available (for Node.js/jsdom)
+if (typeof ImageData === 'undefined') {
+  (globalThis as any).ImageData = class ImageData {
+    data: Uint8ClampedArray;
+    width: number;
+    height: number;
+
+    constructor(widthOrData: number | Uint8ClampedArray, height?: number) {
+      if (typeof widthOrData === 'number') {
+        this.width = widthOrData;
+        this.height = height || widthOrData;
+        this.data = new Uint8ClampedArray(this.width * this.height * 4);
+      } else {
+        this.data = widthOrData;
+        this.width = height || Math.sqrt(widthOrData.length / 4);
+        this.height = height || Math.sqrt(widthOrData.length / 4);
+      }
+    }
+  };
+}
+
+// Mock HTMLCanvasElement.getContext for 2D canvas
+if (typeof HTMLCanvasElement !== 'undefined') {
+  const originalGetContext = HTMLCanvasElement.prototype.getContext;
+  HTMLCanvasElement.prototype.getContext = function(
+    contextId: string,
+    options?: any
+  ): RenderingContext | null {
+    if (contextId === '2d') {
+      // Create a minimal mock 2D context
+      const canvas = this as HTMLCanvasElement;
+      return {
+        canvas,
+        clearRect: () => {},
+        fillRect: () => {},
+        fillStyle: '',
+        strokeStyle: '',
+        lineWidth: 1,
+        beginPath: () => {},
+        moveTo: () => {},
+        lineTo: () => {},
+        arc: () => {},
+        stroke: () => {},
+        fill: () => {},
+        createLinearGradient: () => ({
+          addColorStop: () => {},
+        }),
+        createImageData: (width: number, height: number) => {
+          return new ImageData(width, height);
+        },
+        getImageData: (sx: number, sy: number, sw: number, sh: number) => {
+          return new ImageData(sw, sh);
+        },
+        putImageData: () => {},
+        quadraticCurveTo: () => {},
+      } as unknown as CanvasRenderingContext2D;
+    }
+    // For other context types, use original implementation
+    return originalGetContext.call(this, contextId, options);
+  };
+}
+
 // WebGPU Buffer Usage Flags
 (globalThis as any).GPUBufferUsage = {
   MAP_READ: 0x0001,

@@ -120,14 +120,8 @@ export class EditorPlacementController {
             return;
           }
 
-          // Final fallback: place at fixed distance along ray (prevents ghost from following camera)
-          const DEFAULT_PLACEMENT_DISTANCE = 5.0;
-          const fallbackPosition: Vec3 = [
-            ray.origin[0] + ray.direction[0] * DEFAULT_PLACEMENT_DISTANCE,
-            ray.origin[1] + ray.direction[1] * DEFAULT_PLACEMENT_DISTANCE,
-            ray.origin[2] + ray.direction[2] * DEFAULT_PLACEMENT_DISTANCE,
-          ];
-          void this.config.placementMode.updatePreviewPosition(fallbackPosition);
+          // No valid placement position found - keep ghost at last known position
+          // This prevents the ghost from "jumping back" to camera when moving away from blocks
 
           // Clear pending update
           if (this.pendingMouseUpdate?.rafId === rafId) {
@@ -150,50 +144,54 @@ export class EditorPlacementController {
     // Double-click to confirm placement
     this.config.canvas.addEventListener(
       'dblclick',
-      (event: MouseEvent) => {
+      async (event: MouseEvent) => {
         if (!this.config.placementMode.isActive()) {
           return;
         }
 
         // Update position one last time before confirming
+        // IMPORTANT: Wait for update to complete to ensure position is correct
         const ray = this.createRayFromMouseEvent(event);
         if (ray) {
           const adjacent = this.getAdjacentPlacementFromRay(ray);
           if (adjacent) {
             const exclude = this.getLastRaycastEntity(ray);
             if (exclude) {
-              void this.config.placementMode.updatePreviewPosition(adjacent, {
+              await this.config.placementMode.updatePreviewPosition(adjacent, {
                 ignoreEntities: [exclude],
                 applySnap: false,
               });
             } else {
-              void this.config.placementMode.updatePreviewPosition(adjacent, {
+              await this.config.placementMode.updatePreviewPosition(adjacent, {
                 applySnap: false,
               });
             }
           } else {
             const groundIntersection = this.raycastToGroundPlane(ray);
             if (groundIntersection) {
-              void this.config.placementMode.updatePreviewPosition(groundIntersection);
-            } else {
-              // Final fallback: place at fixed distance along ray
-              const DEFAULT_PLACEMENT_DISTANCE = 5.0;
-              const fallbackPosition: Vec3 = [
-                ray.origin[0] + ray.direction[0] * DEFAULT_PLACEMENT_DISTANCE,
-                ray.origin[1] + ray.direction[1] * DEFAULT_PLACEMENT_DISTANCE,
-                ray.origin[2] + ray.direction[2] * DEFAULT_PLACEMENT_DISTANCE,
-              ];
-              void this.config.placementMode.updatePreviewPosition(fallbackPosition);
+              await this.config.placementMode.updatePreviewPosition(groundIntersection);
             }
+            // No valid placement position found - keep ghost at last known position
           }
         }
 
-        // Confirm placement
+        // Confirm placement after position is updated
         const placed = this.config.placementMode.confirmPlacement();
         if (placed) {
           this.config.selection.select(placed);
           this.config.updateSceneBuffers();
-          this.config.state.placementMode.value = false;
+          // Don't disable placement mode if Easy Place is active (it handles auto-continuation)
+          // Also don't disable if placement mode is still active (auto-continuation may have restarted it)
+          // Use a small delay to allow auto-continuation callbacks to execute first
+          if (!this.config.state.easyPlaceMode.value) {
+            setTimeout(() => {
+              // Only disable if placement mode is still inactive after callback execution
+              // This allows auto-continuation (e.g., from hotbar) to restart placement mode
+              if (!this.config.placementMode.isActive()) {
+                this.config.state.placementMode.value = false;
+              }
+            }, 50);
+          }
           this.config.recordSnapshot('Place object');
           try {
             this.config.state?.adaptiveUI?.trackPlacement?.();

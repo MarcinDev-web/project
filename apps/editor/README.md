@@ -52,3 +52,16 @@ pnpm build
 
 Zobacz: [MIGRATION_PLAN.md](../../docs/MIGRATION_PLAN.md)
 
+## Architecture Notes
+
+### Headless Systems
+
+Some systems in `editor/systems/` are **headless** - they operate without UI integration:
+
+- **CheckpointSystem** - Manages checkpoint activation/respawn during play mode
+- **SpawnPointSystem** - Finds spawn locations for player initialization
+
+These systems are used internally by play mode logic (`EditorModeManager`, `PlayIntroState`) but are not exposed to editor UI panels. They're runtime systems, not editor UI components.
+
+**UI Boundary:** Systems in `editor/systems/` are for runtime logic. UI components belong in `editor/ui/` and `editor/panels/`.
+

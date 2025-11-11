@@ -12,6 +12,7 @@ import { TextureLoader, type LoadedTexture } from './TextureLoader';
 import { ProceduralTextureGenerator } from './ProceduralTextureGenerator';
 import { globalTextureCache } from './TextureCache';
 import type { BlockFaceTexture } from '@engine/blocks';
+import type { PipelineCache } from '../pipeline/PipelineCache';
 
 export interface ManagedTexture {
   /** Texture ID */
@@ -34,10 +35,26 @@ export class TextureManager {
   private textureLoader: TextureLoader;
   private proceduralGenerator: ProceduralTextureGenerator;
   private loadedTextures: Map<string, ManagedTexture> = new Map();
+  private device: GPUDevice | null = null;
+  private pipelineCache: PipelineCache | undefined = undefined;
 
-  constructor(proceduralTextureSize: number = 128) {
+  constructor(device?: GPUDevice, proceduralTextureSize: number = 128, pipelineCache?: PipelineCache) {
     this.textureLoader = new TextureLoader();
     this.proceduralGenerator = new ProceduralTextureGenerator(proceduralTextureSize);
+    this.device = device || null;
+    this.pipelineCache = pipelineCache;
+  }
+
+  /**
+   * Initialize GPU compute shader support for procedural texture generation
+   * @param device WebGPU device
+   * @param pipelineCache Optional pipeline cache for optimization
+   * @param shaderCode Optional shader code (defaults to built-in shader)
+   */
+  public initializeGPU(device: GPUDevice, pipelineCache?: PipelineCache, shaderCode?: string): void {
+    this.device = device;
+    this.pipelineCache = pipelineCache;
+    this.proceduralGenerator.initializeGPU(device, this.pipelineCache, shaderCode);
   }
 
   /**
@@ -47,7 +64,7 @@ export class TextureManager {
     id: string,
     faceTexture: BlockFaceTexture
   ): Promise<ManagedTexture> {
-    // Check if already loaded
+    // Check if already loaded (CRITICAL: prevents regeneration and flickering)
     if (this.loadedTextures.has(id)) {
       return this.loadedTextures.get(id)!;
     }
@@ -60,13 +77,14 @@ export class TextureManager {
         managedTexture = await this.loadTextureFromUrl(id, faceTexture);
       } catch (error) {
         console.warn(`[TextureManager] Failed to load texture from ${faceTexture.textureUrl}, falling back to procedural`, error);
-        managedTexture = this.generateProceduralTexture(id, faceTexture);
+        managedTexture = await this.generateProceduralTexture(id, faceTexture);
       }
     } else {
       // Generate procedurally
-      managedTexture = this.generateProceduralTexture(id, faceTexture);
+      managedTexture = await this.generateProceduralTexture(id, faceTexture);
     }
 
+    // Cache the result (CRITICAL: prevents regeneration)
     this.loadedTextures.set(id, managedTexture);
     return managedTexture;
   }
@@ -135,19 +153,23 @@ export class TextureManager {
   }
 
   /**
-   * Generate procedural texture
+   * Generate procedural texture (uses GPU if available, falls back to CPU)
    */
-  private generateProceduralTexture(
+  private async generateProceduralTexture(
     id: string,
     faceTexture: BlockFaceTexture
-  ): ManagedTexture {
-    // Generate PBR texture set
+  ): Promise<ManagedTexture> {
+    // Generate albedo texture using GPU if available, fallback to CPU
+    const albedoImageData = await this.proceduralGenerator.generateTextureAsync(faceTexture);
+    
+    // Generate PBR texture set (for now, only albedo uses GPU, others use CPU)
+    // TODO: Implement GPU generation for normal, roughness, metallic, ao maps
     const pbrTextures = this.proceduralGenerator.generatePBRTexture(faceTexture);
-
-    // Convert ImageData to LoadedTexture format
+    
+    // Use GPU-generated albedo if available, otherwise use CPU-generated
     const albedo = this.imageDataToLoadedTexture(
       `${id}_albedo`,
-      pbrTextures.albedo
+      albedoImageData
     );
 
     const normal = pbrTextures.normal
@@ -166,12 +188,7 @@ export class TextureManager {
       ? this.imageDataToLoadedTexture(`${id}_ao`, pbrTextures.ao)
       : undefined;
 
-    // Add to cache
-    globalTextureCache.add(albedo.id, albedo.data, albedo.width, albedo.height);
-    if (normal) globalTextureCache.add(normal.id, normal.data, normal.width, normal.height);
-    if (roughness) globalTextureCache.add(roughness.id, roughness.data, roughness.width, roughness.height);
-    if (metallic) globalTextureCache.add(metallic.id, metallic.data, metallic.width, metallic.height);
-    if (ao) globalTextureCache.add(ao.id, ao.data, ao.width, ao.height);
+    // Note: Textures are already cached by imageDataToLoadedTexture via TextureLoader
 
     return {
       id,
@@ -185,15 +202,20 @@ export class TextureManager {
   }
 
   /**
-   * Convert ImageData to LoadedTexture
+   * Convert ImageData to LoadedTexture with mipmap generation
    */
   private imageDataToLoadedTexture(id: string, imageData: ImageData): LoadedTexture {
-    return {
+    // Use TextureLoader to generate mipmaps properly
+    return this.textureLoader.createFromPixels(
       id,
-      data: new Uint8Array(imageData.data),
-      width: imageData.width,
-      height: imageData.height,
-    };
+      new Uint8Array(imageData.data),
+      imageData.width,
+      imageData.height,
+      {
+        cache: true,
+        generateMipmaps: true, // CRITICAL: Generate mipmaps to prevent flickering
+      }
+    );
   }
 
   /**
@@ -318,6 +340,7 @@ export class TextureManager {
 
 /**
  * Global texture manager instance
+ * Can be initialized with GPU support later via initializeGPU()
  */
-export const globalTextureManager = new TextureManager();
+export const globalTextureManager = new TextureManager(undefined, 128, undefined);
 

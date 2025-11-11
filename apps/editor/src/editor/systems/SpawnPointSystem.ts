@@ -22,6 +22,9 @@ export interface SpawnPointResult {
  * 1. User-defined spawn point (entity with SpawnPointComponent, isDefault=true)
  * 2. Raycast fallback (cast ray downward from camera/reference position)
  * 3. Default origin (0, 0, 0) if nothing else works
+ * 
+ * Note: This is a headless system used internally by play mode logic.
+ * It does not expose any UI and is not intended for direct editor UI integration.
  */
 export class SpawnPointSystem {
   /**

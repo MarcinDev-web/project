@@ -85,6 +85,7 @@ export {
   type SelectionHighlight,
 } from './systems/Selection.js';
 export { WeaponSystem } from './systems/WeaponSystem.js';
+export { WeaponPickupSystem } from './systems/WeaponPickupSystem.js';
 export { InventorySystem } from './systems/InventorySystem.js';
 export { InteractionSystem } from './systems/InteractionSystem.js';
 export type { InteractionSystemConfig } from './systems/InteractionSystem.js';

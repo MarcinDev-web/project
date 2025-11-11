@@ -8,7 +8,8 @@ import { Logger } from './utils/logger';
 import { CameraComponent } from '@engine/world';
 import { PhysicsWorld } from '@engine/world';
 import { CharacterControllerSystem } from '@engine/stdlib/CharacterController';
-import { BlockBehaviorSystem, UISystem } from '@engine/world/systems';
+import { BlockBehaviorSystem, UISystem, InteractionSystem } from '@engine/world/systems';
+import { MeshComponent, InteractableComponent } from '@engine/world';
 import { registerTemplates, applyTo } from '@engine/world-templates';
 import { createFlatPlatformTemplate, createStarterBlockTemplate } from '@engine/world-templates';
 import { ShareClient } from '@engine/net';
@@ -27,6 +28,7 @@ export class EditorApp {
   private characterSystem: CharacterControllerSystem | null = null;
   private blockBehaviorSystem: BlockBehaviorSystem | null = null;
   private uiSystem: UISystem | null = null;
+  private interactionSystem: InteractionSystem | null = null;
 
   private renderer: Renderer | null = null;
   private editor: EditorUI | null = null;
@@ -79,7 +81,7 @@ export class EditorApp {
           // Update brand watermark (FORGE ENGINE branding with FPS)
           this.editor?.updateBrandWatermark();
 
-          // Update play mode systems (physics, character controller, FPS camera, UI)
+          // Update play mode systems (physics, character controller, FPS camera, UI, interaction)
           if (this.editor?.isPlayMode()) {
             try {
               // Initialize UI system if not already initialized
@@ -90,6 +92,10 @@ export class EditorApp {
               // Update UI system
               if (this.uiSystem) {
                 this.uiSystem.update();
+              }
+              // Update interaction system
+              if (this.interactionSystem) {
+                this.interactionSystem.update(deltaTime);
               }
             } catch (err) {
               Logger.warn('Play mode update failed:', err as Error);
@@ -131,6 +137,14 @@ export class EditorApp {
       this.characterSystem = new CharacterControllerSystem(this.scene, this.physicsWorld);
       this.blockBehaviorSystem = new BlockBehaviorSystem(this.scene, this.physicsWorld.getSystem());
       this.uiSystem = new UISystem(this.scene);
+      this.interactionSystem = new InteractionSystem(this.scene, {
+        canvas: this.config.canvas,
+        maxRange: 10.0,
+        detectionMode: 'raycast',
+      });
+
+      // Add InteractableComponent to existing blocks that don't have it
+      this.addInteractableToBlocks();
 
       // Expose abort helper for debugging
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -229,6 +243,15 @@ export class EditorApp {
       this.uiSystem = null;
     }
 
+    if (this.interactionSystem) {
+      try {
+        this.interactionSystem.dispose();
+      } catch (error) {
+        Logger.warn('interactionSystem dispose failed:', error as unknown as Error);
+      }
+      this.interactionSystem = null;
+    }
+
     try {
       this.controls.cleanup();
     } catch (error) {
@@ -243,6 +266,41 @@ export class EditorApp {
       } finally {
         this.renderer = null;
       }
+    }
+  }
+
+  /**
+   * Add InteractableComponent to existing blocks (cube meshes) that don't have it
+   */
+  private addInteractableToBlocks(): void {
+    const blocks = this.scene.queryEntities(MeshComponent);
+    let addedCount = 0;
+    
+    for (const entity of blocks) {
+      // Skip if already has InteractableComponent
+      if (entity.getComponent(InteractableComponent)) {
+        continue;
+      }
+      
+      // Only add to cube meshes (blocks)
+      const mesh = entity.getComponent(MeshComponent);
+      if (mesh && mesh.meshType === 'cube') {
+        // Skip EditorCamera and other helper entities
+        if (entity.name === 'EditorCamera' || entity.name === 'PlayerAvatarVisual') {
+          continue;
+        }
+        
+        const interactable = new InteractableComponent();
+        interactable.interactionRange = 5.0;
+        interactable.promptText = 'Kliknij aby interakować';
+        interactable.cooldown = 0.5;
+        entity.addComponent(interactable);
+        addedCount++;
+      }
+    }
+    
+    if (addedCount > 0) {
+      Logger.debug(`Added InteractableComponent to ${addedCount} block(s)`);
     }
   }
 
@@ -375,6 +433,21 @@ export class EditorApp {
   private wireSelection(): () => void {
     const handleClick = (event: MouseEvent) => {
       if (!this.renderer) return;
+      
+      // Only handle clicks in edit mode
+      if (this.editor?.isPlayMode()) {
+        return;
+      }
+      
+      // Ensure pointer lock is released in edit mode (failsafe)
+      if (typeof document !== 'undefined' && document.pointerLockElement === this.config.canvas) {
+        try {
+          document.exitPointerLock();
+        } catch {
+          // Ignore errors
+        }
+      }
+      
       this.updateCameraMatrices();
       const rect = this.config.canvas.getBoundingClientRect();
       const mouseX = event.clientX - rect.left;
@@ -387,7 +460,16 @@ export class EditorApp {
         this.viewMatrix as Mat4,
         this.projectionMatrix as Mat4
       );
-      const hits = this.raycaster.raycastAll(ray, this.scene.getActiveEntities());
+      // Filter out EditorCamera and other helper entities from selection
+      const selectableEntities = this.scene.getActiveEntities().filter(
+        (entity) => 
+          entity.name !== 'EditorCamera' && 
+          entity.name !== 'PlayerAvatarVisual' &&
+          entity.name !== 'Environment' &&
+          entity.name !== 'Sun' &&
+          entity.name !== 'AmbientLight'
+      );
+      const hits = this.raycaster.raycastAll(ray, selectableEntities);
       const isCtrl = event.ctrlKey || event.metaKey;
       if (hits.length > 0) {
         const hit = hits[0]!;

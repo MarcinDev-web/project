@@ -197,8 +197,9 @@ export class OrbitCamera {
       event.preventDefault();
       // Normalize delta across devices/browsers and apply exponential zoom for smoother feel
       const deltaNormalized =
-        event.deltaMode === 0 /* DOM_DELTA_PIXEL */ ? (event.deltaY ?? 0) / 100 : (event.deltaY ?? 0);
-      const scale = Math.exp((deltaNormalized ?? 0) * (this.zoomSpeed ?? ZOOM_SPEED) * 0.1);
+        event.deltaMode === 0 /* DOM_DELTA_PIXEL */ ? (event.deltaY ?? 0) / 50 : (event.deltaY ?? 0);
+      // Significantly increased multiplier from 0.1 to 0.4 for much better responsiveness
+      const scale = Math.exp((deltaNormalized ?? 0) * (this.zoomSpeed ?? ZOOM_SPEED) * 0.4);
       this.distance *= scale;
       if (this.distance < this.minDistance) this.distance = this.minDistance;
       if (this.distance > this.maxDistance) this.distance = this.maxDistance;

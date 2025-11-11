@@ -33,7 +33,7 @@ import { BehaviorRegistry } from '@engine/script';
 import { AnimationComponent } from '@engine/stdlib/Animation';
 import { createAnimationSection } from '../ui/animation/AnimationSection';
 import { MaterialComponent } from '@engine/world/components/MaterialComponent';
-import { CharacterController, NpcComponent } from '@engine/world';
+import { CharacterController, NpcComponent, CheckpointComponent, SpawnPointComponent } from '@engine/world';
 import { UIElementComponent } from '@engine/world/components/UIElementComponent';
 import { UIElementProperties } from '../ui/UIElementProperties';
 import { MovementProfileRegistry, PRESET_PROFILES, type MovementProfileExtension } from '@engine/stdlib/MovementProfiles';
@@ -71,6 +71,8 @@ const SECTION_METADATA: SectionMeta[] = [
   { id: 'npc', label: 'NPC', icon: 'user' },
   { id: 'ui', label: 'UI', icon: 'layers' },
   { id: 'scripts', label: 'Scripts', icon: 'list' },
+  { id: 'spawn-point', label: 'Spawn Point', icon: 'map-pin' },
+  { id: 'checkpoint', label: 'Checkpoint', icon: 'flag' },
 ];
 
 export class PropertiesPanel {
@@ -2793,6 +2795,34 @@ export class PropertiesPanel {
           () => this.toggleSectionCollapse('scripts')
         );
       }
+      case 'spawn-point': {
+        const spawnPointComponent = entity.getComponent(SpawnPointComponent);
+        const content = spawnPointComponent
+          ? this.createSpawnPointProperties(entity, spawnPointComponent)
+          : this.createSpawnPointEmptyState(entity);
+        return this.createCollapsibleSection(
+          'spawn-point',
+          'Spawn Point',
+          'map-pin',
+          content,
+          collapsed,
+          () => this.toggleSectionCollapse('spawn-point')
+        );
+      }
+      case 'checkpoint': {
+        const checkpointComponent = entity.getComponent(CheckpointComponent);
+        const content = checkpointComponent
+          ? this.createCheckpointProperties(entity, checkpointComponent)
+          : this.createCheckpointEmptyState(entity);
+        return this.createCollapsibleSection(
+          'checkpoint',
+          'Checkpoint',
+          'flag',
+          content,
+          collapsed,
+          () => this.toggleSectionCollapse('checkpoint')
+        );
+      }
       default:
         return null;
     }
@@ -3440,6 +3470,217 @@ export class PropertiesPanel {
       }
       try {
         const comp = new UIElementComponent(undefined, 'button');
+        entity.addComponent(comp);
+      } catch {
+        // Ignore add errors
+      }
+      this.renderedEntityId = null;
+      this.refresh();
+    }, { signal: this.refreshAbort!.signal });
+
+    container.appendChild(text);
+    container.appendChild(addBtn);
+    return container;
+  }
+
+  /**
+   * Creates SpawnPoint component properties UI
+   */
+  private createSpawnPointProperties(
+    entity: Entity,
+    component: SpawnPointComponent
+  ): HTMLElement {
+    const container = document.createElement('div');
+    container.className = 'property-content';
+
+    // Is Default checkbox
+    const isDefaultRow = document.createElement('div');
+    isDefaultRow.className = 'property-row-v2';
+    
+    const isDefaultLabel = document.createElement('label');
+    isDefaultLabel.className = 'property-label-v2';
+    isDefaultLabel.textContent = 'Is Default Spawn Point';
+    
+    const isDefaultCheckbox = document.createElement('input');
+    isDefaultCheckbox.type = 'checkbox';
+    isDefaultCheckbox.className = 'property-checkbox';
+    isDefaultCheckbox.checked = component.isDefault;
+    isDefaultCheckbox.addEventListener('change', () => {
+      const prev = component.isDefault;
+      component.isDefault = isDefaultCheckbox.checked;
+      this.registerUndo(() => {
+        component.isDefault = prev;
+        this.refresh();
+      });
+      this.refresh();
+    }, { signal: this.refreshAbort!.signal });
+    
+    isDefaultRow.appendChild(isDefaultLabel);
+    isDefaultRow.appendChild(isDefaultCheckbox);
+    container.appendChild(isDefaultRow);
+
+    // Rotation (yaw in degrees)
+    container.appendChild(
+      this.createNumberPropertyV2(
+        'Rotation (Yaw)',
+        (component.rotation * 180) / Math.PI,
+        (value) => {
+          if (!Number.isFinite(value)) return;
+          const prev = component.rotation;
+          component.rotation = (value * Math.PI) / 180;
+          this.registerUndo(() => {
+            component.rotation = prev;
+            this.refresh();
+          });
+        },
+        '°',
+        -180,
+        180,
+        1
+      )
+    );
+
+    // Info text
+    const infoRow = document.createElement('div');
+    infoRow.className = 'property-row-v2';
+    const infoText = document.createElement('p');
+    infoText.className = 'property-description';
+    infoText.style.margin = '8px 0 0 0';
+    infoText.style.fontSize = '11px';
+    infoText.style.color = 'rgba(148, 163, 184, 0.8)';
+    infoText.textContent = 'Player will spawn at this entity\'s position when entering play mode.';
+    infoRow.appendChild(infoText);
+    container.appendChild(infoRow);
+
+    return container;
+  }
+
+  /**
+   * Creates empty state for SpawnPoint component
+   */
+  private createSpawnPointEmptyState(entity: Entity): HTMLElement {
+    const container = document.createElement('div');
+    container.className = 'property-content spawn-point-empty-state';
+
+    const text = document.createElement('p');
+    text.className = 'muted-text';
+    text.textContent = 'No SpawnPointComponent attached.';
+
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'script-add-component-btn';
+    addBtn.textContent = 'Add SpawnPointComponent';
+    addBtn.addEventListener('click', () => {
+      if (entity.getComponent(SpawnPointComponent)) {
+        this.renderedEntityId = null;
+        this.refresh();
+        return;
+      }
+      try {
+        const comp = new SpawnPointComponent();
+        entity.addComponent(comp);
+      } catch {
+        // Ignore add errors
+      }
+      this.renderedEntityId = null;
+      this.refresh();
+    }, { signal: this.refreshAbort!.signal });
+
+    container.appendChild(text);
+    container.appendChild(addBtn);
+    return container;
+  }
+
+  /**
+   * Creates Checkpoint component properties UI
+   */
+  private createCheckpointProperties(
+    entity: Entity,
+    component: CheckpointComponent
+  ): HTMLElement {
+    const container = document.createElement('div');
+    container.className = 'property-content';
+
+    // Activation Radius
+    container.appendChild(
+      this.createNumberPropertyV2(
+        'Activation Radius',
+        component.activationRadius,
+        (value) => {
+          if (!Number.isFinite(value) || value <= 0) return;
+          const prev = component.activationRadius;
+          component.activationRadius = value;
+          this.registerUndo(() => {
+            component.activationRadius = prev;
+            this.refresh();
+          });
+        },
+        'units',
+        0.1,
+        50,
+        0.1
+      )
+    );
+
+    // Rotation (yaw in degrees)
+    container.appendChild(
+      this.createNumberPropertyV2(
+        'Rotation (Yaw)',
+        (component.rotation * 180) / Math.PI,
+        (value) => {
+          if (!Number.isFinite(value)) return;
+          const prev = component.rotation;
+          component.rotation = (value * Math.PI) / 180;
+          this.registerUndo(() => {
+            component.rotation = prev;
+            this.refresh();
+          });
+        },
+        '°',
+        -180,
+        180,
+        1
+      )
+    );
+
+    // Info text
+    const infoRow = document.createElement('div');
+    infoRow.className = 'property-row-v2';
+    const infoText = document.createElement('p');
+    infoText.className = 'property-description';
+    infoText.style.margin = '8px 0 0 0';
+    infoText.style.fontSize = '11px';
+    infoText.style.color = 'rgba(148, 163, 184, 0.8)';
+    infoText.textContent = 'Player will respawn at this checkpoint if activated during play mode.';
+    infoRow.appendChild(infoText);
+    container.appendChild(infoRow);
+
+    return container;
+  }
+
+  /**
+   * Creates empty state for Checkpoint component
+   */
+  private createCheckpointEmptyState(entity: Entity): HTMLElement {
+    const container = document.createElement('div');
+    container.className = 'property-content checkpoint-empty-state';
+
+    const text = document.createElement('p');
+    text.className = 'muted-text';
+    text.textContent = 'No CheckpointComponent attached.';
+
+    const addBtn = document.createElement('button');
+    addBtn.type = 'button';
+    addBtn.className = 'script-add-component-btn';
+    addBtn.textContent = 'Add CheckpointComponent';
+    addBtn.addEventListener('click', () => {
+      if (entity.getComponent(CheckpointComponent)) {
+        this.renderedEntityId = null;
+        this.refresh();
+        return;
+      }
+      try {
+        const comp = new CheckpointComponent();
         entity.addComponent(comp);
       } catch {
         // Ignore add errors

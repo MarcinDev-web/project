@@ -6,6 +6,9 @@
     "moduleResolution": "bundler",
     "module": "ESNext",
     "skipLibCheck": true,
+    "noEmit": false,
+    "emitDeclarationOnly": false,
+    "verbatimModuleSyntax": false,
     "paths": {
       "@engine/core": ["../core/dist"],
       "@engine/core/*": ["../core/dist/*"],
@@ -23,6 +26,14 @@
       "@engine/voxel/*": ["../voxel/dist/*"]
     }
   },
+  "include": ["src/**/*"],
+  "exclude": [
+    "__tests__",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "dist",
+    "node_modules"
+  ],
   "references": [
     { "path": "../core/tsconfig.build.json" },
     { "path": "../animation/tsconfig.json" },

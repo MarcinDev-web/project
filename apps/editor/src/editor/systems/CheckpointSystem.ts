@@ -23,6 +23,9 @@ export interface CheckpointActivation {
  * - Detects when player enters checkpoint activation radius
  * - Tracks the last activated checkpoint
  * - Provides spawn data for respawn at checkpoint
+ * 
+ * Note: This is a headless system used internally by play mode logic.
+ * It does not expose any UI and is not intended for direct editor UI integration.
  */
 export class CheckpointSystem {
   private activeCheckpoint: Entity | null = null;

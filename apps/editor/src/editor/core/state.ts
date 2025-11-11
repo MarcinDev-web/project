@@ -63,8 +63,11 @@ export const DEFAULT_INSPECTOR_SECTION_ORDER: string[] = [
   'environment',
   'animation',
   'character-controller',
+  'npc',
   'ui',
   'scripts',
+  'spawn-point',
+  'checkpoint',
 ];
 
 export class EditorState {

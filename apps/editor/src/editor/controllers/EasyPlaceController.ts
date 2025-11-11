@@ -76,6 +76,8 @@ export class EasyPlaceController {
     scale: Vec3;
     rotation: Quat;
   } | null = null;
+  /** Flag to prevent multiple simultaneous placement operations */
+  private isPlacing = false;
 
   constructor(private readonly config: EasyPlaceControllerConfig) {
     this.patternPlacer = new PatternPlacer(config.scene, config.collisionDetector);
@@ -103,7 +105,9 @@ export class EasyPlaceController {
     // Single-click placement
     this.config.canvas.addEventListener(
       'click',
-      (event: MouseEvent) => this.handleClick(event),
+      (event: MouseEvent) => {
+        void this.handleClick(event);
+      },
       { signal: this.abortController.signal }
     );
 
@@ -157,7 +161,7 @@ export class EasyPlaceController {
   /**
    * Handles single-click placement
    */
-  private handleClick(event: MouseEvent): void {
+  private async handleClick(event: MouseEvent): Promise<void> {
     if (!this.isEasyPlaceActive()) return;
     if (!this.config.placementMode.isActive()) return;
     if (event.altKey) return; // Alt+Click is for copying
@@ -169,7 +173,7 @@ export class EasyPlaceController {
       this.placeSingle();
     } else {
       // Pattern placement
-      this.handlePatternClick(event);
+      await this.handlePatternClick(event);
     }
   }
 
@@ -177,32 +181,54 @@ export class EasyPlaceController {
    * Places a single entity
    */
   private placeSingle(): void {
-    const placed = this.config.placementMode.confirmPlacement();
-    if (placed) {
-      this.config.selection.select(placed);
-      this.config.updateSceneBuffers();
-      this.config.recordSnapshot('Easy Place object');
-      this.config.onStatusMessage?.('Object placed!', 1000);
-      Logger.debug(`Easy Place: Placed ${placed.name}`);
+    // Prevent multiple simultaneous placement operations
+    if (this.isPlacing) {
+      return;
+    }
 
-      // Auto-continue: restart placement with same asset
+    this.isPlacing = true;
+
+    try {
+      // Save asset before confirmPlacement() clears the preview
       const preview = this.config.placementMode.getPreview();
-      if (preview.asset) {
-        setTimeout(() => {
-          this.config.placementMode.startPlacement(preview.asset!);
+      const assetToContinue = preview.asset;
+      
+      const placed = this.config.placementMode.confirmPlacement();
+      if (placed) {
+        this.config.selection.select(placed);
+        this.config.updateSceneBuffers();
+        this.config.recordSnapshot('Easy Place object');
+        this.config.onStatusMessage?.('Object placed!', 1000);
+        Logger.debug(`Easy Place: Placed ${placed.name}`);
+
+        // Auto-continue: restart placement with same asset immediately (synchronously)
+        // This allows rapid clicking without needing to reselect from hotbar
+        if (assetToContinue) {
+          // Restart placement synchronously so next click can immediately place again
+          this.config.placementMode.startPlacement(assetToContinue);
           this.applyStoredProperties();
-        }, 10);
+          // Ensure placement mode state is active for next click
+          this.config.state.placementMode.value = true;
+          // Reset flag immediately after restart so next click can proceed
+          this.isPlacing = false;
+        } else {
+          this.isPlacing = false;
+        }
+      } else {
+        this.config.onStatusMessage?.('Cannot place here (collision)', 1000);
+        Logger.debug('Easy Place: Placement failed (collision)');
+        this.isPlacing = false;
       }
-    } else {
-      this.config.onStatusMessage?.('Cannot place here (collision)', 1000);
-      Logger.debug('Easy Place: Placement failed (collision)');
+    } catch (error) {
+      Logger.error('Easy Place: Error during placement', error);
+      this.isPlacing = false;
     }
   }
 
   /**
    * Handles pattern click
    */
-  private handlePatternClick(_event: MouseEvent): void {
+  private async handlePatternClick(_event: MouseEvent): Promise<void> {
     const pattern = this.config.state.easyPlacePattern.value;
     const preview = this.config.placementMode.getPreviewEntity();
     if (!preview) return;
@@ -218,14 +244,14 @@ export class EasyPlaceController {
     } else {
       // Second click - finish pattern
       this.patternState.endPosition = currentPosition;
-      this.finishPattern();
+      await this.finishPattern();
     }
   }
 
   /**
    * Finishes pattern placement
    */
-  private finishPattern(): void {
+  private async finishPattern(): Promise<void> {
     const preview = this.config.placementMode.getPreviewEntity();
     if (!preview || !this.patternState.startPosition) return;
 
@@ -262,10 +288,25 @@ export class EasyPlaceController {
     }
 
     // Validate positions
-    void this.patternPlacer.validatePositions(positions, preview);
+    await this.patternPlacer.validatePositions(positions, preview);
 
-    // Place entities
-    const placed = this.patternPlacer.placeEntities(positions, preview);
+    const previewState = this.config.placementMode.getPreview();
+    const baseRotation = [...preview.transform.rotation] as Quat;
+    const baseScale = [...preview.transform.scale] as Vec3;
+    const assetPreset = previewState.asset ?? undefined;
+
+    const placed: Entity[] = [];
+    for (const pos of positions) {
+      if (!pos.valid) continue;
+      const entity = this.config.placementMode.placeEntityFromTemplate(preview, {
+        position: [...pos.position] as Vec3,
+        rotation: baseRotation,
+        scale: baseScale,
+        asset: assetPreset,
+        emitPlacementConfirmed: false,
+      });
+      placed.push(entity);
+    }
 
     if (placed.length > 0) {
       this.config.selection.selectMultiple(placed, 'set');
@@ -483,7 +524,7 @@ export class EasyPlaceController {
   /**
    * Updates pattern preview
    */
-  updatePatternPreview(currentPosition: Vec3): void {
+  async updatePatternPreview(currentPosition: Vec3): Promise<void> {
     if (!this.patternState.active) return;
     if (!this.patternState.startPosition) return;
 
@@ -524,7 +565,7 @@ export class EasyPlaceController {
     }
 
     // Validate and create preview entities
-    void this.patternPlacer.validatePositions(positions, preview);
+    await this.patternPlacer.validatePositions(positions, preview);
     this.patternPlacer.createPreviewEntities(positions, preview, validColor, invalidColor);
 
     const validCount = this.patternPlacer.getValidCount(positions);

@@ -488,17 +488,19 @@ export class EditorCameraController {
     }
 
     // Wheel (without Ctrl): Zoom by moving camera forward/backward
-    // Normalize delta across devices/browsers and apply exponential movement
+    // Use exponential zoom for more natural and responsive feel
     const deltaNormalized = event.deltaMode === 0 /* DOM_DELTA_PIXEL */ 
-      ? (event.deltaY ?? 0) / 100 
+      ? (event.deltaY ?? 0) / 50  // Reduced divisor for more sensitivity
       : (event.deltaY ?? 0);
     
-    // Move camera along forward direction (zoom effect)
-    // Scale movement based on current distance from origin for intuitive feel
-    const zoomSpeed = 0.1; // units per wheel step
+    // Exponential zoom: move camera along forward direction
+    // Scale movement based on distance from origin for consistent feel at all distances
+    const zoomSpeed = 0.4; // Significantly increased sensitivity
     const distanceFromOrigin = Math.hypot(this.position[0], this.position[1], this.position[2]);
-    const zoomScale = Math.max(0.1, Math.min(1.0, distanceFromOrigin / 10)); // Scale 0.1-1.0 based on distance
-    const zoomAmount = -deltaNormalized * zoomSpeed * zoomScale;
+    // Base movement amount scales with distance (closer = smaller steps, farther = larger steps)
+    const baseMovement = Math.max(0.2, distanceFromOrigin * 0.08);
+    const scale = Math.exp(-deltaNormalized * zoomSpeed);
+    const zoomAmount = baseMovement * (1 - scale);
     
     // Move camera along forward direction
     this.position[0] += this.forward[0] * zoomAmount;

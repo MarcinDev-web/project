@@ -37,7 +37,6 @@ export class EditorUILayout {
   private canvasContainer: HTMLElement | null = null;
   private inspectorToggle: HTMLElement | null = null;
   private keyboardCleanup: (() => void) | null = null;
-  private breadcrumbs: HTMLElement | null = null;
   private shortcutsOverlay: HTMLElement | null = null;
   private statusBar: HTMLElement | null = null;
   private sceneMetricsEl: HTMLElement | null = null;
@@ -170,18 +169,6 @@ export class EditorUILayout {
       this.metricsUpdateInterval = window.setInterval(() => this.updateSceneMetrics(), 500);
     }
 
-    // Create breadcrumbs bar
-    this.breadcrumbs = document.createElement('div');
-    this.breadcrumbs.className = 'editor-breadcrumbs';
-    this.breadcrumbs.innerHTML = `
-      <div class="breadcrumb-item">
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-          <path d="M8 2L3 7h2v5h6V7h2z"/>
-        </svg>
-        <span>Editor</span>
-      </div>
-    `;
-
     // Create toggle button for inspector panel
     this.inspectorToggle = this.createToggleButton('right', () => this.toggleInspector());
 
@@ -199,7 +186,6 @@ export class EditorUILayout {
     // Assemble layout
     document.body.appendChild(this.layoutRoot);
     this.layoutRoot.appendChild(this.canvasContainer);
-    this.layoutRoot.appendChild(this.breadcrumbs);
     this.layoutRoot.appendChild(this.toolbar);
     this.layoutRoot.appendChild(this.sidebar);
     this.layoutRoot.appendChild(this.inspector);
@@ -239,7 +225,6 @@ export class EditorUILayout {
       this.inspector,
       this.inspectorToggle,
       this.toolbar,
-      this.breadcrumbs,
       this.shortcutsOverlay,
       this.statusBar,
     ];
@@ -494,17 +479,10 @@ export class EditorUILayout {
 
   /**
    * Updates breadcrumb display (for future extension).
+   * No-op: breadcrumbs removed from UI.
    */
-  updateBreadcrumb(items: { label: string; icon?: string }[]): void {
-    if (!this.breadcrumbs) return;
-
-    this.breadcrumbs.innerHTML = items.map((item, index) => `
-      <div class="breadcrumb-item">
-        ${item.icon || ''}
-        <span>${item.label}</span>
-      </div>
-      ${index < items.length - 1 ? '<div class="breadcrumb-separator">/</div>' : ''}
-    `).join('');
+  updateBreadcrumb(_items: { label: string; icon?: string }[]): void {
+    // Breadcrumbs removed from UI
   }
 
   /**
@@ -585,7 +563,6 @@ export class EditorUILayout {
     this.inspector = null;
     this.canvasContainer = null;
     this.inspectorToggle = null;
-    this.breadcrumbs = null;
     this.shortcutsOverlay = null;
     this.statusBar = null;
     this.sceneMetricsEl = null;

@@ -136,27 +136,22 @@ export class PlacementMode {
     // Warm up collision worker early to avoid first-use stall when rotating/checking
     try { warmupCollisionWorker(); } catch {}
 
-    // Create preview entity
+    // Create preview entity (not added to scene - no ghost/preview visible)
     const previewEntity = new Entity(`${asset.name}_preview`);
-    // Don't set scale yet - animateSpawn will handle it
 
     // Set base color from asset (preserve tuple type)
     initializeBaseColor(previewEntity, asset.color);
 
-    // Mark as preview (not added to scene yet)
+    // Mark as preview (not added to scene - no ghost/preview visible)
     previewEntity.userData.isPreview = true;
     previewEntity.userData.asset = asset.name;
 
-    // Calculate target opacity from config
-    const targetOpacity = this.config.ghostOpacity;
-
-    // Animate spawn (scale + fade in) - animator will set initial scale to [0,0,0] and animate to target
-    this.animator.animateSpawn(previewEntity, asset.scale, targetOpacity);
+    // Set initial position and scale (preview is not added to scene - no ghost/preview visible)
+    previewEntity.transform.position = [0, -1000, 0];
+    previewEntity.transform.scale = [...asset.scale];
     
-    // Set the final scale that will be reached after animation (for collision detection, etc.)
-    // The animator manages the visual scale during animation
-
-    // Delay adding to scene until first position update to avoid origin flash
+    // Preview entity is NOT added to scene - no ghost/preview rendering
+    // It's only used internally for collision detection and position tracking
 
     this.preview = {
       previewEntity,
@@ -192,10 +187,7 @@ export class PlacementMode {
     // This prevents race conditions where old collision checks complete after new ones
     const updateId = ++this.lastUpdateId;
 
-    // Lazily add preview to scene on first valid update to avoid flashing at origin
-    if (!this.preview.previewEntity.scene) {
-      this.scene.addEntity(this.preview.previewEntity);
-    }
+    // Preview entity is already added to scene in startPlacement() to ensure spawn animation is visible
 
     // Apply snap to position unless explicitly disabled
     const shouldSnap = options?.applySnap !== false;
@@ -204,8 +196,8 @@ export class PlacementMode {
       : ([worldPosition[0], worldPosition[1], worldPosition[2]] as Vec3);
     this.preview.position = targetPosition;
 
-    // Animate position smoothly
-    this.animator.animatePosition(this.preview.previewEntity, targetPosition);
+    // Update position directly (no animation, preview not visible anyway)
+    this.preview.previewEntity.transform.position = [...targetPosition];
 
     // Notify listeners about position update
     this.config.onPreviewPositionUpdate?.(targetPosition, this.preview.previewEntity);
@@ -277,8 +269,8 @@ export class PlacementMode {
     const halfAngle = this.preview.rotationAngle / 2;
     const targetQuat: Quat = [0, Math.sin(halfAngle), 0, Math.cos(halfAngle)];
 
-    // Animate rotation smoothly
-    this.animator.animateRotation(this.preview.previewEntity, targetQuat);
+    // Update rotation directly (no animation, preview not visible anyway)
+    this.preview.previewEntity.transform.rotation = [...targetQuat];
 
     // Re-check collision after rotation
     // Note: This is intentionally fire-and-forget (void) to keep rotation UI responsive.
@@ -301,63 +293,85 @@ export class PlacementMode {
       return null;
     }
 
-    // Create actual entity from preview
-    const entity = new Entity(this.preview.asset?.name ?? 'Object');
-    entity.transform.position = this.preview.previewEntity.transform.position;
-    entity.transform.rotation = this.preview.previewEntity.transform.rotation;
-    entity.transform.scale = this.preview.previewEntity.transform.scale;
-
-    // Initialize color of the placed entity, preferring the preview's stored base color
-    const previewBaseColor = this.preview.previewEntity.userData.baseColor as
-      | [number, number, number, number]
-      | undefined;
-    const previewTint = this.preview.previewEntity.color as [number, number, number, number] | undefined;
-    const assetBaseColor = this.preview.asset?.color;
-    const finalColor = previewBaseColor ?? assetBaseColor ?? previewTint;
-    if (finalColor) {
-      initializeBaseColor(entity, finalColor);
-    }
-    if (this.preview.asset) {
-      entity.userData.asset = this.preview.asset.name;
-      // Store blockId for BlockBehaviorSystem to recognize blocks
-      if (this.preview.asset.blockId) {
-        entity.userData.blockId = this.preview.asset.blockId;
-      }
-    }
-
-    // Assign material based on asset type/color to vary atlas usage
-    try {
-      const mat = entity.getComponent(MaterialComponent) ?? entity.addComponent(new MaterialComponent());
-      const assetColor = this.preview.asset?.color ?? entity.color;
-      mat.materialId = this.chooseMaterialIdForAsset(this.preview.asset ?? null, assetColor);
-    } catch (e) {
-      Logger.warn('PlacementMode: Failed to assign materialId', e);
-    }
-
-    // Apply special block properties (light, glass, etc.)
-    this.applyBlockSpecialProperties(entity, this.preview.asset?.blockId);
-
-    // Apply vegetation properties if this is a vegetation asset
-    if (this.preview.asset?.vegetationConfig) {
-      this.applyVegetationProperties(entity, this.preview.asset.vegetationConfig);
-    }
-
-    // Apply NPC properties if this is an NPC asset
-    if (this.preview.asset?.npcConfig) {
-      this.applyNpcProperties(entity, this.preview.asset.npcConfig);
-    }
-
-    // Add to scene
-    this.scene.addEntity(entity);
-
-    // Replicate entity creation
-    this.config.onEntityCreated?.(entity);
-
-    // Notify before clearing preview
-    this.config.onPlacementConfirmed?.(entity);
+    const entity = this.placeEntityFromTemplate(this.preview.previewEntity, {
+      position: this.preview.previewEntity.transform.position,
+      rotation: this.preview.previewEntity.transform.rotation,
+      scale: this.preview.previewEntity.transform.scale,
+      asset: this.preview.asset,
+      emitPlacementConfirmed: true,
+    });
 
     // Clear preview silently (do not emit cancel event)
     this.cancelPlacement(true);
+
+    return entity;
+  }
+
+  /**
+   * Places an entity in the scene based on a template entity and optional asset metadata.
+   * The template is typically the placement preview. Emits placement events when requested.
+   */
+  placeEntityFromTemplate(
+    template: Entity,
+    options: {
+      position: Vec3;
+      rotation: Quat;
+      scale: Vec3;
+      asset?: AssetPreset | null;
+      emitPlacementConfirmed?: boolean;
+    }
+  ): Entity {
+    const { position, rotation, scale, asset = null, emitPlacementConfirmed = false } = options;
+
+    const entityName = asset?.name ?? template.name ?? 'Object';
+    const entity = new Entity(entityName);
+    entity.transform.position = [...position];
+    entity.transform.rotation = [...rotation];
+    entity.transform.scale = [...scale];
+
+    const templateBaseColor = template.userData.baseColor as [number, number, number, number] | undefined;
+    const templateTint = template.color as [number, number, number, number] | undefined;
+    const assetBaseColor = asset?.color;
+    const finalColor = templateBaseColor ?? assetBaseColor ?? templateTint;
+    if (finalColor) {
+      initializeBaseColor(entity, finalColor);
+    }
+
+    const assetName = asset?.name ?? (template.userData.asset as string | undefined);
+    if (assetName) {
+      entity.userData.asset = assetName;
+    }
+
+    const blockId = asset?.blockId ?? (template.userData.blockId as string | undefined);
+    if (blockId) {
+      entity.userData.blockId = blockId;
+    }
+
+    try {
+      const material = entity.getComponent(MaterialComponent) ?? entity.addComponent(new MaterialComponent());
+      const colorForMaterial = asset?.color ?? (entity.color as [number, number, number, number] | undefined);
+      const fallbackColor: [number, number, number, number] = colorForMaterial ?? [0.7, 0.7, 0.7, 1];
+      material.materialId = this.chooseMaterialIdForAsset(asset ?? null, fallbackColor);
+    } catch (error) {
+      Logger.warn('PlacementMode: Failed to assign materialId', error);
+    }
+
+    this.applyBlockSpecialProperties(entity, blockId);
+
+    if (asset?.vegetationConfig) {
+      this.applyVegetationProperties(entity, asset.vegetationConfig);
+    }
+
+    if (asset?.npcConfig) {
+      this.applyNpcProperties(entity, asset.npcConfig);
+    }
+
+    this.scene.addEntity(entity);
+    this.config.onEntityCreated?.(entity);
+
+    if (emitPlacementConfirmed) {
+      this.config.onPlacementConfirmed?.(entity);
+    }
 
     return entity;
   }
@@ -559,11 +573,11 @@ export class PlacementMode {
       faction: npcConfig.faction ?? 'neutral',
       behavior: npcConfig.behavior ?? 'idle',
       armyId: npcConfig.armyId ?? '',
-      patrolWaypoints: npcConfig.patrolWaypoints,
-      patrolSpeed: npcConfig.patrolSpeed,
-      guardPosition: guardPosition,
-      guardRadius: npcConfig.guardRadius,
-      detectionRange: npcConfig.detectionRange,
+      ...(npcConfig.patrolWaypoints !== undefined && { patrolWaypoints: npcConfig.patrolWaypoints }),
+      ...(npcConfig.patrolSpeed !== undefined && { patrolSpeed: npcConfig.patrolSpeed }),
+      ...(guardPosition !== undefined && { guardPosition }),
+      ...(npcConfig.guardRadius !== undefined && { guardRadius: npcConfig.guardRadius }),
+      ...(npcConfig.detectionRange !== undefined && { detectionRange: npcConfig.detectionRange }),
     });
     entity.addComponent(npcComponent);
 

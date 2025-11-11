@@ -88,6 +88,7 @@ import { CharacterController } from '@engine/world/components/CharacterControlle
 import { WeaponComponent } from '@engine/world/components/WeaponComponent';
 import { InventoryComponent } from '@engine/world/components/InventoryComponent';
 import type { PublicUser } from '@engine/net';
+import { frameEditorCameraToScene } from '../utils/cameraFraming';
 
 export interface EditorUIConfig {
   canvas: HTMLCanvasElement;
@@ -186,6 +187,19 @@ export class EditorUI {
     // 6. Restore persisted state
     this.restorePersistedState();
 
+    // 6b. If no persisted camera state, auto-frame the scene for a better starting view
+    try {
+      const persistedCam = storageLoad<{ yaw: number; pitch: number; distance: number }>('camera');
+      if (!persistedCam && this.editorCamera && this.modeManager) {
+        frameEditorCameraToScene({
+          scene: this.config.scene,
+          canvas: this.config.canvas,
+          editorCamera: this.editorCamera,
+          controls: this.config.controls,
+        });
+      }
+    } catch {}
+
     // Ensure scene isn't completely dark when loading persisted scenes without lights
     // If there are no light entities, create a default ambient + directional setup
     try {
@@ -244,6 +258,15 @@ export class EditorUI {
   private async startNewProjectFlow(): Promise<void> {
     if (!this.projectManager) return;
     await this.projectManager.newProject();
+    // Auto-frame after creating a new project
+    if (this.editorCamera) {
+      frameEditorCameraToScene({
+        scene: this.config.scene,
+        canvas: this.config.canvas,
+        editorCamera: this.editorCamera,
+        controls: this.config.controls,
+      });
+    }
   }
 
   /**
@@ -267,6 +290,15 @@ export class EditorUI {
     if (!result) return;
 
     await this.projectManager.newProjectFromTemplate(result.template);
+    // Auto-frame after loading a template as a new project
+    if (this.editorCamera) {
+      frameEditorCameraToScene({
+        scene: this.config.scene,
+        canvas: this.config.canvas,
+        editorCamera: this.editorCamera,
+        controls: this.config.controls,
+      });
+    }
   }
 
 
@@ -738,10 +770,6 @@ export class EditorUI {
           this.placementMode.startPlacement(preset);
           this.state.placementMode.value = true;
           this.config.statusEl.textContent = `Placing ${preset.name} (Q/E rotate, Double-click or Enter confirm, Esc cancel)`;
-          try {
-            this.floatingHints?.dismissAll();
-            this.floatingHints?.showPlacementHint(preset.name);
-          } catch {}
         }
       },
       onSelectionVisualsNeeded: () => {
@@ -1167,6 +1195,8 @@ export class EditorUI {
     try {
       const envEntity = new Entity('Environment');
       envEntity.addComponent(new EnvironmentComponent());
+      // Position far away to avoid collision/interaction - this is not a visible mesh
+      envEntity.transform.position = [0, -1000, 0];
       try {
         initializeBaseColor(envEntity, [0.6, 0.7, 0.9, 1]);
       } catch {}

@@ -201,41 +201,6 @@ export class PatternPlacer {
   }
 
   /**
-   * Places entities at valid positions in the pattern
-   */
-  placeEntities(
-    positions: PatternPosition[],
-    templateEntity: Entity
-  ): Entity[] {
-    const placedEntities: Entity[] = [];
-
-    for (const pos of positions) {
-      if (!pos.valid) continue;
-
-      const entity = new EntityClass(templateEntity.name);
-      entity.transform.position = pos.position;
-      entity.transform.rotation = [...templateEntity.transform.rotation];
-      entity.transform.scale = [...templateEntity.transform.scale];
-
-      // Copy userData
-      const templateBase = templateEntity.userData.baseColor as [number, number, number, number] | undefined;
-      if (templateBase) {
-        initializeBaseColor(entity, templateBase);
-      } else if (templateEntity.color) {
-        initializeBaseColor(entity, templateEntity.color as [number, number, number, number]);
-      }
-      if (templateEntity.userData.asset) {
-        entity.userData.asset = templateEntity.userData.asset;
-      }
-
-      this.scene.addEntity(entity);
-      placedEntities.push(entity);
-    }
-
-    return placedEntities;
-  }
-
-  /**
    * Gets the count of valid positions
    */
   getValidCount(positions: PatternPosition[]): number {

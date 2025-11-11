@@ -70,6 +70,15 @@ export class EditState implements IPlayModeState {
   onEnter(context: PlayModeContext): void {
     Logger.debug('Entering EDIT state');
     
+    // Ensure pointer lock is released in edit mode (failsafe)
+    if (typeof document !== 'undefined' && document.pointerLockElement) {
+      try {
+        document.exitPointerLock();
+      } catch {
+        // Ignore errors
+      }
+    }
+    
     // Show editor UI
     this.deps.setEditorUIVisible(true);
     

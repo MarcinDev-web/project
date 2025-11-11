@@ -5,6 +5,7 @@ export * from './BlockBehaviorSystem.js';
 export * from './ProjectileSystem.js';
 export * from './VegetationSystem.js';
 export * from './WeaponSystem.js';
+export * from './WeaponPickupSystem.js';
 export * from './InventorySystem.js';
 export * from './EconomySystem.js';
 export * from './CraftingSystem.js';

@@ -65,7 +65,10 @@ export type IconName =
   | 'mouse-pointer'
   | 'sparkle'
   | 'shield-check'
-  | 'list';
+  | 'list'
+  | 'map-pin'
+  | 'flag'
+  | 'play-circle';
 
 /**
  * Creates an SVG icon element.
@@ -220,6 +223,12 @@ function getIconPath(name: IconName): string | string[] {
     list: [
       'M8 6h13M8 12h13M8 18h13',
       'M3 6h.01M3 12h.01M3 18h.01',
+    ],
+    'map-pin': 'M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z M12 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',
+    flag: 'M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z M4 22v-7',
+    'play-circle': [
+      'M22 12c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2s10 4.477 10 10z',
+      'M10 8l6 4-6 4V8z',
     ],
   };
 

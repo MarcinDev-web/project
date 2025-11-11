@@ -1,5 +1,5 @@
 import { Entity, Scene } from '@engine/world';
-import { EnvironmentComponent, LightComponent, MeshComponent, MaterialComponent } from '@engine/world';
+import { EnvironmentComponent, LightComponent, MeshComponent, MaterialComponent, InteractableComponent } from '@engine/world';
 import type { TemplateProvider } from '../../types';
 
 /**
@@ -20,11 +20,14 @@ export function createStarterBlockTemplate(): TemplateProvider {
       const scene = new Scene('Starter Block');
 
       // Environment (procedural sky + soft ambient)
+      // Position far away to avoid collision/interaction - this is not a visible mesh
       const env = new Entity('Environment');
       const envComp = new EnvironmentComponent();
       envComp.skyboxType = 'procedural-sky';
       envComp.ambientIntensity = 0.5;
       env.addComponent(envComp);
+      // Position far away so it doesn't interfere with scene objects
+      env.transform.position = [0, -1000, 0];
       scene.addEntity(env);
 
       // Sun (directional)
@@ -55,6 +58,13 @@ export function createStarterBlockTemplate(): TemplateProvider {
       const mat = new MaterialComponent();
       mat.color = [0.25, 0.25, 0.26, 1];
       block.addComponent(mat);
+
+      // Make block interactable
+      const interactable = new InteractableComponent();
+      interactable.interactionRange = 5.0;
+      interactable.promptText = 'Kliknij aby interakować';
+      interactable.cooldown = 0.5;
+      block.addComponent(interactable);
 
       block.transform.scale = [1, 1, 1];
       block.transform.position = [0, 0.5, 0];

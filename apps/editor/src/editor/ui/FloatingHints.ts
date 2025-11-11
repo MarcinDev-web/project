@@ -186,16 +186,6 @@ export class FloatingHints {
   }
 
   /**
-   * Shows a placement mode hint.
-   */
-  public showPlacementHint(assetName: string): string {
-    return this.persistent(
-      `Placing: ${assetName} | Left Click: Place | Right Click: Cancel | Scroll: Rotate`,
-      '🏗️'
-    );
-  }
-
-  /**
    * Shows a selection hint.
    */
   public showSelectionHint(objectName: string): string {

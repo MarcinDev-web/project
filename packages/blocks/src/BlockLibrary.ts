@@ -9,6 +9,7 @@
  */
 
 import type { BlockCategory, BlockMaterialType, CTMConfig } from './types';
+import { CARTOON_PALETTE, getCartoonFaceTexture } from './palette';
 
 // Local type definition to avoid circular dependency with @engine/world
 export type RgbaColor = [number, number, number, number];
@@ -86,8 +87,8 @@ export interface BlockDefinition {
 }
 
 /**
- * Built-in block library with Kogama/Roblox/Minecraft inspired blocks
- * Reduced to 10 essential blocks across 3 categories
+ * Built-in block library with cartoon-style blocks
+ * Uses unified palette for consistent, bright, stylized appearance
  */
 export const BLOCK_LIBRARY: Record<string, BlockDefinition> = {
   // ===== BASIC BLOCKS (5) - Colorful building blocks =====
@@ -96,11 +97,7 @@ export const BLOCK_LIBRARY: Record<string, BlockDefinition> = {
     name: 'Red Block',
     category: 'basic',
     material: 'plastic',
-    textures: {
-      top: { color: [0.9, 0.15, 0.15, 1], pattern: 'smooth', brightness: 1.1 },
-      bottom: { color: [0.9, 0.15, 0.15, 1], pattern: 'smooth', brightness: 0.7 },
-      sides: { color: [0.9, 0.15, 0.15, 1], pattern: 'smooth', brightness: 0.9 },
-    },
+    textures: getCartoonFaceTexture(CARTOON_PALETTE.basic.red, 'standard'),
     properties: {
       solid: true,
       transparent: false,
@@ -115,11 +112,7 @@ export const BLOCK_LIBRARY: Record<string, BlockDefinition> = {
     name: 'Blue Block',
     category: 'basic',
     material: 'plastic',
-    textures: {
-      top: { color: [0.15, 0.45, 0.95, 1], pattern: 'smooth', brightness: 1.1 },
-      bottom: { color: [0.15, 0.45, 0.95, 1], pattern: 'smooth', brightness: 0.7 },
-      sides: { color: [0.15, 0.45, 0.95, 1], pattern: 'smooth', brightness: 0.9 },
-    },
+    textures: getCartoonFaceTexture(CARTOON_PALETTE.basic.blue, 'standard'),
     properties: {
       solid: true,
       transparent: false,
@@ -134,11 +127,7 @@ export const BLOCK_LIBRARY: Record<string, BlockDefinition> = {
     name: 'Green Block',
     category: 'basic',
     material: 'plastic',
-    textures: {
-      top: { color: [0.15, 0.85, 0.25, 1], pattern: 'smooth', brightness: 1.1 },
-      bottom: { color: [0.15, 0.85, 0.25, 1], pattern: 'smooth', brightness: 0.7 },
-      sides: { color: [0.15, 0.85, 0.25, 1], pattern: 'smooth', brightness: 0.9 },
-    },
+    textures: getCartoonFaceTexture(CARTOON_PALETTE.basic.green, 'standard'),
     properties: {
       solid: true,
       transparent: false,
@@ -153,11 +142,7 @@ export const BLOCK_LIBRARY: Record<string, BlockDefinition> = {
     name: 'Yellow Block',
     category: 'basic',
     material: 'plastic',
-    textures: {
-      top: { color: [0.95, 0.85, 0.15, 1], pattern: 'smooth', brightness: 1.1 },
-      bottom: { color: [0.95, 0.85, 0.15, 1], pattern: 'smooth', brightness: 0.7 },
-      sides: { color: [0.95, 0.85, 0.15, 1], pattern: 'smooth', brightness: 0.9 },
-    },
+    textures: getCartoonFaceTexture(CARTOON_PALETTE.basic.yellow, 'standard'),
     properties: {
       solid: true,
       transparent: false,
@@ -172,11 +157,7 @@ export const BLOCK_LIBRARY: Record<string, BlockDefinition> = {
     name: 'White Concrete',
     category: 'basic',
     material: 'stone',
-    textures: {
-      top: { color: [0.9, 0.9, 0.9, 1], pattern: 'smooth', brightness: 1.0 },
-      bottom: { color: [0.9, 0.9, 0.9, 1], pattern: 'smooth', brightness: 0.8 },
-      sides: { color: [0.9, 0.9, 0.9, 1], pattern: 'smooth', brightness: 0.9 },
-    },
+    textures: getCartoonFaceTexture(CARTOON_PALETTE.basic.white, 'standard'),
     properties: {
       solid: true,
       transparent: false,
@@ -192,11 +173,23 @@ export const BLOCK_LIBRARY: Record<string, BlockDefinition> = {
     name: 'Grass Block',
     category: 'natural',
     material: 'stone',
-    textures: {
-      top: { color: [0.35, 0.7, 0.25, 1], pattern: 'noise', brightness: 1.0 },
-      bottom: { color: [0.45, 0.35, 0.25, 1], pattern: 'noise', brightness: 0.8 },
-      sides: { color: [0.45, 0.35, 0.25, 1], pattern: 'noise', brightness: 0.9 },
-    },
+    textures: (() => {
+      const base = getCartoonFaceTexture(CARTOON_PALETTE.natural.grass, 'natural');
+      // Grass has different color for sides (dirt-like)
+      return {
+        ...base,
+        sides: {
+          color: CARTOON_PALETTE.natural.dirt.color,
+          pattern: CARTOON_PALETTE.natural.dirt.pattern,
+          brightness: base.sides.brightness,
+        },
+        bottom: {
+          color: CARTOON_PALETTE.natural.dirt.color,
+          pattern: CARTOON_PALETTE.natural.dirt.pattern,
+          brightness: base.bottom.brightness,
+        },
+      };
+    })(),
     properties: {
       solid: true,
       transparent: false,
@@ -211,11 +204,7 @@ export const BLOCK_LIBRARY: Record<string, BlockDefinition> = {
     name: 'Dirt Block',
     category: 'natural',
     material: 'stone',
-    textures: {
-      top: { color: [0.45, 0.35, 0.25, 1], pattern: 'noise', brightness: 1.0 },
-      bottom: { color: [0.45, 0.35, 0.25, 1], pattern: 'noise', brightness: 0.8 },
-      sides: { color: [0.45, 0.35, 0.25, 1], pattern: 'noise', brightness: 0.9 },
-    },
+    textures: getCartoonFaceTexture(CARTOON_PALETTE.natural.dirt, 'natural'),
     properties: {
       solid: true,
       transparent: false,
@@ -230,11 +219,7 @@ export const BLOCK_LIBRARY: Record<string, BlockDefinition> = {
     name: 'Stone Block',
     category: 'natural',
     material: 'stone',
-    textures: {
-      top: { color: [0.5, 0.5, 0.5, 1], pattern: 'cobble', brightness: 1.0 },
-      bottom: { color: [0.5, 0.5, 0.5, 1], pattern: 'cobble', brightness: 0.8 },
-      sides: { color: [0.5, 0.5, 0.5, 1], pattern: 'cobble', brightness: 0.9 },
-    },
+    textures: getCartoonFaceTexture(CARTOON_PALETTE.natural.stone, 'natural'),
     properties: {
       solid: true,
       transparent: false,
@@ -250,11 +235,7 @@ export const BLOCK_LIBRARY: Record<string, BlockDefinition> = {
     name: 'White Light',
     category: 'gameplay',
     material: 'emissive',
-    textures: {
-      top: { color: [1.0, 1.0, 1.0, 1], pattern: 'smooth', brightness: 2.0 },
-      bottom: { color: [1.0, 1.0, 1.0, 1], pattern: 'smooth', brightness: 2.0 },
-      sides: { color: [1.0, 1.0, 1.0, 1], pattern: 'smooth', brightness: 2.0 },
-    },
+    textures: getCartoonFaceTexture(CARTOON_PALETTE.gameplay.light, 'emissive'),
     properties: {
       solid: true,
       transparent: false,
@@ -269,11 +250,15 @@ export const BLOCK_LIBRARY: Record<string, BlockDefinition> = {
     name: 'Clear Glass',
     category: 'gameplay',
     material: 'glass',
-    textures: {
-      top: { color: [0.85, 0.95, 1.0, 0.3], pattern: 'smooth', brightness: 1.2 },
-      bottom: { color: [0.85, 0.95, 1.0, 0.3], pattern: 'smooth', brightness: 1.0 },
-      sides: { color: [0.85, 0.95, 1.0, 0.3], pattern: 'smooth', brightness: 1.1 },
-    },
+    textures: (() => {
+      const base = getCartoonFaceTexture(CARTOON_PALETTE.gameplay.glass, 'standard');
+      // Glass maintains transparency
+      return {
+        top: { ...base.top, color: CARTOON_PALETTE.gameplay.glass.color },
+        sides: { ...base.sides, color: CARTOON_PALETTE.gameplay.glass.color },
+        bottom: { ...base.bottom, color: CARTOON_PALETTE.gameplay.glass.color },
+      };
+    })(),
     properties: {
       solid: true,
       transparent: true,
@@ -293,11 +278,7 @@ export const BLOCK_LIBRARY: Record<string, BlockDefinition> = {
     name: 'Ice Block',
     category: 'gameplay',
     material: 'plastic',
-    textures: {
-      top: { color: [0.7, 0.9, 1.0, 1], pattern: 'smooth', brightness: 1.2 },
-      bottom: { color: [0.7, 0.9, 1.0, 1], pattern: 'smooth', brightness: 0.9 },
-      sides: { color: [0.7, 0.9, 1.0, 1], pattern: 'smooth', brightness: 1.05 },
-    },
+    textures: getCartoonFaceTexture(CARTOON_PALETTE.gameplay.ice, 'standard'),
     properties: {
       solid: true,
       transparent: false,
@@ -316,11 +297,7 @@ export const BLOCK_LIBRARY: Record<string, BlockDefinition> = {
     name: 'Slime Block',
     category: 'gameplay',
     material: 'plastic',
-    textures: {
-      top: { color: [0.2, 0.8, 0.3, 1], pattern: 'smooth', brightness: 1.1 },
-      bottom: { color: [0.2, 0.8, 0.3, 1], pattern: 'smooth', brightness: 0.8 },
-      sides: { color: [0.2, 0.8, 0.3, 1], pattern: 'smooth', brightness: 0.95 },
-    },
+    textures: getCartoonFaceTexture(CARTOON_PALETTE.gameplay.slime, 'standard'),
     properties: {
       solid: true,
       transparent: false,
@@ -339,11 +316,7 @@ export const BLOCK_LIBRARY: Record<string, BlockDefinition> = {
     name: 'Lava Block',
     category: 'gameplay',
     material: 'emissive',
-    textures: {
-      top: { color: [0.9, 0.2, 0.1, 1], pattern: 'smooth', brightness: 1.5 },
-      bottom: { color: [0.9, 0.2, 0.1, 1], pattern: 'smooth', brightness: 1.2 },
-      sides: { color: [0.9, 0.2, 0.1, 1], pattern: 'smooth', brightness: 1.35 },
-    },
+    textures: getCartoonFaceTexture(CARTOON_PALETTE.gameplay.lava, 'emissive'),
     properties: {
       solid: true,
       transparent: false,
@@ -361,11 +334,7 @@ export const BLOCK_LIBRARY: Record<string, BlockDefinition> = {
     name: 'Poison Block',
     category: 'gameplay',
     material: 'plastic',
-    textures: {
-      top: { color: [0.5, 0.3, 0.7, 1], pattern: 'smooth', brightness: 1.1 },
-      bottom: { color: [0.5, 0.3, 0.7, 1], pattern: 'smooth', brightness: 0.8 },
-      sides: { color: [0.5, 0.3, 0.7, 1], pattern: 'smooth', brightness: 0.95 },
-    },
+    textures: getCartoonFaceTexture(CARTOON_PALETTE.gameplay.poison, 'standard'),
     properties: {
       solid: true,
       transparent: false,
@@ -383,11 +352,7 @@ export const BLOCK_LIBRARY: Record<string, BlockDefinition> = {
     name: 'Bouncy Block',
     category: 'gameplay',
     material: 'plastic',
-    textures: {
-      top: { color: [1.0, 0.4, 0.7, 1], pattern: 'smooth', brightness: 1.2 },
-      bottom: { color: [1.0, 0.4, 0.7, 1], pattern: 'smooth', brightness: 0.9 },
-      sides: { color: [1.0, 0.4, 0.7, 1], pattern: 'smooth', brightness: 1.05 },
-    },
+    textures: getCartoonFaceTexture(CARTOON_PALETTE.gameplay.bouncy, 'standard'),
     properties: {
       solid: true,
       transparent: false,

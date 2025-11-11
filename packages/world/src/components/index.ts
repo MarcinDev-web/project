@@ -29,6 +29,7 @@ export * from './MorphBindingComponent.js';
 export * from './VegetationComponent.js';
 export * from './WaterComponent.js';
 export * from './WeaponComponent.js';
+export * from './WeaponPickupComponent.js';
 export * from './AttachmentComponent.js';
 export * from './AmmoComponent.js';
 export * from './InventoryComponent.js';

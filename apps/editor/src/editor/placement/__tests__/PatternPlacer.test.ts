@@ -238,47 +238,6 @@ describe('PatternPlacer', () => {
     });
   });
 
-  describe('placeEntities', () => {
-    it('should only place entities at valid positions', () => {
-      const template = new Entity('template');
-      template.transform.scale = [1, 1, 1];
-      template.color = [1, 1, 1, 1];
-
-      const positions = [
-        { position: [0, 0, 0] as [number, number, number], valid: true },
-        { position: [1, 0, 0] as [number, number, number], valid: false },
-        { position: [2, 0, 0] as [number, number, number], valid: true },
-      ];
-
-      const placed = patternPlacer.placeEntities(positions, template);
-
-      expect(placed.length).toBe(2);
-      expect(scene.getActiveEntities().length).toBe(2);
-    });
-
-    it('should copy template properties to placed entities', () => {
-      const template = new Entity('TestTemplate');
-      template.transform.scale = [2, 3, 4];
-      template.transform.rotation = [0, 0.7071, 0, 0.7071];
-      template.color = [0.5, 0.5, 0.5, 1];
-
-      const positions = [
-        { position: [5, 5, 5] as [number, number, number], valid: true },
-      ];
-
-      const placed = patternPlacer.placeEntities(positions, template);
-
-      expect(placed[0]?.name).toBe('TestTemplate');
-      expect(placed[0]?.transform.scale).toEqual([2, 3, 4]);
-      // Check rotation components with tolerance for floating point precision
-      expect(placed[0]?.transform.rotation[0]).toBeCloseTo(0, 5);
-      expect(placed[0]?.transform.rotation[1]).toBeCloseTo(0.7071, 4);
-      expect(placed[0]?.transform.rotation[2]).toBeCloseTo(0, 5);
-      expect(placed[0]?.transform.rotation[3]).toBeCloseTo(0.7071, 4);
-      expect(placed[0]?.color).toEqual([0.5, 0.5, 0.5, 1]);
-    });
-  });
-
   describe('getValidCount', () => {
     it('should return count of valid positions', () => {
       const positions = [

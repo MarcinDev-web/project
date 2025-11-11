@@ -523,6 +523,8 @@ export class ProjectManager {
     try {
       const env = new Entity('Environment');
       env.addComponent(new EnvironmentComponent());
+      // Position far away to avoid collision/interaction - this is not a visible mesh
+      env.transform.position = [0, -1000, 0];
       this.options.scene.addEntity(env);
     } catch {
       // Ignore if unavailable in test environment

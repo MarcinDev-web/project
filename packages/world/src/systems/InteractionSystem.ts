@@ -48,6 +48,7 @@ export class InteractionSystem {
   private currentInteractable: Entity | null = null;
   private previousInteractable: Entity | null = null;
   private keyDownHandler: ((event: KeyboardEvent) => void) | null = null;
+  private mouseDownHandler: ((event: Event) => void) | null = null;
   private gamepadPollInterval: number | null = null;
   private lastGamepadButtonState = false;
   // Canvas is stored for potential future use (e.g., coordinate transformations)
@@ -88,6 +89,7 @@ export class InteractionSystem {
     void this.lastGamepadButtonState;
 
     this.setupInputHandling();
+    this.setupMouseHandling();
     if (this.config.enableGamepad !== false) {
       this.setupGamepadHandling();
     }
@@ -294,6 +296,120 @@ export class InteractionSystem {
   }
 
   /**
+   * Setup mouse input handling for left-click interaction
+   */
+  private setupMouseHandling(): void {
+    this.mouseDownHandler = (event: Event) => {
+      const mouseEvent = event as MouseEvent;
+      // Only handle left mouse button (button 0)
+      if (mouseEvent.button !== 0) return;
+
+      // Perform raycast from mouse position to detect clicked block
+      const clickedEntity = this.detectInteractableFromMouse(mouseEvent.clientX, mouseEvent.clientY);
+      
+      if (clickedEntity) {
+        // Trigger interaction with clicked entity
+        this.triggerInteraction(clickedEntity);
+      }
+    };
+
+    const targetElement = this.canvas ?? document;
+    targetElement.addEventListener('mousedown', this.mouseDownHandler);
+  }
+
+  /**
+   * Detect interactable entity from mouse click position
+   * @param mouseX - Mouse X coordinate in screen space (clientX)
+   * @param mouseY - Mouse Y coordinate in screen space (clientY)
+   * @returns The clicked interactable entity, or null if none found
+   */
+  private detectInteractableFromMouse(mouseX: number, mouseY: number): Entity | null {
+    const camera = this.scene.primaryCamera;
+    if (!camera) return null;
+
+    const cameraComponent = camera.getComponent(CameraComponent);
+    if (!cameraComponent) return null;
+
+    // Get canvas dimensions and offset
+    const canvas = this.canvas;
+    let canvasWidth: number;
+    let canvasHeight: number;
+    let offsetX = 0;
+    let offsetY = 0;
+
+    if (canvas) {
+      canvasWidth = canvas.width;
+      canvasHeight = canvas.height;
+      // Get canvas position relative to viewport
+      const rect = canvas.getBoundingClientRect();
+      offsetX = rect.left;
+      offsetY = rect.top;
+    } else {
+      canvasWidth = window.innerWidth;
+      canvasHeight = window.innerHeight;
+    }
+
+    // Convert mouse coordinates to canvas-relative coordinates
+    const canvasX = mouseX - offsetX;
+    const canvasY = mouseY - offsetY;
+
+    // Get camera matrices
+    const aspect = canvasWidth / canvasHeight;
+    const viewMatrix = cameraComponent.getViewMatrix(camera, this.scratchViewMatrix);
+    const projectionMatrix = new Float32Array(16) as Mat4;
+    cameraComponent.getProjectionMatrix(projectionMatrix, aspect);
+
+    // Create ray from mouse position
+    const ray = this.raycaster.createRayFromScreen(
+      canvasX,
+      canvasY,
+      canvasWidth,
+      canvasHeight,
+      viewMatrix,
+      projectionMatrix
+    );
+
+    // Get all interactable entities
+    const interactableEntities = this.scene.queryEntities(InteractableComponent);
+
+    if (interactableEntities.length === 0) {
+      this.raycaster.recycleRay(ray);
+      return null;
+    }
+
+    // Perform raycast to find clicked entity
+    const hit = this.raycaster.raycastClosest(ray, interactableEntities);
+
+    if (!hit) {
+      this.raycaster.recycleRay(ray);
+      return null;
+    }
+
+    const hitEntity = hit.entity;
+    const component = hitEntity.getComponent(InteractableComponent);
+    if (!component) {
+      this.raycaster.recycleRay(ray);
+      return null;
+    }
+
+    // Check if within interaction range
+    const maxRange = Math.max(component.interactionRange, this.config.maxRange ?? 10.0);
+    if (hit.distance > maxRange) {
+      this.raycaster.recycleRay(ray);
+      return null;
+    }
+
+    // Check if enabled and available
+    if (!component.enabled || !component.isAvailable()) {
+      this.raycaster.recycleRay(ray);
+      return null;
+    }
+
+    this.raycaster.recycleRay(ray);
+    return hitEntity;
+  }
+
+  /**
    * Setup gamepad input handling
    */
   private setupGamepadHandling(): void {
@@ -493,6 +609,12 @@ export class InteractionSystem {
     if (this.keyDownHandler) {
       window.removeEventListener('keydown', this.keyDownHandler);
       this.keyDownHandler = null;
+    }
+
+    if (this.mouseDownHandler) {
+      const targetElement = this.canvas ?? document;
+      targetElement.removeEventListener('mousedown', this.mouseDownHandler);
+      this.mouseDownHandler = null;
     }
 
     if (this.gamepadPollInterval !== null) {

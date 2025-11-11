@@ -12,6 +12,7 @@ import {
   InventoryComponent,
   type InventoryComponentData,
 } from '../components/InventoryComponent.js';
+import { SpawnPointComponent } from '../components/SpawnPointComponent.js';
 import { createWeapon } from '../factories/WeaponFactory.js';
 import { getAttachment, getAllAttachments, getAttachmentsByType } from '../data/attachments.js';
 import { getAmmoType, getAllAmmoTypes } from '../data/ammo.js';
@@ -363,4 +364,37 @@ export function setupPvPLoadout(entity: Entity) {
       switchDuration: 0.5,
     }
   );
+}
+
+/**
+ * Spawn player at spawn point and give weapon if configured
+ * Use this when spawning players in multiplayer PvP games
+ * @param playerEntity - Player entity to spawn
+ * @param spawnPointEntity - Spawn point entity with SpawnPointComponent
+ * @param weaponPickupSystem - WeaponPickupSystem instance (optional, will give weapon if spawn point configured)
+ */
+export function spawnPlayerAtSpawnPoint(
+  playerEntity: Entity,
+  spawnPointEntity: Entity,
+  weaponPickupSystem?: { giveWeaponOnSpawn: (player: Entity, spawn: Entity) => void }
+): void {
+  const spawnPoint = spawnPointEntity.getComponent(SpawnPointComponent);
+  if (!spawnPoint) return;
+
+  // Set player position and rotation
+  const spawnPos = spawnPointEntity.transform.getWorldPosition();
+  playerEntity.transform.position = [spawnPos[0], spawnPos[1], spawnPos[2]];
+  
+  if (spawnPoint.rotation !== 0) {
+    // Apply rotation (yaw only for now)
+    playerEntity.transform.rotation = [0, Math.sin(spawnPoint.rotation / 2), 0, Math.cos(spawnPoint.rotation / 2)];
+  } else {
+    // Use spawn point rotation
+    playerEntity.transform.rotation = [...spawnPointEntity.transform.rotation];
+  }
+
+  // Give weapon if spawn point configured and system provided
+  if (weaponPickupSystem) {
+    weaponPickupSystem.giveWeaponOnSpawn(playerEntity, spawnPointEntity);
+  }
 }

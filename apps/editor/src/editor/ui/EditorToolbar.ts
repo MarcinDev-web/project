@@ -336,6 +336,8 @@ export class EditorToolbar {
       }
       const env = new EntityValue('Environment');
       env.addComponent(new EnvironmentComponent());
+      // Position far away to avoid collision/interaction - this is not a visible mesh
+      env.transform.position = [0, -1000, 0];
       scene.addEntity(env);
       this.config.projectManager?.markUnsaved();
     } catch (err) {

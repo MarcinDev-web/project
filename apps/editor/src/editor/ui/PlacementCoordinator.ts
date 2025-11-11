@@ -7,6 +7,7 @@
 
 import type { Asset, AssetPreset } from '../types/BlockAssetTypes';
 import type { PlacementMode } from '../placement/PlacementMode';
+import type { Entity } from '@engine/world';
 import { Logger } from '../../utils/logger';
 
 export interface PlacementCoordinatorConfig {
@@ -42,6 +43,50 @@ export class PlacementCoordinator {
     // Convert Asset to AssetPreset for PlacementMode
     const preset = this.assetToPreset(asset);
 
+    // Store existing onPlacementConfirmed callback to preserve it
+    const existingConfig = this.config.placementMode.getConfig();
+    const existingCallback = existingConfig.onPlacementConfirmed;
+
+    // Set up callback to handle auto-continue for hotbar
+    // This callback will be called even when placement is confirmed directly by controllers
+    // IMPORTANT: We need to capture currentSource and currentAsset in closure before they're cleared
+    const sourceForCallback = source;
+    const assetForCallback = asset;
+    
+    this.config.placementMode.setConfig({
+      onPlacementConfirmed: (entity: Entity) => {
+        Logger.debug('PlacementCoordinator: onPlacementConfirmed callback called', {
+          entityName: entity?.name,
+          sourceForCallback,
+          assetForCallback: assetForCallback?.name,
+        });
+        
+        // Call existing callback if present
+        existingCallback?.(entity);
+        
+        // Auto-continue placement for hotbar: restart with same asset
+        if (sourceForCallback === 'hotbar' && assetForCallback) {
+          Logger.debug('PlacementCoordinator: Auto-continuing hotbar placement', {
+            asset: assetForCallback.name,
+          });
+          
+          // Restart placement with same asset after a short delay
+          // This allows the placement confirmation to complete before restarting
+          // Delay is slightly longer than EditorPlacementController's delay (50ms) to ensure
+          // placement mode state is stable before restarting
+          setTimeout(() => {
+            Logger.debug('PlacementCoordinator: Restarting placement after auto-continue');
+            this.startPlacement(assetForCallback, sourceForCallback);
+          }, 60);
+        } else {
+          Logger.debug('PlacementCoordinator: Not auto-continuing', {
+            source: sourceForCallback,
+            hasAsset: !!assetForCallback,
+          });
+        }
+      },
+    });
+
     // Start placement mode
     this.config.placementMode.startPlacement(preset);
 
@@ -72,15 +117,11 @@ export class PlacementCoordinator {
       Logger.debug('PlacementCoordinator: Placement confirmed', entity?.name);
       this.config.onPlacementEnd?.(true);
       this.config.onStatusUpdate?.('Placement confirmed');
+      // Note: Auto-continue for hotbar is handled by onPlacementConfirmed callback
+      // set up in startPlacement(), which is called even when controllers confirm directly
     } else {
       Logger.warn('PlacementCoordinator: Cannot place here (collision)');
       this.config.onStatusUpdate?.('Cannot place here - collision detected');
-    }
-
-    // Clear current asset if successful
-    if (success) {
-      this.currentAsset = null;
-      this.currentSource = null;
     }
 
     return success;

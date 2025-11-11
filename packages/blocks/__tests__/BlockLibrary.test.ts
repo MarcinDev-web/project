@@ -5,6 +5,11 @@ import {
   getBlocksByCategory,
   getAllCategories,
 } from '../src/BlockLibrary';
+import {
+  CARTOON_PALETTE,
+  CARTOON_BRIGHTNESS,
+  getCartoonFaceTexture,
+} from '../src/palette';
 
 describe('BlockLibrary', () => {
   describe('BLOCK_LIBRARY', () => {
@@ -130,6 +135,80 @@ describe('BlockLibrary', () => {
       expect(categories).toContain('natural');
       expect(categories).toContain('gameplay');
       expect(categories).toHaveLength(3);
+    });
+  });
+
+  describe('Cartoon Palette Integration', () => {
+    it('should use palette colors for basic blocks', () => {
+      const redBlock = getBlock('plastic_red');
+      expect(redBlock).toBeDefined();
+      expect(redBlock?.textures.top.color).toEqual(CARTOON_PALETTE.basic.red.color);
+      expect(redBlock?.textures.top.pattern).toBe(CARTOON_PALETTE.basic.red.pattern);
+    });
+
+    it('should use palette colors for natural blocks', () => {
+      const grassBlock = getBlock('grass');
+      expect(grassBlock).toBeDefined();
+      expect(grassBlock?.textures.top.color).toEqual(CARTOON_PALETTE.natural.grass.color);
+      expect(grassBlock?.textures.top.pattern).toBe(CARTOON_PALETTE.natural.grass.pattern);
+    });
+
+    it('should use consistent brightness presets', () => {
+      const redBlock = getBlock('plastic_red');
+      expect(redBlock).toBeDefined();
+      
+      // Standard blocks should use standard brightness preset
+      const standardBrightness = CARTOON_BRIGHTNESS.standard;
+      expect(redBlock?.textures.top.brightness).toBe(standardBrightness.top);
+      expect(redBlock?.textures.sides.brightness).toBe(standardBrightness.sides);
+      expect(redBlock?.textures.bottom.brightness).toBe(standardBrightness.bottom);
+    });
+
+    it('should use emissive brightness for light blocks', () => {
+      const lightBlock = getBlock('light_white');
+      expect(lightBlock).toBeDefined();
+      
+      const emissiveBrightness = CARTOON_BRIGHTNESS.emissive;
+      expect(lightBlock?.textures.top.brightness).toBe(emissiveBrightness.top);
+      expect(lightBlock?.textures.sides.brightness).toBe(emissiveBrightness.sides);
+      expect(lightBlock?.textures.bottom.brightness).toBe(emissiveBrightness.bottom);
+    });
+
+    it('should have cartoon brightness values within expected range', () => {
+      for (const block of Object.values(BLOCK_LIBRARY)) {
+        // Cartoon style uses minimal brightness variation
+        const topBrightness = block.textures.top.brightness || 1.0;
+        const sidesBrightness = block.textures.sides.brightness || 1.0;
+        const bottomBrightness = block.textures.bottom.brightness || 1.0;
+
+        // Top should be brightest
+        expect(topBrightness).toBeGreaterThanOrEqual(sidesBrightness);
+        expect(sidesBrightness).toBeGreaterThanOrEqual(bottomBrightness);
+
+        // Variation should be minimal for cartoon flat look
+        // Normalize by dividing by top brightness to get relative variation
+        const relativeVariation = (topBrightness - bottomBrightness) / topBrightness;
+        // Allow small floating point precision error (0.15 + epsilon)
+        expect(relativeVariation).toBeLessThanOrEqual(0.1501);
+      }
+    });
+
+    it('should have bright, saturated colors for cartoon style', () => {
+      for (const block of Object.values(BLOCK_LIBRARY)) {
+        const [r, g, b] = block.textures.top.color;
+        
+        // Cartoon colors should be bright (at least one channel > 0.5)
+        const maxChannel = Math.max(r, g, b);
+        expect(maxChannel).toBeGreaterThan(0.5);
+        
+        // Colors should be in valid range
+        expect(r).toBeGreaterThanOrEqual(0);
+        expect(r).toBeLessThanOrEqual(1);
+        expect(g).toBeGreaterThanOrEqual(0);
+        expect(g).toBeLessThanOrEqual(1);
+        expect(b).toBeGreaterThanOrEqual(0);
+        expect(b).toBeLessThanOrEqual(1);
+      }
     });
   });
 });

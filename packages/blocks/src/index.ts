@@ -7,3 +7,4 @@
 
 export * from './BlockLibrary';
 export * from './types';
+export * from './palette';

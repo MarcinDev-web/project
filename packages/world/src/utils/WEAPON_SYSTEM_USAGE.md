@@ -43,7 +43,81 @@ setupInventory(player, [
 });
 ```
 
-### 3. Fire Weapons
+### 3. Multiplayer PvP Setup - Spawn Points with Weapons
+
+**IMPORTANT:** For multiplayer PvP games, configure spawn points to automatically give weapons to players.
+
+```typescript
+import { Scene, Entity } from '@engine/world';
+import { SpawnPointComponent } from '@engine/world/components/SpawnPointComponent';
+import { WeaponPickupSystem } from '@engine/world';
+import { spawnPlayerAtSpawnPoint } from '@engine/world/utils';
+
+const scene = new Scene();
+
+// Create spawn point with weapon configuration
+const spawnPoint = scene.createEntity('Spawn Point 1');
+spawnPoint.transform.position = [0, 1, 0];
+
+const spawnComp = new SpawnPointComponent();
+spawnComp.isDefault = true;
+spawnComp.giveWeaponOnSpawn = true;
+spawnComp.givePvPLoadout = true; // Give full PvP loadout
+// OR: spawnComp.weaponPreset = 'rifle'; // Give single weapon
+spawnPoint.addComponent(spawnComp);
+
+// Initialize weapon pickup system
+const weaponPickupSystem = new WeaponPickupSystem(scene);
+
+// When player joins/spawns:
+function onPlayerSpawn(playerEntity: Entity) {
+  // Find spawn point
+  const spawnPoints = scene.queryEntities(SpawnPointComponent);
+  const defaultSpawn = spawnPoints.find(sp => {
+    const comp = sp.getComponent(SpawnPointComponent);
+    return comp?.isDefault;
+  }) || spawnPoints[0];
+  
+  if (defaultSpawn) {
+    spawnPlayerAtSpawnPoint(playerEntity, defaultSpawn, weaponPickupSystem);
+    // Weapon will be automatically given based on spawn point configuration
+  }
+}
+```
+
+### 4. Weapon Pickup from Ground
+
+```typescript
+import { WeaponPickupComponent } from '@engine/world/components/WeaponPickupComponent';
+import { WeaponPickupSystem } from '@engine/world';
+import { setupWeaponEntity } from '@engine/world/utils';
+
+const scene = new Scene();
+const weaponPickupSystem = new WeaponPickupSystem(scene);
+
+// Create weapon on ground
+const weaponOnGround = scene.createEntity('Weapon Pickup');
+weaponOnGround.transform.position = [10, 1, 5];
+
+// Add weapon component
+setupWeaponEntity(weaponOnGround, 'rifle');
+
+// Add pickup component
+const pickup = new WeaponPickupComponent();
+pickup.weaponPreset = 'rifle'; // Optional: recreate weapon on pickup
+pickup.autoRespawn = true; // Respawn after 10 seconds
+pickup.respawnTime = 10.0;
+weaponOnGround.addComponent(pickup);
+
+// In game loop:
+weaponPickupSystem.update(deltaTime);
+
+// When player presses pickup key:
+weaponPickupSystem.pickupNearestWeapon(playerEntity);
+// OR: weaponPickupSystem.pickupWeapon(playerEntity, weaponOnGround);
+```
+
+### 5. Fire Weapons
 
 ```typescript
 import { WeaponSystem, InventorySystem } from '@engine/world';
@@ -204,6 +278,7 @@ function gameLoop(deltaTime: number) {
 - `setupWeaponEntity(entity, preset, options?)` - Setup single weapon
 - `setupInventory(entity, weapons, options?)` - Setup weapon inventory
 - `setupPvPLoadout(entity)` - Quick PvP setup
+- `spawnPlayerAtSpawnPoint(player, spawnPoint, weaponPickupSystem?)` - Spawn player at spawn point with weapon
 
 ### Modification Functions
 - `addAttachment(entity, attachmentId)` - Add attachment
