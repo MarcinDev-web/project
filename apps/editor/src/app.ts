@@ -1,7 +1,7 @@
 import { createOrbitControls, type OrbitControls } from '@engine/camera';
 import { initRenderer, type Renderer } from '@engine/gfx-webgpu';
 import { Scene, Raycaster, SelectionManager } from '@engine/world';
-import { mat4LookAt, mat4Multiply, mat4Perspective, mat4Invert, mat4GetTranslationOut, mat4GetRotationOut, type Mat4, type Vec3 } from '@engine/core/math';
+import { mat4LookAt, mat4Multiply, mat4Perspective, mat4Invert, mat4GetTranslationOut, mat4GetRotationOut, type Mat4, type Vec3, type Quat } from '@engine/core/math';
 import { FOV_RADIANS, Z_FAR, Z_NEAR } from '@engine/gfx-webgpu/config';
 import { EditorUI } from './editor/ui/EditorUI';
 import { Logger } from './utils/logger';
@@ -10,7 +10,7 @@ import { PhysicsWorld } from '@engine/world';
 import { CharacterControllerSystem } from '@engine/stdlib/CharacterController';
 import { BlockBehaviorSystem, UISystem } from '@engine/world/systems';
 import { registerTemplates, applyTo } from '@engine/world-templates';
-import { createFlatPlatformTemplate } from '@engine/world-templates';
+import { createFlatPlatformTemplate, createStarterBlockTemplate } from '@engine/world-templates';
 import { ShareClient } from '@engine/net';
 
 export interface EditorAppOptions {
@@ -42,7 +42,7 @@ export class EditorApp {
   private readonly viewProjectionMatrix = new Float32Array(16);
 
   constructor(private readonly config: EditorAppOptions) {
-    this.controls = createOrbitControls(config.canvas);
+    this.controls = createOrbitControls(config.canvas, { initialDistance: 18 });
   }
 
   public async start(): Promise<void> {
@@ -58,14 +58,15 @@ export class EditorApp {
         this.config.statusEl.textContent = 'Loading renderer…';
       }, 150);
 
-      // Register a single built-in template once at boot
+      // Register built-in templates once at boot
       try {
         registerTemplates([
           createFlatPlatformTemplate(),
+          createStarterBlockTemplate(),
         ]);
-        // Load default template immediately before initializing renderer/UI
+        // Load default template (starter block) immediately before initializing renderer/UI
         this.config.statusEl.textContent = 'Loading default scene…';
-        await applyTo(this.scene, 'template:flat-platform', { clear: true });
+        await applyTo(this.scene, 'template:starter-block', { clear: true });
       } catch {}
 
       this.renderer = await initRenderer({
@@ -113,9 +114,9 @@ export class EditorApp {
                   const world = new Float32Array(16) as Mat4;
                   mat4Invert(world, view as Mat4);
                   const pos: Vec3 = [0, 0, 0];
-                  const rot: [number, number, number, number] = [0, 0, 0, 1];
-                  mat4GetTranslationOut(pos as unknown as Float32Array, world as Float32Array);
-                  mat4GetRotationOut(rot as unknown as Float32Array, world as Float32Array);
+                  const rot: Quat = [0, 0, 0, 1];
+                  mat4GetTranslationOut(pos, world as Mat4);
+                  mat4GetRotationOut(rot, world as Mat4);
                   this.editor?.getCollaborationManager()?.updateCursor(pos, rot);
                 } catch {}
               }

@@ -5,11 +5,11 @@ export const ZOOM_SPEED = 0.1;
 /** Minimum allowed camera distance. */
 export const MIN_DISTANCE = 0.75;
 /** Maximum allowed camera distance. */
-export const MAX_DISTANCE = 20;
+export const MAX_DISTANCE = 100;
 /** Maximum absolute pitch (in radians) away from horizon. */
 export const PITCH_LIMIT = Math.PI / 2 - 0.01;
 /** Default initial camera distance. */
-export const INITIAL_DISTANCE = 3;
+export const INITIAL_DISTANCE = 40;
 
 /**
  * Current orbit control state expressed in yaw, pitch and distance.

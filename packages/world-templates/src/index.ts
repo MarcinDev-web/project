@@ -10,5 +10,6 @@ export { createProceduralTemplate } from './loaders/ProceduralTemplate';
 
 // Built-in templates (reduced set)
 export { createFlatPlatformTemplate } from './builtins/templates/FlatPlatform';
+export { createStarterBlockTemplate } from './builtins/templates/StarterBlock';
 
 

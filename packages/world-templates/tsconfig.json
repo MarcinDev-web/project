@@ -7,6 +7,10 @@
     "declarationMap": true,
     "sourceMap": true,
     "paths": {
+      "@engine/core": ["../core/dist"],
+      "@engine/core/*": ["../core/dist/*"],
+      "@engine/world": ["../world/dist"],
+      "@engine/world/*": ["../world/dist/*"],
       "@engine/world-server": ["../world-server/dist"],
       "@engine/world-server/*": ["../world-server/dist/*"]
     }

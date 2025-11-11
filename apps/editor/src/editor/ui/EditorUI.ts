@@ -304,7 +304,9 @@ export class EditorUI {
     if (!this.editorCamera) {
       this.editorCamera = new EditorCameraController(this.config.canvas, {
         moveSpeed: 5.0,
-        initialPosition: [0, 2, 8], // Spawn further back to avoid avatar blocking view
+        initialPosition: [0, 3, 8],
+        initialYaw: 0,
+        initialPitch: -0.35,
       });
       this.disposables.add(() => this.editorCamera?.dispose());
     }
