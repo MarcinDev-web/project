@@ -23,6 +23,7 @@ import { AvatarLoadoutSerializer } from '@engine/avatar/serialization/avatar-loa
 import type { ValidationResult } from '@engine/avatar/serialization/avatar-loadout-serializer';
 import type { RgbaColor } from '@engine/world';
 import { materialCatalogService, type MaterialMetadata } from './MaterialCatalogService';
+import { getVec3Pool } from '@engine/core/utils/Vec3Pool';
 
 export interface AvatarBuilderCoreOptions {
   canvas: HTMLCanvasElement;
@@ -251,6 +252,14 @@ export class AvatarBuilderCore {
       if (this.avatar) {
         this.avatar.playAnimation(IDLE_ANIMATION);
       }
+
+      // Frame the avatar so the camera never starts inside geometry
+      try {
+        this.frameAvatar();
+      } catch (e) {
+        // Non-fatal: keep going with default camera if framing fails
+        console.warn('AvatarBuilderCore: frameAvatar failed, using default camera', e);
+      }
     } catch (error) {
       // Provide more specific error messages with better formatting
       let errorMessage = 'Failed to initialize WebGPU renderer';
@@ -280,6 +289,51 @@ export class AvatarBuilderCore {
       
       throw new Error(errorMessage);
     }
+  }
+
+  /**
+   * Compute approximate avatar height from skeleton joints and place camera to fit it.
+   * Uses a simple bounding-sphere fit based on vertical extent.
+   */
+  private frameAvatar(): void {
+    if (!this.avatar) return;
+
+    // Estimate height from skeleton world Y extents
+    const skeleton = this.avatar.getSkeleton();
+    const jointNames = skeleton.getJointNames();
+    const pool = getVec3Pool();
+    let minY = Number.POSITIVE_INFINITY;
+    let maxY = Number.NEGATIVE_INFINITY;
+
+    for (const name of jointNames) {
+      const { position } = skeleton.getWorldTransform(name);
+      const y = position[1];
+      if (y < minY) minY = y;
+      if (y > maxY) maxY = y;
+      // Return pooled vector
+      pool.release(position);
+    }
+
+    // Fallback if something went wrong
+    if (!Number.isFinite(minY) || !Number.isFinite(maxY) || maxY <= minY) {
+      this.resetCamera();
+      return;
+    }
+
+    const height = maxY - minY;
+
+    // Convert height to a comfortable viewing distance using FOV
+    // Using same FOV as renderer config (2π/5 ≈ 72°)
+    const FOV = (2 * Math.PI) / 5;
+    const radius = height * 0.6; // generous sphere radius to include shoulders/arms
+    const distance = Math.max(1, radius / Math.sin(FOV * 0.5) * 1.15);
+
+    // Slightly elevated pitch and a small yaw for depth
+    this.controls.setState({
+      yaw: Math.PI * 0.125,     // ~22.5°
+      pitch: 0.35,              // ~20° down
+      distance,
+    });
   }
 
   /**
@@ -466,11 +520,8 @@ export class AvatarBuilderCore {
    * Reset camera to default position
    */
   resetCamera(): void {
-    this.controls.setState({
-      yaw: 0,
-      pitch: 0.5,
-      distance: 3,
-    });
+    // Use framing logic to ensure avatar fits the view
+    this.frameAvatar();
   }
 
   /**

@@ -66,7 +66,8 @@ export class AvatarPartMountManager {
         meshComponent.meshData = proceduralMesh;
       } else if (
         selection.definition.mesh === 'avatar_torso' ||
-        selection.definition.mesh === 'sphere'
+        selection.definition.mesh === 'sphere' ||
+        selection.definition.mesh === 'capsule_y'
       ) {
         // Procedural mesh generation failed
         console.error(

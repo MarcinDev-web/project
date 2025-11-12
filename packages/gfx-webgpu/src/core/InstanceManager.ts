@@ -11,7 +11,7 @@ import type { Entity, Scene } from '@engine/world';
 import { MaterialComponent, MeshComponent } from '@engine/world';
 import type { Frustum } from './FrustumCuller';
 import { Logger } from '@engine/core/utils';
-import { generateSphereMesh } from '@engine/avatar';
+import { generateSphereMesh, generateCapsuleY, generateHeroicTorsoMesh } from '@engine/avatar';
 
 export interface InstanceData {
   instanceCount: number;
@@ -98,24 +98,45 @@ export class InstanceDataBuilder {
         continue;
       }
 
-      // Fallback: generate geometry for sphere if meshType='sphere' but no meshData
+      // Fallback: generate geometry for procedural mesh types if meshData is missing
+      let fallbackGeometry: ReturnType<typeof generateSphereMesh> | null = null;
+      
       if (meshComponent.meshType === 'sphere') {
         try {
-          const sphereGeometry = generateSphereMesh(16);
-          if (sphereGeometry.vertices && sphereGeometry.indices) {
-            meshComponent.meshData = sphereGeometry;
-            customGeometry.push({ entity, meshComponent });
-            Logger.debug(
-              `[InstanceManager] Generated fallback sphere geometry for entity "${entity.name || entity.id || 'unnamed'}"`
-            );
-            continue;
-          }
+          fallbackGeometry = generateSphereMesh(16);
         } catch (error) {
           Logger.warn(
             `[InstanceManager] Failed to generate fallback sphere geometry for entity "${entity.name || entity.id || 'unnamed'}":`,
             error
           );
         }
+      } else if (meshComponent.meshType === 'capsule_y') {
+        try {
+          fallbackGeometry = generateCapsuleY(0.5, 1.0, 16, 8);
+        } catch (error) {
+          Logger.warn(
+            `[InstanceManager] Failed to generate fallback capsule_y geometry for entity "${entity.name || entity.id || 'unnamed'}":`,
+            error
+          );
+        }
+      } else if (meshComponent.meshType === 'avatar_torso') {
+        try {
+          fallbackGeometry = generateHeroicTorsoMesh();
+        } catch (error) {
+          Logger.warn(
+            `[InstanceManager] Failed to generate fallback avatar_torso geometry for entity "${entity.name || entity.id || 'unnamed'}":`,
+            error
+          );
+        }
+      }
+
+      if (fallbackGeometry?.vertices && fallbackGeometry.indices) {
+        meshComponent.meshData = fallbackGeometry;
+        customGeometry.push({ entity, meshComponent });
+        Logger.debug(
+          `[InstanceManager] Generated fallback ${meshComponent.meshType} geometry for entity "${entity.name || entity.id || 'unnamed'}"`
+        );
+        continue;
       }
 
       // No custom geometry available - use default (cube)

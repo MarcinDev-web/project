@@ -3,6 +3,7 @@ import { memo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { NotificationBell } from '../notifications/NotificationBell';
 import { NavLink } from './NavLink';
+import { CoinsDisplay } from './CoinsDisplay';
 
 export const TopBar = memo(function TopBar() {
   const { isAuthenticated } = useAuth();
@@ -34,6 +35,7 @@ export const TopBar = memo(function TopBar() {
           </NavLink>
         </div>
         <div className="topbar-right">
+          <CoinsDisplay />
           <NotificationBell />
         </div>
       </div>

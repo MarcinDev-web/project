@@ -32,12 +32,25 @@ import { SupportPage } from './pages/SupportPage';
 import { TicketDetail } from './components/support/TicketDetail';
 import { SupportManagementPage } from './pages/admin/SupportManagementPage';
 import { NewsPage } from './pages/NewsPage';
+import { GamesPage } from './pages/GamesPage';
+import { NotFoundPage } from './pages/NotFoundPage';
 import { ProtectedRoute, AdminRoute, ModeratorRoute } from './components/auth/ProtectedRoute';
+import { RouteErrorElement } from './components/shared/RouteErrorElement';
 
 export const router: ReturnType<typeof createBrowserRouter> = createBrowserRouter([
   {
     path: '/',
     element: <HomePage />,
+    errorElement: <RouteErrorElement />,
+  },
+  {
+    path: '/games',
+    element: (
+      <ProtectedRoute>
+        <GamesPage />
+      </ProtectedRoute>
+    ),
+    errorElement: <RouteErrorElement />,
   },
   {
     path: '/login',
@@ -270,6 +283,10 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
   {
     path: '/news',
     element: <NewsPage />,
+  },
+  {
+    path: '*',
+    element: <NotFoundPage />,
   },
 ]);
 
