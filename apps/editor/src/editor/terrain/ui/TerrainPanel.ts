@@ -140,18 +140,38 @@ export class TerrainPanel {
     createButton.className = 'panel-button panel-button-primary';
     createButton.textContent = 'Create Heightmap Terrain';
     createButton.addEventListener('click', () => {
-      const resolution = parseInt(resolutionSelect.value, 10);
-      const size = parseFloat(sizeInput.value);
+      try {
+        const resolution = parseInt(resolutionSelect.value, 10);
+        const size = parseFloat(sizeInput.value);
 
-      const entity = this.config.terrainStudio.createHeightmapTerrain({
-        resolution,
-        size,
-        minHeight: 0,
-        maxHeight: 100,
-      });
+        // Validate resolution (must be power of 2 + 1)
+        const isValidResolution = (n: number): boolean => {
+          return n > 1 && ((n - 1) & ((n - 1) - 1)) === 0;
+        };
 
-      this.setCurrentTerrain(entity);
-      this.config.onTerrainCreated?.(entity);
+        if (!isValidResolution(resolution)) {
+          alert(`Invalid resolution: ${resolution}. Resolution must be a power of 2 + 1 (e.g., 65, 129, 257, 513)`);
+          return;
+        }
+
+        if (size <= 0 || !Number.isFinite(size)) {
+          alert(`Invalid size: ${size}. Size must be a positive number.`);
+          return;
+        }
+
+        const entity = this.config.terrainStudio.createHeightmapTerrain({
+          resolution,
+          size,
+          minHeight: 0,
+          maxHeight: 100,
+        });
+
+        this.setCurrentTerrain(entity);
+        this.config.onTerrainCreated?.(entity);
+      } catch (error) {
+        console.error('Failed to create terrain:', error);
+        alert(`Failed to create terrain: ${error instanceof Error ? error.message : String(error)}`);
+      }
     });
 
     section.appendChild(createButton);
@@ -212,11 +232,25 @@ export class TerrainPanel {
     noiseButton.className = 'panel-button panel-button-secondary';
     noiseButton.textContent = 'Apply Noise';
     noiseButton.addEventListener('click', () => {
-      if (!this.currentEntity) return;
+      if (!this.currentEntity) {
+        alert('Please select or create a terrain first');
+        return;
+      }
 
-      const scale = 5;
-      const amplitude = 10;
-      this.config.terrainStudio.applyNoise(this.currentEntity, scale, amplitude);
+      try {
+        const scale = 5;
+        const amplitude = 10;
+        
+        if (scale <= 0 || amplitude <= 0) {
+          alert('Scale and amplitude must be positive numbers');
+          return;
+        }
+
+        this.config.terrainStudio.applyNoise(this.currentEntity, scale, amplitude);
+      } catch (error) {
+        console.error('Failed to apply noise:', error);
+        alert(`Failed to apply noise: ${error instanceof Error ? error.message : String(error)}`);
+      }
     });
 
     noiseGroup.appendChild(noiseButton);
@@ -226,8 +260,24 @@ export class TerrainPanel {
     smoothButton.className = 'panel-button panel-button-secondary';
     smoothButton.textContent = 'Smooth';
     smoothButton.addEventListener('click', () => {
-      if (!this.currentEntity) return;
-      this.config.terrainStudio.applySmooth(this.currentEntity, 1);
+      if (!this.currentEntity) {
+        alert('Please select or create a terrain first');
+        return;
+      }
+
+      try {
+        const iterations = 1;
+        
+        if (iterations <= 0 || !Number.isInteger(iterations)) {
+          alert('Iterations must be a positive integer');
+          return;
+        }
+
+        this.config.terrainStudio.applySmooth(this.currentEntity, iterations);
+      } catch (error) {
+        console.error('Failed to apply smooth:', error);
+        alert(`Failed to apply smooth: ${error instanceof Error ? error.message : String(error)}`);
+      }
     });
 
     noiseGroup.appendChild(smoothButton);
@@ -271,10 +321,17 @@ export class TerrainPanel {
     sizeValue.textContent = sizeInput.value;
 
     sizeInput.addEventListener('input', () => {
-      sizeValue.textContent = sizeInput.value;
-      this.config.terrainStudio.updateBrushConfig({
-        size: parseFloat(sizeInput.value),
-      });
+      try {
+        const size = parseFloat(sizeInput.value);
+        if (size > 0 && Number.isFinite(size)) {
+          sizeValue.textContent = sizeInput.value;
+          this.config.terrainStudio.updateBrushConfig({
+            size,
+          });
+        }
+      } catch (error) {
+        console.error('Failed to update brush size:', error);
+      }
     });
 
     sizeGroup.appendChild(sizeInput);
@@ -303,10 +360,17 @@ export class TerrainPanel {
     intensityValue.textContent = intensityInput.value;
 
     intensityInput.addEventListener('input', () => {
-      intensityValue.textContent = intensityInput.value;
-      this.config.terrainStudio.updateBrushConfig({
-        intensity: parseFloat(intensityInput.value),
-      });
+      try {
+        const intensity = parseFloat(intensityInput.value);
+        if (intensity >= 0 && intensity <= 1 && Number.isFinite(intensity)) {
+          intensityValue.textContent = intensityInput.value;
+          this.config.terrainStudio.updateBrushConfig({
+            intensity,
+          });
+        }
+      } catch (error) {
+        console.error('Failed to update brush intensity:', error);
+      }
     });
 
     intensityGroup.appendChild(intensityInput);
@@ -371,7 +435,16 @@ export class TerrainPanel {
       button.className = 'panel-button panel-button-secondary';
       button.textContent = op.label;
       button.addEventListener('click', () => {
-        this.config.terrainStudio.setBrushOperation(op.key as any);
+        try {
+          const operation = op.key as 'raise' | 'lower' | 'smooth' | 'flatten' | 'pinch';
+          if (!['raise', 'lower', 'smooth', 'flatten', 'pinch'].includes(operation)) {
+            console.error(`Invalid brush operation: ${operation}`);
+            return;
+          }
+          this.config.terrainStudio.setBrushOperation(operation);
+        } catch (error) {
+          console.error('Failed to set brush operation:', error);
+        }
       });
       section.appendChild(button);
     }
@@ -460,7 +533,10 @@ export class TerrainPanel {
     exportButton.className = 'panel-button panel-button-secondary';
     exportButton.textContent = 'Export to Image';
     exportButton.addEventListener('click', async () => {
-      if (!this.currentEntity) return;
+      if (!this.currentEntity) {
+        alert('Please select or create a terrain first');
+        return;
+      }
 
       try {
         const dataUrl = await this.config.terrainStudio.exportToImage(this.currentEntity);
@@ -471,6 +547,7 @@ export class TerrainPanel {
         link.click();
       } catch (error) {
         console.error('Failed to export terrain:', error);
+        alert(`Failed to export terrain: ${error instanceof Error ? error.message : String(error)}`);
       }
     });
 

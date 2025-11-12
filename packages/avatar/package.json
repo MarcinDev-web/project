@@ -15,7 +15,7 @@
   },
   "sideEffects": false,
   "scripts": {
-    "build": "echo 'Skipping avatar build in production' || tsc -b",
+      "build": "tsc -b",
     "dev": "tsc -w -b",
     "test": "vitest run",
     "test:watch": "vitest",

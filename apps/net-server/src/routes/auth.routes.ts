@@ -152,8 +152,12 @@ export async function createAuthRoutes(
           profile = null;
         }
 
-        // Return profile if exists, otherwise return user
+        // Always ensure role is included - use user role if profile doesn't have it
         const result = profile ?? user;
+        // Ensure role is always present (profile might not have it)
+        if (!result.role && user.role) {
+          result.role = user.role;
+        }
         reply.send(result);
       } catch (error) {
         console.error('Get user error:', error);

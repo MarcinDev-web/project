@@ -16,12 +16,15 @@
     "composite": true,
     "paths": {
       "@engine/core": ["../core/src"],
-      "@engine/core/*": ["../core/src/*"]
+      "@engine/core/*": ["../core/src/*"],
+      "@engine/microblocks": ["../microblocks/src"],
+      "@engine/microblocks/*": ["../microblocks/src/*"]
     }
   },
   "include": ["src/**/*"],
   "references": [
-    { "path": "../core/tsconfig.build.json" }
+    { "path": "../core/tsconfig.build.json" },
+    { "path": "../microblocks/tsconfig.build.json" }
   ]
 }
 

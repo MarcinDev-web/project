@@ -51,7 +51,7 @@ COPY packages/net/package.json ./packages/net/
 COPY packages/world-templates/package.json ./packages/world-templates/
 
 # Install dependencies (production + dev for build)
-RUN pnpm i --frozen-lockfile
+RUN pnpm install --no-frozen-lockfile --prefer-offline
 
 # Copy built packages and applications
 COPY packages ./packages
@@ -60,7 +60,7 @@ COPY shared ./shared
 COPY scripts ./scripts
 
 # Reinstall dependencies to ensure workspace links are correct after copying source files
-RUN pnpm i --frozen-lockfile
+RUN pnpm install --no-frozen-lockfile --prefer-offline
 
 # Generate Prisma client (dummy DATABASE_URL for client generation)
 RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" pnpm -C apps/collab-server db:generate
@@ -109,7 +109,7 @@ COPY --from=builder --chown=nodejs:nodejs /app/packages ./packages
 COPY --from=builder --chown=nodejs:nodejs /app/shared ./shared
 
 # Install production dependencies
-RUN CI=true pnpm install --frozen-lockfile --prod
+RUN CI=true pnpm install --no-frozen-lockfile --prod
 
 # Copy generated Prisma client from builder stage
 # Prisma client is generated at apps/node_modules/.prisma/collab-client (relative to prisma folder: ../../node_modules)

@@ -114,6 +114,9 @@ importers:
       uuid:
         specifier: ^9.0.1
         version: 9.0.1
+      ws:
+        specifier: ^8.18.0
+        version: 8.18.3
       zod:
         specifier: ^3.23.8
         version: 3.25.76
@@ -490,6 +493,9 @@ importers:
       '@engine/core':
         specifier: workspace:*
         version: link:../core
+      '@engine/microblocks':
+        specifier: workspace:*
+        version: link:../microblocks
     devDependencies:
       '@engine/test-utils':
         specifier: workspace:*

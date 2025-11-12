@@ -11,4 +11,5 @@ export * from './job';
 export * from './utils';
 export * from './script';
 export * from './memory';
+export { getGlobalRNG, initGlobalRNG, resetGlobalRNG, isGlobalRNGInitialized, SeededRNG, } from './utils/SeededRNG';
 //# sourceMappingURL=index.d.ts.map

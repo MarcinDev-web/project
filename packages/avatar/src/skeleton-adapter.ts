@@ -1,6 +1,6 @@
 import { Skeleton, type Bone } from '@engine/stdlib/Animation';
 import { getVec3Pool } from '@engine/core/utils/Vec3Pool';
-import type { AvatarSkeleton, AvatarJointName } from './skeleton';
+import type { AvatarSkeleton } from './skeleton';
 
 /**
  * Converts AvatarSkeleton to generic Skeleton format for AnimationComponent.

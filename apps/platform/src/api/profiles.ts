@@ -3,7 +3,7 @@
  */
 
 import { apiClient } from './client';
-import type { UserProfile, UpdateProfileRequest, AvatarLoadoutData } from '@shared/types/profiles';
+import type { UserProfile, UpdateProfileRequest, AvatarLoadoutData, ProfileSocialStats, UserForumActivity } from '@shared/types/profiles';
 import {
   validateProfileUpdate,
   hasValidationErrors,
@@ -11,7 +11,7 @@ import {
 } from '@shared/validation/profile';
 import type { AvatarLoadout, AvatarSlot } from '@engine/avatar';
 
-export type { UserProfile, UpdateProfileRequest };
+export type { UserProfile, UpdateProfileRequest, ProfileSocialStats, UserForumActivity };
 
 /**
  * Convert AvatarLoadout (engine format) to AvatarLoadoutData (JSON-compatible)
@@ -143,43 +143,4 @@ export const profilesApi = {
     return apiClient.get<UserForumActivity>(`/users/${userId}/forum-activity${query ? `?${query}` : ''}`);
   },
 };
-
-/**
- * Social statistics for a user profile
- */
-export interface ProfileSocialStats {
-  friendsCount: number;
-  forumThreadsCount: number;
-  forumPostsCount: number;
-  marketplaceBuildsCount: number;
-  marketplaceLikesCount: number;
-  marketplaceDownloadsCount: number;
-  isFriend?: boolean;
-  friendshipStatus?: 'none' | 'pending' | 'accepted';
-  pendingRequestId?: string;
-  isPendingFromCurrentUser?: boolean;
-}
-
-/**
- * User forum activity data
- */
-export interface UserForumActivity {
-  recentThreads: Array<{
-    id: string;
-    title: string;
-    categoryId: string;
-    categoryName?: string;
-    postCount: number;
-    createdAt: number;
-    lastPostAt: number;
-  }>;
-  recentPosts: Array<{
-    id: string;
-    threadId: string;
-    threadTitle: string;
-    content: string;
-    createdAt: number;
-    score?: number;
-  }>;
-}
 

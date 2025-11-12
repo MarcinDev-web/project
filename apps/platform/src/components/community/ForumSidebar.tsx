@@ -29,7 +29,7 @@ export function ForumSidebar({ categories, activeCategoryId }: ForumSidebarProps
     }
   }, [user]);
 
-  const displayName = userProfile?.displayName || userProfile?.email?.split('@')[0] || user?.email?.split('@')[0] || 'Guest';
+  const displayName = userProfile?.displayName || userProfile?.username || user?.username || userProfile?.email?.split('@')[0] || user?.email?.split('@')[0] || 'Guest';
 
   return (
     <div className="forum-sidebar">

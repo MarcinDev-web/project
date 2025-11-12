@@ -11,6 +11,7 @@ import { HeightmapTerrain } from '@engine/voxel/terrain';
 import { TerrainBrush, type BrushOperation } from './TerrainBrush';
 import type { Vec3 } from '@engine/core/math';
 import { Logger } from '../../../utils/logger';
+import type { HeightmapTerrainTool } from './HeightmapTerrainTool';
 
 /**
  * Sculpting operation configuration
@@ -30,9 +31,11 @@ export class TerrainSculptTool {
   private terrainComponent: TerrainComponent | null = null;
   private heightmapTerrain: HeightmapTerrain | null = null;
   private isActive = false;
+  private heightmapTool: HeightmapTerrainTool | null = null;
 
-  constructor(brush?: TerrainBrush) {
+  constructor(brush?: TerrainBrush, heightmapTool?: HeightmapTerrainTool) {
     this.brush = brush ?? new TerrainBrush();
+    this.heightmapTool = heightmapTool ?? null;
   }
 
   /**
@@ -115,7 +118,25 @@ export class TerrainSculptTool {
       return;
     }
 
+    // Validate position
+    if (!worldPosition || !Array.isArray(worldPosition) || worldPosition.length < 3) {
+      Logger.warn('[TerrainSculptTool] Invalid world position');
+      return;
+    }
+
     const { operation, strength, targetHeight } = config;
+
+    // Validate strength
+    if (strength <= 0 || !Number.isFinite(strength)) {
+      Logger.warn('[TerrainSculptTool] Invalid strength:', strength);
+      return;
+    }
+
+    // Validate operation
+    if (!['raise', 'lower', 'smooth', 'flatten', 'pinch'].includes(operation)) {
+      Logger.warn('[TerrainSculptTool] Invalid operation:', operation);
+      return;
+    }
 
     switch (operation) {
       case 'raise':
@@ -128,8 +149,10 @@ export class TerrainSculptTool {
         this.applySmooth(worldPosition, strength);
         break;
       case 'flatten':
-        if (targetHeight !== undefined) {
+        if (targetHeight !== undefined && Number.isFinite(targetHeight)) {
           this.applyFlatten(worldPosition, targetHeight, strength);
+        } else {
+          Logger.warn('[TerrainSculptTool] Flatten operation requires targetHeight');
         }
         break;
       case 'pinch':
@@ -145,9 +168,8 @@ export class TerrainSculptTool {
     if (!this.heightmapTerrain) return;
 
     const brushSize = this.brush.getConfig().size;
-
-    // Get sample points within brush
-    const samplePoints = this.brush.getSamplePoints(position, 0.5); // Sample every 0.5 units
+    const sampleSpacing = Math.max(0.1, Math.min(1.0, brushSize * 0.1));
+    const samplePoints = this.brush.getSamplePoints(position, sampleSpacing, 1000);
 
     for (const point of samplePoints) {
       const currentHeight = this.heightmapTerrain.getHeightAt(point[0], point[2]);
@@ -166,7 +188,8 @@ export class TerrainSculptTool {
     if (!this.heightmapTerrain) return;
 
     const brushSize = this.brush.getConfig().size;
-    const samplePoints = this.brush.getSamplePoints(position, 0.5);
+    const sampleSpacing = Math.max(0.1, Math.min(1.0, brushSize * 0.1));
+    const samplePoints = this.brush.getSamplePoints(position, sampleSpacing, 1000);
 
     for (const point of samplePoints) {
       const currentHeight = this.heightmapTerrain.getHeightAt(point[0], point[2]);
@@ -184,7 +207,8 @@ export class TerrainSculptTool {
     if (!this.heightmapTerrain) return;
 
     const brushSize = this.brush.getConfig().size;
-    const samplePoints = this.brush.getSamplePoints(position, 0.5);
+    const sampleSpacing = Math.max(0.1, Math.min(1.0, brushSize * 0.1));
+    const samplePoints = this.brush.getSamplePoints(position, sampleSpacing, 1000);
 
     // Collect heights and calculate average
     let totalHeight = 0;
@@ -217,7 +241,8 @@ export class TerrainSculptTool {
     if (!this.heightmapTerrain) return;
 
     const brushSize = this.brush.getConfig().size;
-    const samplePoints = this.brush.getSamplePoints(position, 0.5);
+    const sampleSpacing = Math.max(0.1, Math.min(1.0, brushSize * 0.1));
+    const samplePoints = this.brush.getSamplePoints(position, sampleSpacing, 1000);
 
     for (const point of samplePoints) {
       const currentHeight = this.heightmapTerrain.getHeightAt(point[0], point[2]);
@@ -234,7 +259,8 @@ export class TerrainSculptTool {
     if (!this.heightmapTerrain) return;
 
     const brushSize = this.brush.getConfig().size;
-    const samplePoints = this.brush.getSamplePoints(position, 0.5);
+    const sampleSpacing = Math.max(0.1, Math.min(1.0, brushSize * 0.1));
+    const samplePoints = this.brush.getSamplePoints(position, sampleSpacing, 1000);
 
     // Get center height
     const centerHeight = this.heightmapTerrain.getHeightAt(position[0], position[2]);
@@ -270,10 +296,10 @@ export class TerrainSculptTool {
   }
 
   /**
-   * Commits changes to TerrainComponent
+   * Commits changes to TerrainComponent and regenerates mesh
    */
   commitChanges(): void {
-    if (!this.terrainComponent || !this.heightmapTerrain) {
+    if (!this.terrainComponent || !this.heightmapTerrain || !this.terrainEntity) {
       return;
     }
 
@@ -289,6 +315,17 @@ export class TerrainSculptTool {
       if (updatedData.maxHeight !== undefined) {
         this.terrainComponent.terrainData.heightmap.maxHeight = updatedData.maxHeight;
       }
+    }
+
+    // Regenerate mesh if heightmapTool is available
+    if (this.heightmapTool) {
+      try {
+        this.heightmapTool.updateTerrainMesh(this.terrainEntity, this.heightmapTerrain);
+      } catch (error) {
+        Logger.error('[TerrainSculptTool] Failed to regenerate mesh:', error);
+      }
+    } else {
+      Logger.warn('[TerrainSculptTool] No heightmapTool available, mesh not regenerated');
     }
   }
 

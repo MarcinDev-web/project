@@ -23,6 +23,15 @@ export interface AvatarAnimationStopOptions {
 }
 /**
  * Minimal animation player supporting quaternion slerp + vector lerp.
+ *
+ * @deprecated Use AnimationComponent from @engine/stdlib/Animation instead.
+ * This class is kept for backward compatibility but will be removed in a future version.
+ *
+ * Migration guide:
+ * - Instead of `new AvatarAnimationPlayer(skeleton)`, use `AnimationComponent` on the entity
+ * - Use `avatarAnimationToClip()` to convert AvatarAnimation to AnimationClip
+ * - Use `avatarSkeletonToSkeleton()` to convert AvatarSkeleton to Skeleton
+ * - See `packages/avatar/src/animation-adapter.ts` and `packages/avatar/src/animation-converter.ts` for helpers
  */
 export declare class AvatarAnimationPlayer {
     private readonly skeleton;
@@ -36,6 +45,10 @@ export declare class AvatarAnimationPlayer {
     stop(options?: AvatarAnimationStopOptions): void;
     update(deltaTime: number): void;
     onFinished(handler: (event: AvatarAnimationFinishedEvent) => void): Unsubscribe;
+    /**
+     * Get current animation
+     */
+    getCurrentAnimation(): AvatarAnimation | null;
     onceFinished(handler: (event: AvatarAnimationFinishedEvent) => void): Unsubscribe;
     isFinished(): boolean;
     private sampleAndApply;

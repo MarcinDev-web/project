@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Entity } from '@engine/world';
-import { AnimationComponent } from '@engine/stdlib/Animation';
 import { AvatarInstance } from './avatar-instance';
 import { IDLE_ANIMATION, RUN_ANIMATION, WALK_ANIMATION, JUMP_ANIMATION } from './default-animations';
 
@@ -102,7 +101,6 @@ describe('Default Animations', () => {
       
       // Play through one full cycle
       avatar.update(0.8);
-      const afterCycle = avatar.getSkeleton().getLocalTransform('Leg.L.Upper');
       
       // Play through another cycle
       avatar.update(0.8);

@@ -12,6 +12,8 @@ import { profilesApi } from '../api/profiles';
 import { DEFAULT_AVATAR_LOADOUT, type AvatarLoadout } from '@engine/avatar';
 import { AvatarLoadoutMigrator } from '../components/avatar-builder/AvatarLoadoutMigrator';
 import type { AvatarBuilderCore } from '../components/avatar-builder/AvatarBuilderCore';
+import { useDebounce } from '../hooks/useDebounce';
+import { useLoadoutHistory } from '../hooks/useLoadoutHistory';
 
 /**
  * Main Avatar Builder Studio page
@@ -24,6 +26,19 @@ export function AvatarBuilderStudioPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [builderCore, setBuilderCore] = useState<AvatarBuilderCore | null>(null);
   const [validationErrors, setValidationErrors] = useState<string[]>([]);
+  
+  // Loadout history for undo/redo
+  const {
+    pushToHistory,
+    undo,
+    redo,
+    resetHistory,
+    canUndo,
+    canRedo,
+  } = useLoadoutHistory(loadout);
+  
+  // Debounce loadout for validation (300ms delay)
+  const debouncedLoadout = useDebounce(loadout, 300);
 
   // Load saved loadout on mount
   useEffect(() => {
@@ -45,15 +60,20 @@ export function AvatarBuilderStudioPage() {
             // Optionally save migrated loadout back to server
             // await profilesApi.saveAvatarLoadout(user.id, migrationResult.loadout);
           }
-          setLoadout(migrationResult.loadout);
+          const finalLoadout = migrationResult.loadout;
+          setLoadout(finalLoadout);
+          // Reset history after state update
+          setTimeout(() => resetHistory(finalLoadout), 0);
         } else {
           // Explicitly use default loadout when no saved loadout exists (404)
           setLoadout(DEFAULT_AVATAR_LOADOUT);
+          setTimeout(() => resetHistory(DEFAULT_AVATAR_LOADOUT), 0);
         }
       } catch (error) {
         // When loading fails (network error, server error, etc.), use base avatar
         console.error('Failed to load saved avatar loadout:', error);
         setLoadout(DEFAULT_AVATAR_LOADOUT);
+        setTimeout(() => resetHistory(DEFAULT_AVATAR_LOADOUT), 0);
         
         // Only show error toast for non-404 errors (404 means no saved loadout, which is fine)
         const errorMessage = error instanceof Error ? error.message : String(error);
@@ -66,25 +86,36 @@ export function AvatarBuilderStudioPage() {
     };
 
     loadSavedLoadout();
-  }, [user?.id, showToast]);
+  }, [user?.id, showToast, resetHistory]);
 
-  // Validate loadout when builderCore is ready
+  // Validate loadout when builderCore is ready (debounced)
   useEffect(() => {
     if (builderCore) {
-      const validation = builderCore.validateLoadout(loadout);
+      const validation = builderCore.validateLoadout(debouncedLoadout);
       setValidationErrors(validation.valid ? [] : [...validation.errors]);
     }
-  }, [builderCore, loadout]);
+  }, [builderCore, debouncedLoadout]);
 
   const handleLoadoutChange = useCallback((newLoadout: AvatarLoadout) => {
     setLoadout(newLoadout);
-    
-    // Validate loadout when it changes
-    if (builderCore) {
-      const validation = builderCore.validateLoadout(newLoadout);
-      setValidationErrors(validation.valid ? [] : [...validation.errors]);
+    // Push to history for undo/redo
+    pushToHistory(newLoadout);
+    // Validation is handled by debounced effect above
+  }, [pushToHistory]);
+  
+  const handleUndo = useCallback(() => {
+    const previousLoadout = undo();
+    if (previousLoadout) {
+      setLoadout(previousLoadout);
     }
-  }, [builderCore]);
+  }, [undo]);
+  
+  const handleRedo = useCallback(() => {
+    const nextLoadout = redo();
+    if (nextLoadout) {
+      setLoadout(nextLoadout);
+    }
+  }, [redo]);
 
   const handleSave = useCallback(async () => {
     if (!user?.id) {
@@ -118,9 +149,38 @@ export function AvatarBuilderStudioPage() {
 
   const handleReset = useCallback(() => {
     setLoadout(DEFAULT_AVATAR_LOADOUT);
+    resetHistory(DEFAULT_AVATAR_LOADOUT);
     // Clear validation errors on reset
     setValidationErrors([]);
-  }, []);
+  }, [resetHistory]);
+  
+  // Keyboard shortcuts for undo/redo
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Ctrl+Z or Cmd+Z for undo
+      if ((e.ctrlKey || e.metaKey) && e.key === 'z' && !e.shiftKey) {
+        e.preventDefault();
+        if (canUndo) {
+          handleUndo();
+        }
+      }
+      // Ctrl+Shift+Z or Cmd+Shift+Z or Ctrl+Y for redo
+      if (
+        ((e.ctrlKey || e.metaKey) && e.key === 'z' && e.shiftKey) ||
+        ((e.ctrlKey || e.metaKey) && e.key === 'y')
+      ) {
+        e.preventDefault();
+        if (canRedo) {
+          handleRedo();
+        }
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, [canUndo, canRedo, handleUndo, handleRedo]);
 
   if (isLoading) {
     return (
@@ -145,6 +205,10 @@ export function AvatarBuilderStudioPage() {
               isSaving={isSaving}
               builderCore={builderCore}
               validationErrors={validationErrors}
+              onUndo={handleUndo}
+              onRedo={handleRedo}
+              canUndo={canUndo}
+              canRedo={canRedo}
             />
           </div>
           <div className="avatar-builder-viewport">

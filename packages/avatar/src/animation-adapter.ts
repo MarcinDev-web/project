@@ -1,8 +1,8 @@
 import { AnimationClip } from '@engine/stdlib/Animation';
 import type { AnimationTrack } from '@engine/stdlib/Animation';
 import type { Vec3, Quat } from '@engine/core/math';
-import type { AvatarAnimation, AvatarJointName } from './animation';
-import type { AvatarSkeleton } from './skeleton';
+import type { AvatarAnimation } from './animation';
+import type { AvatarJointName } from './skeleton';
 
 /**
  * Converts AvatarAnimation format to AnimationClip format.

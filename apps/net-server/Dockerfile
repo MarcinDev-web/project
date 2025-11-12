@@ -120,6 +120,9 @@ RUN apk add --no-cache --virtual .build-deps python3 make g++ && \
 # Copy generated Prisma client from builder stage
 # Prisma client is generated at apps/net-server/node_modules/.prisma/net-client (relative to prisma folder)
 COPY --from=builder --chown=nodejs:nodejs /app/apps/net-server/node_modules/.prisma ./apps/net-server/node_modules/.prisma
+# Also copy to apps/node_modules for relative path resolution from dist/server.js
+RUN mkdir -p ./apps/node_modules/.prisma && \
+    cp -r ./apps/net-server/node_modules/.prisma/net-client ./apps/node_modules/.prisma/net-client || true
 
 # Copy Prisma migrations for runtime migration execution
 COPY --from=builder --chown=nodejs:nodejs /app/apps/net-server/prisma/migrations ./apps/net-server/prisma/migrations

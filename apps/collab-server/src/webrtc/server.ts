@@ -49,7 +49,8 @@ export async function createWebRTCServer(
     return;
   }
 
-  webrtcServer = new WebRTCTransportServer({
+  try {
+    webrtcServer = new WebRTCTransportServer({
     signalingPort,
     iceServers: getIceServers(),
     logger: {
@@ -112,8 +113,12 @@ export async function createWebRTCServer(
     },
   });
 
-  await webrtcServer.start();
-  console.log(`WebRTC signaling server started on port ${signalingPort}`);
+    await webrtcServer.start();
+    console.log(`WebRTC signaling server started on port ${signalingPort}`);
+  } catch (error) {
+    console.warn(`[WebRTC] WebRTC not available, continuing without WebRTC support:`, error instanceof Error ? error.message : error);
+    webrtcServer = null;
+  }
 }
 
 /**

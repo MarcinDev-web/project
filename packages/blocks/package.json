@@ -21,7 +21,8 @@
     "clean": "rimraf dist"
   },
   "dependencies": {
-    "@engine/core": "workspace:*"
+    "@engine/core": "workspace:*",
+    "@engine/microblocks": "workspace:*"
   },
   "devDependencies": {
     "@engine/test-utils": "workspace:*",

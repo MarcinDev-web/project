@@ -83,6 +83,40 @@
 .avatar-panel-actions {
   display: flex;
   gap: 8px;
+  align-items: center;
+}
+
+.avatar-history-controls {
+  display: flex;
+  gap: 4px;
+  margin-right: 8px;
+}
+
+.btn-icon {
+  padding: 8px 12px;
+  background: var(--bg-subtle, #333333);
+  border: 1px solid var(--border-color, #3a3a3a);
+  border-radius: 4px;
+  color: var(--text-2, #aaaaaa);
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+  transition: all 0.2s;
+  min-width: 36px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.btn-icon:hover:not(:disabled) {
+  background: var(--bg-hover, #3a3a3a);
+  color: var(--text-1, #ffffff);
+  border-color: var(--border-hover, #4a4a4a);
+}
+
+.btn-icon:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
 }
 
 .avatar-panel-tabs {

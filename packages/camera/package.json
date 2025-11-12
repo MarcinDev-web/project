@@ -12,7 +12,7 @@
                     }
                 },
     "scripts":  {
-                    "build":  "echo 'Skipping camera build in production' || tsc -b",
+                    "build":  "tsc -b",
                     "dev":  "tsc --watch",
                     "test":  "vitest run",
                     "test:watch":  "vitest",

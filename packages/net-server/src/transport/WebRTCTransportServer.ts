@@ -15,25 +15,31 @@ type WrtcModule = {
   RTCIceCandidate: typeof RTCIceCandidate;
 };
 
-let RTCPeerConnectionImpl: typeof RTCPeerConnection;
-let RTCSessionDescriptionImpl: typeof RTCSessionDescription;
-let RTCIceCandidateImpl: typeof RTCIceCandidate;
+let RTCPeerConnectionImpl: typeof RTCPeerConnection | undefined;
+let RTCSessionDescriptionImpl: typeof RTCSessionDescription | undefined;
+let RTCIceCandidateImpl: typeof RTCIceCandidate | undefined;
 
-try {
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  const wrtc = require('wrtc') as WrtcModule;
-  RTCPeerConnectionImpl = wrtc.RTCPeerConnection;
-  RTCSessionDescriptionImpl = wrtc.RTCSessionDescription;
-  RTCIceCandidateImpl = wrtc.RTCIceCandidate;
-} catch {
-  if (typeof RTCPeerConnection !== 'undefined') {
-    RTCPeerConnectionImpl = RTCPeerConnection;
-    RTCSessionDescriptionImpl = RTCSessionDescription;
-    RTCIceCandidateImpl = RTCIceCandidate;
-  } else {
-    throw new Error(
-      'RTCPeerConnection not available. Install "wrtc" package or run in browser context.'
-    );
+function loadWebRTCImplementations(): void {
+  if (RTCPeerConnectionImpl) {
+    return; // Already loaded
+  }
+
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const wrtc = require('wrtc') as WrtcModule;
+    RTCPeerConnectionImpl = wrtc.RTCPeerConnection;
+    RTCSessionDescriptionImpl = wrtc.RTCSessionDescription;
+    RTCIceCandidateImpl = wrtc.RTCIceCandidate;
+  } catch {
+    if (typeof RTCPeerConnection !== 'undefined') {
+      RTCPeerConnectionImpl = RTCPeerConnection;
+      RTCSessionDescriptionImpl = RTCSessionDescription;
+      RTCIceCandidateImpl = RTCIceCandidate;
+    } else {
+      throw new Error(
+        'RTCPeerConnection not available. Install "wrtc" package or run in browser context.'
+      );
+    }
   }
 }
 
@@ -71,6 +77,7 @@ export class WebRTCTransportServer implements TransportServer {
   private readonly onConnectionClosed: ((clientId: string) => void) | undefined;
 
   constructor(private readonly options: WebRTCTransportServerOptions) {
+    loadWebRTCImplementations();
     this.logger = createTransportLogger(options.logger);
     this.onDataChannelMessage = options.onDataChannelMessage ?? undefined;
     this.onConnectionClosed = options.onConnectionClosed ?? undefined;
@@ -201,7 +208,7 @@ export class WebRTCTransportServer implements TransportServer {
       const peer = this.peers.get(clientId);
       if (peer && msg.candidate) {
         try {
-          await peer.pc.addIceCandidate(new RTCIceCandidateImpl(msg.candidate));
+          await peer.pc.addIceCandidate(new (RTCIceCandidateImpl!)(msg.candidate));
         } catch (err) {
           this.logger.error('Error adding ICE candidate:', err);
         }
@@ -224,7 +231,7 @@ export class WebRTCTransportServer implements TransportServer {
     }
 
     const iceServers = this.options.iceServers ?? this.defaultIceServers;
-    const pc = new RTCPeerConnectionImpl({ iceServers });
+    const pc = new (RTCPeerConnectionImpl!)({ iceServers });
 
     // Setup timeout for peer connection (Problem 2)
     const connectionTimeout = setTimeout(() => {
@@ -322,7 +329,7 @@ export class WebRTCTransportServer implements TransportServer {
     };
 
     try {
-      await pc.setRemoteDescription(new RTCSessionDescriptionImpl(offer.offer));
+      await pc.setRemoteDescription(new (RTCSessionDescriptionImpl!)(offer.offer));
       const answer = await pc.createAnswer();
       await pc.setLocalDescription(answer);
 

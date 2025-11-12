@@ -23,11 +23,14 @@ import { ShopPage } from './pages/ShopPage';
 import { PurchaseHistoryPage } from './pages/PurchaseHistoryPage';
 import { ShopManagementPage } from './pages/admin/ShopManagementPage';
 import { ForumManagementPage } from './pages/admin/ForumManagementPage';
+import { NewsManagementPage } from './pages/admin/NewsManagementPage';
 import { ForumModerationPage } from './pages/moderator/ForumModerationPage';
 import { AvatarBuilderStudioPage } from './pages/AvatarBuilderStudioPage';
 import { BlocksModelsStudioPage } from './pages/BlocksModelsStudioPage';
 import { StudioPage } from './pages/StudioPage';
 import { SupportPage } from './pages/SupportPage';
+import { TicketDetail } from './components/support/TicketDetail';
+import { SupportManagementPage } from './pages/admin/SupportManagementPage';
 import { NewsPage } from './pages/NewsPage';
 import { ProtectedRoute, AdminRoute, ModeratorRoute } from './components/auth/ProtectedRoute';
 
@@ -153,6 +156,22 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
     ),
   },
   {
+    path: '/admin/news',
+    element: (
+      <AdminRoute>
+        <NewsManagementPage />
+      </AdminRoute>
+    ),
+  },
+  {
+    path: '/admin/support',
+    element: (
+      <AdminRoute>
+        <SupportManagementPage />
+      </AdminRoute>
+    ),
+  },
+  {
     path: '/moderator',
     element: (
       <ModeratorRoute>
@@ -239,6 +258,14 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
   {
     path: '/support',
     element: <SupportPage />,
+  },
+  {
+    path: '/support/tickets/:id',
+    element: (
+      <ProtectedRoute>
+        <TicketDetail />
+      </ProtectedRoute>
+    ),
   },
   {
     path: '/news',

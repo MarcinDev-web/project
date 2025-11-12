@@ -64,6 +64,8 @@ import { NotificationsStorage } from './storage/NotificationsStorage.js';
 import { UserSettingsStorage } from './storage/UserSettingsStorage.js';
 import { ForumStorage } from './storage/ForumStorage.js';
 import { ForumStorageDB } from './storage/ForumStorageDB.js';
+import { SupportStorageDB } from './storage/SupportStorageDB.js';
+import { NewsStorage } from './storage/NewsStorage.js';
 import { ShopStorage } from './storage/ShopStorage.js';
 import { ShopStorageDB } from './storage/ShopStorageDB.js';
 import { AssetStorage } from './storage/AssetStorage.js';
@@ -95,8 +97,10 @@ import { createSettingsRoutes } from './routes/settings.routes.js';
 import { createShopRoutes } from './routes/shop.routes.js';
 import { createStudioRoutes } from './routes/studio.routes.js';
 import { createForumRoutes } from './routes/forum.routes.js';
+import { createSupportRoutes } from './routes/support.routes.js';
 import { createAdminRoutes } from './routes/admin.routes.js';
 import { createGamesRoutes } from './routes/games.routes.js';
+import { createNewsRoutes } from './routes/news.routes.js';
 import type { RouteDependencies } from './routes/index.js';
 
 // Type for Prisma Client (backward compatibility)
@@ -215,6 +219,11 @@ const notificationsStorage = new NotificationsStorage(DATA_DIR);
 const userSettingsStorage = new UserSettingsStorage(DATA_DIR);
 // Use database storage if available, otherwise fallback to JSON
 const forumStorage = dbPool ? new ForumStorageDB(dbPool) : new ForumStorage(DATA_DIR);
+const supportStorage = dbPool ? new SupportStorageDB(dbPool) : null;
+if (!dbPool && !supportStorage) {
+  console.warn('SupportStorage requires PostgreSQL database. Support system will not be available.');
+}
+const newsStorage = new NewsStorage(DATA_DIR);
 const messageHandler = new MessageHandler(messagesStorage, sessionManager);
 const forumHandler = new ForumHandler(sessionManager, forumStorage as unknown as ForumStorage);
 
@@ -467,6 +476,10 @@ void authManager.initialize().then(async () => {
   await notificationsStorage.initialize();
   await userSettingsStorage.initialize();
   await forumStorage.initialize();
+  if (supportStorage) {
+    await supportStorage.initialize();
+  }
+  await newsStorage.initialize();
   console.log('All storage systems initialized');
 
   // Auto-seed marketplace if empty (development only, skip in tests)
@@ -577,6 +590,25 @@ const routeDeps: RouteDependencies = {
   notificationsStorage,
   userSettingsStorage,
   forumStorage: forumStorage as unknown as ForumStorage,
+  supportStorage: supportStorage || (() => {
+    // Return a mock/stub implementation that throws helpful errors
+    return {
+      createTicket: async () => { throw new Error('SupportStorage requires PostgreSQL database. Set DATABASE_URL environment variable.'); },
+      getTicket: async () => null,
+      getTickets: async () => [],
+      updateTicket: async () => null,
+      addMessage: async () => { throw new Error('SupportStorage requires PostgreSQL database. Set DATABASE_URL environment variable.'); },
+      getTicketStats: async () => ({ total: 0, open: 0, inProgress: 0, resolved: 0, closed: 0, byPriority: { low: 0, medium: 0, high: 0, urgent: 0 } }),
+      createFAQ: async () => { throw new Error('SupportStorage requires PostgreSQL database. Set DATABASE_URL environment variable.'); },
+      getFAQ: async () => null,
+      getFAQs: async () => [],
+      updateFAQ: async () => null,
+      deleteFAQ: async () => false,
+      incrementFAQView: async () => {},
+      incrementFAQHelpful: async () => {},
+    };
+  })(),
+  newsStorage,
   shopStorage: shopStorage as unknown as ShopStorage,
   assetStorage: assetStorage as unknown as AssetStorage,
   purchaseStorage: purchaseStorage as unknown as PurchaseStorage,
@@ -669,6 +701,8 @@ await app.register(createSettingsRoutes, { prefix: '/api/settings', dependencies
 await app.register(createShopRoutes, { prefix: '/api/shop', dependencies: routeDeps });
 await app.register(createStudioRoutes, { prefix: '/api/studio', dependencies: routeDeps });
 await app.register(createForumRoutes, { prefix: '/api/forum', dependencies: routeDeps });
+await app.register(createSupportRoutes, { prefix: '/api/support', dependencies: routeDeps });
+await app.register(createNewsRoutes, { prefix: '/api', dependencies: routeDeps });
 await app.register(createAdminRoutes, { prefix: '/api/admin', dependencies: routeDeps });
 
 /**

@@ -300,6 +300,7 @@ export function MessagesTab() {
     const profile = userProfiles.get(userId);
     if (!profile) return `User ${userId.substring(0, 8)}`;
     if (profile.displayName) return profile.displayName;
+    if (profile.username) return profile.username;
     // email is required in PublicUser, so it's always a string
     return (profile.email ?? '').split('@')[0] || `User ${userId.substring(0, 8)}`;
   };

@@ -194,7 +194,7 @@ export function ForumThreadView({ thread, posts, userVote: initialUserVote, onTh
     onThreadUpdate();
   };
 
-  const displayName = userProfile?.displayName || userProfile?.email?.split('@')[0] || `User ${thread.authorId.substring(0, 8)}`;
+  const displayName = userProfile?.displayName || userProfile?.username || userProfile?.email?.split('@')[0] || `User ${thread.authorId.substring(0, 8)}`;
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-4)' }}>

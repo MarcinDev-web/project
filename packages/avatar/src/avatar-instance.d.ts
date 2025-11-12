@@ -1,6 +1,7 @@
 import { Entity } from '@engine/world';
+import { AnimationComponent } from '@engine/stdlib/Animation';
 import { AvatarAnimationPlayer, type AvatarAnimation } from './animation';
-import { type AvatarPartDefinition, type AvatarPartLibrary, type AvatarSlot } from './slots';
+import { type AvatarPartLibrary, type AvatarSlot } from './slots';
 import { AvatarSkeleton } from './skeleton';
 import type { RgbaColor } from '@engine/world';
 export interface AvatarMaterialBinding {
@@ -25,6 +26,7 @@ export interface AvatarInstanceOptions {
     readonly partLibrary?: AvatarPartLibrary;
     readonly loadout?: AvatarLoadout;
     readonly materialResolver?: AvatarMaterialResolver;
+    readonly strictMode?: boolean;
 }
 export declare class AvatarInstance {
     private readonly root;
@@ -39,17 +41,42 @@ export declare class AvatarInstance {
     private readonly colorManager;
     private readonly mountManager;
     private readonly serializer;
+    private readonly strictMode;
     constructor(parent: Entity, options?: AvatarInstanceOptions);
     getRootEntity(): Entity;
     getSkeleton(): AvatarSkeleton;
+    /**
+     * @deprecated Use getAnimationComponent() instead. This method is kept for backward compatibility.
+     */
     getAnimator(): AvatarAnimationPlayer;
+    /**
+     * Get AnimationComponent from the root entity or parent entity.
+     * Returns null if not found.
+     */
+    getAnimationComponent(): AnimationComponent | null;
+    /**
+     * Get or create AnimationComponent for this avatar instance.
+     * If component doesn't exist, creates it on the root entity and configures it with skeleton.
+     */
+    getOrCreateAnimationComponent(): AnimationComponent;
     update(deltaTime: number): void;
+    /**
+     * Synchronize pose from AnimationComponent to AvatarSkeleton.
+     * This bridges the gap between AnimationComponent's generic Skeleton and AvatarSkeleton.
+     */
+    private syncPoseFromAnimationComponent;
     playAnimation(animation: AvatarAnimation, startTime?: number): void;
     stopAnimation(): void;
     dispose(): void;
     applyLoadout(loadout: AvatarLoadout): void;
     setSlot(slot: AvatarSlot, part: AvatarLoadoutPart | null): void;
     serializeLoadout(): AvatarLoadout;
+    /**
+     * Check if an entity is part of this avatar instance hierarchy
+     *
+     * @param entity - Entity to check
+     * @returns True if entity is the root or a descendant of this avatar instance
+     */
     isEntityPartOfAvatar(entity: Entity | null | undefined): boolean;
     /**
      * Set slot visibility (for hiding head in FPS mode, etc.)
@@ -63,8 +90,4 @@ export declare class AvatarInstance {
     private buildSkeletonEntities;
     private resolveDefinition;
 }
-export declare const DEFAULT_AVATAR_PART_DEFINITIONS: readonly AvatarPartDefinition[];
-export declare function createAvatarPartLibrary(definitions: Iterable<AvatarPartDefinition>): AvatarPartLibrary;
-export declare const DEFAULT_AVATAR_PART_LIBRARY: AvatarPartLibrary;
-export declare const DEFAULT_AVATAR_LOADOUT: AvatarLoadout;
 //# sourceMappingURL=avatar-instance.d.ts.map

@@ -29,7 +29,6 @@ export const Footer = memo(function Footer() {
         <div className="footer-section footer-section--right">
           <div className="footer-status">
             <span className="footer-status__dot"></span>
-            <span className="footer-status__text">All systems operational</span>
           </div>
         </div>
       </div>

@@ -38,19 +38,46 @@ export class TerrainBrush {
   private config: BrushConfig;
 
   constructor(config: Partial<BrushConfig> = {}) {
+    const size = config.size ?? 5.0;
+    const intensity = config.intensity ?? 1.0;
+    
+    // Validate and clamp values
+    const validatedSize = Math.max(0.1, Math.min(1000, size));
+    const validatedIntensity = Math.max(0, Math.min(1, intensity));
+    
     this.config = {
-      size: 5.0,
-      intensity: 1.0,
-      falloff: 'smooth',
-      ...config,
+      size: validatedSize,
+      intensity: validatedIntensity,
+      falloff: config.falloff ?? 'smooth',
+      falloffCurve: config.falloffCurve,
     };
   }
 
   /**
-   * Updates brush configuration
+   * Updates brush configuration with validation
    */
   updateConfig(config: Partial<BrushConfig>): void {
-    this.config = { ...this.config, ...config };
+    const updates: Partial<BrushConfig> = {};
+    
+    if (config.size !== undefined) {
+      updates.size = Math.max(0.1, Math.min(1000, config.size));
+    }
+    
+    if (config.intensity !== undefined) {
+      updates.intensity = Math.max(0, Math.min(1, config.intensity));
+    }
+    
+    if (config.falloff !== undefined) {
+      if (['linear', 'smooth', 'spherical'].includes(config.falloff)) {
+        updates.falloff = config.falloff;
+      }
+    }
+    
+    if (config.falloffCurve !== undefined) {
+      updates.falloffCurve = config.falloffCurve;
+    }
+    
+    this.config = { ...this.config, ...updates };
   }
 
   /**
@@ -159,23 +186,43 @@ export class TerrainBrush {
 
   /**
    * Gets sample points within brush radius (for efficient batch processing)
+   * Optimized to limit maximum number of points for performance
    */
-  getSamplePoints(center: Vec3, sampleSpacing: number): Vec3[] {
+  getSamplePoints(center: Vec3, sampleSpacing: number, maxPoints: number = 1000): Vec3[] {
     const { size } = this.config;
     const points: Vec3[] = [];
 
-    const steps = Math.ceil((size * 2) / sampleSpacing);
+    // Validate inputs
+    if (sampleSpacing <= 0 || !Number.isFinite(sampleSpacing)) {
+      return points;
+    }
+
+    // Calculate optimal sample spacing if too many points would be generated
+    const estimatedPoints = Math.ceil((size * 2) / sampleSpacing) ** 2;
+    let effectiveSpacing = sampleSpacing;
+    
+    if (estimatedPoints > maxPoints) {
+      // Increase spacing to limit points
+      effectiveSpacing = (size * 2) / Math.sqrt(maxPoints);
+    }
+
+    const steps = Math.ceil((size * 2) / effectiveSpacing);
     const halfSteps = Math.floor(steps / 2);
 
     for (let z = -halfSteps; z <= halfSteps; z++) {
       for (let x = -halfSteps; x <= halfSteps; x++) {
-        const worldX = center[0] + x * sampleSpacing;
-        const worldZ = center[2] + z * sampleSpacing;
+        const worldX = center[0] + x * effectiveSpacing;
+        const worldZ = center[2] + z * effectiveSpacing;
         const point: Vec3 = [worldX, center[1], worldZ];
 
         const distance = distanceVec3(center, point);
         if (distance <= size) {
           points.push(point);
+          
+          // Hard limit to prevent excessive memory usage
+          if (points.length >= maxPoints) {
+            return points;
+          }
         }
       }
     }

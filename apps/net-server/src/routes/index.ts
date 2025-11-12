@@ -16,6 +16,8 @@ import type { BlockedUsersStorage } from '../storage/BlockedUsersStorage.js';
 import type { NotificationsStorage } from '../storage/NotificationsStorage.js';
 import type { UserSettingsStorage } from '../storage/UserSettingsStorage.js';
 import type { ForumStorage } from '../storage/ForumStorage.js';
+import type { SupportStorage } from '../storage/SupportStorage.js';
+import type { NewsStorage } from '../storage/NewsStorage.js';
 import type { ShopStorage } from '../storage/ShopStorage.js';
 import type { AssetStorage } from '../storage/AssetStorage.js';
 import type { PurchaseStorage } from '../storage/PurchaseStorage.js';
@@ -57,6 +59,8 @@ export interface RouteDependencies {
   notificationsStorage: NotificationsStorage;
   userSettingsStorage: UserSettingsStorage;
   forumStorage: ForumStorage;
+  supportStorage: SupportStorage;
+  newsStorage: NewsStorage;
   shopStorage: ShopStorage;
   assetStorage: AssetStorage;
   purchaseStorage: PurchaseStorage;

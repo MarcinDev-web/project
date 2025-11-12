@@ -153,7 +153,7 @@ export class AvatarInstance {
     return component;
   }
 
-  update(deltaTime: number): void {
+  update(_deltaTime: number): void {
     // AnimationComponent is updated by AnimationSystem, so we don't need to call animator.update()
     // But we keep it for backward compatibility if someone is using the old animator directly
     // this.animator.update(deltaTime); // Removed - AnimationSystem handles this
@@ -179,6 +179,7 @@ export class AvatarInstance {
     const jointNames = this.skeleton.getJointNames();
     for (let i = 0; i < jointNames.length; i++) {
       const jointName = jointNames[i];
+      if (!jointName) continue;
       const boneIndex = component.skeleton.findBoneIndex(jointName);
       if (boneIndex === -1) continue;
       
@@ -195,7 +196,7 @@ export class AvatarInstance {
     }
   }
 
-  playAnimation(animation: AvatarAnimation, startTime = 0): void {
+  playAnimation(animation: AvatarAnimation, _startTime = 0): void {
     const component = this.getOrCreateAnimationComponent();
     const clip = avatarAnimationToClip(animation);
     

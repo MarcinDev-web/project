@@ -1,5 +1,6 @@
 import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { ForumCategory } from '../storage/ForumStorage.js';
+import type { NewsItem } from '../storage/NewsStorage.js';
 import type { RouteDependencies } from './index.js';
 
 /**
@@ -24,6 +25,7 @@ export async function createAdminRoutes(
     shopStorage,
     assetStorage,
     purchaseStorage,
+    newsStorage,
   } = opts.dependencies;
 
   // ========================================
@@ -1298,6 +1300,242 @@ export async function createAdminRoutes(
         console.error('Admin purge forum error:', error);
         reply.code(500).send({
           error: 'Failed to purge forum',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  );
+
+  // ========================================
+  // ADMIN NEWS ENDPOINTS
+  // ========================================
+
+  // Get all news items (with pagination and filters)
+  app.get(
+    '/admin/news',
+    { preHandler: [authMiddleware, requireAdmin()] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
+        }
+
+        const query = request.query as {
+          limit?: string | number;
+          offset?: string | number;
+          published?: string;
+          authorId?: string;
+          search?: string;
+        };
+        const limit = query.limit ? parseInt(String(query.limit), 10) : 50;
+        const offset = query.offset ? parseInt(String(query.offset), 10) : 0;
+        const published = query.published === undefined ? undefined : query.published === 'true';
+        const authorId = query.authorId;
+        const search = query.search;
+
+        const result = await newsStorage.getNews({
+          limit,
+          offset,
+          published,
+          authorId,
+          search,
+        });
+
+        // Enrich with author names
+        const enrichedNews = await Promise.all(
+          result.news.map(async (item) => {
+            const profile = await profileStorage.getProfile(item.authorId);
+            return {
+              ...item,
+              authorName: profile?.username || item.authorId,
+            };
+          })
+        );
+
+        reply.send({
+          news: enrichedNews,
+          total: result.total,
+          page: Math.floor(offset / limit) + 1,
+          pageSize: limit,
+        });
+      } catch (error) {
+        console.error('Get admin news error:', error);
+        reply.code(500).send({
+          error: 'Failed to get news',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  );
+
+  // Get single news item
+  app.get<{ Params: { id: string } }>(
+    '/admin/news/:id',
+    { preHandler: [authMiddleware, requireAdmin()] },
+    async (request, reply) => {
+      try {
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
+        }
+
+        const { id } = request.params;
+        const newsItem = await newsStorage.getNewsItem(id);
+
+        if (!newsItem) {
+          return reply.code(404).send({ error: 'News item not found' });
+        }
+
+        // Enrich with author name
+        const profile = await profileStorage.getProfile(newsItem.authorId);
+        reply.send({
+          ...newsItem,
+          authorName: profile?.username || newsItem.authorId,
+        });
+      } catch (error) {
+        console.error('Get admin news item error:', error);
+        reply.code(500).send({
+          error: 'Failed to get news item',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  );
+
+  // Create news item
+  app.post(
+    '/admin/news',
+    { preHandler: [authMiddleware, requireAdmin()] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
+        }
+
+        const body = request.body as {
+          title: string;
+          content: string;
+          excerpt?: string;
+          published?: boolean;
+          tags?: string[];
+          imageUrl?: string;
+        };
+
+        if (!body.title || !body.content) {
+          return reply.code(400).send({ error: 'Title and content are required' });
+        }
+
+        const newsItem = await newsStorage.createNewsItem({
+          title: body.title,
+          content: body.content,
+          excerpt: body.excerpt,
+          authorId: request.user.id,
+          published: body.published ?? false,
+          tags: body.tags,
+          imageUrl: body.imageUrl,
+        });
+
+        // Enrich with author name
+        const profile = await profileStorage.getProfile(newsItem.authorId);
+        reply.code(201).send({
+          ...newsItem,
+          authorName: profile?.username || newsItem.authorId,
+        });
+      } catch (error) {
+        console.error('Create admin news error:', error);
+        reply.code(500).send({
+          error: 'Failed to create news',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  );
+
+  // Update news item
+  app.put<{ Params: { id: string } }>(
+    '/admin/news/:id',
+    { preHandler: [authMiddleware, requireAdmin()] },
+    async (request, reply) => {
+      try {
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
+        }
+
+        const { id } = request.params;
+        const body = request.body as {
+          title?: string;
+          content?: string;
+          excerpt?: string;
+          published?: boolean;
+          tags?: string[];
+          imageUrl?: string;
+        };
+
+        const updated = await newsStorage.updateNewsItem(id, body);
+
+        if (!updated) {
+          return reply.code(404).send({ error: 'News item not found' });
+        }
+
+        // Enrich with author name
+        const profile = await profileStorage.getProfile(updated.authorId);
+        reply.send({
+          ...updated,
+          authorName: profile?.username || updated.authorId,
+        });
+      } catch (error) {
+        console.error('Update admin news error:', error);
+        reply.code(500).send({
+          error: 'Failed to update news',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  );
+
+  // Delete news item
+  app.delete<{ Params: { id: string } }>(
+    '/admin/news/:id',
+    { preHandler: [authMiddleware, requireAdmin()] },
+    async (request, reply) => {
+      try {
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
+        }
+
+        const { id } = request.params;
+        const deleted = await newsStorage.deleteNewsItem(id);
+
+        if (!deleted) {
+          return reply.code(404).send({ error: 'News item not found' });
+        }
+
+        reply.code(204).send();
+      } catch (error) {
+        console.error('Delete admin news error:', error);
+        reply.code(500).send({
+          error: 'Failed to delete news',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  );
+
+  // Get news statistics
+  app.get(
+    '/admin/news/stats',
+    { preHandler: [authMiddleware, requireAdmin()] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
+        }
+
+        const stats = await newsStorage.getNewsStats();
+        reply.send(stats);
+      } catch (error) {
+        console.error('Get admin news stats error:', error);
+        reply.code(500).send({
+          error: 'Failed to get news stats',
           message: error instanceof Error ? error.message : String(error),
         });
       }

@@ -109,7 +109,7 @@ export function PostCard({ post, threadAuthorId, onUpdate, onReply }: PostCardPr
     }
   };
 
-  const displayName = userProfile?.displayName || userProfile?.email?.split('@')[0] || `User ${post.authorId.substring(0, 8)}`;
+  const displayName = userProfile?.displayName || userProfile?.username || userProfile?.email?.split('@')[0] || `User ${post.authorId.substring(0, 8)}`;
   const isOP = threadAuthorId === post.authorId;
   const canEdit = user && (user.id === post.authorId || user.role === 'admin' || user.role === 'moderator');
 

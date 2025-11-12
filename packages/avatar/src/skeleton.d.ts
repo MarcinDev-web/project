@@ -50,18 +50,55 @@ export declare class AvatarSkeleton {
     private readonly nameToIndex;
     private readonly jointNames;
     private worldDirty;
+    private readonly jointDirty;
     constructor(definitions?: readonly AvatarJointDefinition[]);
     resetPose(): void;
+    /**
+     * Mark all joints as dirty (for full sync).
+     */
+    markAllDirty(): void;
+    /**
+     * Check if a joint is dirty.
+     */
+    isJointDirty(name: AvatarJointName): boolean;
+    /**
+     * Mark a joint as clean (not dirty).
+     */
+    markJointClean(name: AvatarJointName): void;
+    /**
+     * Get all dirty joint names.
+     */
+    getDirtyJoints(): readonly AvatarJointName[];
     getJointNames(): readonly AvatarJointName[];
     getParent(name: AvatarJointName): AvatarJointName | null;
+    /**
+     * Get local transform (position and rotation) for a joint.
+     *
+     * Returns pooled Vec3/Quat that may be reused. If you need to keep the values
+     * long-term, clone them immediately after calling this method.
+     *
+     * @param name - Joint name
+     * @returns Transform with pooled Vec3/Quat (clone if keeping long-term)
+     */
     getLocalTransform(name: AvatarJointName): AvatarJointTransform;
     setLocalPosition(name: AvatarJointName, position: Vec3): void;
     setLocalRotation(name: AvatarJointName, rotation: Quat): void;
     applyLocalPose(pose: Partial<Record<AvatarJointName, Partial<AvatarJointTransform>>>): void;
+    /**
+     * Get world transform (position and rotation) for a joint.
+     *
+     * Returns pooled Vec3/Quat that may be reused. If you need to keep the values
+     * long-term, clone them immediately after calling this method.
+     *
+     * @param name - Joint name
+     * @returns Transform with pooled Vec3/Quat (clone if keeping long-term)
+     */
     getWorldTransform(name: AvatarJointName): AvatarJointTransform;
     getWorldMatrix(name: AvatarJointName, out?: Mat4): Mat4;
     forEachJoint(callback: (name: AvatarJointName, parent: AvatarJointName | null) => void): void;
     private getJoint;
+    private markJointDirty;
+    private markDescendantsDirty;
     private updateWorldTransforms;
 }
 //# sourceMappingURL=skeleton.d.ts.map

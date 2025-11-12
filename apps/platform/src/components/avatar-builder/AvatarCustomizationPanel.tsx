@@ -19,6 +19,10 @@ export interface AvatarCustomizationPanelProps {
   isSaving?: boolean;
   builderCore?: AvatarBuilderCore | null;
   validationErrors?: string[];
+  onUndo?: () => void;
+  onRedo?: () => void;
+  canUndo?: boolean;
+  canRedo?: boolean;
 }
 
 /**
@@ -32,6 +36,10 @@ export function AvatarCustomizationPanel({
   isSaving = false,
   builderCore,
   validationErrors = [],
+  onUndo,
+  onRedo,
+  canUndo = false,
+  canRedo = false,
 }: AvatarCustomizationPanelProps) {
   const [selectedSlot, setSelectedSlot] = useState<AvatarSlot | null>(null);
   const [activeTab, setActiveTab] = useState<'parts' | 'colors' | 'materials'>('parts');
@@ -110,6 +118,24 @@ export function AvatarCustomizationPanel({
           </div>
         )}
         <div className="avatar-panel-actions">
+          <div className="avatar-history-controls">
+            <button 
+              onClick={onUndo} 
+              disabled={!canUndo || isSaving} 
+              className="btn-icon"
+              title="Undo (Ctrl+Z)"
+            >
+              ↶
+            </button>
+            <button 
+              onClick={onRedo} 
+              disabled={!canRedo || isSaving} 
+              className="btn-icon"
+              title="Redo (Ctrl+Y)"
+            >
+              ↷
+            </button>
+          </div>
           <button onClick={onReset} disabled={isSaving} className="btn-secondary">
             Reset
           </button>

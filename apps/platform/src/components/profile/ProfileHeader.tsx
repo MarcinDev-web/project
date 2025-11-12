@@ -25,7 +25,7 @@ export const ProfileHeader = memo(function ProfileHeader({
   socialStats,
   onFriendshipChanged,
 }: ProfileHeaderProps) {
-  const displayName = profile.displayName ?? profile.email;
+  const displayName = profile.displayName ?? profile.username ?? profile.email.split('@')[0];
   const memberSince = new Date(profile.createdAt).toLocaleDateString('pl-PL', {
     year: 'numeric',
     month: 'long',

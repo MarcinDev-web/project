@@ -8,3 +8,6 @@
 export * from './BlockLibrary';
 export * from './types';
 export * from './palette';
+export * from './ModelBuilder';
+export * from './ModelBuilderTypes';
+export * from './BlockDefinitionGenerator';

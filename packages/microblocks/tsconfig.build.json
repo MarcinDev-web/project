@@ -1,0 +1,27 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "rootDir": "./src",
+    "skipLibCheck": true,
+    "paths": {
+      "@engine/core": ["../core/dist"],
+      "@engine/core/*": ["../core/dist/*"],
+      "@engine/world": ["../world/dist"],
+      "@engine/world/*": ["../world/dist/*"]
+    }
+  },
+  "include": ["src/**/*.ts"],
+  "exclude": [
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "**/__tests__/**",
+    "__tests__",
+    "dist",
+    "node_modules",
+    "**/test-utils",
+    "src/**/*.test.ts",
+    "src/**/*.spec.ts"
+  ]
+}
+

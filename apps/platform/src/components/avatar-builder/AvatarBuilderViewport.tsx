@@ -26,10 +26,12 @@ export function AvatarBuilderViewport({
   const coreRef = useRef<AvatarBuilderCore | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [retryKey, setRetryKey] = useState(0); // Force re-initialization on retry
   const statusRef = useRef<HTMLDivElement>(null);
   // Track last applied loadout to prevent infinite loops when applying external updates
   const lastLoadoutRef = useRef<AvatarLoadout | undefined>(initialLoadout);
 
+  // Initialize or re-initialize WebGPU
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) {
@@ -44,6 +46,16 @@ export function AvatarBuilderViewport({
       try {
         setIsInitializing(true);
         setError(null);
+
+        // Cleanup previous core if exists
+        if (coreRef.current) {
+          try {
+            coreRef.current.dispose();
+          } catch (e) {
+            console.warn('Error disposing previous core:', e);
+          }
+          coreRef.current = null;
+        }
 
         const options: AvatarBuilderCoreOptions = {
           canvas,
@@ -76,11 +88,16 @@ export function AvatarBuilderViewport({
     return () => {
       mounted = false;
       if (coreRef.current) {
-        coreRef.current.dispose();
+        try {
+          coreRef.current.dispose();
+        } catch (e) {
+          console.warn('Error disposing core on unmount:', e);
+        }
         coreRef.current = null;
       }
     };
-  }, []); // Only run once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [retryKey]); // Only re-run on retry (intentional - we want stable callbacks)
 
   // Update core when loadout changes externally (from parent)
   // This effect only runs when initialLoadout prop changes from parent state
@@ -174,8 +191,8 @@ export function AvatarBuilderViewport({
             WebGPU Error
           </div>
           <div style={{ marginBottom: '16px', lineHeight: '1.5' }}>{error}</div>
-          {error.includes('WebGPU not supported') && (
-            <div style={{ fontSize: '14px', opacity: 0.9, marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.3)' }}>
+          {error.includes('WebGPU not supported') ? (
+            <div style={{ fontSize: '14px', opacity: '0.9', marginTop: '12px', paddingTop: '12px', borderTop: '1px solid rgba(255,255,255,0.3)' }}>
               <div style={{ marginBottom: '8px' }}>
                 <strong>WebGPU requires:</strong>
               </div>
@@ -183,9 +200,45 @@ export function AvatarBuilderViewport({
                 <div>• Chrome 113+, Edge 113+, or Opera 99+</div>
                 <div>• Firefox 110+ (experimental)</div>
                 <div>• Safari 18.0+ (macOS/iOS)</div>
-                <div style={{ marginTop: '8px', opacity: 0.8 }}>
+                <div style={{ marginTop: '8px', opacity: '0.8' }}>
                   Please update your browser or try a different browser.
                 </div>
+              </div>
+            </div>
+          ) : (
+            <div style={{ marginTop: '16px', paddingTop: '16px', borderTop: '1px solid rgba(255,255,255,0.3)' }}>
+              <button
+                onClick={() => {
+                  setRetryKey((prev) => prev + 1);
+                  setError(null);
+                }}
+                disabled={isInitializing}
+                style={{
+                  padding: '10px 20px',
+                  background: isInitializing ? 'rgba(255,255,255,0.3)' : 'rgba(255,255,255,0.2)',
+                  color: 'white',
+                  border: '1px solid rgba(255,255,255,0.4)',
+                  borderRadius: '6px',
+                  fontSize: '14px',
+                  fontWeight: '500',
+                  cursor: isInitializing ? 'not-allowed' : 'pointer',
+                  transition: 'all 0.2s',
+                }}
+                onMouseEnter={(e) => {
+                  if (!isInitializing) {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.3)';
+                  }
+                }}
+                onMouseLeave={(e) => {
+                  if (!isInitializing) {
+                    e.currentTarget.style.background = 'rgba(255,255,255,0.2)';
+                  }
+                }}
+              >
+                {isInitializing ? 'Retrying...' : 'Retry'}
+              </button>
+              <div style={{ fontSize: '13px', opacity: '0.8', marginTop: '12px' }}>
+                If the problem persists, try refreshing the page or updating your browser.
               </div>
             </div>
           )}

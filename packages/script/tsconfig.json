@@ -17,9 +17,9 @@
       "@engine/core/*": ["../core/dist/*"],
       "@engine/world": ["../world/dist"],
       "@engine/world/*": ["../world/dist/*"],
-      "@engine/stdlib/Animation": ["../stdlib/dist/Animation"],
-      "@engine/stdlib": ["../stdlib/dist"],
-      "@engine/stdlib/*": ["../stdlib/dist/*"]
+      "@engine/stdlib/Animation": ["../stdlib/dist/stdlib/src/Animation"],
+      "@engine/stdlib": ["../stdlib/dist/stdlib/src"],
+      "@engine/stdlib/*": ["../stdlib/dist/stdlib/src/*"]
     }
   },
   "include": ["src/**/*"],

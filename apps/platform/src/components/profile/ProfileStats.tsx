@@ -7,6 +7,7 @@ interface ProfileStatsProps {
   socialStats: ProfileSocialStats | null;
   userId: string;
   loading?: boolean;
+  isOwnProfile?: boolean;
 }
 
 /**
@@ -24,8 +25,9 @@ export const ProfileStats = memo(function ProfileStats({
   socialStats,
   userId,
   loading = false,
+  isOwnProfile = false,
 }: ProfileStatsProps) {
-  if (loading || !socialStats) {
+  if (loading) {
     return (
       <Card hoverable={false}>
         <div style={{ 
@@ -55,7 +57,62 @@ export const ProfileStats = memo(function ProfileStats({
     );
   }
 
-  const stats = [
+  if (!socialStats) {
+    return null;
+  }
+
+  const renderStatCard = (
+    label: string,
+    value: number,
+    icon: string,
+    link?: string
+  ) => {
+    const content = (
+      <div 
+        style={{ 
+          textAlign: 'center',
+          cursor: link ? 'pointer' : 'default',
+        }}
+      >
+        <div style={{ 
+          fontSize: 'var(--text-2xl)',
+          marginBottom: 'var(--spacing-2)',
+        }}>
+          {icon}
+        </div>
+        <div style={{ 
+          fontSize: 'var(--text-2xl)',
+          fontWeight: 'var(--font-bold)',
+          color: 'var(--text-1)',
+          marginBottom: 'var(--spacing-1)',
+        }}>
+          {value.toLocaleString('pl-PL')}
+        </div>
+        <div style={{ 
+          fontSize: 'var(--text-sm)',
+          color: 'var(--text-2)',
+        }}>
+          {label}
+        </div>
+      </div>
+    );
+
+    if (link && value > 0) {
+      return (
+        <Link 
+          key={label}
+          to={link}
+          style={{ textDecoration: 'none' }}
+        >
+          {content}
+        </Link>
+      );
+    }
+
+    return <div key={label}>{content}</div>;
+  };
+
+  const basicStats = [
     {
       label: 'Znajomi',
       value: socialStats.friendsCount,
@@ -95,59 +152,98 @@ export const ProfileStats = memo(function ProfileStats({
   ];
 
   return (
-    <Card hoverable={false}>
-      <div style={{ 
-        display: 'grid', 
-        gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
-        gap: 'var(--spacing-4)',
-      }}>
-        {stats.map((stat) => {
-          const content = (
-            <div 
-              key={stat.label}
-              style={{ 
-                textAlign: 'center',
-                cursor: stat.link ? 'pointer' : 'default',
-              }}
-            >
-              <div style={{ 
-                fontSize: 'var(--text-2xl)',
-                marginBottom: 'var(--spacing-2)',
-              }}>
-                {stat.icon}
-              </div>
-              <div style={{ 
-                fontSize: 'var(--text-2xl)',
-                fontWeight: 'var(--font-bold)',
+    <div>
+      {/* Basic Stats */}
+      <Card hoverable={false} style={{ marginBottom: isOwnProfile ? 'var(--spacing-6)' : 0 }}>
+        <div style={{ 
+          display: 'grid', 
+          gridTemplateColumns: 'repeat(auto-fit, minmax(120px, 1fr))',
+          gap: 'var(--spacing-4)',
+        }}>
+          {basicStats.map((stat) => renderStatCard(stat.label, stat.value, stat.icon, stat.link))}
+        </div>
+      </Card>
+
+      {/* Extended Stats - Only for own profile */}
+      {isOwnProfile && socialStats && (
+        <>
+          {/* Marketplace Detailed Stats */}
+          {socialStats.marketplaceStats && (
+            <Card hoverable={false} style={{ marginBottom: 'var(--spacing-6)' }}>
+              <h3 style={{ 
+                marginTop: 0,
+                marginBottom: 'var(--spacing-4)',
                 color: 'var(--text-1)',
-                marginBottom: 'var(--spacing-1)',
+                fontSize: 'var(--text-lg)',
+                fontWeight: 'var(--font-semibold)',
               }}>
-                {stat.value.toLocaleString('pl-PL')}
-              </div>
+                Marketplace - Szczegóły
+              </h3>
               <div style={{ 
-                fontSize: 'var(--text-sm)',
-                color: 'var(--text-2)',
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                gap: 'var(--spacing-4)',
               }}>
-                {stat.label}
+                {renderStatCard('Buildy', socialStats.marketplaceStats.buildsCount, '🏗️', `/marketplace?type=build&author=${userId}`)}
+                {renderStatCard('Avatary', socialStats.marketplaceStats.avatarsCount, '👤', `/marketplace?type=avatar&author=${userId}`)}
+                {renderStatCard('Polubienia buildów', socialStats.marketplaceStats.buildsLikes, '❤️')}
+                {renderStatCard('Pobrania buildów', socialStats.marketplaceStats.buildsDownloads, '⬇️')}
+                {renderStatCard('Polubienia avatarów', socialStats.marketplaceStats.avatarsLikes, '❤️')}
+                {renderStatCard('Pobrania avatarów', socialStats.marketplaceStats.avatarsDownloads, '⬇️')}
               </div>
-            </div>
-          );
+            </Card>
+          )}
 
-          if (stat.link && stat.value > 0) {
-            return (
-              <Link 
-                key={stat.label}
-                to={stat.link}
-                style={{ textDecoration: 'none' }}
-              >
-                {content}
-              </Link>
-            );
-          }
+          {/* Blocks Stats */}
+          {socialStats.blocksStats && (
+            <Card hoverable={false} style={{ marginBottom: 'var(--spacing-6)' }}>
+              <h3 style={{ 
+                marginTop: 0,
+                marginBottom: 'var(--spacing-4)',
+                color: 'var(--text-1)',
+                fontSize: 'var(--text-lg)',
+                fontWeight: 'var(--font-semibold)',
+              }}>
+                Bloki/Modele
+              </h3>
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                gap: 'var(--spacing-4)',
+              }}>
+                {renderStatCard('Zapisane', socialStats.blocksStats.saved, '📦', '/studio')}
+                {renderStatCard('Opublikowane', socialStats.blocksStats.published, '🌐')}
+                {renderStatCard('Użycia', socialStats.blocksStats.totalUses, '🔄')}
+              </div>
+            </Card>
+          )}
 
-          return content;
-        })}
-      </div>
-    </Card>
+          {/* Avatars Stats */}
+          {socialStats.avatarsStats && (
+            <Card hoverable={false} style={{ marginBottom: 'var(--spacing-6)' }}>
+              <h3 style={{ 
+                marginTop: 0,
+                marginBottom: 'var(--spacing-4)',
+                color: 'var(--text-1)',
+                fontSize: 'var(--text-lg)',
+                fontWeight: 'var(--font-semibold)',
+              }}>
+                Avatary
+              </h3>
+              <div style={{ 
+                display: 'grid', 
+                gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+                gap: 'var(--spacing-4)',
+              }}>
+                {renderStatCard('Zapisane presety', socialStats.avatarsStats.savedPresets, '💾', '/studio')}
+                {renderStatCard('Opublikowane', socialStats.avatarsStats.published, '🌐', `/marketplace?type=avatar&author=${userId}`)}
+                {renderStatCard('Pobrania', socialStats.avatarsStats.totalDownloads, '⬇️')}
+                {renderStatCard('Polubienia', socialStats.avatarsStats.totalLikes, '❤️')}
+              </div>
+            </Card>
+          )}
+        </>
+      )}
+    </div>
   );
 });

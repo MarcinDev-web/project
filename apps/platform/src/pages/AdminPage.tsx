@@ -43,6 +43,18 @@ export function AdminPage() {
       link: '/admin/forum',
       icon: '💬',
     },
+    {
+      title: 'News Management',
+      description: 'Create and manage news articles',
+      link: '/admin/news',
+      icon: '📰',
+    },
+    {
+      title: 'Support Management',
+      description: 'Manage support tickets and FAQ',
+      link: '/admin/support',
+      icon: '🎫',
+    },
   ];
 
   return (

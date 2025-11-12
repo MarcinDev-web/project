@@ -56,7 +56,6 @@ export const NavBar = memo(function NavBar() {
               size="small"
               onClick={() => window.location.href = '/register'}
             >
-              <span>🚀</span>
               <span>Get Started</span>
             </Button>
           </>

@@ -1541,6 +1541,54 @@ export async function createMarketplaceRoutes(
     }
   });
 
+  /**
+   * POST /api/marketplace/admin/regenerate-thumbnails
+   * Regenerate all marketplace item thumbnails (admin only)
+   */
+  app.post(
+    '/admin/regenerate-thumbnails',
+    { preHandler: [authMiddleware] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        // Check if user is admin
+        if (request.user?.role !== 'admin') {
+          return reply.code(403).send({ error: 'Admin access required' });
+        }
+
+        // Get all marketplace items
+        const allItems = await marketplaceStorage.getItems({});
+        
+        let regenerated = 0;
+        let failed = 0;
+
+        for (const item of allItems) {
+          try {
+            await generateAndSaveThumbnail(THUMBNAIL_DIR, item.id, item.title, item.tags || [], item.type);
+            const thumbnailUrl = `/api/marketplace/thumbnails/${item.id}`;
+            await marketplaceStorage.updateItem(item.id, { thumbnailUrl });
+            regenerated++;
+          } catch (error) {
+            console.warn(`Failed to regenerate thumbnail for item ${item.id}:`, error);
+            failed++;
+          }
+        }
+
+        reply.send({
+          success: true,
+          regenerated,
+          failed,
+          total: allItems.length,
+        });
+      } catch (error) {
+        console.error('Error regenerating thumbnails:', error);
+        reply.code(500).send({
+          error: 'Failed to regenerate thumbnails',
+          message: error instanceof Error ? error.message : 'Unknown error',
+        });
+      }
+    }
+  );
+
 }
 
 

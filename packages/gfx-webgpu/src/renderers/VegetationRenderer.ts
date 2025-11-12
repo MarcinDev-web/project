@@ -946,7 +946,7 @@ fn fragmentMain(
       indexCount: number;
     },
     modelUrl: string
-  ): void {
+  ): Promise<void> {
     if (!this.device || !this.model3DPipeline) {
       return;
     }

@@ -349,5 +349,92 @@ export const adminApi = {
   }> {
     return apiClient.post('/admin/forum/purge');
   },
+
+  /**
+   * Get all news items (admin)
+   */
+  async getNews(params?: {
+    limit?: number;
+    offset?: number;
+    published?: boolean;
+    authorId?: string;
+    search?: string;
+  }): Promise<{
+    news: NewsItem[];
+    total: number;
+    page: number;
+    pageSize: number;
+  }> {
+    const query = new URLSearchParams();
+    if (params?.limit) query.set('limit', params.limit.toString());
+    if (params?.offset) query.set('offset', params.offset.toString());
+    if (params?.published !== undefined) query.set('published', params.published.toString());
+    if (params?.authorId) query.set('authorId', params.authorId);
+    if (params?.search) query.set('search', params.search);
+
+    return apiClient.get(`/admin/news?${query.toString()}`);
+  },
+
+  /**
+   * Get single news item (admin)
+   */
+  async getNewsItem(id: string): Promise<NewsItem> {
+    return apiClient.get(`/admin/news/${id}`);
+  },
+
+  /**
+   * Create news item (admin)
+   */
+  async createNewsItem(data: {
+    title: string;
+    content: string;
+    excerpt?: string;
+    published?: boolean;
+    tags?: string[];
+    imageUrl?: string;
+  }): Promise<NewsItem> {
+    return apiClient.post('/admin/news', data);
+  },
+
+  /**
+   * Update news item (admin)
+   */
+  async updateNewsItem(id: string, updates: Partial<NewsItem>): Promise<NewsItem> {
+    return apiClient.put(`/admin/news/${id}`, updates);
+  },
+
+  /**
+   * Delete news item (admin)
+   */
+  async deleteNewsItem(id: string): Promise<void> {
+    return apiClient.delete(`/admin/news/${id}`);
+  },
+
+  /**
+   * Get news statistics (admin)
+   */
+  async getNewsStats(): Promise<{
+    total: number;
+    published: number;
+    draft: number;
+    last30Days: number;
+  }> {
+    return apiClient.get('/admin/news/stats');
+  },
 };
+
+export interface NewsItem {
+  id: string;
+  title: string;
+  content: string;
+  excerpt?: string;
+  authorId: string;
+  authorName?: string;
+  published: boolean;
+  publishedAt?: number;
+  createdAt: number;
+  updatedAt: number;
+  tags?: string[];
+  imageUrl?: string;
+}
 

@@ -60,7 +60,12 @@ export const ProfileActivitySection = memo(function ProfileActivitySection({
     );
   }
 
-  if (!activity || (activity.recentThreads.length === 0 && activity.recentPosts.length === 0)) {
+  // Don't render if activity is null (not loaded yet or error)
+  if (!activity) {
+    return null;
+  }
+
+  if (activity.recentThreads?.length === 0 && activity.recentPosts?.length === 0) {
     return (
       <Card hoverable={false}>
         <h2 style={{ 

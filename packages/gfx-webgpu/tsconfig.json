@@ -20,8 +20,8 @@
       "@engine/voxel/*": ["../voxel/dist/*"],
       "@engine/world-server": ["../world-server/dist"],
       "@engine/world-server/*": ["../world-server/dist/*"],
-      "@engine/script": ["../script/dist"],
-      "@engine/script/*": ["../script/dist/*"],
+      "@engine/script": ["../script/dist/src"],
+      "@engine/script/*": ["../script/dist/src/*"],
       "@engine/core": ["../core/src"],
       "@engine/core/*": ["../core/src/*"],
       "@engine/world": ["../world/src"],
@@ -31,12 +31,18 @@
       "@engine/test-utils": ["../test-utils/dist"],
       "@engine/test-utils/*": ["../test-utils/dist/*"],
       "@engine/camera": ["../camera/dist"],
-      "@engine/camera/*": ["../camera/dist/*"]
+      "@engine/camera/*": ["../camera/dist/*"],
+      "@engine/avatar": ["../avatar/dist/avatar/src"],
+      "@engine/avatar/*": ["../avatar/dist/avatar/src/*"]
     }
   },
   "include": ["src/**/*"],
   "exclude": [
     "__tests__",
+    "**/__tests__/**",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "**/__examples__/**",
     "dist",
     "node_modules",
     "../economy/src",

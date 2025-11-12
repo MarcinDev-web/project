@@ -9,10 +9,13 @@ import type { OrbitControls, CameraDirector } from '@engine/camera';
 import type { EditorState } from '../../core/state';
 import type { Entity } from '@engine/world';
 import { TerrainComponent } from '@engine/world/components/TerrainComponent';
+import { CameraComponent } from '@engine/world/components/CameraComponent';
+import { Raycaster, type RaycastHit } from '@engine/world';
 import { TerrainSculptTool, type SculptOperationConfig } from '../tools/TerrainSculptTool';
 import { HeightmapTerrainTool } from '../tools/HeightmapTerrainTool';
 import type { BrushOperation } from '../tools/TerrainBrush';
-import type { Vec3 } from '@engine/core/math';
+import type { Vec3, Mat4 } from '@engine/core/math';
+import { Logger } from '../../../utils/logger';
 
 export interface TerrainBuilderControllerConfig {
   canvas: HTMLCanvasElement;
@@ -31,15 +34,27 @@ export class TerrainBuilderController {
   private config: TerrainBuilderControllerConfig;
   private sculptTool: TerrainSculptTool;
   private heightmapTool: HeightmapTerrainTool;
+  private raycaster: Raycaster;
   private abortController: AbortController | null = null;
   private isActive = false;
   private currentOperation: BrushOperation = 'raise';
   private isSculpting = false;
+  private cachedTerrainEntity: Entity | null = null;
+  private terrainEntityCacheDirty = true;
+  private readonly scratchViewMatrix: Mat4 = new Float32Array(16) as Mat4;
+  private readonly scratchProjectionMatrix: Mat4 = new Float32Array(16) as Mat4;
 
   constructor(config: TerrainBuilderControllerConfig) {
     this.config = config;
-    this.sculptTool = new TerrainSculptTool();
     this.heightmapTool = new HeightmapTerrainTool(config.scene);
+    this.sculptTool = new TerrainSculptTool(undefined, this.heightmapTool);
+    this.raycaster = new Raycaster();
+    
+    // Invalidate cache when scene changes
+    if (config.scene) {
+      // Note: Scene doesn't have direct event for entity changes,
+      // so we'll invalidate cache on each raycast if needed
+    }
   }
 
   /**
@@ -61,8 +76,26 @@ export class TerrainBuilderController {
     this.isActive = true;
 
     if (entity) {
+      if (!entity.hasComponent(TerrainComponent)) {
+        Logger.warn('[TerrainBuilderController] Entity does not have TerrainComponent');
+        this.config.onStatusMessage?.('Invalid terrain entity', 2000);
+        return;
+      }
       this.sculptTool.setTerrainEntity(entity);
       this.sculptTool.activate();
+      this.cachedTerrainEntity = entity;
+      this.terrainEntityCacheDirty = false;
+    } else {
+      // Try to find terrain entity
+      const terrainEntity = this.getTerrainEntity();
+      if (terrainEntity) {
+        this.sculptTool.setTerrainEntity(terrainEntity);
+        this.sculptTool.activate();
+      } else {
+        Logger.warn('[TerrainBuilderController] No terrain entity found in scene');
+        this.config.onStatusMessage?.('No terrain found in scene', 2000);
+        return;
+      }
     }
 
     this.config.onStatusMessage?.('Terrain editing mode active', 2000);
@@ -75,6 +108,7 @@ export class TerrainBuilderController {
     this.isActive = false;
     this.isSculpting = false;
     this.sculptTool.deactivate();
+    this.terrainEntityCacheDirty = true; // Invalidate cache on deactivate
     this.config.onStatusMessage?.('Terrain editing mode deactivated', 2000);
   }
 
@@ -207,135 +241,104 @@ export class TerrainBuilderController {
   }
 
   /**
-   * Raycasts to terrain surface
+   * Raycasts to terrain surface using proper raycasting system
    */
   private raycastToTerrain(event: MouseEvent): { position: Vec3; entity: Entity } | null {
     const canvas = this.config.canvas;
     const rect = canvas.getBoundingClientRect();
-    const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
-    const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+    const canvasX = event.clientX - rect.left;
+    const canvasY = event.clientY - rect.top;
+    const canvasWidth = rect.width;
+    const canvasHeight = rect.height;
 
-    // Get camera info - use cameraDirector if available, otherwise use scene's primary camera
-    let cameraPosition: Vec3 = [0, 2, 5];
-    let forward: Vec3 = [0, -0.5, -1];
-
-    if (this.config.cameraDirector) {
-      // Try to get position from editor camera controller
-      const editorCamera = (this.config.cameraDirector as unknown as { editorCamera?: { getPosition(): Vec3; getOrientation(): { yaw: number; pitch: number } } }).editorCamera;
-      if (editorCamera) {
-        cameraPosition = editorCamera.getPosition();
-        const orientation = editorCamera.getOrientation();
-        // Calculate forward vector from yaw/pitch
-        const cosPitch = Math.cos(orientation.pitch);
-        forward = [
-          Math.sin(orientation.yaw) * cosPitch,
-          -Math.sin(orientation.pitch),
-          -Math.cos(orientation.yaw) * cosPitch,
-        ];
-      }
-    } else {
-      // Extract camera position and forward direction from scene's primary camera
-      const primaryCamera = this.config.scene.primaryCamera;
-      if (primaryCamera) {
-        const transform = primaryCamera.transform;
-        cameraPosition = transform.getWorldPosition();
-        forward = transform.getForward([0, 0, -1]);
-      }
+    // Validate canvas dimensions
+    if (canvasWidth <= 0 || canvasHeight <= 0) {
+      Logger.warn('[TerrainBuilderController] Invalid canvas dimensions');
+      return null;
     }
 
-    // Normalize forward vector
+    // Get primary camera from scene
+    const primaryCamera = this.config.scene.primaryCamera;
+    if (!primaryCamera) {
+      Logger.warn('[TerrainBuilderController] No primary camera found');
+      return null;
+    }
 
-    const forwardLength = Math.sqrt(
-      forward[0] * forward[0] + forward[1] * forward[1] + forward[2] * forward[2]
+    const cameraComponent = primaryCamera.getComponent(CameraComponent);
+    if (!cameraComponent) {
+      Logger.warn('[TerrainBuilderController] Primary camera has no CameraComponent');
+      return null;
+    }
+
+    // Get camera matrices
+    const aspect = canvasWidth / canvasHeight;
+    const viewMatrix = cameraComponent.getViewMatrix(primaryCamera, this.scratchViewMatrix);
+    const projectionMatrix = cameraComponent.getProjectionMatrix(this.scratchProjectionMatrix, aspect);
+
+    // Create ray from screen coordinates
+    const ray = this.raycaster.createRayFromScreen(
+      canvasX,
+      canvasY,
+      canvasWidth,
+      canvasHeight,
+      viewMatrix,
+      projectionMatrix
     );
-    if (forwardLength < 0.001) {
-      return null;
-    }
 
-    // Normalize forward
-    forward[0] /= forwardLength;
-    forward[1] /= forwardLength;
-    forward[2] /= forwardLength;
+    try {
+      // Get terrain entities (use cached if available and valid)
+      const terrainEntities = this.getTerrainEntities();
+      if (terrainEntities.length === 0) {
+        this.raycaster.recycleRay(ray);
+        return null;
+      }
 
-    // Calculate right and up vectors
-    const up: Vec3 = [0, 1, 0];
-    const right: Vec3 = [
-      forward[1] * up[2] - forward[2] * up[1],
-      forward[2] * up[0] - forward[0] * up[2],
-      forward[0] * up[1] - forward[1] * up[0],
-    ];
+      // Raycast to find closest terrain hit
+      const hit = this.raycaster.raycastClosest(ray, terrainEntities);
+      this.raycaster.recycleRay(ray);
 
-    const rightLength = Math.sqrt(right[0] * right[0] + right[1] * right[1] + right[2] * right[2]);
-    if (rightLength > 0.001) {
-      right[0] /= rightLength;
-      right[1] /= rightLength;
-      right[2] /= rightLength;
-    }
+      if (!hit) {
+        return null;
+      }
 
-    // Calculate ray direction
-    const fov = Math.PI / 4; // 45 degrees
-    const aspect = rect.width / rect.height;
-    const tanFov = Math.tan(fov / 2);
-
-    const rayDir: Vec3 = [
-      forward[0] + right[0] * x * tanFov * aspect + up[0] * y * tanFov,
-      forward[1] + right[1] * x * tanFov * aspect + up[1] * y * tanFov,
-      forward[2] + right[2] * x * tanFov * aspect + up[2] * y * tanFov,
-    ];
-
-    const dirLength = Math.sqrt(rayDir[0] * rayDir[0] + rayDir[1] * rayDir[1] + rayDir[2] * rayDir[2]);
-    if (dirLength > 0.001) {
-      rayDir[0] /= dirLength;
-      rayDir[1] /= dirLength;
-      rayDir[2] /= dirLength;
-    }
-
-    // Raycast to terrain (simplified: raycast to Y=0 plane or use proper raycaster)
-    // For now, project to Y=0 plane
-    if (rayDir[1] >= 0) {
-      return null;
-    }
-
-    const t = -cameraPosition[1] / rayDir[1];
-    if (t <= 0) {
-      return null;
-    }
-
-    const position: Vec3 = [
-      cameraPosition[0] + rayDir[0] * t,
-      0, // Will be replaced with actual terrain height
-      cameraPosition[2] + rayDir[2] * t,
-    ];
-
-    // Find terrain entity and get actual height
-    const terrainEntity = this.getTerrainEntity();
-    if (terrainEntity) {
+      // Get actual terrain height at hit point
       const terrain = this.sculptTool.getHeightmapTerrain();
       if (terrain) {
-        position[1] = terrain.getHeightAt(position[0], position[2]);
-        return { position, entity: terrainEntity };
+        const height = terrain.getHeightAt(hit.point[0], hit.point[2]);
+        const position: Vec3 = [hit.point[0], height, hit.point[2]];
+        return { position, entity: hit.entity };
       }
-    }
 
-    // Get first root entity or create a fallback
-    const rootEntities = this.config.scene.rootEntities;
-    const rootEntity = rootEntities.length > 0 ? rootEntities[0] ?? null : null;
-    if (!rootEntity) {
+      // Fallback: use hit point directly
+      return { position: hit.point as Vec3, entity: hit.entity };
+    } catch (error) {
+      this.raycaster.recycleRay(ray);
+      Logger.error('[TerrainBuilderController] Raycast error:', error);
       return null;
     }
-    return { position, entity: rootEntity };
   }
 
   /**
-   * Gets the current terrain entity
+   * Gets the current terrain entity (with caching)
    * Searches through all entities in the scene to find one with TerrainComponent
    */
   private getTerrainEntity(): Entity | null {
+    // Return cached entity if available and valid
+    if (!this.terrainEntityCacheDirty && this.cachedTerrainEntity) {
+      if (this.cachedTerrainEntity.hasComponent(TerrainComponent)) {
+        return this.cachedTerrainEntity;
+      }
+      // Cache is stale, invalidate it
+      this.terrainEntityCacheDirty = true;
+    }
+
     const rootEntities = this.config.scene.rootEntities;
     
     // First, check root entities
     for (const entity of rootEntities) {
       if (entity.hasComponent(TerrainComponent)) {
+        this.cachedTerrainEntity = entity;
+        this.terrainEntityCacheDirty = false;
         return entity;
       }
     }
@@ -352,11 +355,49 @@ export class TerrainBuilderController {
       });
       
       if (foundEntity) {
+        this.cachedTerrainEntity = foundEntity;
+        this.terrainEntityCacheDirty = false;
         return foundEntity;
       }
     }
     
+    this.cachedTerrainEntity = null;
     return null;
+  }
+
+  /**
+   * Gets all terrain entities in the scene
+   */
+  private getTerrainEntities(): Entity[] {
+    const terrainEntities: Entity[] = [];
+    const rootEntities = this.config.scene.rootEntities;
+    
+    // Check root entities
+    for (const entity of rootEntities) {
+      if (entity.hasComponent(TerrainComponent)) {
+        terrainEntities.push(entity);
+      }
+    }
+    
+    // Search recursively through children
+    for (const rootEntity of rootEntities) {
+      rootEntity.traverse((entity) => {
+        if (entity.hasComponent(TerrainComponent)) {
+          terrainEntities.push(entity);
+        }
+      });
+    }
+    
+    return terrainEntities;
+  }
+
+  /**
+   * Invalidates the terrain entity cache
+   * Call this when terrain entities are added/removed from the scene
+   */
+  invalidateTerrainCache(): void {
+    this.terrainEntityCacheDirty = true;
+    this.cachedTerrainEntity = null;
   }
 
   /**
@@ -384,6 +425,8 @@ export class TerrainBuilderController {
     this.deactivate();
     this.sculptTool.dispose();
     this.heightmapTool.dispose();
+    this.cachedTerrainEntity = null;
+    this.terrainEntityCacheDirty = true;
   }
 }
 

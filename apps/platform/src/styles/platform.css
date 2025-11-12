@@ -9,8 +9,8 @@
 .forge-card {
   background: var(--fw-base-medium);
   border: 1px solid var(--fw-border-color-medium);
-  border-radius: 8px;
-  padding: var(--spacing-6);
+  border-radius: 4px;
+  padding: var(--spacing-4);
   box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   transition: all var(--transition-fast);
 }
@@ -356,12 +356,19 @@ select.forge-select option {
   border-radius: var(--radius-md);
   overflow: hidden;
   background: var(--color-base-200);
+  cursor: pointer;
+  position: relative;
 }
 
 .marketplace-card-thumbnail img {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  transition: transform var(--transition-base);
+}
+
+.marketplace-card-thumbnail:hover img {
+  transform: scale(1.1);
 }
 
 /* Profile page specific styles */

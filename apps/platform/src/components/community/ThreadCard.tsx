@@ -69,7 +69,7 @@ export function ThreadCard({ thread, onVote, showCategory = false }: ThreadCardP
     }
   };
 
-  const displayName = userProfile?.displayName || userProfile?.email?.split('@')[0] || `User ${thread.authorId.substring(0, 8)}`;
+  const displayName = userProfile?.displayName || userProfile?.username || userProfile?.email?.split('@')[0] || `User ${thread.authorId.substring(0, 8)}`;
   const preview = thread.content.length > 150 
     ? thread.content.substring(0, 150) + '...' 
     : thread.content;

@@ -1,12 +1,5 @@
 import { useState, useEffect } from 'react';
-
-interface NewsItem {
-  id: string;
-  title: string;
-  content: string;
-  date: string;
-  author: string;
-}
+import { newsApi, type NewsItem } from '../../api/news';
 
 export function NewsTab() {
   const [news, setNews] = useState<NewsItem[]>([]);
@@ -19,20 +12,8 @@ export function NewsTab() {
   const loadNews = async () => {
     setLoading(true);
     try {
-      // TODO: Implement API call to fetch news
-      // const data = await newsApi.getNews();
-      // setNews(data);
-      
-      // Temporary mock data
-      setNews([
-        {
-          id: '1',
-          title: 'Welcome to the News Section',
-          content: 'Stay updated with the latest announcements and updates from the community.',
-          date: new Date().toISOString(),
-          author: 'System'
-        }
-      ]);
+      const response = await newsApi.getNews({ limit: 20 });
+      setNews(response.news);
     } catch (error) {
       console.error('Failed to load news:', error);
     } finally {
@@ -72,11 +53,34 @@ export function NewsTab() {
                     color: 'var(--text-2)', 
                     marginBottom: 'var(--spacing-3)' 
                   }}>
-                    {new Date(item.date).toLocaleDateString()} • {item.author}
+                    {new Date(item.publishedAt || item.createdAt).toLocaleDateString()} • {item.authorName || item.authorId}
                   </div>
+                  {item.excerpt && (
+                    <p style={{ margin: '0 0 var(--spacing-2) 0', color: 'var(--text-1)', fontWeight: '500' }}>
+                      {item.excerpt}
+                    </p>
+                  )}
                   <p style={{ margin: 0, color: 'var(--text-2)', lineHeight: '1.6' }}>
                     {item.content}
                   </p>
+                  {item.tags && item.tags.length > 0 && (
+                    <div style={{ marginTop: 'var(--spacing-2)', display: 'flex', gap: 'var(--spacing-1)', flexWrap: 'wrap' }}>
+                      {item.tags.map((tag) => (
+                        <span
+                          key={tag}
+                          style={{
+                            padding: '0.125rem 0.5rem',
+                            background: 'var(--surface-3)',
+                            borderRadius: 'var(--radius-1)',
+                            fontSize: 'var(--font-xs)',
+                            color: 'var(--text-2)',
+                          }}
+                        >
+                          #{tag}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </article>
               ))}
             </div>

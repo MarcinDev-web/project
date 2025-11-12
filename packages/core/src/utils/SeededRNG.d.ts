@@ -136,3 +136,4 @@ export declare function randomInt(min: number, max: number): number;
  * @deprecated Use getGlobalRNG().randomFloat(min, max) or create SeededRNG instance
  */
 export declare function randomFloat(min: number, max: number): number;
+//# sourceMappingURL=SeededRNG.d.ts.map

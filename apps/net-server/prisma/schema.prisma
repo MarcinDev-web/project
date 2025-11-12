@@ -475,3 +475,64 @@ model ForumPostVote {
   @@map("forum_post_votes")
 }
 
+// Support System
+model SupportTicket {
+  id          String   @id @default(uuid())
+  userId      String   @map("user_id")
+  type        String   // 'bug' | 'question' | 'feature' | 'other'
+  status      String   @default("open") // 'open' | 'in_progress' | 'resolved' | 'closed'
+  priority    String   @default("medium") // 'low' | 'medium' | 'high' | 'urgent'
+  title       String
+  description String
+  metadata    Json?    // Additional data (browser info, screenshots, etc.)
+  assignedTo  String?  @map("assigned_to") // User ID of moderator/admin
+  resolvedAt  DateTime? @map("resolved_at")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  messages SupportTicketMessage[]
+
+  @@index([userId])
+  @@index([status])
+  @@index([priority])
+  @@index([assignedTo])
+  @@index([createdAt(sort: Desc)])
+  @@map("support_tickets")
+}
+
+model SupportTicketMessage {
+  id         String   @id @default(uuid())
+  ticketId   String   @map("ticket_id")
+  authorId   String   @map("author_id")
+  content    String
+  isInternal Boolean  @default(false) @map("is_internal") // For staff notes
+  createdAt  DateTime @default(now()) @map("created_at")
+
+  ticket SupportTicket @relation(fields: [ticketId], references: [id], onDelete: Cascade)
+
+  @@index([ticketId])
+  @@index([authorId])
+  @@index([createdAt(sort: Desc)])
+  @@map("support_ticket_messages")
+}
+
+model SupportFAQ {
+  id          String   @id @default(uuid())
+  question    String
+  answer      String
+  category    String   // 'general' | 'editor' | 'marketplace' | 'account' | 'technical'
+  order       Int      @default(999)
+  isPublished Boolean  @default(false) @map("is_published")
+  tags        String[] @default([])
+  viewCount   Int      @default(0) @map("view_count")
+  helpfulCount Int     @default(0) @map("helpful_count")
+  createdAt   DateTime @default(now()) @map("created_at")
+  updatedAt   DateTime @default(now()) @updatedAt @map("updated_at")
+
+  @@index([category])
+  @@index([isPublished])
+  @@index([order])
+  @@index([tags], type: Gin)
+  @@map("support_faqs")
+}
+

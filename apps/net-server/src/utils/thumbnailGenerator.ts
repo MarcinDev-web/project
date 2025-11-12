@@ -205,9 +205,6 @@ export function generateThumbnailSVG(options: ThumbnailOptions): string {
   // Create gradient ID unique for this thumbnail
   const gradientId = `grad_${titleHash}`;
 
-  // Get first 2-3 tags for display
-  const displayTags = tags.slice(0, 3);
-
   return `<?xml version="1.0" encoding="UTF-8"?>
 <svg width="${width}" height="${height}" xmlns="http://www.w3.org/2000/svg">
   <defs>
@@ -264,23 +261,6 @@ export function generateThumbnailSVG(options: ThumbnailOptions): string {
         text-anchor="middle">
     ${displayLines[1]}
   </text>`
-      : ''
-  }
-  
-  <!-- Tags as small badges -->
-  ${
-    displayTags.length > 0
-      ? `
-  <g transform="translate(${width / 2 - (displayTags.length * 30 + (displayTags.length - 1) * 8) / 2}, ${displayLines.length > 1 ? height - 8 : height - 12})">
-    ${displayTags
-      .map(
-        (tag, i) => `
-    <rect x="${i * 38}" y="0" width="${tag.length * 5 + 10}" height="16" rx="8" fill="rgba(255,255,255,0.25)" stroke="rgba(255,255,255,0.4)" stroke-width="1"/>
-    <text x="${i * 38 + tag.length * 2.5 + 5}" y="11" font-family="system-ui" font-size="9" font-weight="600" fill="white" text-anchor="middle">${tag.substring(0, 8)}</text>
-    `
-      )
-      .join('')}
-  </g>`
       : ''
   }
   
