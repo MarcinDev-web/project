@@ -7,13 +7,8 @@ import { studioApi, type StudioProject, type StudioStats as StudioStatsType, typ
 import { useToast } from '../contexts/ToastContext';
 import { ProjectsList } from '../components/studio/ProjectsList';
 import { AvatarsList } from '../components/studio/AvatarsList';
-import { StudioStats } from '../components/studio/StudioStats';
 import { StudioLeaderboard } from '../components/studio/StudioLeaderboard';
 import { TeamManagement } from '../components/studio/TeamManagement';
-import { StudioHealthCard } from '../components/studio/StudioHealthCard';
-import { RevenueCard } from '../components/studio/RevenueCard';
-import { StudioFocusGoals } from '../components/studio/StudioFocusGoals';
-import { InsightsList } from '../components/studio/InsightsList';
 import { PublishModal } from '../components/studio/PublishModal';
 import '../styles/studio.css';
 
@@ -23,7 +18,7 @@ export function StudioPage() {
   const [avatars, setAvatars] = useState<AvatarPreset[]>([]);
   const [stats, setStats] = useState<StudioStatsType | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'projects' | 'avatars' | 'stats' | 'leaderboard' | 'team'>('projects');
+  const [activeTab, setActiveTab] = useState<'projects' | 'avatars' | 'leaderboard' | 'team'>('projects');
   const [publishModalProject, setPublishModalProject] = useState<StudioProject | null>(null);
   const [publishModalAvatar, setPublishModalAvatar] = useState<AvatarPreset | null>(null);
 
@@ -184,12 +179,6 @@ export function StudioPage() {
             Avatary
           </button>
           <button
-            className={`studio-tab ${activeTab === 'stats' ? 'active' : ''}`}
-            onClick={() => setActiveTab('stats')}
-          >
-            Statystyki
-          </button>
-          <button
             className={`studio-tab ${activeTab === 'leaderboard' ? 'active' : ''}`}
             onClick={() => setActiveTab('leaderboard')}
           >
@@ -223,18 +212,6 @@ export function StudioPage() {
                 onPublish={handlePublishAvatar}
                 loading={loading}
               />
-            </div>
-          )}
-
-          {activeTab === 'stats' && (
-            <div className="studio-stats-section">
-              <div className="stats-grid" style={{ display: 'grid', gap: '1rem' }}>
-                <StudioHealthCard />
-                <RevenueCard />
-                <StudioFocusGoals />
-                <StudioStats stats={stats} loading={loading} />
-                <InsightsList />
-              </div>
             </div>
           )}
 

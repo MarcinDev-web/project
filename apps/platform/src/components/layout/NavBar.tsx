@@ -2,7 +2,6 @@ import { Link, useLocation } from 'react-router-dom';
 import { memo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/shared/Button';
-import { NotificationBell } from '../notifications/NotificationBell';
 import { NavLink } from './NavLink';
 import { UserMenu } from './UserMenu';
 
@@ -26,40 +25,25 @@ export const NavBar = memo(function NavBar() {
       <div className="navbar-nav">
         {isAuthenticated ? (
           <>
-            <NavLink to="/marketplace" icon="🛒" isActive={isActive('/marketplace')}>
-              Marketplace
+            <NavLink to="/games" isActive={isActive('/games')}>
+              Games
             </NavLink>
-            <NavLink to="/shop" icon="🛍️" isActive={isActive('/shop')}>
-              Shop
+            <NavLink to="/community-hub" isActive={isActive('/community-hub')}>
+              Community
             </NavLink>
-            <NavLink to="/avatar-builder" icon="🎨" isActive={isActive('/avatar-builder')}>
+            <NavLink to="/studio" isActive={isActive('/studio')}>
+              Studio
+            </NavLink>
+            <NavLink to="/blocks-models-studio" isActive={isActive('/blocks-models-studio')}>
+              Model Builder
+            </NavLink>
+            <NavLink to="/avatar-builder" isActive={isActive('/avatar-builder')}>
               Avatar Builder
             </NavLink>
-            <NavLink to="/community-hub" icon="💬" isActive={isActive('/community-hub')}>
-              Community OS
-            </NavLink>
-
-            {/* Admin/Moderator Links */}
-            {(isAdmin || isModerator) && (
-              <>
-                <div className="navbar-divider" />
-                {isModerator && (
-                  <NavLink to="/moderator" icon="🛡️" isActive={isActive('/moderator')}>
-                    Moderator
-                  </NavLink>
-                )}
-                {isAdmin && (
-                  <NavLink to="/admin" icon="⚙️" isActive={isActive('/admin')}>
-                    Admin
-                  </NavLink>
-                )}
-              </>
-            )}
 
             {/* Divider */}
             <div className="navbar-divider" />
 
-            <NotificationBell />
             <UserMenu />
           </>
         ) : (

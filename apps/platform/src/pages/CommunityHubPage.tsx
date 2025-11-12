@@ -4,21 +4,22 @@ import { Layout } from '../components/layout/Layout';
 import { MessagesTab } from '../components/community-hub/MessagesTab';
 import { FriendsTab } from '../components/community-hub/FriendsTab';
 import { CommunityTab } from '../components/community-hub/CommunityTab';
+import { NewsTab } from '../components/community-hub/NewsTab';
 
-type TabType = 'messages' | 'friends' | 'community';
+type TabType = 'messages' | 'friends' | 'community' | 'news';
 
 export function CommunityHubPage() {
   const [searchParams, setSearchParams] = useSearchParams();
   const tabParam = searchParams.get('tab') as TabType | null;
-  const [activeTab, setActiveTab] = useState<TabType>(tabParam || 'messages');
+  const [activeTab, setActiveTab] = useState<TabType>(tabParam || 'community');
 
   useEffect(() => {
     // Sync URL with active tab
-    if (tabParam && ['messages', 'friends', 'community'].includes(tabParam)) {
+    if (tabParam && ['messages', 'friends', 'community', 'news'].includes(tabParam)) {
       setActiveTab(tabParam);
     } else if (!tabParam) {
-      // If no tab param, default to messages and update URL
-      setSearchParams({ tab: 'messages' }, { replace: true });
+      // If no tab param, default to community and update URL
+      setSearchParams({ tab: 'community' }, { replace: true });
     }
   }, [tabParam, setSearchParams]);
 
@@ -30,66 +31,77 @@ export function CommunityHubPage() {
   return (
     <Layout>
       <div className="page-container">
-        <h1 style={{ marginBottom: 'var(--spacing-6)' }}>Community OS</h1>
-
-        {/* Tab Navigation */}
-        <div style={{
-          display: 'flex',
-          gap: 'var(--spacing-2)',
-          marginBottom: 'var(--spacing-6)',
-          borderBottom: '1px solid var(--border-default)',
-        }}>
-          <button
-            onClick={() => handleTabChange('messages')}
-            style={{
-              padding: 'var(--spacing-2) var(--spacing-4)',
-              border: 'none',
-              background: 'transparent',
-              color: activeTab === 'messages' ? 'var(--text-1)' : 'var(--text-2)',
-              borderBottom: activeTab === 'messages' ? '2px solid var(--bg-button-primary)' : '2px solid transparent',
-              cursor: 'pointer',
-              fontSize: 'var(--text-base)',
-              fontWeight: activeTab === 'messages' ? 'var(--font-semibold)' : 'var(--font-normal)',
-            }}
-          >
-            💬 Messages
-          </button>
-          <button
-            onClick={() => handleTabChange('friends')}
-            style={{
-              padding: 'var(--spacing-2) var(--spacing-4)',
-              border: 'none',
-              background: 'transparent',
-              color: activeTab === 'friends' ? 'var(--text-1)' : 'var(--text-2)',
-              borderBottom: activeTab === 'friends' ? '2px solid var(--bg-button-primary)' : '2px solid transparent',
-              cursor: 'pointer',
-              fontSize: 'var(--text-base)',
-              fontWeight: activeTab === 'friends' ? 'var(--font-semibold)' : 'var(--font-normal)',
-            }}
-          >
-            👥 Friends
-          </button>
-          <button
-            onClick={() => handleTabChange('community')}
-            style={{
-              padding: 'var(--spacing-2) var(--spacing-4)',
-              border: 'none',
-              background: 'transparent',
-              color: activeTab === 'community' ? 'var(--text-1)' : 'var(--text-2)',
-              borderBottom: activeTab === 'community' ? '2px solid var(--bg-button-primary)' : '2px solid transparent',
-              cursor: 'pointer',
-              fontSize: 'var(--text-base)',
-              fontWeight: activeTab === 'community' ? 'var(--font-semibold)' : 'var(--font-normal)',
-            }}
-          >
-            💬 Community
-          </button>
+        <div className="community-hub-header">
+          <h1>Community</h1>
         </div>
 
+        {/* Tab Navigation */}
+        <nav className="community-hub-tabs" role="tablist" aria-label="Community sections">
+          <button
+            role="tab"
+            aria-selected={activeTab === 'community'}
+            aria-controls="community-panel"
+            onClick={() => handleTabChange('community')}
+            className={`community-hub-tab ${activeTab === 'community' ? 'community-hub-tab--active' : ''}`}
+          >
+            <span className="community-hub-tab__icon">💬</span>
+            <span className="community-hub-tab__label">Community</span>
+          </button>
+          <button
+            role="tab"
+            aria-selected={activeTab === 'news'}
+            aria-controls="news-panel"
+            onClick={() => handleTabChange('news')}
+            className={`community-hub-tab ${activeTab === 'news' ? 'community-hub-tab--active' : ''}`}
+          >
+            <span className="community-hub-tab__icon">📰</span>
+            <span className="community-hub-tab__label">News</span>
+          </button>
+          <button
+            role="tab"
+            aria-selected={activeTab === 'friends'}
+            aria-controls="friends-panel"
+            onClick={() => handleTabChange('friends')}
+            className={`community-hub-tab ${activeTab === 'friends' ? 'community-hub-tab--active' : ''}`}
+          >
+            <span className="community-hub-tab__icon">👥</span>
+            <span className="community-hub-tab__label">Friends</span>
+          </button>
+          <button
+            role="tab"
+            aria-selected={activeTab === 'messages'}
+            aria-controls="messages-panel"
+            onClick={() => handleTabChange('messages')}
+            className={`community-hub-tab ${activeTab === 'messages' ? 'community-hub-tab--active' : ''}`}
+          >
+            <span className="community-hub-tab__icon">💬</span>
+            <span className="community-hub-tab__label">Messages</span>
+          </button>
+        </nav>
+
         {/* Tab Content */}
-        {activeTab === 'messages' && <MessagesTab />}
-        {activeTab === 'friends' && <FriendsTab />}
-        {activeTab === 'community' && <CommunityTab />}
+        <div className="community-hub-content">
+          {activeTab === 'community' && (
+            <div id="community-panel" role="tabpanel" aria-labelledby="community-tab">
+              <CommunityTab />
+            </div>
+          )}
+          {activeTab === 'news' && (
+            <div id="news-panel" role="tabpanel" aria-labelledby="news-tab">
+              <NewsTab />
+            </div>
+          )}
+          {activeTab === 'friends' && (
+            <div id="friends-panel" role="tabpanel" aria-labelledby="friends-tab">
+              <FriendsTab />
+            </div>
+          )}
+          {activeTab === 'messages' && (
+            <div id="messages-panel" role="tabpanel" aria-labelledby="messages-tab">
+              <MessagesTab />
+            </div>
+          )}
+        </div>
       </div>
     </Layout>
   );

@@ -27,6 +27,8 @@ import { ForumModerationPage } from './pages/moderator/ForumModerationPage';
 import { AvatarBuilderStudioPage } from './pages/AvatarBuilderStudioPage';
 import { BlocksModelsStudioPage } from './pages/BlocksModelsStudioPage';
 import { StudioPage } from './pages/StudioPage';
+import { SupportPage } from './pages/SupportPage';
+import { NewsPage } from './pages/NewsPage';
 import { ProtectedRoute, AdminRoute, ModeratorRoute } from './components/auth/ProtectedRoute';
 
 export const router: ReturnType<typeof createBrowserRouter> = createBrowserRouter([
@@ -233,6 +235,14 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
         <StudioPage />
       </ProtectedRoute>
     ),
+  },
+  {
+    path: '/support',
+    element: <SupportPage />,
+  },
+  {
+    path: '/news',
+    element: <NewsPage />,
   },
 ]);
 
