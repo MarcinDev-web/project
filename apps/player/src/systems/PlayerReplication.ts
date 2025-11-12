@@ -1,4 +1,5 @@
-import type { Scene, Entity } from '@engine/world';
+import type { Scene } from '@engine/world';
+import { Entity, MeshComponent, MaterialComponent, type RgbaColor } from '@engine/world';
 import type { Vec3 } from '@engine/core/math';
 import { Logger } from '../utils/logger';
 import type { MultiplayerSystem, RemotePlayer } from './MultiplayerSystem.js';
@@ -75,10 +76,69 @@ export class PlayerReplication {
     entity.userData.playerId = playerId;
     entity.userData.displayName = playerData.displayName;
     
-    // TODO: Add visual representation (avatar, nameplate, etc.)
+    // Add visual representation: avatar mesh
+    const mesh = new MeshComponent();
+    mesh.meshType = 'capsule_y'; // Humanoid shape
+    entity.addComponent(mesh);
     
-    Logger.debug(`[PlayerReplication] Created entity for remote player: ${playerId}`);
+    // Add material with distinct color based on playerId
+    const material = new MaterialComponent();
+    material.primaryColor = this.getPlayerColor(playerId);
+    material.roughness = 0.7;
+    material.metallic = 0.1;
+    entity.addComponent(material);
+    
+    // Create nameplate indicator above player head
+    this.createNameplate(entity, playerData.displayName);
+    
+    Logger.debug(`[PlayerReplication] Created entity for remote player: ${playerId} (${playerData.displayName})`);
     return entity;
+  }
+
+  /**
+   * Generate a distinct color for a player based on their ID hash
+   */
+  private getPlayerColor(playerId: string): RgbaColor {
+    // Simple hash function to generate consistent color from playerId
+    let hash = 0;
+    for (let i = 0; i < playerId.length; i++) {
+      hash = playerId.charCodeAt(i) + ((hash << 5) - hash);
+    }
+    
+    // Generate RGB values in [0.3, 1.0] range for visibility
+    const r = 0.3 + ((hash & 0xff0000) >> 16) / 255 * 0.7;
+    const g = 0.3 + ((hash & 0x00ff00) >> 8) / 255 * 0.7;
+    const b = 0.3 + (hash & 0x0000ff) / 255 * 0.7;
+    
+    return [r, g, b, 1];
+  }
+
+  /**
+   * Create a nameplate indicator above the player's head
+   */
+  private createNameplate(parentEntity: Entity, displayName: string): void {
+    const nameplate = new Entity(`${parentEntity.name}_nameplate`);
+    
+    // Position nameplate above player head (capsule_y is ~2 units tall)
+    nameplate.transform.position = [0, 1.2, 0]; // Local position relative to parent
+    nameplate.transform.scale = [0.8, 0.2, 0.1]; // Wide, thin plate
+    
+    // Add visual indicator (small cube/sphere)
+    const nameplateMesh = new MeshComponent();
+    nameplateMesh.meshType = 'cube';
+    nameplate.addComponent(nameplateMesh);
+    
+    const nameplateMaterial = new MaterialComponent();
+    nameplateMaterial.primaryColor = [0.2, 0.2, 0.2, 0.8]; // Dark semi-transparent
+    nameplateMaterial.opacity = 0.8;
+    nameplateMaterial.alphaMode = 'blend';
+    nameplate.addComponent(nameplateMaterial);
+    
+    // Store display name in userData for potential text rendering later
+    nameplate.userData.isNameplate = true;
+    nameplate.userData.displayName = displayName;
+    
+    parentEntity.addChild(nameplate);
   }
 
   /**

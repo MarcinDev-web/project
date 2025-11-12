@@ -159,17 +159,12 @@ export class TextureManager {
     id: string,
     faceTexture: BlockFaceTexture
   ): Promise<ManagedTexture> {
-    // Generate albedo texture using GPU if available, fallback to CPU
-    const albedoImageData = await this.proceduralGenerator.generateTextureAsync(faceTexture);
+    // Generate PBR texture set using GPU if available, fallback to CPU
+    const pbrTextures = await this.proceduralGenerator.generatePBRTextureAsync(faceTexture);
     
-    // Generate PBR texture set (for now, only albedo uses GPU, others use CPU)
-    // TODO: Implement GPU generation for normal, roughness, metallic, ao maps
-    const pbrTextures = this.proceduralGenerator.generatePBRTexture(faceTexture);
-    
-    // Use GPU-generated albedo if available, otherwise use CPU-generated
     const albedo = this.imageDataToLoadedTexture(
       `${id}_albedo`,
-      albedoImageData
+      pbrTextures.albedo
     );
 
     const normal = pbrTextures.normal

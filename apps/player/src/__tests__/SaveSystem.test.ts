@@ -1,15 +1,12 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SaveSystem } from '../systems/SaveSystem.js';
-import { CheckpointSystem } from '../systems/CheckpointSystem.js';
 
 describe('SaveSystem', () => {
   let saveSystem: SaveSystem;
-  let checkpointSystem: CheckpointSystem;
 
   beforeEach(() => {
     saveSystem = new SaveSystem();
-    checkpointSystem = new CheckpointSystem();
-    saveSystem.initialize(checkpointSystem, 'test-build-id');
+    saveSystem.initialize('test-build-id');
     
     // Clear localStorage before each test
     localStorage.clear();

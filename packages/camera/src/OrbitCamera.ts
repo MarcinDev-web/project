@@ -2,6 +2,8 @@
 export const ROTATE_SPEED = 0.005;
 /** Default zoom multiplier applied per wheel step. */
 export const ZOOM_SPEED = 0.1;
+/** Default exponential zoom multiplier for smooth zoom feel. */
+export const ZOOM_MULTIPLIER = 0.4;
 /** Minimum allowed camera distance. */
 export const MIN_DISTANCE = 0.75;
 /** Maximum allowed camera distance. */
@@ -29,6 +31,8 @@ export interface OrbitControlsConfig {
   rotateSpeed?: number;
   /** Multiplier for wheel zoom sensitivity. Defaults to `ZOOM_SPEED`. */
   zoomSpeed?: number;
+  /** Exponential zoom multiplier for smooth zoom feel. Defaults to `ZOOM_MULTIPLIER`. */
+  zoomMultiplier?: number;
   /** Lower clamp for camera distance. Defaults to `MIN_DISTANCE`. */
   minDistance?: number;
   /** Upper clamp for camera distance. Defaults to `MAX_DISTANCE`. */
@@ -54,6 +58,7 @@ export class OrbitCamera {
   private readonly controller: AbortController;
   private readonly rotateSpeed: number;
   private readonly zoomSpeed: number;
+  private readonly zoomMultiplier: number;
   private readonly minDistance: number;
   private readonly maxDistance: number;
   private readonly pitchLimit: number;
@@ -72,6 +77,7 @@ export class OrbitCamera {
     this.controller = new AbortController();
     this.rotateSpeed = config?.rotateSpeed ?? ROTATE_SPEED;
     this.zoomSpeed = config?.zoomSpeed ?? ZOOM_SPEED;
+    this.zoomMultiplier = config?.zoomMultiplier ?? ZOOM_MULTIPLIER;
     this.minDistance = config?.minDistance ?? MIN_DISTANCE;
     this.maxDistance = config?.maxDistance ?? MAX_DISTANCE;
     this.pitchLimit = config?.pitchLimit ?? PITCH_LIMIT;
@@ -108,6 +114,7 @@ export class OrbitCamera {
 
   /**
    * Applies one of preset camera states.
+   * Alias for `setState()` - provided for semantic clarity when setting preset views.
    */
   setPreset(state: { yaw: number; pitch: number; distance: number }): void {
     this.setState(state);
@@ -198,8 +205,7 @@ export class OrbitCamera {
       // Normalize delta across devices/browsers and apply exponential zoom for smoother feel
       const deltaNormalized =
         event.deltaMode === 0 /* DOM_DELTA_PIXEL */ ? (event.deltaY ?? 0) / 50 : (event.deltaY ?? 0);
-      // Significantly increased multiplier from 0.1 to 0.4 for much better responsiveness
-      const scale = Math.exp((deltaNormalized ?? 0) * (this.zoomSpeed ?? ZOOM_SPEED) * 0.4);
+      const scale = Math.exp((deltaNormalized ?? 0) * (this.zoomSpeed ?? ZOOM_SPEED) * this.zoomMultiplier);
       this.distance *= scale;
       if (this.distance < this.minDistance) this.distance = this.minDistance;
       if (this.distance > this.maxDistance) this.distance = this.maxDistance;

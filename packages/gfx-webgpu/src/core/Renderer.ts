@@ -226,6 +226,8 @@ export interface GridRenderer {
   initialize(device: GPUDevice, format: GPUTextureFormat, depthFormat: GPUTextureFormat): Promise<void>;
   render(passEncoder: GPURenderPassEncoder, viewProjectionMatrix: Float32Array): void;
   dispose(): void;
+  /** Optional method to control grid visibility */
+  setVisible?(visible: boolean): void;
 }
 
 interface RendererOptions {

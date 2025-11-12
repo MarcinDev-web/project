@@ -91,16 +91,52 @@ function frame(dt: number) {
 ### FPS Camera
 
 ```typescript
-import { FPSCamera } from '@engine/camera';
+import { FPSCamera, FPSRaycastCollision } from '@engine/camera';
+import type { PhysicsWorld } from '@engine/world';
 
 const fpsCamera = new FPSCamera(canvas, {
   eyeHeight: 1.6,
   sensitivity: 0.0025,
   pitchLimit: Math.PI / 2 - 0.05,
+  baseFov: (72 * Math.PI) / 180, // 72 degrees
+  sprintMultiplier: 1.15, // +15% FOV when sprinting
+  aimMultiplier: 0.65,    // -35% FOV when aiming
+  headBobEnabled: true,
 });
 
 // Enable pointer lock
 fpsCamera.enable();
+
+// Enable collision detection (prevents camera from clipping through walls)
+if (physicsWorld) {
+  const collisionProvider = new FPSRaycastCollision({
+    physics: physicsWorld,
+    radius: 0.2,        // Eye sphere radius
+    backoff: 0.03,      // Desired clearance from walls
+    maxIters: 2,        // Collision resolution iterations
+    sampleCount: 6,     // Sample directions (6 or 12)
+  });
+  fpsCamera.setCollisionProvider(collisionProvider);
+  fpsCamera.setCollisionEnabled(true);
+}
+
+// Update camera (in game loop)
+fpsCamera.update(deltaTime, playerVelocity);
+
+// Add camera shake (e.g., on weapon fire)
+fpsCamera.addShake(0.1, 0.2, 0.5);
+
+// Set camera roll (e.g., for damage effect)
+fpsCamera.setRoll(0.1);
+
+// Dynamic FOV effects (sprint/aim)
+if (isSprinting) {
+  fpsCamera.setFovMultiplier(fpsCamera.getSprintMultiplier());
+} else if (isAiming) {
+  fpsCamera.setFovMultiplier(fpsCamera.getAimMultiplier());
+} else {
+  fpsCamera.setFovMultiplier(1.0); // Normal FOV
+}
 
 // Get view matrix
 const viewMatrix = fpsCamera.getViewMatrix(playerPosition);
@@ -162,8 +198,10 @@ packages/camera/
 │   ├── OrbitCamera.ts (refactored from src/input.ts)
 │   ├── FPSCamera.ts
 │   ├── CameraDirector.ts
+│   ├── collision/
+│   │   └── FPSRaycastCollision.ts (collision provider for FPSCamera)
 │   └── index.ts
-└── __tests__/ (tested via @engine/input)
+└── __tests__/
 ```
 
 Zobacz: [MIGRATION_PLAN.md](../../docs/MIGRATION_PLAN.md)

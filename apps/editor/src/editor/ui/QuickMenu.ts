@@ -268,9 +268,21 @@ export class QuickMenu {
     return section;
   }
 
+  private authContainer: HTMLElement | null = null;
+
   private createAuthButtons(): HTMLElement {
     const authContainer = document.createElement('div');
     authContainer.className = 'top-bar-auth-group';
+    this.authContainer = authContainer;
+    this.updateAuthButtons();
+    return authContainer;
+  }
+
+  private updateAuthButtons(): void {
+    if (!this.authContainer) return;
+
+    // Clear existing buttons
+    this.authContainer.innerHTML = '';
 
     if (this.config.isUserLoggedIn?.()) {
       // User logged in - show avatar/name
@@ -279,7 +291,7 @@ export class QuickMenu {
       const userName = this.config.getUserName?.() || 'User';
       userButton.textContent = userName.charAt(0).toUpperCase();
       userButton.title = userName;
-      authContainer.appendChild(userButton);
+      this.authContainer.appendChild(userButton);
     } else {
       // Not logged in - show Login + Register
       const loginBtn = document.createElement('button');
@@ -292,11 +304,14 @@ export class QuickMenu {
       registerBtn.textContent = 'Register';
       registerBtn.addEventListener('click', () => this.config.onRegister?.());
       
-      authContainer.appendChild(loginBtn);
-      authContainer.appendChild(registerBtn);
+      this.authContainer.appendChild(loginBtn);
+      this.authContainer.appendChild(registerBtn);
     }
+  }
 
-    return authContainer;
+  /** Updates auth button state (call after login/logout). */
+  public updateAuthState(): void {
+    this.updateAuthButtons();
   }
 
   private createRightSection(): HTMLElement {

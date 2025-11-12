@@ -1,16 +1,20 @@
-import type { CharacterController } from '@engine/world';
+import type { Scene } from '@engine/world';
+import { CharacterController } from '@engine/world';
 import type { PhysicsWorld } from '@engine/world';
 import type { Vec3 } from '@engine/core/math';
 import { GroundDetectionCache } from './GroundDetectionCache';
 
 /**
- * System for handling ground detection for character controllers
+ * Independent system for handling ground detection for character controllers
  * 
  * Uses physics raycasting with spatial hash caching to efficiently detect
- * ground for multiple characters. Separated from CharacterControllerSystem
- * to improve separation of concerns.
+ * ground for multiple characters. This system operates independently and
+ * queries CharacterController components from the scene automatically.
+ * 
+ * Must be updated before CharacterControllerSystem.update() in the game loop.
  */
 export class GroundDetectionSystem {
+  private readonly scene: Scene;
   private readonly physics: PhysicsWorld;
   private readonly cache: GroundDetectionCache;
   private currentTime = 0;
@@ -18,22 +22,23 @@ export class GroundDetectionSystem {
   private readonly cleanupInterval = 1.0; // Cleanup every 1 second
 
   /**
+   * @param scene - Scene to query CharacterController components from
    * @param physics - Physics world for raycasting
    * @param cacheCellSize - Size of spatial hash cells in meters (default: 0.5)
    * @param cacheMaxAge - Maximum age of cache entries in seconds (default: 0.1)
    */
-  constructor(physics: PhysicsWorld, cacheCellSize = 0.5, cacheMaxAge = 0.1) {
+  constructor(scene: Scene, physics: PhysicsWorld, cacheCellSize = 0.5, cacheMaxAge = 0.1) {
+    this.scene = scene;
     this.physics = physics;
     this.cache = new GroundDetectionCache(cacheCellSize, cacheMaxAge);
   }
 
   /**
-   * Update ground detection for all controllers
+   * Update ground detection for all character controllers in the scene
    * 
-   * @param controllers - Array of character controllers to update
    * @param deltaTime - Time since last frame in seconds
    */
-  update(controllers: CharacterController[], deltaTime: number): void {
+  update(deltaTime: number): void {
     this.currentTime += deltaTime;
 
     // Cleanup expired cache entries periodically
@@ -42,7 +47,11 @@ export class GroundDetectionSystem {
       this.lastCleanupTime = this.currentTime;
     }
 
-    for (const controller of controllers) {
+    // Query all CharacterController components from the scene
+    const entities = this.scene.queryEntities(CharacterController);
+    for (const entity of entities) {
+      const controller = entity.getComponent(CharacterController) as CharacterController;
+      if (!controller) continue;
       this.updateGroundDetection(controller);
     }
   }

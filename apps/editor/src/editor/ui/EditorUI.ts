@@ -70,7 +70,7 @@ import { EnvironmentComponent } from '@engine/world/components/EnvironmentCompon
 import { AdaptiveUIManager } from './AdaptiveUIManager';
 import { FeatureIntroduction } from './FeatureIntroduction';
 import type { PhysicsWorld } from '@engine/world';
-import type { CharacterControllerSystem } from '@engine/stdlib/CharacterController';
+import type { CharacterControllerSystem, GroundDetectionSystem } from '@engine/stdlib/CharacterController';
 import type { BlockBehaviorSystem } from '@engine/world/systems';
 import { CharacterInputHandler } from '@engine/input';
 import { EditorCameraController, FPSCamera } from '@engine/camera';
@@ -87,8 +87,9 @@ import { RuntimePlayerTag } from '@engine/world/components/RuntimePlayerTag';
 import { CharacterController } from '@engine/world/components/CharacterController';
 import { WeaponComponent } from '@engine/world/components/WeaponComponent';
 import { InventoryComponent } from '@engine/world/components/InventoryComponent';
-import type { PublicUser } from '@engine/net';
 import { frameEditorCameraToScene } from '../utils/cameraFraming';
+import * as auth from '../../utils/auth';
+import type { PublicUser } from '../../utils/auth';
 
 export interface EditorUIConfig {
   canvas: HTMLCanvasElement;
@@ -101,6 +102,7 @@ export interface EditorUIConfig {
   getRenderer: () => Renderer | null;
   physicsWorld?: PhysicsWorld | null;
   characterSystem?: CharacterControllerSystem | null;
+  groundDetectionSystem?: GroundDetectionSystem | null;
   blockBehaviorSystem?: BlockBehaviorSystem | null;
 }
 
@@ -137,6 +139,7 @@ export class EditorUI {
   private collaborationPanelVisible = false;
   private playModeInviteDialog: PlayModeInviteDialog | null = null;
   private weaponHUD: WeaponHUD | null = null;
+  private currentUser: PublicUser | null = null;
 
   // Core systems
   private state: EditorState | null = null;
@@ -327,6 +330,7 @@ export class EditorUI {
 
     const physicsWorld = this.config.physicsWorld ?? null;
     const characterSystem = this.config.characterSystem ?? null;
+    const groundDetectionSystem = this.config.groundDetectionSystem ?? null;
     const blockBehaviorSystem = this.config.blockBehaviorSystem ?? null;
 
     if (!this.characterInput) {
@@ -364,6 +368,7 @@ export class EditorUI {
       controls: this.config.controls,
       physicsWorld,
       characterSystem,
+      groundDetectionSystem,
       blockBehaviorSystem,
       characterInput: this.characterInput,
       fpsCamera: this.fpsCamera,
@@ -632,12 +637,25 @@ export class EditorUI {
         if (!this.loginModal) {
           this.loginModal = new LoginModal({
             onLogin: async (email, password) => {
-              // TODO: Implement actual authentication
-              console.log('[EditorUI] Login attempt:', { email });
-              // For now, just show success message
-              this.setStatusMessage('Login feature coming soon', 2000);
-              // In production, call auth service here
-              // await authService.login(email, password);
+              try {
+                const user = await auth.login(email, password);
+                this.currentUser = user;
+                this.setStatusMessage(`Logged in as ${user.username || user.email}`, 2000);
+                this.quickMenu?.updateAuthState();
+                // Refresh collaboration manager with new token
+                if (this.collaborationManager) {
+                  const token = auth.getTokens().token;
+                  if (token) {
+                    // Reinitialize collaboration with new token
+                    this.collaborationManager.dispose();
+                    this.initializeCollaborationManager();
+                  }
+                }
+              } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : 'Login failed';
+                this.setStatusMessage(errorMessage, 3000);
+                throw error; // Re-throw to let modal handle error display
+              }
             },
             onClose: () => {
               this.loginModal = null;
@@ -650,13 +668,26 @@ export class EditorUI {
         console.log('[EditorUI] Register requested');
         if (!this.registerModal) {
           this.registerModal = new RegisterModal({
-            onRegister: async (email, password) => {
-              // TODO: Implement actual authentication
-              console.log('[EditorUI] Register attempt:', { email });
-              // For now, just show success message
-              this.setStatusMessage('Register feature coming soon', 2000);
-              // In production, call auth service here
-              // await authService.register(email, password);
+            onRegister: async (email, username, password) => {
+              try {
+                const user = await auth.register(email, username, password);
+                this.currentUser = user;
+                this.setStatusMessage(`Registered and logged in as ${user.username || user.email}`, 2000);
+                this.quickMenu?.updateAuthState();
+                // Refresh collaboration manager with new token
+                if (this.collaborationManager) {
+                  const token = auth.getTokens().token;
+                  if (token) {
+                    // Reinitialize collaboration with new token
+                    this.collaborationManager.dispose();
+                    this.initializeCollaborationManager();
+                  }
+                }
+              } catch (error) {
+                const errorMessage = error instanceof Error ? error.message : 'Registration failed';
+                this.setStatusMessage(errorMessage, 3000);
+                throw error; // Re-throw to let modal handle error display
+              }
             },
             onClose: () => {
               this.registerModal = null;
@@ -665,8 +696,8 @@ export class EditorUI {
         }
         this.registerModal.show();
       },
-      isUserLoggedIn: () => false, // Mock for now
-      getUserName: () => null,
+      isUserLoggedIn: () => this.currentUser !== null,
+      getUserName: () => this.currentUser?.username || this.currentUser?.email || null,
     });
     this.quickMenu.mount();
     this.quickMenu.setPlayMode(this.state.editorMode.value === 'play');
@@ -904,103 +935,10 @@ export class EditorUI {
     this.disposables.add(() => this.featureIntro?.dispose());
 
     // Initialize Collaboration Manager (optional - requires auth token)
-    try {
-      // Get JWT token from localStorage (using same key as platform app)
-      const jwtToken = localStorage.getItem('forge_token') || 'temp_token';
-      this.collaborationManager = new CollaborationManager({
-        scene: this.config.scene,
-        physicsWorld: this.config.physicsWorld ?? null,
-        jwtToken,
-        wsUrl: 'ws://localhost:3001',
-        onStart: () => {
-          this.setStatusMessage('Collaboration started', 2000);
-        },
-        onStop: () => {
-          this.setStatusMessage('Collaboration stopped', 2000);
-        },
-      });
-      this.collaborationManager.initialize();
-      
-      // Mount collaboration panel (initially hidden)
-      if (this.collaborationManager) {
-        this.collaborationManager.mountPanel(document.body);
-        // Hide panel initially
-        const panel = this.collaborationManager.getPanel();
-        if (panel) {
-          const root = panel.getRoot();
-          if (root) {
-            root.style.display = 'none';
-          }
-        }
+    this.initializeCollaborationManager();
 
-        // Subscribe to Play Mode synchronization events
-        const unsubscribeRequested = this.collaborationManager.onPlayModeRequested((fromUser, requestId) => {
-          this.handlePlayModeRequest(fromUser, requestId);
-        });
-
-        const unsubscribeStarted = this.collaborationManager.onPlayModeStarted(() => {
-          this.handlePlayModeStart();
-        });
-
-        this.disposables.add(() => {
-          unsubscribeRequested();
-          unsubscribeStarted();
-        });
-
-        // Wire follow/stop-follow actions to ModeManager camera follow
-        if (this.modeManager) {
-          this.collaborationManager.setFollowHandlers(
-            (userId: string) => {
-              this.modeManager?.followUser(userId);
-              this.collaborationManager?.setFollowingUser(userId);
-              this.setStatusMessage(`Following ${userId}`, 1200);
-            },
-            () => {
-              this.modeManager?.stopFollowingUser();
-              this.collaborationManager?.setFollowingUser(null);
-              this.setStatusMessage('Stopped following', 800);
-            }
-          );
-
-          // Wire presenter toggle handler
-          this.collaborationManager.setPresenterToggleHandler((active: boolean) => {
-            if (active) {
-              this.collaborationManager?.enablePresenterMode();
-            } else {
-              this.collaborationManager?.disablePresenterMode();
-            }
-          });
-
-          // React to presenter changes: auto-follow presenter on non-presenters
-          const unbindPresenter = this.collaborationManager.onPresenterChanged((userId) => {
-            const presenterId = userId;
-            if (!presenterId) {
-              this.modeManager?.stopFollowingUser();
-              this.collaborationManager?.setFollowingUser(null);
-              this.setStatusMessage('Presenter mode off', 1000);
-              return;
-            }
-            // If presenter is someone else, follow
-            try {
-              const rid = this.collaborationManager?.getLocalUserId() ?? null;
-              if (!rid || presenterId !== rid) {
-                this.modeManager?.followUser(presenterId);
-                this.collaborationManager?.setFollowingUser(presenterId);
-                this.setStatusMessage('Presenter mode on', 1000);
-              }
-            } catch {}
-          });
-          this.disposables.add(unbindPresenter);
-        }
-      }
-      
-      this.disposables.add(() => {
-        this.playModeInviteDialog?.dispose();
-        this.collaborationManager?.dispose();
-      });
-    } catch (error) {
-      console.warn('Failed to initialize collaboration manager:', error);
-    }
+    // Load current user if authenticated
+    this.loadCurrentUser();
   }
 
   /**
@@ -2151,6 +2089,126 @@ export class EditorUI {
         this.state.placementMode.value = false;
       }
     } catch {}
+  }
+
+  /**
+   * Initializes Collaboration Manager with current auth token.
+   */
+  private initializeCollaborationManager(): void {
+    try {
+      // Get JWT token from localStorage (using same key as platform app)
+      const { token } = auth.getTokens();
+      const jwtToken = token || 'temp_token';
+      this.collaborationManager = new CollaborationManager({
+        scene: this.config.scene,
+        physicsWorld: this.config.physicsWorld ?? null,
+        jwtToken,
+        wsUrl: 'ws://localhost:3001',
+        onStart: () => {
+          this.setStatusMessage('Collaboration started', 2000);
+        },
+        onStop: () => {
+          this.setStatusMessage('Collaboration stopped', 2000);
+        },
+      });
+      this.collaborationManager.initialize();
+      
+      // Mount collaboration panel (initially hidden)
+      if (this.collaborationManager) {
+        this.collaborationManager.mountPanel(document.body);
+        // Hide panel initially
+        const panel = this.collaborationManager.getPanel();
+        if (panel) {
+          const root = panel.getRoot();
+          if (root) {
+            root.style.display = 'none';
+          }
+        }
+
+        // Subscribe to Play Mode synchronization events
+        const unsubscribeRequested = this.collaborationManager.onPlayModeRequested((fromUser, requestId) => {
+          this.handlePlayModeRequest(fromUser, requestId);
+        });
+
+        const unsubscribeStarted = this.collaborationManager.onPlayModeStarted(() => {
+          this.handlePlayModeStart();
+        });
+
+        this.disposables.add(() => {
+          unsubscribeRequested();
+          unsubscribeStarted();
+        });
+
+        // Wire follow/stop-follow actions to ModeManager camera follow
+        if (this.modeManager) {
+          this.collaborationManager.setFollowHandlers(
+            (userId: string) => {
+              this.modeManager?.followUser(userId);
+              this.collaborationManager?.setFollowingUser(userId);
+              this.setStatusMessage(`Following ${userId}`, 1200);
+            },
+            () => {
+              this.modeManager?.stopFollowingUser();
+              this.collaborationManager?.setFollowingUser(null);
+              this.setStatusMessage('Stopped following', 800);
+            }
+          );
+
+          // Wire presenter toggle handler
+          this.collaborationManager.setPresenterToggleHandler((active: boolean) => {
+            if (active) {
+              this.collaborationManager?.enablePresenterMode();
+            } else {
+              this.collaborationManager?.disablePresenterMode();
+            }
+          });
+
+          // React to presenter changes: auto-follow presenter on non-presenters
+          const unbindPresenter = this.collaborationManager.onPresenterChanged((userId) => {
+            const presenterId = userId;
+            if (!presenterId) {
+              this.modeManager?.stopFollowingUser();
+              this.collaborationManager?.setFollowingUser(null);
+              this.setStatusMessage('Presenter mode off', 1000);
+              return;
+            }
+            // If presenter is someone else, follow
+            try {
+              const rid = this.collaborationManager?.getLocalUserId() ?? null;
+              if (!rid || presenterId !== rid) {
+                this.modeManager?.followUser(presenterId);
+                this.collaborationManager?.setFollowingUser(presenterId);
+                this.setStatusMessage('Presenter mode on', 1000);
+              }
+            } catch {}
+          });
+          this.disposables.add(unbindPresenter);
+        }
+      }
+      
+      this.disposables.add(() => {
+        this.playModeInviteDialog?.dispose();
+        this.collaborationManager?.dispose();
+      });
+    } catch (error) {
+      console.warn('Failed to initialize collaboration manager:', error);
+    }
+  }
+
+  /**
+   * Loads current authenticated user from token.
+   */
+  private async loadCurrentUser(): Promise<void> {
+    try {
+      const user = await auth.getCurrentUser();
+      if (user) {
+        this.currentUser = user;
+        this.quickMenu?.updateAuthState();
+      }
+    } catch {
+      // User not authenticated or token invalid
+      this.currentUser = null;
+    }
   }
 }
 

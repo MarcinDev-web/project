@@ -6,7 +6,7 @@ import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { PlayerModeManager } from '../managers/PlayerModeManager.js';
 import { Scene } from '@engine/world';
 import { PhysicsWorld } from '@engine/world';
-import { CharacterControllerSystem } from '@engine/stdlib/CharacterController';
+import { CharacterControllerSystem, GroundDetectionSystem } from '@engine/stdlib/CharacterController';
 import { serializeScene } from '@engine/editor-utils';
 
 // Mock fetch for loadBuildData
@@ -100,6 +100,7 @@ describe.skip('PlayerModeManager', () => {
   let scene: Scene;
   let renderer: any;
   let physicsWorld: PhysicsWorld;
+  let groundDetectionSystem: GroundDetectionSystem;
   let characterSystem: CharacterControllerSystem;
   let characterInput: any;
   let fpsCamera: any;
@@ -110,6 +111,7 @@ describe.skip('PlayerModeManager', () => {
     scene = new Scene('Test Scene');
     renderer = createMockRenderer();
     physicsWorld = new PhysicsWorld(scene);
+    groundDetectionSystem = new GroundDetectionSystem(scene, physicsWorld);
     characterSystem = new CharacterControllerSystem(scene, physicsWorld);
     characterInput = createMockCharacterInput();
     fpsCamera = createMockFpsCamera();
@@ -120,6 +122,7 @@ describe.skip('PlayerModeManager', () => {
       renderer,
       physicsWorld,
       characterSystem,
+      groundDetectionSystem,
       characterInput,
       fpsCamera,
     });

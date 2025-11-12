@@ -89,4 +89,24 @@ export interface OrbitCameraConfig {
   zoomMix?: Partial<OrbitCameraZoomMix>;
 }
 
+/**
+ * Collision provider interface for FPSCamera.
+ * Computes corrected eye position to prevent camera from penetrating geometry.
+ * Implementations must avoid allocations (mutate and return `out`).
+ */
+export interface IFPSCameraCollisionProvider {
+  /**
+   * Resolves eye position to prevent collision with geometry.
+   * @param out Output vector (mutate this)
+   * @param desiredEye Desired eye position
+   * @param forward Forward direction vector
+   * @returns Corrected eye position (same as `out`)
+   */
+  resolveEye(out: Vec3, desiredEye: Readonly<Vec3>, forward: Readonly<Vec3>): Vec3;
+  /**
+   * Optional cleanup hook
+   */
+  dispose?(): void;
+}
+
 

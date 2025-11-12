@@ -4,7 +4,12 @@ import { crossVec3Out, dotVec3, lengthVec3, normalizeVec3Out, scaleVec3Out, type
 import { damp, expDecayAlpha } from '../utils/Damper';
 import { OrbitCameraComponent } from './OrbitCameraComponent';
 
-/** Scratch vectors to avoid allocations in hot path */
+/**
+ * Scratch vectors to avoid allocations in hot path.
+ * These are Float32Array instances cast to Vec3 for performance.
+ * Note: Direct mutation requires 'as any' cast because Vec3 is a tuple type,
+ * but Float32Array is compatible at runtime and provides zero-allocation performance.
+ */
 const V_RIGHT: Vec3 = new Float32Array(3) as unknown as Vec3;
 const V_UP: Vec3 = new Float32Array(3) as unknown as Vec3;
 const V_FORWARD: Vec3 = new Float32Array(3) as unknown as Vec3;
@@ -37,7 +42,7 @@ export class OrbitCameraSystem {
   }
 
   update(dt: number): void {
-    if (!(dt > 0)) return;
+    if (!(dt > 0 && Number.isFinite(dt))) return;
     const entities = this.scene.queryEntities(OrbitCameraComponent, CameraComponent, Transform);
     if (entities.length === 0) return;
 
@@ -115,6 +120,7 @@ export class OrbitCameraSystem {
         // Forward from camera toward target (pivot - eye), right = forward x up
         // forward = [sx, sy, sz] pointing from eye to pivot
         // Using spherical: forward = [cp * sy, sp, cp * cy]
+        // Performance: Float32Array mutation requires 'as any' cast (see scratch vectors comment above)
         (V_FORWARD as any)[0] = cp * sy;
         (V_FORWARD as any)[1] = sp;
         (V_FORWARD as any)[2] = cp * cy;
@@ -127,6 +133,7 @@ export class OrbitCameraSystem {
         const rightLen = lengthVec3(V_RIGHT);
         if (!(rightLen > 0)) {
           // Fallback to canonical right if degenerate
+          // Performance: Float32Array mutation requires 'as any' cast (see scratch vectors comment above)
           (V_RIGHT as any)[0] = 1; (V_RIGHT as any)[1] = 0; (V_RIGHT as any)[2] = 0;
         } else {
           normalizeVec3Out(V_RIGHT, V_RIGHT);
@@ -134,6 +141,7 @@ export class OrbitCameraSystem {
         // screen-up ≈ upWorld projected to plane orthogonal to forward
         // up = normalize(upWorld - dot(upWorld, forward) * forward)
         const du = dotVec3(upWorld, V_FORWARD);
+        // Performance: Float32Array mutation requires 'as any' cast (see scratch vectors comment above)
         (V_UP as any)[0] = upWorld[0] - V_FORWARD[0] * du;
         (V_UP as any)[1] = upWorld[1] - V_FORWARD[1] * du;
         (V_UP as any)[2] = upWorld[2] - V_FORWARD[2] * du;
@@ -145,6 +153,7 @@ export class OrbitCameraSystem {
 
         // desired pivot after raw delta (note dx pans left, dy pans up)
         // pivot' = pivot + (-dx * right + dy * up) * panScale
+        // Performance: Float32Array mutation requires 'as any' cast (see scratch vectors comment above)
         (V_TMP as any)[0] = V_RIGHT[0] * -dx + V_UP[0] * dy;
         (V_TMP as any)[1] = V_RIGHT[1] * -dx + V_UP[1] * dy;
         (V_TMP as any)[2] = V_RIGHT[2] * -dx + V_UP[2] * dy;
@@ -153,10 +162,12 @@ export class OrbitCameraSystem {
         // Smoothly approach desired pivot using pan damping
         const a = expDecayAlpha(ctrl.damping.panTau, dt);
         // pivot = pivot + (delta * a)
-        (V_RIGHT as any)[0] = ctrl.pivot[0] + V_TMP[0] * a;
-        (V_RIGHT as any)[1] = ctrl.pivot[1] + V_TMP[1] * a;
-        (V_RIGHT as any)[2] = ctrl.pivot[2] + V_TMP[2] * a;
-        ctrl.pivot = [V_RIGHT[0], V_RIGHT[1], V_RIGHT[2]];
+        // Performance: Float32Array mutation requires 'as any' cast (see scratch vectors comment above)
+        // Using V_TMP for pivot calculation to avoid reusing V_RIGHT which represents right vector
+        (V_TMP as any)[0] = ctrl.pivot[0] + V_TMP[0] * a;
+        (V_TMP as any)[1] = ctrl.pivot[1] + V_TMP[1] * a;
+        (V_TMP as any)[2] = ctrl.pivot[2] + V_TMP[2] * a;
+        ctrl.pivot = [V_TMP[0], V_TMP[1], V_TMP[2]];
       }
 
       // 3) Smooth current toward targets
@@ -179,17 +190,19 @@ export class OrbitCameraSystem {
       const cp2 = Math.cos(ctrl.pitch);
       const sp2 = Math.sin(ctrl.pitch);
       // forward from eye to pivot (unit): [cp*sin(yaw), sp, cp*cos(yaw)]
+      // Performance: Float32Array mutation requires 'as any' cast (see scratch vectors comment above)
       (V_FORWARD as any)[0] = cp2 * sy2;
       (V_FORWARD as any)[1] = sp2;
       (V_FORWARD as any)[2] = cp2 * cy2;
       // eye = pivot - forward * radius
       scaleVec3Out(V_TMP, V_FORWARD, ctrl.radius);
-      (V_RIGHT as any)[0] = ctrl.pivot[0] - V_TMP[0];
-      (V_RIGHT as any)[1] = ctrl.pivot[1] - V_TMP[1];
-      (V_RIGHT as any)[2] = ctrl.pivot[2] - V_TMP[2];
+      // Performance: Float32Array mutation requires 'as any' cast (see scratch vectors comment above)
+      (V_TMP as any)[0] = ctrl.pivot[0] - V_TMP[0];
+      (V_TMP as any)[1] = ctrl.pivot[1] - V_TMP[1];
+      (V_TMP as any)[2] = ctrl.pivot[2] - V_TMP[2];
 
       // 5) Write transform position and camera properties
-      transform.position = [V_RIGHT[0], V_RIGHT[1], V_RIGHT[2]];
+      transform.position = [V_TMP[0], V_TMP[1], V_TMP[2]];
       cam.fov = ctrl.fov;
       cam.target = [...ctrl.pivot] as Vec3;
       cam.up = [...ctrl.worldUp] as Vec3;

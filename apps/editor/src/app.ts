@@ -7,7 +7,7 @@ import { EditorUI } from './editor/ui/EditorUI';
 import { Logger } from './utils/logger';
 import { CameraComponent } from '@engine/world';
 import { PhysicsWorld } from '@engine/world';
-import { CharacterControllerSystem } from '@engine/stdlib/CharacterController';
+import { CharacterControllerSystem, GroundDetectionSystem } from '@engine/stdlib/CharacterController';
 import { BlockBehaviorSystem, UISystem, InteractionSystem } from '@engine/world/systems';
 import { MeshComponent, InteractableComponent } from '@engine/world';
 import { registerTemplates, applyTo } from '@engine/world-templates';
@@ -25,6 +25,7 @@ export class EditorApp {
   private readonly controls: OrbitControls;
   private readonly raycaster = new Raycaster();
   private physicsWorld: PhysicsWorld | null = null;
+  private groundDetectionSystem: GroundDetectionSystem | null = null;
   private characterSystem: CharacterControllerSystem | null = null;
   private blockBehaviorSystem: BlockBehaviorSystem | null = null;
   private uiSystem: UISystem | null = null;
@@ -134,6 +135,7 @@ export class EditorApp {
       });
 
       this.physicsWorld = new PhysicsWorld(this.scene);
+      this.groundDetectionSystem = new GroundDetectionSystem(this.scene, this.physicsWorld);
       this.characterSystem = new CharacterControllerSystem(this.scene, this.physicsWorld);
       this.blockBehaviorSystem = new BlockBehaviorSystem(this.scene, this.physicsWorld.getSystem());
       this.uiSystem = new UISystem(this.scene);
@@ -167,6 +169,7 @@ export class EditorApp {
         getRenderer: () => this.renderer,
         physicsWorld: this.physicsWorld,
         characterSystem: this.characterSystem,
+        groundDetectionSystem: this.groundDetectionSystem,
         blockBehaviorSystem: this.blockBehaviorSystem,
       });
       await this.editor.initialize();
@@ -232,6 +235,7 @@ export class EditorApp {
     }
 
     this.physicsWorld = null;
+    this.groundDetectionSystem = null;
     this.characterSystem = null;
 
     if (this.uiSystem) {

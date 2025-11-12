@@ -258,6 +258,7 @@ export class FrameRenderer {
       targetState,
       swapChainView,
       featureFlags,
+      sampleCount,
       passDescriptor
     );
 
@@ -936,13 +937,15 @@ export class FrameRenderer {
     targetState: ReturnType<FrameTargetManager['ensureTargets']>,
     swapChainView: GPUTextureView,
     featureFlags: ResolvedFeatureFlags,
+    sampleCount: number,
     passDescriptor?: GPURenderPassDescriptor
   ): GPURenderPassEncoder {
     const enableHDR = featureFlags.enableHDR;
     
-    // Validate texture views are still valid before using them
-    // If textures were destroyed due to device change, views will be invalid
-    let resolveTarget: GPUTextureView;
+    // Only set resolveTarget when MSAA is enabled (sampleCount > 1)
+    // WebGPU spec: resolveTarget is only valid when sampleCount > 1
+    let resolveTarget: GPUTextureView | undefined;
+    if (sampleCount > 1) {
     try {
       resolveTarget = enableHDR ? targetState.hdrView ?? swapChainView : swapChainView;
       // Test if view is still valid by checking if we can create a render pass
@@ -950,11 +953,12 @@ export class FrameRenderer {
     } catch (err) {
       Logger.warn('[FrameRenderer] Invalid resolve target, using swap chain view:', err);
       resolveTarget = swapChainView;
+      }
     }
     
     const colorAttachment: GPURenderPassColorAttachment = {
       view: frameResources.msaaColorView,
-      resolveTarget: resolveTarget,
+      ...(resolveTarget && { resolveTarget }),
       clearValue: CLEAR_COLOR,
       loadOp: 'clear',
       storeOp: 'store',

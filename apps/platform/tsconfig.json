@@ -16,6 +16,8 @@
       "@engine/avatar/*": ["../../packages/avatar/src/*"],
       "@engine/camera": ["../../packages/camera/src"],
       "@engine/camera/*": ["../../packages/camera/src/*"],
+      "@engine/blocks": ["../../packages/blocks/src"],
+      "@engine/blocks/*": ["../../packages/blocks/src/*"],
       "@engine/net": ["../../packages/net/src"],
       "@engine/net/*": ["../../packages/net/src/*"],
       "@engine/net-protocol": ["../../packages/net-protocol/src"],

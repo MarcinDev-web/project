@@ -213,7 +213,6 @@ export class DragDropController {
     const scale = [...entity.transform.scale] as Vec3;
 
     // Visual feedback - make it slightly transparent and blue-ish
-    const originalColor = entity.color ? [...entity.color] : [1, 1, 1, 1];
     entity.color = [0.2, 0.5, 1.0, 0.8]; // Blue with alpha
 
     this.dragState = {

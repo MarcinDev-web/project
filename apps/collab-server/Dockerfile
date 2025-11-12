@@ -73,9 +73,16 @@ RUN find packages -type d -name dist -exec rm -rf {} + 2>/dev/null || true && \
     find packages -name "*.tsbuildinfo" -delete 2>/dev/null || true && \
     pnpm --filter @engine/core build && \
     pnpm --filter @engine/animation build && \
-    pnpm --filter @engine/blocks build && \
     pnpm --filter @engine/economy build && \
+    (cd packages/world && pnpm exec tsc --project tsconfig.build.json --skipLibCheck --noEmit false) && \
+    pnpm --filter @engine/microblocks build && \
+    pnpm --filter @engine/blocks build && \
     (cd packages/world && pnpm exec tsc -b tsconfig.build.json) && \
+    pnpm --filter @engine/stdlib build && \
+    pnpm --filter @engine/script build && \
+    pnpm --filter @engine/camera build && \
+    pnpm --filter @engine/avatar build && \
+    pnpm --filter @engine/gfx-webgpu build && \
     pnpm --filter @engine/net-protocol build && \
     pnpm --filter @engine/net-server build && \
     pnpm -C apps/collab-server build
@@ -108,8 +115,15 @@ COPY --from=builder --chown=nodejs:nodejs /app/apps/collab-server/package.json .
 COPY --from=builder --chown=nodejs:nodejs /app/packages ./packages
 COPY --from=builder --chown=nodejs:nodejs /app/shared ./shared
 
-# Install production dependencies
-RUN CI=true pnpm install --no-frozen-lockfile --prod
+# Install production dependencies and rebuild native modules
+# Install build tools temporarily for native module compilation (bcrypt)
+# Also install Prisma CLI for migrations
+# pnpm ignores build scripts by default in CI, so we rebuild bcrypt manually
+RUN apk add --no-cache --virtual .build-deps python3 make g++ && \
+    CI=true pnpm install --no-frozen-lockfile --prod && \
+    pnpm add -g prisma@^5.22.0 || npm install -g prisma@^5.22.0 || true && \
+    pnpm rebuild bcrypt --prod || find /app/node_modules/.pnpm -name "bcrypt" -type d -path "*/bcrypt@*/node_modules/bcrypt" -exec sh -c 'cd "{}" && npm rebuild' \; || true && \
+    apk del .build-deps
 
 # Copy generated Prisma client from builder stage
 # Prisma client is generated at apps/node_modules/.prisma/collab-client (relative to prisma folder: ../../node_modules)
@@ -124,8 +138,16 @@ RUN mkdir -p ./node_modules/.prisma/client && \
     ln -sf ../collab-client ./node_modules/.prisma/client/default || \
     cp -r ./node_modules/.prisma/collab-client ./node_modules/.prisma/client/default
 
+# Copy Prisma migrations for runtime migration execution
+COPY --from=builder --chown=nodejs:nodejs /app/apps/collab-server/prisma/migrations ./apps/collab-server/prisma/migrations
+COPY --from=builder --chown=nodejs:nodejs /app/apps/collab-server/prisma/schema.prisma ./apps/collab-server/prisma/schema.prisma
+
 # Copy built application from builder stage
 COPY --from=builder --chown=nodejs:nodejs /app/apps/collab-server/dist ./apps/collab-server/dist
+
+# Copy Docker entrypoint for runtime checks and migrations
+COPY --from=builder /app/apps/collab-server/docker/entrypoint.sh ./apps/collab-server/docker/entrypoint.sh
+RUN chmod +x /app/apps/collab-server/docker/entrypoint.sh
 
 # Prune dev dependencies (keep only production)
 RUN CI=true pnpm prune --prod
@@ -133,12 +155,16 @@ RUN CI=true pnpm prune --prod
 # Switch to non-root user
 USER nodejs
 
+# Change working directory to where index.js is located for correct relative imports
+WORKDIR /app/apps/collab-server/dist
+
 EXPOSE 4000
 
 # Health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:4000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"
 
-CMD ["node", "apps/collab-server/dist/index.js"]
+ENTRYPOINT ["/app/apps/collab-server/docker/entrypoint.sh"]
+CMD ["node", "index.js"]
 
 

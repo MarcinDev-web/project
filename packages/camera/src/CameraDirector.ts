@@ -6,6 +6,7 @@ import type { OrbitControls } from './OrbitCamera';
 import type { FPSCamera } from './FPSCamera';
 import type { EditorCameraController } from './EditorCameraController';
 import type { ThirdPersonCamera } from './ThirdPersonCamera';
+import { FPSRaycastCollision } from './collision/FPSRaycastCollision';
 
 // Default rendering config constants
 const FOV_RADIANS = (2 * Math.PI) / 5;
@@ -121,6 +122,19 @@ export class CameraDirector {
     
     // Enable the default camera mode (free-fly for editor)
     this.enableCameraForMode(this.currentMode);
+
+    // Setup collision detection for FPS camera if physics world is available
+    if (this.fpsCamera && this.physicsWorld) {
+      const collisionProvider = new FPSRaycastCollision({
+        physics: this.physicsWorld,
+        radius: this.collisionRadius,
+        backoff: 0.03,
+        maxIters: 2,
+        sampleCount: 6,
+      });
+      this.fpsCamera.setCollisionProvider(collisionProvider);
+      this.fpsCamera.setCollisionEnabled(true);
+    }
   }
 
   /**
@@ -447,8 +461,15 @@ export class CameraDirector {
     const height = this.canvas.height;
     const aspect = width > 0 && height > 0 ? (width / height) : 1;
     
-    // Always update projection (same for all modes currently)
-    mat4Perspective(this.projectionMatrix, this.currentFov, aspect, Z_NEAR, Z_FAR);
+    // Get FOV from active camera (FPSCamera manages its own FOV, others use currentFov)
+    let activeFov = this.currentFov;
+    if (this.currentMode === 'fps' && this.fpsCamera) {
+      // Use FOV from FPSCamera if available
+      activeFov = this.fpsCamera.getFov();
+    }
+    
+    // Update projection matrix
+    mat4Perspective(this.projectionMatrix, activeFov, aspect, Z_NEAR, Z_FAR);
     
     // Update view matrix based on mode (if not blending)
     if (!this.blend) {
@@ -536,39 +557,12 @@ export class CameraDirector {
   }
 
   private resolveCameraCollision(playerPosition: Vec3): Vec3 {
-    if (!this.physicsWorld || !this.scene || !this.fpsCamera) {
-      return playerPosition;
-    }
-
-    const eyeOffset: Vec3 = [playerPosition[0], playerPosition[1], playerPosition[2]];
-
-    const forward = this.fpsCamera.getForwardDirection();
-    const desiredPosition: Vec3 = [
-      eyeOffset[0],
-      eyeOffset[1],
-      eyeOffset[2],
-    ];
-
-    const rayOrigin: Vec3 = [
-      eyeOffset[0],
-      eyeOffset[1],
-      eyeOffset[2],
-    ];
-    const rayDirection: Vec3 = [forward[0] * -1, forward[1] * -1, forward[2] * -1];
-
-    const hit = this.physicsWorld.raycast(rayOrigin, rayDirection, {
-      maxDistance: this.collisionRadius,
-      ignoreEntities: [],
-    });
-
-    if (hit && hit.distance < this.collisionRadius) {
-      const penetration = this.collisionRadius - hit.distance;
-      desiredPosition[0] += rayDirection[0] * penetration;
-      desiredPosition[1] += rayDirection[1] * penetration;
-      desiredPosition[2] += rayDirection[2] * penetration;
-    }
-
-    return desiredPosition;
+    // Collision detection is now handled by FPSCamera's collision provider
+    // This method is kept for backward compatibility but no longer performs collision
+    // The old implementation was moved to FPSRaycastCollision provider
+    // Scene is available here for future extensions if needed
+    void this.scene; // Suppress unused warning
+    return playerPosition;
   }
 
   /**

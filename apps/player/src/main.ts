@@ -1,4 +1,4 @@
-import { bootstrap } from './bootstrap';
+import { bootstrap } from './bootstrap.js';
 import { Logger } from './utils/logger';
 
 bootstrap().catch((error) => {

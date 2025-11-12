@@ -1,4 +1,4 @@
-import type { Scene, Entity } from '@engine/world';
+import type { Scene } from '@engine/world';
 import type { Renderer } from '@engine/gfx-webgpu';
 import { Logger } from '../utils/logger';
 import type { Vec3 } from '@engine/core/math';
@@ -30,7 +30,6 @@ export interface PerformanceMetrics {
  */
 export class PerformanceSystem {
   private scene: Scene | null = null;
-  private renderer: Renderer | null = null;
   private cameraPosition: Vec3 | null = null;
   private cameraForward: Vec3 | null = null;
   
@@ -40,10 +39,11 @@ export class PerformanceSystem {
   private enableFrustumCulling = true;
   
   // Performance monitoring
-  private frameCount = 0;
   private lastFPSUpdate = 0;
   private frameTimes: number[] = [];
   private maxFrameTimeSamples = 60;
+  private currentDrawCalls = 0;
+  private currentTriangles = 0;
   private currentMetrics: PerformanceMetrics = {
     fps: 60,
     frameTime: 16.67,
@@ -57,7 +57,13 @@ export class PerformanceSystem {
    */
   initialize(scene: Scene, renderer: Renderer): void {
     this.scene = scene;
-    this.renderer = renderer;
+    
+    // Subscribe to render stats updates
+    renderer.onRenderStats((stats) => {
+      this.currentDrawCalls = stats.drawCalls;
+      this.currentTriangles = stats.triangles;
+    });
+    
     Logger.debug('[PerformanceSystem] Initialized');
   }
 
@@ -102,11 +108,11 @@ export class PerformanceSystem {
       const distance = this.calculateDistance(this.cameraPosition, entityPosition);
       
       let lodLevel: LODLevel;
-      if (distance < this.lodDistances[0]) {
+      if (distance < this.lodDistances[0]!) {
         lodLevel = LODLevel.HIGH;
-      } else if (distance < this.lodDistances[1]) {
+      } else if (distance < this.lodDistances[1]!) {
         lodLevel = LODLevel.MEDIUM;
-      } else if (distance < this.lodDistances[2]) {
+      } else if (distance < this.lodDistances[2]!) {
         lodLevel = LODLevel.LOW;
       } else {
         lodLevel = LODLevel.CULLED;
@@ -166,8 +172,8 @@ export class PerformanceSystem {
     this.currentMetrics = {
       fps: Math.round(fps),
       frameTime: Math.round(avgFrameTime * 100) / 100,
-      drawCalls: 0, // TODO: Get from renderer
-      triangles: 0, // TODO: Get from renderer
+      drawCalls: this.currentDrawCalls,
+      triangles: this.currentTriangles,
       entities: this.scene?.getAllEntities().length ?? 0,
     };
     
@@ -222,7 +228,6 @@ export class PerformanceSystem {
    */
   dispose(): void {
     this.scene = null;
-    this.renderer = null;
     this.cameraPosition = null;
     this.cameraForward = null;
     this.frameTimes = [];

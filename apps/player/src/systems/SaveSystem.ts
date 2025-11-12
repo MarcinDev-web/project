@@ -1,6 +1,5 @@
 import type { Vec3 } from '@engine/core/math';
 import { Logger } from '../utils/logger';
-import type { CheckpointSystem } from './CheckpointSystem.js';
 
 /**
  * Game save data structure
@@ -32,16 +31,13 @@ export interface GameSaveData {
  * - Auto-save support
  */
 export class SaveSystem {
-  private checkpointSystem: CheckpointSystem | null = null;
   private buildId: string | null = null;
   private readonly storageKeyPrefix = 'forge_player_save_';
-  private readonly maxSlots = 10;
 
   /**
    * Initialize save system
    */
-  initialize(checkpointSystem: CheckpointSystem, buildId: string): void {
-    this.checkpointSystem = checkpointSystem;
+  initialize(buildId: string): void {
     this.buildId = buildId;
     Logger.debug('[SaveSystem] Initialized');
   }
@@ -67,15 +63,8 @@ export class SaveSystem {
     }
 
     try {
-      const checkpoint = this.checkpointSystem?.getActiveCheckpoint();
-      let checkpointPath: number[] | undefined;
-      
-      // Try to get checkpoint path if active
-      if (checkpoint?.entity) {
-        // Note: Entity path calculation would need to be implemented
-        // For now, we'll just store checkpoint position
-        checkpointPath = undefined; // TODO: Calculate entity path
-      }
+      // TODO: Calculate checkpoint path when checkpoint entity path calculation is implemented
+      const checkpointPath: number[] | undefined = undefined;
 
       const saveData: GameSaveData = {
         slotId,
@@ -83,8 +72,8 @@ export class SaveSystem {
         timestamp: Date.now(),
         playerPosition: [...playerPosition] as Vec3,
         playerRotation,
-        checkpointPath,
-        gameState,
+        ...(checkpointPath !== undefined && { checkpointPath }),
+        ...(gameState !== undefined && { gameState }),
       };
 
       const storageKey = `${this.storageKeyPrefix}${slotId}`;
@@ -239,7 +228,6 @@ export class SaveSystem {
    * Dispose of resources
    */
   dispose(): void {
-    this.checkpointSystem = null;
     this.buildId = null;
   }
 }

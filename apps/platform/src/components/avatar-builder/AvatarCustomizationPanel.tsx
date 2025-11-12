@@ -211,7 +211,7 @@ export function AvatarCustomizationPanel({
                 slot={selectedSlot}
                 {...(selectedPart?.material !== undefined && { currentMaterial: selectedPart.material })}
                 onMaterialChange={handleMaterialChange}
-                availableMaterials={builderCore?.getAvailableMaterials()}
+                {...(builderCore && { availableMaterials: builderCore.getAvailableMaterials() })}
               />
             )}
           </div>
@@ -230,8 +230,21 @@ export function AvatarCustomizationPanel({
         onRotateRight={() => builderCore?.rotateRight()}
         onPlayAnimation={(animation) => builderCore?.playAnimation(animation)}
         onResetPose={() => builderCore?.resetPose()}
-        availableAnimations={builderCore?.getAvailableAnimations()}
-        currentAnimation={builderCore?.getAvatarInstance()?.getAnimator()?.getCurrentAnimation() || null}
+        {...(builderCore?.getAvailableAnimations() !== undefined && {
+          availableAnimations: builderCore.getAvailableAnimations(),
+        })}
+        currentAnimation={(() => {
+          const avatarInstance = builderCore?.getAvatarInstance();
+          if (!avatarInstance) return null;
+          const animComponent = avatarInstance.getAnimationComponent();
+          if (!animComponent) return null;
+          const activeStateName = animComponent.getActiveState();
+          if (!activeStateName) return null;
+          const availableAnimations = builderCore?.getAvailableAnimations();
+          if (!availableAnimations) return null;
+          const match = availableAnimations.find((a) => a.animation.name === activeStateName);
+          return match?.animation || null;
+        })()}
       />
     </div>
   );

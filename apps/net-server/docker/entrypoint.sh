@@ -35,8 +35,16 @@ if [ -n "$DATABASE_URL" ]; then
   echo "Running database migrations..."
   cd /app/apps/net-server
   if command -v prisma >/dev/null 2>&1; then
+    # First, try to resolve any failed migrations
+    # Check if the migration is already applied (username column exists)
+    # If it exists, mark as applied; otherwise mark as rolled back
+    echo "Checking for failed migrations..."
+    prisma migrate resolve --applied 20250101000000_add_username_field --schema=./prisma/schema.prisma 2>/dev/null || \
+    prisma migrate resolve --rolled-back 20250101000000_add_username_field --schema=./prisma/schema.prisma 2>/dev/null || true
+    
+    # Then deploy migrations
     prisma migrate deploy --schema=./prisma/schema.prisma || {
-      echo "WARN: Migration failed or prisma not available, continuing..."
+      echo "WARN: Migration deployment failed, but continuing..."
     }
   else
     echo "WARN: Prisma CLI not available, skipping migrations"

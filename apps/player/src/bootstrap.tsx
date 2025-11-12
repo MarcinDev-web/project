@@ -5,13 +5,15 @@
 import { initRenderer } from '@engine/gfx-webgpu';
 import { Scene } from '@engine/world';
 import { PhysicsWorld } from '@engine/world';
-import { CharacterControllerSystem } from '@engine/stdlib/CharacterController';
+import { CharacterControllerSystem, GroundDetectionSystem } from '@engine/stdlib/CharacterController';
 import { FPSCamera } from '@engine/camera';
 import { CharacterInputHandler } from '@engine/input';
 import { PlayerModeManager } from './managers/PlayerModeManager.js';
 import { PlayerStateType } from './core/PlayerStateMachine.js';
 import { Logger } from './utils/logger';
 import { requirePlayerDom } from './utils/dom';
+import { initHUD } from './ui/index.js';
+import type { HUDProps } from './ui/HUD.js';
 
 export async function bootstrap(): Promise<void> {
   const dom = requirePlayerDom();
@@ -58,6 +60,9 @@ export async function bootstrap(): Promise<void> {
     
     const physicsWorld = new PhysicsWorld(scene);
     
+    // Initialize ground detection system
+    const groundDetectionSystem = new GroundDetectionSystem(scene, physicsWorld);
+    
     // Initialize character system
     const characterSystem = new CharacterControllerSystem(scene, physicsWorld);
     
@@ -75,12 +80,42 @@ export async function bootstrap(): Promise<void> {
       dom.statusEl.textContent = 'Loading game...';
     }
     
-    const playerManager = new PlayerModeManager({
+    // Initialize HUD state
+    let showPauseMenu = false;
+    let showDisconnectUI = false;
+    let hudUnmount: (() => void) | null = null;
+    let playerManager: PlayerModeManager;
+    
+    // Initialize HUD update function (will be called after playerManager is created)
+    const updateHUD = () => {
+      if (hudUnmount) {
+        hudUnmount();
+      }
+      
+      const hudProps: HUDProps = {
+        showPauseMenu,
+        showDisconnectUI,
+        onResume: () => {
+          playerManager.requestResume();
+        },
+        onExit: () => {
+          void playerManager.exit();
+        },
+        onReconnect: () => {
+          void playerManager.requestReconnect();
+        },
+      };
+      
+      hudUnmount = initHUD(hudProps);
+    };
+    
+    playerManager = new PlayerModeManager({
       canvas: dom.canvas,
       scene,
       renderer,
       physicsWorld,
       characterSystem,
+      groundDetectionSystem,
       characterInput,
       fpsCamera,
       onLoadingProgress: (step: string, percentage: number, message?: string) => {
@@ -89,14 +124,19 @@ export async function bootstrap(): Promise<void> {
         }
       },
       onPauseMenuVisibilityChange: (visible: boolean) => {
-        // TODO: Show/hide pause menu UI
+        showPauseMenu = visible;
+        updateHUD();
         Logger.debug(`Pause menu visibility: ${visible}`);
       },
       onDisconnectUIVisibilityChange: (visible: boolean) => {
-        // TODO: Show/hide disconnect UI
+        showDisconnectUI = visible;
+        updateHUD();
         Logger.debug(`Disconnect UI visibility: ${visible}`);
       },
     });
+    
+    // Initial HUD render (after playerManager is created)
+    updateHUD();
     
     // Initialize player mode (loads build data, spawns player, etc.)
     await playerManager.initialize(buildId);
@@ -155,6 +195,9 @@ export async function bootstrap(): Promise<void> {
     
     // Cleanup on page unload
     window.addEventListener('beforeunload', () => {
+      if (hudUnmount) {
+        hudUnmount();
+      }
       playerManager.dispose();
     }, { once: true });
     

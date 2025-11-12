@@ -1,27 +1,45 @@
-# Architecture - UGC 3D Platform
+# Architecture - Forge Engine
 
 **Jedno źródło prawdy o architekturze projektu**
 
 ## Przegląd
 
-Modularny silnik 3D oparty na WebGPU z profesjonalnym edytorem scen. Architektura monorepo z czystym podziałem na pakiety silnika i aplikacje.
+Modularny silnik 3D oparty na WebGPU z profesjonalnym edytorem scen i kompletną platformą multiplayer. Architektura monorepo z czystym podziałem na pakiety silnika i aplikacje.
 
 ## Struktura Projektu
 
 ```
-ugc-3d-platform/
+forge-engine/
 ├── packages/           # Pakiety silnika (@engine/*)
 │   ├── core/          # Fundament (math, ECS types, event, job, utils)
 │   ├── world/         # ECS runtime + fizyka
 │   ├── gfx-webgpu/    # Renderer WebGPU
 │   ├── script/        # Skryptowanie UGC (LogicCubes)
+│   ├── stdlib/        # Biblioteka standardowa (animation, audio, character)
 │   ├── input/         # Input management
 │   ├── camera/        # Systemy kamer
-│   ├── stdlib/        # Biblioteka standardowa
-│   ├── editor-utils/  # Narzędzia edytorskie (NEW)
-│   └── test-utils/    # Narzędzia testowe (mocks, fixtures, assertions)
+│   ├── editor-utils/  # Narzędzia edytorskie (history, snap)
+│   ├── test-utils/    # Narzędzia testowe (mocks, fixtures, assertions)
+│   ├── animation/     # System animacji
+│   ├── avatar/        # System awatarów i customizacji
+│   ├── blocks/        # System bloków i generacji modeli
+│   ├── brand/         # Branding i zasoby wizualne
+│   ├── economy/       # System ekonomii i walut
+│   ├── gateway/       # API gateway i rate limiting
+│   ├── microblocks/   # System mikrobloków (voxel)
+│   ├── net/           # Networking client-side
+│   ├── net-protocol/  # Definicje protokołu sieciowego
+│   ├── net-server/    # Networking server-side
+│   ├── voxel/         # System voxeli i renderowania chunków
+│   ├── wasm-collision/# WASM collision detection
+│   ├── world-server/  # Server-side world management
+│   └── world-templates/ # Szablony światów
 ├── apps/              # Aplikacje
-│   └── editor/        # Edytor scen 3D
+│   ├── editor/        # Edytor scen 3D
+│   ├── player/        # Klient gry (player)
+│   ├── platform/      # Platforma web (dashboard, marketplace)
+│   ├── net-server/    # Serwer API i bazy danych
+│   └── collab-server/ # Serwer kolaboracji WebRTC
 └── docs/              # Dokumentacja
 ```
 
@@ -170,6 +188,147 @@ const history = new HistoryManager(100);
 const snap = new SnapSystem({ increment: 0.5 });
 ```
 
+### @engine/animation
+**System animacji** - zaawansowany runtime animacji
+
+**Eksportuje:**
+- AnimationClip, AnimationTrack - klipy i ścieżki animacji
+- AnimationBlender - mieszanie animacji
+- GLTF animation support - import z GLTF
+- Skeletal animation - animacja szkieletowa z skinningiem
+
+**Zależności:** `@engine/core`, `@engine/world`
+
+### @engine/avatar
+**System awatarów** - customizacja postaci
+
+**Eksportuje:**
+- AvatarBuilder - builder awatarów
+- BodyPart, CharacterRig - części ciała i rigging
+- AvatarCustomizer - system customizacji
+
+**Zależności:** `@engine/core`, `@engine/world`, `@engine/animation`
+
+### @engine/blocks
+**System bloków** - definicje i generacja modeli
+
+**Eksportuje:**
+- BlockLibrary - biblioteka bloków
+- ModelBuilder - proceduralny generator modeli
+- BlockPalette - palety bloków
+
+**Zależności:** `@engine/core`, `@engine/world`
+
+### @engine/economy
+**System ekonomii** - wirtualna waluta i transakcje
+
+**Eksportuje:**
+- CurrencySystem - zarządzanie walutami
+- TransactionManager - system transakcji
+- MarketplaceIntegration - integracja z marketplace
+
+**Zależności:** `@engine/core`
+
+### @engine/voxel
+**System voxeli** - renderowanie i generacja terenu
+
+**Eksportuje:**
+- VoxelChunk, VoxelWorld - chunki i świat voxelowy
+- TerrainGenerator - generator terenu
+- VoxelRenderer - renderer voxeli
+
+**Zależności:** `@engine/core`, `@engine/world`, `@engine/gfx-webgpu`
+
+### @engine/microblocks
+**Mikrobloki** - precyzyjne budowanie
+
+**Eksportuje:**
+- MicroblockSystem - system mikrobloków
+- SubBlockPlacement - umieszczanie sub-bloków
+- AdvancedPlacementTools - zaawansowane narzędzia
+
+**Zależności:** `@engine/core`, `@engine/world`
+
+### @engine/world-templates
+**Szablony światów** - gotowe konfiguracje
+
+**Eksportuje:**
+- WorldTemplate - system szablonów
+- TemplateLoader - ładowanie szablonów
+- ScenarioBuilder - builder scenariuszy
+
+**Zależności:** `@engine/core`, `@engine/world`
+
+### @engine/net
+**Networking client** - synchronizacja multiplayer (klient)
+
+**Eksportuje:**
+- NetworkClient - klient sieciowy
+- EntitySync - synchronizacja encji
+- ZoneManager - zarządzanie strefami
+
+**Zależności:** `@engine/core`, `@engine/world`
+
+### @engine/net-protocol
+**Protokół sieciowy** - definicje wspólne
+
+**Eksportuje:**
+- MessageTypes - typy wiadomości
+- Serialization - serializacja danych
+- ProtocolVersion - wersjonowanie protokołu
+
+**Zależności:** Brak (shared)
+
+### @engine/net-server
+**Networking server** - logika serwera
+
+**Eksportuje:**
+- ServerNetworkManager - zarządzanie siecią
+- SessionManager - zarządzanie sesjami
+- ServerZoneManager - serwer stref
+
+**Zależności:** `@engine/core`, `@engine/world-server`, `@engine/net-protocol`
+
+### @engine/world-server
+**Server world** - symulacja po stronie serwera
+
+**Eksportuje:**
+- ServerWorld - świat serwerowy
+- HeadlessPhysics - fizyka bez renderowania
+- ServerEntityManager - zarządzanie encjami
+
+**Zależności:** `@engine/core`, `@engine/world`
+
+### @engine/gateway
+**API Gateway** - zarządzanie API
+
+**Eksportuje:**
+- APIGateway - gateway API
+- RateLimiter - rate limiting
+- TokenAuth - autentykacja tokenowa
+- ServiceRegistry - rejestr serwisów
+
+**Zależności:** Brak (standalone)
+
+### @engine/brand
+**Branding** - zasoby brandingowe
+
+**Eksportuje:**
+- Logo, Wordmark - zasoby logo
+- BrandColors - kolory brandingowe
+- Typography - typografia
+
+**Zależności:** Brak (assets)
+
+### @engine/wasm-collision
+**WASM Collision** - detekcja kolizji w WASM
+
+**Eksportuje:**
+- WASMCollisionWorld - świat kolizji WASM
+- initWASM - inicjalizacja modułu
+
+**Zależności:** Rust/WASM
+
 ## Aplikacje
 
 ### @apps/editor
@@ -188,20 +347,80 @@ const snap = new SnapSystem({ increment: 0.5 });
 
 **Zależności:** wszystkie pakiety @engine/*
 
+### @apps/player
+**Klient gry** - aplikacja do grania
+
+**Funkcje:**
+- Multiplayer support
+- Real-time synchronization
+- Save system i checkpoints
+- Performance monitoring
+- Chat system
+- Input handling
+
+**Zależności:** `@engine/core`, `@engine/world`, `@engine/gfx-webgpu`, `@engine/stdlib`, `@engine/net`, `@engine/avatar`
+
+### @apps/platform
+**Platforma Web** - interfejs platformy
+
+**Funkcje:**
+- User dashboard
+- Game browser i launcher
+- Studio i zarządzanie projektami
+- Marketplace (assets, games)
+- Social (friends, chat, forum)
+- User profiles
+
+**Zależności:** React, własne API
+
+### @apps/net-server
+**Serwer API** - backend platformy
+
+**Funkcje:**
+- RESTful API
+- Authentication (JWT)
+- Database (Prisma + PostgreSQL)
+- WebSocket support
+- Asset storage
+- User management
+- Forum, marketplace, studio
+
+**Zależności:** Express, Prisma, WebSocket
+
+### @apps/collab-server
+**Serwer kolaboracji** - real-time multiplayer
+
+**Funkcje:**
+- WebRTC signaling
+- Room management
+- Real-time synchronization
+- Session handling
+
+**Zależności:** WebSocket, WebRTC
+
 ## Zasady Architektoniczne
 
 ### Dependency Flow
 ```
-core → world → {gfx-webgpu, assets, script, input, camera, stdlib}
-                          ↓
-                       editor
+Level 0: core (fundament)
+         ↓
+Level 1: world, net-protocol (shared)
+         ↓
+Level 2: gfx-webgpu, script, input, camera, stdlib, animation, 
+         blocks, voxel, microblocks, world-templates, net, 
+         world-server, editor-utils, avatar
+         ↓
+Level 3: net-server, gateway
+         ↓
+Level 4: apps (editor, player, platform, net-server, collab-server)
 ```
 
 **Reguły:**
-- Core nie ma zależności
-- World zależy tylko od core
-- Inne pakiety zależą od core i/lub world
-- Editor zależy od wszystkich
+- Core nie ma zależności (Level 0)
+- World zależy tylko od core (Level 1)
+- Pakiety silnika zależą od core i/lub world (Level 2)
+- Networking i gateway na Level 3
+- Aplikacje zależą od odpowiednich pakietów (Level 4)
 - Brak cyklicznych zależności (oprócz world ↔ stdlib - dozwolone)
 
 ### Module Boundaries
@@ -387,5 +606,5 @@ Architecture Decision Records w `adr/`:
 
 ---
 
-**Status:** ✅ Migracja do modularnej architektury zakończona (Fazy 0-8)  
-**Ostatnia aktualizacja:** 2025-10-26
+**Status:** ✅ Architektura produkcyjna - kompletna platforma multiplayer  
+**Ostatnia aktualizacja:** 2025-11-12

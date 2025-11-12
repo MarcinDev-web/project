@@ -28,7 +28,7 @@ import { CameraDirector } from '@engine/camera';
 import type { OrbitControls, EditorCameraController } from '@engine/camera';
 import type { FPSCamera } from '@engine/camera';
 // Note: FPSCamera and ThirdPersonCamera are not used in editor, only in play mode
-import type { CharacterControllerSystem } from '@engine/stdlib/CharacterController';
+import type { CharacterControllerSystem, GroundDetectionSystem } from '@engine/stdlib/CharacterController';
 import type { CharacterInputHandler } from '@engine/input';
 import {
   AvatarInstance,
@@ -68,6 +68,7 @@ export interface EditorModeManagerConfig {
   controls: OrbitControls;
   physicsWorld?: PhysicsWorld | null;
   characterSystem?: CharacterControllerSystem | null;
+  groundDetectionSystem?: GroundDetectionSystem | null;
   blockBehaviorSystem?: BlockBehaviorSystem | null;
   characterInput?: CharacterInputHandler | null;
   fpsCamera?: FPSCamera | null;
@@ -105,6 +106,7 @@ export class EditorModeManager {
   // Systems
   private readonly physicsWorld: PhysicsWorld | null;
   private readonly characterSystem: CharacterControllerSystem | null;
+  private readonly groundDetectionSystem: GroundDetectionSystem | null;
   private readonly blockBehaviorSystem: BlockBehaviorSystem | null;
   private readonly characterInput: CharacterInputHandler | null;
   private readonly editorCamera: EditorCameraController | null;
@@ -133,6 +135,7 @@ export class EditorModeManager {
   constructor(private readonly config: EditorModeManagerConfig) {
     this.physicsWorld = config.physicsWorld ?? null;
     this.characterSystem = config.characterSystem ?? null;
+    this.groundDetectionSystem = config.groundDetectionSystem ?? null;
     this.blockBehaviorSystem = config.blockBehaviorSystem ?? null;
     this.characterInput = config.characterInput ?? null;
     this.editorCamera = config.editorCamera ?? null;
@@ -716,6 +719,8 @@ export class EditorModeManager {
     let steps = 0;
     while (this.playAccumulator >= fixedDeltaTime && steps < maxSubsteps) {
       this.physicsWorld?.update(fixedDeltaTime);
+      // Ground detection must be updated before character controllers
+      this.groundDetectionSystem?.update(fixedDeltaTime);
       this.characterSystem?.update(fixedDeltaTime);
       this.blockBehaviorSystem?.update(fixedDeltaTime);
       this.playerSession?.update(fixedDeltaTime);

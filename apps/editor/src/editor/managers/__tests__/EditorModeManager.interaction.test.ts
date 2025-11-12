@@ -7,7 +7,7 @@ import { SelectionManager } from '@engine/world';
 import type { OrbitControls, EditorCameraController } from '@engine/camera';
 import { CharacterInputHandler } from '@engine/input';
 // FPSCamera not used in editor - only in play mode
-import { CharacterControllerSystem } from '@engine/stdlib/CharacterController';
+import { CharacterControllerSystem, GroundDetectionSystem } from '@engine/stdlib/CharacterController';
 import { PhysicsWorld } from '@engine/world/physics';
 import { PlayModeStateType } from '../../core/PlayModeStateMachine';
 import { ReturnState } from '../../states/ReturnState';
@@ -99,6 +99,7 @@ describe('EditorModeManager – regresyjne scenariusze', () => {
   let controls: OrbitControls;
   let editorCamera: EditorCameraController;
   let physicsWorld: PhysicsWorld;
+  let groundDetectionSystem: GroundDetectionSystem;
   let characterSystem: CharacterControllerSystem;
   let characterInput: CharacterInputHandler;
   let modeManager: EditorModeManager;
@@ -121,6 +122,7 @@ describe('EditorModeManager – regresyjne scenariusze', () => {
     editorCamera = createMockEditorCamera();
 
     physicsWorld = new PhysicsWorld(scene);
+    groundDetectionSystem = new GroundDetectionSystem(scene, physicsWorld);
     characterSystem = new CharacterControllerSystem(scene, physicsWorld);
     characterInput = new CharacterInputHandler();
     // FPS camera not used in editor - only in play mode
@@ -140,6 +142,7 @@ describe('EditorModeManager – regresyjne scenariusze', () => {
       controls,
       physicsWorld,
       characterSystem,
+      groundDetectionSystem,
       characterInput,
       fpsCamera: null, // Not used in editor - only in play mode
       editorCamera,

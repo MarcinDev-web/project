@@ -3,6 +3,7 @@
   "compilerOptions": {
     "outDir": "./dist",
     "baseUrl": ".",
+    "jsx": "react-jsx",
     "paths": {
       "@engine/core": ["../../packages/core/src"],
       "@engine/core/*": ["../../packages/core/src/*"],
@@ -17,7 +18,11 @@
       "@engine/stdlib": ["../../packages/stdlib/src"],
       "@engine/stdlib/*": ["../../packages/stdlib/src/*"],
       "@engine/editor-utils": ["../../packages/editor-utils/src"],
-      "@engine/editor-utils/*": ["../../packages/editor-utils/src/*"]
+      "@engine/editor-utils/*": ["../../packages/editor-utils/src/*"],
+      "@engine/script": ["../../packages/script/src"],
+      "@engine/script/*": ["../../packages/script/src/*"],
+      "@engine/avatar": ["../../packages/avatar/src"],
+      "@engine/avatar/*": ["../../packages/avatar/src/*"]
     }
   },
   "include": ["src/**/*", "index.html"],

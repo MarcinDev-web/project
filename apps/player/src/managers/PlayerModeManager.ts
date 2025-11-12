@@ -8,7 +8,7 @@
 import { Scene, Entity } from '@engine/world';
 import type { Renderer } from '@engine/gfx-webgpu';
 import type { PhysicsWorld } from '@engine/world';
-import type { CharacterControllerSystem } from '@engine/stdlib/CharacterController';
+import type { CharacterControllerSystem, GroundDetectionSystem } from '@engine/stdlib/CharacterController';
 import type { CharacterInputHandler } from '@engine/input';
 import type { FPSCamera } from '@engine/camera';
 import { CameraDirector } from '@engine/camera';
@@ -19,6 +19,7 @@ import { HealthComponent } from '@engine/world/components/HealthComponent';
 import { DefaultControllerFactory, PlayerSession } from '@engine/stdlib/CharacterController';
 import { hydrateScene } from '@engine/editor-utils';
 import type { Vec3 } from '@engine/core/math';
+import { quatToEuler } from '@engine/core/math';
 import { Logger } from '../utils/logger';
 import { loadBuildData } from '../utils/loadBuildData';
 import {
@@ -30,12 +31,14 @@ import {
   RUN_ANIMATION,
   JUMP_ANIMATION,
 } from '@engine/avatar';
-import { PlayerStateMachine, PlayerStateType, type PlayerContext } from '../core/PlayerStateMachine.js';
+import { PlayerStateMachine, PlayerStateType } from '../core/PlayerStateMachine.js';
 import { LoadingState } from '../core/states/LoadingState.js';
 import { ConnectingState } from '../core/states/ConnectingState.js';
 import { PlayingState } from '../core/states/PlayingState.js';
 import { PausedState } from '../core/states/PausedState.js';
 import { DisconnectedState } from '../core/states/DisconnectedState.js';
+import { MultiplayerSystem, MultiplayerConnectionState } from '../systems/MultiplayerSystem.js';
+import { PlayerReplication } from '../systems/PlayerReplication.js';
 
 // PlayManifest interface
 interface PlayManifest {
@@ -208,6 +211,7 @@ export interface PlayerModeManagerConfig {
   renderer: Renderer;
   physicsWorld: PhysicsWorld;
   characterSystem: CharacterControllerSystem;
+  groundDetectionSystem: GroundDetectionSystem;
   characterInput: CharacterInputHandler;
   fpsCamera: FPSCamera;
   /** Callback for loading progress updates */
@@ -223,6 +227,7 @@ export class PlayerModeManager {
   private renderer: Renderer;
   private physicsWorld: PhysicsWorld;
   private characterSystem: CharacterControllerSystem;
+  private groundDetectionSystem: GroundDetectionSystem;
   private characterInput: CharacterInputHandler;
   private fpsCamera: FPSCamera;
   private canvas: HTMLCanvasElement;
@@ -247,6 +252,11 @@ export class PlayerModeManager {
   // State references for external control
   private playingState: PlayingState | null = null;
   private pausedState: PausedState | null = null;
+  private disconnectedState: DisconnectedState | null = null;
+  
+  // Multiplayer systems
+  private multiplayerSystem: MultiplayerSystem | null = null;
+  private playerReplication: PlayerReplication | null = null;
   
   constructor(config: PlayerModeManagerConfig) {
     this.canvas = config.canvas;
@@ -254,6 +264,7 @@ export class PlayerModeManager {
     this.renderer = config.renderer;
     this.physicsWorld = config.physicsWorld;
     this.characterSystem = config.characterSystem;
+    this.groundDetectionSystem = config.groundDetectionSystem;
     this.characterInput = config.characterInput;
     this.fpsCamera = config.fpsCamera;
     
@@ -322,9 +333,48 @@ export class PlayerModeManager {
     // Connecting state (placeholder for now - will be implemented with multiplayer)
     const connectingState = new ConnectingState({
       connect: async (buildId: string) => {
-        // TODO: Implement multiplayer connection
-        Logger.info(`Connecting to multiplayer server for build ${buildId}...`);
-        await new Promise(resolve => setTimeout(resolve, 500)); // Simulate connection
+        // Check if multiplayer is enabled in manifest
+        const context = this.stateMachine.getContext();
+        const manifest = context.manifest as PlayManifest | null;
+        const isMultiplayer = manifest?.simulation?.enableMultiplayer ?? false;
+        
+        if (!isMultiplayer) {
+          // Skip connection if multiplayer is disabled
+          return;
+        }
+        
+        // Initialize MultiplayerSystem if not already created
+        if (!this.multiplayerSystem) {
+          this.multiplayerSystem = new MultiplayerSystem({
+            onConnectionStateChanged: (state) => {
+              // Handle state changes (e.g., transition to DISCONNECTED on error)
+              if (state === MultiplayerConnectionState.DISCONNECTED) {
+                const currentState = this.stateMachine.getCurrentStateType();
+                if (currentState === PlayerStateType.PLAYING) {
+                  // Transition to DISCONNECTED state
+                  this.stateMachine.transitionTo(PlayerStateType.DISCONNECTED);
+                }
+              }
+            },
+            onPlayerJoined: (player) => {
+              Logger.info(`[PlayerModeManager] Player joined: ${player.displayName}`);
+            },
+            onPlayerLeft: (playerId) => {
+              Logger.info(`[PlayerModeManager] Player left: ${playerId}`);
+            },
+            onError: (error) => {
+              Logger.error('[PlayerModeManager] Multiplayer error:', error);
+              const context = this.stateMachine.getMutableContext();
+              context.errors.push(`Multiplayer error: ${error.message}`);
+            },
+          });
+          
+          // Initialize PlayerReplication (will be fully initialized after player spawn)
+          this.playerReplication = new PlayerReplication();
+        }
+        
+        // Connect to server
+        await this.multiplayerSystem.connect(buildId);
       },
       onStarted: () => {
         Logger.info('Connecting to server...');
@@ -359,14 +409,33 @@ export class PlayerModeManager {
     });
     
     // Disconnected state
-    const disconnectedState = new DisconnectedState({
+    this.disconnectedState = new DisconnectedState({
       setDisconnectUIVisible: (visible: boolean) => {
         config.onDisconnectUIVisibilityChange?.(visible);
       },
       reconnect: async () => {
-        // TODO: Implement reconnection
-        Logger.info('Attempting to reconnect...');
-        await new Promise(resolve => setTimeout(resolve, 1000));
+        if (!this.multiplayerSystem || !this.buildId) {
+          Logger.warn('[PlayerModeManager] Cannot reconnect: multiplayer system not initialized');
+          return;
+        }
+        
+        // Disconnect first if still connected
+        if (this.multiplayerSystem.getConnectionState() !== MultiplayerConnectionState.DISCONNECTED) {
+          this.multiplayerSystem.disconnect();
+        }
+        
+        // Attempt reconnection
+        try {
+          await this.multiplayerSystem.connect(this.buildId);
+          // Transition back to CONNECTING state after successful reconnect
+          const currentState = this.stateMachine.getCurrentStateType();
+          if (currentState === PlayerStateType.DISCONNECTED) {
+            this.stateMachine.transitionTo(PlayerStateType.CONNECTING);
+          }
+        } catch (error) {
+          Logger.error('[PlayerModeManager] Reconnection failed:', error as unknown as Error);
+          throw error;
+        }
       },
     });
     
@@ -375,7 +444,7 @@ export class PlayerModeManager {
     this.stateMachine.registerState(connectingState);
     this.stateMachine.registerState(this.playingState);
     this.stateMachine.registerState(this.pausedState);
-    this.stateMachine.registerState(disconnectedState);
+    this.stateMachine.registerState(this.disconnectedState);
   }
   
   /**
@@ -486,6 +555,12 @@ export class PlayerModeManager {
       const startRot = playerStart?.rotation ?? manifest.playerStart.rotation;
       await this.spawnPlayer(startPos, startRot);
       
+      // Initialize PlayerReplication if multiplayer is enabled and system exists
+      if (manifest.simulation.enableMultiplayer && this.multiplayerSystem && this.playerReplication && this.playerEntity) {
+        const localPlayerId = this.playerSession?.id ?? 'localPlayer';
+        this.playerReplication.initialize(this.scene, this.multiplayerSystem, localPlayerId);
+      }
+      
       // Fetch and apply user avatar loadout
       try {
         const userLoadout = await this.fetchUserAvatarLoadout();
@@ -532,6 +607,9 @@ export class PlayerModeManager {
         this.physicsWorld.update(fixedDeltaTime);
       }
       
+      // Ground detection must be updated before character controllers
+      this.groundDetectionSystem.update(fixedDeltaTime);
+      
       // Update character controller
       this.characterSystem.update(fixedDeltaTime);
       
@@ -552,6 +630,23 @@ export class PlayerModeManager {
     
     // Update avatar visuals and animation
     this.updateAvatar(deltaTime);
+    
+    // Update multiplayer system
+    if (this.multiplayerSystem) {
+      this.multiplayerSystem.update();
+    }
+    
+    // Send player position updates to server (if multiplayer)
+    if (this.multiplayerSystem && this.playerEntity) {
+      const position = this.playerEntity.transform.position;
+      const rotation = quatToEuler(this.playerEntity.transform.rotation)[1]; // Y rotation (yaw)
+      this.multiplayerSystem.sendPositionUpdate(position, rotation);
+    }
+    
+    // Update remote player replication
+    if (this.playerReplication) {
+      this.playerReplication.update();
+    }
     
     // Update scene buffers
     this.renderer.updateScene();
@@ -574,6 +669,16 @@ export class PlayerModeManager {
     const currentState = this.stateMachine.getCurrentStateType();
     if (currentState === PlayerStateType.PAUSED && this.pausedState) {
       this.pausedState.resume();
+    }
+  }
+  
+  /**
+   * Request reconnect (from disconnected state)
+   */
+  requestReconnect(): void {
+    const currentState = this.stateMachine.getCurrentStateType();
+    if (currentState === PlayerStateType.DISCONNECTED && this.disconnectedState) {
+      this.disconnectedState.reconnect();
     }
   }
   
@@ -920,6 +1025,18 @@ export class PlayerModeManager {
     this.lastPlayedAnim = null;
     
     this.playerSession = null;
+    
+    // Cleanup multiplayer systems
+    if (this.multiplayerSystem) {
+      this.multiplayerSystem.dispose();
+      this.multiplayerSystem = null;
+    }
+    
+    if (this.playerReplication) {
+      this.playerReplication.dispose();
+      this.playerReplication = null;
+    }
+    
     this.isInitialized = false;
     
     Logger.debug('Player mode cleaned up');

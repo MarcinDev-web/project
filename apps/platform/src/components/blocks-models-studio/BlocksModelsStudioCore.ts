@@ -29,7 +29,6 @@ export class BlocksModelsStudioCore {
   private animationFrameId: number | null = null;
   private isInitialized = false;
   private disposed = false;
-  private lastFrameTime = 0;
 
   private readonly canvas: HTMLCanvasElement;
   private readonly statusEl: HTMLElement | null;
@@ -87,10 +86,57 @@ export class BlocksModelsStudioCore {
     // Setup environment and lighting
     this.setupEnvironment();
 
+    // Note: Camera is handled by orbit controls via getOrbitState callback
+    // No need to add camera entity to scene - renderer will use orbit controls
+
     // Create preview entity for block preview
     this.previewEntity = new Entity('PreviewBlock');
     this.previewEntity.transform.position = [0, 0, 0];
     this.scene.addEntity(this.previewEntity);
+    
+    // Add a test cube to verify rendering works
+    // Orbit controls look at [0, 0, 0] by default, so place cube at origin
+    const testCube = new Entity('TestCube');
+    testCube.transform.position = [0, 0, 0]; // At origin, orbit controls will look at it
+    testCube.transform.scale = [1, 1, 1];
+    
+    // Ensure entity is active (should be by default)
+    // testCube.active = true; // Entity is active by default
+    
+    // Add mesh component (will be rendered by renderer)
+    const meshComponent = new MeshComponent();
+    meshComponent.meshType = 'cube'; // Use meshType, not meshId
+    testCube.addComponent(meshComponent);
+    
+    // Add material component
+    const materialComponent = new MaterialComponent();
+    materialComponent.materialId = 0; // Default material ID
+    materialComponent.primaryColor = [0.5, 0.7, 1.0, 1.0]; // Light blue - use primaryColor, not color
+    testCube.addComponent(materialComponent);
+    
+    this.scene.addEntity(testCube);
+    
+    // Log entity details for debugging
+    const activeEntities = this.scene.getActiveEntities();
+    console.log('[BlocksModelsStudioCore] Test cube added:', {
+      position: testCube.transform.position,
+      scale: testCube.transform.scale,
+      meshType: meshComponent.meshType,
+      materialId: materialComponent.materialId,
+      color: materialComponent.color,
+      active: testCube.active,
+      totalActiveEntities: activeEntities.length,
+      entityId: testCube.id,
+      hasMeshComponent: !!testCube.getComponent(MeshComponent),
+      hasMaterialComponent: !!testCube.getComponent(MaterialComponent)
+    });
+    console.log('[BlocksModelsStudioCore] All active entities:', activeEntities.map(e => ({
+      name: e.name,
+      id: e.id,
+      active: e.active,
+      hasMesh: !!e.getComponent(MeshComponent),
+      position: e.transform.position
+    })));
   }
 
   /**
@@ -146,8 +192,12 @@ export class BlocksModelsStudioCore {
         onFrameUpdate: () => {
           // Update blocks/models if needed
         },
-        enableShadows: true,
-        shadowQuality: 'med',
+        enableShadows: false, // Disable shadows to avoid WebGPU errors
+        shadowQuality: 'low',
+        enableHDR: false, // Disable HDR to simplify rendering
+        enableBloom: false, // Disable bloom
+        enableSSAO: false, // Disable SSAO
+        msaaSampleCount: 1, // Reduce MSAA to avoid texture issues
       });
 
       if (this.statusEl) {
@@ -155,7 +205,6 @@ export class BlocksModelsStudioCore {
       }
 
       this.isInitialized = true;
-      this.lastFrameTime = performance.now();
       this.startGameLoop();
     } catch (error) {
       let errorMessage = 'Failed to initialize WebGPU renderer';
@@ -182,15 +231,47 @@ export class BlocksModelsStudioCore {
    * Start the game loop
    */
   private startGameLoop(): void {
+    let lastLogTime = 0;
+    
     const frame = (currentTime: number) => {
       if (this.disposed || !this.renderer || !this.isInitialized) {
         return;
       }
 
-      this.lastFrameTime = currentTime;
-
       // Update renderer scene (grid is handled by renderer if enabled)
       this.renderer.updateScene();
+      
+      // Debug: Log scene state periodically (first frame + every 5 seconds)
+      const shouldLog = lastLogTime === 0 || currentTime - lastLogTime >= 5000;
+      if (shouldLog) {
+        const activeEntities = this.scene.getActiveEntities();
+        const entitiesWithMesh = activeEntities.filter(e => e.getComponent(MeshComponent));
+        const testCube = activeEntities.find(e => e.name === 'TestCube');
+        const material = testCube?.getComponent(MaterialComponent);
+        console.log('[BlocksModelsStudioCore] Scene state:', {
+          totalActiveEntities: activeEntities.length,
+          entitiesWithMesh: entitiesWithMesh.length,
+          testCubeExists: !!testCube,
+          testCubeActive: testCube?.active,
+          testCubePosition: testCube?.transform.position,
+          testCubeMeshType: testCube?.getComponent(MeshComponent)?.meshType,
+          testCubeMaterialId: material?.materialId,
+          testCubePrimaryColor: material?.primaryColor,
+          testCubeOpacity: material?.opacity,
+          testCubeFlags: material?.flags
+        });
+        
+        // Log all entities with mesh for debugging
+        if (entitiesWithMesh.length > 0) {
+          console.log('[BlocksModelsStudioCore] Entities with mesh:', entitiesWithMesh.map(e => ({
+            name: e.name,
+            position: e.transform.position,
+            meshType: e.getComponent(MeshComponent)?.meshType,
+            materialId: e.getComponent(MaterialComponent)?.materialId
+          })));
+        }
+        lastLogTime = currentTime;
+      }
 
       // Continue loop
       this.animationFrameId = requestAnimationFrame(frame);

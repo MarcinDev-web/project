@@ -74,9 +74,16 @@ RUN find packages -type d -name dist -exec rm -rf {} + 2>/dev/null || true && \
     find packages -name "*.tsbuildinfo" -delete 2>/dev/null || true && \
     pnpm --filter @engine/core build && \
     (cd packages/animation && pnpm exec tsc -b) && \
-    pnpm --filter @engine/blocks build && \
     pnpm --filter @engine/economy build && \
+    (cd packages/world && pnpm exec tsc --project tsconfig.build.json --skipLibCheck --noEmit false) && \
+    pnpm --filter @engine/microblocks build && \
+    pnpm --filter @engine/blocks build && \
     (cd packages/world && pnpm exec tsc -b tsconfig.build.json) && \
+    pnpm --filter @engine/stdlib build && \
+    pnpm --filter @engine/script build && \
+    pnpm --filter @engine/camera build && \
+    pnpm --filter @engine/avatar build && \
+    pnpm --filter @engine/gfx-webgpu build && \
     pnpm -C apps/net-server build
 
 # Note: bundling with tsup produces correct ESM with .js extensions and avoids alias rewriting
@@ -123,6 +130,11 @@ COPY --from=builder --chown=nodejs:nodejs /app/apps/net-server/node_modules/.pri
 # Also copy to apps/node_modules for relative path resolution from dist/server.js
 RUN mkdir -p ./apps/node_modules/.prisma && \
     cp -r ./apps/net-server/node_modules/.prisma/net-client ./apps/node_modules/.prisma/net-client || true
+# Create symlink for @prisma/client to find the client (it looks for .prisma/client/default)
+# The @prisma/client package expects the client at .prisma/client/default, but we have it at .prisma/net-client
+RUN mkdir -p ./node_modules/.prisma/client && \
+    ln -sf ../../apps/net-server/node_modules/.prisma/net-client ./node_modules/.prisma/client/default || \
+    cp -r ./apps/net-server/node_modules/.prisma/net-client ./node_modules/.prisma/client/default || true
 
 # Copy Prisma migrations for runtime migration execution
 COPY --from=builder --chown=nodejs:nodejs /app/apps/net-server/prisma/migrations ./apps/net-server/prisma/migrations

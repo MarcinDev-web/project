@@ -8,7 +8,6 @@ import { Logger } from '../utils/logger';
  * Manages LogicCubes visual scripting system in player runtime
  */
 export class ScriptSystem {
-  private scene: Scene | null = null;
   private scriptSystem: LogicCubeSystem | null = null;
   private isEnabled = false;
 
@@ -16,8 +15,6 @@ export class ScriptSystem {
    * Initialize script system with scene
    */
   initialize(scene: Scene): void {
-    this.scene = scene;
-    
     // Check if scene has scriptRuntime
     const runtime = (scene as any).scriptRuntime;
     if (runtime?.scriptSystem) {
@@ -25,14 +22,9 @@ export class ScriptSystem {
       Logger.debug('[ScriptSystem] Initialized with existing scriptSystem from scene');
     } else {
       // Create new LogicCubeSystem if scene doesn't have one
+      // LogicCubeSystem automatically registers itself with the scene in its constructor
       this.scriptSystem = new LogicCubeSystem(scene);
-      // Add to scene's systems if possible
-      try {
-        scene.addSystem(this.scriptSystem);
-        Logger.debug('[ScriptSystem] Created new LogicCubeSystem');
-      } catch (error) {
-        Logger.warn('[ScriptSystem] Could not add system to scene:', error as unknown as Error);
-      }
+      Logger.debug('[ScriptSystem] Created new LogicCubeSystem');
     }
   }
 
@@ -94,7 +86,6 @@ export class ScriptSystem {
   dispose(): void {
     this.setEnabled(false);
     this.scriptSystem = null;
-    this.scene = null;
   }
 }
 

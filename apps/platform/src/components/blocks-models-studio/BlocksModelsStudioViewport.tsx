@@ -14,6 +14,7 @@ export interface BlocksModelsStudioViewportProps {
   onBlockPlaced?: (block: BlockDefinition, position: Vec3, scale: Vec3) => void;
   className?: string;
   onCoreReady?: (core: BlocksModelsStudioCore) => void;
+  onError?: (error: string) => void;
 }
 
 /**
@@ -25,20 +26,42 @@ export const BlocksModelsStudioViewport = forwardRef<HTMLCanvasElement, BlocksMo
   onBlockPlaced,
   className,
   onCoreReady,
+  onError,
 }, ref) => {
+  console.log('[BlocksModelsStudioViewport] Component rendering');
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const coreRef = useRef<BlocksModelsStudioCore | null>(null);
   const dragDropControllerRef = useRef<DragDropController | null>(null);
   const [isInitializing, setIsInitializing] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const statusRef = useRef<HTMLDivElement>(null);
+  // Store callbacks in refs to avoid re-running effect
+  const onCoreReadyRef = useRef(onCoreReady);
+  const onBlockPlacedRef = useRef(onBlockPlaced);
+  const onErrorRef = useRef(onError);
+  
+  // Update refs when callbacks change
+  useEffect(() => {
+    onCoreReadyRef.current = onCoreReady;
+    onBlockPlacedRef.current = onBlockPlaced;
+    onErrorRef.current = onError;
+  }, [onCoreReady, onBlockPlaced, onError]);
 
   useEffect(() => {
+    console.log('[BlocksModelsStudioViewport] useEffect triggered');
     const canvas = canvasRef.current;
     if (!canvas) {
+      console.warn('[BlocksModelsStudioViewport] Canvas not available yet');
       return;
     }
 
+    // Prevent multiple initializations
+    if (coreRef.current) {
+      console.warn('[BlocksModelsStudioViewport] Core already initialized, skipping');
+      return;
+    }
+
+    console.log('[BlocksModelsStudioViewport] Canvas found:', canvas);
     const statusEl = statusRef.current;
 
     let mounted = true;
@@ -47,6 +70,24 @@ export const BlocksModelsStudioViewport = forwardRef<HTMLCanvasElement, BlocksMo
       try {
         setIsInitializing(true);
         setError(null);
+        console.log('[BlocksModelsStudioViewport] Starting initialization...');
+
+        // Ensure canvas has valid size
+        const rect = canvas.getBoundingClientRect();
+        if (rect.width === 0 || rect.height === 0) {
+          console.warn('[BlocksModelsStudioViewport] Canvas has zero size, waiting for resize...');
+          // Wait a bit for layout to settle
+          await new Promise(resolve => setTimeout(resolve, 100));
+          const newRect = canvas.getBoundingClientRect();
+          if (newRect.width === 0 || newRect.height === 0) {
+            throw new Error('Canvas has zero size. Please ensure the viewport container has dimensions.');
+          }
+        }
+
+        // Set canvas size explicitly
+        canvas.width = Math.max(1, Math.floor(rect.width * window.devicePixelRatio));
+        canvas.height = Math.max(1, Math.floor(rect.height * window.devicePixelRatio));
+        console.log('[BlocksModelsStudioViewport] Canvas size:', canvas.width, 'x', canvas.height);
 
         const options: BlocksModelsStudioCoreOptions = {
           canvas,
@@ -55,17 +96,33 @@ export const BlocksModelsStudioViewport = forwardRef<HTMLCanvasElement, BlocksMo
           ...(onBlockChange && { onBlockChange }),
         };
 
+        // Double-check that core wasn't initialized by another effect run
+        if (coreRef.current) {
+          console.warn('[BlocksModelsStudioViewport] Core already exists, skipping initialization');
+          return;
+        }
+
+        console.log('[BlocksModelsStudioViewport] Creating BlocksModelsStudioCore...');
         const core = new BlocksModelsStudioCore(options);
         coreRef.current = core;
 
+        console.log('[BlocksModelsStudioViewport] Initializing core...');
         await core.initialize();
+        console.log('[BlocksModelsStudioViewport] Core initialized successfully');
 
-        // Notify parent that core is ready
-        if (onCoreReady) {
-          onCoreReady(core);
+        // Notify parent that core is ready (always call, even if there were errors)
+        console.log('[BlocksModelsStudioViewport] Notifying parent that core is ready...');
+        if (onCoreReadyRef.current && mounted) {
+          try {
+            onCoreReadyRef.current(core);
+            console.log('[BlocksModelsStudioViewport] onCoreReady callback executed');
+          } catch (callbackError) {
+            console.error('[BlocksModelsStudioViewport] Error in onCoreReady callback:', callbackError);
+          }
         }
 
         // Initialize drag & drop controller
+        console.log('[BlocksModelsStudioViewport] Initializing drag & drop controller...');
         const dragController = new DragDropController({
           canvas,
           controls: core.getControls(),
@@ -75,8 +132,8 @@ export const BlocksModelsStudioViewport = forwardRef<HTMLCanvasElement, BlocksMo
             // Add block to scene with scale
             core.addBlock(block, position, scale);
             // Notify parent
-            if (onBlockPlaced) {
-              onBlockPlaced(block, position, scale);
+            if (onBlockPlacedRef.current) {
+              onBlockPlacedRef.current(block, position, scale);
             }
           },
           onStatusMessage: (message, duration) => {
@@ -93,15 +150,25 @@ export const BlocksModelsStudioViewport = forwardRef<HTMLCanvasElement, BlocksMo
 
         dragController.initialize();
         dragDropControllerRef.current = dragController;
+        console.log('[BlocksModelsStudioViewport] Initialization complete');
 
         if (mounted) {
           setIsInitializing(false);
         }
       } catch (err) {
         console.error('Failed to initialize Blocks/Models Studio:', err);
+        const errorMessage = err instanceof Error ? err.message : 'Failed to initialize';
         if (mounted) {
-          setError(err instanceof Error ? err.message : 'Failed to initialize');
+          setError(errorMessage);
           setIsInitializing(false);
+          // Notify parent about error
+          if (onErrorRef.current) {
+            try {
+              onErrorRef.current(errorMessage);
+            } catch (callbackError) {
+              console.error('Error in onError callback:', callbackError);
+            }
+          }
         }
       }
     };
@@ -119,7 +186,7 @@ export const BlocksModelsStudioViewport = forwardRef<HTMLCanvasElement, BlocksMo
         coreRef.current = null;
       }
     };
-  }, [onBlockPlaced, onCoreReady]); // Only run once on mount
+  }, []); // Empty deps - only run once on mount
 
   // Start drag from palette
   const startBlockDrag = useCallback((block: BlockDefinition, scale: Vec3) => {

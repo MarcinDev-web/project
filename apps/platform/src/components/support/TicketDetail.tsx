@@ -157,6 +157,7 @@ export function TicketDetail() {
         </Card>
       )}
       </div>
+      </div>
     </Layout>
   );
 }

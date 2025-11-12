@@ -29,8 +29,8 @@ export interface CameraDirector {
 
 export interface FPSCamera {
   getYawPitch(): { yaw: number; pitch: number };
-  getForwardDirection(): Vec3;
-  getRightDirection(): Vec3;
+  getForwardDirection(): Readonly<Vec3>;
+  getRightDirection(): Readonly<Vec3>;
 }
 
 export interface CharacterControllerSystem {
@@ -156,8 +156,10 @@ export class LocalPlayerController implements PlayerController {
     }
 
     // Apply to character controller
-    const forwardVec: Vec3 = this.fpsCamera?.getForwardDirection() ?? [0, 0, -1];
-    const rightVec: Vec3 = this.fpsCamera?.getRightDirection() ?? [1, 0, 0];
+    const forwardReadonly = this.fpsCamera?.getForwardDirection() ?? [0, 0, -1];
+    const rightReadonly = this.fpsCamera?.getRightDirection() ?? [1, 0, 0];
+    const forwardVec: Vec3 = [forwardReadonly[0], forwardReadonly[1], forwardReadonly[2]];
+    const rightVec: Vec3 = [rightReadonly[0], rightReadonly[1], rightReadonly[2]];
 
     // Create CharacterInput for multiplayer replication
     const characterInput: CharacterInput = {

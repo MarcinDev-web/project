@@ -60,8 +60,8 @@ export function AvatarBuilderViewport({
         const options: AvatarBuilderCoreOptions = {
           canvas,
           ...(statusEl && { statusEl }),
-          initialLoadout,
-          onLoadoutChange,
+          ...(initialLoadout !== undefined && { initialLoadout }),
+          ...(onLoadoutChange !== undefined && { onLoadoutChange }),
         };
 
         const core = new AvatarBuilderCore(options);

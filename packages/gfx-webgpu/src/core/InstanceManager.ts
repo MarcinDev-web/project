@@ -139,6 +139,11 @@ export class InstanceDataBuilder {
     });
 
     const count = entitiesWithoutCustom.length;
+    if (count === 0) {
+      Logger.debug('[InstanceManager] build(): no renderable entities detected in scene');
+    } else {
+      Logger.debug('[InstanceManager] build(): processing entities', { count });
+    }
 
     // Grow if needed (only reallocates when exceeding capacity)
     if (count > this.capacity) {

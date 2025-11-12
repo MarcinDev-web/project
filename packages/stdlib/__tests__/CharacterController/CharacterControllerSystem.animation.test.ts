@@ -1,12 +1,13 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { Entity, Scene, CharacterController, CharacterState } from '@engine/world';
 import { PhysicsWorld } from '@engine/world/physics';
-import { CharacterControllerSystem } from '@engine/stdlib/CharacterController';
+import { CharacterControllerSystem, GroundDetectionSystem } from '@engine/stdlib/CharacterController';
 import { AnimationComponent, AnimationClip } from '@engine/stdlib/Animation';
 
 describe('CharacterControllerSystem - Animation Synchronization', () => {
   let scene: Scene;
   let physics: PhysicsWorld;
+  let groundDetectionSystem: GroundDetectionSystem;
   let system: CharacterControllerSystem;
   let entity: Entity;
   let controller: CharacterController;
@@ -15,6 +16,7 @@ describe('CharacterControllerSystem - Animation Synchronization', () => {
   beforeEach(() => {
     scene = new Scene();
     physics = new PhysicsWorld(scene);
+    groundDetectionSystem = new GroundDetectionSystem(scene, physics);
     system = new CharacterControllerSystem(scene, physics);
 
     entity = new Entity('Player');
@@ -39,7 +41,8 @@ describe('CharacterControllerSystem - Animation Synchronization', () => {
       controller.isGrounded = true;
       controller.state = CharacterState.Running;
       
-      // Update system (triggers animation sync)
+      // Update ground detection first, then system (triggers animation sync)
+      groundDetectionSystem.update(1 / 60);
       system.update(1 / 60);
       
       // Verify animation state switched to "run"
@@ -77,7 +80,8 @@ describe('CharacterControllerSystem - Animation Synchronization', () => {
       controller.isGrounded = true;
       controller.state = CharacterState.Running;
       
-      // Update system
+      // Update ground detection first, then system
+      groundDetectionSystem.update(1 / 60);
       system.update(1 / 60);
       
       // Animation should remain as walk (silent failure when clip missing)
@@ -130,11 +134,13 @@ describe('CharacterControllerSystem - Animation Synchronization', () => {
       controller.state = CharacterState.Running;
       
       // First update - should set animation
+      groundDetectionSystem.update(1 / 60);
       system.update(1 / 60);
       expect(animation.getActiveState()).toBe('run');
       
       // Second update with same state - should not change
       const previousState = animation.getActiveState();
+      groundDetectionSystem.update(1 / 60);
       system.update(1 / 60);
       expect(animation.getActiveState()).toBe(previousState);
     });
@@ -148,7 +154,10 @@ describe('CharacterControllerSystem - Animation Synchronization', () => {
       controller.state = CharacterState.Running;
       
       // Should not throw error
-      expect(() => system.update(1 / 60)).not.toThrow();
+      expect(() => {
+        groundDetectionSystem.update(1 / 60);
+        system.update(1 / 60);
+      }).not.toThrow();
     });
   });
 });

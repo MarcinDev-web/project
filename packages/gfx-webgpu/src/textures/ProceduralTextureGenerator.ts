@@ -264,6 +264,272 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 }
 `;
 
+// Normal map generation shader (Sobel operator)
+const NORMAL_MAP_SHADER_CODE = `
+struct NormalMapParams {
+  size: u32,
+  strength: f32,
+  _padding1: f32,
+  _padding2: f32,
+}
+
+@group(0) @binding(0) var<uniform> params: NormalMapParams;
+@group(0) @binding(1) var<storage, read> heightMap: array<u32>;
+@group(0) @binding(2) var<storage, read_write> output: array<u32>;
+
+fn getHeight(x: i32, y: i32) -> f32 {
+  let wrappedX = (x + i32(params.size)) % i32(params.size);
+  let wrappedY = (y + i32(params.size)) % i32(params.size);
+  let idx = u32(wrappedY) * params.size + u32(wrappedX);
+  let packed = heightMap[idx];
+  // Extract red channel as height (0-255 -> 0.0-1.0)
+  return f32(packed & 0xFFu) / 255.0;
+}
+
+@compute @workgroup_size(8, 8)
+fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let x = i32(gid.x);
+  let y = i32(gid.y);
+  if (u32(x) >= params.size || u32(y) >= params.size) {
+    return;
+  }
+  
+  // Sample surrounding heights for Sobel operator
+  let tl = getHeight(x - 1, y - 1);
+  let t = getHeight(x, y - 1);
+  let tr = getHeight(x + 1, y - 1);
+  let l = getHeight(x - 1, y);
+  let r = getHeight(x + 1, y);
+  let bl = getHeight(x - 1, y + 1);
+  let b = getHeight(x, y + 1);
+  let br = getHeight(x + 1, y + 1);
+  
+  // Sobel operator
+  let dX = (tr + 2.0 * r + br) - (tl + 2.0 * l + bl);
+  let dY = (bl + 2.0 * b + br) - (tl + 2.0 * t + tr);
+  
+  // Calculate normal vector
+  let nX = -dX * params.strength;
+  let nY = -dY * params.strength;
+  let nZ = 1.0;
+  
+  // Normalize
+  let length = sqrt(nX * nX + nY * nY + nZ * nZ);
+  let normX = nX / length;
+  let normY = nY / length;
+  let normZ = nZ / length;
+  
+  // Convert to [0, 255] range (tangent space normal map)
+  let r = u32((normX * 0.5 + 0.5) * 255.0);
+  let g = u32((normY * 0.5 + 0.5) * 255.0);
+  let b = u32((normZ * 0.5 + 0.5) * 255.0);
+  let a = 255u;
+  
+  let idx = u32(y) * params.size + u32(x);
+  output[idx] = r | (g << 8u) | (b << 16u) | (a << 24u);
+}
+`;
+
+// Roughness map generation shader
+const ROUGHNESS_MAP_SHADER_CODE = `
+struct RoughnessMapParams {
+  pattern: u32,
+  size: u32,
+  seed: f32,
+  _padding: f32,
+}
+
+@group(0) @binding(0) var<uniform> params: RoughnessMapParams;
+@group(0) @binding(1) var<storage, read_write> output: array<u32>;
+
+fn hash2(p: vec2<f32>) -> u32 {
+  let h = u32(params.seed) + u32(p.x * 374761393.0) + u32(p.y * 668265263.0);
+  let h1 = h ^ (h >> 13u);
+  let h2 = h1 * 1274126177u;
+  return h2 ^ (h2 >> 16u);
+}
+
+fn permHash(x: u32, y: u32) -> u32 {
+  let h = u32(params.seed) + x * 374761393u + y * 668265263u;
+  let h1 = h ^ (h >> 13u);
+  let h2 = h1 * 1274126177u;
+  return (h2 ^ (h2 >> 16u)) & 255u;
+}
+
+fn fade(t: f32) -> f32 {
+  return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
+}
+
+fn lerp(t: f32, a: f32, b: f32) -> f32 {
+  return a + t * (b - a);
+}
+
+fn grad2D(hash: u32, x: f32, y: f32) -> f32 {
+  let h = hash & 3u;
+  let u = select(y, x, h < 2u);
+  let v = select(x, y, h < 2u);
+  let signU = select(-1.0, 1.0, (h & 1u) == 0u);
+  let signV = select(-1.0, 1.0, (h & 2u) == 0u);
+  return signU * u + signV * v;
+}
+
+fn perlinNoise2D(x: f32, y: f32) -> f32 {
+  let X = u32(floor(x)) & 255u;
+  let Y = u32(floor(y)) & 255u;
+  let xf = x - floor(x);
+  let yf = y - floor(y);
+  let u = fade(xf);
+  let v = fade(yf);
+  let A = permHash(X, Y);
+  let AA = permHash(A & 255u, 0u);
+  let AB = permHash(A & 255u, 1u);
+  let B = permHash((X + 1u) & 255u, Y);
+  let BA = permHash(B & 255u, 0u);
+  let BB = permHash(B & 255u, 1u);
+  return lerp(
+    v,
+    lerp(u, grad2D(AA, xf, yf), grad2D(BA, xf - 1.0, yf)),
+    lerp(u, grad2D(AB, xf, yf - 1.0), grad2D(BB, xf - 1.0, yf - 1.0))
+  );
+}
+
+fn quantize(value: f32, levels: u32) -> f32 {
+  if (levels <= 1u) {
+    return value;
+  }
+  return floor(value * f32(levels)) / f32(levels);
+}
+
+@compute @workgroup_size(8, 8)
+fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let x = gid.x;
+  let y = gid.y;
+  if (x >= params.size || y >= params.size) {
+    return;
+  }
+  
+  // Pattern-based base roughness (smooth=0.2, others=0.7)
+  let baseRoughness = select(0.7, 0.2, params.pattern == 1u); // pattern 1 = smooth
+  
+  // Simplex-like noise variation (reduced for cartoon style)
+  let noise = perlinNoise2D(f32(x) * 0.1, f32(y) * 0.1);
+  let normalized = (noise + 1.0) * 0.5;
+  var roughness = baseRoughness + normalized * 0.1;
+  
+  // Quantize for cartoon consistency (5 levels)
+  roughness = quantize(roughness, 5u);
+  roughness = clamp(roughness, 0.0, 1.0);
+  
+  let r = u32(roughness * 255.0);
+  let idx = y * params.size + x;
+  output[idx] = r | (r << 8u) | (r << 16u) | (255u << 24u);
+}
+`;
+
+// Metallic map generation shader (mostly constant)
+const METALLIC_MAP_SHADER_CODE = `
+struct MetallicMapParams {
+  size: u32,
+  _padding1: u32,
+  _padding2: f32,
+  _padding3: f32,
+}
+
+@group(0) @binding(0) var<uniform> params: MetallicMapParams;
+@group(0) @binding(1) var<storage, read_write> output: array<u32>;
+
+@compute @workgroup_size(8, 8)
+fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let x = gid.x;
+  let y = gid.y;
+  if (x >= params.size || y >= params.size) {
+    return;
+  }
+  
+  // Most blocks are non-metallic (0)
+  let idx = y * params.size + x;
+  output[idx] = 0u | (0u << 8u) | (0u << 16u) | (255u << 24u);
+}
+`;
+
+// AO map generation shader
+const AO_MAP_SHADER_CODE = `
+struct AOMapParams {
+  pattern: u32,
+  size: u32,
+  seed: f32,
+  _padding: f32,
+}
+
+@group(0) @binding(0) var<uniform> params: AOMapParams;
+@group(0) @binding(1) var<storage, read_write> output: array<u32>;
+
+fn hash2(p: vec2<f32>) -> u32 {
+  let h = u32(params.seed) + u32(p.x * 374761393.0) + u32(p.y * 668265263.0);
+  let h1 = h ^ (h >> 13u);
+  let h2 = h1 * 1274126177u;
+  return h2 ^ (h2 >> 16u);
+}
+
+fn getFeaturePoint(cellX: i32, cellY: i32) -> vec2<f32> {
+  let hash = hash2(vec2<f32>(f32(cellX), f32(cellY)));
+  let fx = f32(cellX) + f32(hash & 0xFFFFu) / 65535.0;
+  let fy = f32(cellY) + f32((hash >> 16u) & 0xFFFFu) / 65535.0;
+  return vec2<f32>(fx, fy);
+}
+
+fn distanceEuclidean(p1: vec2<f32>, p2: vec2<f32>) -> f32 {
+  let dx = p2.x - p1.x;
+  let dy = p2.y - p1.y;
+  return sqrt(dx * dx + dy * dy);
+}
+
+fn worleyNoise(x: f32, y: f32) -> f32 {
+  let cellX = i32(floor(x));
+  let cellY = i32(floor(y));
+  var minDist: f32 = 999999.0;
+  let pos = vec2<f32>(x, y);
+  
+  for (var dy = -1; dy <= 1; dy++) {
+    for (var dx = -1; dx <= 1; dx++) {
+      let featurePoint = getFeaturePoint(cellX + dx, cellY + dy);
+      let dist = distanceEuclidean(pos, featurePoint);
+      minDist = min(minDist, dist);
+    }
+  }
+  
+  return minDist;
+}
+
+@compute @workgroup_size(8, 8)
+fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let x = f32(gid.x);
+  let y = f32(gid.y);
+  if (u32(x) >= params.size || u32(y) >= params.size) {
+    return;
+  }
+  
+  // Edge detection (distance from texture edges)
+  let edgeX = min(x, f32(params.size) - x) / (f32(params.size) / 2.0);
+  let edgeY = min(y, f32(params.size) - y) / (f32(params.size) / 2.0);
+  let edgeFactor = min(edgeX, edgeY);
+  
+  // Base AO (darker at edges)
+  var ao = 0.7 + edgeFactor * 0.3;
+  
+  // Pattern-specific variation (bricks/cobble use Worley noise)
+  if (params.pattern == 3u || params.pattern == 4u) { // cobble=3, bricks=4
+    let noise = worleyNoise(x * 0.05, y * 0.05);
+    ao *= 0.8 + noise * 0.2;
+  }
+  
+  ao = clamp(ao, 0.0, 1.0);
+  let aoValue = u32(ao * 255.0);
+  let idx = u32(y) * params.size + u32(x);
+  output[idx] = aoValue | (aoValue << 8u) | (aoValue << 16u) | (255u << 24u);
+}
+`;
+
 export interface PBRTextureData {
   /** Base color/albedo texture */
   albedo: ImageData;
@@ -292,6 +558,27 @@ export class ProceduralTextureGenerator {
   private pipelineLayout: GPUPipelineLayout | null = null;
   private uniformBuffer: GPUBuffer | null = null;
   private isGPUInitialized: boolean = false;
+
+  // GPU resources for PBR maps
+  private normalMapPipeline: GPUComputePipeline | null = null;
+  private normalMapBindGroupLayout: GPUBindGroupLayout | null = null;
+  private normalMapPipelineLayout: GPUPipelineLayout | null = null;
+  private normalMapUniformBuffer: GPUBuffer | null = null;
+
+  private roughnessMapPipeline: GPUComputePipeline | null = null;
+  private roughnessMapBindGroupLayout: GPUBindGroupLayout | null = null;
+  private roughnessMapPipelineLayout: GPUPipelineLayout | null = null;
+  private roughnessMapUniformBuffer: GPUBuffer | null = null;
+
+  private metallicMapPipeline: GPUComputePipeline | null = null;
+  private metallicMapBindGroupLayout: GPUBindGroupLayout | null = null;
+  private metallicMapPipelineLayout: GPUPipelineLayout | null = null;
+  private metallicMapUniformBuffer: GPUBuffer | null = null;
+
+  private aoMapPipeline: GPUComputePipeline | null = null;
+  private aoMapBindGroupLayout: GPUBindGroupLayout | null = null;
+  private aoMapPipelineLayout: GPUPipelineLayout | null = null;
+  private aoMapUniformBuffer: GPUBuffer | null = null;
 
   constructor(private readonly textureSize: number = 64, seed?: number) {
     this.canvas = document.createElement('canvas');
@@ -381,6 +668,18 @@ export class ProceduralTextureGenerator {
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       });
 
+      // Initialize normal map pipeline
+      this.initializeNormalMapPipeline(device);
+      
+      // Initialize roughness map pipeline
+      this.initializeRoughnessMapPipeline(device);
+      
+      // Initialize metallic map pipeline
+      this.initializeMetallicMapPipeline(device);
+      
+      // Initialize AO map pipeline
+      this.initializeAOMapPipeline(device);
+
       this.isGPUInitialized = true;
       console.info('[ProceduralTextureGenerator] GPU compute shaders initialized successfully');
     } catch (error) {
@@ -391,6 +690,191 @@ export class ProceduralTextureGenerator {
       this.pipelineLayout = null;
       this.uniformBuffer = null;
       this.isGPUInitialized = false;
+    }
+  }
+
+  /**
+   * Initialize normal map compute pipeline
+   */
+  private initializeNormalMapPipeline(device: GPUDevice): void {
+    try {
+      const shaderModule = device.createShaderModule({
+        label: 'normal-map-compute-shader',
+        code: NORMAL_MAP_SHADER_CODE,
+      });
+
+      this.normalMapBindGroupLayout = device.createBindGroupLayout({
+        label: 'normal-map-bgl',
+        entries: [
+          { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+          { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+          { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+        ],
+      });
+
+      this.normalMapPipelineLayout = device.createPipelineLayout({
+        label: 'normal-map-pipeline-layout',
+        bindGroupLayouts: [this.normalMapBindGroupLayout],
+      });
+
+      const pipelineDescriptor: GPUComputePipelineDescriptor = {
+        label: 'normal-map-compute-pipeline',
+        layout: this.normalMapPipelineLayout,
+        compute: { module: shaderModule, entryPoint: 'main' },
+      };
+
+      if (this.pipelineCache) {
+        this.normalMapPipeline = this.pipelineCache.getComputePipeline(pipelineDescriptor);
+      } else {
+        this.normalMapPipeline = device.createComputePipeline(pipelineDescriptor);
+      }
+
+      this.normalMapUniformBuffer = device.createBuffer({
+        label: 'normal-map-uniforms',
+        size: 16, // NormalMapParams: u32(4) + f32(4) + f32(4) + f32(4)
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
+    } catch (error) {
+      console.warn('[ProceduralTextureGenerator] Normal map pipeline initialization failed', error);
+      this.normalMapPipeline = null;
+    }
+  }
+
+  /**
+   * Initialize roughness map compute pipeline
+   */
+  private initializeRoughnessMapPipeline(device: GPUDevice): void {
+    try {
+      const shaderModule = device.createShaderModule({
+        label: 'roughness-map-compute-shader',
+        code: ROUGHNESS_MAP_SHADER_CODE,
+      });
+
+      this.roughnessMapBindGroupLayout = device.createBindGroupLayout({
+        label: 'roughness-map-bgl',
+        entries: [
+          { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+          { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+        ],
+      });
+
+      this.roughnessMapPipelineLayout = device.createPipelineLayout({
+        label: 'roughness-map-pipeline-layout',
+        bindGroupLayouts: [this.roughnessMapBindGroupLayout],
+      });
+
+      const pipelineDescriptor: GPUComputePipelineDescriptor = {
+        label: 'roughness-map-compute-pipeline',
+        layout: this.roughnessMapPipelineLayout,
+        compute: { module: shaderModule, entryPoint: 'main' },
+      };
+
+      if (this.pipelineCache) {
+        this.roughnessMapPipeline = this.pipelineCache.getComputePipeline(pipelineDescriptor);
+      } else {
+        this.roughnessMapPipeline = device.createComputePipeline(pipelineDescriptor);
+      }
+
+      this.roughnessMapUniformBuffer = device.createBuffer({
+        label: 'roughness-map-uniforms',
+        size: 16, // RoughnessMapParams: u32(4) + u32(4) + f32(4) + f32(4)
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
+    } catch (error) {
+      console.warn('[ProceduralTextureGenerator] Roughness map pipeline initialization failed', error);
+      this.roughnessMapPipeline = null;
+    }
+  }
+
+  /**
+   * Initialize metallic map compute pipeline
+   */
+  private initializeMetallicMapPipeline(device: GPUDevice): void {
+    try {
+      const shaderModule = device.createShaderModule({
+        label: 'metallic-map-compute-shader',
+        code: METALLIC_MAP_SHADER_CODE,
+      });
+
+      this.metallicMapBindGroupLayout = device.createBindGroupLayout({
+        label: 'metallic-map-bgl',
+        entries: [
+          { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+          { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+        ],
+      });
+
+      this.metallicMapPipelineLayout = device.createPipelineLayout({
+        label: 'metallic-map-pipeline-layout',
+        bindGroupLayouts: [this.metallicMapBindGroupLayout],
+      });
+
+      const pipelineDescriptor: GPUComputePipelineDescriptor = {
+        label: 'metallic-map-compute-pipeline',
+        layout: this.metallicMapPipelineLayout,
+        compute: { module: shaderModule, entryPoint: 'main' },
+      };
+
+      if (this.pipelineCache) {
+        this.metallicMapPipeline = this.pipelineCache.getComputePipeline(pipelineDescriptor);
+      } else {
+        this.metallicMapPipeline = device.createComputePipeline(pipelineDescriptor);
+      }
+
+      this.metallicMapUniformBuffer = device.createBuffer({
+        label: 'metallic-map-uniforms',
+        size: 16, // MetallicMapParams: u32(4) + u32(4) + f32(4) + f32(4)
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
+    } catch (error) {
+      console.warn('[ProceduralTextureGenerator] Metallic map pipeline initialization failed', error);
+      this.metallicMapPipeline = null;
+    }
+  }
+
+  /**
+   * Initialize AO map compute pipeline
+   */
+  private initializeAOMapPipeline(device: GPUDevice): void {
+    try {
+      const shaderModule = device.createShaderModule({
+        label: 'ao-map-compute-shader',
+        code: AO_MAP_SHADER_CODE,
+      });
+
+      this.aoMapBindGroupLayout = device.createBindGroupLayout({
+        label: 'ao-map-bgl',
+        entries: [
+          { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+          { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+        ],
+      });
+
+      this.aoMapPipelineLayout = device.createPipelineLayout({
+        label: 'ao-map-pipeline-layout',
+        bindGroupLayouts: [this.aoMapBindGroupLayout],
+      });
+
+      const pipelineDescriptor: GPUComputePipelineDescriptor = {
+        label: 'ao-map-compute-pipeline',
+        layout: this.aoMapPipelineLayout,
+        compute: { module: shaderModule, entryPoint: 'main' },
+      };
+
+      if (this.pipelineCache) {
+        this.aoMapPipeline = this.pipelineCache.getComputePipeline(pipelineDescriptor);
+      } else {
+        this.aoMapPipeline = device.createComputePipeline(pipelineDescriptor);
+      }
+
+      this.aoMapUniformBuffer = device.createBuffer({
+        label: 'ao-map-uniforms',
+        size: 16, // AOMapParams: u32(4) + u32(4) + f32(4) + f32(4)
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
+    } catch (error) {
+      console.warn('[ProceduralTextureGenerator] AO map pipeline initialization failed', error);
+      this.aoMapPipeline = null;
     }
   }
 
@@ -578,6 +1062,389 @@ export class ProceduralTextureGenerator {
       imageData.data[pixelIdx + 1] = g;
       imageData.data[pixelIdx + 2] = b;
       imageData.data[pixelIdx + 3] = a;
+    }
+
+    stagingBuffer.unmap();
+    outputBuffer.destroy();
+    stagingBuffer.destroy();
+
+    return imageData;
+  }
+
+  /**
+   * Generate normal map using GPU compute shader (if available)
+   * @param heightMap Height map ImageData
+   * @param strength Normal map strength multiplier
+   * @returns ImageData or null if GPU unavailable
+   */
+  public async generateNormalMapGPU(heightMap: ImageData, strength: number = 2.0): Promise<ImageData | null> {
+    if (!this.device || !this.normalMapPipeline || !this.normalMapUniformBuffer || !this.normalMapBindGroupLayout) {
+      return null; // Fall back to CPU
+    }
+
+    const outputSize = this.textureSize * this.textureSize * 4;
+    
+    // Create height map buffer (pack RGBA as u32)
+    const heightMapBuffer = this.device.createBuffer({
+      label: 'normal-map-height-input',
+      size: outputSize,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+
+    // Pack height map data
+    const heightMapData = new Uint32Array(this.textureSize * this.textureSize);
+    for (let i = 0; i < heightMapData.length; i++) {
+      const pixelIdx = i * 4;
+      const r = heightMap.data[pixelIdx]!;
+      const g = heightMap.data[pixelIdx + 1]!;
+      const b = heightMap.data[pixelIdx + 2]!;
+      const a = heightMap.data[pixelIdx + 3]!;
+      heightMapData[i] = r | (g << 8) | (b << 16) | (a << 24);
+    }
+    this.device.queue.writeBuffer(heightMapBuffer, 0, heightMapData);
+
+    // Create output buffer
+    const outputBuffer = this.device.createBuffer({
+      label: 'normal-map-output',
+      size: outputSize,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+    });
+
+    // Create staging buffer
+    const stagingBuffer = this.device.createBuffer({
+      label: 'normal-map-staging',
+      size: outputSize,
+      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+    });
+
+    // Update uniform buffer
+    const uniformBuffer = new ArrayBuffer(16);
+    const uniformView = new DataView(uniformBuffer);
+    uniformView.setUint32(0, this.textureSize, true);
+    uniformView.setFloat32(4, strength, true);
+    uniformView.setFloat32(8, 0.0, true); // padding
+    uniformView.setFloat32(12, 0.0, true); // padding
+    this.device.queue.writeBuffer(this.normalMapUniformBuffer, 0, uniformBuffer);
+
+    // Create bind group
+    const bindGroup = this.device.createBindGroup({
+      label: 'normal-map-bg',
+      layout: this.normalMapBindGroupLayout,
+      entries: [
+        { binding: 0, resource: { buffer: this.normalMapUniformBuffer } },
+        { binding: 1, resource: { buffer: heightMapBuffer } },
+        { binding: 2, resource: { buffer: outputBuffer } },
+      ],
+    });
+
+    // Dispatch compute shader
+    const encoder = this.device.createCommandEncoder({ label: 'normal-map-encoder' });
+    const pass = encoder.beginComputePass({ label: 'normal-map-pass' });
+    pass.setPipeline(this.normalMapPipeline);
+    pass.setBindGroup(0, bindGroup);
+    const workgroupSize = 8;
+    const workgroupsX = Math.ceil(this.textureSize / workgroupSize);
+    const workgroupsY = Math.ceil(this.textureSize / workgroupSize);
+    pass.dispatchWorkgroups(workgroupsX, workgroupsY);
+    pass.end();
+
+    encoder.copyBufferToBuffer(outputBuffer, 0, stagingBuffer, 0, outputSize);
+    this.device.queue.submit([encoder.finish()]);
+
+    try {
+      await stagingBuffer.mapAsync(GPUMapMode.READ);
+    } catch (error) {
+      console.warn('[ProceduralTextureGenerator] Failed to map normal map staging buffer', error);
+      heightMapBuffer.destroy();
+      outputBuffer.destroy();
+      stagingBuffer.destroy();
+      return null;
+    }
+
+    // Read back data
+    const mappedRange = stagingBuffer.getMappedRange();
+    const data = new Uint32Array(mappedRange);
+    const imageData = new ImageData(this.textureSize, this.textureSize);
+    for (let i = 0; i < data.length; i++) {
+      const packed = data[i]!;
+      const pixelIdx = i * 4;
+      imageData.data[pixelIdx] = (packed & 0xFF);
+      imageData.data[pixelIdx + 1] = ((packed >> 8) & 0xFF);
+      imageData.data[pixelIdx + 2] = ((packed >> 16) & 0xFF);
+      imageData.data[pixelIdx + 3] = ((packed >> 24) & 0xFF);
+    }
+
+    stagingBuffer.unmap();
+    heightMapBuffer.destroy();
+    outputBuffer.destroy();
+    stagingBuffer.destroy();
+
+    return imageData;
+  }
+
+  /**
+   * Generate roughness map using GPU compute shader (if available)
+   * @param face BlockFaceTexture definition
+   * @returns ImageData or null if GPU unavailable
+   */
+  public async generateRoughnessMapGPU(face: BlockFaceTexture): Promise<ImageData | null> {
+    if (!this.device || !this.roughnessMapPipeline || !this.roughnessMapUniformBuffer || !this.roughnessMapBindGroupLayout) {
+      return null; // Fall back to CPU
+    }
+
+    const pattern = face.pattern || 'solid';
+    const patternMap: Record<string, number> = {
+      'solid': 0,
+      'smooth': 1,
+      'noise': 2,
+      'cobble': 3,
+      'bricks': 4,
+      'planks': 5,
+      'grid': 6,
+    };
+    const patternId = patternMap[pattern] ?? 0;
+    const seed = this.generateDeterministicSeed(face);
+
+    const outputSize = this.textureSize * this.textureSize * 4;
+    const outputBuffer = this.device.createBuffer({
+      label: 'roughness-map-output',
+      size: outputSize,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+    });
+
+    const stagingBuffer = this.device.createBuffer({
+      label: 'roughness-map-staging',
+      size: outputSize,
+      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+    });
+
+    // Update uniform buffer
+    const uniformBuffer = new ArrayBuffer(16);
+    const uniformView = new DataView(uniformBuffer);
+    uniformView.setUint32(0, patternId, true);
+    uniformView.setUint32(4, this.textureSize, true);
+    uniformView.setFloat32(8, seed, true);
+    uniformView.setFloat32(12, 0.0, true); // padding
+    this.device.queue.writeBuffer(this.roughnessMapUniformBuffer, 0, uniformBuffer);
+
+    const bindGroup = this.device.createBindGroup({
+      label: 'roughness-map-bg',
+      layout: this.roughnessMapBindGroupLayout,
+      entries: [
+        { binding: 0, resource: { buffer: this.roughnessMapUniformBuffer } },
+        { binding: 1, resource: { buffer: outputBuffer } },
+      ],
+    });
+
+    const encoder = this.device.createCommandEncoder({ label: 'roughness-map-encoder' });
+    const pass = encoder.beginComputePass({ label: 'roughness-map-pass' });
+    pass.setPipeline(this.roughnessMapPipeline);
+    pass.setBindGroup(0, bindGroup);
+    const workgroupSize = 8;
+    const workgroupsX = Math.ceil(this.textureSize / workgroupSize);
+    const workgroupsY = Math.ceil(this.textureSize / workgroupSize);
+    pass.dispatchWorkgroups(workgroupsX, workgroupsY);
+    pass.end();
+
+    encoder.copyBufferToBuffer(outputBuffer, 0, stagingBuffer, 0, outputSize);
+    this.device.queue.submit([encoder.finish()]);
+
+    try {
+      await stagingBuffer.mapAsync(GPUMapMode.READ);
+    } catch (error) {
+      console.warn('[ProceduralTextureGenerator] Failed to map roughness map staging buffer', error);
+      outputBuffer.destroy();
+      stagingBuffer.destroy();
+      return null;
+    }
+
+    const mappedRange = stagingBuffer.getMappedRange();
+    const data = new Uint32Array(mappedRange);
+    const imageData = new ImageData(this.textureSize, this.textureSize);
+    for (let i = 0; i < data.length; i++) {
+      const packed = data[i]!;
+      const pixelIdx = i * 4;
+      imageData.data[pixelIdx] = (packed & 0xFF);
+      imageData.data[pixelIdx + 1] = ((packed >> 8) & 0xFF);
+      imageData.data[pixelIdx + 2] = ((packed >> 16) & 0xFF);
+      imageData.data[pixelIdx + 3] = ((packed >> 24) & 0xFF);
+    }
+
+    stagingBuffer.unmap();
+    outputBuffer.destroy();
+    stagingBuffer.destroy();
+
+    return imageData;
+  }
+
+  /**
+   * Generate metallic map using GPU compute shader (if available)
+   * @param face BlockFaceTexture definition
+   * @returns ImageData or null if GPU unavailable
+   */
+  public async generateMetallicMapGPU(_face: BlockFaceTexture): Promise<ImageData | null> {
+    if (!this.device || !this.metallicMapPipeline || !this.metallicMapUniformBuffer || !this.metallicMapBindGroupLayout) {
+      return null; // Fall back to CPU
+    }
+
+    const outputSize = this.textureSize * this.textureSize * 4;
+    const outputBuffer = this.device.createBuffer({
+      label: 'metallic-map-output',
+      size: outputSize,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+    });
+
+    const stagingBuffer = this.device.createBuffer({
+      label: 'metallic-map-staging',
+      size: outputSize,
+      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+    });
+
+    // Update uniform buffer
+    const uniformBuffer = new ArrayBuffer(16);
+    const uniformView = new DataView(uniformBuffer);
+    uniformView.setUint32(0, this.textureSize, true);
+    uniformView.setUint32(4, 0, true); // padding
+    uniformView.setFloat32(8, 0.0, true); // padding
+    uniformView.setFloat32(12, 0.0, true); // padding
+    this.device.queue.writeBuffer(this.metallicMapUniformBuffer, 0, uniformBuffer);
+
+    const bindGroup = this.device.createBindGroup({
+      label: 'metallic-map-bg',
+      layout: this.metallicMapBindGroupLayout,
+      entries: [
+        { binding: 0, resource: { buffer: this.metallicMapUniformBuffer } },
+        { binding: 1, resource: { buffer: outputBuffer } },
+      ],
+    });
+
+    const encoder = this.device.createCommandEncoder({ label: 'metallic-map-encoder' });
+    const pass = encoder.beginComputePass({ label: 'metallic-map-pass' });
+    pass.setPipeline(this.metallicMapPipeline);
+    pass.setBindGroup(0, bindGroup);
+    const workgroupSize = 8;
+    const workgroupsX = Math.ceil(this.textureSize / workgroupSize);
+    const workgroupsY = Math.ceil(this.textureSize / workgroupSize);
+    pass.dispatchWorkgroups(workgroupsX, workgroupsY);
+    pass.end();
+
+    encoder.copyBufferToBuffer(outputBuffer, 0, stagingBuffer, 0, outputSize);
+    this.device.queue.submit([encoder.finish()]);
+
+    try {
+      await stagingBuffer.mapAsync(GPUMapMode.READ);
+    } catch (error) {
+      console.warn('[ProceduralTextureGenerator] Failed to map metallic map staging buffer', error);
+      outputBuffer.destroy();
+      stagingBuffer.destroy();
+      return null;
+    }
+
+    const mappedRange = stagingBuffer.getMappedRange();
+    const data = new Uint32Array(mappedRange);
+    const imageData = new ImageData(this.textureSize, this.textureSize);
+    for (let i = 0; i < data.length; i++) {
+      const packed = data[i]!;
+      const pixelIdx = i * 4;
+      imageData.data[pixelIdx] = (packed & 0xFF);
+      imageData.data[pixelIdx + 1] = ((packed >> 8) & 0xFF);
+      imageData.data[pixelIdx + 2] = ((packed >> 16) & 0xFF);
+      imageData.data[pixelIdx + 3] = ((packed >> 24) & 0xFF);
+    }
+
+    stagingBuffer.unmap();
+    outputBuffer.destroy();
+    stagingBuffer.destroy();
+
+    return imageData;
+  }
+
+  /**
+   * Generate AO map using GPU compute shader (if available)
+   * @param face BlockFaceTexture definition
+   * @returns ImageData or null if GPU unavailable
+   */
+  public async generateAOMapGPU(face: BlockFaceTexture): Promise<ImageData | null> {
+    if (!this.device || !this.aoMapPipeline || !this.aoMapUniformBuffer || !this.aoMapBindGroupLayout) {
+      return null; // Fall back to CPU
+    }
+
+    const pattern = face.pattern || 'solid';
+    const patternMap: Record<string, number> = {
+      'solid': 0,
+      'smooth': 1,
+      'noise': 2,
+      'cobble': 3,
+      'bricks': 4,
+      'planks': 5,
+      'grid': 6,
+    };
+    const patternId = patternMap[pattern] ?? 0;
+    const seed = this.generateDeterministicSeed(face);
+
+    const outputSize = this.textureSize * this.textureSize * 4;
+    const outputBuffer = this.device.createBuffer({
+      label: 'ao-map-output',
+      size: outputSize,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+    });
+
+    const stagingBuffer = this.device.createBuffer({
+      label: 'ao-map-staging',
+      size: outputSize,
+      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+    });
+
+    // Update uniform buffer
+    const uniformBuffer = new ArrayBuffer(16);
+    const uniformView = new DataView(uniformBuffer);
+    uniformView.setUint32(0, patternId, true);
+    uniformView.setUint32(4, this.textureSize, true);
+    uniformView.setFloat32(8, seed, true);
+    uniformView.setFloat32(12, 0.0, true); // padding
+    this.device.queue.writeBuffer(this.aoMapUniformBuffer, 0, uniformBuffer);
+
+    const bindGroup = this.device.createBindGroup({
+      label: 'ao-map-bg',
+      layout: this.aoMapBindGroupLayout,
+      entries: [
+        { binding: 0, resource: { buffer: this.aoMapUniformBuffer } },
+        { binding: 1, resource: { buffer: outputBuffer } },
+      ],
+    });
+
+    const encoder = this.device.createCommandEncoder({ label: 'ao-map-encoder' });
+    const pass = encoder.beginComputePass({ label: 'ao-map-pass' });
+    pass.setPipeline(this.aoMapPipeline);
+    pass.setBindGroup(0, bindGroup);
+    const workgroupSize = 8;
+    const workgroupsX = Math.ceil(this.textureSize / workgroupSize);
+    const workgroupsY = Math.ceil(this.textureSize / workgroupSize);
+    pass.dispatchWorkgroups(workgroupsX, workgroupsY);
+    pass.end();
+
+    encoder.copyBufferToBuffer(outputBuffer, 0, stagingBuffer, 0, outputSize);
+    this.device.queue.submit([encoder.finish()]);
+
+    try {
+      await stagingBuffer.mapAsync(GPUMapMode.READ);
+    } catch (error) {
+      console.warn('[ProceduralTextureGenerator] Failed to map AO map staging buffer', error);
+      outputBuffer.destroy();
+      stagingBuffer.destroy();
+      return null;
+    }
+
+    const mappedRange = stagingBuffer.getMappedRange();
+    const data = new Uint32Array(mappedRange);
+    const imageData = new ImageData(this.textureSize, this.textureSize);
+    for (let i = 0; i < data.length; i++) {
+      const packed = data[i]!;
+      const pixelIdx = i * 4;
+      imageData.data[pixelIdx] = (packed & 0xFF);
+      imageData.data[pixelIdx + 1] = ((packed >> 8) & 0xFF);
+      imageData.data[pixelIdx + 2] = ((packed >> 16) & 0xFF);
+      imageData.data[pixelIdx + 3] = ((packed >> 24) & 0xFF);
     }
 
     stagingBuffer.unmap();
@@ -1033,6 +1900,61 @@ export class ProceduralTextureGenerator {
     
     // Generate ambient occlusion
     const ao = this.generateAOMap(face);
+    
+    return {
+      albedo,
+      normal,
+      roughness,
+      metallic,
+      ao
+    };
+  }
+
+  /**
+   * Generate full PBR texture set (tries GPU first, falls back to CPU)
+   */
+  public async generatePBRTextureAsync(face: BlockFaceTexture): Promise<PBRTextureData> {
+    // Generate albedo using GPU if available
+    const albedo = await this.generateTextureAsync(face);
+    
+    // Generate height map for normal generation (CPU for now)
+    const heightMap = this.generateHeightMap(face);
+    
+    // Try GPU for normal map, fall back to CPU
+    let normal: ImageData | undefined;
+    if (this.isGPUInitialized) {
+      const gpuNormal = await this.generateNormalMapGPU(heightMap, 2.0);
+      normal = gpuNormal || this.generateNormalMap(heightMap, 2.0);
+    } else {
+      normal = this.generateNormalMap(heightMap, 2.0);
+    }
+    
+    // Try GPU for roughness map, fall back to CPU
+    let roughness: ImageData | undefined;
+    if (this.isGPUInitialized) {
+      const gpuRoughness = await this.generateRoughnessMapGPU(face);
+      roughness = gpuRoughness || this.generateRoughnessMap(face);
+    } else {
+      roughness = this.generateRoughnessMap(face);
+    }
+    
+    // Try GPU for metallic map, fall back to CPU
+    let metallic: ImageData | undefined;
+    if (this.isGPUInitialized) {
+      const gpuMetallic = await this.generateMetallicMapGPU(face);
+      metallic = gpuMetallic || this.generateMetallicMap(face);
+    } else {
+      metallic = this.generateMetallicMap(face);
+    }
+    
+    // Try GPU for AO map, fall back to CPU
+    let ao: ImageData | undefined;
+    if (this.isGPUInitialized) {
+      const gpuAO = await this.generateAOMapGPU(face);
+      ao = gpuAO || this.generateAOMap(face);
+    } else {
+      ao = this.generateAOMap(face);
+    }
     
     return {
       albedo,

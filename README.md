@@ -60,21 +60,31 @@ forge-engine/
 │   ├── world/        # ECS runtime, physics
 │   ├── gfx-webgpu/   # WebGPU renderer
 │   ├── script/       # Visual scripting (LogicCubes)
+│   ├── stdlib/       # Standard library (animation, audio, character)
 │   ├── input/        # Input management
 │   ├── camera/       # Camera systems
-│   ├── stdlib/       # Standard library (animation, audio, character)
 │   ├── editor-utils/ # Editor utilities (history, snap)
 │   ├── test-utils/   # Test utilities (mocks, fixtures)
-│   ├── net/          # Networking
-│   ├── avatar/       # Avatar system
-│   ├── voxel/        # Voxel system
-│   └── ...
+│   ├── animation/    # Animation system
+│   ├── avatar/       # Avatar and character system
+│   ├── blocks/       # Block building system
+│   ├── brand/        # Branding assets
+│   ├── economy/      # Economy and virtual currency system
+│   ├── gateway/      # API gateway and rate limiting
+│   ├── microblocks/  # Microblock voxel system
+│   ├── net/          # Client-side networking
+│   ├── net-protocol/ # Network protocol definitions
+│   ├── net-server/   # Server-side networking engine
+│   ├── voxel/        # Voxel rendering and management
+│   ├── wasm-collision/ # WASM collision detection
+│   ├── world-server/ # Server-side world management
+│   └── world-templates/ # World template system
 ├── apps/              # Applications
 │   ├── editor/        # 3D scene editor
-│   ├── platform/      # Platform UI
-│   ├── player/        # Player client
-│   ├── net-server/    # Network server
-│   └── collab-server/ # Collaboration server
+│   ├── player/        # Game player client
+│   ├── platform/      # Platform web UI
+│   ├── net-server/    # Network/API server
+│   └── collab-server/ # Real-time collaboration server
 └── docs/              # Documentation
 ```
 
@@ -111,10 +121,76 @@ forge-engine/
 - Runtime execution with coroutines
 
 ### @engine/net
-**Multiplayer networking** - Real-time synchronization
+**Multiplayer networking** - Real-time synchronization (client-side)
 - WebSocket-based networking
 - Entity synchronization
 - Zone and session management
+
+### @engine/avatar
+**Avatar system** - Character customization and management
+- Avatar builder with body parts
+- Character rigging and animation
+- Customization system
+
+### @engine/animation
+**Animation system** - Advanced animation runtime
+- Skeletal animation with skinning
+- Animation blending and transitions
+- GLTF animation support
+
+### @engine/economy
+**Virtual economy** - Currency and transactions
+- Virtual currency system
+- Marketplace integration
+- Transaction management
+
+### @engine/voxel
+**Voxel system** - Voxel rendering and world generation
+- Chunk-based voxel rendering
+- Block placement and modification
+- Terrain generation
+
+### @engine/microblocks
+**Microblocks** - Fine-grained voxel building
+- Sub-block precision building
+- Advanced placement tools
+
+### @engine/blocks
+**Block system** - Block definitions and model generation
+- Block library and palettes
+- Procedural model generation
+
+### @engine/world-templates
+**World templates** - Pre-built world configurations
+- Template system for common scenarios
+- Serialization and loading
+
+### @engine/net-server
+**Server networking** - Server-side networking engine
+- Session management
+- World synchronization
+- Zone management
+
+### @engine/world-server
+**Server world** - Server-side world simulation
+- Headless physics simulation
+- Server-side entity management
+
+### @engine/net-protocol
+**Network protocol** - Shared protocol definitions
+- Message types and serialization
+- Protocol versioning
+
+### @engine/gateway
+**API Gateway** - Rate limiting and API management
+- Token-based authentication
+- Rate limiting
+- Service registry
+
+### @engine/brand
+**Branding** - Project branding assets
+- Logo and visual identity
+- Brand colors and typography
 
 ---
 
@@ -147,6 +223,48 @@ pnpm test:unit:fast
 - [TEST_COMMANDS_CHEATSHEET.md](TEST_COMMANDS_CHEATSHEET.md) - Command reference
 - [docs/TESTING.md](docs/TESTING.md) - Testing philosophy
 - [docs/TESTING_AUTOMATION.md](docs/TESTING_AUTOMATION.md) - Full guide
+
+---
+
+## 🎮 Applications
+
+### @apps/editor
+**3D Scene Editor** - Professional editor for building 3D worlds
+- Visual scene editing
+- Block placement system
+- LogicCubes visual scripting
+- Animation timeline
+- Play mode testing
+
+### @apps/player
+**Game Player** - Client application for playing games
+- Multiplayer support
+- Real-time synchronization
+- Input handling and controls
+- Save system and checkpoints
+- Performance monitoring
+
+### @apps/platform
+**Platform Web UI** - Web interface for the platform
+- User dashboard
+- Game browser and launcher
+- Studio and project management
+- Marketplace
+- Social features (friends, chat)
+
+### @apps/net-server
+**Network & API Server** - Backend server for the platform
+- RESTful API
+- Authentication and authorization
+- Database management (Prisma)
+- WebSocket support
+- Asset storage
+
+### @apps/collab-server
+**Collaboration Server** - Real-time collaboration for multiplayer
+- WebRTC signaling
+- Room management
+- Real-time state synchronization
 
 ---
 

@@ -5,7 +5,7 @@ import { Entity } from '@engine/world';
 import { EditorState } from '../../editor/core/state';
 import { SelectionManager } from '@engine/world';
 import { PhysicsWorld } from '@engine/world/physics';
-import { CharacterControllerSystem } from '@engine/stdlib/CharacterController';
+import { CharacterControllerSystem, GroundDetectionSystem } from '@engine/stdlib/CharacterController';
 import { CharacterInputHandler } from '@engine/input';
 import { FPSCamera } from '@engine/camera';
 import { CharacterController } from '@engine/world';
@@ -58,6 +58,7 @@ describe.skip('PlayModeFPS Integration Tests', () => {
   let canvas: HTMLCanvasElement;
   let controls: OrbitControls;
   let physicsWorld: PhysicsWorld;
+  let groundDetectionSystem: GroundDetectionSystem;
   let characterSystem: CharacterControllerSystem;
   let characterInput: CharacterInputHandler;
   let fpsCamera: FPSCamera;
@@ -83,6 +84,7 @@ describe.skip('PlayModeFPS Integration Tests', () => {
     canvas = createMockCanvas();
     controls = createMockControls();
     physicsWorld = new PhysicsWorld(scene);
+    groundDetectionSystem = new GroundDetectionSystem(scene, physicsWorld);
     characterSystem = new CharacterControllerSystem(scene, physicsWorld);
     characterInput = new CharacterInputHandler();
     fpsCamera = new FPSCamera(canvas);
@@ -102,6 +104,7 @@ describe.skip('PlayModeFPS Integration Tests', () => {
       controls,
       physicsWorld,
       characterSystem,
+      groundDetectionSystem,
       characterInput,
       fpsCamera,
     });

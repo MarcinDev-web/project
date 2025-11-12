@@ -55,8 +55,13 @@ export function useProfile({ userId, isOwnProfile }: UseProfileOptions): UseProf
         !isOwnProfile && currentUser 
           ? usersApi.getBlockedStatus(actualUserId).catch(() => null) 
           : Promise.resolve(null),
-        // Load social stats (even for own profile, to show stats)
-        profilesApi.getSocialStats(actualUserId).catch(() => null),
+        // Load social stats - only for own profile (requires auth)
+        isOwnProfile && currentUser
+          ? profilesApi.getSocialStats(actualUserId).catch((err) => {
+              console.error('Failed to load social stats:', err);
+              return null;
+            })
+          : Promise.resolve(null),
         // Load forum activity (optional, can fail if no activity)
         profilesApi.getUserForumActivity(actualUserId, 10).catch(() => null),
       ]);
@@ -92,8 +97,14 @@ export function useProfile({ userId, isOwnProfile }: UseProfileOptions): UseProf
       const actualUserId = userId === 'me' ? currentUser?.id : userId;
       if (!actualUserId) return;
 
+      const isOwn = userId === 'me' || userId === currentUser?.id;
       const [socialStatsData, forumActivityData] = await Promise.all([
-        profilesApi.getSocialStats(actualUserId).catch(() => null),
+        isOwn && currentUser
+          ? profilesApi.getSocialStats(actualUserId).catch((err) => {
+              console.error('Failed to refresh social stats:', err);
+              return null;
+            })
+          : Promise.resolve(null),
         profilesApi.getUserForumActivity(actualUserId, 10).catch(() => null),
       ]);
 

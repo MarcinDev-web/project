@@ -4,7 +4,6 @@ import type { PhysicsWorld } from '@engine/world';
 import type { Vec3 } from '@engine/core/math';
 import { MovementProfileRegistry } from '../MovementProfiles/MovementProfileRegistry';
 import { AnimationComponent } from '../Animation';
-import { GroundDetectionSystem } from './GroundDetectionSystem';
 import { AnimationStateName } from './AnimationStateName';
 import { AnimationBlendConfig } from './AnimationBlendConfig';
 
@@ -33,25 +32,22 @@ const STATE_TO_ANIMATION: Record<CharacterState, AnimationStateName> = {
  * 
  * Handles:
  * - Character controller updates
- * - Ground detection using physics raycasting
  * - Animation synchronization with character state
  * - Integration with physics world
+ * 
+ * Note: Ground detection is handled by GroundDetectionSystem, which must be
+ * updated before this system in the game loop. Pass it via dependency injection
+ * if you need to share the same instance, otherwise it can be omitted.
  */
 export class CharacterControllerSystem {
   private scene: Scene;
   private intentBuffer = new Map<CharacterController, IntentFrame>();
-  private groundDetection: GroundDetectionSystem;
   private readonly blendConfig: AnimationBlendConfig;
 
-  constructor(scene: Scene, physics: PhysicsWorld, options?: {
-    cacheCellSize?: number;
-    cacheMaxAge?: number;
+  constructor(scene: Scene, _physics: PhysicsWorld, options?: {
     blendConfig?: AnimationBlendConfig;
   }) {
     this.scene = scene;
-    const cacheCellSize = options?.cacheCellSize ?? 0.5;
-    const cacheMaxAge = options?.cacheMaxAge ?? 0.1;
-    this.groundDetection = new GroundDetectionSystem(physics, cacheCellSize, cacheMaxAge);
     this.blendConfig = options?.blendConfig ?? new AnimationBlendConfig();
   }
 
@@ -86,8 +82,8 @@ export class CharacterControllerSystem {
       controllers.push(controller);
     }
 
-    // Update ground detection for all controllers (must be before controller.update())
-    this.groundDetection.update(controllers, deltaTime);
+    // Note: Ground detection should be handled by GroundDetectionSystem.update()
+    // which must be called before this system's update() in the game loop
 
     // Update each controller
     for (const controller of controllers) {

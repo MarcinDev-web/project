@@ -126,6 +126,10 @@ export class CurrencyTransactionHistory {
       [TransactionType.WITHDRAWAL]: 0,
       [TransactionType.TRANSFER]: 0,
       [TransactionType.EXCHANGE]: 0,
+      [TransactionType.PURCHASE]: 0,
+      [TransactionType.MARKETPLACE]: 0,
+      [TransactionType.FEE]: 0,
+      [TransactionType.PAYOUT]: 0,
     };
 
     const countByStatus: Record<TransactionStatus, number> = {

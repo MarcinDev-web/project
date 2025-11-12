@@ -15,9 +15,11 @@ export interface BlocksModelsStudioPanelProps {
   onSave: () => void;
   hasUnsavedChanges: boolean;
   viewportRef?: React.RefObject<HTMLCanvasElement>;
+  mode?: 'blocks' | 'model-builder';
+  onModeChange?: (mode: 'blocks' | 'model-builder') => void;
 }
 
-type TabType = 'blocks' | 'models' | 'micro-blocks';
+type TabType = 'blocks' | 'models' | 'micro-blocks' | 'model-builder';
 
 /**
  * Main panel component with tabs
@@ -28,8 +30,10 @@ export function BlocksModelsStudioPanel({
   onSave,
   hasUnsavedChanges,
   viewportRef,
+  mode = 'blocks',
+  onModeChange,
 }: BlocksModelsStudioPanelProps) {
-  const [activeTab, setActiveTab] = useState<TabType>('blocks');
+  const [activeTab, setActiveTab] = useState<TabType>(mode === 'model-builder' ? 'model-builder' : 'blocks');
 
   // Handler for starting drag from micro block palette
   const handleMicroBlockSelect = (block: BlockDefinition, scale: Vec3) => {
@@ -72,7 +76,10 @@ export function BlocksModelsStudioPanel({
       <div className="panel-tabs">
         <button
           className={`tab-button ${activeTab === 'blocks' ? 'active' : ''}`}
-          onClick={() => setActiveTab('blocks')}
+          onClick={() => {
+            setActiveTab('blocks');
+            onModeChange?.('blocks');
+          }}
         >
           🧱 Blocks
         </button>
@@ -87,6 +94,15 @@ export function BlocksModelsStudioPanel({
           onClick={() => setActiveTab('micro-blocks')}
         >
           🔲 Micro Blocks
+        </button>
+        <button
+          className={`tab-button ${activeTab === 'model-builder' ? 'active' : ''}`}
+          onClick={() => {
+            setActiveTab('model-builder');
+            onModeChange?.('model-builder');
+          }}
+        >
+          🔨 Model Builder
         </button>
       </div>
 
@@ -105,6 +121,17 @@ export function BlocksModelsStudioPanel({
             <MicroBlockPalette
               onBlockSelect={handleMicroBlockSelect}
             />
+          </div>
+        )}
+        {activeTab === 'model-builder' && (
+          <div>
+            <div style={{ padding: '1rem' }}>
+              <h3>Model Builder</h3>
+              <p>Build models using microblocks</p>
+              <p style={{ fontSize: '0.875rem', color: 'rgba(255, 255, 255, 0.7)', marginTop: '0.5rem' }}>
+                Coming soon: Full Model Builder integration
+              </p>
+            </div>
           </div>
         )}
       </div>

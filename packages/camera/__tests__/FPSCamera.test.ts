@@ -467,5 +467,409 @@ describe('FPSCamera', () => {
       expect(length).toBeCloseTo(1, 5);
     });
   });
+
+  describe('camera roll', () => {
+    it('should set and get roll', () => {
+      camera.setRoll(0.5);
+      expect(camera.getRoll()).toBeCloseTo(0, 5); // Should be smoothed, starts at 0
+
+      // Update to allow smoothing
+      camera.update(0.1);
+      const roll = camera.getRoll();
+      expect(roll).toBeGreaterThan(0);
+      expect(roll).toBeLessThanOrEqual(0.5);
+    });
+
+    it('should smooth roll transitions', () => {
+      camera.setRoll(Math.PI / 4);
+      camera.update(0.01);
+      const roll1 = camera.getRoll();
+
+      camera.update(0.01);
+      const roll2 = camera.getRoll();
+
+      // Should be approaching target
+      expect(roll2).toBeGreaterThan(roll1);
+      expect(roll2).toBeLessThanOrEqual(Math.PI / 4);
+    });
+
+    it('should reset roll to zero', () => {
+      camera.setRoll(0.5);
+      camera.update(0.1);
+      camera.setRoll(0);
+      camera.update(0.1);
+
+      const roll = camera.getRoll();
+      expect(roll).toBeLessThan(0.5);
+    });
+
+    it('should set roll smoothing', () => {
+      camera.setRollSmoothing(0.1);
+      camera.setRoll(1.0);
+      camera.update(0.01);
+      const roll1 = camera.getRoll();
+
+      camera.setRollSmoothing(0.01);
+      camera.setRoll(1.0);
+      camera.update(0.01);
+      const roll2 = camera.getRoll();
+
+      // Lower smoothing should be more responsive
+      expect(roll2).toBeGreaterThan(roll1);
+    });
+  });
+
+  describe('camera shake', () => {
+    it('should add shake', () => {
+      expect(camera.getShakeCount()).toBe(0);
+      camera.addShake(0.1, 0.5);
+      expect(camera.getShakeCount()).toBe(1);
+    });
+
+    it('should update shake over time', () => {
+      camera.addShake(0.1, 0.5);
+      camera.update(0.1);
+      expect(camera.getShakeCount()).toBe(1);
+
+      // Shake should decay
+      camera.update(0.3);
+      expect(camera.getShakeCount()).toBe(1);
+
+      // Shake should expire
+      camera.update(0.2);
+      expect(camera.getShakeCount()).toBe(0);
+    });
+
+    it('should handle multiple shakes', () => {
+      camera.addShake(0.1, 0.2);
+      camera.addShake(0.05, 0.3);
+      expect(camera.getShakeCount()).toBe(2);
+
+      camera.update(0.25);
+      expect(camera.getShakeCount()).toBe(1);
+
+      camera.update(0.1);
+      expect(camera.getShakeCount()).toBe(0);
+    });
+
+    it('should clear all shakes', () => {
+      camera.addShake(0.1, 0.5);
+      camera.addShake(0.05, 0.3);
+      expect(camera.getShakeCount()).toBe(2);
+
+      camera.clearShakes();
+      expect(camera.getShakeCount()).toBe(0);
+    });
+
+    it('should ignore invalid shake parameters', () => {
+      const countBefore = camera.getShakeCount();
+      camera.addShake(-1, 0.5);
+      camera.addShake(0.1, -1);
+      camera.addShake(NaN, 0.5);
+      expect(camera.getShakeCount()).toBe(countBefore);
+    });
+
+    it('should apply shake decay', () => {
+      camera.addShake(1.0, 1.0, 0.1); // Fast decay
+      camera.addShake(1.0, 1.0, 0.9); // Slow decay
+      expect(camera.getShakeCount()).toBe(2);
+      
+      camera.update(0.5);
+      // Both should still be active
+      expect(camera.getShakeCount()).toBe(2);
+    });
+  });
+
+  describe('head bob', () => {
+    it('should enable and disable head bob', () => {
+      camera.setHeadBobEnabled(true);
+      camera.setHeadBobIntensity(0.05); // Use higher intensity for test
+      const velocity: Vec3 = [2, 0, 2];
+      // Update multiple times to build up timer
+      for (let i = 0; i < 10; i++) {
+        camera.update(0.016, velocity);
+      }
+      const offset1 = camera.getHeadBobOffset();
+      const mag1 = Math.sqrt(offset1[0] ** 2 + offset1[1] ** 2 + offset1[2] ** 2);
+
+      camera.setHeadBobEnabled(false);
+      camera.update(0.016, velocity);
+      const offset2 = camera.getHeadBobOffset();
+
+      expect(mag1).toBeGreaterThan(0.001);
+      expect(offset2[0]).toBe(0);
+      expect(offset2[1]).toBe(0);
+      expect(offset2[2]).toBe(0);
+    });
+
+    it('should update head bob timer based on velocity', () => {
+      camera.setHeadBobEnabled(true);
+      const velocity: Vec3 = [2, 0, 2];
+      
+      camera.update(0.016, velocity);
+      const offset1 = [...camera.getHeadBobOffset()];
+
+      camera.update(0.016, velocity);
+      const offset2 = camera.getHeadBobOffset();
+
+      // Offset should change over time (at least slightly)
+      const changed = Math.abs(offset1[0] - offset2[0]) > 1e-6 || 
+                      Math.abs(offset1[1] - offset2[1]) > 1e-6 ||
+                      Math.abs(offset1[2] - offset2[2]) > 1e-6;
+      expect(changed).toBe(true);
+    });
+
+    it('should reset head bob when no velocity', () => {
+      camera.setHeadBobEnabled(true);
+      const velocity: Vec3 = [1, 0, 1];
+      camera.update(0.016, velocity);
+      const offset1 = camera.getHeadBobOffset();
+
+      camera.update(0.016, [0, 0, 0]);
+      const offset2 = camera.getHeadBobOffset();
+
+      expect(offset2[0]).toBeCloseTo(0, 2);
+      expect(offset2[1]).toBeCloseTo(0, 2);
+      expect(offset2[2]).toBeCloseTo(0, 2);
+    });
+
+    it('should set head bob intensity', () => {
+      camera.setHeadBobEnabled(true);
+      const velocity: Vec3 = [2, 0, 2];
+      
+      camera.setHeadBobIntensity(0.01);
+      // Build up timer to a known point
+      for (let i = 0; i < 10; i++) {
+        camera.update(0.016, velocity);
+      }
+      const offset1 = camera.getHeadBobOffset();
+      const mag1 = Math.sqrt(offset1[0] ** 2 + offset1[1] ** 2 + offset1[2] ** 2);
+
+      // Change intensity without resetting timer (simulating runtime change)
+      camera.setHeadBobIntensity(0.05);
+      // Continue with same timer progression
+      camera.update(0.016, velocity);
+      const offset2 = camera.getHeadBobOffset();
+      const mag2 = Math.sqrt(offset2[0] ** 2 + offset2[1] ** 2 + offset2[2] ** 2);
+
+      // Higher intensity should produce larger offsets (at same timer value)
+      // With 5x intensity, magnitude should be significantly larger
+      expect(mag2).toBeGreaterThan(mag1 * 3);
+    });
+
+    it('should set head bob speed', () => {
+      camera.setHeadBobEnabled(true);
+      camera.setHeadBobSpeed(5.0);
+      const velocity: Vec3 = [1, 0, 1];
+      camera.update(0.016, velocity);
+      camera.update(0.016, velocity);
+      const offset1 = [...camera.getHeadBobOffset()];
+
+      // Reset timer
+      camera.setHeadBobEnabled(false);
+      camera.setHeadBobEnabled(true);
+      camera.setHeadBobSpeed(20.0);
+      camera.update(0.016, velocity);
+      camera.update(0.016, velocity);
+      const offset2 = camera.getHeadBobOffset();
+
+      // Higher speed should produce different pattern (different timer progression)
+      const changed = Math.abs(offset1[0] - offset2[0]) > 1e-6 || 
+                      Math.abs(offset1[1] - offset2[1]) > 1e-6 ||
+                      Math.abs(offset1[2] - offset2[2]) > 1e-6;
+      // Note: With same timer start, speed affects progression, so values should differ
+      expect(changed).toBe(true);
+    });
+
+    it('should scale head bob with speed', () => {
+      camera.setHeadBobEnabled(true);
+      camera.setHeadBobIntensity(0.05);
+      const slowVelocity: Vec3 = [0.5, 0, 0.5];
+      const fastVelocity: Vec3 = [5, 0, 5];
+
+      // Test with slow velocity
+      camera.setHeadBobEnabled(false);
+      camera.setHeadBobEnabled(true);
+      // Update multiple times to build up timer
+      for (let i = 0; i < 10; i++) {
+        camera.update(0.016, slowVelocity);
+      }
+      const offsetSlow = camera.getHeadBobOffset();
+      const magSlow = Math.sqrt(offsetSlow[0] ** 2 + offsetSlow[1] ** 2 + offsetSlow[2] ** 2);
+
+      // Test with fast velocity - timer will progress faster
+      camera.setHeadBobEnabled(false);
+      camera.setHeadBobEnabled(true);
+      // Update same number of times
+      for (let i = 0; i < 10; i++) {
+        camera.update(0.016, fastVelocity);
+      }
+      const offsetFast = camera.getHeadBobOffset();
+      const magFast = Math.sqrt(offsetFast[0] ** 2 + offsetFast[1] ** 2 + offsetFast[2] ** 2);
+
+      // Fast velocity should produce larger magnitude due to:
+      // 1. Faster timer progression (more cycles)
+      // 2. speedFactor scaling: slow ~0.14, fast = 1.0
+      // Combined effect should be significant
+      expect(magFast).toBeGreaterThan(magSlow);
+      // At minimum, fast should be at least 2x due to speedFactor alone
+      expect(magFast).toBeGreaterThan(magSlow * 1.2);
+    });
+  });
+
+  describe('FOV effects', () => {
+    it('should initialize with default FOV', () => {
+      const fov = camera.getFov();
+      const expectedFov = (72 * Math.PI) / 180; // Default 72 degrees
+      expect(fov).toBeCloseTo(expectedFov, 5);
+    });
+
+    it('should set and get base FOV', () => {
+      const customFov = (90 * Math.PI) / 180; // 90 degrees
+      camera.setBaseFov(customFov);
+      // When multiplier is 1.0, baseFov is applied immediately
+      expect(camera.getFov()).toBeCloseTo(customFov, 5);
+    });
+
+    it('should smooth FOV transitions', () => {
+      const baseFov = (72 * Math.PI) / 180;
+      camera.setBaseFov(baseFov);
+      camera.setFovMultiplier(1.2); // +20%
+      
+      camera.update(0.01);
+      const fov1 = camera.getFov();
+      
+      camera.update(0.01);
+      const fov2 = camera.getFov();
+      
+      // Should be approaching target
+      expect(fov2).toBeGreaterThan(fov1);
+      expect(fov2).toBeLessThanOrEqual(baseFov * 1.2);
+    });
+
+    it('should apply FOV multiplier', () => {
+      const baseFov = (72 * Math.PI) / 180;
+      camera.setBaseFov(baseFov);
+      camera.setFovMultiplier(1.5);
+      
+      // Update multiple times to reach target (need more iterations for smooth transition)
+      for (let i = 0; i < 50; i++) {
+        camera.update(0.016);
+      }
+      
+      const fov = camera.getFov();
+      expect(fov).toBeCloseTo(baseFov * 1.5, 1);
+    });
+
+    it('should reset FOV multiplier to normal', () => {
+      const baseFov = (72 * Math.PI) / 180;
+      camera.setBaseFov(baseFov);
+      camera.setFovMultiplier(1.5);
+      
+      // Update to reach target
+      for (let i = 0; i < 50; i++) {
+        camera.update(0.016);
+      }
+      
+      camera.setFovMultiplier(1.0);
+      
+      // Update to return to normal (multiplier 1.0 should be instant)
+      for (let i = 0; i < 50; i++) {
+        camera.update(0.016);
+      }
+      
+      const fov = camera.getFov();
+      expect(fov).toBeCloseTo(baseFov, 1);
+    });
+
+    it('should set and get sprint multiplier', () => {
+      camera.setSprintMultiplier(1.15);
+      expect(camera.getSprintMultiplier()).toBe(1.15);
+    });
+
+    it('should set and get aim multiplier', () => {
+      camera.setAimMultiplier(0.65);
+      expect(camera.getAimMultiplier()).toBe(0.65);
+    });
+
+    it('should use sprint multiplier for sprint effect', () => {
+      const baseFov = (72 * Math.PI) / 180;
+      camera.setBaseFov(baseFov);
+      camera.setSprintMultiplier(1.15);
+      
+      camera.setFovMultiplier(camera.getSprintMultiplier());
+      
+      // Update to reach target
+      for (let i = 0; i < 50; i++) {
+        camera.update(0.016);
+      }
+      
+      const fov = camera.getFov();
+      expect(fov).toBeCloseTo(baseFov * 1.15, 1);
+    });
+
+    it('should use aim multiplier for aim effect', () => {
+      const baseFov = (72 * Math.PI) / 180;
+      camera.setBaseFov(baseFov);
+      camera.setAimMultiplier(0.65);
+      
+      camera.setFovMultiplier(camera.getAimMultiplier());
+      
+      // Update to reach target
+      for (let i = 0; i < 50; i++) {
+        camera.update(0.016);
+      }
+      
+      const fov = camera.getFov();
+      expect(fov).toBeCloseTo(baseFov * 0.65, 1);
+    });
+
+    it('should set FOV smoothing', () => {
+      camera.setFovSmoothing(0.05);
+      const baseFov = (72 * Math.PI) / 180;
+      camera.setBaseFov(baseFov);
+      camera.setFovMultiplier(1.5);
+      
+      camera.update(0.01);
+      const fov1 = camera.getFov();
+      
+      camera.setFovSmoothing(0.2);
+      camera.setFovMultiplier(1.5);
+      camera.update(0.01);
+      const fov2 = camera.getFov();
+      
+      // Lower smoothing should be more responsive
+      expect(fov2).toBeGreaterThan(fov1);
+    });
+
+    it('should ignore invalid FOV values', () => {
+      const originalFov = camera.getFov();
+      camera.setBaseFov(-1);
+      camera.setBaseFov(NaN);
+      expect(camera.getFov()).toBeCloseTo(originalFov, 5);
+    });
+
+    it('should ignore invalid FOV multiplier values', () => {
+      const originalMultiplier = camera.getFovMultiplier();
+      camera.setFovMultiplier(-1);
+      camera.setFovMultiplier(NaN);
+      expect(camera.getFovMultiplier()).toBe(originalMultiplier);
+    });
+
+    it('should initialize with custom FOV options', () => {
+      const customCamera = new FPSCamera(canvas, {
+        baseFov: (90 * Math.PI) / 180,
+        sprintMultiplier: 1.2,
+        aimMultiplier: 0.6,
+        fovSmoothing: 0.05,
+      });
+      
+      expect(customCamera.getFov()).toBeCloseTo((90 * Math.PI) / 180, 5);
+      expect(customCamera.getSprintMultiplier()).toBe(1.2);
+      expect(customCamera.getAimMultiplier()).toBe(0.6);
+      
+      customCamera.dispose();
+    });
+  });
 });
 

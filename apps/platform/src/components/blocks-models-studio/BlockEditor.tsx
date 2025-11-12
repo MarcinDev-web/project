@@ -3,8 +3,7 @@
  */
 
 import { useState, useEffect } from 'react';
-import type { BlockDefinition, BlockCategory, BlockMaterialType, CTMPattern } from '@engine/blocks';
-import { BLOCK_LIBRARY } from '@engine/blocks';
+import type { BlockDefinition, BlockCategory, BlockMaterialType } from '@engine/blocks';
 import type { RgbaColor } from '@engine/world';
 
 export interface BlockEditorProps {

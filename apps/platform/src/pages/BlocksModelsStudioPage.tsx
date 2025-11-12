@@ -22,10 +22,23 @@ export function BlocksModelsStudioPage() {
   const [selectedBlock, setSelectedBlock] = useState<BlockDefinition | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
+  const [initError, setInitError] = useState<string | null>(null);
+  const [mode, setMode] = useState<'blocks' | 'model-builder'>('blocks');
   const viewportCanvasRef = useRef<HTMLCanvasElement>(null);
   const coreRef = useRef<BlocksModelsStudioCore | null>(null);
 
-  // Note: Loading is now handled in onCoreReady callback
+  // Timeout fallback - if loading takes too long, show error
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      if (isLoading && !initError) {
+        console.warn('Blocks/Models Studio initialization timeout');
+        setInitError('Initialization timeout - please check browser console for errors');
+        setIsLoading(false);
+      }
+    }, 30000); // 30 seconds timeout
+
+    return () => clearTimeout(timeout);
+  }, [isLoading, initError]);
 
   const handleBlockChange = useCallback((block: BlockDefinition) => {
     setSelectedBlock(block);
@@ -94,18 +107,60 @@ export function BlocksModelsStudioPage() {
     return () => window.removeEventListener('keydown', handleKeyDown);
   }, [hasUnsavedChanges, handleSave]);
 
-  if (isLoading) {
-    return (
-      <Layout>
-        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '80vh' }}>
-          <div>Loading Blocks/Models Studio...</div>
-        </div>
-      </Layout>
-    );
-  }
-
+  console.log('[BlocksModelsStudioPage] Render - isLoading:', isLoading, 'initError:', initError);
+  
+  // Always render the component - let it handle its own loading state
   return (
     <Layout>
+      {isLoading && !initError && (
+        <div style={{ 
+          position: 'fixed', 
+          top: 0, 
+          left: 0, 
+          right: 0, 
+          bottom: 0, 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          backgroundColor: 'rgba(0, 0, 0, 0.8)',
+          zIndex: 9999,
+          flexDirection: 'column', 
+          gap: '1rem' 
+        }}>
+          <div style={{ color: 'white', fontSize: '1.2rem' }}>Loading Blocks/Models Studio...</div>
+        </div>
+      )}
+      
+      {initError && (
+        <div style={{ 
+          position: 'fixed', 
+          top: 0, 
+          left: 0, 
+          right: 0, 
+          bottom: 0, 
+          display: 'flex', 
+          justifyContent: 'center', 
+          alignItems: 'center', 
+          backgroundColor: 'rgba(0, 0, 0, 0.9)',
+          zIndex: 9999,
+          flexDirection: 'column', 
+          gap: '1rem' 
+        }}>
+          <div style={{ color: 'red', fontSize: '1.2rem', fontWeight: 'bold' }}>Failed to initialize Blocks/Models Studio</div>
+          <div style={{ color: 'red', maxWidth: '600px', textAlign: 'center' }}>{initError}</div>
+          <button 
+            onClick={() => {
+              setInitError(null);
+              setIsLoading(true);
+              window.location.reload();
+            }}
+            style={{ padding: '0.5rem 1rem', marginTop: '1rem' }}
+          >
+            Retry
+          </button>
+        </div>
+      )}
+
       <div className="blocks-models-studio-page">
         <div className="blocks-models-studio-container">
           <div className="blocks-models-studio-sidebar">
@@ -115,6 +170,8 @@ export function BlocksModelsStudioPage() {
               onSave={handleSave}
               hasUnsavedChanges={hasUnsavedChanges}
               viewportRef={viewportCanvasRef}
+              mode={mode}
+              onModeChange={setMode}
             />
           </div>
           <div className="blocks-models-studio-viewport">
@@ -123,9 +180,16 @@ export function BlocksModelsStudioPage() {
               onBlockChange={handleBlockChange}
               onBlockPlaced={handleBlockPlaced}
               onCoreReady={(core) => {
+                console.log('[BlocksModelsStudioPage] onCoreReady called, user:', user);
                 coreRef.current = core;
+                setInitError(null);
+                
+                // Always set loading to false first, then load blocks if needed
+                setIsLoading(false);
+                
                 // Trigger load after core is ready
                 if (user?.id) {
+                  console.log('[BlocksModelsStudioPage] User ID found, loading saved blocks...');
                   // Load blocks when core is ready
                   const loadSavedBlocks = async () => {
                     try {
@@ -172,17 +236,21 @@ export function BlocksModelsStudioPage() {
                           }))
                         );
                       }
-                      setIsLoading(false);
+                      console.log('[BlocksModelsStudioPage] Saved blocks loaded');
                     } catch (error) {
-                      console.error('Failed to load saved blocks:', error);
+                      console.error('[BlocksModelsStudioPage] Failed to load saved blocks:', error);
                       showToast('Failed to load saved blocks', 'error');
-                      setIsLoading(false);
                     }
                   };
                   loadSavedBlocks();
                 } else {
-                  setIsLoading(false);
+                  console.log('[BlocksModelsStudioPage] No user ID, skipping block loading');
                 }
+              }}
+              onError={(error) => {
+                console.error('[BlocksModelsStudioPage] onError called:', error);
+                setInitError(error);
+                setIsLoading(false);
               }}
               ref={viewportCanvasRef}
             />

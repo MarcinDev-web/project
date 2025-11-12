@@ -10,3 +10,6 @@ export * from './ecs/OrbitCameraComponent';
 export * from './ecs/OrbitCameraSystem';
 export * from './utils/Damper';
 
+// Collision providers
+export * from './collision/FPSRaycastCollision';
+

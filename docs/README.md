@@ -156,8 +156,9 @@ Complete documentation for the UGC 3D Platform project.
 ## 📁 Documentation Structure
 
 ```
-ugc-3d-platform/
+forge-engine/
 ├── AI_CONTEXT.md                    # 🤖 AI assistant guide ⭐
+├── AI_FILES_INDEX.md                # 🤖 Quick index for finding docs
 ├── CODEBASE_PATTERNS.md             # 🤖 Design patterns ⭐
 ├── AI_PROMPTS.md                    # 🤖 Example prompts & workflows
 ├── QUICK_START_AI.md                # 🤖 2-minute quick start
@@ -174,28 +175,37 @@ ugc-3d-platform/
     │   ├── PACKAGE_GUIDELINES.md         # Where code belongs
     │   ├── CODE_REVIEW_CHECKLIST.md      # PR review checklist
     │   └── TEAM_ONBOARDING.md            # New dev guide
-    ├── archive/                    # Archived documentation
+    ├── deployment/                  # Deployment documentation
+    │   ├── RAILWAY_DEPLOYMENT.md         # Railway deployment guide
+    │   ├── VERCEL_DEPLOY.md              # Vercel deployment
+    │   ├── DOCKER_DEPLOYMENT_GUIDE.md    # Docker setup
+    │   └── [other deployment docs]
+    ├── archive/                     # Archived documentation
     │   ├── REFACTORING_COMPLETE.md      # Oct 2025 refactoring summary
     │   ├── MIGRATION_SUCCESS_METRICS.md
     │   ├── [completed refactoring docs]
     │   └── [historical analyses]
-    ├── analysis/                   # Current analysis documents
+    ├── analysis/                    # Current analysis documents
     │   ├── HOTBAR_PLACEMENT_ANALYSIS.md
+    │   ├── MARKETPLACE_ANALYSIS.md
     │   ├── PLACEMENT_ANALYSIS_PROBLEMS.md
     │   └── [other analyses]
     ├── technical/                   # Technical specs
     │   ├── FRAME_MODEL.md
-    │   └── PLAY_MODE.md
+    │   ├── PLAY_MODE.md
+    │   ├── WEBGPU_FEATURE_POLICY.md
+    │   ├── UGC_SECURITY_MODEL.md
+    │   └── RUNTIME_DETERMINISM_AND_SERIALIZATION.md
     ├── adr/                         # Architecture decisions
     │   └── 001-modular-engine-architecture.md
     ├── issues/                      # Issue documentation
     │   └── SHADER_NON_UNIFORM_CONTROL_FLOW.md
-    └── [various analysis docs]
+    └── [various docs]
 ```
 
 ---
 
-**Last Updated:** 2025-11-02  
-**Maintainer:** Tech Lead
+**Last Updated:** 2025-11-12  
+**Maintainer:** Tech Team
 
-**Note:** Documentation has been reorganized. Historical analyses and completed refactoring documentation are now in [archive/](./archive/).
+**Note:** Documentation has been reorganized. Historical analyses and completed refactoring documentation are now in [archive/](./archive/). Deployment documentation is in [deployment/](./deployment/).

@@ -17,7 +17,6 @@ import {
   type AvatarLoadout,
   type AvatarSlot,
   type AvatarMaterialResolver,
-  type AvatarMaterialBinding,
   type AvatarAnimation,
 } from '@engine/avatar';
 import { AvatarLoadoutSerializer } from '@engine/avatar/serialization/avatar-loadout-serializer';
@@ -43,7 +42,6 @@ export class AvatarBuilderCore {
   private animationFrameId: number | null = null;
   private isInitialized = false;
   private disposed = false;
-  private lastFrameTime = 0;
 
   private readonly canvas: HTMLCanvasElement;
   private readonly statusEl: HTMLElement | null;
@@ -247,7 +245,6 @@ export class AvatarBuilderCore {
       }
 
       this.isInitialized = true;
-      this.lastFrameTime = performance.now();
       this.startGameLoop();
       
       // Start idle animation
@@ -289,12 +286,10 @@ export class AvatarBuilderCore {
    * Start the game loop
    */
   private startGameLoop(): void {
-    const frame = (currentTime: number) => {
+    const frame = (_currentTime: number) => {
       if (this.disposed || !this.renderer || !this.isInitialized) {
         return;
       }
-
-      this.lastFrameTime = currentTime;
 
       // Update renderer scene (picks up any changes)
       // Note: renderer handles actual rendering internally via its own loop

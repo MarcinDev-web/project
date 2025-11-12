@@ -12,7 +12,7 @@
 import { createIcon } from '../utils/icons';
 
 export interface RegisterModalOptions {
-  onRegister?: (email: string, password: string) => Promise<void> | void;
+  onRegister?: (email: string, username: string, password: string) => Promise<void> | void;
   onClose?: () => void;
 }
 
@@ -81,6 +81,32 @@ export class RegisterModal {
     emailGroup.appendChild(emailLabel);
     emailGroup.appendChild(emailInput);
 
+    // Username input
+    const usernameGroup = document.createElement('div');
+    usernameGroup.className = 'form-group';
+    const usernameLabel = document.createElement('label');
+    usernameLabel.textContent = 'Username';
+    usernameLabel.setAttribute('for', 'register-username');
+    const usernameInput = document.createElement('input');
+    usernameInput.type = 'text';
+    usernameInput.id = 'register-username';
+    usernameInput.className = 'input';
+    usernameInput.required = true;
+    usernameInput.minLength = 3;
+    usernameInput.maxLength = 20;
+    usernameInput.pattern = '[a-zA-Z0-9_]+';
+    usernameInput.title = 'Username can only contain letters, numbers, and underscores';
+    usernameInput.placeholder = 'Enter your username';
+    const usernameHint = document.createElement('small');
+    usernameHint.textContent = '3-20 characters, letters, numbers, and underscores only';
+    usernameHint.style.display = 'block';
+    usernameHint.style.marginTop = 'var(--spacing-1)';
+    usernameHint.style.fontSize = 'var(--text-sm)';
+    usernameHint.style.color = 'var(--color-text-secondary)';
+    usernameGroup.appendChild(usernameLabel);
+    usernameGroup.appendChild(usernameInput);
+    usernameGroup.appendChild(usernameHint);
+
     // Password input
     const passwordGroup = document.createElement('div');
     passwordGroup.className = 'form-group';
@@ -128,6 +154,7 @@ export class RegisterModal {
     submitBtn.style.marginTop = 'var(--spacing-4)';
 
     form.appendChild(emailGroup);
+    form.appendChild(usernameGroup);
     form.appendChild(passwordGroup);
     form.appendChild(confirmPasswordGroup);
     form.appendChild(errorMsg);
@@ -162,6 +189,7 @@ export class RegisterModal {
 
     // Store references for form handling
     (this.modal as any).emailInput = emailInput;
+    (this.modal as any).usernameInput = usernameInput;
     (this.modal as any).passwordInput = passwordInput;
     (this.modal as any).confirmPasswordInput = confirmPasswordInput;
     (this.modal as any).errorMsg = errorMsg;
@@ -175,17 +203,31 @@ export class RegisterModal {
     if (!this.modal) return;
 
     const emailInput = (this.modal as any).emailInput as HTMLInputElement;
+    const usernameInput = (this.modal as any).usernameInput as HTMLInputElement;
     const passwordInput = (this.modal as any).passwordInput as HTMLInputElement;
     const confirmPasswordInput = (this.modal as any).confirmPasswordInput as HTMLInputElement;
     const errorMsg = (this.modal as any).errorMsg as HTMLElement;
     const submitBtn = (this.modal as any).submitBtn as HTMLButtonElement;
 
     const email = emailInput.value.trim();
+    const username = usernameInput.value.trim();
     const password = passwordInput.value;
     const confirmPassword = confirmPasswordInput.value;
 
-    if (!email || !password || !confirmPassword) {
+    if (!email || !username || !password || !confirmPassword) {
       errorMsg.textContent = 'Please fill in all fields';
+      errorMsg.style.display = 'block';
+      return;
+    }
+
+    // Validate username
+    if (username.length < 3 || username.length > 20) {
+      errorMsg.textContent = 'Username must be between 3 and 20 characters long';
+      errorMsg.style.display = 'block';
+      return;
+    }
+    if (!/^[a-zA-Z0-9_]+$/.test(username)) {
+      errorMsg.textContent = 'Username can only contain letters, numbers, and underscores';
       errorMsg.style.display = 'block';
       return;
     }
@@ -209,7 +251,7 @@ export class RegisterModal {
 
     try {
       if (this.options.onRegister) {
-        await this.options.onRegister(email, password);
+        await this.options.onRegister(email, username, password);
       }
       // Close modal on success
       this.hide();

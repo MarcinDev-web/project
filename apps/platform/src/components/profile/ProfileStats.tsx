@@ -165,83 +165,77 @@ export const ProfileStats = memo(function ProfileStats({
       </Card>
 
       {/* Extended Stats - Only for own profile */}
-      {isOwnProfile && socialStats && (
+      {isOwnProfile && (
         <>
           {/* Marketplace Detailed Stats */}
-          {socialStats.marketplaceStats && (
-            <Card hoverable={false} style={{ marginBottom: 'var(--spacing-6)' }}>
-              <h3 style={{ 
-                marginTop: 0,
-                marginBottom: 'var(--spacing-4)',
-                color: 'var(--text-1)',
-                fontSize: 'var(--text-lg)',
-                fontWeight: 'var(--font-semibold)',
-              }}>
-                Marketplace - Szczegóły
-              </h3>
-              <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-                gap: 'var(--spacing-4)',
-              }}>
-                {renderStatCard('Buildy', socialStats.marketplaceStats.buildsCount, '🏗️', `/marketplace?type=build&author=${userId}`)}
-                {renderStatCard('Avatary', socialStats.marketplaceStats.avatarsCount, '👤', `/marketplace?type=avatar&author=${userId}`)}
-                {renderStatCard('Polubienia buildów', socialStats.marketplaceStats.buildsLikes, '❤️')}
-                {renderStatCard('Pobrania buildów', socialStats.marketplaceStats.buildsDownloads, '⬇️')}
-                {renderStatCard('Polubienia avatarów', socialStats.marketplaceStats.avatarsLikes, '❤️')}
-                {renderStatCard('Pobrania avatarów', socialStats.marketplaceStats.avatarsDownloads, '⬇️')}
-              </div>
-            </Card>
-          )}
+          <Card hoverable={false} style={{ marginBottom: 'var(--spacing-6)' }}>
+            <h3 style={{ 
+              marginTop: 0,
+              marginBottom: 'var(--spacing-4)',
+              color: 'var(--text-1)',
+              fontSize: 'var(--text-lg)',
+              fontWeight: 'var(--font-semibold)',
+            }}>
+              Marketplace - Szczegóły
+            </h3>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+              gap: 'var(--spacing-4)',
+            }}>
+              {renderStatCard('Buildy', socialStats?.marketplaceStats?.buildsCount ?? 0, '🏗️', `/marketplace?type=build&author=${userId}`)}
+              {renderStatCard('Avatary', socialStats?.marketplaceStats?.avatarsCount ?? 0, '👤', `/marketplace?type=avatar&author=${userId}`)}
+              {renderStatCard('Polubienia buildów', socialStats?.marketplaceStats?.buildsLikes ?? 0, '❤️')}
+              {renderStatCard('Pobrania buildów', socialStats?.marketplaceStats?.buildsDownloads ?? 0, '⬇️')}
+              {renderStatCard('Polubienia avatarów', socialStats?.marketplaceStats?.avatarsLikes ?? 0, '❤️')}
+              {renderStatCard('Pobrania avatarów', socialStats?.marketplaceStats?.avatarsDownloads ?? 0, '⬇️')}
+            </div>
+          </Card>
 
           {/* Blocks Stats */}
-          {socialStats.blocksStats && (
-            <Card hoverable={false} style={{ marginBottom: 'var(--spacing-6)' }}>
-              <h3 style={{ 
-                marginTop: 0,
-                marginBottom: 'var(--spacing-4)',
-                color: 'var(--text-1)',
-                fontSize: 'var(--text-lg)',
-                fontWeight: 'var(--font-semibold)',
-              }}>
-                Bloki/Modele
-              </h3>
-              <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-                gap: 'var(--spacing-4)',
-              }}>
-                {renderStatCard('Zapisane', socialStats.blocksStats.saved, '📦', '/studio')}
-                {renderStatCard('Opublikowane', socialStats.blocksStats.published, '🌐')}
-                {renderStatCard('Użycia', socialStats.blocksStats.totalUses, '🔄')}
-              </div>
-            </Card>
-          )}
+          <Card hoverable={false} style={{ marginBottom: 'var(--spacing-6)' }}>
+            <h3 style={{ 
+              marginTop: 0,
+              marginBottom: 'var(--spacing-4)',
+              color: 'var(--text-1)',
+              fontSize: 'var(--text-lg)',
+              fontWeight: 'var(--font-semibold)',
+            }}>
+              Bloki/Modele
+            </h3>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+              gap: 'var(--spacing-4)',
+            }}>
+              {renderStatCard('Zapisane', socialStats?.blocksStats?.saved ?? 0, '📦', '/studio')}
+              {renderStatCard('Opublikowane', socialStats?.blocksStats?.published ?? 0, '🌐')}
+              {renderStatCard('Użycia', socialStats?.blocksStats?.totalUses ?? 0, '🔄')}
+            </div>
+          </Card>
 
           {/* Avatars Stats */}
-          {socialStats.avatarsStats && (
-            <Card hoverable={false} style={{ marginBottom: 'var(--spacing-6)' }}>
-              <h3 style={{ 
-                marginTop: 0,
-                marginBottom: 'var(--spacing-4)',
-                color: 'var(--text-1)',
-                fontSize: 'var(--text-lg)',
-                fontWeight: 'var(--font-semibold)',
-              }}>
-                Avatary
-              </h3>
-              <div style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
-                gap: 'var(--spacing-4)',
-              }}>
-                {renderStatCard('Zapisane presety', socialStats.avatarsStats.savedPresets, '💾', '/studio')}
-                {renderStatCard('Opublikowane', socialStats.avatarsStats.published, '🌐', `/marketplace?type=avatar&author=${userId}`)}
-                {renderStatCard('Pobrania', socialStats.avatarsStats.totalDownloads, '⬇️')}
-                {renderStatCard('Polubienia', socialStats.avatarsStats.totalLikes, '❤️')}
-              </div>
-            </Card>
-          )}
+          <Card hoverable={false} style={{ marginBottom: 'var(--spacing-6)' }}>
+            <h3 style={{ 
+              marginTop: 0,
+              marginBottom: 'var(--spacing-4)',
+              color: 'var(--text-1)',
+              fontSize: 'var(--text-lg)',
+              fontWeight: 'var(--font-semibold)',
+            }}>
+              Avatary
+            </h3>
+            <div style={{ 
+              display: 'grid', 
+              gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))',
+              gap: 'var(--spacing-4)',
+            }}>
+              {renderStatCard('Zapisane presety', socialStats?.avatarsStats?.savedPresets ?? 0, '💾', '/studio')}
+              {renderStatCard('Opublikowane', socialStats?.avatarsStats?.published ?? 0, '🌐', `/marketplace?type=avatar&author=${userId}`)}
+              {renderStatCard('Pobrania', socialStats?.avatarsStats?.totalDownloads ?? 0, '⬇️')}
+              {renderStatCard('Polubienia', socialStats?.avatarsStats?.totalLikes ?? 0, '❤️')}
+            </div>
+          </Card>
         </>
       )}
     </div>
