@@ -43,6 +43,7 @@ export class AvatarBuilderCore {
   private animationFrameId: number | null = null;
   private isInitialized = false;
   private disposed = false;
+  private initPromise: Promise<void> | null = null;
 
   private readonly canvas: HTMLCanvasElement;
   private readonly statusEl: HTMLElement | null;
@@ -71,18 +72,25 @@ export class AvatarBuilderCore {
     // Create serializer for validation
     this.serializer = new AvatarLoadoutSerializer();
 
-    // Create root entity for avatar
-    const avatarRoot = new Entity('AvatarRoot');
-    avatarRoot.transform.position = [0, 0, 0];
-    this.scene.addEntity(avatarRoot);
+    // Create a temporary parent entity for AvatarInstance
+    // AvatarInstance will create its own root entity as a child of this parent
+    // We don't add this parent to the scene to avoid rendering it
+    const tempParent = new Entity('AvatarTempParent');
+    tempParent.transform.position = [0, 0, 0];
 
     // Initialize avatar with default or provided loadout
     const loadout = options.initialLoadout ?? DEFAULT_AVATAR_LOADOUT;
-    this.avatar = new AvatarInstance(avatarRoot, {
+    this.avatar = new AvatarInstance(tempParent, {
       name: 'BuilderAvatar',
       loadout,
       materialResolver: this.materialResolver,
     });
+
+    // Add AvatarInstance's root directly to the scene (not the temp parent)
+    // This ensures only the avatar's actual root is in the scene, avoiding nested rendering
+    const avatarInstanceRoot = this.avatar.getRootEntity();
+    tempParent.removeChild(avatarInstanceRoot);
+    this.scene.addEntity(avatarInstanceRoot);
   }
 
   /**
@@ -127,23 +135,18 @@ export class AvatarBuilderCore {
    * Play animation on avatar
    */
   playAnimation(animation: AvatarAnimation): void {
-    if (!this.avatar) {
-      throw new Error('Avatar not initialized');
-    }
-    this.avatar.playAnimation(animation);
+    this.requireAvatar().playAnimation(animation);
   }
 
   /**
    * Stop current animation
    */
   stopAnimation(resetPose = false): void {
-    if (!this.avatar) {
-      throw new Error('Avatar not initialized');
-    }
-    this.avatar.stopAnimation();
+    const avatar = this.requireAvatar();
+    avatar.stopAnimation();
     if (resetPose) {
       // Reset pose by playing idle animation from start
-      this.avatar.playAnimation(IDLE_ANIMATION, 0);
+      avatar.playAnimation(IDLE_ANIMATION, 0);
     }
   }
 
@@ -195,23 +198,39 @@ export class AvatarBuilderCore {
 
   /**
    * Initialize the renderer and start the game loop
+   * Idempotent: multiple calls return the same promise
    */
   async initialize(): Promise<void> {
+    // Return existing promise if initialization is in progress
+    if (this.initPromise) {
+      return this.initPromise;
+    }
+
+    // Return immediately if already initialized
     if (this.isInitialized) {
-      throw new Error('AvatarBuilderCore is already initialized');
+      return Promise.resolve();
     }
 
     if (this.disposed) {
       throw new Error('AvatarBuilderCore has been disposed');
     }
 
+    // Create and store the initialization promise
+    this.initPromise = this._doInitialize();
+    return this.initPromise;
+  }
+
+  /**
+   * Internal initialization logic
+   */
+  private async _doInitialize(): Promise<void> {
     try {
       if (this.statusEl) {
         this.statusEl.textContent = 'Initializing WebGPU renderer...';
       }
 
       // Check WebGPU availability before attempting initialization
-      if (!('gpu' in navigator)) {
+      if (typeof navigator === 'undefined' || !('gpu' in navigator)) {
         const errorMsg = 'WebGPU not supported in this browser. Please use Chrome 113+, Edge 113+, Opera 99+, Firefox 110+, or Safari 18.0+.';
         if (this.statusEl) {
           this.statusEl.textContent = errorMsg;
@@ -287,6 +306,8 @@ export class AvatarBuilderCore {
       // Log the full error for debugging
       console.error('AvatarBuilderCore: WebGPU initialization error:', error);
       
+      // Clear promise on error so retry is possible
+      this.initPromise = null;
       throw new Error(errorMessage);
     }
   }
@@ -314,9 +335,13 @@ export class AvatarBuilderCore {
       pool.release(position);
     }
 
-    // Fallback if something went wrong
+    // Fallback if something went wrong - use default camera state instead of recursion
     if (!Number.isFinite(minY) || !Number.isFinite(maxY) || maxY <= minY) {
-      this.resetCamera();
+      this.controls.setState({
+        yaw: Math.PI * 0.125,
+        pitch: 0.35,
+        distance: 3,
+      });
       return;
     }
 
@@ -372,11 +397,7 @@ export class AvatarBuilderCore {
    * @param silent - If true, don't trigger onLoadoutChange callback (useful for external updates)
    */
   applyLoadout(loadout: AvatarLoadout, silent = false): void {
-    if (!this.avatar) {
-      throw new Error('Avatar not initialized');
-    }
-
-    this.avatar.applyLoadout(loadout);
+    this.requireAvatar().applyLoadout(loadout);
     if (!silent) {
       this.notifyLoadoutChange();
     }
@@ -386,26 +407,14 @@ export class AvatarBuilderCore {
    * Set color for a specific slot and color slot
    */
   setSlotColor(slot: AvatarSlot, colorSlot: string, color: RgbaColor): void {
-    if (!this.avatar) {
-      throw new Error('Avatar not initialized');
-    }
-
     const currentLoadout = this.getCurrentLoadout();
     const part = currentLoadout.parts[slot];
 
     if (part) {
-      const updatedPart = {
-        ...part,
+      this.updateSlot(slot, {
         colors: {
           ...part.colors,
           [colorSlot]: color,
-        },
-      };
-      this.applyLoadout({
-        ...currentLoadout,
-        parts: {
-          ...currentLoadout.parts,
-          [slot]: updatedPart,
         },
       });
     }
@@ -415,69 +424,22 @@ export class AvatarBuilderCore {
    * Set mesh for a specific slot
    */
   setSlotMesh(slot: AvatarSlot, meshId: string): void {
-    if (!this.avatar) {
-      throw new Error('Avatar not initialized');
-    }
-
-    const currentLoadout = this.getCurrentLoadout();
-    const part = currentLoadout.parts[slot];
-
-    if (part) {
-      const updatedPart = {
-        ...part,
-        mesh: meshId,
-      };
-      this.applyLoadout({
-        ...currentLoadout,
-        parts: {
-          ...currentLoadout.parts,
-          [slot]: updatedPart,
-        },
-      });
-    } else {
-      // Create new part entry
-      this.applyLoadout({
-        ...currentLoadout,
-        parts: {
-          ...currentLoadout.parts,
-          [slot]: { mesh: meshId },
-        },
-      });
-    }
+    this.updateSlot(slot, { mesh: meshId });
   }
 
   /**
    * Set material for a specific slot
    */
   setSlotMaterial(slot: AvatarSlot, materialId: string): void {
-    if (!this.avatar) {
-      throw new Error('Avatar not initialized');
-    }
-
     const currentLoadout = this.getCurrentLoadout();
     const part = currentLoadout.parts[slot];
 
     if (part) {
-      const updatedPart = {
-        ...part,
-        material: materialId,
-      };
-      this.applyLoadout({
-        ...currentLoadout,
-        parts: {
-          ...currentLoadout.parts,
-          [slot]: updatedPart,
-        },
-      });
+      this.updateSlot(slot, { material: materialId });
     } else {
-      // Create new part entry with material
-      this.applyLoadout({
-        ...currentLoadout,
-        parts: {
-          ...currentLoadout.parts,
-          [slot]: { mesh: 'default', material: materialId },
-        },
-      });
+      // Don't create part without mesh - material requires existing part with mesh
+      // User should set mesh first, then material
+      throw new Error(`Cannot set material for slot ${slot}: part does not exist. Set mesh first.`);
     }
   }
 
@@ -486,6 +448,53 @@ export class AvatarBuilderCore {
    */
   resetToDefault(): void {
     this.applyLoadout(DEFAULT_AVATAR_LOADOUT);
+  }
+
+  /**
+   * Require avatar instance - throws if avatar is not initialized
+   */
+  private requireAvatar(): AvatarInstance {
+    if (!this.avatar) {
+      throw new Error('Avatar not initialized');
+    }
+    return this.avatar;
+  }
+
+  /**
+   * Update a slot in the current loadout with a partial update
+   */
+  private updateSlot(
+    slot: AvatarSlot,
+    update: Partial<AvatarLoadout['parts'][AvatarSlot]>,
+  ): void {
+    const avatar = this.requireAvatar();
+    const currentLoadout = avatar.serializeLoadout();
+    const part = currentLoadout.parts[slot];
+
+    if (part) {
+      const updatedPart = {
+        ...part,
+        ...update,
+      };
+      this.applyLoadout({
+        ...currentLoadout,
+        parts: {
+          ...currentLoadout.parts,
+          [slot]: updatedPart,
+        },
+      });
+    } else {
+      // Only create new part if update includes mesh (required field)
+      if ('mesh' in update && update.mesh) {
+        this.applyLoadout({
+          ...currentLoadout,
+          parts: {
+            ...currentLoadout.parts,
+            [slot]: update as AvatarLoadout['parts'][AvatarSlot],
+          },
+        });
+      }
+    }
   }
 
   /**
@@ -567,6 +576,9 @@ export class AvatarBuilderCore {
 
     this.disposed = true;
 
+    // Clear initialization promise
+    this.initPromise = null;
+
     // Stop animation loop
     if (this.animationFrameId !== null) {
       cancelAnimationFrame(this.animationFrameId);
@@ -599,4 +611,5 @@ export class AvatarBuilderCore {
     this.isInitialized = false;
   }
 }
+
 

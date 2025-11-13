@@ -1,4 +1,5 @@
 import type { CustomMeshData } from '@engine/world';
+import { VERTEX_STRIDE_FLOATS } from './torso-geometry';
 
 /**
  * Generates a sphere mesh with UV sphere topology.
@@ -10,6 +11,10 @@ import type { CustomMeshData } from '@engine/world';
  * @returns CustomMeshData with vertices, normals, and indices
  */
 export function generateSphereMesh(segments = 16): CustomMeshData {
+  if (segments < 3) {
+    throw new Error(`generateSphereMesh: "segments" must be >= 3 (got ${segments})`);
+  }
+  
   // Store positions, normals, and UVs separately for clarity
   const positions: number[] = [];
   const normals: number[] = [];
@@ -81,7 +86,7 @@ export function generateSphereMesh(segments = 16): CustomMeshData {
   for (let lon = 0; lon < segments; lon++) {
     const current = 1 + ((segments - 2) * segments) + lon;
     const next = 1 + ((segments - 2) * segments) + ((lon + 1) % segments);
-    indices.push(current, bottomVertexIdx, next);
+    indices.push(bottomVertexIdx, current, next);
   }
   
   // Convert to typed arrays
@@ -93,10 +98,10 @@ export function generateSphereMesh(segments = 16): CustomMeshData {
   // Interleave positions, normals, and UVs for renderer format
   // Format: [x, y, z, nx, ny, nz, u, v, x, y, z, nx, ny, nz, u, v, ...] (8 floats per vertex)
   const vertexCount = positions.length / 3;
-  const interleavedData = new Float32Array(vertexCount * 8);
+  const interleavedData = new Float32Array(vertexCount * VERTEX_STRIDE_FLOATS);
   
   for (let i = 0; i < vertexCount; i++) {
-    const base = i * 8;
+    const base = i * VERTEX_STRIDE_FLOATS;
     const posIdx = i * 3;
     const uvIdx = i * 2;
     

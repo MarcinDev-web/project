@@ -34,22 +34,14 @@ describe('Default Animations', () => {
       avatar.playAnimation(IDLE_ANIMATION);
       
       // Simulate multiple loop cycles using AnimationSystem
-      const component = avatar.getAnimationComponent();
-      if (component) {
-        for (let i = 0; i < 10; i++) {
-          component.stateMachine.update(0.3); // 0.3s per update, should loop every 3s
-          avatar.update(0.3);
-        }
-        
-        // Looping animation should still be active
-        expect(component.getActiveState()).toBe('idle');
-      } else {
-        // Fallback: use old animator
-        for (let i = 0; i < 10; i++) {
-          avatar.update(0.3);
-        }
-        expect(avatar.getAnimator().isFinished()).toBe(false);
+      const component = avatar.getOrCreateAnimationComponent();
+      for (let i = 0; i < 10; i++) {
+        component.stateMachine.update(0.3); // 0.3s per update, should loop every 3s
+        avatar.update(0.3);
       }
+      
+      // Looping animation should still be active
+      expect(component.getActiveState()).toBe('idle');
     });
   });
 
@@ -179,22 +171,16 @@ describe('Default Animations', () => {
       const avatar = new AvatarInstance(parentEntity);
       avatar.playAnimation(JUMP_ANIMATION);
       
-      const component = avatar.getAnimationComponent();
-      if (component) {
-        // Play through entire animation using AnimationSystem
-        for (let i = 0; i < 10; i++) {
-          component.stateMachine.update(0.1);
-          avatar.update(0.1);
-        }
-        
-        // Non-looping animation should still be active (AnimationComponent doesn't auto-stop)
-        // But we can check that it played through
-        expect(component.getActiveState()).toBe('jump');
-      } else {
-        // Fallback: use old animator
-        avatar.update(1.0);
-        expect(avatar.getAnimator().isFinished()).toBe(true);
+      // Play through entire animation using AnimationSystem
+      const animComponent = avatar.getOrCreateAnimationComponent();
+      for (let i = 0; i < 10; i++) {
+        animComponent.stateMachine.update(0.1);
+        avatar.update(0.1);
       }
+      
+      // Non-looping animation should still be active (AnimationComponent doesn't auto-stop)
+      // But we can check that it played through
+      expect(animComponent.getActiveState()).toBe('jump');
     });
   });
 });

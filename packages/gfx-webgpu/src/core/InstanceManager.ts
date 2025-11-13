@@ -75,6 +75,7 @@ export class InstanceDataBuilder {
   /**
    * Separates entities with custom meshData from default geometry entities.
    * Generates fallback geometry for meshType='sphere' if meshData is missing.
+   * Skips entities with meshType='none' (structural entities).
    */
   separateCustomGeometry(entities: Entity[]): {
     defaultGeometry: Entity[];
@@ -85,6 +86,8 @@ export class InstanceDataBuilder {
 
     for (const entity of entities) {
       if (!entity) continue;
+      // Skip entities with meshType='none' (structural entities like joints, roots)
+      if (entity.meshType === 'none') continue;
       const meshComponent = entity.getComponent(MeshComponent);
       
       if (!meshComponent) {
@@ -112,7 +115,7 @@ export class InstanceDataBuilder {
         }
       } else if (meshComponent.meshType === 'capsule_y') {
         try {
-          fallbackGeometry = generateCapsuleY(0.5, 1.0, 16, 8);
+          fallbackGeometry = generateCapsuleY({ radius: 0.5, cylinderHeight: 1.0, radialSegments: 16, hemisphereSegments: 8 });
         } catch (error) {
           Logger.warn(
             `[InstanceManager] Failed to generate fallback capsule_y geometry for entity "${entity.name || entity.id || 'unnamed'}":`,
@@ -150,11 +153,14 @@ export class InstanceDataBuilder {
    * Builds instance data by reusing internal buffers.
    * Returns views into reusable buffers (no allocations).
    * Only processes entities without custom meshData.
+   * Skips entities with meshType='none' (structural entities).
    */
   build(entities: Entity[]): InstanceData {
-    // Filter out entities with custom geometry
+    // Filter out entities with custom geometry or meshType='none'
     const entitiesWithoutCustom = entities.filter(e => {
       if (!e) return false;
+      // Skip entities with meshType='none' (structural entities like joints, roots)
+      if (e.meshType === 'none') return false;
       const meshComponent = e.getComponent(MeshComponent);
       return !meshComponent?.meshData?.vertices || !meshComponent.meshData.indices;
     });

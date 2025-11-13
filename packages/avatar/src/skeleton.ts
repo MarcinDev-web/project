@@ -2,6 +2,7 @@ import {
   mat4FromQuatTranslation,
   quatMultiplyOut,
   quatNormalizeOut,
+  vec3Equals,
   type Mat4,
   type Quat,
   type Vec3,
@@ -249,14 +250,21 @@ export class AvatarSkeleton {
 
   setLocalPosition(name: AvatarJointName, position: Vec3): void {
     const joint = this.getJoint(name);
-    copyVec3(joint.localPosition, position);
-    this.markJointDirty(name);
+    // Only mark dirty if position actually changed
+    if (!vec3Equals(joint.localPosition, position)) {
+      copyVec3(joint.localPosition, position);
+      this.markJointDirty(name);
+    }
   }
 
   setLocalRotation(name: AvatarJointName, rotation: Quat): void {
     const joint = this.getJoint(name);
-    copyQuat(joint.localRotation, normalizeQuat(rotation));
-    this.markJointDirty(name);
+    const normalizedRotation = normalizeQuat(rotation);
+    // Only mark dirty if rotation actually changed
+    if (!quatEquals(joint.localRotation, normalizedRotation)) {
+      copyQuat(joint.localRotation, normalizedRotation);
+      this.markJointDirty(name);
+    }
   }
 
   applyLocalPose(pose: Partial<Record<AvatarJointName, Partial<AvatarJointTransform>>>): void {
@@ -412,4 +420,21 @@ function rotateVec3(out: MutableVec3, vec: Vec3, rotation: Quat): void {
   out[0] = ix * qw + iw * -qx + iy * -qz - iz * -qy;
   out[1] = iy * qw + iw * -qy + iz * -qx - ix * -qz;
   out[2] = iz * qw + iw * -qz + ix * -qy - iy * -qx;
+}
+
+function quatEquals(a: Quat, b: Quat, epsilon = 1e-6): boolean {
+  // Quaternions q and -q represent the same rotation, so check both
+  const direct =
+    Math.abs(a[0] - b[0]) <= epsilon &&
+    Math.abs(a[1] - b[1]) <= epsilon &&
+    Math.abs(a[2] - b[2]) <= epsilon &&
+    Math.abs(a[3] - b[3]) <= epsilon;
+  if (direct) return true;
+  // Check if they're negations of each other
+  return (
+    Math.abs(a[0] + b[0]) <= epsilon &&
+    Math.abs(a[1] + b[1]) <= epsilon &&
+    Math.abs(a[2] + b[2]) <= epsilon &&
+    Math.abs(a[3] + b[3]) <= epsilon
+  );
 }

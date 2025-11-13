@@ -1,7 +1,7 @@
 import { Component } from './Component.js';
 import { registerComponent } from './registry.js';
 
-export type MeshKind = 'cube' | 'sphere' | 'custom' | 'avatar_torso' | 'terrain' | 'capsule_y';
+export type MeshKind = 'none' | 'cube' | 'sphere' | 'custom' | 'avatar_torso' | 'terrain' | 'capsule_y';
 
 export interface CustomMeshData {
   vertices?: Float32Array | Uint8Array;
@@ -12,7 +12,7 @@ export interface CustomMeshData {
 export class MeshComponent extends Component {
   static readonly type = 'Mesh';
 
-  meshType: MeshKind = 'cube';
+  meshType: MeshKind = 'none';
   meshData?: CustomMeshData;
 
   getType(): string {

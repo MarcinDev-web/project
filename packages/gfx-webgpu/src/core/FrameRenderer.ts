@@ -495,13 +495,36 @@ export class FrameRenderer {
     }
     
     // Validate device before creating swap chain view
+    // Critical: texture view must be created with the same device as the encoder
     if (!this.validateDeviceAndCleanupEncoder(ctx, deviceSnapshot, encoder, 'swap chain view creation')) {
+      return null;
+    }
+    
+    // Double-check device consistency - texture must be from the same device as configuredDevice
+    // If device changed, getCurrentTexture() may return a texture from the old device
+    if (!DeviceValidator.validateBeforeOperation(ctx, deviceSnapshot, 'texture view creation')) {
+      try {
+        encoder.finish();
+      } catch {
+        // ignore
+      }
       return null;
     }
     
     let swapChainView: GPUTextureView;
     try {
+      // Create view immediately after validation to minimize chance of device change
       swapChainView = swapChainTexture.createView({ label: 'frame-color-resolve-view' });
+      
+      // Validate device one more time after creating view to ensure consistency
+      if (!DeviceValidator.validateBeforeOperation(ctx, deviceSnapshot, 'texture view creation completion')) {
+        try {
+          encoder.finish();
+        } catch {
+          // ignore
+        }
+        return null;
+      }
     } catch (err) {
       this.errorMetrics.deviceValidationErrors++;
       this.errorMetrics.lastErrorTime = performance.now();

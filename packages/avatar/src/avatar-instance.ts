@@ -1,7 +1,7 @@
 import { Entity } from '@engine/world';
 import { AnimationComponent } from '@engine/stdlib/Animation';
 import { getVec3Pool } from '@engine/core/utils/Vec3Pool';
-import { AvatarAnimationPlayer, type AvatarAnimation } from './animation';
+import type { AvatarAnimation } from './animation';
 import { avatarAnimationToClip } from './animation-adapter';
 import { avatarSkeletonToSkeleton } from './skeleton-adapter';
 import {
@@ -62,7 +62,6 @@ export interface AvatarInstanceOptions {
 export class AvatarInstance {
   private readonly root: Entity;
   private readonly skeleton: AvatarSkeleton;
-  private readonly animator: AvatarAnimationPlayer; // Deprecated: kept for backward compatibility
   private readonly partLibrary: AvatarPartLibrary;
   private readonly jointEntities = new Map<AvatarJointName, Entity>();
   private readonly slotEntities = new Map<AvatarSlot, Entity>();
@@ -73,6 +72,8 @@ export class AvatarInstance {
   private readonly mountManager: AvatarPartMountManager;
   private readonly serializer: AvatarLoadoutSerializer;
   private readonly strictMode: boolean;
+  // Cache bone indices for AnimationComponent synchronization
+  private boneIndexCache = new Map<AvatarJointName, number>();
 
   constructor(parent: Entity, options: AvatarInstanceOptions = {}) {
     this.strictMode = options.strictMode ?? false;
@@ -82,7 +83,6 @@ export class AvatarInstance {
 
     this.partLibrary = options.partLibrary ?? createAvatarPartLibrary(DEFAULT_AVATAR_PART_DEFINITIONS);
     this.skeleton = new AvatarSkeleton(DEFAULT_AVATAR_JOINTS);
-    this.animator = new AvatarAnimationPlayer(this.skeleton);
 
     // Initialize managers
     this.meshGenerator = new AvatarMeshGenerator();
@@ -110,10 +110,13 @@ export class AvatarInstance {
   }
 
   /**
-   * @deprecated Use getAnimationComponent() instead. This method is kept for backward compatibility.
+   * @deprecated Use getAnimationComponent() instead. This method has been removed.
+   * @throws Error if called - use getAnimationComponent() instead.
    */
-  getAnimator(): AvatarAnimationPlayer {
-    return this.animator;
+  getAnimator(): never {
+    throw new Error(
+      'getAnimator() has been removed. Use getAnimationComponent() or getOrCreateAnimationComponent() instead.',
+    );
   }
 
   /**
@@ -180,8 +183,16 @@ export class AvatarInstance {
     for (let i = 0; i < jointNames.length; i++) {
       const jointName = jointNames[i];
       if (!jointName) continue;
-      const boneIndex = component.skeleton.findBoneIndex(jointName);
-      if (boneIndex === -1) continue;
+      
+      // Cache bone index to avoid repeated lookups
+      let boneIndex = this.boneIndexCache.get(jointName);
+      if (boneIndex === undefined) {
+        boneIndex = component.skeleton.findBoneIndex(jointName);
+        if (boneIndex === -1) {
+          continue;
+        }
+        this.boneIndexCache.set(jointName, boneIndex);
+      }
       
       const poseBone = component.pose[boneIndex];
       if (!poseBone) continue;
@@ -196,17 +207,25 @@ export class AvatarInstance {
     }
   }
 
-  playAnimation(animation: AvatarAnimation, _startTime = 0): void {
+  playAnimation(animation: AvatarAnimation, startTime?: number): void {
     const component = this.getOrCreateAnimationComponent();
     const clip = avatarAnimationToClip(animation);
     
-    // Add clip if it doesn't exist
+    // Add clip if it doesn't exist (use clip.name for consistency)
     if (!component.clips.has(clip.name)) {
       component.addClip(clip);
     }
     
-    // Set active state
-    component.setActiveState(animation.name);
+    // Set active state using clip name (ensures consistency)
+    component.setActiveState(clip.name);
+    
+    // Set start time if provided
+    if (typeof startTime === 'number' && Number.isFinite(startTime)) {
+      const controller = component.getController(clip.name);
+      if (controller) {
+        controller.time.value = Math.max(0, startTime);
+      }
+    }
     
     // Sync immediately
     this.syncJointEntities();
@@ -215,24 +234,25 @@ export class AvatarInstance {
   stopAnimation(): void {
     const component = this.getAnimationComponent();
     if (component) {
-      // Stop all controllers instead of setting state to null
-      // (AnimationStateMachine doesn't support null state)
+      // Stop all controllers
       for (const controller of component.controllers.values()) {
         controller.stop();
       }
-      // Clear active state name
+      // Clear active state (setActiveState accepts null)
       component.setActiveState(null);
-    } else {
-      // Fallback to old animator for backward compatibility
-      this.animator.stop();
     }
   }
 
   dispose(): void {
-    for (const slot of this.slotEntities.keys()) {
+    // Collect slots before iteration to avoid modifying map during iteration
+    const slots = Array.from(this.slotEntities.keys());
+    for (const slot of slots) {
       this.mountManager.unmountSlot(slot);
     }
     this.slotEntities.clear();
+    this.selections.clear();
+    this.jointEntities.clear();
+    this.boneIndexCache.clear();
     const parent = this.root.parent;
     if (parent) {
       parent.removeChild(this.root);

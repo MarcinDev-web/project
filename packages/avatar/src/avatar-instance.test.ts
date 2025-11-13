@@ -78,11 +78,12 @@ describe('AvatarInstance', () => {
   });
 
   describe('getAnimator', () => {
-    it('should return the animator instance (deprecated)', () => {
+    it('should throw error when called (deprecated and removed)', () => {
       const avatar = new AvatarInstance(parentEntity);
-      const animator = avatar.getAnimator();
-
-      expect(animator).toBeDefined();
+      
+      expect(() => {
+        avatar.getAnimator();
+      }).toThrow('getAnimator() has been removed');
     });
   });
 
@@ -326,7 +327,7 @@ describe('AvatarInstance', () => {
       expect(timeAfter).toBe(timeBefore); // Time should not advance when stopped
     });
 
-    it('should fallback to old animator if AnimationComponent does not exist', () => {
+    it('should stop animation using AnimationComponent', () => {
       const avatar = new AvatarInstance(parentEntity);
       const animation: AvatarAnimation = {
         name: 'test',
@@ -342,8 +343,8 @@ describe('AvatarInstance', () => {
         ],
       };
 
-      // Use old animator directly
-      avatar.getAnimator().play(animation);
+      // Use AnimationComponent
+      avatar.playAnimation(animation);
       expect(() => {
         avatar.stopAnimation();
       }).not.toThrow();

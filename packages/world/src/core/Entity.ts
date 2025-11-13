@@ -71,11 +71,11 @@ export class Entity {
   }
 
   /**
-   * Mesh/geometry type proxying the MeshComponent. Defaults to 'cube' when no component is present.
+   * Mesh/geometry type proxying the MeshComponent. Defaults to 'none' when no component is present.
    */
   get meshType(): MeshKind {
     const mesh = this.getComponent(MeshComponent);
-    return mesh?.meshType ?? 'cube';
+    return mesh?.meshType ?? 'none';
   }
   set meshType(value: MeshKind) {
     let mesh = this.getComponent(MeshComponent);

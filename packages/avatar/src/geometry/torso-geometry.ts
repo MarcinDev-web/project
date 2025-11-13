@@ -1,6 +1,12 @@
 import type { CustomMeshData } from '@engine/world';
 
 /**
+ * Vertex stride for interleaved mesh data format.
+ * Format: [x, y, z, nx, ny, nz, u, v] = 8 floats per vertex
+ */
+export const VERTEX_STRIDE_FLOATS = 8;
+
+/**
  * Shoulder width ratio relative to torso core width.
  * This is the style ABI for avatar torso proportions.
  * Artists and community content creators should reference this value.
@@ -8,6 +14,28 @@ import type { CustomMeshData } from '@engine/world';
  * shoulderShelfWidthX ≈ 1.35 * torsoCoreWidthX
  */
 export const SHOULDER_TO_TORSO_RATIO = 1.35;
+
+/**
+ * Default torso geometry parameters
+ */
+export interface TorsoGeometryParams {
+  /** Lower torso width (relative to full width) */
+  lowerWidth?: number;
+  /** Lower torso height (relative to total height) */
+  lowerHeight?: number;
+  /** Lower torso depth */
+  lowerDepth?: number;
+  /** Shoulder width multiplier relative to torso core */
+  shoulderWidthRatio?: number;
+  /** Shoulder height (relative to total height) */
+  shoulderHeight?: number;
+  /** Shoulder depth */
+  shoulderDepth?: number;
+  /** Overlap between lower torso and shoulder shelf (for seamless blend) */
+  shoulderOverlap?: number;
+  /** Vertical offset of lower torso center */
+  lowerCenterY?: number;
+}
 
 /**
  * Generates a heroic torso mesh with compound geometry:
@@ -21,22 +49,24 @@ export const SHOULDER_TO_TORSO_RATIO = 1.35;
  * The mesh is designed to be scaled by the avatar system's localScale,
  * so dimensions here are in unit space (will be multiplied by scale).
  * 
+ * @param params - Optional geometry parameters (uses defaults if not provided)
  * @returns CustomMeshData with vertices, normals, and indices
  */
-export function generateHeroicTorsoMesh(): CustomMeshData {
+export function generateHeroicTorsoMesh(params: TorsoGeometryParams = {}): CustomMeshData {
   // Dimensions in unit space (before localScale applied)
   // These are relative proportions, actual size comes from localScale: [0.4, 0.55, 0.24]
   
   // Lower torso (main body) - narrower
-  const lowerWidth = 0.95;  // 95% of full width (allows shoulder to extend)
-  const lowerHeight = 0.8;  // 80% of total height
-  const lowerDepth = 1.0;   // Full depth
+  const lowerWidth = params.lowerWidth ?? 0.95;  // 95% of full width (allows shoulder to extend)
+  const lowerHeight = params.lowerHeight ?? 0.8;  // 80% of total height
+  const lowerDepth = params.lowerDepth ?? 1.0;   // Full depth
   
   // Upper shoulder shelf - wider
-  const shoulderWidth = SHOULDER_TO_TORSO_RATIO; // 1.35x = extends on each side
-  const shoulderHeight = 0.25; // 25% of total height (upper portion)
-  const shoulderDepth = 1.0;
-  const shoulderOverlap = 0.05; // 5% overlap with lower torso for seamless blend
+  const shoulderWidthRatio = params.shoulderWidthRatio ?? SHOULDER_TO_TORSO_RATIO;
+  const shoulderWidth = shoulderWidthRatio; // Multiplier = extends on each side
+  const shoulderHeight = params.shoulderHeight ?? 0.25; // 25% of total height (upper portion)
+  const shoulderDepth = params.shoulderDepth ?? 1.0;
+  const shoulderOverlap = params.shoulderOverlap ?? 0.05; // 5% overlap with lower torso for seamless blend
   
   const vertices: number[] = [];
   const normals: number[] = [];
@@ -144,7 +174,7 @@ export function generateHeroicTorsoMesh(): CustomMeshData {
   };
   
   // Add lower torso (centered at origin, extends downward more)
-  const lowerCenterY = -0.15; // Shifted down slightly
+  const lowerCenterY = params.lowerCenterY ?? -0.15; // Shifted down slightly
   addBox(0, lowerCenterY, 0, lowerWidth, lowerHeight, lowerDepth);
   
   // Add upper shoulder shelf (positioned at top, overlapping slightly with lower torso)
@@ -160,10 +190,10 @@ export function generateHeroicTorsoMesh(): CustomMeshData {
   // Interleave positions, normals, and UVs for renderer format
   // Format: [x, y, z, nx, ny, nz, u, v, x, y, z, nx, ny, nz, u, v, ...] (8 floats per vertex)
   const vertexCount = vertices.length / 3;
-  const interleavedData = new Float32Array(vertexCount * 8);
+  const interleavedData = new Float32Array(vertexCount * VERTEX_STRIDE_FLOATS);
   
   for (let i = 0; i < vertexCount; i++) {
-    const base = i * 8;
+    const base = i * VERTEX_STRIDE_FLOATS;
     const posIdx = i * 3;
     const uvIdx = i * 2;
     
