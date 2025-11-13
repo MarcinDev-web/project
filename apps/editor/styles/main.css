@@ -70,6 +70,7 @@
 @import './editor/layers-panel.css';
 @import './editor/bookmarks-panel.css';
 @import './editor/history-panel.css';
+@import './editor/marketplace-panel.css';
 @import './editor/resizable-sidebar.css';
 @import './editor/welcome-enhanced.css';
 @import './editor/interactive-tutorial.css';

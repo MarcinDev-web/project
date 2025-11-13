@@ -35,7 +35,7 @@
 /* Hotbar container - positioned at bottom center */
 .unified-build-hotbar-container {
   position: absolute;
-  bottom: 2rem;
+  bottom: calc(2rem + 40px);
   left: 50%;
   transform: translateX(-50%);
   pointer-events: auto;
@@ -111,7 +111,7 @@
   }
   
   .unified-build-hotbar-container {
-    bottom: 1rem;
+    bottom: calc(1rem + 40px);
   }
   
   .hotbar-component {

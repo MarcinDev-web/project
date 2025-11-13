@@ -55,6 +55,12 @@ export function AdminPage() {
       link: '/admin/support',
       icon: '🎫',
     },
+    {
+      title: 'Release Management',
+      description: 'Manage releases and semantic versioning',
+      link: '/admin/releases',
+      icon: '🚀',
+    },
   ];
 
   return (

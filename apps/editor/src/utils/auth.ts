@@ -201,3 +201,59 @@ export async function logout(): Promise<void> {
   clearTokens();
 }
 
+/**
+ * Wallet balance types
+ */
+export interface WalletBalance {
+  currency: string;
+  balance: number;
+}
+
+export interface Wallet {
+  balances: WalletBalance[];
+}
+
+/**
+ * Get user wallet balance (including coins)
+ */
+export async function getWallet(): Promise<Wallet> {
+  const { token } = getTokens();
+  if (!token) {
+    throw new Error('Not authenticated');
+  }
+
+  const response = await fetch(`${API_BASE_URL}/shop/wallet`, {
+    method: 'GET',
+    headers: {
+      'Authorization': `Bearer ${token}`,
+      'Content-Type': 'application/json',
+    },
+    credentials: 'include',
+  });
+
+  if (!response.ok) {
+    if (response.status === 401) {
+      clearTokens();
+      throw new Error('Not authenticated');
+    }
+    throw new Error('Failed to fetch wallet');
+  }
+
+  return await response.json();
+}
+
+/**
+ * Get user coins balance
+ */
+export async function getCoins(): Promise<number> {
+  try {
+    const wallet = await getWallet();
+    const coinsBalance = wallet.balances.find(
+      (b: WalletBalance) => b.currency.toLowerCase() === 'coins'
+    );
+    return coinsBalance?.balance ?? 0;
+  } catch {
+    return 0;
+  }
+}
+

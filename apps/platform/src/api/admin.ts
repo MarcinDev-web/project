@@ -421,6 +421,47 @@ export const adminApi = {
   }> {
     return apiClient.get('/admin/news/stats');
   },
+
+  /**
+   * Get all releases
+   */
+  async getReleases(): Promise<{
+    releases: Release[];
+    total: number;
+  }> {
+    return apiClient.get('/admin/releases');
+  },
+
+  /**
+   * Get release statistics
+   */
+  async getReleaseStats(): Promise<{
+    total: number;
+    byType: {
+      major: number;
+      minor: number;
+      patch: number;
+    };
+    lastRelease?: {
+      tag: string;
+      version: string;
+      createdAt: number;
+    };
+    currentVersion: string;
+  }> {
+    return apiClient.get('/admin/releases/stats');
+  },
+
+  /**
+   * Create a new release (triggers GitHub Actions workflow)
+   */
+  async createRelease(versionType: 'major' | 'minor' | 'patch'): Promise<{
+    success: boolean;
+    message: string;
+    workflowRunId?: string;
+  }> {
+    return apiClient.post('/admin/releases', { versionType });
+  },
 };
 
 export interface NewsItem {
@@ -436,5 +477,17 @@ export interface NewsItem {
   updatedAt: number;
   tags?: string[];
   imageUrl?: string;
+}
+
+export interface Release {
+  id: string;
+  tag: string;
+  version: string;
+  type: 'major' | 'minor' | 'patch';
+  status: 'pending' | 'running' | 'success' | 'failed';
+  createdAt: number;
+  createdBy?: string;
+  changelog?: string;
+  githubReleaseUrl?: string;
 }
 

@@ -66,6 +66,8 @@ import { ForumStorage } from './storage/ForumStorage.js';
 import { ForumStorageDB } from './storage/ForumStorageDB.js';
 import { SupportStorageDB } from './storage/SupportStorageDB.js';
 import { NewsStorage } from './storage/NewsStorage.js';
+import { ReleaseStorage } from './storage/ReleaseStorage.js';
+import { GitHubService } from './services/GitHubService.js';
 import { ShopStorage } from './storage/ShopStorage.js';
 import { ShopStorageDB } from './storage/ShopStorageDB.js';
 import { AssetStorage } from './storage/AssetStorage.js';
@@ -224,6 +226,8 @@ if (!dbPool && !supportStorage) {
   console.warn('SupportStorage requires PostgreSQL database. Support system will not be available.');
 }
 const newsStorage = new NewsStorage(DATA_DIR);
+const releaseStorage = new ReleaseStorage(DATA_DIR);
+const githubService = new GitHubService();
 const messageHandler = new MessageHandler(messagesStorage, sessionManager);
 const forumHandler = new ForumHandler(sessionManager, forumStorage as unknown as ForumStorage);
 
@@ -480,6 +484,7 @@ void authManager.initialize().then(async () => {
     await supportStorage.initialize();
   }
   await newsStorage.initialize();
+  await releaseStorage.initialize();
   console.log('All storage systems initialized');
 
   // Auto-seed marketplace if empty (development only, skip in tests)
@@ -609,6 +614,8 @@ const routeDeps: RouteDependencies = {
     };
   })(),
   newsStorage,
+  releaseStorage,
+  githubService,
   shopStorage: shopStorage as unknown as ShopStorage,
   assetStorage: assetStorage as unknown as AssetStorage,
   purchaseStorage: purchaseStorage as unknown as PurchaseStorage,

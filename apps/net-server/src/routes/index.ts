@@ -18,6 +18,8 @@ import type { UserSettingsStorage } from '../storage/UserSettingsStorage.js';
 import type { ForumStorage } from '../storage/ForumStorage.js';
 import type { SupportStorage } from '../storage/SupportStorage.js';
 import type { NewsStorage } from '../storage/NewsStorage.js';
+import type { ReleaseStorage } from '../storage/ReleaseStorage.js';
+import type { GitHubService } from '../services/GitHubService.js';
 import type { ShopStorage } from '../storage/ShopStorage.js';
 import type { AssetStorage } from '../storage/AssetStorage.js';
 import type { PurchaseStorage } from '../storage/PurchaseStorage.js';
@@ -61,6 +63,8 @@ export interface RouteDependencies {
   forumStorage: ForumStorage;
   supportStorage: SupportStorage;
   newsStorage: NewsStorage;
+  releaseStorage: ReleaseStorage;
+  githubService: GitHubService;
   shopStorage: ShopStorage;
   assetStorage: AssetStorage;
   purchaseStorage: PurchaseStorage;

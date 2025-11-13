@@ -31,6 +31,7 @@ import { StudioPage } from './pages/StudioPage';
 import { SupportPage } from './pages/SupportPage';
 import { TicketDetail } from './components/support/TicketDetail';
 import { SupportManagementPage } from './pages/admin/SupportManagementPage';
+import { ReleaseManagementPage } from './pages/admin/ReleaseManagementPage';
 import { NewsPage } from './pages/NewsPage';
 import { GamesPage } from './pages/GamesPage';
 import { NotFoundPage } from './pages/NotFoundPage';
@@ -181,6 +182,14 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
     element: (
       <AdminRoute>
         <SupportManagementPage />
+      </AdminRoute>
+    ),
+  },
+  {
+    path: '/admin/releases',
+    element: (
+      <AdminRoute>
+        <ReleaseManagementPage />
       </AdminRoute>
     ),
   },

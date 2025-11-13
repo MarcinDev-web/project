@@ -50,6 +50,10 @@ export class FrameTargetManager {
   private tonemapView: GPUTextureView | null = null;
   private tonemapSize: Size | null = null;
   private pendingDestroy: GPUTexture[] = [];
+  // Track active encoders and textures they use to prevent premature destruction
+  private activeEncoders: WeakMap<GPUCommandEncoder, Set<GPUTexture>> = new WeakMap();
+  // Track all textures currently in use by any active encoder (for fast lookup)
+  private texturesInUse: Set<GPUTexture> = new Set();
 
   ensureTargets(
     ctx: FrameRenderContext,
@@ -62,7 +66,11 @@ export class FrameTargetManager {
     // Ensure device matches - if not, textures from previous device are invalid
     if (device !== configuredDevice) {
       Logger.warn('[FrameTargetManager] Device mismatch - clearing all targets');
-      this.flushImmediate(); // Destroy all textures immediately
+      // Clear active encoders - they're from old device and invalid
+      this.activeEncoders = new WeakMap();
+      this.texturesInUse.clear();
+      // Destroy textures safely (only those not in use)
+      this.flushImmediate();
       this.releaseHdrResources();
       this.releaseNormalResources();
       this.releaseSsaoResources();
@@ -275,9 +283,97 @@ export class FrameTargetManager {
     };
   }
 
+  /**
+   * Gets the HDR color texture (for encoder registration).
+   */
+  getHdrColorTexture(): GPUTexture | null {
+    return this.hdrColorTexture;
+  }
+
+  /**
+   * Gets the bloom texture (for encoder registration).
+   */
+  getBloomTexture(): GPUTexture | null {
+    return this.bloomTexture;
+  }
+
+  /**
+   * Gets the normal texture (for encoder registration).
+   */
+  getNormalTexture(): GPUTexture | null {
+    return this.normalTexture;
+  }
+
+  /**
+   * Gets the SSAO texture (for encoder registration).
+   */
+  getSsaoTexture(): GPUTexture | null {
+    return this.ssaoTexture;
+  }
+
+  /**
+   * Gets the resolved depth texture (for encoder registration).
+   */
+  getResolvedDepthTexture(): GPUTexture | null {
+    return this.resolvedDepthTexture;
+  }
+
+  /**
+   * Gets the tonemap texture (for encoder registration).
+   */
+  getTonemapTexture(): GPUTexture | null {
+    return this.tonemapTexture;
+  }
+
+  /**
+   * Registers textures used by an encoder to prevent premature destruction.
+   * Must be called before using textures in a CommandEncoder.
+   * Call unregisterEncoderTextures() after encoder.finish().
+   */
+  registerEncoderTextures(encoder: GPUCommandEncoder, textures: GPUTexture[]): void {
+    const textureSet = new Set(textures.filter((t): t is GPUTexture => t !== null));
+    if (textureSet.size > 0) {
+      this.activeEncoders.set(encoder, textureSet);
+      // Track textures in use
+      for (const texture of textureSet) {
+        this.texturesInUse.add(texture);
+      }
+    }
+  }
+
+  /**
+   * Unregisters an encoder after it has been finished.
+   * Must be called after encoder.finish() to allow texture destruction.
+   */
+  unregisterEncoderTextures(encoder: GPUCommandEncoder): void {
+    const textureSet = this.activeEncoders.get(encoder);
+    if (textureSet) {
+      // Remove textures from tracking set
+      for (const texture of textureSet) {
+        this.texturesInUse.delete(texture);
+      }
+    }
+    this.activeEncoders.delete(encoder);
+  }
+
+  /**
+   * Checks if a texture is currently used by any active encoder.
+   */
+  private isTextureInUse(texture: GPUTexture): boolean {
+    return this.texturesInUse.has(texture);
+  }
+
   queueDestroy(texture: GPUTexture | null | undefined): void {
     if (texture) {
-      this.pendingDestroy.push(texture);
+      // Don't queue textures that are currently in use by active encoders
+      if (this.isTextureInUse(texture)) {
+        // Texture is in use - will be queued after encoder finishes
+        // We'll check again in flush()
+        this.pendingDestroy.push(texture);
+      } else {
+        // Safe to queue for destruction
+        this.pendingDestroy.push(texture);
+      }
     }
   }
 
@@ -285,9 +381,39 @@ export class FrameTargetManager {
     if (this.pendingDestroy.length === 0) {
       return;
     }
-    const textures = this.pendingDestroy.splice(0);
+    
+    // Filter out textures that are still in use by active encoders
+    const texturesToDestroy: GPUTexture[] = [];
+    const texturesStillInUse: GPUTexture[] = [];
+    
+    for (const texture of this.pendingDestroy) {
+      if (this.isTextureInUse(texture)) {
+        texturesStillInUse.push(texture);
+      } else {
+        texturesToDestroy.push(texture);
+      }
+    }
+    
+    // Keep textures still in use for next flush
+    this.pendingDestroy = texturesStillInUse;
+    
+    if (texturesToDestroy.length === 0) {
+      return;
+    }
+    
     const destroyTextures = () => {
-      for (const texture of textures) {
+      // Double-check textures aren't in use before destroying
+      const safeToDestroy: GPUTexture[] = [];
+      for (const texture of texturesToDestroy) {
+        if (!this.isTextureInUse(texture)) {
+          safeToDestroy.push(texture);
+        } else {
+          // Texture became in use again - re-queue for next flush
+          this.pendingDestroy.push(texture);
+        }
+      }
+      
+      for (const texture of safeToDestroy) {
         try {
           texture.destroy();
         } catch (err) {
@@ -297,19 +423,21 @@ export class FrameTargetManager {
         }
       }
     };
+    
     // Wait for GPU work to complete before destroying textures
     // This ensures textures aren't destroyed while still referenced in command buffers
     queue
       .onSubmittedWorkDone()
       .then(() => {
-        // Add small delay to ensure all GPU work is truly complete
+        // Add delay to ensure all GPU work is truly complete
         // This gives WebGPU time to finish processing command buffers
-        setTimeout(destroyTextures, 16); // ~1 frame at 60fps
+        // Use longer delay (2 frames) to be safe with variable frame rates
+        setTimeout(destroyTextures, 32);
       })
       .catch((err) => {
         Logger.warn('[FrameTargetManager] Failed to wait for GPU work completion during cleanup:', err);
         // Use longer fallback delay to be safe
-        setTimeout(destroyTextures, 100);
+        setTimeout(destroyTextures, 200);
       });
   }
 
@@ -328,8 +456,23 @@ export class FrameTargetManager {
   }
 
   private flushImmediate(): void {
-    const textures = this.pendingDestroy.splice(0);
-    for (const texture of textures) {
+    // Only destroy textures that are NOT in use by active encoders
+    const texturesToDestroy: GPUTexture[] = [];
+    const texturesStillInUse: GPUTexture[] = [];
+    
+    for (const texture of this.pendingDestroy) {
+      if (this.isTextureInUse(texture)) {
+        texturesStillInUse.push(texture);
+      } else {
+        texturesToDestroy.push(texture);
+      }
+    }
+    
+    // Keep textures still in use
+    this.pendingDestroy = texturesStillInUse;
+    
+    // Destroy only safe textures
+    for (const texture of texturesToDestroy) {
       try {
         texture.destroy();
       } catch {

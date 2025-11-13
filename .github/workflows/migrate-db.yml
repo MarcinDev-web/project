@@ -1,0 +1,391 @@
+name: Database Migrations
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment'
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+      confirm:
+        description: 'Type "confirm" to proceed'
+        required: true
+      skip_validation:
+        description: 'Skip migration validation (use with caution)'
+        required: false
+        type: boolean
+        default: false
+  push:
+    branches: [main]
+    paths:
+      - 'apps/*/prisma/**'
+      - 'apps/net-server/prisma/**'
+      - 'apps/collab-server/prisma/**'
+  workflow_call:
+    inputs:
+      environment:
+        description: 'Environment to migrate'
+        required: true
+        type: string
+      skip_validation:
+        description: 'Skip migration validation'
+        required: false
+        type: boolean
+        default: false
+    secrets:
+      DATABASE_URL:
+        required: false
+      COLLAB_DATABASE_URL:
+        required: false
+
+jobs:
+  check-prisma-changes:
+    name: Check for Prisma Changes
+    runs-on: ubuntu-latest
+    outputs:
+      has_changes: ${{ steps.check.outputs.has_changes }}
+      net_server_changed: ${{ steps.check.outputs.net_server_changed }}
+      collab_server_changed: ${{ steps.check.outputs.collab_server_changed }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+
+      - name: Check for Prisma changes
+        id: check
+        run: |
+          if [ "${{ github.event_name }}" = "push" ]; then
+            # Check if Prisma files changed in this commit
+            CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD | grep -E "(prisma/schema\.prisma|prisma/migrations/)" || true)
+            if [ -n "$CHANGED_FILES" ]; then
+              echo "has_changes=true" >> $GITHUB_OUTPUT
+              if echo "$CHANGED_FILES" | grep -q "apps/net-server"; then
+                echo "net_server_changed=true" >> $GITHUB_OUTPUT
+              else
+                echo "net_server_changed=false" >> $GITHUB_OUTPUT
+              fi
+              if echo "$CHANGED_FILES" | grep -q "apps/collab-server"; then
+                echo "collab_server_changed=true" >> $GITHUB_OUTPUT
+              else
+                echo "collab_server_changed=false" >> $GITHUB_OUTPUT
+              fi
+            else
+              echo "has_changes=false" >> $GITHUB_OUTPUT
+              echo "net_server_changed=false" >> $GITHUB_OUTPUT
+              echo "collab_server_changed=false" >> $GITHUB_OUTPUT
+            fi
+          else
+            # For manual/workflow_call triggers, assume changes exist
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            echo "net_server_changed=true" >> $GITHUB_OUTPUT
+            echo "collab_server_changed=true" >> $GITHUB_OUTPUT
+          fi
+
+  migrate-staging:
+    name: Migrate Staging Database
+    runs-on: ubuntu-latest
+    needs: check-prisma-changes
+    if: |
+      (github.event.inputs.environment == 'staging' && github.event.inputs.confirm == 'confirm') ||
+      (github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.check-prisma-changes.outputs.has_changes == 'true') ||
+      (github.event_name == 'workflow_call' && inputs.environment == 'staging')
+    environment:
+      name: staging
+    outputs:
+      net_server_status: ${{ steps.migrate-net-server.outputs.status }}
+      collab_server_status: ${{ steps.migrate-collab-server.outputs.status }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.19.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate migration status (net-server)
+        if: |
+          needs.check-prisma-changes.outputs.net_server_changed == 'true' &&
+          (github.event.inputs.skip_validation != 'true' && github.event.inputs.skip_validation != true)
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+        run: |
+          cd apps/net-server
+          echo "Checking migration status for net-server..."
+          STATUS=$(pnpm prisma migrate status --schema=./prisma/schema.prisma 2>&1 || true)
+          echo "$STATUS"
+          if echo "$STATUS" | grep -q "Database schema is out of sync"; then
+            echo "⚠️ Warning: Database schema is out of sync"
+          fi
+          if echo "$STATUS" | grep -q "Error"; then
+            echo "❌ Error checking migration status"
+            exit 1
+          fi
+
+      - name: Run Prisma migrations (net-server)
+        id: migrate-net-server
+        if: needs.check-prisma-changes.outputs.net_server_changed == 'true'
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+        continue-on-error: true
+        run: |
+          cd apps/net-server
+          echo "🚀 Starting migrations for net-server..."
+          set +e
+          pnpm prisma migrate deploy --schema=./prisma/schema.prisma
+          MIGRATE_EXIT=$?
+          if [ $MIGRATE_EXIT -eq 0 ]; then
+            echo "✅ Migrations applied successfully"
+            pnpm prisma generate --schema=./prisma/schema.prisma
+            echo "status=success" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Migration failed with exit code $MIGRATE_EXIT"
+            echo "status=failed" >> $GITHUB_OUTPUT
+            exit $MIGRATE_EXIT
+          fi
+          set -e
+
+      - name: Validate migration status (collab-server)
+        if: |
+          needs.check-prisma-changes.outputs.collab_server_changed == 'true' &&
+          (github.event.inputs.skip_validation != 'true' && github.event.inputs.skip_validation != true)
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_COLLAB_DATABASE_URL }}
+        run: |
+          cd apps/collab-server
+          echo "Checking migration status for collab-server..."
+          STATUS=$(pnpm prisma migrate status --schema=./prisma/schema.prisma 2>&1 || true)
+          echo "$STATUS"
+          if echo "$STATUS" | grep -q "Database schema is out of sync"; then
+            echo "⚠️ Warning: Database schema is out of sync"
+          fi
+          if echo "$STATUS" | grep -q "Error"; then
+            echo "❌ Error checking migration status"
+            exit 1
+          fi
+
+      - name: Run Prisma migrations (collab-server)
+        id: migrate-collab-server
+        if: needs.check-prisma-changes.outputs.collab_server_changed == 'true'
+        env:
+          DATABASE_URL: ${{ secrets.STAGING_COLLAB_DATABASE_URL }}
+        continue-on-error: true
+        run: |
+          cd apps/collab-server
+          echo "🚀 Starting migrations for collab-server..."
+          set +e
+          pnpm prisma migrate deploy --schema=./prisma/schema.prisma
+          MIGRATE_EXIT=$?
+          if [ $MIGRATE_EXIT -eq 0 ]; then
+            echo "✅ Migrations applied successfully"
+            pnpm prisma generate --schema=./prisma/schema.prisma
+            echo "status=success" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Migration failed with exit code $MIGRATE_EXIT"
+            echo "status=failed" >> $GITHUB_OUTPUT
+            exit $MIGRATE_EXIT
+          fi
+          set -e
+
+      - name: Verify migrations
+        if: always()
+        env:
+          NET_DATABASE_URL: ${{ secrets.STAGING_DATABASE_URL }}
+          COLLAB_DATABASE_URL: ${{ secrets.STAGING_COLLAB_DATABASE_URL }}
+        run: |
+          echo "📊 Verifying migration status..."
+          
+          if [ "${{ needs.check-prisma-changes.outputs.net_server_changed }}" == "true" ]; then
+            echo "Checking net-server migrations..."
+            cd apps/net-server
+            pnpm prisma migrate status --schema=./prisma/schema.prisma || true
+          fi
+          
+          if [ "${{ needs.check-prisma-changes.outputs.collab_server_changed }}" == "true" ]; then
+            echo "Checking collab-server migrations..."
+            cd apps/collab-server
+            pnpm prisma migrate status --schema=./prisma/schema.prisma || true
+          fi
+
+      - name: Migration Summary
+        if: always()
+        run: |
+          echo "## Migration Summary (Staging)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Net Server: ${{ steps.migrate-net-server.outputs.status || 'skipped' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Collab Server: ${{ steps.migrate-collab-server.outputs.status || 'skipped' }}" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.migrate-net-server.outputs.status }}" == "failed" ] || [ "${{ steps.migrate-collab-server.outputs.status }}" == "failed" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **Migration failed!** Please review the logs above." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          fi
+
+  migrate-production:
+    name: Migrate Production Database
+    runs-on: ubuntu-latest
+    needs: check-prisma-changes
+    if: |
+      (github.event.inputs.environment == 'production' && github.event.inputs.confirm == 'confirm') ||
+      (github.event_name == 'workflow_call' && inputs.environment == 'production')
+    environment:
+      name: production
+    outputs:
+      net_server_status: ${{ steps.migrate-net-server.outputs.status }}
+      collab_server_status: ${{ steps.migrate-collab-server.outputs.status }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'pnpm'
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.19.0
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Validate migration status (net-server)
+        if: |
+          needs.check-prisma-changes.outputs.net_server_changed == 'true' &&
+          (github.event.inputs.skip_validation != 'true' && github.event.inputs.skip_validation != true)
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        run: |
+          cd apps/net-server
+          echo "🔍 Validating migration status for net-server (PRODUCTION)..."
+          STATUS=$(pnpm prisma migrate status --schema=./prisma/schema.prisma 2>&1 || true)
+          echo "$STATUS"
+          if echo "$STATUS" | grep -q "Database schema is out of sync"; then
+            echo "⚠️ Warning: Database schema is out of sync"
+          fi
+          if echo "$STATUS" | grep -q "Error"; then
+            echo "❌ Error checking migration status"
+            exit 1
+          fi
+          echo "✅ Migration status validated"
+
+      - name: Run Prisma migrations (net-server)
+        id: migrate-net-server
+        if: needs.check-prisma-changes.outputs.net_server_changed == 'true'
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+        continue-on-error: true
+        run: |
+          cd apps/net-server
+          echo "🚀 Starting PRODUCTION migrations for net-server..."
+          echo "⚠️ This will modify the production database!"
+          set +e
+          pnpm prisma migrate deploy --schema=./prisma/schema.prisma
+          MIGRATE_EXIT=$?
+          if [ $MIGRATE_EXIT -eq 0 ]; then
+            echo "✅ Production migrations applied successfully"
+            pnpm prisma generate --schema=./prisma/schema.prisma
+            echo "status=success" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Production migration failed with exit code $MIGRATE_EXIT"
+            echo "status=failed" >> $GITHUB_OUTPUT
+            exit $MIGRATE_EXIT
+          fi
+          set -e
+
+      - name: Validate migration status (collab-server)
+        if: |
+          needs.check-prisma-changes.outputs.collab_server_changed == 'true' &&
+          (github.event.inputs.skip_validation != 'true' && github.event.inputs.skip_validation != true)
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_COLLAB_DATABASE_URL }}
+        run: |
+          cd apps/collab-server
+          echo "🔍 Validating migration status for collab-server (PRODUCTION)..."
+          STATUS=$(pnpm prisma migrate status --schema=./prisma/schema.prisma 2>&1 || true)
+          echo "$STATUS"
+          if echo "$STATUS" | grep -q "Database schema is out of sync"; then
+            echo "⚠️ Warning: Database schema is out of sync"
+          fi
+          if echo "$STATUS" | grep -q "Error"; then
+            echo "❌ Error checking migration status"
+            exit 1
+          fi
+          echo "✅ Migration status validated"
+
+      - name: Run Prisma migrations (collab-server)
+        id: migrate-collab-server
+        if: needs.check-prisma-changes.outputs.collab_server_changed == 'true'
+        env:
+          DATABASE_URL: ${{ secrets.PRODUCTION_COLLAB_DATABASE_URL }}
+        continue-on-error: true
+        run: |
+          cd apps/collab-server
+          echo "🚀 Starting PRODUCTION migrations for collab-server..."
+          echo "⚠️ This will modify the production database!"
+          set +e
+          pnpm prisma migrate deploy --schema=./prisma/schema.prisma
+          MIGRATE_EXIT=$?
+          if [ $MIGRATE_EXIT -eq 0 ]; then
+            echo "✅ Production migrations applied successfully"
+            pnpm prisma generate --schema=./prisma/schema.prisma
+            echo "status=success" >> $GITHUB_OUTPUT
+          else
+            echo "❌ Production migration failed with exit code $MIGRATE_EXIT"
+            echo "status=failed" >> $GITHUB_OUTPUT
+            exit $MIGRATE_EXIT
+          fi
+          set -e
+
+      - name: Verify migrations
+        if: always()
+        env:
+          NET_DATABASE_URL: ${{ secrets.PRODUCTION_DATABASE_URL }}
+          COLLAB_DATABASE_URL: ${{ secrets.PRODUCTION_COLLAB_DATABASE_URL }}
+        run: |
+          echo "📊 Verifying production migration status..."
+          
+          if [ "${{ needs.check-prisma-changes.outputs.net_server_changed }}" == "true" ]; then
+            echo "Checking net-server migrations..."
+            cd apps/net-server
+            pnpm prisma migrate status --schema=./prisma/schema.prisma || true
+          fi
+          
+          if [ "${{ needs.check-prisma-changes.outputs.collab_server_changed }}" == "true" ]; then
+            echo "Checking collab-server migrations..."
+            cd apps/collab-server
+            pnpm prisma migrate status --schema=./prisma/schema.prisma || true
+          fi
+
+      - name: Migration Summary
+        if: always()
+        run: |
+          echo "## Migration Summary (Production)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- Net Server: ${{ steps.migrate-net-server.outputs.status || 'skipped' }}" >> $GITHUB_STEP_SUMMARY
+          echo "- Collab Server: ${{ steps.migrate-collab-server.outputs.status || 'skipped' }}" >> $GITHUB_STEP_SUMMARY
+          
+          if [ "${{ steps.migrate-net-server.outputs.status }}" == "failed" ] || [ "${{ steps.migrate-collab-server.outputs.status }}" == "failed" ]; then
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "❌ **Production migration failed!** Please review the logs and consider rollback." >> $GITHUB_STEP_SUMMARY
+            exit 1
+          else
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "✅ **Production migrations completed successfully**" >> $GITHUB_STEP_SUMMARY
+          fi
+

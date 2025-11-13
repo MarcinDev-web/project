@@ -15,6 +15,7 @@ import type { BlockAsset, AssetPreset } from '../types/BlockAssetTypes';
 import { blockToAsset } from '../types/BlockAssetTypes';
 import type { VegetationPresetManager } from '../managers/VegetationPresetManager';
 import type { NpcPresetManager } from '../managers/NpcPresetManager';
+import type { MarketplaceAssetManager } from '../managers/MarketplaceAssetManager';
 
 export interface AssetPaletteConfig {
   scene: Scene;
@@ -24,6 +25,7 @@ export interface AssetPaletteConfig {
   onStartPlacementPreset?: (preset: AssetPreset) => void;
   vegetationPresetManager?: VegetationPresetManager | null;
   npcPresetManager?: NpcPresetManager | null;
+  marketplaceAssetManager?: MarketplaceAssetManager | null;
 }
 
 export class AssetPalette {
@@ -35,9 +37,11 @@ export class AssetPalette {
   private allBlocks: BlockAsset[] = [];
   private vegetationAssets: BlockAsset[] = [];
   private npcAssets: BlockAsset[] = [];
+  private marketplaceAssets: Array<{ id: string; title: string; thumbnailUrl?: string; fileUrl: string }> = [];
   private keyboardCleanup: (() => void) | null = null;
   private vegetationPresetManagerListener: (() => void) | null = null;
   private npcPresetManagerListener: (() => void) | null = null;
+  private marketplaceAssetManagerListener: (() => void) | null = null;
 
   constructor(private readonly config: AssetPaletteConfig) {
     // Convert all blocks to assets
@@ -49,6 +53,9 @@ export class AssetPalette {
     // Load NPC presets
     this.loadNpcPresets();
     
+    // Load marketplace assets
+    void this.loadMarketplaceAssets();
+
     // Initialize hotbar with first 9 blocks
     this.hotbarSlots = this.allBlocks.slice(0, 9);
 
@@ -64,6 +71,14 @@ export class AssetPalette {
     if (this.config.npcPresetManager) {
       this.npcPresetManagerListener = this.config.npcPresetManager.addListener(() => {
         this.loadNpcPresets();
+        this.refresh();
+      });
+    }
+
+    // Listen for marketplace asset changes
+    if (this.config.marketplaceAssetManager) {
+      this.marketplaceAssetManagerListener = this.config.marketplaceAssetManager.addListener(() => {
+        void this.loadMarketplaceAssets();
         this.refresh();
       });
     }
@@ -187,6 +202,20 @@ export class AssetPalette {
     for (const asset of this.npcAssets) {
       const item = this.createNpcItem(asset);
       grid.appendChild(item);
+    }
+
+    // Add marketplace assets to grid
+    if (this.marketplaceAssets.length > 0) {
+      // Add separator
+      const separator = document.createElement('div');
+      separator.className = 'build-menu-separator';
+      separator.textContent = 'Marketplace';
+      grid.appendChild(separator);
+
+      for (const asset of this.marketplaceAssets) {
+        const item = this.createMarketplaceItem(asset);
+        grid.appendChild(item);
+      }
     }
 
     menu.appendChild(grid);
@@ -328,6 +357,89 @@ export class AssetPalette {
     }
 
     this.npcAssets = this.config.npcPresetManager.getAllPresetsAsAssets();
+  }
+
+  /**
+   * Loads marketplace assets
+   */
+  private async loadMarketplaceAssets(): Promise<void> {
+    if (!this.config.marketplaceAssetManager) {
+      this.marketplaceAssets = [];
+      return;
+    }
+
+    try {
+      const assets = await this.config.marketplaceAssetManager.listAssets({ type: 'avatar' });
+      this.marketplaceAssets = assets.map(asset => ({
+        id: asset.itemId,
+        title: asset.title,
+        thumbnailUrl: asset.thumbnailUrl,
+        fileUrl: asset.fileUrl,
+      }));
+    } catch (error) {
+      console.error('Failed to load marketplace assets:', error);
+      this.marketplaceAssets = [];
+    }
+  }
+
+  /**
+   * Creates a marketplace item for the grid
+   */
+  private createMarketplaceItem(asset: { id: string; title: string; thumbnailUrl?: string; fileUrl: string }): HTMLElement {
+    const item = document.createElement('div');
+    item.className = 'build-menu-item build-menu-item-marketplace';
+    item.title = asset.title;
+
+    const preview = document.createElement('div');
+    preview.className = 'build-menu-item-preview';
+    
+    if (asset.thumbnailUrl) {
+      const img = document.createElement('img');
+      img.src = asset.thumbnailUrl;
+      img.alt = asset.title;
+      img.style.width = '100%';
+      img.style.height = '100%';
+      img.style.objectFit = 'cover';
+      img.onerror = () => {
+        preview.textContent = '📦';
+        preview.style.display = 'flex';
+        preview.style.alignItems = 'center';
+        preview.style.justifyContent = 'center';
+        preview.style.fontSize = '1.5rem';
+      };
+      preview.appendChild(img);
+    } else {
+      preview.textContent = '📦';
+      preview.style.display = 'flex';
+      preview.style.alignItems = 'center';
+      preview.style.justifyContent = 'center';
+      preview.style.fontSize = '1.5rem';
+    }
+    
+    // Add marketplace icon indicator
+    preview.style.position = 'relative';
+    const icon = document.createElement('div');
+    icon.textContent = '🛒';
+    icon.style.position = 'absolute';
+    icon.style.top = '2px';
+    icon.style.right = '2px';
+    icon.style.fontSize = '12px';
+    preview.appendChild(icon);
+    item.appendChild(preview);
+
+    const name = document.createElement('div');
+    name.className = 'build-menu-item-name';
+    name.textContent = asset.title;
+    item.appendChild(name);
+
+    // Click handler - for now just log, can be extended later
+    item.addEventListener('click', () => {
+      console.log('Marketplace asset clicked:', asset.title);
+      // TODO: Implement placement logic for marketplace assets
+      this.toggleBuildMenu(); // Close menu after selection
+    });
+
+    return item;
   }
 
   /**

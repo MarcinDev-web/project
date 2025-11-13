@@ -7,6 +7,7 @@ import { ProjectStorage, type ProjectData, type ProjectMetadata } from './Projec
 import { Logger } from '../../utils/logger';
 import { ShareClient } from '@engine/net';
 import { NewProjectDialog, type NewProjectConfig } from '../ui/NewProjectDialog';
+import { MarketplaceApiClient } from '../../utils/marketplaceApi';
 
 export type ProjectSaveStatus = 'Saved' | 'Unsaved' | 'Saving...' | '';
 
@@ -411,6 +412,84 @@ export class ProjectManager {
         Logger.error('Rollback failed:', rollbackError);
       }
       alert('Failed to load project.');
+    }
+  }
+
+  /**
+   * Import a build from marketplace
+   */
+  public async importMarketplaceBuild(itemId: string): Promise<void> {
+    if (this.options.state.editorMode.value === 'play') {
+      this.options.showStatusMessage('Stop play mode to import build.', 1500);
+      return;
+    }
+
+    if (this.unsavedChanges) {
+      const confirmed = window.confirm('You have unsaved changes. Import build?');
+      if (!confirmed) return;
+    }
+
+    // Backup current scene for rollback
+    const backup = this.options.scene.toJSON();
+
+    try {
+      this.options.showStatusMessage('Downloading build from marketplace...', 0);
+
+      const marketplaceClient = new MarketplaceApiClient({
+        baseUrl: '/api',
+        getAuthToken: () => localStorage.getItem('forge_token') || null,
+      });
+
+      // Get item details
+      const item = await marketplaceClient.getItem(itemId);
+      
+      if (item.type !== 'build') {
+        throw new Error('Item is not a build');
+      }
+
+      // Download the build file
+      let fileUrl: string;
+      if (item.price && item.price.amount > 0) {
+        // Paid item - need to purchase first
+        const purchaseResult = await marketplaceClient.purchaseItem(itemId);
+        fileUrl = purchaseResult.fileUrl;
+      } else {
+        // Free item
+        const downloadResult = await marketplaceClient.downloadFreeItem(itemId);
+        fileUrl = downloadResult.fileUrl;
+      }
+
+      // Fetch the project file
+      const response = await fetch(fileUrl);
+      if (!response.ok) {
+        throw new Error(`Failed to download build file: ${response.status}`);
+      }
+
+      const projectData = await response.json() as ProjectData;
+
+      // Load the scene
+      const newScene = Scene.fromJSON(projectData.scene);
+      this.resetSceneRootEntities(newScene.rootEntities);
+
+      // Clear current project (imported builds are not saved automatically)
+      this.currentProjectId = null;
+      this.unsavedChanges = true;
+      this.options.onSaveStatusChange('Unsaved');
+      this.options.updateSceneBuffers();
+      this.options.showStatusMessage(`Imported: ${item.title}`, 2000);
+    } catch (error) {
+      Logger.error('Import failed:', error);
+      // Attempt rollback to previous scene state
+      try {
+        const restored = Scene.fromJSON(backup);
+        this.resetSceneRootEntities(restored.rootEntities);
+        this.options.updateSceneBuffers();
+      } catch (rollbackError) {
+        Logger.error('Rollback failed:', rollbackError);
+      }
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      alert(`Failed to import build: ${errorMessage}`);
+      this.options.showStatusMessage('Import failed!', 2000);
     }
   }
 

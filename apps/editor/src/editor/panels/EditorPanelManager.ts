@@ -28,6 +28,7 @@ import { SidebarTabs } from '../ui/SidebarTabs';
 import { TemplateGalleryPanel } from './TemplateGalleryPanel';
 import { VegetationPanel } from './VegetationPanel';
 import { EconomyPanel } from './EconomyPanel';
+import { MarketplacePanel } from './MarketplacePanel';
 import { UIPanel } from './UIPanel';
 import { NpcPanel } from './NpcPanel';
 import { WeaponPanel } from './WeaponPanel';
@@ -75,6 +76,8 @@ export interface EditorPanelManagerConfig {
   getRenderer?: () => import('@engine/gfx-webgpu').Renderer | null;
   vegetationPresetManager?: VegetationPresetManager | null;
   npcPresetManager?: NpcPresetManager | null;
+  onImportMarketplaceBuild?: (itemId: string) => Promise<void>;
+  onMarketplaceAssetPurchased?: (itemId: string) => void;
 }
 
 /**
@@ -103,6 +106,7 @@ export class EditorPanelManager {
   private assetPalette: AssetPalette | null = null;
   private assetBrowserWrapper: { refresh: () => void } | null = null;
   private resizableSidebar: ResizableSidebar | null = null;
+  private marketplacePanel: MarketplacePanel | null = null;
 
   constructor(private readonly config: EditorPanelManagerConfig) {}
 
@@ -289,6 +293,12 @@ export class EditorPanelManager {
     // Initialize Economy Panel
     const economyPanel = new EconomyPanel();
 
+    // Initialize Marketplace Panel
+    this.marketplacePanel = new MarketplacePanel({
+      onImportBuild: this.config.onImportMarketplaceBuild,
+      onAssetPurchased: this.config.onMarketplaceAssetPurchased,
+    });
+
     // Initialize Weapon Panel
     this.weaponPanel = new WeaponPanel({
       selection: this.config.selection,
@@ -474,8 +484,15 @@ export class EditorPanelManager {
     this.sidebarTabs.addTab({
       id: 'economy',
       label: 'Economy',
-      icon: 'banknote',
+      icon: 'package',
       content: economyPanel.element,
+    });
+
+    this.sidebarTabs.addTab({
+      id: 'marketplace',
+      label: 'Marketplace',
+      icon: 'box',
+      content: this.marketplacePanel.element,
     });
 
     if (this.terrainPanel) {
@@ -574,6 +591,7 @@ export class EditorPanelManager {
       },
       vegetationPresetManager: this.config.vegetationPresetManager ?? null,
       npcPresetManager: this.config.npcPresetManager ?? null,
+      marketplaceAssetManager: this.marketplacePanel?.getAssetManager() ?? null,
     });
     this.assetPalette.mount();
     this.disposables.add(() => this.assetPalette?.dispose());

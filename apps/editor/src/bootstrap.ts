@@ -16,6 +16,19 @@ export async function bootstrap(): Promise<void> {
   const collabSession = urlParams.get('session');
   const projectId = urlParams.get('project') || 'default-project';
 
+  // Check authentication status from platform
+  try {
+    const { getCurrentUser } = await import('./utils/auth');
+    const currentUser = await getCurrentUser();
+    if (currentUser) {
+      Logger.info(`Editor: User authenticated as ${currentUser.email}`);
+    } else {
+      Logger.info('Editor: No authenticated user found');
+    }
+  } catch (error) {
+    Logger.warn('Editor: Failed to check authentication status:', error as Error);
+  }
+
   // Removed: Asset Registry initialization (no longer needed)
 
   // Initialize Logic Cube System

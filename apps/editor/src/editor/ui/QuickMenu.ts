@@ -35,6 +35,7 @@ export interface QuickMenuConfig {
   onRegister?: () => void;
   isUserLoggedIn?: () => boolean;
   getUserName?: () => string | null;
+  getUserCoins?: () => number;
 }
 
 export class QuickMenu {
@@ -285,13 +286,48 @@ export class QuickMenu {
     this.authContainer.innerHTML = '';
 
     if (this.config.isUserLoggedIn?.()) {
-      // User logged in - show avatar/name
+      // User logged in - show user name and coins
+      const userInfoContainer = document.createElement('div');
+      userInfoContainer.className = 'top-bar-user-info';
+      userInfoContainer.style.display = 'flex';
+      userInfoContainer.style.alignItems = 'center';
+      userInfoContainer.style.gap = 'var(--spacing-2)';
+
+      // User name button
       const userButton = document.createElement('button');
       userButton.className = 'top-bar-user-button';
       const userName = this.config.getUserName?.() || 'User';
-      userButton.textContent = userName.charAt(0).toUpperCase();
+      userButton.textContent = userName;
       userButton.title = userName;
-      this.authContainer.appendChild(userButton);
+      userInfoContainer.appendChild(userButton);
+
+      // Coins display
+      const coinsDisplay = document.createElement('div');
+      coinsDisplay.className = 'top-bar-coins-display';
+      coinsDisplay.style.display = 'flex';
+      coinsDisplay.style.alignItems = 'center';
+      coinsDisplay.style.gap = 'var(--spacing-1)';
+      coinsDisplay.style.padding = 'var(--spacing-1) var(--spacing-2)';
+      coinsDisplay.style.borderRadius = 'var(--radius-sm)';
+      coinsDisplay.style.background = 'var(--bg-surface-2)';
+      
+      const coinsIcon = document.createElement('span');
+      coinsIcon.textContent = '🪙';
+      coinsIcon.style.fontSize = '14px';
+      
+      const coinsAmount = document.createElement('span');
+      const coins = this.config.getUserCoins?.() ?? 0;
+      coinsAmount.textContent = coins.toLocaleString();
+      coinsAmount.style.fontSize = 'var(--text-sm)';
+      coinsAmount.style.fontWeight = 'var(--font-medium)';
+      coinsAmount.style.color = 'var(--text-1)';
+      
+      coinsDisplay.appendChild(coinsIcon);
+      coinsDisplay.appendChild(coinsAmount);
+      coinsDisplay.title = `${coins.toLocaleString()} coins`;
+      
+      userInfoContainer.appendChild(coinsDisplay);
+      this.authContainer.appendChild(userInfoContainer);
     } else {
       // Not logged in - show Login + Register
       const loginBtn = document.createElement('button');

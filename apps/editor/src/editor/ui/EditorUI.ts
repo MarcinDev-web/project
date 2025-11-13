@@ -90,6 +90,7 @@ import { InventoryComponent } from '@engine/world/components/InventoryComponent'
 import { frameEditorCameraToScene } from '../utils/cameraFraming';
 import * as auth from '../../utils/auth';
 import type { PublicUser } from '../../utils/auth';
+import { Logger } from '../../utils/logger';
 
 export interface EditorUIConfig {
   canvas: HTMLCanvasElement;
@@ -140,6 +141,7 @@ export class EditorUI {
   private playModeInviteDialog: PlayModeInviteDialog | null = null;
   private weaponHUD: WeaponHUD | null = null;
   private currentUser: PublicUser | null = null;
+  private userCoins: number = 0;
 
   // Core systems
   private state: EditorState | null = null;
@@ -640,6 +642,13 @@ export class EditorUI {
               try {
                 const user = await auth.login(email, password);
                 this.currentUser = user;
+                // Load coins balance after login
+                try {
+                  this.userCoins = await auth.getCoins();
+                } catch (error) {
+                  Logger.warn('EditorUI: Failed to load coins after login:', error as Error);
+                  this.userCoins = 0;
+                }
                 this.setStatusMessage(`Logged in as ${user.username || user.email}`, 2000);
                 this.quickMenu?.updateAuthState();
                 // Refresh collaboration manager with new token
@@ -698,6 +707,7 @@ export class EditorUI {
       },
       isUserLoggedIn: () => this.currentUser !== null,
       getUserName: () => this.currentUser?.username || this.currentUser?.email || null,
+      getUserCoins: () => this.userCoins,
     });
     this.quickMenu.mount();
     this.quickMenu.setPlayMode(this.state.editorMode.value === 'play');
@@ -839,6 +849,15 @@ export class EditorUI {
       getRenderer: () => this.config.getRenderer(),
       vegetationPresetManager: this.vegetationPresetManager,
       npcPresetManager: this.npcPresetManager,
+      onImportMarketplaceBuild: async (itemId: string) => {
+        if (this.projectManager) {
+          await this.projectManager.importMarketplaceBuild(itemId);
+        }
+      },
+      onMarketplaceAssetPurchased: (itemId: string) => {
+        // Refresh asset palette to show newly purchased asset
+        this.panelManager?.getAssetPalette()?.refresh();
+      },
     });
     this.panelManager.mount(containers.sidebar, containers.inspector);
     this.disposables.add(() => this.panelManager?.dispose());
@@ -939,6 +958,9 @@ export class EditorUI {
 
     // Load current user if authenticated
     this.loadCurrentUser();
+
+    // Setup authentication synchronization with platform
+    this.setupAuthSync();
   }
 
   /**
@@ -2203,12 +2225,51 @@ export class EditorUI {
       const user = await auth.getCurrentUser();
       if (user) {
         this.currentUser = user;
+        // Load coins balance
+        try {
+          this.userCoins = await auth.getCoins();
+        } catch (error) {
+          Logger.warn('EditorUI: Failed to load coins:', error as Error);
+          this.userCoins = 0;
+        }
         this.quickMenu?.updateAuthState();
+        Logger.info(`EditorUI: User authenticated as ${user.email}, coins: ${this.userCoins}`);
+      } else {
+        this.currentUser = null;
+        this.userCoins = 0;
+        this.quickMenu?.updateAuthState();
+        Logger.info('EditorUI: No authenticated user found');
       }
-    } catch {
+    } catch (error) {
       // User not authenticated or token invalid
       this.currentUser = null;
+      this.userCoins = 0;
+      this.quickMenu?.updateAuthState();
+      Logger.warn('EditorUI: Failed to load current user:', error as Error);
     }
+  }
+
+  /**
+   * Sets up authentication synchronization with platform.
+   * Listens for token changes in localStorage and automatically refreshes user state.
+   */
+  private setupAuthSync(): void {
+    // Listen for token changes from platform (storage event fires when localStorage changes in other tabs/windows)
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === 'forge_token' || e.key === 'forge_refresh_token') {
+        Logger.info('EditorUI: Token change detected, refreshing user state');
+        void this.loadCurrentUser();
+      }
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+    this.disposables.add(() => {
+      window.removeEventListener('storage', handleStorageChange);
+    });
+
+    // Also listen for same-origin changes (when platform updates tokens in same tab)
+    // We need to poll or use a custom event since storage event only fires for cross-tab changes
+    // For same-tab changes, we'll rely on explicit calls to loadCurrentUser() after login/logout
   }
 }
 

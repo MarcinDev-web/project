@@ -3,13 +3,18 @@
  */
 
 import { useEffect } from 'react';
+import { useAuth } from '../contexts/AuthContext';
 
 export function EditorPage() {
+  const { isAuthenticated } = useAuth();
+
   useEffect(() => {
     // Redirect to editor app (separate app on port 5173)
     // In production, this could be a different domain or subdomain
-    window.location.href = 'http://localhost:5173';
-  }, []);
+    // Tokeny są już w localStorage przez AuthContext, więc Editor automatycznie je wykryje
+    const editorUrl = `http://localhost:5173${isAuthenticated ? '?authenticated=true' : ''}`;
+    window.location.href = editorUrl;
+  }, [isAuthenticated]);
 
   return (
     <div style={{

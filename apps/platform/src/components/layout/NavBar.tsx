@@ -1,4 +1,4 @@
-import { Link, useLocation } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { memo } from 'react';
 import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/shared/Button';
@@ -8,6 +8,7 @@ import { UserMenu } from './UserMenu';
 export const NavBar = memo(function NavBar() {
   const { isAuthenticated, isAdmin, isModerator } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
 
   const isActive = (path: string) => {
     return location.pathname.startsWith(path);
@@ -25,6 +26,14 @@ export const NavBar = memo(function NavBar() {
       <div className="navbar-nav">
         {isAuthenticated ? (
           <>
+            <Button
+              variant="primary"
+              size="small"
+              onClick={() => navigate('/studio')}
+              style={{ marginRight: 'var(--spacing-2)' }}
+            >
+              <span>✨ Nowa gra</span>
+            </Button>
             <NavLink to="/games" isActive={isActive('/games')}>
               Games
             </NavLink>

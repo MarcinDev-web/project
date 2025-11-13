@@ -2,6 +2,8 @@ import type { FastifyInstance, FastifyRequest, FastifyReply } from 'fastify';
 import type { ForumCategory } from '../storage/ForumStorage.js';
 import type { NewsItem } from '../storage/NewsStorage.js';
 import type { RouteDependencies } from './index.js';
+import type { ReleaseStorage } from '../storage/ReleaseStorage.js';
+import type { GitHubService } from '../services/GitHubService.js';
 
 /**
  * Create admin and moderator routes for Fastify
@@ -26,6 +28,8 @@ export async function createAdminRoutes(
     assetStorage,
     purchaseStorage,
     newsStorage,
+    releaseStorage,
+    githubService,
   } = opts.dependencies;
 
   // ========================================
@@ -1536,6 +1540,161 @@ export async function createAdminRoutes(
         console.error('Get admin news stats error:', error);
         reply.code(500).send({
           error: 'Failed to get news stats',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  );
+
+  // ========================================
+  // ADMIN RELEASE ENDPOINTS
+  // ========================================
+
+  // Get all releases
+  app.get(
+    '/admin/releases',
+    { preHandler: [authMiddleware, requireAdmin()] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
+        }
+
+        const releases = await releaseStorage.getReleases();
+
+        // Sync with GitHub releases if configured
+        if (githubService.isConfigured()) {
+          try {
+            const githubReleases = await githubService.getReleases(50);
+            for (const githubRelease of githubReleases) {
+              // Check if release exists in our storage
+              let release = await releaseStorage.getReleaseByTag(githubRelease.tag_name);
+              if (!release) {
+                // Create release record from GitHub
+                const version = githubRelease.tag_name.replace(/^v/, '');
+                const type = version.split('.')[0] !== '0' ? 'major' : version.split('.')[1] !== '0' ? 'minor' : 'patch';
+                release = await releaseStorage.createRelease({
+                  tag: githubRelease.tag_name,
+                  version,
+                  type,
+                  status: 'success',
+                  createdAt: new Date(githubRelease.created_at).getTime(),
+                  changelog: githubRelease.body,
+                  githubReleaseUrl: githubRelease.html_url,
+                });
+              } else if (!release.githubReleaseUrl) {
+                // Update with GitHub URL if missing
+                await releaseStorage.updateRelease(release.id, {
+                  githubReleaseUrl: githubRelease.html_url,
+                  changelog: release.changelog || githubRelease.body,
+                });
+              }
+            }
+            // Reload releases after sync
+            const updatedReleases = await releaseStorage.getReleases();
+            reply.send({
+              releases: updatedReleases,
+              total: updatedReleases.length,
+            });
+            return;
+          } catch (error) {
+            console.error('Failed to sync with GitHub releases:', error);
+            // Continue with local releases if GitHub sync fails
+          }
+        }
+
+        reply.send({
+          releases,
+          total: releases.length,
+        });
+      } catch (error) {
+        console.error('Get admin releases error:', error);
+        reply.code(500).send({
+          error: 'Failed to get releases',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  );
+
+  // Get release statistics
+  app.get(
+    '/admin/releases/stats',
+    { preHandler: [authMiddleware, requireAdmin()] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
+        }
+
+        const stats = await releaseStorage.getReleaseStats();
+        reply.send(stats);
+      } catch (error) {
+        console.error('Get admin release stats error:', error);
+        reply.code(500).send({
+          error: 'Failed to get release stats',
+          message: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+  );
+
+  // Create a new release (trigger GitHub Actions workflow)
+  app.post(
+    '/admin/releases',
+    { preHandler: [authMiddleware, requireAdmin()] },
+    async (request: FastifyRequest, reply: FastifyReply) => {
+      try {
+        if (!request.user) {
+          return reply.code(401).send({ error: 'Unauthorized' });
+        }
+
+        const body = request.body as {
+          versionType: 'major' | 'minor' | 'patch';
+        };
+
+        if (!body.versionType || !['major', 'minor', 'patch'].includes(body.versionType)) {
+          return reply.code(400).send({ error: 'Invalid versionType. Must be major, minor, or patch' });
+        }
+
+        if (!githubService.isConfigured()) {
+          return reply.code(500).send({
+            error: 'GitHub integration not configured',
+            message: 'Set GITHUB_TOKEN, GITHUB_OWNER, and GITHUB_REPO environment variables',
+          });
+        }
+
+        // Trigger GitHub Actions workflow
+        // Note: workflow input name is "version" as defined in release.yml
+        const workflowRun = await githubService.triggerWorkflow(
+          'release.yml',
+          'main',
+          { version: body.versionType }
+        );
+
+        // Create release record
+        const release = await releaseStorage.createRelease({
+          tag: '', // Will be updated when workflow completes
+          version: '', // Will be updated when workflow completes
+          type: body.versionType,
+          status: workflowRun.status === 'completed' 
+            ? (workflowRun.conclusion === 'success' ? 'success' : 'failed')
+            : 'pending',
+          createdAt: Date.now(),
+          createdBy: request.user.id,
+          workflowRunId: workflowRun.id.toString(),
+          githubReleaseUrl: workflowRun.html_url,
+        });
+
+        reply.code(201).send({
+          success: true,
+          message: 'Release workflow started successfully',
+          workflowRunId: workflowRun.id.toString(),
+        });
+      } catch (error) {
+        console.error('Create admin release error:', error);
+        reply.code(500).send({
+          error: 'Failed to create release',
           message: error instanceof Error ? error.message : String(error),
         });
       }

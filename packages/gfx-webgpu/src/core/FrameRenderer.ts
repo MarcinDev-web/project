@@ -225,6 +225,20 @@ export class FrameRenderer {
 
     const encoder = configuredDevice.createCommandEncoder({ label: 'frame-encoder' });
     
+    // Register all textures used by this encoder to prevent premature destruction
+    const texturesUsedByEncoder: GPUTexture[] = [
+      frameResources.depthTexture,
+      frameResources.msaaColorTexture,
+      this.frameTargets.getHdrColorTexture(),
+      this.frameTargets.getBloomTexture(),
+      this.frameTargets.getNormalTexture(),
+      this.frameTargets.getSsaoTexture(),
+      this.frameTargets.getResolvedDepthTexture(),
+      this.frameTargets.getTonemapTexture(),
+    ].filter((t): t is GPUTexture => t !== null);
+    
+    this.frameTargets.registerEncoderTextures(encoder, texturesUsedByEncoder);
+    
     const swapChainView = this.setupSwapChain(ctx, configuredDevice, encoder, deviceSnapshot);
     if (!swapChainView) {
       return geometry;
@@ -327,6 +341,8 @@ export class FrameRenderer {
     this.resolveTimestampQueries(frameResources, encoder);
 
     const commandBuffer = encoder.finish();
+    // Unregister encoder textures after finish - textures are now safe to destroy after submit
+    this.frameTargets.unregisterEncoderTextures(encoder);
     this.submitAndCleanup(configuredDevice, commandBuffer, encoder);
     this.frameTargets.flush(configuredDevice.queue);
     this.postProcess.flush(configuredDevice.queue);
@@ -462,8 +478,11 @@ export class FrameRenderer {
       this.errorMetrics.lastErrorTime = performance.now();
       try {
         encoder.finish();
+        // Unregister encoder textures after finish
+        this.frameTargets.unregisterEncoderTextures(encoder);
       } catch {
-        // ignore
+        // ignore - but still unregister to prevent leaks
+        this.frameTargets.unregisterEncoderTextures(encoder);
       }
       return false;
     }
@@ -494,22 +513,24 @@ export class FrameRenderer {
       return null;
     }
     
-    // Validate device before creating swap chain view
-    // Critical: texture view must be created with the same device as the encoder
-    if (!this.validateDeviceAndCleanupEncoder(ctx, deviceSnapshot, encoder, 'swap chain view creation')) {
-      return null;
-    }
-    
-    // Double-check device consistency - texture must be from the same device as configuredDevice
-    // If device changed, getCurrentTexture() may return a texture from the old device
-    if (!DeviceValidator.validateBeforeOperation(ctx, deviceSnapshot, 'texture view creation')) {
-      try {
-        encoder.finish();
-      } catch {
-        // ignore
+      // Validate device before creating swap chain view
+      // Critical: texture view must be created with the same device as the encoder
+      if (!this.validateDeviceAndCleanupEncoder(ctx, deviceSnapshot, encoder, 'swap chain view creation')) {
+        return null;
       }
-      return null;
-    }
+      
+      // Double-check device consistency - texture must be from the same device as configuredDevice
+      // If device changed, getCurrentTexture() may return a texture from the old device
+      if (!DeviceValidator.validateBeforeOperation(ctx, deviceSnapshot, 'texture view creation')) {
+        try {
+          encoder.finish();
+          this.frameTargets.unregisterEncoderTextures(encoder);
+        } catch {
+          // ignore - but still unregister to prevent leaks
+          this.frameTargets.unregisterEncoderTextures(encoder);
+        }
+        return null;
+      }
     
     let swapChainView: GPUTextureView;
     try {
@@ -520,8 +541,10 @@ export class FrameRenderer {
       if (!DeviceValidator.validateBeforeOperation(ctx, deviceSnapshot, 'texture view creation completion')) {
         try {
           encoder.finish();
+          this.frameTargets.unregisterEncoderTextures(encoder);
         } catch {
-          // ignore
+          // ignore - but still unregister to prevent leaks
+          this.frameTargets.unregisterEncoderTextures(encoder);
         }
         return null;
       }
@@ -531,8 +554,10 @@ export class FrameRenderer {
       Logger.warn('[FrameRenderer] Failed to create swap chain view - device may have changed:', err);
       try {
         encoder.finish();
+        this.frameTargets.unregisterEncoderTextures(encoder);
       } catch {
-        // ignore
+        // ignore - but still unregister to prevent leaks
+        this.frameTargets.unregisterEncoderTextures(encoder);
       }
       return null;
     }
@@ -551,8 +576,10 @@ export class FrameRenderer {
       if (!DeviceValidator.validateBeforeOperation(ctx, deviceSnapshot, 'getCurrentTexture')) {
         try {
           encoder.finish();
+          this.frameTargets.unregisterEncoderTextures(encoder);
         } catch {
-          // ignore
+          // ignore - but still unregister to prevent leaks
+          this.frameTargets.unregisterEncoderTextures(encoder);
         }
         return null;
       }
@@ -564,8 +591,10 @@ export class FrameRenderer {
       if (!DeviceValidator.validateBeforeOperation(ctx, deviceSnapshot, 'texture acquisition completion')) {
         try {
           encoder.finish();
+          this.frameTargets.unregisterEncoderTextures(encoder);
         } catch {
-          // ignore
+          // ignore - but still unregister to prevent leaks
+          this.frameTargets.unregisterEncoderTextures(encoder);
         }
         return null;
       }
@@ -577,8 +606,10 @@ export class FrameRenderer {
       Logger.warn('[FrameRenderer] Failed to get current swap chain texture - device may have changed:', err);
       try {
         encoder.finish();
+        this.frameTargets.unregisterEncoderTextures(encoder);
       } catch {
-        // ignore
+        // ignore - but still unregister to prevent leaks
+        this.frameTargets.unregisterEncoderTextures(encoder);
       }
       return null;
     }
