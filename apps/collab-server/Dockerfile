@@ -1,5 +1,5 @@
 # Multi-stage build for optimized production image
-FROM node:22-alpine AS base
+FROM node:25-alpine AS base
 
 # Enable corepack (pnpm)
 RUN corepack enable
