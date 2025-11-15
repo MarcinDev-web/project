@@ -293,34 +293,37 @@ export class QuickMenu {
       userInfoContainer.style.alignItems = 'center';
       userInfoContainer.style.gap = 'var(--spacing-2)';
 
-      // User name button
+      // User avatar button (initials only)
       const userButton = document.createElement('button');
       userButton.className = 'top-bar-user-button';
       const userName = this.config.getUserName?.() || 'User';
-      userButton.textContent = userName;
+      // Get initials from username (first letter of each word, max 2 letters)
+      const initials = userName
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase())
+        .slice(0, 2)
+        .join('') || userName.charAt(0).toUpperCase();
+      userButton.textContent = initials;
       userButton.title = userName;
       userInfoContainer.appendChild(userButton);
+
+      // Divider between user and coins
+      const divider = document.createElement('div');
+      divider.className = 'top-bar-user-divider';
+      userInfoContainer.appendChild(divider);
 
       // Coins display
       const coinsDisplay = document.createElement('div');
       coinsDisplay.className = 'top-bar-coins-display';
-      coinsDisplay.style.display = 'flex';
-      coinsDisplay.style.alignItems = 'center';
-      coinsDisplay.style.gap = 'var(--spacing-1)';
-      coinsDisplay.style.padding = 'var(--spacing-1) var(--spacing-2)';
-      coinsDisplay.style.borderRadius = 'var(--radius-sm)';
-      coinsDisplay.style.background = 'var(--bg-surface-2)';
       
       const coinsIcon = document.createElement('span');
+      coinsIcon.className = 'top-bar-coins-icon';
       coinsIcon.textContent = '🪙';
-      coinsIcon.style.fontSize = '14px';
       
       const coinsAmount = document.createElement('span');
+      coinsAmount.className = 'top-bar-coins-amount';
       const coins = this.config.getUserCoins?.() ?? 0;
       coinsAmount.textContent = coins.toLocaleString();
-      coinsAmount.style.fontSize = 'var(--text-sm)';
-      coinsAmount.style.fontWeight = 'var(--font-medium)';
-      coinsAmount.style.color = 'var(--text-1)';
       
       coinsDisplay.appendChild(coinsIcon);
       coinsDisplay.appendChild(coinsAmount);

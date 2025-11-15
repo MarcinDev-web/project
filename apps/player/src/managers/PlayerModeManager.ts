@@ -37,8 +37,8 @@ import { ConnectingState } from '../core/states/ConnectingState.js';
 import { PlayingState } from '../core/states/PlayingState.js';
 import { PausedState } from '../core/states/PausedState.js';
 import { DisconnectedState } from '../core/states/DisconnectedState.js';
-import { MultiplayerSystem, MultiplayerConnectionState } from '../systems/MultiplayerSystem.js';
-import { PlayerReplication } from '../systems/PlayerReplication.js';
+import { ReplicationClient, MultiplayerGameplayManager, ReplicationState } from '@engine/net';
+import { MultiplayerAPI } from '../utils/multiplayerApi.js';
 
 // PlayManifest interface
 interface PlayManifest {
@@ -255,8 +255,8 @@ export class PlayerModeManager {
   private disconnectedState: DisconnectedState | null = null;
   
   // Multiplayer systems
-  private multiplayerSystem: MultiplayerSystem | null = null;
-  private playerReplication: PlayerReplication | null = null;
+  private replicationClient: ReplicationClient | null = null;
+  private multiplayerGameplayManager: MultiplayerGameplayManager | null = null;
   
   constructor(config: PlayerModeManagerConfig) {
     this.canvas = config.canvas;
@@ -330,7 +330,7 @@ export class PlayerModeManager {
       },
     });
     
-    // Connecting state (placeholder for now - will be implemented with multiplayer)
+    // Connecting state - connect to multiplayer server using @engine/net
     const connectingState = new ConnectingState({
       connect: async (buildId: string) => {
         // Check if multiplayer is enabled in manifest
@@ -343,38 +343,61 @@ export class PlayerModeManager {
           return;
         }
         
-        // Initialize MultiplayerSystem if not already created
-        if (!this.multiplayerSystem) {
-          this.multiplayerSystem = new MultiplayerSystem({
-            onConnectionStateChanged: (state) => {
-              // Handle state changes (e.g., transition to DISCONNECTED on error)
-              if (state === MultiplayerConnectionState.DISCONNECTED) {
-                const currentState = this.stateMachine.getCurrentStateType();
-                if (currentState === PlayerStateType.PLAYING) {
-                  // Transition to DISCONNECTED state
-                  this.stateMachine.transitionTo(PlayerStateType.DISCONNECTED);
-                }
-              }
-            },
-            onPlayerJoined: (player) => {
-              Logger.info(`[PlayerModeManager] Player joined: ${player.displayName}`);
-            },
-            onPlayerLeft: (playerId) => {
-              Logger.info(`[PlayerModeManager] Player left: ${playerId}`);
-            },
-            onError: (error) => {
-              Logger.error('[PlayerModeManager] Multiplayer error:', error);
-              const context = this.stateMachine.getMutableContext();
-              context.errors.push(`Multiplayer error: ${error.message}`);
-            },
-          });
-          
-          // Initialize PlayerReplication (will be fully initialized after player spawn)
-          this.playerReplication = new PlayerReplication();
+        // Get JWT token for authentication
+        const jwtToken = await this.getJWTToken();
+        if (!jwtToken) {
+          throw new Error('Failed to get authentication token');
         }
         
-        // Connect to server
-        await this.multiplayerSystem.connect(buildId);
+        // Get WebSocket URL
+        const wsUrl = await MultiplayerAPI.getWebSocketUrl(buildId);
+        
+        // Initialize ReplicationClient if not already created
+        if (!this.replicationClient) {
+          this.replicationClient = new ReplicationClient(wsUrl, jwtToken, {
+            enableTransportNegotiation: true,
+          });
+          
+          // Subscribe to state changes
+          this.replicationClient.onStateChange((state) => {
+            // Handle state changes (e.g., transition to DISCONNECTED on error)
+            if (state === ReplicationState.Disconnected || state === ReplicationState.Error) {
+              const currentState = this.stateMachine.getCurrentStateType();
+              if (currentState === PlayerStateType.PLAYING) {
+                // Transition to DISCONNECTED state
+                this.stateMachine.transitionTo(PlayerStateType.DISCONNECTED);
+              }
+            }
+          });
+          
+          // Subscribe to errors
+          this.replicationClient.onError((error, code) => {
+            Logger.error('[PlayerModeManager] ReplicationClient error:', error);
+            const context = this.stateMachine.getMutableContext();
+            context.errors.push(`Multiplayer error: ${error}${code ? ` (${code})` : ''}`);
+          });
+          
+          // Initialize MultiplayerGameplayManager
+          this.multiplayerGameplayManager = new MultiplayerGameplayManager(
+            this.replicationClient,
+            this.scene,
+            this.physicsWorld
+          );
+          
+          // Subscribe to MultiplayerGameplayManager errors
+          this.multiplayerGameplayManager.onError((error) => {
+            Logger.error('[PlayerModeManager] MultiplayerGameplayManager error:', error);
+            const context = this.stateMachine.getMutableContext();
+            context.errors.push(`Multiplayer error: ${error.message}`);
+          });
+        }
+        
+        // Connect to server and start session
+        // Use buildId as sessionId for game sessions
+        await this.replicationClient.connect(buildId);
+        
+        // Start multiplayer session after player is spawned (will be called in spawnPlayer)
+        // For now, we just ensure connection is established
       },
       onStarted: () => {
         Logger.info('Connecting to server...');
@@ -414,19 +437,14 @@ export class PlayerModeManager {
         config.onDisconnectUIVisibilityChange?.(visible);
       },
       reconnect: async () => {
-        if (!this.multiplayerSystem || !this.buildId) {
+        if (!this.multiplayerGameplayManager || !this.buildId) {
           Logger.warn('[PlayerModeManager] Cannot reconnect: multiplayer system not initialized');
           return;
         }
         
-        // Disconnect first if still connected
-        if (this.multiplayerSystem.getConnectionState() !== MultiplayerConnectionState.DISCONNECTED) {
-          this.multiplayerSystem.disconnect();
-        }
-        
         // Attempt reconnection
         try {
-          await this.multiplayerSystem.connect(this.buildId);
+          await this.multiplayerGameplayManager.reconnect();
           // Transition back to CONNECTING state after successful reconnect
           const currentState = this.stateMachine.getCurrentStateType();
           if (currentState === PlayerStateType.DISCONNECTED) {
@@ -555,10 +573,11 @@ export class PlayerModeManager {
       const startRot = playerStart?.rotation ?? manifest.playerStart.rotation;
       await this.spawnPlayer(startPos, startRot);
       
-      // Initialize PlayerReplication if multiplayer is enabled and system exists
-      if (manifest.simulation.enableMultiplayer && this.multiplayerSystem && this.playerReplication && this.playerEntity) {
-        const localPlayerId = this.playerSession?.id ?? 'localPlayer';
-        this.playerReplication.initialize(this.scene, this.multiplayerSystem, localPlayerId);
+      // Start multiplayer session if multiplayer is enabled and manager exists
+      if (manifest.simulation.enableMultiplayer && this.multiplayerGameplayManager && this.playerEntity) {
+        // Use buildId as sessionId for game sessions
+        const sessionId = this.buildId ?? 'default-session';
+        await this.multiplayerGameplayManager.startSession(sessionId, this.playerEntity);
       }
       
       // Fetch and apply user avatar loadout
@@ -631,21 +650,17 @@ export class PlayerModeManager {
     // Update avatar visuals and animation
     this.updateAvatar(deltaTime);
     
-    // Update multiplayer system
-    if (this.multiplayerSystem) {
-      this.multiplayerSystem.update();
+    // Update multiplayer systems if enabled
+    if (this.multiplayerGameplayManager) {
+      this.multiplayerGameplayManager.update(deltaTime);
     }
     
-    // Send player position updates to server (if multiplayer)
-    if (this.multiplayerSystem && this.playerEntity) {
-      const position = this.playerEntity.transform.position;
-      const rotation = quatToEuler(this.playerEntity.transform.rotation)[1]; // Y rotation (yaw)
-      this.multiplayerSystem.sendPositionUpdate(position, rotation);
-    }
-    
-    // Update remote player replication
-    if (this.playerReplication) {
-      this.playerReplication.update();
+    // Process character input for multiplayer if enabled
+    if (this.multiplayerGameplayManager && this.characterInput) {
+      const input = this.characterInput.getInput();
+      if (input) {
+        this.multiplayerGameplayManager.processInput(input);
+      }
     }
     
     // Update scene buffers
@@ -923,6 +938,60 @@ export class PlayerModeManager {
     }
   }
   
+  /**
+   * Get JWT token for authentication.
+   * Tries to get from cookies or API.
+   */
+  private async getJWTToken(): Promise<string | null> {
+    // Try to get token from cookies (if set by auth system)
+    const cookies = document.cookie.split(';');
+    for (const cookie of cookies) {
+      const [name, value] = cookie.trim().split('=');
+      if (name === 'authToken' || name === 'jwt' || name === 'token') {
+        return decodeURIComponent(value);
+      }
+    }
+    
+    // Try to get from API
+    try {
+      const response = await fetch('/api/auth/token', {
+        credentials: 'include',
+      });
+      if (response.ok) {
+        const data = (await response.json()) as { token?: string };
+        if (data.token) {
+          return data.token;
+        }
+      }
+    } catch (error) {
+      Logger.warn('[PlayerModeManager] Failed to get token from API:', error as unknown as Error);
+    }
+    
+    // Try to get from /api/auth/me response headers or body
+    try {
+      const response = await fetch('/api/auth/me', {
+        credentials: 'include',
+      });
+      if (response.ok) {
+        // Check if token is in Authorization header or response body
+        const authHeader = response.headers.get('Authorization');
+        if (authHeader && authHeader.startsWith('Bearer ')) {
+          return authHeader.substring(7);
+        }
+        
+        const data = (await response.json()) as { token?: string };
+        if (data.token) {
+          return data.token;
+        }
+      }
+    } catch (error) {
+      Logger.warn('[PlayerModeManager] Failed to get token from /api/auth/me:', error as unknown as Error);
+    }
+    
+    Logger.warn('[PlayerModeManager] No JWT token found - multiplayer may not work');
+    return null;
+  }
+  
   private async fetchUserAvatarLoadout(): Promise<AvatarLoadout | null> {
     interface AvatarLoadoutData {
       version: number;
@@ -1027,14 +1096,14 @@ export class PlayerModeManager {
     this.playerSession = null;
     
     // Cleanup multiplayer systems
-    if (this.multiplayerSystem) {
-      this.multiplayerSystem.dispose();
-      this.multiplayerSystem = null;
+    if (this.multiplayerGameplayManager) {
+      this.multiplayerGameplayManager.dispose();
+      this.multiplayerGameplayManager = null;
     }
     
-    if (this.playerReplication) {
-      this.playerReplication.dispose();
-      this.playerReplication = null;
+    if (this.replicationClient) {
+      // ReplicationClient doesn't have dispose method, but connection will be closed on page unload
+      this.replicationClient = null;
     }
     
     this.isInitialized = false;

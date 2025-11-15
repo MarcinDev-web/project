@@ -13,10 +13,6 @@ export const TopBar = memo(function TopBar() {
     return location.pathname.startsWith(path);
   };
 
-  if (!isAuthenticated) {
-    return null;
-  }
-
   return (
     <div className="topbar">
       <div className="topbar-content">
@@ -34,10 +30,12 @@ export const TopBar = memo(function TopBar() {
             Support
           </NavLink>
         </div>
-        <div className="topbar-right">
-          <CoinsDisplay />
-          <NotificationBell />
-        </div>
+        {isAuthenticated && (
+          <div className="topbar-right">
+            <CoinsDisplay />
+            <NotificationBell />
+          </div>
+        )}
       </div>
     </div>
   );

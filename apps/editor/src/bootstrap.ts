@@ -15,6 +15,63 @@ export async function bootstrap(): Promise<void> {
   const shareToken = urlParams.get('share');
   const collabSession = urlParams.get('session');
   const projectId = urlParams.get('project') || 'default-project';
+  
+  // Get token from URL (passed from platform) and store in localStorage
+  const tokenFromUrl = urlParams.get('token');
+  const refreshTokenFromUrl = urlParams.get('refreshToken');
+  
+  Logger.info(`Editor: URL params - token: ${tokenFromUrl ? 'present' : 'missing'}, refreshToken: ${refreshTokenFromUrl ? 'present' : 'missing'}`);
+  Logger.info(`Editor: Current URL: ${window.location.href}`);
+  
+  if (tokenFromUrl) {
+    try {
+      const { setTokens, getTokens: getStoredTokens } = await import('./utils/auth');
+      const stored = getStoredTokens();
+      Logger.info(`Editor: Current localStorage token: ${stored.token ? 'present' : 'missing'}`);
+      
+      // Only set if not already stored or different
+      if (!stored.token || stored.token !== tokenFromUrl) {
+        // Use refreshToken from URL if provided, otherwise keep existing one
+        const refreshToken = refreshTokenFromUrl || stored.refreshToken || '';
+        setTokens(tokenFromUrl, refreshToken);
+        Logger.info('Editor: Token received from platform and stored in localStorage');
+        
+        // Verify it was stored
+        const verify = getStoredTokens();
+        if (verify.token === tokenFromUrl) {
+          Logger.info('Editor: Token successfully verified in localStorage');
+        } else {
+          Logger.warn('Editor: Token storage verification failed!');
+        }
+        
+        // Clean up URL by removing token parameters
+        urlParams.delete('token');
+        urlParams.delete('refreshToken');
+        const newUrl = window.location.pathname + (urlParams.toString() ? `?${urlParams.toString()}` : '');
+        window.history.replaceState({}, '', newUrl);
+      } else {
+        Logger.info('Editor: Token already exists in localStorage, skipping');
+      }
+    } catch (error) {
+      Logger.warn('Editor: Failed to store token from URL:', error as Error);
+    }
+  } else {
+    Logger.info('Editor: No token in URL - checking localStorage for existing token');
+    try {
+      const { getTokens: getStoredTokens } = await import('./utils/auth');
+      const stored = getStoredTokens();
+      Logger.info(`Editor: localStorage token: ${stored.token ? 'present' : 'missing'}`);
+      
+      // If no token in URL and no token in localStorage, check if we came from platform
+      // by checking if URL has authenticated=true parameter
+      if (!stored.token && urlParams.get('authenticated') === 'true') {
+        Logger.warn('Editor: URL has authenticated=true but no token - platform may not have passed token correctly');
+        Logger.warn('Editor: This usually means platform localStorage is empty or token was not available');
+      }
+    } catch (error) {
+      Logger.warn('Editor: Failed to check localStorage:', error as Error);
+    }
+  }
 
   // Check authentication status from platform
   try {

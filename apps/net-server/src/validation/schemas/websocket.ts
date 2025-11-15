@@ -69,6 +69,38 @@ export const playerUpdateMessageSchema = z.object({
 });
 
 /**
+ * Input message schema.
+ */
+export const inputMessageSchema = z.object({
+  type: z.literal('input'),
+  sequence: z.number().int().nonnegative(),
+  inputType: z.enum(['move', 'jump', 'sprint', 'sprint-end']),
+  moveDirection: z.tuple([z.number(), z.number()]).optional(),
+  cameraForward: positionSchema.optional(),
+  cameraRight: positionSchema.optional(),
+  timestamp: z.number().int().nonnegative().optional(),
+});
+
+/**
+ * Physics state message schema.
+ */
+export const physicsStateMessageSchema = z.object({
+  type: z.literal('physics-state'),
+  frameNumber: z.number().int().nonnegative(),
+  bodies: z.array(
+    z.object({
+      entityId: z.string().min(1),
+      position: positionSchema,
+      rotation: rotationSchema,
+      velocity: positionSchema.optional(),
+      angularVelocity: z.tuple([z.number(), z.number(), z.number()]).optional(),
+      timestamp: z.number().int().nonnegative(),
+    })
+  ),
+  timestamp: z.number().int().nonnegative().optional(),
+});
+
+/**
  * Cursor update message schema.
  */
 export const cursorUpdateMessageSchema = z.object({
@@ -104,6 +136,8 @@ export const websocketMessageSchema = z.discriminatedUnion('type', [
   leaveSessionMessageSchema,
   operationMessageSchema,
   playerUpdateMessageSchema,
+  inputMessageSchema,
+  physicsStateMessageSchema,
   cursorUpdateMessageSchema,
   pingMessageSchema,
   messageTypingSchema,
@@ -116,6 +150,8 @@ export type JoinSessionMessageRequest = z.infer<typeof joinSessionMessageSchema>
 export type LeaveSessionMessageRequest = z.infer<typeof leaveSessionMessageSchema>;
 export type OperationMessageRequest = z.infer<typeof operationMessageSchema>;
 export type PlayerUpdateMessageRequest = z.infer<typeof playerUpdateMessageSchema>;
+export type InputMessageRequest = z.infer<typeof inputMessageSchema>;
+export type PhysicsStateMessageRequest = z.infer<typeof physicsStateMessageSchema>;
 export type CursorUpdateMessageRequest = z.infer<typeof cursorUpdateMessageSchema>;
 export type PingMessageRequest = z.infer<typeof pingMessageSchema>;
 export type MessageTypingRequest = z.infer<typeof messageTypingSchema>;

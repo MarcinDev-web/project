@@ -10,6 +10,8 @@ import type {
   LeaveSessionMessage,
   OperationMessage,
   PlayerUpdateMessage,
+  InputMessage,
+  PhysicsStateMessage,
   CursorUpdateMessage,
   UserJoinedMessage,
   UserLeftMessage,
@@ -104,6 +106,12 @@ export class ReplicationServer {
           break;
         case 'player-update':
           await this.handlePlayerUpdate(ws, message as PlayerUpdateMessage);
+          break;
+        case 'input':
+          await this.handleInput(ws, message as InputMessage);
+          break;
+        case 'physics-state':
+          await this.handlePhysicsState(ws, message as PhysicsStateMessage);
           break;
         case 'cursor-update':
           await this.handleCursorUpdate(ws, message as CursorUpdateMessage);
@@ -265,6 +273,60 @@ export class ReplicationServer {
       }
     } catch (error) {
       console.error('Error handling player update:', error);
+    }
+  }
+
+  /**
+   * Handle input message (player input events).
+   */
+  private async handleInput(ws: WebSocket, message: InputMessage): Promise<void> {
+    try {
+      // Check token expiration before processing
+      if (!this.isTokenValid(ws)) {
+        return; // Silently ignore expired token for input messages (frequent messages)
+      }
+
+      const userId = this.getUserIdFromConnection(ws);
+      if (!userId) {
+        return;
+      }
+
+      message.userId = userId;
+
+      // Broadcast to other users in session
+      const sessionId = this.sessionManager.getUserSession(userId);
+      if (sessionId) {
+        this.sessionManager.broadcast(sessionId, message, userId);
+      }
+    } catch (error) {
+      console.error('Error handling input message:', error);
+    }
+  }
+
+  /**
+   * Handle physics state message (rigid body synchronization).
+   */
+  private async handlePhysicsState(ws: WebSocket, message: PhysicsStateMessage): Promise<void> {
+    try {
+      // Check token expiration before processing
+      if (!this.isTokenValid(ws)) {
+        return; // Silently ignore expired token for physics state (frequent messages)
+      }
+
+      const userId = this.getUserIdFromConnection(ws);
+      if (!userId) {
+        return;
+      }
+
+      message.userId = userId;
+
+      // Broadcast to other users in session
+      const sessionId = this.sessionManager.getUserSession(userId);
+      if (sessionId) {
+        this.sessionManager.broadcast(sessionId, message, userId);
+      }
+    } catch (error) {
+      console.error('Error handling physics state message:', error);
     }
   }
 

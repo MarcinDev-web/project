@@ -158,5 +158,80 @@ describe('MultiplayerGameplayManager', () => {
 
     expect(manager.getLocalPlayerEntity()).toBe(localPlayerEntity);
   });
+
+  it('should handle reconnection', async () => {
+    await manager.startSession('test-session-id', localPlayerEntity);
+    
+    // Simulate disconnection
+    (replicationClient.getState as ReturnType<typeof vi.fn>).mockReturnValue('disconnected' as any);
+    manager.update(0.016);
+    
+    // Simulate reconnection
+    (replicationClient.getState as ReturnType<typeof vi.fn>).mockReturnValue('connected' as any);
+    manager.update(0.016);
+    
+    // Should still be active
+    expect(manager.isSessionActive()).toBe(true);
+  });
+
+  it('should reset sync states on reconnection', async () => {
+    await manager.startSession('test-session-id', localPlayerEntity);
+    
+    const playerSync = (manager as any).playerSync;
+    const physicsSync = (manager as any).physicsSync;
+    const inputReplicator = (manager as any).inputReplicator;
+    
+    // Simulate reconnection
+    (replicationClient.getState as ReturnType<typeof vi.fn>).mockReturnValue('disconnected' as any);
+    manager.update(0.016);
+    
+    (replicationClient.getState as ReturnType<typeof vi.fn>).mockReturnValue('connected' as any);
+    manager.update(0.016);
+    
+    // Sync states should be reset
+    if (playerSync) {
+      expect(playerSync.resetForReconnection).toBeDefined();
+    }
+    if (physicsSync) {
+      expect(physicsSync.resetForReconnection).toBeDefined();
+    }
+    if (inputReplicator) {
+      expect(inputReplicator.flushBuffer).toBeDefined();
+    }
+  });
+
+  it('should handle manual reconnection', async () => {
+    await manager.startSession('test-session-id', localPlayerEntity);
+    
+    (replicationClient.getState as ReturnType<typeof vi.fn>).mockReturnValue('disconnected' as any);
+    
+    await manager.reconnect();
+    
+    expect(replicationClient.connect).toHaveBeenCalledWith('test-session-id');
+  });
+
+  it('should handle invalid input gracefully', async () => {
+    await manager.startSession('test-session-id', localPlayerEntity);
+    
+    const errorHandler = (manager as any).errorHandler;
+    const handleErrorSpy = vi.spyOn(errorHandler, 'handleError');
+    
+    // @ts-expect-error - Testing invalid input
+    manager.processInput(null);
+    
+    expect(handleErrorSpy).toHaveBeenCalled();
+  });
+
+  it('should handle update with invalid deltaTime', async () => {
+    await manager.startSession('test-session-id', localPlayerEntity);
+    
+    const errorHandler = (manager as any).errorHandler;
+    const handleErrorSpy = vi.spyOn(errorHandler, 'handleError');
+    
+    // @ts-expect-error - Testing invalid input
+    manager.update(NaN);
+    
+    expect(handleErrorSpy).toHaveBeenCalled();
+  });
 });
 

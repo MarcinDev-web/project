@@ -83,20 +83,20 @@ export class WelcomeOverlay {
           
           <defs>
             <linearGradient id="iconGlow" x1="0" y1="0" x2="80" y2="80">
-              <stop offset="0%" stop-color="#667eea"/>
-              <stop offset="100%" stop-color="#764ba2"/>
+              <stop offset="0%" stop-color="#0ea5e9"/>
+              <stop offset="100%" stop-color="#0284c7"/>
             </linearGradient>
             <linearGradient id="cubeFace1" x1="40" y1="20" x2="60" y2="60">
-              <stop offset="0%" stop-color="#764ba2"/>
-              <stop offset="100%" stop-color="#4c3a6d"/>
+              <stop offset="0%" stop-color="#0284c7"/>
+              <stop offset="100%" stop-color="#0369a1"/>
             </linearGradient>
             <linearGradient id="cubeFace2" x1="20" y1="30" x2="40" y2="60">
-              <stop offset="0%" stop-color="#667eea"/>
-              <stop offset="100%" stop-color="#4a5db8"/>
+              <stop offset="0%" stop-color="#0ea5e9"/>
+              <stop offset="100%" stop-color="#075985"/>
             </linearGradient>
             <linearGradient id="cubeFace3" x1="20" y1="20" x2="60" y2="40">
-              <stop offset="0%" stop-color="#8094f0"/>
-              <stop offset="100%" stop-color="#667eea"/>
+              <stop offset="0%" stop-color="#38bdf8"/>
+              <stop offset="100%" stop-color="#0ea5e9"/>
             </linearGradient>
             <linearGradient id="edgeGlow" x1="20" y1="20" x2="60" y2="60">
               <stop offset="0%" stop-color="rgba(255,255,255,0.8)"/>

@@ -167,6 +167,26 @@ export class InputReplicator {
    * Send input event to server.
    */
   private sendInput(input: CharacterInput, timestamp: number): void {
+    // Validate timestamp
+    const now = Date.now();
+    const finalTimestamp = this.config.enableTimestampSync ? timestamp : now;
+    
+    // Sanity check: timestamp should not be in the future (allow small drift)
+    if (finalTimestamp > now + 1000) {
+      this.config.errorHandler.handleError(
+        ErrorFactory.invalidInput('timestamp', finalTimestamp, 'timestamp is too far in the future')
+      );
+      return;
+    }
+    
+    // Sanity check: timestamp should not be too old (more than 5 seconds)
+    if (finalTimestamp < now - 5000) {
+      this.config.errorHandler.handleError(
+        ErrorFactory.invalidInput('timestamp', finalTimestamp, 'timestamp is too old')
+      );
+      return;
+    }
+
     // Determine input event type
     let type: InputEvent['type'] = 'move';
     if (input.jump) {
@@ -184,9 +204,39 @@ export class InputReplicator {
     const cameraRight: [number, number, number] | undefined = 
       input.cameraRight ? [...input.cameraRight] as [number, number, number] : undefined;
 
+    // Validate moveDirection if present
+    if (moveDirection) {
+      if (!this.isValidMoveDirection(moveDirection)) {
+        this.config.errorHandler.handleError(
+          ErrorFactory.invalidInput('moveDirection', moveDirection, 'invalid moveDirection values')
+        );
+        return;
+      }
+    }
+
+    // Validate cameraForward if present
+    if (cameraForward) {
+      if (!this.isValidCameraVector(cameraForward)) {
+        this.config.errorHandler.handleError(
+          ErrorFactory.invalidInput('cameraForward', cameraForward, 'invalid cameraForward values')
+        );
+        return;
+      }
+    }
+
+    // Validate cameraRight if present
+    if (cameraRight) {
+      if (!this.isValidCameraVector(cameraRight)) {
+        this.config.errorHandler.handleError(
+          ErrorFactory.invalidInput('cameraRight', cameraRight, 'invalid cameraRight values')
+        );
+        return;
+      }
+    }
+
     const event: BufferedInputEvent = {
       type,
-      timestamp: this.config.enableTimestampSync ? timestamp : Date.now(),
+      timestamp: finalTimestamp,
       sequence: this.sequenceNumber++,
       ...(moveDirection && { moveDirection }),
       ...(cameraForward && { cameraForward }),
@@ -286,6 +336,36 @@ export class InputReplicator {
     };
 
     this.inputBuffer.push(event);
+  }
+
+  /**
+   * Validate move direction vector.
+   */
+  private isValidMoveDirection(moveDirection: [number, number]): boolean {
+    return (
+      Array.isArray(moveDirection) &&
+      moveDirection.length === 2 &&
+      Number.isFinite(moveDirection[0]) &&
+      Number.isFinite(moveDirection[1]) &&
+      Math.abs(moveDirection[0]) <= 1.0 && // Normalized vector
+      Math.abs(moveDirection[1]) <= 1.0
+    );
+  }
+
+  /**
+   * Validate camera vector (forward or right).
+   */
+  private isValidCameraVector(vector: [number, number, number]): boolean {
+    return (
+      Array.isArray(vector) &&
+      vector.length === 3 &&
+      Number.isFinite(vector[0]) &&
+      Number.isFinite(vector[1]) &&
+      Number.isFinite(vector[2]) &&
+      Math.abs(vector[0]) < 1e6 && // Reasonable bounds
+      Math.abs(vector[1]) < 1e6 &&
+      Math.abs(vector[2]) < 1e6
+    );
   }
 
   /**

@@ -415,6 +415,9 @@ importers:
       '@engine/input':
         specifier: workspace:*
         version: link:../../packages/input
+      '@engine/net':
+        specifier: workspace:*
+        version: link:../../packages/net
       '@engine/script':
         specifier: workspace:*
         version: link:../../packages/script

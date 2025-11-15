@@ -125,5 +125,135 @@ describe('PhysicsSync', () => {
     // Should not throw errors after disposal
     expect(() => physicsSync.update(0.016)).not.toThrow();
   });
+
+  it('should reject invalid position values (NaN)', () => {
+    const onPhysicsState = (replicationClient.onPhysicsState as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+    const errorHandler = (physicsSync as any).config.errorHandler;
+    const handleErrorSpy = vi.spyOn(errorHandler, 'handleError');
+
+    onPhysicsState({
+      type: 'physics-state',
+      timestamp: Date.now(),
+      userId: 'remote-user-id',
+      frameNumber: 1,
+      bodies: [{
+        entityId: 'test-entity',
+        position: [NaN, 1, 1] as [number, number, number],
+        rotation: [0, 0, 0, 1] as [number, number, number, number],
+        timestamp: Date.now(),
+      }],
+    });
+
+    expect(handleErrorSpy).toHaveBeenCalled();
+  });
+
+  it('should reject invalid position values (Infinity)', () => {
+    const onPhysicsState = (replicationClient.onPhysicsState as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+    const errorHandler = (physicsSync as any).config.errorHandler;
+    const handleErrorSpy = vi.spyOn(errorHandler, 'handleError');
+
+    onPhysicsState({
+      type: 'physics-state',
+      timestamp: Date.now(),
+      userId: 'remote-user-id',
+      frameNumber: 1,
+      bodies: [{
+        entityId: 'test-entity',
+        position: [Infinity, 1, 1] as [number, number, number],
+        rotation: [0, 0, 0, 1] as [number, number, number, number],
+        timestamp: Date.now(),
+      }],
+    });
+
+    expect(handleErrorSpy).toHaveBeenCalled();
+  });
+
+  it('should reject invalid timestamp (future)', () => {
+    const onPhysicsState = (replicationClient.onPhysicsState as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+    const errorHandler = (physicsSync as any).config.errorHandler;
+    const handleErrorSpy = vi.spyOn(errorHandler, 'handleError');
+
+    onPhysicsState({
+      type: 'physics-state',
+      timestamp: Date.now(),
+      userId: 'remote-user-id',
+      frameNumber: 1,
+      bodies: [{
+        entityId: 'test-entity',
+        position: [1, 1, 1] as [number, number, number],
+        rotation: [0, 0, 0, 1] as [number, number, number, number],
+        timestamp: Date.now() + 2000, // 2 seconds in future
+      }],
+    });
+
+    expect(handleErrorSpy).toHaveBeenCalled();
+  });
+
+  it('should reject invalid timestamp (too old)', () => {
+    const onPhysicsState = (replicationClient.onPhysicsState as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+    const errorHandler = (physicsSync as any).config.errorHandler;
+    const handleErrorSpy = vi.spyOn(errorHandler, 'handleError');
+
+    onPhysicsState({
+      type: 'physics-state',
+      timestamp: Date.now(),
+      userId: 'remote-user-id',
+      frameNumber: 1,
+      bodies: [{
+        entityId: 'test-entity',
+        position: [1, 1, 1] as [number, number, number],
+        rotation: [0, 0, 0, 1] as [number, number, number, number],
+        timestamp: Date.now() - 10000, // 10 seconds ago
+      }],
+    });
+
+    expect(handleErrorSpy).toHaveBeenCalled();
+  });
+
+  it('should handle null message gracefully', () => {
+    const onPhysicsState = (replicationClient.onPhysicsState as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+    const errorHandler = (physicsSync as any).config.errorHandler;
+    const handleErrorSpy = vi.spyOn(errorHandler, 'handleError');
+
+    // @ts-expect-error - Testing invalid input
+    onPhysicsState(null);
+
+    expect(handleErrorSpy).toHaveBeenCalled();
+  });
+
+  it('should handle invalid bodies array', () => {
+    const onPhysicsState = (replicationClient.onPhysicsState as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+    const errorHandler = (physicsSync as any).config.errorHandler;
+    const handleErrorSpy = vi.spyOn(errorHandler, 'handleError');
+
+    onPhysicsState({
+      type: 'physics-state',
+      timestamp: Date.now(),
+      userId: 'remote-user-id',
+      frameNumber: 1,
+      bodies: null as any,
+    });
+
+    expect(handleErrorSpy).toHaveBeenCalled();
+  });
+
+  it('should reset state for reconnection', () => {
+    const entity = scene.createEntity('DynamicBody');
+    const physics = new PhysicsComponent();
+    physics.rigidbodyType = RigidbodyType.Dynamic;
+    entity.addComponent(physics);
+
+    physicsSync.update(0.2);
+    
+    physicsSync.resetForReconnection();
+    
+    // Remote states should be cleared
+    const remoteStates = (physicsSync as any).remotePhysicsStates;
+    expect(remoteStates.size).toBe(0);
+    
+    // Last sent snapshot should be cleared
+    const lastSentSnapshot = (physicsSync as any).lastSentSnapshot;
+    expect(lastSentSnapshot).toBeNull();
+  });
 });
 

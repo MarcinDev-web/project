@@ -6,7 +6,6 @@
  * - Top: Floating toolbar (compact, glassmorphism)
  * - Left: Collapsible scene hierarchy panel
  * - Right: Collapsible properties inspector panel
- * - Bottom: Floating status bar
  *
  * Features:
  * - Fullscreen canvas for maximum scene visibility
@@ -38,9 +37,6 @@ export class EditorUILayout {
   private inspectorToggle: HTMLElement | null = null;
   private keyboardCleanup: (() => void) | null = null;
   private shortcutsOverlay: HTMLElement | null = null;
-  private statusBar: HTMLElement | null = null;
-  private sceneMetricsEl: HTMLElement | null = null;
-  private metricsUpdateInterval: number | null = null;
 
   private sidebarCollapsed = true;  // Start closed - cleaner canvas
   private inspectorCollapsed = true; // Start closed - cleaner canvas
@@ -90,84 +86,6 @@ export class EditorUILayout {
     this.inspector.className = 'editor-inspector custom-scrollbar';
     this.inspector.setAttribute('aria-label', 'Properties Inspector');
 
-    // Status bar (full-width footer - Forge World style)
-    const statusBar = document.createElement('div');
-    statusBar.className = 'status-bar';
-
-    // Left: Project info
-    const projectSection = document.createElement('div');
-    projectSection.className = 'status-bar-section left';
-    projectSection.innerHTML = `
-      <div class="status-bar-item">
-        <svg class="status-icon" width="14" height="14" viewBox="0 0 16 16" fill="currentColor">
-          <path d="M2 2h12v12H2z"/>
-        </svg>
-        <span class="status-label">Project:</span>
-        <span id="project-name" class="status-value">Untitled</span>
-      </div>
-      <div class="status-bar-divider"></div>
-      <div class="status-bar-item">
-        <span id="save-status" class="status-badge">Saved</span>
-      </div>
-    `;
-
-    // Center: Performance metrics
-    const metricsSection = document.createElement('div');
-    metricsSection.className = 'status-bar-section center';
-    metricsSection.innerHTML = `
-      <div class="status-bar-item">
-        <span class="status-label">FPS:</span>
-        <span id="fps-value" class="status-value metric">60</span>
-      </div>
-      <div class="status-bar-divider"></div>
-      <div class="status-bar-item">
-        <span class="status-label">△:</span>
-        <span id="triangles-value" class="status-value metric">0</span>
-      </div>
-      <div class="status-bar-divider"></div>
-      <div class="status-bar-item">
-        <span class="status-label">Entities:</span>
-        <span id="entities-value" class="status-value metric">0</span>
-      </div>
-    `;
-
-    // Right: System info
-    const systemSection = document.createElement('div');
-    systemSection.className = 'status-bar-section right';
-    systemSection.innerHTML = `
-      <div class="status-bar-item">
-        <span class="status-label">Canvas:</span>
-        <span id="canvas-dimensions" class="status-value">1920×1080</span>
-      </div>
-      <div class="status-bar-divider"></div>
-      <div class="status-bar-item">
-        <svg class="status-icon webgpu" width="12" height="12" viewBox="0 0 16 16" fill="currentColor">
-          <path d="M8 2l6 4v6l-6 4-6-4V6z"/>
-        </svg>
-        <span class="status-value">WebGPU</span>
-      </div>
-      <div class="status-bar-divider"></div>
-      <button class="shortcuts-help-button">
-        <span>?</span>
-      </button>
-    `;
-
-    statusBar.appendChild(projectSection);
-    statusBar.appendChild(metricsSection);
-    statusBar.appendChild(systemSection);
-
-    // Add keyboard shortcuts button handler
-    const shortcutsButton = systemSection.querySelector('.shortcuts-help-button') as HTMLButtonElement;
-    if (shortcutsButton) {
-      shortcutsButton.addEventListener('click', () => this.toggleShortcutsOverlay());
-    }
-
-    // Store references for metrics updates
-    if (this.config.sceneMetricsProvider) {
-      this.sceneMetricsEl = metricsSection.querySelector('#fps-value')?.parentElement as HTMLElement;
-      // Start metrics update loop
-      this.metricsUpdateInterval = window.setInterval(() => this.updateSceneMetrics(), 500);
-    }
 
     // Create toggle button for inspector panel
     this.inspectorToggle = this.createToggleButton('right', () => this.toggleInspector());
@@ -189,17 +107,8 @@ export class EditorUILayout {
     this.layoutRoot.appendChild(this.toolbar);
     this.layoutRoot.appendChild(this.sidebar);
     this.layoutRoot.appendChild(this.inspector);
-    this.layoutRoot.appendChild(statusBar);
     this.layoutRoot.appendChild(this.inspectorToggle);
     this.layoutRoot.appendChild(this.shortcutsOverlay);
-    this.statusBar = statusBar;
-
-    // Update canvas dimensions display
-    this.updateCanvasDimensions();
-    const resizeObserver = new ResizeObserver(() => {
-      this.updateCanvasDimensions();
-    });
-    resizeObserver.observe(this.config.canvas);
 
     // Setup keyboard shortcuts
     this.setupKeyboardShortcuts();
@@ -226,7 +135,6 @@ export class EditorUILayout {
       this.inspectorToggle,
       this.toolbar,
       this.shortcutsOverlay,
-      this.statusBar,
     ];
 
     for (const el of toggleElements) {
@@ -334,48 +242,6 @@ export class EditorUILayout {
     return button;
   }
 
-  /**
-   * Updates canvas dimensions display in status bar.
-   */
-  private updateCanvasDimensions(): void {
-    const dimensionsEl = document.getElementById('canvas-dimensions');
-    if (dimensionsEl && this.config.canvas) {
-      dimensionsEl.textContent = `${this.config.canvas.width} × ${this.config.canvas.height}`;
-    }
-  }
-
-  /**
-   * Updates scene metrics display in status bar.
-   * Updates FPS, triangles, and entities separately.
-   */
-  private updateSceneMetrics(): void {
-    // In headless/test environments, window/document may be unavailable
-    // or the layout already disposed.
-    if (typeof document === 'undefined' || !this.config.sceneMetricsProvider) return;
-
-    const metrics = this.config.sceneMetricsProvider();
-
-    // Update FPS
-    const fpsEl = document.getElementById('fps-value');
-    if (fpsEl && metrics.fps !== undefined) {
-      fpsEl.textContent = Math.round(metrics.fps).toString();
-    }
-
-    // Update triangles
-    const trianglesEl = document.getElementById('triangles-value');
-    if (trianglesEl && metrics.triangles !== undefined) {
-      const triStr = metrics.triangles > 1000 
-        ? `${(metrics.triangles / 1000).toFixed(1)}k` 
-        : metrics.triangles.toString();
-      trianglesEl.textContent = triStr;
-    }
-
-    // Update entities
-    const entitiesEl = document.getElementById('entities-value');
-    if (entitiesEl && metrics.entityCount !== undefined) {
-      entitiesEl.textContent = metrics.entityCount.toString();
-    }
-  }
 
   /**
    * Creates the keyboard shortcuts overlay.
@@ -548,11 +414,6 @@ export class EditorUILayout {
       this.keyboardCleanup = null;
     }
 
-    if (this.metricsUpdateInterval !== null) {
-      clearInterval(this.metricsUpdateInterval);
-      this.metricsUpdateInterval = null;
-    }
-
     if (this.layoutRoot && this.layoutRoot.parentNode) {
       this.layoutRoot.parentNode.removeChild(this.layoutRoot);
     }
@@ -564,7 +425,5 @@ export class EditorUILayout {
     this.canvasContainer = null;
     this.inspectorToggle = null;
     this.shortcutsOverlay = null;
-    this.statusBar = null;
-    this.sceneMetricsEl = null;
   }
 }

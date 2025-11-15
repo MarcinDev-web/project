@@ -19,7 +19,10 @@
     "db:migrate": "prisma migrate dev",
     "db:push": "prisma db push",
     "db:studio": "prisma studio",
-    "db:check": "tsx scripts/check-database.ts"
+    "db:check": "tsx scripts/check-database.ts",
+    "db:clear": "tsx src/scripts/clearDatabase.ts",
+    "db:clear:all": "tsx src/scripts/clearDatabase.ts --clear-cache",
+    "db:reset": "prisma migrate reset --force"
   },
   "dependencies": {
     "@engine/economy": "workspace:*",

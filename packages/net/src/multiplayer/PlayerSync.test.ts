@@ -133,5 +133,118 @@ describe('PlayerSync', () => {
 
     expect(replicationClient.getLocalUserId).toHaveBeenCalled();
   });
+
+  it('should reject invalid position values (NaN)', () => {
+    const onPlayerUpdate = (replicationClient.onPlayerUpdate as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+    const errorHandler = (playerSync as any).config.errorHandler;
+    const handleErrorSpy = vi.spyOn(errorHandler, 'handleError');
+
+    onPlayerUpdate({
+      type: 'player-update',
+      timestamp: Date.now(),
+      userId: 'remote-user-id',
+      playerId: 'remote-user-id',
+      position: [NaN, 1, 1] as [number, number, number],
+    });
+
+    expect(handleErrorSpy).toHaveBeenCalled();
+  });
+
+  it('should reject invalid position values (Infinity)', () => {
+    const onPlayerUpdate = (replicationClient.onPlayerUpdate as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+    const errorHandler = (playerSync as any).config.errorHandler;
+    const handleErrorSpy = vi.spyOn(errorHandler, 'handleError');
+
+    onPlayerUpdate({
+      type: 'player-update',
+      timestamp: Date.now(),
+      userId: 'remote-user-id',
+      playerId: 'remote-user-id',
+      position: [Infinity, 1, 1] as [number, number, number],
+    });
+
+    expect(handleErrorSpy).toHaveBeenCalled();
+  });
+
+  it('should reject extreme position values', () => {
+    const onPlayerUpdate = (replicationClient.onPlayerUpdate as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+    const errorHandler = (playerSync as any).config.errorHandler;
+    const handleErrorSpy = vi.spyOn(errorHandler, 'handleError');
+
+    onPlayerUpdate({
+      type: 'player-update',
+      timestamp: Date.now(),
+      userId: 'remote-user-id',
+      playerId: 'remote-user-id',
+      position: [1e7, 1, 1] as [number, number, number], // Too large
+    });
+
+    expect(handleErrorSpy).toHaveBeenCalled();
+  });
+
+  it('should reject invalid timestamp (future)', () => {
+    const onPlayerUpdate = (replicationClient.onPlayerUpdate as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+    const errorHandler = (playerSync as any).config.errorHandler;
+    const handleErrorSpy = vi.spyOn(errorHandler, 'handleError');
+
+    onPlayerUpdate({
+      type: 'player-update',
+      timestamp: Date.now() + 2000, // 2 seconds in future
+      userId: 'remote-user-id',
+      playerId: 'remote-user-id',
+      position: [1, 1, 1] as [number, number, number],
+    });
+
+    expect(handleErrorSpy).toHaveBeenCalled();
+  });
+
+  it('should reject invalid timestamp (too old)', () => {
+    const onPlayerUpdate = (replicationClient.onPlayerUpdate as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+    const errorHandler = (playerSync as any).config.errorHandler;
+    const handleErrorSpy = vi.spyOn(errorHandler, 'handleError');
+
+    onPlayerUpdate({
+      type: 'player-update',
+      timestamp: Date.now() - 15000, // 15 seconds ago
+      userId: 'remote-user-id',
+      playerId: 'remote-user-id',
+      position: [1, 1, 1] as [number, number, number],
+    });
+
+    expect(handleErrorSpy).toHaveBeenCalled();
+  });
+
+  it('should handle null message gracefully', () => {
+    const onPlayerUpdate = (replicationClient.onPlayerUpdate as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+    const errorHandler = (playerSync as any).config.errorHandler;
+    const handleErrorSpy = vi.spyOn(errorHandler, 'handleError');
+
+    // @ts-expect-error - Testing invalid input
+    onPlayerUpdate(null);
+
+    expect(handleErrorSpy).toHaveBeenCalled();
+  });
+
+  it('should handle undefined message gracefully', () => {
+    const onPlayerUpdate = (replicationClient.onPlayerUpdate as ReturnType<typeof vi.fn>).mock.calls[0]![0];
+    const errorHandler = (playerSync as any).config.errorHandler;
+    const handleErrorSpy = vi.spyOn(errorHandler, 'handleError');
+
+    // @ts-expect-error - Testing invalid input
+    onPlayerUpdate(undefined);
+
+    expect(handleErrorSpy).toHaveBeenCalled();
+  });
+
+  it('should reset state for reconnection', () => {
+    localPlayerEntity.transform.position = [5, 1, 5];
+    playerSync.update(0.2); // Send update
+    
+    playerSync.resetForReconnection();
+    
+    // Should force sending update on next frame
+    const lastSentPosition = (playerSync as any).lastSentPosition;
+    expect(lastSentPosition).toBeNull();
+  });
 });
 

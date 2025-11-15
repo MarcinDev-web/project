@@ -313,6 +313,29 @@ export class PhysicsSync {
         );
         continue;
       }
+      
+      // Sanity check: timestamp should not be in the future (allow small drift)
+      const now = Date.now();
+      if (bodyState.timestamp > now + 1000) {
+        this.config.errorHandler.handleError(
+          new SyncError(`Timestamp too far in the future for entity ${bodyState.entityId}`, {
+            code: 'SYNC_INVALID_TIMESTAMP_FUTURE',
+            context: { entityId: bodyState.entityId, timestamp: bodyState.timestamp, now },
+          })
+        );
+        continue;
+      }
+      
+      // Sanity check: timestamp should not be too old (more than 5 seconds for physics updates)
+      if (bodyState.timestamp < now - 5000) {
+        this.config.errorHandler.handleError(
+          new SyncError(`Timestamp too old for entity ${bodyState.entityId}`, {
+            code: 'SYNC_INVALID_TIMESTAMP_OLD',
+            context: { entityId: bodyState.entityId, timestamp: bodyState.timestamp, now },
+          })
+        );
+        continue;
+      }
 
       // Skip local player's physics (we control it)
       if (this.isLocalPlayerEntity(bodyState.entityId)) {

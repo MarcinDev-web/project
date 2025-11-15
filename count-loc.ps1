@@ -28,3 +28,6 @@ Write-Host "`nTotal files: $fileCount"
 Write-Host "Total lines of code: $totalLines"
 
 
+
+
+

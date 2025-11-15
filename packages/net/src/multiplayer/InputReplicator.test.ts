@@ -114,5 +114,100 @@ describe('InputReplicator', () => {
 
     expect(seq2).toBeGreaterThan(seq1);
   });
+
+  it('should reject invalid moveDirection (NaN)', () => {
+    const errorHandler = (inputReplicator as any).config.errorHandler;
+    const handleErrorSpy = vi.spyOn(errorHandler, 'handleError');
+
+    const input: CharacterInput = {
+      moveDirection: [NaN, 0, 1],
+      jump: false,
+      sprint: false,
+    };
+
+    inputReplicator.recordInput(input);
+
+    // Should handle error gracefully (may not send)
+    expect(handleErrorSpy).toHaveBeenCalled();
+  });
+
+  it('should reject invalid moveDirection (extreme values)', () => {
+    const errorHandler = (inputReplicator as any).config.errorHandler;
+    const handleErrorSpy = vi.spyOn(errorHandler, 'handleError');
+
+    const input: CharacterInput = {
+      moveDirection: [1e7, 0, 1],
+      jump: false,
+      sprint: false,
+    };
+
+    inputReplicator.recordInput(input);
+
+    expect(handleErrorSpy).toHaveBeenCalled();
+  });
+
+  it('should reject invalid cameraForward (Infinity)', () => {
+    const errorHandler = (inputReplicator as any).config.errorHandler;
+    const handleErrorSpy = vi.spyOn(errorHandler, 'handleError');
+
+    const input: CharacterInput = {
+      moveDirection: [0, 0, 1],
+      cameraForward: [Infinity, 0, -1],
+      jump: false,
+      sprint: false,
+    };
+
+    inputReplicator.recordInput(input);
+
+    expect(handleErrorSpy).toHaveBeenCalled();
+  });
+
+  it('should reject invalid timestamp (future)', () => {
+    const errorHandler = (inputReplicator as any).config.errorHandler;
+    const handleErrorSpy = vi.spyOn(errorHandler, 'handleError');
+
+    const input: CharacterInput = {
+      moveDirection: [0, 0, 1],
+      jump: false,
+      sprint: false,
+    };
+
+    // Use sendImmediate with future timestamp
+    const sendInput = (inputReplicator as any).sendInput.bind(inputReplicator);
+    sendInput(input, Date.now() + 2000);
+
+    expect(handleErrorSpy).toHaveBeenCalled();
+  });
+
+  it('should reject invalid timestamp (too old)', () => {
+    const errorHandler = (inputReplicator as any).config.errorHandler;
+    const handleErrorSpy = vi.spyOn(errorHandler, 'handleError');
+
+    const input: CharacterInput = {
+      moveDirection: [0, 0, 1],
+      jump: false,
+      sprint: false,
+    };
+
+    // Use sendImmediate with old timestamp
+    const sendInput = (inputReplicator as any).sendInput.bind(inputReplicator);
+    sendInput(input, Date.now() - 10000);
+
+    expect(handleErrorSpy).toHaveBeenCalled();
+  });
+
+  it('should flush buffer', () => {
+    const input: CharacterInput = {
+      moveDirection: [0, 0, 1],
+      jump: false,
+      sprint: false,
+    };
+
+    inputReplicator.recordInput(input);
+    inputReplicator.flushBuffer();
+
+    const buffered = inputReplicator.getBufferedInputs(0, 100);
+    expect(buffered.length).toBe(0);
+  });
 });
 

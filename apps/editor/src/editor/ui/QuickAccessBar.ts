@@ -338,36 +338,75 @@ export class QuickAccessBar {
    * Updates the quick access bar with new entity values
    */
   updateEntity(entity: Entity): void {
-    // Update transform values
+    // Helper to check if value differs significantly (more than rounding error)
+    const valuesDiffer = (inputValue: string, entityValue: number): boolean => {
+      const parsed = Number.parseFloat(inputValue);
+      if (!Number.isFinite(parsed)) return true;
+      const diff = Math.abs(parsed - entityValue);
+      return diff > 0.001; // More than rounding error
+    };
+
+    // Update transform values - update if no field is active, or if value differs (e.g., due to snap)
     const posX = this.root.querySelector('input[data-field="quick-position-x"]') as HTMLInputElement | null;
-    if (posX && document.activeElement !== posX) {
-      const posY = this.root.querySelector('input[data-field="quick-position-y"]') as HTMLInputElement | null;
-      const posZ = this.root.querySelector('input[data-field="quick-position-z"]') as HTMLInputElement | null;
+    const posY = this.root.querySelector('input[data-field="quick-position-y"]') as HTMLInputElement | null;
+    const posZ = this.root.querySelector('input[data-field="quick-position-z"]') as HTMLInputElement | null;
+    const isPositionActive = posX === document.activeElement || posY === document.activeElement || posZ === document.activeElement;
+    
+    if (posX) {
       const pos = entity.transform.position;
-      posX.value = Number.isFinite(pos[0]) ? pos[0].toFixed(2) : '0.00';
-      if (posY) posY.value = Number.isFinite(pos[1]) ? pos[1].toFixed(2) : '0.00';
-      if (posZ) posZ.value = Number.isFinite(pos[2]) ? pos[2].toFixed(2) : '0.00';
+      const shouldUpdate = !isPositionActive || 
+        valuesDiffer(posX.value, pos[0]) || 
+        (posY && valuesDiffer(posY.value, pos[1])) || 
+        (posZ && valuesDiffer(posZ.value, pos[2]));
+      
+      if (shouldUpdate) {
+        posX.value = Number.isFinite(pos[0]) ? pos[0].toFixed(2) : '0.00';
+        if (posY) posY.value = Number.isFinite(pos[1]) ? pos[1].toFixed(2) : '0.00';
+        if (posZ) posZ.value = Number.isFinite(pos[2]) ? pos[2].toFixed(2) : '0.00';
+      }
     }
 
     const rotX = this.root.querySelector('input[data-field="quick-rotation-x"]') as HTMLInputElement | null;
-    if (rotX && document.activeElement !== rotX) {
-      const rotY = this.root.querySelector('input[data-field="quick-rotation-y"]') as HTMLInputElement | null;
-      const rotZ = this.root.querySelector('input[data-field="quick-rotation-z"]') as HTMLInputElement | null;
+    const rotY = this.root.querySelector('input[data-field="quick-rotation-y"]') as HTMLInputElement | null;
+    const rotZ = this.root.querySelector('input[data-field="quick-rotation-z"]') as HTMLInputElement | null;
+    const isRotationActive = rotX === document.activeElement || rotY === document.activeElement || rotZ === document.activeElement;
+    
+    if (rotX) {
       const eulerRad = quatToEuler(entity.transform.rotation);
       const toDeg = (r: number) => (r * 180) / Math.PI;
-      rotX.value = Number.isFinite(eulerRad[0]) ? toDeg(eulerRad[0]).toFixed(2) : '0.00';
-      if (rotY) rotY.value = Number.isFinite(eulerRad[1]) ? toDeg(eulerRad[1]).toFixed(2) : '0.00';
-      if (rotZ) rotZ.value = Number.isFinite(eulerRad[2]) ? toDeg(eulerRad[2]).toFixed(2) : '0.00';
+      const degX = toDeg(eulerRad[0]);
+      const degY = toDeg(eulerRad[1]);
+      const degZ = toDeg(eulerRad[2]);
+      
+      const shouldUpdate = !isRotationActive || 
+        valuesDiffer(rotX.value, degX) || 
+        (rotY && valuesDiffer(rotY.value, degY)) || 
+        (rotZ && valuesDiffer(rotZ.value, degZ));
+      
+      if (shouldUpdate) {
+        rotX.value = Number.isFinite(eulerRad[0]) ? degX.toFixed(2) : '0.00';
+        if (rotY) rotY.value = Number.isFinite(eulerRad[1]) ? degY.toFixed(2) : '0.00';
+        if (rotZ) rotZ.value = Number.isFinite(eulerRad[2]) ? degZ.toFixed(2) : '0.00';
+      }
     }
 
     const scaleX = this.root.querySelector('input[data-field="quick-scale-x"]') as HTMLInputElement | null;
-    if (scaleX && document.activeElement !== scaleX) {
-      const scaleY = this.root.querySelector('input[data-field="quick-scale-y"]') as HTMLInputElement | null;
-      const scaleZ = this.root.querySelector('input[data-field="quick-scale-z"]') as HTMLInputElement | null;
+    const scaleY = this.root.querySelector('input[data-field="quick-scale-y"]') as HTMLInputElement | null;
+    const scaleZ = this.root.querySelector('input[data-field="quick-scale-z"]') as HTMLInputElement | null;
+    const isScaleActive = scaleX === document.activeElement || scaleY === document.activeElement || scaleZ === document.activeElement;
+    
+    if (scaleX) {
       const scale = entity.transform.scale;
-      scaleX.value = Number.isFinite(scale[0]) ? scale[0].toFixed(2) : '0.00';
-      if (scaleY) scaleY.value = Number.isFinite(scale[1]) ? scale[1].toFixed(2) : '0.00';
-      if (scaleZ) scaleZ.value = Number.isFinite(scale[2]) ? scale[2].toFixed(2) : '0.00';
+      const shouldUpdate = !isScaleActive || 
+        valuesDiffer(scaleX.value, scale[0]) || 
+        (scaleY && valuesDiffer(scaleY.value, scale[1])) || 
+        (scaleZ && valuesDiffer(scaleZ.value, scale[2]));
+      
+      if (shouldUpdate) {
+        scaleX.value = Number.isFinite(scale[0]) ? scale[0].toFixed(2) : '0.00';
+        if (scaleY) scaleY.value = Number.isFinite(scale[1]) ? scale[1].toFixed(2) : '0.00';
+        if (scaleZ) scaleZ.value = Number.isFinite(scale[2]) ? scale[2].toFixed(2) : '0.00';
+      }
     }
 
     // Update color

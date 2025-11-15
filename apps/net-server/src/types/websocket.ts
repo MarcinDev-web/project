@@ -18,6 +18,8 @@ export type WebSocketMessageType =
   | 'operation'
   | 'snapshot'
   | 'player-update'
+  | 'input' // Input events for gameplay
+  | 'physics-state' // Physics state synchronization
   | 'cursor-update'
   | 'user-joined'
   | 'user-left'
@@ -96,6 +98,41 @@ export interface PlayerUpdateMessage extends WebSocketMessage {
   rotation?: [number, number, number, number]; // quaternion
   velocity?: [number, number, number];
   state?: Record<string, unknown>; // Additional player state
+}
+
+/**
+ * Input message (bidirectional).
+ * Player input events for gameplay replication.
+ */
+export interface InputMessage extends WebSocketMessage {
+  type: 'input';
+  sequence: number; // Sequence number for ordering
+  inputType: 'move' | 'jump' | 'sprint' | 'sprint-end';
+  moveDirection?: [number, number]; // [forward, right] normalized
+  cameraForward?: [number, number, number];
+  cameraRight?: [number, number, number];
+}
+
+/**
+ * Physics state message (bidirectional).
+ * Synchronization of dynamic rigid body states.
+ */
+export interface PhysicsStateMessage extends WebSocketMessage {
+  type: 'physics-state';
+  frameNumber: number; // Frame number for deterministic simulation
+  bodies: RigidBodyState[];
+}
+
+/**
+ * Rigid body state for physics synchronization.
+ */
+export interface RigidBodyState {
+  entityId: string;
+  position: [number, number, number];
+  rotation: [number, number, number, number]; // quaternion
+  velocity?: [number, number, number];
+  angularVelocity?: [number, number, number];
+  timestamp: number;
 }
 
 /**

@@ -575,6 +575,10 @@ export class EditorUI {
       this.disposables.add(modeManagerCleanup);
     }
 
+    // Load current user if authenticated (before mounting QuickMenu)
+    // Await to ensure user is loaded before QuickMenu checks authentication
+    await this.loadCurrentUser();
+
     // Top bar via QuickMenu (Cursor-like, single row, always visible)
     this.quickMenu = new QuickMenu({
       state: this.state,
@@ -705,7 +709,12 @@ export class EditorUI {
         }
         this.registerModal.show();
       },
-      isUserLoggedIn: () => this.currentUser !== null,
+      isUserLoggedIn: () => {
+        // Check both currentUser and token in localStorage for immediate feedback
+        if (this.currentUser !== null) return true;
+        const { token } = auth.getTokens();
+        return token !== null;
+      },
       getUserName: () => this.currentUser?.username || this.currentUser?.email || null,
       getUserCoins: () => this.userCoins,
     });
@@ -955,9 +964,6 @@ export class EditorUI {
 
     // Initialize Collaboration Manager (optional - requires auth token)
     this.initializeCollaborationManager();
-
-    // Load current user if authenticated
-    this.loadCurrentUser();
 
     // Setup authentication synchronization with platform
     this.setupAuthSync();
@@ -2222,6 +2228,17 @@ export class EditorUI {
    */
   private async loadCurrentUser(): Promise<void> {
     try {
+      // Check if token exists first
+      const { token } = auth.getTokens();
+      if (!token) {
+        Logger.info('EditorUI: No token found in localStorage');
+        this.currentUser = null;
+        this.userCoins = 0;
+        this.quickMenu?.updateAuthState();
+        return;
+      }
+
+      Logger.info('EditorUI: Token found, loading user from API...');
       const user = await auth.getCurrentUser();
       if (user) {
         this.currentUser = user;
@@ -2233,19 +2250,19 @@ export class EditorUI {
           this.userCoins = 0;
         }
         this.quickMenu?.updateAuthState();
-        Logger.info(`EditorUI: User authenticated as ${user.email}, coins: ${this.userCoins}`);
+        Logger.info(`EditorUI: User authenticated as ${user.email || user.username}, coins: ${this.userCoins}`);
       } else {
+        Logger.warn('EditorUI: Token exists but getCurrentUser() returned null - token may be invalid');
         this.currentUser = null;
         this.userCoins = 0;
         this.quickMenu?.updateAuthState();
-        Logger.info('EditorUI: No authenticated user found');
       }
     } catch (error) {
       // User not authenticated or token invalid
+      Logger.error('EditorUI: Failed to load current user:', error as Error);
       this.currentUser = null;
       this.userCoins = 0;
       this.quickMenu?.updateAuthState();
-      Logger.warn('EditorUI: Failed to load current user:', error as Error);
     }
   }
 

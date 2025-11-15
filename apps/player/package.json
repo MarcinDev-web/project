@@ -19,6 +19,7 @@
     "@engine/editor-utils": "workspace:*",
     "@engine/script": "workspace:*",
     "@engine/avatar": "workspace:*",
+    "@engine/net": "workspace:*",
     "@webgpu/types": "^0.1.65",
     "gl-matrix": "^3.4.4",
     "react": "^18.3.1",

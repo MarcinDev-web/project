@@ -346,6 +346,29 @@ export class PlayerSync {
       );
       return;
     }
+    
+    // Sanity check: timestamp should not be in the future (allow small drift)
+    const now = Date.now();
+    if (message.timestamp > now + 1000) {
+      this.config.errorHandler.handleError(
+        new SyncError('Timestamp is too far in the future', {
+          code: 'SYNC_INVALID_TIMESTAMP_FUTURE',
+          context: { timestamp: message.timestamp, now },
+        })
+      );
+      return;
+    }
+    
+    // Sanity check: timestamp should not be too old (more than 10 seconds for player updates)
+    if (message.timestamp < now - 10000) {
+      this.config.errorHandler.handleError(
+        new SyncError('Timestamp is too old', {
+          code: 'SYNC_INVALID_TIMESTAMP_OLD',
+          context: { timestamp: message.timestamp, now },
+        })
+      );
+      return;
+    }
 
     // Ignore updates from self (local player updates come from our own sends)
     const localUserId = this.getLocalUserId();
