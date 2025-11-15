@@ -269,7 +269,16 @@ export class EditorModeManager {
       },
       spawnPlayer: this.spawnPlayer.bind(this),
       configureController: this.configureController.bind(this),
-      enableCharacterInput: () => this.characterInput?.enable(),
+      enableCharacterInput: () => {
+        Logger.info('[EditorModeManager] enableCharacterInput called, characterInput:', this.characterInput ? 'exists' : 'null');
+        if (this.characterInput) {
+          Logger.info('[EditorModeManager] Calling characterInput.enable()');
+          this.characterInput.enable();
+          Logger.info('[EditorModeManager] Character input enabled, isEnabled:', this.characterInput.isEnabled());
+        } else {
+          Logger.warn('[EditorModeManager] characterInput is null, cannot enable');
+        }
+      },
       disableOrbitControls: () => this.controls.setEnabled(false),
       freezeHistory: () => this.config.state.disableHistory(),
       hasFpsCamera: () => this.getFPSCamera() !== null,
@@ -721,9 +730,21 @@ export class EditorModeManager {
       this.physicsWorld?.update(fixedDeltaTime);
       // Ground detection must be updated before character controllers
       this.groundDetectionSystem?.update(fixedDeltaTime);
+      
+      // CRITICAL: playerSession.update() must be called BEFORE characterSystem.update()
+      // because playerSession writes to intentBuffer, and characterSystem reads from it
+      if (this.playerSession) {
+        this.playerSession.update(fixedDeltaTime);
+      } else {
+        // Debug: log only first frame to avoid spam
+        if (steps === 0) {
+          Logger.warn('[EditorModeManager] playerSession is null, cannot update');
+        }
+      }
+      
+      // Now apply intents that were written to buffer by playerSession
       this.characterSystem?.update(fixedDeltaTime);
       this.blockBehaviorSystem?.update(fixedDeltaTime);
-      this.playerSession?.update(fixedDeltaTime);
       this.stateMachine.update(fixedDeltaTime);
       this.playAccumulator -= fixedDeltaTime;
       steps += 1;
@@ -806,10 +827,15 @@ export class EditorModeManager {
       fpsCamera.setInvertY(controllerConfig.preferences.invertY);
     }
 
+    Logger.info('[EditorModeManager] configureController called, characterInput:', this.characterInput ? 'exists' : 'null');
     if (this.characterInput) {
+      Logger.info('[EditorModeManager] Setting bindings:', controllerConfig.input);
       this.characterInput.setBindings(controllerConfig.input);
+      Logger.info('[EditorModeManager] Bindings set successfully');
+    } else {
+      Logger.warn('[EditorModeManager] characterInput is null, cannot configure bindings');
     }
-    Logger.debug('Controller configured from manifest');
+    Logger.info('[EditorModeManager] Controller configured from manifest');
   }
 
   /**

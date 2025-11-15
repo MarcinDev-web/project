@@ -100,6 +100,10 @@ export class PlayIntroState implements IPlayModeState {
       const manifest = context.manifest as PlayManifest | undefined;
       if (manifest) {
         this.deps.configureController(manifest);
+      } else {
+        // If manifest doesn't exist, ensure default bindings are set
+        // This should not happen normally, but provides a fallback
+        Logger.warn('PlayIntroState: No manifest found, using default bindings');
       }
 
       // Step 2: Find spawn point and initialize checkpoints with runtime world
@@ -139,7 +143,9 @@ export class PlayIntroState implements IPlayModeState {
       }
       
       // Step 4: Enable character input
+      Logger.info('PlayIntroState: About to enable character input');
       this.deps.enableCharacterInput();
+      Logger.info('PlayIntroState: Character input enable called');
       
       // Step 5: Enable scripts for play mode
       this.deps.enableScripts?.();

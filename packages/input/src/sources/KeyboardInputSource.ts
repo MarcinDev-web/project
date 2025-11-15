@@ -48,11 +48,14 @@ export class KeyboardInputSource implements InputSource {
    * Set input mapping (key bindings)
    */
   setMapping(mapping: Partial<InputMapping>): void {
+    console.log('[KeyboardInputSource] setMapping() called with:', mapping);
     if (mapping.movement) {
       this.mapping.movement = { ...this.mapping.movement, ...mapping.movement };
+      console.log('[KeyboardInputSource] Movement mapping set to:', this.mapping.movement);
     }
     if (mapping.actions) {
       this.mapping.actions = { ...this.mapping.actions, ...mapping.actions };
+      console.log('[KeyboardInputSource] Actions mapping set to:', this.mapping.actions);
     }
   }
 
@@ -91,10 +94,28 @@ export class KeyboardInputSource implements InputSource {
     let x = 0;
     let z = 0;
 
-    if (this.isKeyPressed(this.mapping.movement.forward)) z += 1;
-    if (this.isKeyPressed(this.mapping.movement.backward)) z -= 1;
-    if (this.isKeyPressed(this.mapping.movement.left)) x -= 1;
-    if (this.isKeyPressed(this.mapping.movement.right)) x += 1;
+    const forwardPressed = this.isKeyPressed(this.mapping.movement.forward);
+    const backwardPressed = this.isKeyPressed(this.mapping.movement.backward);
+    const leftPressed = this.isKeyPressed(this.mapping.movement.left);
+    const rightPressed = this.isKeyPressed(this.mapping.movement.right);
+
+    // Debug: log when keys are pressed
+    if (forwardPressed || backwardPressed || leftPressed || rightPressed) {
+      console.log('[KeyboardInputSource] getInput() - movement detected:', {
+        forward: forwardPressed,
+        backward: backwardPressed,
+        left: leftPressed,
+        right: rightPressed,
+        mapping: this.mapping.movement,
+        pressedKeys: Array.from(this.keys.entries()).filter(([_, v]) => v).map(([k]) => k),
+        moveDirection: [x, 0, z]
+      });
+    }
+
+    if (forwardPressed) z += 1;
+    if (backwardPressed) z -= 1;
+    if (leftPressed) x -= 1;
+    if (rightPressed) x += 1;
 
     // Normalize diagonal movement
     const length = Math.sqrt(x * x + z * z);
@@ -124,7 +145,9 @@ export class KeyboardInputSource implements InputSource {
    * Enable input handling
    */
   enable(): void {
+    console.log('[KeyboardInputSource] enable() called, id:', this.id, 'was enabled:', this._enabled);
     this._enabled = true;
+    console.log('[KeyboardInputSource] enable() completed, now enabled:', this._enabled);
   }
 
   /**
@@ -147,8 +170,18 @@ export class KeyboardInputSource implements InputSource {
    * Handle key down event
    */
   private handleKeyDown(event: KeyboardEvent): void {
-    if (!this._enabled) return;
+    if (!this._enabled) {
+      // Debug: log when keys are pressed but input is disabled
+      if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight'].includes(event.code)) {
+        console.log('[KeyboardInputSource] Key pressed but disabled:', event.code, '_enabled:', this._enabled);
+      }
+      return;
+    }
     this.keys.set(event.code, true);
+    // Debug: log movement keys
+    if (['KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(event.code)) {
+      console.log('[KeyboardInputSource] Movement key pressed:', event.code, 'keys state:', Array.from(this.keys.entries()).filter(([_, v]) => v));
+    }
   }
 
   /**

@@ -49,7 +49,15 @@ export class PlayerSession {
   }
 
   update(deltaTime: number): void {
-    this.controller?.update(deltaTime);
+    if (!this.controller) {
+      console.warn('[PlayerSession] update() called but controller is null');
+      return;
+    }
+    // Debug: log occasionally
+    if (Math.random() < 0.01) {
+      console.log('[PlayerSession] update() called, controller:', this.controller.id);
+    }
+    this.controller.update(deltaTime);
   }
 
   getController(): PlayerController | null {

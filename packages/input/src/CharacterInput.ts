@@ -85,6 +85,11 @@ export class CharacterInputHandler {
   getInput(): CharacterInput {
     const input = this.inputManager.getInput();
     
+    // Debug: log input occasionally
+    if (Math.random() < 0.01) {
+      console.log('[CharacterInputHandler] getInput() called, input:', input, '_enabled:', this._enabled);
+    }
+    
     // If no input from manager, return default with camera directions
     if (!input) {
       return {
@@ -108,8 +113,12 @@ export class CharacterInputHandler {
    * Enable input handling
    */
   enable(): void {
+    console.log('[CharacterInputHandler] enable() called, current _enabled:', this._enabled);
     this._enabled = true;
     this.inputManager.enableAll();
+    console.log('[CharacterInputHandler] enable() completed, _enabled:', this._enabled, 'isEnabled():', this.isEnabled());
+    const sources = this.inputManager.getSources();
+    console.log('[CharacterInputHandler] Input sources:', sources.map(s => ({ id: s.id, enabled: s.enabled, connected: s.connected })));
   }
 
   /**

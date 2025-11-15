@@ -43,12 +43,16 @@ export class CharacterControllerSystem {
   private scene: Scene;
   private intentBuffer = new Map<CharacterController, IntentFrame>();
   private readonly blendConfig: AnimationBlendConfig;
+  // Reused array to avoid allocations in hot path (update loop)
+  private readonly controllers: CharacterController[] = [];
 
   constructor(scene: Scene, _physics: PhysicsWorld, options?: {
     blendConfig?: AnimationBlendConfig;
   }) {
     this.scene = scene;
     this.blendConfig = options?.blendConfig ?? new AnimationBlendConfig();
+    // Note: _physics parameter kept for API consistency with other systems
+    // but not used here as ground detection is handled by GroundDetectionSystem
   }
 
   /**
@@ -56,7 +60,8 @@ export class CharacterControllerSystem {
    */
   update(deltaTime: number): void {
     const entities = this.scene.queryEntities(CharacterController);
-    const controllers: CharacterController[] = [];
+    // Reuse array instead of creating new one each frame (performance optimization)
+    this.controllers.length = 0;
 
     for (const entity of entities) {
       const controller = entity.getComponent(CharacterController) as CharacterController;
@@ -74,19 +79,31 @@ export class CharacterControllerSystem {
           cameraForward: bufferedIntent.forward,
           cameraRight: bufferedIntent.right,
         };
+        
+        // Debug: log when applying buffered intent
+        if (bufferedIntent.move[0] !== 0 || bufferedIntent.move[1] !== 0 || bufferedIntent.jump || bufferedIntent.sprint) {
+          console.log('[CharacterControllerSystem] Applying buffered intent to controller:', {
+            moveDirection: input.moveDirection,
+            jump: input.jump,
+            sprint: input.sprint,
+            cameraForward: input.cameraForward,
+            cameraRight: input.cameraRight
+          });
+        }
+        
         controller.setInput(input);
 
         this.intentBuffer.delete(controller);
       }
 
-      controllers.push(controller);
+      this.controllers.push(controller);
     }
 
     // Note: Ground detection should be handled by GroundDetectionSystem.update()
     // which must be called before this system's update() in the game loop
 
     // Update each controller
-    for (const controller of controllers) {
+    for (const controller of this.controllers) {
       // Update character controller
       controller.update(deltaTime);
 
@@ -127,7 +144,7 @@ export class CharacterControllerSystem {
     cameraForward: Vec3,
     cameraRight: Vec3
   ): void {
-    // Create copies of Vec3 arrays
+    // Create copies of Vec3 arrays to avoid reference issues
     const forward: Vec3 = [cameraForward[0], cameraForward[1], cameraForward[2]];
     const right: Vec3 = [cameraRight[0], cameraRight[1], cameraRight[2]];
     
@@ -139,7 +156,6 @@ export class CharacterControllerSystem {
       right: right,
     });
   }
-
 
   /**
    * Set input for a specific character controller

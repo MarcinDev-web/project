@@ -105,8 +105,15 @@ export class FXAAPass {
           let isHorizontal = edgeHorz >= edgeVert;
 
           // Determine gradient
-          let luma1 = isHorizontal ? lumaDown : lumaLeft;
-          let luma2 = isHorizontal ? lumaUp : lumaRight;
+          var luma1: f32;
+          var luma2: f32;
+          if (isHorizontal) {
+            luma1 = lumaDown;
+            luma2 = lumaUp;
+          } else {
+            luma1 = lumaLeft;
+            luma2 = lumaRight;
+          }
           let gradient1 = luma1 - lumaCenter;
           let gradient2 = luma2 - lumaCenter;
           
@@ -114,7 +121,12 @@ export class FXAAPass {
           let gradientScaled = 0.25 * max(abs(gradient1), abs(gradient2));
           
           // Calculate step size
-          let stepLength = isHorizontal ? texelSize.y : texelSize.x;
+          var stepLength: f32;
+          if (isHorizontal) {
+            stepLength = texelSize.y;
+          } else {
+            stepLength = texelSize.x;
+          }
           let lumaLocalAverage = 0.0;
           if (is1Steepest) {
             stepLength = -stepLength;
@@ -124,7 +136,12 @@ export class FXAAPass {
           }
 
           // Calculate UV offset
-          let uvOffset = isHorizontal ? vec2<f32>(0.0, stepLength) : vec2<f32>(stepLength, 0.0);
+          var uvOffset: vec2<f32>;
+          if (isHorizontal) {
+            uvOffset = vec2<f32>(0.0, stepLength);
+          } else {
+            uvOffset = vec2<f32>(stepLength, 0.0);
+          }
           
           // Sample along edge
           let uv1 = input.uv - uvOffset;
@@ -151,8 +168,15 @@ export class FXAAPass {
           }
 
           // Calculate distance
-          let distance1 = isHorizontal ? (input.uv.x - uv1.x) : (input.uv.y - uv1.y);
-          let distance2 = isHorizontal ? (uv2.x - input.uv.x) : (uv2.y - input.uv.y);
+          var distance1: f32;
+          var distance2: f32;
+          if (isHorizontal) {
+            distance1 = input.uv.x - uv1.x;
+            distance2 = uv2.x - input.uv.x;
+          } else {
+            distance1 = input.uv.y - uv1.y;
+            distance2 = uv2.y - input.uv.y;
+          }
           
           let distance = min(distance1, distance2);
           let edgeSpan = distance1 + distance2;

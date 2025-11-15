@@ -124,6 +124,7 @@ export class LocalPlayerController implements PlayerController {
 
   update(_deltaTime: number): void {
     if (!this.context.pawn || !this.pawnController) {
+      console.log('[LocalPlayerController] update() skipped - no pawn or controller');
       return;
     }
 
@@ -133,6 +134,15 @@ export class LocalPlayerController implements PlayerController {
     }
 
     const input = this.inputHandler.getInput();
+    
+    // Debug: log input occasionally
+    if (Math.random() < 0.01 && input && (input.moveDirection[0] !== 0 || input.moveDirection[2] !== 0 || input.jump || input.sprint)) {
+      console.log('[LocalPlayerController] update() - input received:', {
+        moveDirection: input.moveDirection,
+        jump: input.jump,
+        sprint: input.sprint
+      });
+    }
 
     // Update intent state
     const intent = this.context.intent;
@@ -179,6 +189,16 @@ export class LocalPlayerController implements PlayerController {
       // Use system applyIntent for multiplayer replication
       // System expects CharacterController specifically for camera-relative movement
       if (this.pawnController instanceof CharacterController) {
+        // Debug: log when applying intent
+        if (intent.move[0] !== 0 || intent.move[1] !== 0 || intent.jump || intent.sprint) {
+          console.log('[LocalPlayerController] Applying intent via characterSystem:', {
+            move: [intent.move[0], intent.move[1]],
+            jump: intent.jump,
+            sprint: intent.sprint,
+            forward: forwardVec,
+            right: rightVec
+          });
+        }
         this.characterSystem.applyIntent(
           this.pawnController,
           {
@@ -189,10 +209,13 @@ export class LocalPlayerController implements PlayerController {
           forwardVec,
           rightVec
         );
+      } else {
+        console.warn('[LocalPlayerController] pawnController is not CharacterController instance');
       }
     } else {
       // Direct input - can use MovementInput or CharacterInput
       // CharacterInput needed for camera-relative movement in multiplayer
+      console.log('[LocalPlayerController] No characterSystem, using direct setInput');
       this.pawnController.setInput(characterInput);
     }
   }

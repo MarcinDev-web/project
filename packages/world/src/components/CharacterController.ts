@@ -253,17 +253,39 @@ export class CharacterController extends Component implements MovementController
    * Set movement input using CharacterInput (original interface)
    */
   private setCharacterInput(input: CharacterInput): void {
+    // Debug: log when input is set
+    if (input.moveDirection[0] !== 0 || input.moveDirection[2] !== 0 || input.jump || input.sprint) {
+      console.log('[CharacterController] setCharacterInput() called:', {
+        moveDirection: input.moveDirection,
+        cameraForward: input.cameraForward,
+        cameraRight: input.cameraRight,
+        jump: input.jump,
+        sprint: input.sprint
+      });
+    }
+    
     // Store movement direction
     this.normalizeInto(this.moveInput, input.moveDirection);
 
     // Apply camera-relative movement if camera directions provided
     if (input.cameraForward && input.cameraRight) {
+      const beforeCameraRelative = [this.moveInput[0], this.moveInput[1], this.moveInput[2]] as Vec3;
       this.getCameraRelativeDirectionOut(
         this.moveInput,
         input.moveDirection,
         input.cameraForward,
         input.cameraRight
       );
+      
+      // Debug: log camera-relative transformation
+      if (input.moveDirection[0] !== 0 || input.moveDirection[2] !== 0) {
+        console.log('[CharacterController] Camera-relative movement:', {
+          before: beforeCameraRelative,
+          after: [this.moveInput[0], this.moveInput[1], this.moveInput[2]],
+          cameraForward: input.cameraForward,
+          cameraRight: input.cameraRight
+        });
+      }
     }
 
     this.isSprinting = input.sprint;
@@ -383,6 +405,20 @@ export class CharacterController extends Component implements MovementController
    */
   private applyMovement(deltaTime: number): void {
     if (!this.physics) return;
+
+    // Debug: log movement application occasionally
+    if (Math.random() < 0.01 && (this.moveInput[0] !== 0 || this.moveInput[2] !== 0)) {
+      console.log('[CharacterController] applyMovement() called:', {
+        moveInput: [this.moveInput[0], this.moveInput[1], this.moveInput[2]],
+        isGrounded: this.isGrounded,
+        velocity: [this.velocity[0], this.velocity[1], this.velocity[2]],
+        config: {
+          moveSpeed: this.config.moveSpeed,
+          sprintMultiplier: this.config.sprintMultiplier,
+          airControlMultiplier: this.config.airControlMultiplier
+        }
+      });
+    }
 
     // Calculate target speed
     const baseSpeed = this.config.moveSpeed;
