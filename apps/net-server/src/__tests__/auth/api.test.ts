@@ -1,10 +1,11 @@
 // Note: Fastify inject is built-in, no need to import light-my-request
 import { describe, it, expect, beforeAll } from 'vitest';
 import { app, authManager } from '../../server.js';
+import { generateTestUsername } from '../helpers/testHelpers.js';
 
 describe('Auth API', () => {
   const email = `auth_test_${Date.now()}@example.com`;
-  const username = `authtest_${Date.now()}`;
+  const username = generateTestUsername('authtest');
   const password = 'StrongPass1';
 
   beforeAll(async () => {
@@ -99,7 +100,7 @@ describe('Auth API', () => {
   it('enforces admin-only access and respects role changes', async () => {
     // Register a fresh user
     const email2 = `auth_admin_${Date.now()}@example.com`;
-    const username2 = `authadmin_${Date.now()}`;
+    const username2 = generateTestUsername('authadmin');
     const password2 = 'StrongPass2';
     const reg = await app.inject({
       method: 'POST',
@@ -138,7 +139,11 @@ describe('Auth API', () => {
     const weakRes = await app.inject({
       method: 'POST',
       url: '/api/auth/register',
-      payload: { email: `weak_${Date.now()}@example.com`, username: `weakuser_${Date.now()}`, password: 'weakpass' },
+      payload: {
+        email: `weak_${Date.now()}@example.com`,
+        username: generateTestUsername('weakuser'),
+        password: 'weakpass',
+      },
     });
     expect(weakRes.statusCode).toBe(400);
   });

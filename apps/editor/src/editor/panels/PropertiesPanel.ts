@@ -21,14 +21,11 @@ import { rgbaToHex, type RgbaColor } from '../../utils/colors';
 import type { EditorState, InspectorLayoutPreferences } from '../core/state';
 import { DEFAULT_INSPECTOR_SECTION_ORDER } from '../core/state';
 import { createIcon } from '../utils/icons';
-import type { IconName } from '../utils/icons';
 import { CameraComponent } from '@engine/world/components/CameraComponent';
 import { EnvironmentComponent } from '@engine/world/components/EnvironmentComponent';
 import { createVectorInput } from '../ui/VectorInput';
 import { createColorPicker } from '../ui/ColorPicker';
 import { ScriptComponent, type ScriptComponentState, type ScriptDefinition } from '@engine/script';
-import { CoordinateManager } from '../utils/CoordinateManager';
-import { QuaternionHelper } from '../utils/QuaternionHelper';
 import { BehaviorRegistry } from '@engine/script';
 import { AnimationComponent } from '@engine/stdlib/Animation';
 import { createAnimationSection } from '../ui/animation/AnimationSection';
@@ -40,8 +37,6 @@ import { MovementProfileRegistry, PRESET_PROFILES, type MovementProfileExtension
 import { showCustomProfileEditor } from '../ui/CustomProfileEditor';
 import { getAllNpcUnitTypes, getAllNpcBehaviors, getAllNpcFactions } from '@engine/editor-utils';
 
-const MIN_SCALE = 0.001;
-
 interface PropertiesPanelConfig {
   selection: SelectionManager;
   onTransformChanged: (entity: Entity) => void;
@@ -52,28 +47,6 @@ interface PropertiesPanelConfig {
   getRenderer?: () => { updateRenderSettings?: (settings: any) => void; getRenderSettings?: () => any } | null;
 }
 
-
-
-interface SectionMeta {
-  id: string;
-  label: string;
-  icon: IconName;
-}
-
-const SECTION_METADATA: SectionMeta[] = [
-  { id: 'transform', label: 'Transform', icon: 'move' },
-  { id: 'appearance', label: 'Appearance', icon: 'palette' },
-  { id: 'material', label: 'Material', icon: 'palette' },
-  { id: 'camera', label: 'Camera', icon: 'camera' },
-  { id: 'environment', label: 'Environment', icon: 'sun' },
-  { id: 'animation', label: 'Animation', icon: 'play' },
-  { id: 'character-controller', label: 'Character Controller', icon: 'user' },
-  { id: 'npc', label: 'NPC', icon: 'user' },
-  { id: 'ui', label: 'UI', icon: 'layers' },
-  { id: 'scripts', label: 'Scripts', icon: 'list' },
-  { id: 'spawn-point', label: 'Spawn Point', icon: 'map-pin' },
-  { id: 'checkpoint', label: 'Checkpoint', icon: 'flag' },
-];
 
 export class PropertiesPanel {
   private readonly root: HTMLElement;
@@ -90,14 +63,15 @@ export class PropertiesPanel {
   private sectionElements = new Map<string, HTMLElement>();
   private currentSectionOrder: string[] = [];
   private scrollRaf: number | null = null;
+  private undoStack: Array<() => void> = [];
+  private maxUndoStackSize = 50;
+  private announceElement: HTMLElement | null = null;
   private handleRootKeyDown = (e: KeyboardEvent) => {
     if ((e.ctrlKey || e.metaKey) && (e.key === 'z' || e.key === 'Z')) {
       e.preventDefault();
       this.performUndo();
     }
   };
-  private availableSections: string[] = [];
-  private sectionsWrapper: HTMLElement | null = null;
 
   constructor(private readonly config: PropertiesPanelConfig) {
     this.root = document.createElement('section');
@@ -140,6 +114,18 @@ export class PropertiesPanel {
     this.root.appendChild(this.content);
 
     this.root.addEventListener('keydown', this.handleRootKeyDown);
+    
+    // Create aria-live region for announcements
+    this.announceElement = document.createElement('div');
+    this.announceElement.setAttribute('role', 'status');
+    this.announceElement.setAttribute('aria-live', 'polite');
+    this.announceElement.setAttribute('aria-atomic', 'true');
+    this.announceElement.style.position = 'absolute';
+    this.announceElement.style.left = '-10000px';
+    this.announceElement.style.width = '1px';
+    this.announceElement.style.height = '1px';
+    this.announceElement.style.overflow = 'hidden';
+    document.body.appendChild(this.announceElement);
   }
 
   public mount(parent: HTMLElement): void {
@@ -207,7 +193,6 @@ export class PropertiesPanel {
     // Create sections wrapper
     const sectionsWrapper = document.createElement('div');
     sectionsWrapper.className = 'inspector-sections';
-    this.sectionsWrapper = sectionsWrapper;
     this.content.appendChild(sectionsWrapper);
 
     // Entity card (simplified, less prominent)
@@ -238,10 +223,16 @@ export class PropertiesPanel {
       this.scrollRaf = null;
     }
     this.content.removeEventListener('scroll', this.handleScroll);
+    this.root.removeEventListener('keydown', this.handleRootKeyDown);
     for (const timeoutId of this.activeTimeouts) {
       window.clearTimeout(timeoutId);
     }
     this.activeTimeouts.clear();
+    this.undoStack = [];
+    if (this.announceElement && this.announceElement.parentNode) {
+      this.announceElement.parentNode.removeChild(this.announceElement);
+      this.announceElement = null;
+    }
     this.sectionElements.clear();
     this.content.innerHTML = '';
     this.root.remove();
@@ -281,30 +272,58 @@ export class PropertiesPanel {
     }, { signal: this.refreshAbort!.signal });
   }
 
-  private restoreFocus(): void {}
-
-  private announce(_message: string): void {}
-
-  private registerUndo(_action: () => void): void {}
-
-  private performUndo(): void {}
-
-  private getSnapConfig(): {
-    enabled: boolean;
-    increment: number;
-    axes: { x: boolean; y: boolean; z: boolean };
-    rotationIncrement: number;
-    scaleIncrement: number;
-    minScale: number;
-  } | null {
-    const cfg = this.config.state?.snapConfig.value;
-    if (!cfg || !cfg.enabled) return null;
-    return cfg;
+  private restoreFocus(): void {
+    // Restore focus to previously focused element if needed
+    // This is a placeholder for future focus management
   }
 
-  private roundToIncrement(value: number, increment: number): number {
-    if (!Number.isFinite(value) || !Number.isFinite(increment) || increment <= 0) return value;
-    return Math.round(value / increment) * increment;
+  private announce(message: string): void {
+    if (this.announceElement) {
+      this.announceElement.textContent = message;
+      // Clear after announcement is read (screen readers typically read within 1-2 seconds)
+      setTimeout(() => {
+        if (this.announceElement) {
+          this.announceElement.textContent = '';
+        }
+      }, 2000);
+    }
+    // Also log for debugging
+    console.log('[PropertiesPanel]', message);
+  }
+
+  private registerUndo(action: () => void): void {
+    if (!action) return;
+    
+    // Add to local undo stack
+    this.undoStack.push(action);
+    
+    // Limit stack size
+    if (this.undoStack.length > this.maxUndoStackSize) {
+      this.undoStack.shift();
+    }
+    
+    // If we have EditorState with history, also create a scene snapshot for major changes
+    // Note: For simple property tweaks, we use local undo stack to avoid expensive snapshots
+    // Major changes (like component add/remove) should create snapshots via EditorState
+  }
+
+  private performUndo(): void {
+    if (this.undoStack.length === 0) {
+      this.announce('Nothing to undo');
+      return;
+    }
+    
+    const undoAction = this.undoStack.pop();
+    if (undoAction) {
+      try {
+        undoAction();
+        this.announce('Undo performed');
+        this.refresh();
+      } catch (error) {
+        console.error('[PropertiesPanel] Undo failed:', error);
+        this.announce('Undo failed');
+      }
+    }
   }
 
   private tryUpdateExistingValues(entity: Entity): boolean {
@@ -550,479 +569,7 @@ export class PropertiesPanel {
     return section;
   }
 
-  /**
-   * Creates transform properties content (no wrapper).
-   */
-  private createTransformProperties(entity: Entity): HTMLElement {
-    const container = document.createElement('div');
-    container.className = 'property-content';
 
-    // Position with reset button
-    container.appendChild(
-      createVectorInput({
-        label: 'Position',
-        values: entity.transform.position,
-        onCommit: (next) => {
-          const prev = [...entity.transform.position] as Vec3;
-          const snap = this.getSnapConfig();
-          if (snap) {
-            const [x, y, z] = next;
-            const xi = snap.axes.x ? this.roundToIncrement(x, snap.increment) : x;
-            const yi = snap.axes.y ? this.roundToIncrement(y, snap.increment) : y;
-            const zi = snap.axes.z ? this.roundToIncrement(z, snap.increment) : z;
-            entity.transform.position = [xi, yi, zi];
-          } else {
-            entity.transform.position = next;
-          }
-          this.config.onTransformChanged(entity);
-          this.registerUndo(() => {
-            entity.transform.position = prev;
-            this.config.onTransformChanged(entity);
-          });
-          this.announce('Position updated');
-        },
-        onReset: () => {
-          const prev = [...entity.transform.position] as Vec3;
-          entity.transform.position = [0, 0, 0];
-          this.config.onTransformChanged(entity);
-          this.refresh();
-          this.registerUndo(() => {
-            entity.transform.position = prev;
-            this.config.onTransformChanged(entity);
-          });
-          this.announce('Position reset');
-        },
-        group: 'position',
-        abortSignal: this.refreshAbort!.signal,
-        debounceMs: 120,
-        setManagedTimeout: (fn, ms) => this.setManagedTimeout(fn, ms),
-      })
-    );
-
-    // Rotation (degrees, XYZ order) with snap
-    container.appendChild(
-      createVectorInput({
-        label: 'Rotation (°)',
-        values: (() => {
-          const eulerRad = quatToEuler(entity.transform.rotation);
-          const toDeg = (r: number) => (r * 180) / Math.PI;
-          return [toDeg(eulerRad[0]), toDeg(eulerRad[1]), toDeg(eulerRad[2])] as Vec3;
-        })(),
-        onCommit: (nextDeg) => {
-          const snap = this.getSnapConfig();
-          const toRad = (d: number) => (d * Math.PI) / 180;
-          const prevEulerRad = quatToEuler(entity.transform.rotation);
-          let [dx, dy, dz] = nextDeg;
-          if (snap) {
-            const incDeg = (snap.rotationIncrement * 180) / Math.PI;
-            dx = this.roundToIncrement(dx, incDeg);
-            dy = this.roundToIncrement(dy, incDeg);
-            dz = this.roundToIncrement(dz, incDeg);
-          }
-          entity.transform.setEulerAngles(toRad(dx), toRad(dy), toRad(dz));
-          this.config.onTransformChanged(entity);
-          this.registerUndo(() => {
-            entity.transform.setEulerAngles(prevEulerRad[0], prevEulerRad[1], prevEulerRad[2]);
-            this.config.onTransformChanged(entity);
-          });
-          this.announce('Rotation updated');
-        },
-        onReset: () => {
-          const prevEulerRad = quatToEuler(entity.transform.rotation);
-          entity.transform.setEulerAngles(0, 0, 0);
-          this.config.onTransformChanged(entity);
-          this.refresh();
-          this.registerUndo(() => {
-            entity.transform.setEulerAngles(prevEulerRad[0], prevEulerRad[1], prevEulerRad[2]);
-            this.config.onTransformChanged(entity);
-          });
-          this.announce('Rotation reset');
-        },
-        group: 'rotation',
-        abortSignal: this.refreshAbort!.signal,
-        debounceMs: 120,
-        setManagedTimeout: (fn, ms) => this.setManagedTimeout(fn, ms),
-      })
-    );
-
-    // Scale with reset button
-    container.appendChild(
-      createVectorInput({
-        label: 'Scale',
-        values: entity.transform.scale,
-        onCommit: (next) => {
-          const prev = [...entity.transform.scale] as Vec3;
-          const snap = this.getSnapConfig();
-          const min = snap?.minScale ?? MIN_SCALE;
-          let [sx, sy, sz] = next;
-          if (snap) {
-            sx = this.roundToIncrement(sx, snap.scaleIncrement);
-            sy = this.roundToIncrement(sy, snap.scaleIncrement);
-            sz = this.roundToIncrement(sz, snap.scaleIncrement);
-          }
-          entity.transform.scale = [
-            Math.max(min, sx),
-            Math.max(min, sy),
-            Math.max(min, sz),
-          ] as Vec3;
-          this.config.onTransformChanged(entity);
-          this.registerUndo(() => {
-            entity.transform.scale = prev;
-            this.config.onTransformChanged(entity);
-          });
-          this.announce('Scale updated');
-        },
-        onReset: () => {
-          const prev = [...entity.transform.scale] as Vec3;
-          entity.transform.scale = [1, 1, 1];
-          this.config.onTransformChanged(entity);
-          this.refresh();
-          this.registerUndo(() => {
-            entity.transform.scale = prev;
-            this.config.onTransformChanged(entity);
-          });
-          this.announce('Scale reset');
-        },
-        group: 'scale',
-        abortSignal: this.refreshAbort!.signal,
-        debounceMs: 120,
-        setManagedTimeout: (fn, ms) => this.setManagedTimeout(fn, ms),
-      })
-    );
-
-    // Precision controls
-    container.appendChild(this.createPrecisionControls(entity));
-
-    return container;
-  }
-
-  /**
-   * Creates precision control buttons
-   */
-  private createPrecisionControls(entity: Entity): HTMLElement {
-    const controls = document.createElement('div');
-    controls.className = 'precision-controls';
-
-    // Position controls
-    const posControls = document.createElement('div');
-    posControls.className = 'precision-group';
-
-    const posLabel = document.createElement('div');
-    posLabel.className = 'precision-label';
-    posLabel.textContent = 'Position';
-    posControls.appendChild(posLabel);
-
-    const posButtons = document.createElement('div');
-    posButtons.className = 'precision-buttons';
-
-    // Copy position
-    const copyPosBtn = document.createElement('button');
-    copyPosBtn.type = 'button';
-    copyPosBtn.className = 'precision-btn';
-    copyPosBtn.title = 'Copy Position';
-    copyPosBtn.appendChild(createIcon('copy', 12));
-    copyPosBtn.addEventListener('click', async () => {
-      const success = await CoordinateManager.copyToClipboard(entity.transform.position);
-      if (success) {
-        this.showTempStatus(copyPosBtn, 'Copied!');
-        this.announce('Position copied to clipboard');
-      }
-    }, { signal: this.refreshAbort!.signal });
-    posButtons.appendChild(copyPosBtn);
-
-    // Paste position
-    const pastePosBtn = document.createElement('button');
-    pastePosBtn.type = 'button';
-    pastePosBtn.className = 'precision-btn';
-    pastePosBtn.title = 'Paste Position';
-    pastePosBtn.appendChild(createIcon('paste', 12));
-    pastePosBtn.addEventListener('click', async () => {
-      const coords = await CoordinateManager.pasteFromClipboard();
-      if (coords) {
-        const prev = [...entity.transform.position] as Vec3;
-        entity.transform.position = coords;
-        this.config.onTransformChanged(entity);
-        this.refresh();
-        this.registerUndo(() => {
-          entity.transform.position = prev;
-          this.config.onTransformChanged(entity);
-        });
-        this.announce('Position pasted');
-      }
-    }, { signal: this.refreshAbort!.signal });
-    posButtons.appendChild(pastePosBtn);
-
-    // Snap to grid
-    const snapGridBtn = document.createElement('button');
-    snapGridBtn.type = 'button';
-    snapGridBtn.className = 'precision-btn';
-    snapGridBtn.title = 'Snap to Grid';
-    snapGridBtn.appendChild(createIcon('grid', 12));
-    snapGridBtn.addEventListener('click', () => {
-      const snap = this.getSnapConfig();
-      const gridSize = snap?.increment ?? 0.5;
-      const prev = [...entity.transform.position] as Vec3;
-      entity.transform.position = CoordinateManager.snapVectorToGrid(
-        entity.transform.position,
-        gridSize
-      );
-      this.config.onTransformChanged(entity);
-      this.refresh();
-      this.registerUndo(() => {
-        entity.transform.position = prev;
-        this.config.onTransformChanged(entity);
-      });
-      this.announce('Snapped to grid');
-    }, { signal: this.refreshAbort!.signal });
-    posButtons.appendChild(snapGridBtn);
-
-    // Reset to origin
-    const resetPosBtn = document.createElement('button');
-    resetPosBtn.type = 'button';
-    resetPosBtn.className = 'precision-btn';
-    resetPosBtn.title = 'Reset to Origin';
-    resetPosBtn.appendChild(createIcon('circle', 12));
-    resetPosBtn.addEventListener('click', () => {
-      const prev = [...entity.transform.position] as Vec3;
-      entity.transform.position = [0, 0, 0];
-      this.config.onTransformChanged(entity);
-      this.refresh();
-      this.registerUndo(() => {
-        entity.transform.position = prev;
-        this.config.onTransformChanged(entity);
-      });
-      this.announce('Position reset to origin');
-    }, { signal: this.refreshAbort!.signal });
-    posButtons.appendChild(resetPosBtn);
-
-    posControls.appendChild(posButtons);
-    controls.appendChild(posControls);
-
-    // Rotation controls
-    const rotControls = document.createElement('div');
-    rotControls.className = 'precision-group';
-
-    const rotLabel = document.createElement('div');
-    rotLabel.className = 'precision-label';
-    rotLabel.textContent = 'Rotation';
-    rotControls.appendChild(rotLabel);
-
-    const rotButtons = document.createElement('div');
-    rotButtons.className = 'precision-buttons';
-
-    // Copy rotation
-    const copyRotBtn = document.createElement('button');
-    copyRotBtn.type = 'button';
-    copyRotBtn.className = 'precision-btn';
-    copyRotBtn.title = 'Copy Rotation';
-    copyRotBtn.appendChild(createIcon('copy', 12));
-    copyRotBtn.addEventListener('click', async () => {
-      const success = await QuaternionHelper.copyToClipboard(entity.transform.rotation);
-      if (success) {
-        this.showTempStatus(copyRotBtn, 'Copied!');
-        this.announce('Rotation copied to clipboard');
-      }
-    }, { signal: this.refreshAbort!.signal });
-    rotButtons.appendChild(copyRotBtn);
-
-    // Paste rotation
-    const pasteRotBtn = document.createElement('button');
-    pasteRotBtn.type = 'button';
-    pasteRotBtn.className = 'precision-btn';
-    pasteRotBtn.title = 'Paste Rotation';
-    pasteRotBtn.appendChild(createIcon('paste', 12));
-    pasteRotBtn.addEventListener('click', async () => {
-      const rotation = await QuaternionHelper.pasteFromClipboard();
-      if (rotation) {
-        entity.transform.rotation = rotation;
-        this.config.onTransformChanged(entity);
-        this.refresh();
-      }
-    }, { signal: this.refreshAbort!.signal });
-    rotButtons.appendChild(pasteRotBtn);
-
-    // Quick rotate buttons
-    const quickRotate = (axis: 'x' | 'y' | 'z', degrees: number) => {
-      const helper = QuaternionHelper;
-      let newRot;
-      switch (axis) {
-        case 'x': newRot = helper.rotateX(entity.transform.rotation, degrees); break;
-        case 'y': newRot = helper.rotateY(entity.transform.rotation, degrees); break;
-        case 'z': newRot = helper.rotateZ(entity.transform.rotation, degrees); break;
-      }
-      entity.transform.rotation = newRot;
-      this.config.onTransformChanged(entity);
-      this.refresh();
-    };
-
-    // Quick rotation presets - 45° increments
-    const rotPresets = [
-      { deg: 45, label: '45°' },
-      { deg: 90, label: '90°' },
-      { deg: 180, label: '180°' },
-    ];
-
-    rotPresets.forEach(preset => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'precision-btn';
-      btn.title = `Rotate Y ${preset.label}`;
-      btn.textContent = preset.label;
-      btn.addEventListener('click', () => quickRotate('y', preset.deg), { signal: this.refreshAbort!.signal });
-      rotButtons.appendChild(btn);
-    });
-
-    // Reset rotation
-    const resetRotBtn = document.createElement('button');
-    resetRotBtn.type = 'button';
-    resetRotBtn.className = 'precision-btn';
-    resetRotBtn.title = 'Reset Rotation';
-    resetRotBtn.appendChild(createIcon('rotate', 12));
-    resetRotBtn.addEventListener('click', () => {
-      const prevEuler = quatToEuler(entity.transform.rotation);
-      entity.transform.rotation = QuaternionHelper.identity();
-      this.config.onTransformChanged(entity);
-      this.refresh();
-      this.registerUndo(() => {
-        entity.transform.setEulerAngles(prevEuler[0], prevEuler[1], prevEuler[2]);
-        this.config.onTransformChanged(entity);
-      });
-      this.announce('Rotation reset');
-    }, { signal: this.refreshAbort!.signal });
-    rotButtons.appendChild(resetRotBtn);
-
-    rotControls.appendChild(rotButtons);
-    controls.appendChild(rotControls);
-
-    // Scale controls with presets
-    const scaleControls = document.createElement('div');
-    scaleControls.className = 'precision-group';
-
-    const scaleLabel = document.createElement('div');
-    scaleLabel.className = 'precision-label';
-    scaleLabel.textContent = 'Scale';
-    scaleControls.appendChild(scaleLabel);
-
-    const scaleButtons = document.createElement('div');
-    scaleButtons.className = 'precision-buttons';
-
-    // Scale presets
-    const scalePresets = [
-      { value: 0.5, label: '0.5×' },
-      { value: 1.0, label: '1×' },
-      { value: 2.0, label: '2×' },
-      { value: 5.0, label: '5×' },
-    ];
-
-    scalePresets.forEach(preset => {
-      const btn = document.createElement('button');
-      btn.type = 'button';
-      btn.className = 'precision-btn';
-      btn.title = `Set scale to ${preset.label}`;
-      btn.textContent = preset.label;
-      btn.addEventListener('click', () => {
-        const prev = [...entity.transform.scale] as Vec3;
-        entity.transform.scale = [preset.value, preset.value, preset.value];
-        this.config.onTransformChanged(entity);
-        this.refresh();
-        this.registerUndo(() => {
-          entity.transform.scale = prev;
-          this.config.onTransformChanged(entity);
-        });
-        this.announce(`Scale set to ${preset.label}`);
-      }, { signal: this.refreshAbort!.signal });
-      scaleButtons.appendChild(btn);
-    });
-
-    scaleControls.appendChild(scaleButtons);
-    controls.appendChild(scaleControls);
-
-    return controls;
-  }
-
-  /**
-   * Shows temporary status on button
-   */
-  private showTempStatus(button: HTMLButtonElement, message: string): void {
-    const originalHTML = button.innerHTML;
-    button.innerHTML = message;
-    button.disabled = true;
-    button.setAttribute('aria-disabled', 'true');
-    this.announce(message);
-    setTimeout(() => {
-      button.innerHTML = originalHTML;
-      button.disabled = false;
-      button.setAttribute('aria-disabled', 'false');
-    }, 800);
-  }
-
-  /**
-   * Creates appearance properties content (no wrapper).
-   */
-  private createAppearanceProperties(entity: Entity): HTMLElement {
-    const container = document.createElement('div');
-    container.className = 'property-content';
-
-    // Check if entity has textured material (can't change color for textured blocks)
-    const materialComp = entity.getComponent(MaterialComponent);
-    const hasTexture = this.entityHasTexture(entity, materialComp);
-
-    if (hasTexture) {
-      // Show info message that color can't be changed for textured blocks
-      const info = document.createElement('div');
-      info.className = 'property-info-message';
-      info.innerHTML = `
-        <svg width="16" height="16" viewBox="0 0 16 16" fill="currentColor">
-          <path d="M8 1a7 7 0 100 14A7 7 0 008 1zm0 3a1 1 0 011 1v4a1 1 0 01-2 0V5a1 1 0 011-1zm0 8a1 1 0 110-2 1 1 0 010 2z"/>
-        </svg>
-        <span>This block uses a texture. Color can only be changed for solid color blocks (plastic blocks).</span>
-      `;
-      container.appendChild(info);
-    } else {
-      // Color property with modern picker (only for solid color blocks)
-      container.appendChild(
-        createColorPicker({
-          value: entity.color,
-          onChange: (next) => this.config.onColorChanged(entity, next),
-          abortSignal: this.refreshAbort!.signal,
-          setManagedTimeout: (fn, ms) => this.setManagedTimeout(fn, ms),
-          dataFieldPrefix: 'appearance-base-color',
-        })
-      );
-    }
-
-    return container;
-  }
-
-  /**
-   * Determines if entity has a texture (vs solid color).
-   * Textured materials: stone, wood, metal, grass, dirt, brick, glass, gold, sand, concrete, ice
-   * Solid color materials: plastic blocks (materialId 10-13), custom entities with materialId 0
-   */
-  private entityHasTexture(entity: Entity, materialComp: MaterialComponent | null): boolean {
-    if (!materialComp) {
-      // No material component = custom entity with solid color
-      return false;
-    }
-
-    const matId = materialComp.materialId;
-    
-    // Plastic blocks (10-13) are solid color and can be tinted
-    if (matId >= 10 && matId <= 13) {
-      return false;
-    }
-
-    // materialId 0 = default/custom entity without specific texture
-    // Allow color change unless it has blockId/asset indicating it uses texture atlas
-    if (matId === 0) {
-      const hasBlockId = entity.userData.blockId || entity.userData.asset;
-      return !!hasBlockId;
-    }
-
-    // All other materialIds (1-9, 14-15) are textured materials
-    // 1=stone, 2=wood, 3=metal, 4=grass, 5=dirt, 6=brick, 7=glass, 8=gold, 9=sand, 14=concrete, 15=ice
-    return true;
-  }
 
   /**
    * Creates camera preview
@@ -2641,7 +2188,6 @@ export class PropertiesPanel {
 
   private buildSections(entity: Entity): Array<{ id: string; element: HTMLElement }> {
     const built: Array<{ id: string; element: HTMLElement }> = [];
-    const renderedIds: string[] = [];
     // Filter out transform and appearance - they're in QuickAccessBar now
     const filteredOrder = this.currentSectionOrder.filter(
       id => id !== 'transform' && id !== 'appearance'
@@ -2650,28 +2196,9 @@ export class PropertiesPanel {
       const element = this.createSectionForId(sectionId, entity);
       if (element) {
         built.push({ id: sectionId, element });
-        renderedIds.push(sectionId);
       }
     }
-    this.availableSections = renderedIds;
     return built;
-  }
-
-  private focusSection(sectionId: string): void {
-    const section = this.sectionElements.get(sectionId);
-    if (!section) return;
-    
-    // Scroll to section
-    section.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    
-    // Expand if collapsed
-    const content = section.querySelector('.property-section-content');
-    if (content && content.classList.contains('collapsed')) {
-      const header = section.querySelector('.property-section-header') as HTMLButtonElement;
-      if (header) {
-        header.click();
-      }
-    }
   }
 
   private createSectionForId(id: string, entity: Entity): HTMLElement | null {
@@ -3487,7 +3014,7 @@ export class PropertiesPanel {
    * Creates SpawnPoint component properties UI
    */
   private createSpawnPointProperties(
-    entity: Entity,
+    _entity: Entity,
     component: SpawnPointComponent
   ): HTMLElement {
     const container = document.createElement('div');
@@ -3595,7 +3122,7 @@ export class PropertiesPanel {
    * Creates Checkpoint component properties UI
    */
   private createCheckpointProperties(
-    entity: Entity,
+    _entity: Entity,
     component: CheckpointComponent
   ): HTMLElement {
     const container = document.createElement('div');

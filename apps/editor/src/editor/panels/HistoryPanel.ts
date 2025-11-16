@@ -8,7 +8,7 @@
  */
 
 import { createIcon } from '../utils/icons';
-import type { HistoryManager, SceneSnapshot } from '@engine/editor-utils';
+import type { HistoryManager  } from '@engine/editor-utils';
 
 export interface HistoryPanelConfig {
   history?: HistoryManager;

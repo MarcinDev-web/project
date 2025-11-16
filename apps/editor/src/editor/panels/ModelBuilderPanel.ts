@@ -165,17 +165,8 @@ export class ModelBuilderPanel {
       });
     }
 
-    // Operation buttons (placeholder - would need region selection)
-    const fillBtn = panel.querySelector('#fill-btn');
-    const clearBtn = panel.querySelector('#clear-btn');
-    const mirrorXBtn = panel.querySelector('#mirror-x-btn');
-    const mirrorYBtn = panel.querySelector('#mirror-y-btn');
-    const mirrorZBtn = panel.querySelector('#mirror-z-btn');
-
-    // Export buttons (placeholder)
-    const exportBtn = panel.querySelector('#export-btn');
-    const importBtn = panel.querySelector('#import-btn');
-    const saveBlockBtn = panel.querySelector('#save-block-btn');
+    // Region operations and export buttons intentionally left without handlers
+    // until the corresponding builder APIs are implemented.
   }
 
   /**

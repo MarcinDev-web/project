@@ -5,6 +5,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { CameraDirector } from '../src/CameraDirector';
 import { OrbitCamera } from '../src/OrbitCamera';
 import { FPSCamera } from '../src/FPSCamera';
+import { EditorCameraController } from '../src/EditorCameraController';
 import type { Vec3 } from '@engine/core/math';
 
 function mockCanvas(): HTMLCanvasElement {
@@ -395,6 +396,55 @@ describe('CameraDirector', () => {
       // Should not throw or produce NaN
       const projection = director.getProjectionMatrix();
       expect(Array.from(projection).every(v => !isNaN(v))).toBe(true);
+    });
+  });
+
+  describe('getPosition', () => {
+    it('returns orbit camera position when orbit mode is active', () => {
+      orbitCamera.setState({ yaw: 0, pitch: 0, distance: 10 });
+
+      const director = new CameraDirector({
+        orbitControls: orbitCamera,
+        fpsCamera,
+        canvas,
+      });
+
+      director.setMode('orbit');
+      const position = director.getPosition();
+      expect(Array.from(position)).toEqual([0, 0, 10]);
+      director.dispose();
+    });
+
+    it('returns editor camera position for free-fly mode', () => {
+      const editorCamera = new EditorCameraController(canvas, {
+        initialPosition: [1, 2, 3],
+      });
+
+      const director = new CameraDirector({
+        orbitControls: orbitCamera,
+        fpsCamera,
+        editorCamera,
+        canvas,
+      });
+
+      const position = director.getPosition();
+      expect(Array.from(position)).toEqual([1, 2, 3]);
+      director.dispose();
+    });
+
+    it('returns player position when FPS mode has a player pose', () => {
+      const director = new CameraDirector({
+        orbitControls: orbitCamera,
+        fpsCamera,
+        canvas,
+      });
+
+      director.setPlayerPosition([5, 1, -2]);
+      director.setMode('fps');
+
+      const position = director.getPosition();
+      expect(Array.from(position)).toEqual([5, 1, -2]);
+      director.dispose();
     });
   });
 

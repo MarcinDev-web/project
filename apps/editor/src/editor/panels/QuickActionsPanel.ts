@@ -10,9 +10,8 @@
 
 import type { Entity } from '@engine/world';
 import type { SelectionManager } from '@engine/world';
-import type { Vec3 } from '@engine/core/math';
 import type { RgbaColor } from '../../utils/colors';
-import { QuickAccessBar, type QuickAccessBarConfig } from '../ui/QuickAccessBar';
+import { QuickAccessBar } from '../ui/QuickAccessBar';
 import type { EditorState } from '../core/state';
 import { MaterialComponent } from '@engine/world/components/MaterialComponent';
 

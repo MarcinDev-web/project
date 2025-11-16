@@ -257,8 +257,13 @@ export class InputContextManager {
         // Trigger action callback
         context.onAction?.(action.name);
         
+        // For movement keys (WASD, arrows), don't prevent default/stop propagation
+        // to allow KeyboardInputSource to handle them in capture phase
+        const isMovementKey = ['KeyW', 'KeyA', 'KeyS', 'KeyD', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(event.code);
+        
         // Prevent default if action is not blockable or context blocks lower contexts
-        if (!action.blockable || context.blocksLowerContexts) {
+        // BUT skip this for movement keys to allow KeyboardInputSource to handle them
+        if (!isMovementKey && (!action.blockable || context.blocksLowerContexts)) {
           event.preventDefault();
           event.stopPropagation();
         }

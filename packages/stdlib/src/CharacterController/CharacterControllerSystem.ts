@@ -56,6 +56,13 @@ export class CharacterControllerSystem {
   }
 
   /**
+   * Get the scene that this system queries for character controllers.
+   */
+  getScene(): Scene {
+    return this.scene;
+  }
+
+  /**
    * Update all character controllers
    */
   update(deltaTime: number): void {

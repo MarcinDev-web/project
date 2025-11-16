@@ -12,6 +12,11 @@ import type { AssetPreset } from '../types/BlockAssetTypes';
 import { createIcon } from '../utils/icons';
 import { getAllNpcUnitTypes, getAllNpcBehaviors, getAllNpcFactions } from '@engine/editor-utils';
 
+type NpcConfig = NonNullable<AssetPreset['npcConfig']>;
+type NpcConfigUpdates = {
+  [K in keyof NpcConfig]?: NpcConfig[K] | undefined;
+};
+
 export interface NpcPanelConfig {
   /** Current NPC asset preset (if any) */
   assetPreset: AssetPreset | null;
@@ -21,6 +26,8 @@ export interface NpcPanelConfig {
   onCreatePreset?: (config: AssetPreset['npcConfig']) => void;
   /** Called to start placement with given preset */
   onStartPlacement?: (preset: AssetPreset) => void;
+  /** Optional undo registration callback */
+  registerUndo?: (action: () => void) => void;
 }
 
 /**
@@ -144,7 +151,17 @@ export class NpcPanel {
     }
 
     select.addEventListener('change', () => {
-      this.updateConfig({ unitType: select.value as any });
+      const unitTypes = getAllNpcUnitTypes();
+      const isValid = unitTypes.some(ut => ut.id === select.value);
+      if (!isValid) {
+        console.warn(`Invalid unit type: ${select.value}`);
+        select.value = this.currentConfig?.unitType ?? 'soldier';
+        return;
+      }
+      const prevValue = this.currentConfig?.unitType ?? 'soldier';
+      this.updateConfig({ unitType: select.value as any }, prevValue !== select.value ? () => {
+        this.updateConfig({ unitType: prevValue });
+      } : undefined);
     });
 
     section.appendChild(select);
@@ -176,7 +193,17 @@ export class NpcPanel {
     }
 
     select.addEventListener('change', () => {
-      this.updateConfig({ faction: select.value as any });
+      const factions = getAllNpcFactions();
+      const isValid = factions.some(f => f.id === select.value);
+      if (!isValid) {
+        console.warn(`Invalid faction: ${select.value}`);
+        select.value = this.currentConfig?.faction ?? 'neutral';
+        return;
+      }
+      const prevValue = this.currentConfig?.faction ?? 'neutral';
+      this.updateConfig({ faction: select.value as any }, prevValue !== select.value ? () => {
+        this.updateConfig({ faction: prevValue });
+      } : undefined);
     });
 
     section.appendChild(select);
@@ -208,7 +235,18 @@ export class NpcPanel {
     }
 
     select.addEventListener('change', () => {
-      this.updateConfig({ behavior: select.value as any });
+      const behaviors = getAllNpcBehaviors();
+      const isValid = behaviors.some(b => b.id === select.value);
+      if (!isValid) {
+        console.warn(`Invalid behavior: ${select.value}`);
+        select.value = this.currentConfig?.behavior ?? 'idle';
+        return;
+      }
+      const prevValue = this.currentConfig?.behavior ?? 'idle';
+      this.updateConfig({ behavior: select.value as any }, prevValue !== select.value ? () => {
+        this.updateConfig({ behavior: prevValue });
+        this.render();
+      } : undefined);
       // Re-render to show behavior-specific sections
       this.render();
     });
@@ -236,7 +274,17 @@ export class NpcPanel {
     input.value = this.currentConfig?.armyId ?? '';
 
     input.addEventListener('input', () => {
-      this.updateConfig({ armyId: input.value.trim() || undefined });
+      const trimmed = input.value.trim();
+      // Validate army ID (alphanumeric, dashes, underscores)
+      const isValid = trimmed === '' || /^[a-zA-Z0-9_-]+$/.test(trimmed);
+      if (!isValid) {
+        console.warn('Invalid army ID format (alphanumeric, dashes, underscores only)');
+        return;
+      }
+      const prevValue = this.currentConfig?.armyId ?? undefined;
+      this.updateConfig({ armyId: trimmed || undefined }, prevValue !== trimmed ? () => {
+        this.updateConfig({ armyId: prevValue });
+      } : undefined);
     });
 
     section.appendChild(input);
@@ -274,8 +322,14 @@ export class NpcPanel {
 
     speedInput.addEventListener('input', () => {
       const value = parseFloat(speedInput.value);
-      if (!isNaN(value)) {
-        this.updateConfig({ patrolSpeed: value });
+      const clamped = Math.max(0.5, Math.min(10, isNaN(value) ? 3.0 : value));
+      const prevValue = this.currentConfig?.patrolSpeed ?? 3.0;
+      this.updateConfig({ patrolSpeed: clamped }, prevValue !== clamped ? () => {
+        this.updateConfig({ patrolSpeed: prevValue });
+      } : undefined);
+      // Update input value if clamped
+      if (clamped !== value && !isNaN(value)) {
+        speedInput.value = String(clamped);
       }
     });
 
@@ -322,8 +376,14 @@ export class NpcPanel {
 
     radiusInput.addEventListener('input', () => {
       const value = parseFloat(radiusInput.value);
-      if (!isNaN(value)) {
-        this.updateConfig({ guardRadius: value });
+      const clamped = Math.max(1, Math.min(50, isNaN(value) ? 5.0 : value));
+      const prevValue = this.currentConfig?.guardRadius ?? 5.0;
+      this.updateConfig({ guardRadius: clamped }, prevValue !== clamped ? () => {
+        this.updateConfig({ guardRadius: prevValue });
+      } : undefined);
+      // Update input value if clamped
+      if (clamped !== value && !isNaN(value)) {
+        radiusInput.value = String(clamped);
       }
     });
 
@@ -369,8 +429,14 @@ export class NpcPanel {
 
     rangeInput.addEventListener('input', () => {
       const value = parseFloat(rangeInput.value);
-      if (!isNaN(value)) {
-        this.updateConfig({ detectionRange: value });
+      const clamped = Math.max(5, Math.min(100, isNaN(value) ? 20.0 : value));
+      const prevValue = this.currentConfig?.detectionRange ?? 20.0;
+      this.updateConfig({ detectionRange: clamped }, prevValue !== clamped ? () => {
+        this.updateConfig({ detectionRange: prevValue });
+      } : undefined);
+      // Update input value if clamped
+      if (clamped !== value && !isNaN(value)) {
+        rangeInput.value = String(clamped);
       }
     });
 
@@ -421,7 +487,7 @@ export class NpcPanel {
             ...this.currentConfig,
           };
         }
-        this.config.onStartPlacement(preset);
+        this.config.onStartPlacement?.(preset);
       });
       section.appendChild(placeBtn);
     }
@@ -432,14 +498,37 @@ export class NpcPanel {
   /**
    * Updates the configuration
    */
-  private updateConfig(updates: Partial<AssetPreset['npcConfig']>): void {
-    this.currentConfig = {
+  private updateConfig(updates: NpcConfigUpdates, undoAction?: () => void): void {
+    const prevConfig = this.currentConfig ? { ...this.currentConfig } : null;
+    
+    const mutableConfig: Partial<NpcConfig> = {
       unitType: 'soldier',
       faction: 'neutral',
       behavior: 'idle',
-      ...this.currentConfig,
-      ...updates,
+      ...(this.currentConfig ?? {}),
     };
+    const target = mutableConfig as Record<keyof NpcConfig, NpcConfig[keyof NpcConfig] | undefined>;
+    for (const [key, value] of Object.entries(updates) as Array<[keyof NpcConfig, NpcConfig[keyof NpcConfig] | undefined]>) {
+      if (value === undefined) {
+        delete target[key];
+      } else {
+        target[key] = value;
+      }
+    }
+    this.currentConfig = mutableConfig as NpcConfig;
+    
+    // Register undo action if provided
+    if (undoAction && this.config.registerUndo && prevConfig) {
+      this.config.registerUndo(() => {
+        this.currentConfig = prevConfig;
+        this.config.onConfigChanged(this.currentConfig);
+        // Update asset preset if it exists
+        if (this.config.assetPreset) {
+          this.config.assetPreset.npcConfig = this.currentConfig;
+        }
+      });
+    }
+    
     this.config.onConfigChanged(this.currentConfig);
     
     // Update asset preset if it exists

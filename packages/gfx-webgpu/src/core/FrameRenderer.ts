@@ -17,7 +17,7 @@ import type { FrameResources, GeometryData } from '../resources/resources';
 import { FrustumCuller } from './FrustumCuller';
 import { InstanceDataBuilder, type CustomGeometryEntity } from './InstanceManager';
 import { GeometryCache } from './GeometryCache';
-import { ComputePrepass } from './ComputePrepass';
+import { GpuInstancePipeline } from './GpuInstancePipeline';
 import type { EnvironmentRenderer } from '../renderers/EnvironmentRenderer';
 import type { WaterRenderer } from '../renderers/WaterRenderer';
 import type { LogicConnectionRenderer } from '../LogicConnectionRenderer';
@@ -49,6 +49,7 @@ import {
 } from './InstanceBufferUtils';
 import type { GPUBufferPool } from './bufferPool';
 import { DeviceValidator, type DeviceSnapshot } from './DeviceValidator';
+import { buildIndirectDrawArgs, IndirectCommandOffset } from './InstancePipelineTypes';
 
 interface ResolvedFeatureFlags extends PostProcessFeatureFlags {
   enableComputePrepass: boolean;
@@ -145,7 +146,8 @@ export class FrameRenderer {
   private visibleEntitiesCache: Entity[] = [];
   private customGeometryEntitiesCache: CustomGeometryEntity[] = [];
   private customGeometryTriangleCounts: Map<Entity, number> = new Map();
-  private computePrepass: ComputePrepass | null = null;
+  private instancePipeline: GpuInstancePipeline | null = null;
+  private instancePipelineDevice: GPUDevice | null = null;
   private pendingTimestampRead = false;
   private staticBundle: GPURenderBundle | null = null;
   private bundleDirty = true;
@@ -264,7 +266,17 @@ export class FrameRenderer {
     this.runShadowPass(ctx, featureFlags, encoder, frameResources, geometry, viewMatrix, projectionMatrix);
 
     this.runForwardPlus(ctx, featureFlags, encoder, viewProjectionMatrix, viewMatrix, eyePosition);
-    this.runComputePrepass(ctx, featureFlags, encoder, frameResources);
+    const usedGpuInstancePipeline = this.runComputePrepass(
+      ctx,
+      featureFlags,
+      encoder,
+      frameResources,
+      geometry,
+      viewProjectionMatrix
+    );
+    if (!usedGpuInstancePipeline) {
+      this.updateCpuIndirectArgs(configuredDevice, frameResources, geometry);
+    }
 
     const renderPass = this.beginMainPass(
       encoder,
@@ -363,11 +375,12 @@ export class FrameRenderer {
 
   dispose(): void {
     try {
-      this.computePrepass?.dispose();
+      this.instancePipeline?.dispose();
     } catch {
       // ignore
     }
-    this.computePrepass = null;
+    this.instancePipeline = null;
+    this.instancePipelineDevice = null;
     this.forwardPlus?.dispose?.();
     this.forwardPlus = null;
     this.screenSpaceLOD?.dispose?.();
@@ -774,6 +787,7 @@ export class FrameRenderer {
         instanceMaterialParamsData: sceneData.instanceMaterialParamsData,
         instanceRotationData: sceneData.instanceRotationData,
         instanceMaterialIdData: sceneData.instanceMaterialIdData,
+        instanceBoundsData: sceneData.instanceBoundsData,
       };
 
       if (geometry.instanceCount === sceneData.instanceCount) {
@@ -944,19 +958,19 @@ export class FrameRenderer {
     ctx: FrameRenderContext,
     featureFlags: ResolvedFeatureFlags,
     encoder: GPUCommandEncoder,
-    frameResources: FrameResources
-  ): void {
+    frameResources: FrameResources,
+    geometry: GeometryData,
+    viewProjectionMatrix: Mat4
+  ): boolean {
     if (!featureFlags.enableComputePrepass) {
-      return;
+      this.instancePipeline?.dispose();
+      this.instancePipeline = null;
+      this.instancePipelineDevice = null;
+      return false;
     }
     try {
       const configuredDevice = ctx.configuredDevice ?? ctx.device;
-      if (!this.computePrepass && typeof encoder.beginComputePass === 'function') {
-        this.computePrepass = new ComputePrepass(configuredDevice);
-      }
-      if (!this.computePrepass) {
-        return;
-      }
+      const pipeline = this.ensureInstancePipeline(configuredDevice);
       if (frameResources.timestampQuerySet) {
         try {
           (encoder as any).writeTimestamp?.(
@@ -967,7 +981,12 @@ export class FrameRenderer {
           // ignore
         }
       }
-      this.computePrepass.run(encoder);
+      const success = pipeline.execute({
+        encoder,
+        frameResources,
+        geometry,
+        viewProjectionMatrix,
+      });
       if (frameResources.timestampQuerySet) {
         try {
           (encoder as any).writeTimestamp?.(
@@ -978,11 +997,38 @@ export class FrameRenderer {
           // ignore
         }
       }
+      return success;
     } catch (err) {
       this.errorMetrics.computePrepassErrors++;
       this.errorMetrics.lastErrorTime = performance.now();
       Logger.warn('Compute prepass failed:', err);
+      return false;
     }
+  }
+
+  private ensureInstancePipeline(device: GPUDevice): GpuInstancePipeline {
+    if (!this.instancePipeline || this.instancePipelineDevice !== device) {
+      try {
+        this.instancePipeline?.dispose();
+      } catch {
+        // ignore
+      }
+      this.instancePipeline = new GpuInstancePipeline(device);
+      this.instancePipelineDevice = device;
+    }
+    return this.instancePipeline;
+  }
+
+  private updateCpuIndirectArgs(
+    device: GPUDevice,
+    frameResources: FrameResources,
+    geometry: GeometryData
+  ): void {
+    const totalInstances = geometry.instanceCount;
+    const opaqueCount = Math.min(Math.max(geometry.opaqueCount ?? totalInstances, 0), totalInstances);
+    const transparentCount = Math.max(totalInstances - opaqueCount, 0);
+    const args = buildIndirectDrawArgs(geometry.indices.length, opaqueCount, transparentCount);
+    device.queue.writeBuffer(frameResources.instanceIndirectArgsBuffer, 0, args);
   }
 
   private beginMainPass(
@@ -1303,28 +1349,22 @@ export class FrameRenderer {
     encoder.setVertexBuffer(7, frameResources.instanceMaterialIdBuffer);
     encoder.setIndexBuffer(frameResources.indexBuffer, 'uint16');
 
-    const totalInstances = geometry.instanceCount;
-    const opaqueCount = Math.min(Math.max(geometry.opaqueCount ?? totalInstances, 0), totalInstances);
-    const transparentCount = Math.max(totalInstances - opaqueCount, 0);
+    encoder.setPipeline(frameResources.renderPipeline);
+    encoder.setBindGroup(0, frameResources.uniformBindGroup);
+    encoder.setBindGroup(1, frameResources.textureBindGroup);
+    encoder.drawIndexedIndirect(frameResources.instanceIndirectArgsBuffer, IndirectCommandOffset.OPAQUE);
 
-    if (opaqueCount > 0) {
-      encoder.setPipeline(frameResources.renderPipeline);
-      encoder.setBindGroup(0, frameResources.uniformBindGroup);
-      encoder.setBindGroup(1, frameResources.textureBindGroup);
-      encoder.drawIndexed(geometry.indices.length, opaqueCount, 0, 0, 0);
-    }
-
-    if (transparentCount > 0 && frameResources.transparentPipeline) {
+    if (frameResources.transparentPipeline) {
       encoder.setPipeline(frameResources.transparentPipeline);
       encoder.setBindGroup(0, frameResources.uniformBindGroup);
       encoder.setBindGroup(1, frameResources.textureBindGroup);
-      encoder.drawIndexed(geometry.indices.length, transparentCount, 0, 0, opaqueCount);
+      encoder.drawIndexedIndirect(frameResources.instanceIndirectArgsBuffer, IndirectCommandOffset.TRANSPARENT);
     }
 
     encoder.setPipeline(frameResources.overlayPipeline);
     encoder.setBindGroup(0, frameResources.uniformBindGroup);
     encoder.setBindGroup(1, frameResources.textureBindGroup);
-    encoder.drawIndexed(geometry.indices.length, totalInstances, 0, 0, 0);
+    encoder.drawIndexedIndirect(frameResources.instanceIndirectArgsBuffer, IndirectCommandOffset.OVERLAY);
   }
 
   private recordStaticBundle(

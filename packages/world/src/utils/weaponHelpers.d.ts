@@ -111,6 +111,10 @@ export declare const WeaponLoadouts: {
      */
     sniper: (entity: Entity) => WeaponComponent;
     /**
+     * Pistol loadout (sidearm)
+     */
+    pistol: (entity: Entity) => WeaponComponent;
+    /**
      * Close Quarters loadout (shotgun)
      */
     closeQuarters: (entity: Entity) => WeaponComponent;

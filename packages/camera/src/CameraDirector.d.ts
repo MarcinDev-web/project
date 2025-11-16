@@ -78,6 +78,11 @@ export declare class CameraDirector {
      * Get the active projection matrix
      */
     getProjectionMatrix(): Mat4;
+    /**
+     * Get the current camera world position.
+     * Optionally provide an output Vec3 to avoid allocations.
+     */
+    getPosition(out?: Vec3): Vec3;
     setFov(radians: number): void;
     setCameraOffset(offset: Vec3): void;
     setCollisionRadius(radius: number): void;
@@ -122,6 +127,9 @@ export declare class CameraDirector {
      * Update internal camera state based on current mode
      */
     private updateCameraState;
+    private computeCameraPosition;
+    private computeOrbitCameraPosition;
+    private copyVec3;
     /**
      * Compute view matrix for a specific mode
      */

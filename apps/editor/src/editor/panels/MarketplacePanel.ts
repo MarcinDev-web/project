@@ -9,7 +9,7 @@
  * - Import builds directly into editor
  */
 
-import type { MarketplaceItem } from '../../utils/marketplaceApi';
+import type { MarketplaceFilterOptions, MarketplaceItem } from '../../utils/marketplaceApi';
 import { MarketplaceApiClient } from '../../utils/marketplaceApi';
 import { MarketplaceAssetManager } from '../managers/MarketplaceAssetManager';
 import { Logger } from '../../utils/logger';
@@ -40,10 +40,9 @@ export class MarketplacePanel {
   private pageSize = 20;
   private totalItems = 0;
   
-  private filtersContainer: HTMLElement;
-  private searchInput: HTMLInputElement;
-  private itemsContainer: HTMLElement;
-  private paginationContainer: HTMLElement;
+  private searchInput!: HTMLInputElement;
+  private itemsContainer!: HTMLElement;
+  private paginationContainer!: HTMLElement;
 
   constructor(config: MarketplacePanelConfig = {}) {
     this.config = config;
@@ -152,7 +151,6 @@ export class MarketplacePanel {
     searchContainer.appendChild(this.searchInput);
     filters.appendChild(searchContainer);
     
-    this.filtersContainer = filters;
     this.element.appendChild(filters);
   }
 
@@ -168,6 +166,20 @@ export class MarketplacePanel {
     this.element.appendChild(this.paginationContainer);
   }
 
+  private buildFilterOptions(offset: number): MarketplaceFilterOptions {
+    const options: MarketplaceFilterOptions = {
+      limit: this.pageSize,
+      offset,
+      sortBy: this.currentSort,
+    };
+
+    if (this.currentTags.length > 0) {
+      options.tags = this.currentTags;
+    }
+
+    return options;
+  }
+
   private async loadItems(): Promise<void> {
     if (this.loading) return;
     
@@ -177,26 +189,18 @@ export class MarketplacePanel {
     
     try {
       const offset = (this.currentPage - 1) * this.pageSize;
+      const filters = this.buildFilterOptions(offset);
       let response;
       
       if (this.currentSearch.trim()) {
         response = await this.marketplaceClient.search(this.currentSearch, {
+          ...filters,
           type: this.currentType,
-          tags: this.currentTags.length > 0 ? this.currentTags : undefined,
-          limit: this.pageSize,
-          offset,
-          sortBy: this.currentSort,
         });
       } else {
-        const options = {
-          tags: this.currentTags.length > 0 ? this.currentTags : undefined,
-          limit: this.pageSize,
-          offset,
-          sortBy: this.currentSort,
-        };
         response = this.currentType === 'build'
-          ? await this.marketplaceClient.getBuilds(options)
-          : await this.marketplaceClient.getAvatars(options);
+          ? await this.marketplaceClient.getBuilds(filters)
+          : await this.marketplaceClient.getAvatars(filters);
       }
       
       this.items = response.items;

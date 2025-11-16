@@ -316,6 +316,17 @@ export const WeaponLoadouts = {
   },
 
   /**
+   * Pistol loadout (sidearm)
+   */
+  pistol: (entity: Entity) => {
+    return setupWeaponEntity(entity, 'pistol', {
+      attachments: ['light_suppressor', 'fast_mag'],
+      ammoType: 'hollow_point',
+      ammoCount: 48,
+    });
+  },
+
+  /**
    * Close Quarters loadout (shotgun)
    */
   closeQuarters: (entity: Entity) => {

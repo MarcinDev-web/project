@@ -25,6 +25,9 @@ export function createStarterBlockTemplate(): TemplateProvider {
       const envComp = new EnvironmentComponent();
       envComp.skyboxType = 'procedural-sky';
       envComp.ambientIntensity = 0.5;
+      envComp.cloudsEnabled = true;
+      envComp.cloudDensity = 0.85;
+      envComp.cloudSpeed = 0.02;
       env.addComponent(envComp);
       // Position far away so it doesn't interfere with scene objects
       env.transform.position = [0, -1000, 0];

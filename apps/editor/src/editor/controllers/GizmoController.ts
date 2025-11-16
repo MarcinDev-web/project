@@ -18,10 +18,7 @@ import {
   calculateViewAngle,
   calculateAxisOpacity,
   calculateCenterPoint,
-  getPlaneNormal,
-  getPlaneAxes,
   transformDirectionByRotation,
-  clamp,
 } from './GizmoMath';
 
 export interface GizmoControllerOptions {
@@ -165,10 +162,10 @@ export class GizmoController {
     const axisLength = DEFAULT_GIZMO_CONFIG.axisLength * (scale / 10); // Normalize scale
 
     // Update axes
-    this.updateAxes(worldPosition, originX, originY, rect, axisLength, selected[0]);
+    this.updateAxes(worldPosition, originX, originY, rect, axisLength, selected[0]!);
 
     // Update plane handles
-    this.updatePlanes(worldPosition, originX, originY, rect, axisLength);
+    this.updatePlanes(originX, originY, axisLength);
 
     // Update center (for uniform scale)
     const mode = this.options.state.gizmoMode.value ?? 'translate';
@@ -184,7 +181,6 @@ export class GizmoController {
     axisLength: number,
     primaryEntity: Entity
   ): void {
-    const cameraPos = this.options.getCameraPosition?.() ?? [0, 0, 0];
     const cameraRot = this.options.getCameraRotation?.() ?? [0, 0, 0, 1];
     
     // Camera forward for visibility calculation
@@ -229,13 +225,7 @@ export class GizmoController {
     });
   }
 
-  private updatePlanes(
-    worldPosition: Vec3,
-    originX: number,
-    originY: number,
-    rect: DOMRect,
-    axisLength: number
-  ): void {
+  private updatePlanes(originX: number, originY: number, axisLength: number): void {
     const mode = this.options.state.gizmoMode.value ?? 'translate';
     const showPlanes = mode === 'translate';
 
@@ -275,6 +265,8 @@ export class GizmoController {
   private startDrag(handle: HandleKey, event: PointerEvent): void {
     const selected = this.getSelectedEntities();
     if (selected.length === 0) return;
+    const primary = selected[0];
+    if (!primary) return;
 
     // Cleanup any existing drag
     if (this.activePointerCleanup) {
@@ -285,7 +277,6 @@ export class GizmoController {
     this.options.setControlsEnabled(false);
     this.renderer.setActiveHandle(handle);
 
-    const primary = selected[0];
     const originalPosition = this.getGizmoPosition(selected);
     const originalRotation = primary.transform.rotation as Quat;
     const originalScale = primary.transform.scale as Vec3;
@@ -392,6 +383,8 @@ export class GizmoController {
     pointerEvent: PointerEvent
   ): void {
     if (!this.gizmoState) return;
+    const primary = selected[0];
+    if (!primary) return;
 
     const visual = this.renderer.axisVisuals[axis];
     if (visual.screenLength <= 0) return;
@@ -405,7 +398,6 @@ export class GizmoController {
     }
 
     const axisIndex = axis === 'x' ? 0 : axis === 'y' ? 1 : 2;
-    const primary = selected[0];
 
     if (mode === 'translate') {
       const next = [...this.gizmoState.originalPosition] as Vec3;
@@ -497,6 +489,8 @@ export class GizmoController {
     pointerEvent: PointerEvent
   ): void {
     if (!this.gizmoState) return;
+    const primary = selected[0];
+    if (!primary) return;
 
     const [axis1, axis2] = this.renderer.planeVisuals[plane].axes;
     const visual1 = this.renderer.axisVisuals[axis1];
@@ -525,7 +519,7 @@ export class GizmoController {
 
     // Apply to all selected
     if (selected.length === 1) {
-      selected[0].transform.position = finalPos;
+      primary.transform.position = finalPos;
     } else {
       const delta: Vec3 = [
         finalPos[0] - this.gizmoState.originalPosition[0],
@@ -608,8 +602,13 @@ export class GizmoController {
   }
 
   private getGizmoPosition(entities: Entity[]): Vec3 {
+    const [first] = entities;
+    if (!first) {
+      return [0, 0, 0];
+    }
+
     if (entities.length === 1) {
-      return entities[0].transform.getWorldPosition();
+      return first.transform.getWorldPosition();
     }
     
     const positions = entities.map((e) => e.transform.getWorldPosition());

@@ -14,21 +14,18 @@ import type { SelectionManager } from '@engine/world';
 import { WeaponComponent } from '@engine/world/components/WeaponComponent';
 import { InventoryComponent } from '@engine/world/components/InventoryComponent';
 import { AttachmentComponent } from '@engine/world/components/AttachmentComponent';
-import { AmmoComponent } from '@engine/world/components/AmmoComponent';
 import {
   setupWeaponEntity,
-  setupInventory,
   addAttachment,
   removeAttachment,
   changeAmmoType,
   getEffectiveWeaponStats,
   getAllAttachmentIds,
-  getAvailableAttachmentsByType,
   getAllAmmoTypeNames,
   WeaponLoadouts,
   setupPvPLoadout,
 } from '@engine/world';
-import type { WeaponPresetType, AttachmentType, AmmoType } from '@engine/world/types/weapon';
+import type { WeaponPresetType, AmmoType } from '@engine/world/types/weapon';
 import { getAttachment } from '@engine/world/data/attachments';
 import { getAmmoType } from '@engine/world/data/ammo';
 import { createIcon } from '../utils/icons';
@@ -42,6 +39,8 @@ export interface WeaponPanelConfig {
   onConfigChanged?: () => void;
   /** Called to update scene buffers */
   updateSceneBuffers?: () => void;
+  /** Optional undo registration callback */
+  registerUndo?: (action: () => void) => void;
 }
 
 /**
@@ -53,6 +52,8 @@ export class WeaponPanel {
   private selectedEntity: Entity | null = null;
   private weaponComponent: WeaponComponent | null = null;
   private inventoryComponent: InventoryComponent | null = null;
+  private selectionUpdateInterval: number | null = null;
+  private selectionChangeHandler: (() => void) | null = null;
 
   constructor(config: WeaponPanelConfig) {
     this.config = config;
@@ -70,6 +71,8 @@ export class WeaponPanel {
         this.render();
       };
       
+      this.selectionChangeHandler = updateSelection;
+      
       // Initial update
       updateSelection();
       
@@ -78,15 +81,12 @@ export class WeaponPanel {
         (config.selection as any).onSelectionChanged(updateSelection);
       } else {
         // Fallback: poll or use event system
-        const interval = setInterval(() => {
+        this.selectionUpdateInterval = window.setInterval(() => {
           const current = config.selection.primarySelection;
           if (current !== this.selectedEntity) {
             updateSelection();
           }
         }, 100);
-        
-        // Cleanup would be handled by dispose if we add it
-        (this.root as any)._cleanupInterval = interval;
       }
     } else {
       this.render();
@@ -394,13 +394,41 @@ export class WeaponPanel {
     select.addEventListener('change', () => {
       if (this.selectedEntity && select.value !== currentPreset) {
         const preset = select.value as WeaponPresetType;
-        // Remove old weapon component if exists
+        
+        // Validate preset value
+        const validPresets: WeaponPresetType[] = ['rifle', 'shotgun', 'sniper', 'pistol', 'smg', 'custom'];
+        if (!validPresets.includes(preset)) {
+          console.warn(`Invalid weapon preset: ${preset}`);
+          select.value = currentPreset ?? 'custom';
+          return;
+        }
+        
+        // Store previous state for undo
         const oldWeapon = this.selectedEntity.getComponent(WeaponComponent);
+        const oldPreset = oldWeapon?.weaponPreset ?? null;
+        
+        // Remove old weapon component if exists
         if (oldWeapon) {
           this.selectedEntity.removeComponent(WeaponComponent);
         }
+        
         // Create new weapon with preset
         setupWeaponEntity(this.selectedEntity, preset);
+        
+        // Register undo action
+        if (this.config.registerUndo && oldPreset !== null) {
+          this.config.registerUndo(() => {
+            const currentWeapon = this.selectedEntity?.getComponent(WeaponComponent);
+            if (currentWeapon && this.selectedEntity) {
+              this.selectedEntity.removeComponent(WeaponComponent);
+              setupWeaponEntity(this.selectedEntity, oldPreset);
+              this.refresh();
+              this.config.onConfigChanged?.();
+              this.config.updateSceneBuffers?.();
+            }
+          });
+        }
+        
         this.refresh();
         this.config.onConfigChanged?.();
         this.config.updateSceneBuffers?.();
@@ -481,7 +509,7 @@ export class WeaponPanel {
     section.appendChild(title);
 
     const attachmentComp = this.selectedEntity.getComponent(AttachmentComponent);
-    const currentAttachments = attachmentComp ? attachmentComp.getAttachments() : [];
+    const currentAttachments = attachmentComp ? attachmentComp.getAllAttachments() : [];
 
     // Show current attachments
     if (currentAttachments.length > 0) {
@@ -595,8 +623,34 @@ export class WeaponPanel {
     }
 
     typeSelect.addEventListener('change', () => {
-      if (this.selectedEntity) {
-        changeAmmoType(this.selectedEntity, typeSelect.value as AmmoType);
+      if (this.selectedEntity && this.weaponComponent) {
+        const newAmmoType = typeSelect.value as AmmoType;
+        
+        // Validate ammo type
+        const validAmmoTypes = getAllAmmoTypeNames();
+        if (!validAmmoTypes.includes(newAmmoType)) {
+          console.warn(`Invalid ammo type: ${newAmmoType}`);
+          typeSelect.value = this.weaponComponent.currentAmmoType;
+          return;
+        }
+        
+        // Store previous state for undo
+        const oldAmmoType = this.weaponComponent.currentAmmoType;
+        
+        changeAmmoType(this.selectedEntity, newAmmoType);
+        
+        // Register undo action
+        if (this.config.registerUndo) {
+          this.config.registerUndo(() => {
+            if (this.selectedEntity) {
+              changeAmmoType(this.selectedEntity, oldAmmoType);
+              this.refresh();
+              this.config.onConfigChanged?.();
+              this.config.updateSceneBuffers?.();
+            }
+          });
+        }
+        
         this.refresh();
         this.config.onConfigChanged?.();
         this.config.updateSceneBuffers?.();
@@ -606,6 +660,33 @@ export class WeaponPanel {
     section.appendChild(typeSelect);
 
     return section;
+  }
+
+  /**
+   * Disposes the panel and cleans up resources
+   */
+  dispose(): void {
+    // Clear polling interval if it exists
+    if (this.selectionUpdateInterval !== null) {
+      window.clearInterval(this.selectionUpdateInterval);
+      this.selectionUpdateInterval = null;
+    }
+    
+    // Remove selection change handler if registered
+    if (this.selectionChangeHandler && typeof (this.config.selection as any).removeSelectionChanged === 'function') {
+      (this.config.selection as any).removeSelectionChanged(this.selectionChangeHandler);
+      this.selectionChangeHandler = null;
+    }
+    
+    // Clear references
+    this.selectedEntity = null;
+    this.weaponComponent = null;
+    this.inventoryComponent = null;
+    
+    // Remove root element from DOM if it's attached
+    if (this.root.parentNode) {
+      this.root.parentNode.removeChild(this.root);
+    }
   }
 }
 

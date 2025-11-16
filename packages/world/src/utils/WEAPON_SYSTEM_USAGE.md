@@ -295,5 +295,6 @@ function gameLoop(deltaTime: number) {
 ### Loadouts
 - `WeaponLoadouts.assaultRifle(entity)` - Assault rifle loadout
 - `WeaponLoadouts.sniper(entity)` - Sniper loadout
+- `WeaponLoadouts.pistol(entity)` - Sidearm/pistol loadout
 - `WeaponLoadouts.closeQuarters(entity)` - Shotgun loadout
 - `WeaponLoadouts.smg(entity)` - SMG loadout

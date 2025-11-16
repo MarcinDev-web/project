@@ -22,6 +22,8 @@ export interface VegetationPanelConfig {
   onActivatePaint?: (preset: AssetPreset) => void;
   /** Called to update paint tool configuration */
   onUpdatePaintConfig?: (config: { brushRadius?: number; density?: number; minSpacing?: number }) => void;
+  /** Optional undo registration callback */
+  registerUndo?: (action: () => void) => void;
 }
 
 /**
@@ -160,11 +162,21 @@ export class VegetationPanel {
     input.value = this.currentConfig?.billboardTexture ?? '';
 
     input.addEventListener('input', () => {
-      const updates: Partial<AssetPreset['vegetationConfig']> = {};
-      if (input.value.trim()) {
-        updates.billboardTexture = input.value.trim();
+      const trimmed = input.value.trim();
+      // Basic URL validation (allow relative paths and URLs)
+      const isValid = trimmed === '' || /^[a-zA-Z0-9._\/-]+$/.test(trimmed) || /^https?:\/\//.test(trimmed);
+      if (!isValid && trimmed !== '') {
+        console.warn('Invalid texture URL format');
+        return;
       }
-      this.updateConfig(updates);
+      const updates: Partial<AssetPreset['vegetationConfig']> = {};
+      if (trimmed) {
+        updates.billboardTexture = trimmed;
+      }
+      const prevValue = this.currentConfig?.billboardTexture ?? '';
+      this.updateConfig(updates, prevValue !== trimmed ? () => {
+        this.updateConfig({ billboardTexture: prevValue });
+      } : undefined);
     });
 
     section.appendChild(input);
@@ -190,11 +202,21 @@ export class VegetationPanel {
     input.value = this.currentConfig?.modelUrl ?? '';
 
     input.addEventListener('input', () => {
-      const updates: Partial<AssetPreset['vegetationConfig']> = {};
-      if (input.value.trim()) {
-        updates.modelUrl = input.value.trim();
+      const trimmed = input.value.trim();
+      // Basic URL validation (allow relative paths and URLs)
+      const isValid = trimmed === '' || /^[a-zA-Z0-9._\/-]+$/.test(trimmed) || /^https?:\/\//.test(trimmed);
+      if (!isValid && trimmed !== '') {
+        console.warn('Invalid model URL format');
+        return;
       }
-      this.updateConfig(updates);
+      const updates: Partial<AssetPreset['vegetationConfig']> = {};
+      if (trimmed) {
+        updates.modelUrl = trimmed;
+      }
+      const prevValue = this.currentConfig?.modelUrl ?? '';
+      this.updateConfig(updates, prevValue !== trimmed ? () => {
+        this.updateConfig({ modelUrl: prevValue });
+      } : undefined);
     });
 
     section.appendChild(input);
@@ -236,7 +258,12 @@ export class VegetationPanel {
 
     strengthInput.addEventListener('input', () => {
       strengthValue.textContent = strengthInput.value;
-      this.updateConfig({ windStrength: parseFloat(strengthInput.value) });
+      const value = parseFloat(strengthInput.value);
+      const clamped = Math.max(0, Math.min(1, isNaN(value) ? 0.3 : value));
+      const prevValue = this.currentConfig?.windStrength ?? 0.3;
+      this.updateConfig({ windStrength: clamped }, prevValue !== clamped ? () => {
+        this.updateConfig({ windStrength: prevValue });
+      } : undefined);
     });
 
     strengthWrapper.appendChild(strengthInput);
@@ -266,7 +293,12 @@ export class VegetationPanel {
 
     frequencyInput.addEventListener('input', () => {
       frequencyValue.textContent = frequencyInput.value;
-      this.updateConfig({ windFrequency: parseFloat(frequencyInput.value) });
+      const value = parseFloat(frequencyInput.value);
+      const clamped = Math.max(0, Math.min(5, isNaN(value) ? 1.0 : value));
+      const prevValue = this.currentConfig?.windFrequency ?? 1.0;
+      this.updateConfig({ windFrequency: clamped }, prevValue !== clamped ? () => {
+        this.updateConfig({ windFrequency: prevValue });
+      } : undefined);
     });
 
     frequencyWrapper.appendChild(frequencyInput);
@@ -330,7 +362,11 @@ export class VegetationPanel {
 
       timeInput.addEventListener('input', () => {
         const value = parseFloat(timeInput.value);
-        this.updateConfig({ harvestTime: isNaN(value) ? 0 : value });
+        const clamped = Math.max(0, isNaN(value) ? 0 : value);
+        const prevValue = this.currentConfig?.harvestTime ?? 0;
+        this.updateConfig({ harvestTime: clamped }, prevValue !== clamped ? () => {
+          this.updateConfig({ harvestTime: prevValue });
+        } : undefined);
       });
 
       timeWrapper.appendChild(timeInput);
@@ -371,8 +407,13 @@ export class VegetationPanel {
 
     radiusInput.addEventListener('input', () => {
       const value = parseFloat(radiusInput.value);
+      const clamped = Math.max(0.5, Math.min(20, isNaN(value) ? 3.0 : value));
       if (!isNaN(value) && this.config.onUpdatePaintConfig) {
-        this.config.onUpdatePaintConfig({ brushRadius: value });
+        this.config.onUpdatePaintConfig({ brushRadius: clamped });
+      }
+      // Update input value if clamped
+      if (clamped !== value) {
+        radiusInput.value = String(clamped);
       }
     });
 
@@ -403,8 +444,13 @@ export class VegetationPanel {
     densityInput.addEventListener('input', () => {
       densityValue.textContent = densityInput.value;
       const value = parseFloat(densityInput.value);
+      const clamped = Math.max(0, Math.min(1, isNaN(value) ? 0.3 : value));
       if (!isNaN(value) && this.config.onUpdatePaintConfig) {
-        this.config.onUpdatePaintConfig({ density: value });
+        this.config.onUpdatePaintConfig({ density: clamped });
+      }
+      // Update display if clamped
+      if (clamped !== value) {
+        densityValue.textContent = String(clamped);
       }
     });
 
@@ -453,7 +499,9 @@ export class VegetationPanel {
   /**
    * Updates current configuration
    */
-  private updateConfig(updates: Partial<AssetPreset['vegetationConfig']>): void {
+  private updateConfig(updates: Partial<AssetPreset['vegetationConfig']>, undoAction?: () => void): void {
+    const prevConfig = this.currentConfig ? { ...this.currentConfig } : null;
+    
     this.currentConfig = {
       ...(this.currentConfig ?? {
         type: 'grass',
@@ -463,6 +511,17 @@ export class VegetationPanel {
       }),
       ...updates,
     };
+
+    // Register undo action if provided
+    if (undoAction && this.config.registerUndo && prevConfig) {
+      this.config.registerUndo(() => {
+        this.currentConfig = prevConfig;
+        this.config.onConfigChanged(this.currentConfig);
+        if (updates?.type !== undefined) {
+          this.render();
+        }
+      });
+    }
 
     this.config.onConfigChanged(this.currentConfig);
     

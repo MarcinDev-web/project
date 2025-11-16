@@ -556,8 +556,10 @@ export class CollaborationManager {
   }
 
   private sendPresenterState(active: boolean, playerId: string): void {
+    const client = this.replicationClient;
+    if (!client) return;
     try {
-      this.replicationClient.sendPlayerUpdate({
+      client.sendPlayerUpdate({
         playerId,
         state: { presenter: active },
       } as any);

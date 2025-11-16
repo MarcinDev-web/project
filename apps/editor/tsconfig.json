@@ -34,6 +34,8 @@
       "@engine/editor-utils/*": ["../../packages/editor-utils/src/*"],
       "@engine/blocks": ["../../packages/blocks/src"],
       "@engine/blocks/*": ["../../packages/blocks/src/*"],
+      "@engine/microblocks": ["../../packages/microblocks/src"],
+      "@engine/microblocks/*": ["../../packages/microblocks/src/*"],
       "@engine/economy": ["../../packages/economy/src"],
       "@engine/economy/*": ["../../packages/economy/src/*"],
       "@engine/voxel": ["../../packages/voxel/src"],

@@ -7,7 +7,7 @@ import { SelectionManager } from '@engine/world';
 import type { OrbitControls, EditorCameraController } from '@engine/camera';
 import { CharacterInputHandler } from '@engine/input';
 // FPSCamera not used in editor - only in play mode
-import { CharacterControllerSystem, GroundDetectionSystem } from '@engine/stdlib/CharacterController';
+import { CharacterControllerSystem, GroundDetectionSystem, PlayerSession } from '@engine/stdlib/CharacterController';
 import { PhysicsWorld } from '@engine/world/physics';
 import { PlayModeStateType } from '../../core/PlayModeStateMachine';
 import { ReturnState } from '../../states/ReturnState';
@@ -249,6 +249,36 @@ describe('EditorModeManager – regresyjne scenariusze', () => {
     if (sessionSpy) {
       expect(sessionSpy).toHaveBeenCalledTimes(expectedSteps);
     }
+  });
+
+  it('dispose() zatrzymuje symulację i zwalnia PlayerSession', () => {
+    const mockPlayer = new Entity('__playmode_player_dispose');
+    scene.addEntity(mockPlayer);
+    (modeManager as any).playerEntity = mockPlayer;
+    (modeManager as any).playerScene = scene;
+
+    const session = new PlayerSession({
+      id: 'player-dispose',
+      displayName: 'Player Dispose',
+    });
+    const sessionDisposeSpy = vi.spyOn(session, 'dispose');
+    (modeManager as any).playerSession = session;
+
+    const stopSpy = vi.spyOn(physicsWorld, 'stop');
+    const disableSpy = vi.spyOn(characterInput, 'disable');
+    const clearSpy = vi.spyOn(characterInput, 'clear');
+    stopSpy.mockClear();
+    disableSpy.mockClear();
+    clearSpy.mockClear();
+
+    modeManager.dispose();
+    dispose = null; // Avoid double-dispose in afterEach
+
+    expect(sessionDisposeSpy).toHaveBeenCalledTimes(1);
+    expect(stopSpy).toHaveBeenCalledTimes(1);
+    expect(disableSpy).toHaveBeenCalledTimes(1);
+    expect(clearSpy).toHaveBeenCalledTimes(1);
+    expect(modeManager.getPlayerSession()).toBeNull();
   });
 });
 

@@ -2,6 +2,7 @@ import type { Mat4, Vec3 } from '@engine/core/math';
 import type { EnvironmentComponent } from '@engine/world';
 import { BrdfLutPass } from '../postprocess/BrdfLut';
 import { loadHdrFile, parseHdrFile } from '../resources/HdrLoader';
+import { createProceduralCloudyHdr } from '../textures/ProceduralSkyCubemap';
 
 /**
  * Skybox vertex shader - renders a full-screen quad at far plane
@@ -291,6 +292,8 @@ export class EnvironmentRenderer {
   private envCube: GPUTexture | null = null;
   // Cubemap cache
   private cubemapCache: Map<string, GPUTexture> = new Map();
+  private readonly defaultCubemapKey = '__procedural_cloudy_sky__';
+  private defaultCubemap: GPUTexture | null = null;
   // IBL cache
   private iblCache: Map<string, { brdfLut: GPUTexture; envCube: GPUTexture; timestamp: number }> = new Map();
   private iblCacheMaxSize = 5;
@@ -407,6 +410,11 @@ export class EnvironmentRenderer {
     await this.createCubemapPipeline(config.presentationFormat, sampleCount);
 
     this.initialized = true;
+    try {
+      await this.ensureDefaultCubemap();
+    } catch (err) {
+      console.warn('EnvironmentRenderer: failed to create default cloudy cubemap', err);
+    }
   }
 
   /**
@@ -517,6 +525,31 @@ export class EnvironmentRenderer {
     });
 
     this.pipelines.set('cubemap', pipeline);
+  }
+
+  private async ensureDefaultCubemap(): Promise<void> {
+    if (this.defaultCubemap) {
+      return;
+    }
+    const hdrData = createProceduralCloudyHdr({
+      width: 256,
+      height: 128,
+      exposure: 1.5,
+      cloudDensity: 0.68,
+    });
+    this.defaultCubemap = await this.convertHdrToCubemap(hdrData, 512, this.defaultCubemapKey);
+  }
+
+  private getDefaultCubemap(): GPUTexture | null {
+    if (this.defaultCubemap) {
+      return this.defaultCubemap;
+    }
+    const cached = this.cubemapCache.get(this.defaultCubemapKey);
+    if (cached) {
+      this.defaultCubemap = cached;
+      return cached;
+    }
+    return null;
   }
 
   /**
@@ -683,6 +716,12 @@ export class EnvironmentRenderer {
       }
 
       case 'cubemap': {
+        if (!environment.cubemapTexture) {
+          const fallback = this.getDefaultCubemap();
+          if (fallback) {
+            environment.setCubemap(fallback, this.defaultCubemapKey);
+          }
+        }
         // For cubemap, we still write placeholder data to params buffer (for bind group compatibility)
         // Actual texture is bound separately in cubemap bind group
         data[offset++] = 0;
@@ -1147,6 +1186,7 @@ fn fs(input: VSOut) -> @location(0) vec4<f32> {
       texture.destroy();
     }
     this.cubemapCache.clear();
+    this.defaultCubemap = null;
 
     // Cleanup IBL cache
     for (const cached of this.iblCache.values()) {

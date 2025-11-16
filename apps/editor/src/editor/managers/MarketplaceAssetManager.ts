@@ -8,9 +8,8 @@
  * - Integration with EconomyApiClient for payments
  */
 
-import type { MarketplaceItem } from '../../utils/marketplaceApi';
 import { MarketplaceApiClient } from '../../utils/marketplaceApi';
-import { EconomyApiClient, type GetWalletResponse } from '@engine/economy';
+import { EconomyApiClient} from '@engine/economy';
 import { Logger } from '../../utils/logger';
 
 export interface PurchasedAsset {
@@ -127,13 +126,22 @@ export class MarketplaceAssetManager {
       itemId: item.id,
       type: item.type,
       title: item.title,
-      description: item.description,
-      thumbnailUrl: item.thumbnailUrl,
       fileUrl: item.fileUrl,
       tags: item.tags,
       purchasedAt: Date.now(),
-      price: item.price,
     };
+
+    if (item.description !== undefined) {
+      purchasedAsset.description = item.description;
+    }
+
+    if (item.thumbnailUrl !== undefined) {
+      purchasedAsset.thumbnailUrl = item.thumbnailUrl;
+    }
+
+    if (item.price) {
+      purchasedAsset.price = item.price;
+    }
 
     await this.saveAsset(purchasedAsset);
     this.notifyListeners();
@@ -184,8 +192,9 @@ export class MarketplaceAssetManager {
       try {
         const tx = this.db!.transaction(this.storeName, 'readonly');
         const store = tx.objectStore(this.storeName);
-        const index = options?.type ? store.index('type') : null;
-        const request = index ? index.openCursor(IDBKeyRange.only(options.type)) : store.openCursor(null, 'prev');
+        const targetType = options?.type;
+        const index = targetType ? store.index('type') : null;
+        const request = index ? index.openCursor(IDBKeyRange.only(targetType)) : store.openCursor(null, 'prev');
 
         const results: PurchasedAsset[] = [];
         request.onsuccess = () => {

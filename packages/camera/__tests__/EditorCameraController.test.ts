@@ -331,6 +331,35 @@ describe('EditorCameraController', () => {
     });
   });
 
+  describe('key normalization', () => {
+    beforeEach(() => {
+      camera.enable();
+    });
+
+    it('should store canonical lowercase entries for horizontal movement keys', () => {
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'W' }));
+
+      const internalKeys = (camera as unknown as { keysPressed: Set<string> }).keysPressed;
+      expect(internalKeys.has('w')).toBe(true);
+      expect(internalKeys.has('W')).toBe(false);
+
+      window.dispatchEvent(new KeyboardEvent('keyup', { key: 'W' }));
+    });
+
+    it('should normalize spacebar input to "space" identifier', () => {
+      // Enable RMB look to allow spacebar capture
+      canvas.dispatchEvent(new MouseEvent('mousedown', { button: 2, clientX: 0, clientY: 0 }));
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: ' ' }));
+
+      const internalKeys = (camera as unknown as { keysPressed: Set<string> }).keysPressed;
+      expect(internalKeys.has('space')).toBe(true);
+      expect(internalKeys.has(' ')).toBe(false);
+
+      window.dispatchEvent(new KeyboardEvent('keyup', { key: ' ' }));
+      window.dispatchEvent(new MouseEvent('mouseup', { button: 2 }));
+    });
+  });
+
   describe('movement - Q/E vertical', () => {
     beforeEach(() => {
       camera.enable();

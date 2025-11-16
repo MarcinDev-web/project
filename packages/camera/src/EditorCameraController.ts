@@ -2,6 +2,9 @@ import type { Vec3, Mat4 } from '@engine/core/math';
 import { mat4LookAt } from '@engine/core/math';
 import { damp } from './utils/Damper';
 
+const HORIZONTAL_MOVEMENT_KEYS = new Set(['w', 'a', 's', 'd']);
+const VERTICAL_MOVEMENT_KEYS = new Set(['q', 'e', 'c', 'space']);
+
 /**
  * Configuration for EditorCameraController
  */
@@ -186,7 +189,23 @@ export class EditorCameraController {
       this.viewMatrixDirty = true;
     }
     
-    if (this.keysPressed.size === 0) return;
+    const moveForward = this.keysPressed.has('w');
+    const moveBackward = this.keysPressed.has('s');
+    const moveRight = this.keysPressed.has('d');
+    const moveLeft = this.keysPressed.has('a');
+    const moveUp = this.keysPressed.has('e') || this.keysPressed.has('space');
+    const moveDown = this.keysPressed.has('q') || this.keysPressed.has('c');
+
+    if (
+      !moveForward &&
+      !moveBackward &&
+      !moveRight &&
+      !moveLeft &&
+      !moveUp &&
+      !moveDown
+    ) {
+      return;
+    }
 
     // Determine speed multiplier
     let speed = this.moveSpeed;
@@ -207,16 +226,16 @@ export class EditorCameraController {
     let forwardAmount = 0;
     let rightAmount = 0;
 
-    if (this.keysPressed.has('w') || this.keysPressed.has('W')) {
+    if (moveForward) {
       forwardAmount += 1;
     }
-    if (this.keysPressed.has('s') || this.keysPressed.has('S')) {
+    if (moveBackward) {
       forwardAmount -= 1;
     }
-    if (this.keysPressed.has('d') || this.keysPressed.has('D')) {
+    if (moveRight) {
       rightAmount += 1;
     }
-    if (this.keysPressed.has('a') || this.keysPressed.has('A')) {
+    if (moveLeft) {
       rightAmount -= 1;
     }
 
@@ -235,20 +254,10 @@ export class EditorCameraController {
     this.scratch.movement[2] += (this.forward[2] * forwardAmount + this.right[2] * rightAmount) * moveAmount;
 
     // Q/E or Space/C for vertical movement (world up/down)
-    if (
-      this.keysPressed.has('e') ||
-      this.keysPressed.has('E') ||
-      this.keysPressed.has(' ') /* Space */ ||
-      this.keysPressed.has('space')
-    ) {
+    if (moveUp) {
       this.scratch.movement[1] += moveAmount;
     }
-    if (
-      this.keysPressed.has('q') ||
-      this.keysPressed.has('Q') ||
-      this.keysPressed.has('c') ||
-      this.keysPressed.has('C')
-    ) {
+    if (moveDown) {
       this.scratch.movement[1] -= moveAmount;
     }
 
@@ -397,15 +406,12 @@ export class EditorCameraController {
       return;
     }
     
-    // Only capture movement keys (store both lowercase and original case for compatibility)
-    const keyLower = key.toLowerCase();
-    const isSpace = key === ' ';
-    const isVerticalKey = keyLower === 'q' || keyLower === 'e' || keyLower === 'c' || isSpace;
-    const isMovementKey = keyLower === 'w' || keyLower === 'a' || keyLower === 's' || keyLower === 'd';
+    const normalizedKey = this.normalizeMovementKey(key);
+    const isMovementKey = normalizedKey ? HORIZONTAL_MOVEMENT_KEYS.has(normalizedKey) : false;
+    const isVerticalKey = normalizedKey ? VERTICAL_MOVEMENT_KEYS.has(normalizedKey) : false;
     // Gate vertical movement (Q/E) to when RMB-look is active to reduce conflicts with editor shortcuts
-    if (isMovementKey || (isVerticalKey && this.isRightMouseDown)) {
-      this.keysPressed.add(key); // Store original key for Shift/Alt detection
-      this.keysPressed.add(keyLower); // Store lowercase for movement detection
+    if (normalizedKey && (isMovementKey || (isVerticalKey && this.isRightMouseDown))) {
+      this.keysPressed.add(normalizedKey);
       event.preventDefault();
     }
   }
@@ -426,11 +432,9 @@ export class EditorCameraController {
       return;
     }
     
-    const keyLower = key.toLowerCase();
-    if (['w', 'a', 's', 'd', 'q', 'e', 'c'].includes(keyLower) || key === ' ') {
-      // Remove both original and lowercase versions
-      this.keysPressed.delete(key);
-      this.keysPressed.delete(keyLower);
+    const normalizedKey = this.normalizeMovementKey(key);
+    if (normalizedKey) {
+      this.keysPressed.delete(normalizedKey);
       event.preventDefault();
       event.stopPropagation();
     }
@@ -552,6 +556,20 @@ export class EditorCameraController {
     this.up[0] = 0;
     this.up[1] = 1;
     this.up[2] = 0;
+  }
+
+  private normalizeMovementKey(key: string): string | null {
+    if (key === ' ') {
+      return 'space';
+    }
+    const lower = key.toLowerCase();
+    if (lower === 'space' || lower === 'spacebar') {
+      return 'space';
+    }
+    if (HORIZONTAL_MOVEMENT_KEYS.has(lower) || VERTICAL_MOVEMENT_KEYS.has(lower)) {
+      return lower;
+    }
+    return null;
   }
 }
 

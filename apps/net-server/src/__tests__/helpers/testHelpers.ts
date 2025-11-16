@@ -11,6 +11,19 @@ import type { ProjectData } from '../../types.js';
 
 const JWT_SECRET = process.env.JWT_SECRET || 'test-secret-key';
 
+export function generateTestUsername(prefix = 'testuser'): string {
+  const sanitizedPrefix = prefix.replace(/[^a-zA-Z0-9_]/g, '').slice(0, 10) || 'user';
+  const unique = `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 4)}`;
+  let username = `${sanitizedPrefix}_${unique}`.toLowerCase();
+  if (username.length > 20) {
+    username = username.slice(0, 20);
+  }
+  if (username.endsWith('_')) {
+    username = `${username.slice(0, -1)}${Math.random().toString(36).charAt(2)}`;
+  }
+  return username;
+}
+
 /**
  * Create a test user and return auth token
  */
@@ -20,7 +33,7 @@ export async function createTestUser(
   password = 'TestPassword123',
   username?: string
 ): Promise<{ userId: string; email: string; token: string }> {
-  const finalUsername = username || `testuser_${Date.now()}`;
+  const finalUsername = username || generateTestUsername();
   const result = await authManager.register(email, finalUsername, password);
   const token = result.session.token;
 

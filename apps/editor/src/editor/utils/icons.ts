@@ -68,7 +68,8 @@ export type IconName =
   | 'list'
   | 'map-pin'
   | 'flag'
-  | 'play-circle';
+  | 'play-circle'
+  | 'target';
 
 /**
  * Creates an SVG icon element.
@@ -229,6 +230,11 @@ function getIconPath(name: IconName): string | string[] {
     'play-circle': [
       'M22 12c0 5.523-4.477 10-10 10S2 17.523 2 12 6.477 2 12 2s10 4.477 10 10z',
       'M10 8l6 4-6 4V8z',
+    ],
+    target: [
+      'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z',
+      'M12 18a6 6 0 1 0 0-12 6 6 0 0 0 0 12z',
+      'M12 14a2 2 0 1 0 0-4 2 2 0 0 0 0 4z',
     ],
   };
 

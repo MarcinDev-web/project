@@ -9,11 +9,14 @@ import { ModelBuilder, BlockDefinitionGenerator } from '@engine/blocks';
 import { MicroBlockSystem } from '@engine/microblocks';
 import { ModelBuilderScene } from '../model-builder/ModelBuilderScene';
 import { ModelBuilderMode } from '../model-builder/ModelBuilderMode';
+import type { ModelBuilderModeConfig } from '../model-builder/ModelBuilderMode';
 import { ModelBuilderController } from '../controllers/ModelBuilderController';
+import type { ModelBuilderControllerConfig } from '../controllers/ModelBuilderController';
 import { BuildBoundsVisualizer } from '../model-builder/BuildBoundsVisualizer';
 import { MicroBlockPreview } from '../model-builder/MicroBlockPreview';
 import { ModelBuilderPanel } from '../panels/ModelBuilderPanel';
-import type { BuildBounds } from '@engine/blocks';
+import type { BuildBounds, ModelBuilderConfig } from '@engine/blocks';
+import type { ModelBuilderSceneConfig } from '../model-builder/ModelBuilderScene';
 import { DisposableGroup } from '@engine/core';
 
 /**
@@ -59,6 +62,9 @@ export class ModelBuilderManager {
       warn: console.warn.bind(console),
       error: (msg, err) => console.error(msg, err),
     };
+
+    // Keep reference to the host scene for future integrations
+    void this.scene;
   }
 
   /**
@@ -71,19 +77,30 @@ export class ModelBuilderManager {
     }
 
     // Create ModelBuilder
-    this.builder = new ModelBuilder({
-      bounds: this.config.bounds,
-      logger: this.logger,
-    });
+    const builderConfig: ModelBuilderConfig = this.logger
+      ? {
+          bounds: this.config.bounds,
+          logger: this.logger,
+        }
+      : {
+          bounds: this.config.bounds,
+        };
+
+    this.builder = new ModelBuilder(builderConfig);
 
     // Create ModelBuilderScene
-    this.builderScene = new ModelBuilderScene({
+    const builderSceneConfig: ModelBuilderSceneConfig = {
       roomSize: this.config.roomSize ?? 4,
-      logger: this.logger,
-    });
+    };
+
+    if (this.logger) {
+      builderSceneConfig.logger = this.logger;
+    }
+
+    this.builderScene = new ModelBuilderScene(builderSceneConfig);
 
     // Setup model entity
-    const modelEntity = this.builderScene.setupModel(this.builder);
+    this.builderScene.setupModel(this.builder);
 
     // Create MicroBlockSystem
     this.microBlockSystem = new MicroBlockSystem(this.builderScene.getScene(), {
@@ -92,19 +109,31 @@ export class ModelBuilderManager {
     });
 
     // Create ModelBuilderMode
+    const builderModeConfig: ModelBuilderModeConfig = {
+      enableHistory: true,
+    };
+
+    if (this.logger) {
+      builderModeConfig.logger = this.logger;
+    }
+
     this.builderMode = new ModelBuilderMode(
       this.builderScene.getScene(),
       this.builderScene,
       this.builder,
-      { enableHistory: true, logger: this.logger }
+      builderModeConfig
     );
 
     // Create controller
+    const controllerConfig: ModelBuilderControllerConfig | undefined = this.logger
+      ? { logger: this.logger }
+      : undefined;
+
     this.controller = new ModelBuilderController(
       this.builderScene.getScene(),
       this.builder,
       this.builderMode,
-      { logger: this.logger }
+      controllerConfig
     );
 
     // Create visualizer

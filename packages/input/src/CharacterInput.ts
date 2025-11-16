@@ -83,6 +83,17 @@ export class CharacterInputHandler {
    * Get current character input state
    */
   getInput(): CharacterInput {
+    // If handler is disabled, return empty input
+    if (!this._enabled) {
+      return {
+        moveDirection: [0, 0, 0],
+        sprint: false,
+        jump: false,
+        cameraForward: this.cameraForward,
+        cameraRight: this.cameraRight,
+      };
+    }
+    
     const input = this.inputManager.getInput();
     
     // Debug: log input occasionally

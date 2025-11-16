@@ -35,8 +35,11 @@ export class SettingsPanel {
   private settings: EditorSettings;
 
   constructor(config: SettingsPanelConfig) {
-    this.state = config.state;
-    this.onSettingsChanged = config.onSettingsChanged;
+    const { state, onSettingsChanged } = config;
+    this.state = state;
+    if (onSettingsChanged) {
+      this.onSettingsChanged = onSettingsChanged;
+    }
     
     // Load saved settings from localStorage
     const saved = this.loadSettings();

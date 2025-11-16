@@ -142,28 +142,24 @@ describe('GET /api/marketplace/builds', () => {
     expect(foundItem).toHaveProperty('playersOnline');
   });
 
-  it('handles invalid limit parameter gracefully', async () => {
+  it('returns 400 for invalid limit parameter', async () => {
     const response = await app.inject({
       method: 'GET',
       url: '/api/marketplace/builds',
       query: { limit: 'invalid' },
     });
 
-    expect(response.statusCode).toBe(200); // Should still work, using default
-    const body = JSON.parse(response.body);
-    expect(body.pageSize).toBeDefined();
+    expect(response.statusCode).toBe(400);
   });
 
-  it('handles invalid offset parameter gracefully', async () => {
+  it('returns 400 for invalid offset parameter', async () => {
     const response = await app.inject({
       method: 'GET',
       url: '/api/marketplace/builds',
       query: { offset: 'invalid' },
     });
 
-    expect(response.statusCode).toBe(200); // Should still work, using default
-    const body = JSON.parse(response.body);
-    expect(body).toHaveProperty('items');
+    expect(response.statusCode).toBe(400);
   });
 
   it('returns empty array when no builds exist', async () => {

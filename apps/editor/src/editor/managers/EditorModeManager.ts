@@ -95,6 +95,7 @@ export class EditorModeManager {
   
   // Legacy player entity (for compatibility)
   private playerEntity: Entity | null = null;
+  private playerScene: Scene | null = null;
   private playerSession: PlayerSession | null = null;
   private avatarInstance: AvatarInstance | null = null;
   private avatarVisualRoot: Entity | null = null;
@@ -214,12 +215,7 @@ export class EditorModeManager {
         this.editorCamera.setOrientation(state.yaw, state.pitch);
       },
       stopPhysics: () => this.physicsWorld?.stop(),
-      disableScripts: () => {
-        const runtime = this.config.scene.scriptRuntime;
-        if (runtime?.scriptSystem) {
-          runtime.scriptSystem.setEnabled(false);
-        }
-      },
+      disableScripts: () => this.setScriptSystemEnabled(false),
       enableHistory: () => config.state.enableHistory(),
       disableHistory: () => config.state.disableHistory(),
       isReturningFromPlay: () => this.returningFromPlay,
@@ -285,12 +281,7 @@ export class EditorModeManager {
       initializeCheckpoints: (scene) => {
         this.checkpointSystem.initialize(scene);
       },
-      enableScripts: () => {
-        const runtime = this.config.scene.scriptRuntime;
-        if (runtime?.scriptSystem) {
-          runtime.scriptSystem.setEnabled(true);
-        }
-      },
+      enableScripts: () => this.setScriptSystemEnabled(true),
       onFailure: () => {
         this.controls.setEnabled(false);
         if (this.editorCameraSnapshot && this.editorCamera) {
@@ -323,8 +314,8 @@ export class EditorModeManager {
         }
       },
       updateCharacterInput: (forward, right) => this.characterInput?.setCameraDirections(forward, right),
-      getCameraForward: () => this.getFPSCamera()?.getForwardDirection() ?? [0, 0, -1],
-      getCameraRight: () => this.getFPSCamera()?.getRightDirection() ?? [1, 0, 0],
+      getCameraForward: () => this.getMutableCameraForward(),
+      getCameraRight: () => this.getMutableCameraRight(),
       updateCheckpoints: (playerPosition) => this.checkpointSystem.update(playerPosition),
       resumeHistory: () => this.config.state.enableHistory(),
       updateMultiplayer: (deltaTime) => {
@@ -357,12 +348,7 @@ export class EditorModeManager {
         this.stateMachine.getMutableContext().data.delete('gameplayContextActive');
       },
       stopPhysics: () => this.physicsWorld?.stop(),
-      disableScripts: () => {
-        const runtime = this.config.scene.scriptRuntime;
-        if (runtime?.scriptSystem) {
-          runtime.scriptSystem.setEnabled(false);
-        }
-      },
+      disableScripts: () => this.setScriptSystemEnabled(false),
       disableCharacterInput: () => this.characterInput?.disable(),
       disableFPSCamera: () => this.getFPSCamera()?.disable(),
       unbindPlayerController: () => this.playerSession?.unbindController(),
@@ -661,11 +647,60 @@ export class EditorModeManager {
     this.characterInput?.clear();
   }
 
+  private getMutableCameraForward(): Vec3 {
+    const forward = this.getFPSCamera()?.getForwardDirection();
+    return forward ? this.cloneVec3(forward) : [0, 0, -1];
+  }
+
+  private getMutableCameraRight(): Vec3 {
+    const right = this.getFPSCamera()?.getRightDirection();
+    return right ? this.cloneVec3(right) : [1, 0, 0];
+  }
+
+  private cloneVec3(vec: Readonly<Vec3>): Vec3 {
+    return [vec[0], vec[1], vec[2]] as Vec3;
+  }
+
+  private setScriptSystemEnabled(enabled: boolean): void {
+    const runtime = this.config.scene.scriptRuntime as { scriptSystem?: unknown } | null;
+    if (!runtime) {
+      return;
+    }
+    const scriptSystem = runtime.scriptSystem;
+    if (this.isToggleableScriptSystem(scriptSystem)) {
+      scriptSystem.setEnabled(enabled);
+    }
+  }
+
+  private isToggleableScriptSystem(
+    value: unknown,
+  ): value is { setEnabled: (enabled: boolean) => void } {
+    if (typeof value !== 'object' || value === null) {
+      return false;
+    }
+    const candidate = value as { setEnabled?: unknown };
+    return typeof candidate.setEnabled === 'function';
+  }
+
   getWorldManager(): WorldManager {
     return this.worldManager;
   }
 
   getActiveScene(): Scene {
+    return this.worldManager.getRuntimeWorld() ?? this.config.scene;
+  }
+
+  /**
+   * Determine which scene is currently simulated by physics/character systems.
+   * Falls back to runtime world (if available) or the editor scene.
+   */
+  private getSimulationScene(): Scene {
+    if (this.physicsWorld) {
+      return this.physicsWorld.getScene();
+    }
+    if (this.characterSystem) {
+      return this.characterSystem.getScene();
+    }
     return this.worldManager.getRuntimeWorld() ?? this.config.scene;
   }
 
@@ -760,6 +795,9 @@ export class EditorModeManager {
   }
 
   dispose(): void {
+    // Ensure play mode resources are torn down even if dispose is called directly
+    this.cleanupPlayer();
+
     // Cleanup temporary editor camera entity and primary camera assignment
     if (this.editorCameraEntity) {
       try {
@@ -778,8 +816,6 @@ export class EditorModeManager {
     this.cameraDirector.dispose();
     this.inputContext.dispose();
     this.checkpointSystem.dispose();
-    this.playerEntity = null;
-    // Avatar is not used in editor, no cleanup needed
   }
 
   // ========== Collaboration Follow API ==========
@@ -966,14 +1002,11 @@ export class EditorModeManager {
       this.playerSession = session;
     }
 
-    // Add to runtime world if it exists, otherwise authoring world
-    const runtimeWorld = this.worldManager.getRuntimeWorld();
-    if (runtimeWorld) {
-      runtimeWorld.addEntity(player);
-    } else {
-      this.config.scene.addEntity(player);
-    }
-    
+    // Add to the scene that is currently simulated by physics/character systems.
+    const simulationScene = this.getSimulationScene();
+    simulationScene.addEntity(player);
+    this.playerScene = simulationScene;
+
     this.playerEntity = player;
 
     // Attach visual avatar under the player for play mode
@@ -1017,6 +1050,20 @@ export class EditorModeManager {
       }
     }
 
+    // Stop simulation subsystems to avoid leaving them running in editor mode
+    this.physicsWorld?.stop();
+    this.getFPSCamera()?.disable();
+    this.characterInput?.disable();
+    this.characterInput?.clear();
+
+    if (this.playerSession) {
+      try {
+        this.playerSession.dispose();
+      } catch (error) {
+        Logger.warn('Failed to dispose player session:', error as Error);
+      }
+    }
+
     // Cleanup avatar visuals
     if (this.avatarInstance) {
       try {
@@ -1030,17 +1077,33 @@ export class EditorModeManager {
     this.lastPlayedAnim = null;
 
     if (this.playerEntity) {
-      try {
-        const runtimeWorld = this.worldManager.getRuntimeWorld();
-        if (runtimeWorld) {
-          runtimeWorld.removeEntity(this.playerEntity);
-        } else {
-          this.config.scene.removeEntity(this.playerEntity);
-        }
-      } catch (error) {
-        Logger.warn('Error removing player entity:', error as Error);
+      const scenes = new Set<Scene>();
+      if (this.playerScene) {
+        scenes.add(this.playerScene);
       }
+      const runtimeWorld = this.worldManager.getRuntimeWorld();
+      if (runtimeWorld) {
+        scenes.add(runtimeWorld);
+      }
+      scenes.add(this.config.scene);
+
+      let removed = false;
+      for (const scene of scenes) {
+        try {
+          scene.removeEntity(this.playerEntity);
+          removed = true;
+          break;
+        } catch {
+          // Try next scene
+        }
+      }
+
+      if (!removed) {
+        Logger.warn('Failed to remove player entity from any scene');
+      }
+
       this.playerEntity = null;
+      this.playerScene = null;
     }
     this.playerSession = null;
   }

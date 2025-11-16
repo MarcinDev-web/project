@@ -299,6 +299,23 @@ export class CameraDirector {
     return this.projectionMatrix;
   }
 
+  /**
+   * Get the current camera world position.
+   * Optionally provide an output Vec3 to avoid allocations.
+   */
+  getPosition(out?: Vec3): Vec3 {
+    const target = out ?? (new Float32Array(3) as unknown as Vec3);
+
+    if (this.blend && this.blend.active) {
+      // Derive the camera position from the blended view matrix
+      mat4Invert(this.blendScratch.fromWorld, this.getViewMatrix());
+      mat4GetTranslationOut(target, this.blendScratch.fromWorld);
+      return target;
+    }
+
+    return this.computeCameraPosition(this.currentMode, target);
+  }
+
   setFov(radians: number): void {
     if (!Number.isFinite(radians) || radians <= 0) {
       return;
@@ -475,6 +492,52 @@ export class CameraDirector {
     if (!this.blend) {
       this.computeViewMatrix(this.currentMode, this.viewMatrix);
     }
+  }
+
+  private computeCameraPosition(mode: CameraMode, out: Vec3): Vec3 {
+    switch (mode) {
+      case 'orbit':
+        return this.computeOrbitCameraPosition(out);
+      case 'free-fly':
+        if (this.editorCamera) {
+          return this.copyVec3(this.editorCamera.getPosition(), out);
+        }
+        return this.computeOrbitCameraPosition(out);
+      case 'fps':
+        if (this.fpsCamera && this.playerPosition) {
+          out[0] = this.playerPosition[0] + this.cameraOffset[0];
+          out[1] = this.playerPosition[1] + this.cameraOffset[1];
+          out[2] = this.playerPosition[2] + this.cameraOffset[2];
+          const resolved = this.resolveCameraCollision(out);
+          return resolved === out ? out : this.copyVec3(resolved, out);
+        }
+        return this.computeOrbitCameraPosition(out);
+      case 'third-person':
+        if (this.thirdPersonCamera) {
+          return this.copyVec3(this.thirdPersonCamera.getPosition(), out);
+        }
+        return this.computeOrbitCameraPosition(out);
+      default:
+        return this.computeOrbitCameraPosition(out);
+    }
+  }
+
+  private computeOrbitCameraPosition(out: Vec3): Vec3 {
+    const { yaw, pitch, distance } = this.orbitControls.getState();
+    const cosPitch = Math.cos(pitch);
+    const sinPitch = Math.sin(pitch);
+
+    out[0] = cosPitch * Math.sin(yaw) * distance;
+    out[1] = sinPitch * distance;
+    out[2] = cosPitch * Math.cos(yaw) * distance;
+    return out;
+  }
+
+  private copyVec3(source: Vec3, target: Vec3): Vec3 {
+    target[0] = source[0];
+    target[1] = source[1];
+    target[2] = source[2];
+    return target;
   }
 
   /**

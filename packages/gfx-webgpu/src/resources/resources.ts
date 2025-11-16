@@ -4,6 +4,11 @@ import { DEFAULT_INSTANCE_GRID } from '../config';
 import { Logger } from '@engine/core/utils';
 import { TextureAtlas } from '../textures/TextureAtlas';
 import { buildDefaultAtlasMaterials } from './defaultAtlasMaterials';
+import {
+  INDIRECT_COMMAND_BYTE_LENGTH,
+  INDIRECT_COMMAND_COUNT,
+  buildIndirectDrawArgs,
+} from '../core/InstancePipelineTypes';
 
 // Warn-once flag for mock environments lacking copyBufferToTexture
 let warnedNoCopyBufferToTexture = false;
@@ -20,18 +25,30 @@ export interface GeometryData {
   instanceMaterialParamsData: Float32Array;
   instanceRotationData: Float32Array;
   instanceMaterialIdData?: Float32Array; // NEW: For texture atlas (optional)
+  instanceBoundsData: Float32Array;
 }
 
 export interface FrameResources {
   vertexBuffer: GPUBuffer;
   indexBuffer: GPUBuffer;
   instanceOffsetBuffer: GPUBuffer;
+  instanceOffsetStagingBuffer: GPUBuffer;
   instanceColorScaleBuffer: GPUBuffer;
+  instanceColorScaleStagingBuffer: GPUBuffer;
   instanceSecondaryColorBuffer: GPUBuffer;
+  instanceSecondaryColorStagingBuffer: GPUBuffer;
   instanceEmissiveColorBuffer: GPUBuffer;
+  instanceEmissiveColorStagingBuffer: GPUBuffer;
   instanceMaterialParamsBuffer: GPUBuffer;
+  instanceMaterialParamsStagingBuffer: GPUBuffer;
   instanceRotationBuffer: GPUBuffer;
+  instanceRotationStagingBuffer: GPUBuffer;
   instanceMaterialIdBuffer: GPUBuffer; // NEW: For texture atlas
+  instanceMaterialIdStagingBuffer: GPUBuffer;
+  /** Bounds used by compute passes (center.xyz + radius). */
+  instanceBoundsBuffer: GPUBuffer;
+  /** Draw arguments for opaque/transparent/overlay instanced draws. */
+  instanceIndirectArgsBuffer: GPUBuffer;
   uniformBuffer: GPUBuffer;
   uniformBindGroupLayout: GPUBindGroupLayout;
   textureBindGroupLayout: GPUBindGroupLayout;
@@ -415,6 +432,22 @@ export const DEFAULT_GEOMETRY: GeometryData = {
     data.fill(0); // All instances use default material (ID 0)
     return data;
   })(),
+  instanceBoundsData: (() => {
+    const dim = DEFAULT_INSTANCE_GRID.dimensions;
+    const data = new Float32Array(dim * dim * 4);
+    const spacing = DEFAULT_INSTANCE_GRID.spacing;
+    const half = (dim - 1) * 0.5 * spacing;
+    let i = 0;
+    for (let y = 0; y < dim; y++) {
+      for (let x = 0; x < dim; x++) {
+        data[i++] = x * spacing - half;
+        data[i++] = 0;
+        data[i++] = y * spacing - half;
+        data[i++] = 0.75;
+      }
+    }
+    return data;
+  })(),
 };
 
 // Validate bundled default geometry at module load time to catch errors early.
@@ -478,26 +511,51 @@ export function createGeometryBuffers(
   vertexBuffer: GPUBuffer;
   indexBuffer: GPUBuffer;
   instanceOffsetBuffer: GPUBuffer;
+  instanceOffsetStagingBuffer: GPUBuffer;
   instanceColorScaleBuffer: GPUBuffer;
+  instanceColorScaleStagingBuffer: GPUBuffer;
   instanceSecondaryColorBuffer: GPUBuffer;
+  instanceSecondaryColorStagingBuffer: GPUBuffer;
   instanceEmissiveColorBuffer: GPUBuffer;
+  instanceEmissiveColorStagingBuffer: GPUBuffer;
   instanceMaterialParamsBuffer: GPUBuffer;
+  instanceMaterialParamsStagingBuffer: GPUBuffer;
   instanceRotationBuffer: GPUBuffer;
+  instanceRotationStagingBuffer: GPUBuffer;
   instanceMaterialIdBuffer: GPUBuffer; // NEW
+  instanceMaterialIdStagingBuffer: GPUBuffer;
+  instanceBoundsBuffer: GPUBuffer;
 } {
   // Validate provided geometry early to surface issues before GPU resource creation.
   validateGeometryData(geometry);
-  const vertexBuffer = device.createBuffer({
-    label: 'cube-vertex-buffer',
-    size: geometry.vertices.byteLength,
-    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-  });
-  device.queue.writeBuffer(
-    vertexBuffer,
-    0,
-    geometry.vertices.buffer as ArrayBuffer,
-    geometry.vertices.byteOffset,
-    geometry.vertices.byteLength
+  const createBufferWithData = (
+    label: string,
+    usage: GPUBufferUsageFlags,
+    data: ArrayBufferView,
+    minSize = 0
+  ): GPUBuffer => {
+    const size = Math.max(data.byteLength, minSize, 16);
+    const buffer = device.createBuffer({
+      label,
+      size,
+      usage,
+    });
+    if (data.byteLength > 0) {
+      device.queue.writeBuffer(
+        buffer,
+        0,
+        data.buffer as ArrayBuffer,
+        data.byteOffset,
+        data.byteLength
+      );
+    }
+    return buffer;
+  };
+
+  const vertexBuffer = createBufferWithData(
+    'cube-vertex-buffer',
+    GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+    geometry.vertices
   );
 
   const indexBuffer = device.createBuffer({
@@ -513,118 +571,140 @@ export function createGeometryBuffers(
     geometry.indices.byteLength
   );
 
-  const instanceOffsetBuffer = device.createBuffer({
-    label: 'instance-offset-buffer',
-    size: geometry.instanceOffsetData.byteLength,
-    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-  });
-  device.queue.writeBuffer(
-    instanceOffsetBuffer,
-    0,
-    geometry.instanceOffsetData.buffer as ArrayBuffer,
-    geometry.instanceOffsetData.byteOffset,
-    geometry.instanceOffsetData.byteLength
+  const renderInstanceUsage =
+    GPUBufferUsage.VERTEX |
+    GPUBufferUsage.COPY_DST |
+    GPUBufferUsage.STORAGE |
+    GPUBufferUsage.COPY_SRC;
+  const stagingInstanceUsage =
+    GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC;
+
+  const instanceOffsetBuffer = createBufferWithData(
+    'instance-offset-buffer',
+    renderInstanceUsage,
+    geometry.instanceOffsetData
+  );
+  const instanceOffsetStagingBuffer = createBufferWithData(
+    'instance-offset-staging-buffer',
+    stagingInstanceUsage,
+    geometry.instanceOffsetData
   );
 
-  const instanceColorScaleBuffer = device.createBuffer({
-    label: 'instance-color-scale-buffer',
-    size: geometry.instanceColorScaleData.byteLength,
-    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-  });
-  device.queue.writeBuffer(
-    instanceColorScaleBuffer,
-    0,
-    geometry.instanceColorScaleData.buffer as ArrayBuffer,
-    geometry.instanceColorScaleData.byteOffset,
-    geometry.instanceColorScaleData.byteLength
+  const instanceColorScaleBuffer = createBufferWithData(
+    'instance-color-scale-buffer',
+    renderInstanceUsage,
+    geometry.instanceColorScaleData
+  );
+  const instanceColorScaleStagingBuffer = createBufferWithData(
+    'instance-color-scale-staging-buffer',
+    stagingInstanceUsage,
+    geometry.instanceColorScaleData
   );
 
-  const instanceSecondaryColorBuffer = device.createBuffer({
-    label: 'instance-secondary-color-buffer',
-    size: geometry.instanceSecondaryColorData.byteLength,
-    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-  });
-  device.queue.writeBuffer(
-    instanceSecondaryColorBuffer,
-    0,
-    geometry.instanceSecondaryColorData.buffer as ArrayBuffer,
-    geometry.instanceSecondaryColorData.byteOffset,
-    geometry.instanceSecondaryColorData.byteLength
+  const instanceSecondaryColorBuffer = createBufferWithData(
+    'instance-secondary-color-buffer',
+    renderInstanceUsage,
+    geometry.instanceSecondaryColorData
+  );
+  const instanceSecondaryColorStagingBuffer = createBufferWithData(
+    'instance-secondary-color-staging-buffer',
+    stagingInstanceUsage,
+    geometry.instanceSecondaryColorData
   );
 
-  const instanceEmissiveColorBuffer = device.createBuffer({
-    label: 'instance-emissive-color-buffer',
-    size: geometry.instanceEmissiveColorData.byteLength,
-    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-  });
-  device.queue.writeBuffer(
-    instanceEmissiveColorBuffer,
-    0,
-    geometry.instanceEmissiveColorData.buffer as ArrayBuffer,
-    geometry.instanceEmissiveColorData.byteOffset,
-    geometry.instanceEmissiveColorData.byteLength
+  const instanceEmissiveColorBuffer = createBufferWithData(
+    'instance-emissive-color-buffer',
+    renderInstanceUsage,
+    geometry.instanceEmissiveColorData
+  );
+  const instanceEmissiveColorStagingBuffer = createBufferWithData(
+    'instance-emissive-color-staging-buffer',
+    stagingInstanceUsage,
+    geometry.instanceEmissiveColorData
   );
 
-  const instanceMaterialParamsBuffer = device.createBuffer({
-    label: 'instance-material-params-buffer',
-    size: geometry.instanceMaterialParamsData.byteLength,
-    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-  });
-  device.queue.writeBuffer(
-    instanceMaterialParamsBuffer,
-    0,
-    geometry.instanceMaterialParamsData.buffer as ArrayBuffer,
-    geometry.instanceMaterialParamsData.byteOffset,
-    geometry.instanceMaterialParamsData.byteLength
+  const instanceMaterialParamsBuffer = createBufferWithData(
+    'instance-material-params-buffer',
+    renderInstanceUsage,
+    geometry.instanceMaterialParamsData
+  );
+  const instanceMaterialParamsStagingBuffer = createBufferWithData(
+    'instance-material-params-staging-buffer',
+    stagingInstanceUsage,
+    geometry.instanceMaterialParamsData
   );
 
-  const instanceRotationBuffer = device.createBuffer({
-    label: 'instance-rotation-buffer',
-    size: geometry.instanceRotationData.byteLength,
-    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-  });
-  device.queue.writeBuffer(
-    instanceRotationBuffer,
-    0,
-    geometry.instanceRotationData.buffer as ArrayBuffer,
-    geometry.instanceRotationData.byteOffset,
-    geometry.instanceRotationData.byteLength
+  const instanceRotationBuffer = createBufferWithData(
+    'instance-rotation-buffer',
+    renderInstanceUsage,
+    geometry.instanceRotationData
+  );
+  const instanceRotationStagingBuffer = createBufferWithData(
+    'instance-rotation-staging-buffer',
+    stagingInstanceUsage,
+    geometry.instanceRotationData
   );
 
   // NEW: Material ID buffer for texture atlas
-  const expectedMaterialIdsBytes = Math.max(
-    geometry.instanceMaterialIdData?.byteLength ?? 0,
-    Math.max(0, geometry.instanceCount) * 4
+  const ensureMaterialIdData = (): Float32Array => {
+    const requiredLength = Math.max(geometry.instanceCount, 1);
+    const existing = geometry.instanceMaterialIdData;
+    if (!existing || existing.length < requiredLength) {
+      return new Float32Array(requiredLength);
+    }
+    return existing;
+  };
+  const instanceMaterialIdData = ensureMaterialIdData();
+  const instanceMaterialIdBuffer = createBufferWithData(
+    'instance-material-id-buffer',
+    renderInstanceUsage,
+    instanceMaterialIdData
   );
-  const instanceMaterialIdBuffer = device.createBuffer({
-    label: 'instance-material-id-buffer',
-    size: expectedMaterialIdsBytes,
-    usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+  const instanceMaterialIdStagingBuffer = createBufferWithData(
+    'instance-material-id-staging-buffer',
+    stagingInstanceUsage,
+    instanceMaterialIdData
+  );
+
+  const instanceBoundsSource =
+    geometry.instanceBoundsData ??
+    new Float32Array(Math.max(geometry.instanceCount, 1) * 4);
+  const instanceBoundsBuffer = createBufferWithData(
+    'instance-bounds-buffer',
+    GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC,
+    instanceBoundsSource
+  );
+
+  const instanceIndirectArgsBuffer = device.createBuffer({
+    label: 'instance-indirect-args-buffer',
+    size: INDIRECT_COMMAND_BYTE_LENGTH * INDIRECT_COMMAND_COUNT,
+    usage: GPUBufferUsage.INDIRECT | GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
   });
-  if (geometry.instanceMaterialIdData && geometry.instanceMaterialIdData.byteLength > 0) {
-    device.queue.writeBuffer(
-      instanceMaterialIdBuffer,
-      0,
-      geometry.instanceMaterialIdData.buffer as ArrayBuffer,
-      geometry.instanceMaterialIdData.byteOffset,
-      geometry.instanceMaterialIdData.byteLength
-    );
-  } else if (expectedMaterialIdsBytes > 0) {
-    // Initialize with zeros to ensure defined data; default to material 0
-    const zeros = new Uint8Array(expectedMaterialIdsBytes);
-    device.queue.writeBuffer(instanceMaterialIdBuffer, 0, zeros);
-  }
+  const indexCount = geometry.indices.length;
+  const opaqueCount = Math.min(Math.max(geometry.opaqueCount ?? geometry.instanceCount, 0), geometry.instanceCount);
+  const transparentCount = Math.max(geometry.instanceCount - opaqueCount, 0);
+  const indirectArgs = buildIndirectDrawArgs(indexCount, opaqueCount, transparentCount);
+  device.queue.writeBuffer(instanceIndirectArgsBuffer, 0, indirectArgs);
 
   return {
     vertexBuffer,
     indexBuffer,
     instanceOffsetBuffer,
+    instanceOffsetStagingBuffer,
     instanceColorScaleBuffer,
+    instanceColorScaleStagingBuffer,
     instanceSecondaryColorBuffer,
+    instanceSecondaryColorStagingBuffer,
     instanceEmissiveColorBuffer,
+    instanceEmissiveColorStagingBuffer,
     instanceMaterialParamsBuffer,
+    instanceMaterialParamsStagingBuffer,
     instanceRotationBuffer,
+    instanceRotationStagingBuffer,
     instanceMaterialIdBuffer, // NEW
+    instanceMaterialIdStagingBuffer,
+    instanceBoundsBuffer,
+    instanceIndirectArgsBuffer,
   };
 }
 

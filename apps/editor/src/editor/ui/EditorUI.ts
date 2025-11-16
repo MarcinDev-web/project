@@ -1160,7 +1160,14 @@ export class EditorUI {
     // Create default Environment entity for skybox/atmosphere editing
     try {
       const envEntity = new Entity('Environment');
-      envEntity.addComponent(new EnvironmentComponent());
+      const envComp = new EnvironmentComponent();
+      envComp.skyboxType = 'cubemap';
+      envComp.cloudsEnabled = false;
+      envComp.ambientIntensity = 0.45;
+      envComp.exposure = 1.25;
+      // Hints for UI to display status of built-in cubemap
+      (envComp as EnvironmentComponent & { cubemapPath?: string }).cubemapPath = 'procedural-clouds';
+      envEntity.addComponent(envComp);
       // Position far away to avoid collision/interaction - this is not a visible mesh
       envEntity.transform.position = [0, -1000, 0];
       try {

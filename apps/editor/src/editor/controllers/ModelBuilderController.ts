@@ -4,13 +4,13 @@
  * Raycasting, mouse clicks, dragging, keyboard shortcuts
  */
 
-import type { Scene } from '@engine/world';
-import { Raycaster, type RaycastHit } from '@engine/world';
+import { Raycaster } from '@engine/world';
+import type { Scene, Entity, Ray, RaycastHit } from '@engine/world';
 import type { ModelBuilder } from '@engine/blocks';
 import type { ModelBuilderMode } from '../model-builder/ModelBuilderMode';
+import { MicroBlockComponent, MICRO_BLOCK_SIZE } from '@engine/microblocks';
 import type { LocalPos } from '@engine/microblocks';
 import type { Vec3 } from '@engine/core/math';
-import { MICRO_BLOCK_SIZE } from '@engine/microblocks';
 
 /**
  * Configuration for ModelBuilderController
@@ -24,6 +24,8 @@ export interface ModelBuilderControllerConfig {
   };
 }
 
+type ControllerLogger = NonNullable<ModelBuilderControllerConfig['logger']>;
+
 /**
  * ModelBuilderController handles user input and raycasting
  */
@@ -32,7 +34,13 @@ export class ModelBuilderController {
   private readonly builder: ModelBuilder;
   private readonly mode: ModelBuilderMode;
   private readonly raycaster: Raycaster;
-  private readonly logger: ModelBuilderControllerConfig['logger'];
+  private readonly logger: ControllerLogger;
+  private readonly scratchRay: Ray = {
+    origin: [0, 0, 0] as [number, number, number],
+    direction: [0, 0, 0] as [number, number, number],
+  };
+  private cachedMicroBlockEntities: Entity[] = [];
+  private cachedEntityCount = -1;
 
   private isDragging = false;
   private lastHitPos: LocalPos | null = null;
@@ -46,32 +54,31 @@ export class ModelBuilderController {
     this.scene = scene;
     this.builder = builder;
     this.mode = mode;
-    this.raycaster = new Raycaster(scene);
+    this.raycaster = new Raycaster();
     this.logger = config?.logger ?? {
       debug: console.debug.bind(console),
       warn: console.warn.bind(console),
       error: (msg, err) => console.error(msg, err),
     };
+    this.logger.debug('ModelBuilderController initialized');
   }
 
   /**
    * Performs raycast and returns hit position in local coordinates
    */
   raycast(rayOrigin: Vec3, rayDirection: Vec3): LocalPos | null {
-    const hit = this.raycaster.intersect(rayOrigin, rayDirection);
-    if (!hit || !hit.entity) {
+    const targetEntities = this.getMicroBlockEntities();
+    if (targetEntities.length === 0) {
       return null;
     }
 
-    // Convert world position to local position
-    const worldPos = hit.point;
-    const localPos: LocalPos = [
-      Math.floor(worldPos[0] / MICRO_BLOCK_SIZE),
-      Math.floor(worldPos[1] / MICRO_BLOCK_SIZE),
-      Math.floor(worldPos[2] / MICRO_BLOCK_SIZE),
-    ];
+    const ray = this.updateRay(rayOrigin, rayDirection);
+    const hit: RaycastHit | null = this.raycaster.raycastClosest(ray, targetEntities);
+    if (!hit) {
+      return null;
+    }
 
-    return localPos;
+    return this.toLocalPos(hit.point);
   }
 
   /**
@@ -210,6 +217,43 @@ export class ModelBuilderController {
    */
   getLastHitPosition(): LocalPos | null {
     return this.lastHitPos;
+  }
+
+  private updateRay(rayOrigin: Vec3, rayDirection: Vec3): Ray {
+    const ray = this.scratchRay;
+    const origin = ray.origin;
+    origin[0] = rayOrigin[0] ?? 0;
+    origin[1] = rayOrigin[1] ?? 0;
+    origin[2] = rayOrigin[2] ?? 0;
+
+    const direction = ray.direction;
+    direction[0] = rayDirection[0] ?? 0;
+    direction[1] = rayDirection[1] ?? 0;
+    direction[2] = rayDirection[2] ?? 0;
+
+    const length = Math.hypot(direction[0], direction[1], direction[2]) || 1;
+    direction[0] /= length;
+    direction[1] /= length;
+    direction[2] /= length;
+
+    return ray;
+  }
+
+  private getMicroBlockEntities(): Entity[] {
+    const entityCount = this.scene.entityCount;
+    if (entityCount !== this.cachedEntityCount) {
+      this.cachedMicroBlockEntities = this.scene.queryEntities(MicroBlockComponent);
+      this.cachedEntityCount = entityCount;
+    }
+    return this.cachedMicroBlockEntities;
+  }
+
+  private toLocalPos(worldPos: [number, number, number]): LocalPos {
+    return [
+      Math.floor((worldPos[0] ?? 0) / MICRO_BLOCK_SIZE),
+      Math.floor((worldPos[1] ?? 0) / MICRO_BLOCK_SIZE),
+      Math.floor((worldPos[2] ?? 0) / MICRO_BLOCK_SIZE),
+    ] as LocalPos;
   }
 }
 

@@ -28,7 +28,7 @@ import { SidebarTabs } from '../ui/SidebarTabs';
 import { TemplateGalleryPanel } from './TemplateGalleryPanel';
 import { VegetationPanel } from './VegetationPanel';
 import { EconomyPanel } from './EconomyPanel';
-import { MarketplacePanel } from './MarketplacePanel';
+import { MarketplacePanel, type MarketplacePanelConfig } from './MarketplacePanel';
 import { UIPanel } from './UIPanel';
 import { NpcPanel } from './NpcPanel';
 import { WeaponPanel } from './WeaponPanel';
@@ -39,7 +39,7 @@ import type { TerrainBuilderStudio } from '../terrain/TerrainBuilderStudio';
 import { RenderSettingsPanel } from './RenderSettingsPanel';
 import { SettingsPanel } from './SettingsPanel';
 import { QuickActionsPanel } from './QuickActionsPanel';
-import { hydrateScene, resolveEntityByPath, type SceneSnapshot } from '@engine/editor-utils';
+import { hydrateScene, resolveEntityByPath, serializeScene, computeEntityPath, type SceneSnapshot } from '@engine/editor-utils';
 import { MaterialComponent } from '@engine/world/components/MaterialComponent';
 
 export interface PanelVisibility {
@@ -85,6 +85,8 @@ export interface EditorPanelManagerConfig {
  */
 export class EditorPanelManager {
   private readonly disposables = new DisposableGroup();
+  private quickActionsUndoStack: Array<() => void> = [];
+  private maxQuickActionsUndoStackSize = 20;
 
   private sidebarTabs: SidebarTabs | null = null;
   private sidebarContainer: HTMLElement | null = null;
@@ -261,7 +263,7 @@ export class EditorPanelManager {
       assetPreset: defaultNpcPreset,
       onConfigChanged: (config) => {
         // Update the preset with new config
-        if (defaultNpcPreset.npcConfig) {
+        if (config && defaultNpcPreset.npcConfig) {
           defaultNpcPreset.npcConfig = config;
         }
       },
@@ -294,10 +296,15 @@ export class EditorPanelManager {
     const economyPanel = new EconomyPanel();
 
     // Initialize Marketplace Panel
-    this.marketplacePanel = new MarketplacePanel({
-      onImportBuild: this.config.onImportMarketplaceBuild,
-      onAssetPurchased: this.config.onMarketplaceAssetPurchased,
-    });
+    const marketplacePanelConfig: MarketplacePanelConfig = {};
+    const { onImportMarketplaceBuild, onMarketplaceAssetPurchased } = this.config;
+    if (onImportMarketplaceBuild) {
+      marketplacePanelConfig.onImportBuild = onImportMarketplaceBuild;
+    }
+    if (onMarketplaceAssetPurchased) {
+      marketplacePanelConfig.onAssetPurchased = onMarketplaceAssetPurchased;
+    }
+    this.marketplacePanel = new MarketplacePanel(marketplacePanelConfig);
 
     // Initialize Weapon Panel
     this.weaponPanel = new WeaponPanel({
@@ -401,11 +408,29 @@ export class EditorPanelManager {
       entityHasTexture: (entity, materialComp) => this.entityHasTexture(entity, materialComp),
       setManagedTimeout: (fn, ms) => window.setTimeout(fn, ms),
       registerUndo: (action) => {
-        this.config.state.history.pushSnapshot();
-        this.config.state.history.registerUndo(action);
+        if (!action) return;
+        
+        // Store restore action in local undo stack for quick property changes
+        this.quickActionsUndoStack.push(action);
+        
+        // Limit stack size
+        if (this.quickActionsUndoStack.length > this.maxQuickActionsUndoStackSize) {
+          this.quickActionsUndoStack.shift();
+        }
+        
+        // For major changes (like transform changes that affect multiple entities),
+        // we could optionally create a scene snapshot, but for simple property tweaks
+        // the local undo stack is more efficient
       },
       announce: (message) => {
-        // Could integrate with status message system
+        // Create aria-live announcement for accessibility
+        const announceEl = document.querySelector('[role="status"][aria-live]') as HTMLElement;
+        if (announceEl) {
+          announceEl.textContent = message;
+          setTimeout(() => {
+            if (announceEl) announceEl.textContent = '';
+          }, 2000);
+        }
         console.log('[QuickActions]', message);
       },
       state: this.config.state,

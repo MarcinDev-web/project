@@ -23,6 +23,7 @@ export interface InstanceData {
   instanceMaterialParamsData: Float32Array;
   instanceRotationData: Float32Array;
   instanceMaterialIdData: Float32Array;
+  instanceBoundsData: Float32Array;
 }
 
 /**
@@ -45,6 +46,7 @@ export class InstanceDataBuilder {
   private materialParamsBuffer: Float32Array;
   private rotationBuffer: Float32Array;
   private materialIdBuffer: Float32Array;
+  private boundsBuffer: Float32Array;
   private capacity: number;
 
   constructor(initialCapacity = 1000) {
@@ -56,6 +58,7 @@ export class InstanceDataBuilder {
     this.materialParamsBuffer = new Float32Array(initialCapacity * 4);
     this.rotationBuffer = new Float32Array(initialCapacity * 4);
     this.materialIdBuffer = new Float32Array(initialCapacity);
+    this.boundsBuffer = new Float32Array(initialCapacity * 4);
   }
 
   /**
@@ -70,6 +73,7 @@ export class InstanceDataBuilder {
     this.materialParamsBuffer = new Float32Array(newCapacity * 4);
     this.rotationBuffer = new Float32Array(newCapacity * 4);
     this.materialIdBuffer = new Float32Array(newCapacity);
+    this.boundsBuffer = new Float32Array(newCapacity * 4);
   }
 
   /**
@@ -251,6 +255,13 @@ export class InstanceDataBuilder {
 
       // Material ID (for texture atlas)
       this.materialIdBuffer[index] = material?.materialId ?? 0;
+
+      const maxExtent = Math.max(scale[0], scale[1], scale[2]);
+      const radius = Math.max(maxExtent * 0.5, 0.001);
+      this.boundsBuffer[index * 4 + 0] = pos[0];
+      this.boundsBuffer[index * 4 + 1] = pos[1];
+      this.boundsBuffer[index * 4 + 2] = pos[2];
+      this.boundsBuffer[index * 4 + 3] = radius;
     }
 
     // Return views (no allocations)
@@ -264,6 +275,7 @@ export class InstanceDataBuilder {
       instanceMaterialParamsData: this.materialParamsBuffer.subarray(0, count * 4),
       instanceRotationData: this.rotationBuffer.subarray(0, count * 4),
       instanceMaterialIdData: this.materialIdBuffer.subarray(0, count),
+      instanceBoundsData: this.boundsBuffer.subarray(0, count * 4),
     };
   }
 

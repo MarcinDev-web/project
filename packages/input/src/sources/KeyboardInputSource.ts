@@ -160,27 +160,48 @@ export class KeyboardInputSource implements InputSource {
 
   /**
    * Setup keyboard event listeners
+   * Uses capture phase to intercept events before InputContextManager
    */
   private setupEventListeners(): void {
-    window.addEventListener('keydown', this.boundHandleKeyDown);
-    window.addEventListener('keyup', this.boundHandleKeyUp);
+    window.addEventListener('keydown', this.boundHandleKeyDown, true); // capture phase
+    window.addEventListener('keyup', this.boundHandleKeyUp, true); // capture phase
   }
 
   /**
    * Handle key down event
    */
   private handleKeyDown(event: KeyboardEvent): void {
+    // Always log movement keys for debugging
+    const isMovementKey = ['KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(event.code);
+    
     if (!this._enabled) {
       // Debug: log when keys are pressed but input is disabled
-      if (['KeyW', 'KeyA', 'KeyS', 'KeyD', 'Space', 'ShiftLeft', 'ShiftRight'].includes(event.code)) {
+      if (isMovementKey || ['Space', 'ShiftLeft', 'ShiftRight'].includes(event.code)) {
         console.log('[KeyboardInputSource] Key pressed but disabled:', event.code, '_enabled:', this._enabled);
       }
       return;
     }
+    
+    // Check if this is a movement or action key
+    const isMovementKeyInMapping = this.mapping.movement.forward.includes(event.code) ||
+                         this.mapping.movement.backward.includes(event.code) ||
+                         this.mapping.movement.left.includes(event.code) ||
+                         this.mapping.movement.right.includes(event.code);
+    const isActionKey = this.mapping.actions.jump.includes(event.code) ||
+                       this.mapping.actions.sprint.includes(event.code) ||
+                       this.mapping.actions.interact.includes(event.code);
+    
+    // Prevent default browser behavior for movement/action keys to avoid scrolling, etc.
+    if (isMovementKeyInMapping || isActionKey) {
+      event.preventDefault();
+      // Don't stop propagation - let InputContextManager also receive the event
+      // but KeyboardInputSource handles it first in capture phase
+    }
+    
     this.keys.set(event.code, true);
     // Debug: log movement keys
-    if (['KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(event.code)) {
-      console.log('[KeyboardInputSource] Movement key pressed:', event.code, 'keys state:', Array.from(this.keys.entries()).filter(([_, v]) => v));
+    if (isMovementKey) {
+      console.log('[KeyboardInputSource] Movement key pressed:', event.code, 'enabled:', this._enabled, 'keys state:', Array.from(this.keys.entries()).filter(([_, v]) => v).map(([k]) => k));
     }
   }
 
@@ -203,8 +224,8 @@ export class KeyboardInputSource implements InputSource {
    */
   dispose(): void {
     this.disable();
-    window.removeEventListener('keydown', this.boundHandleKeyDown);
-    window.removeEventListener('keyup', this.boundHandleKeyUp);
+    window.removeEventListener('keydown', this.boundHandleKeyDown, true); // capture phase
+    window.removeEventListener('keyup', this.boundHandleKeyUp, true); // capture phase
     this.keys.clear();
   }
 }

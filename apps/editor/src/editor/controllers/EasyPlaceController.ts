@@ -293,7 +293,7 @@ export class EasyPlaceController {
     const previewState = this.config.placementMode.getPreview();
     const baseRotation = [...preview.transform.rotation] as Quat;
     const baseScale = [...preview.transform.scale] as Vec3;
-    const assetPreset = previewState.asset ?? undefined;
+    const assetPreset = previewState.asset ?? null;
 
     const placed: Entity[] = [];
     for (const pos of positions) {

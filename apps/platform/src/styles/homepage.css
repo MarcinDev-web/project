@@ -60,6 +60,346 @@
   pointer-events: none;
 }
 
+.discover-stack {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-6);
+  margin-bottom: var(--spacing-8);
+}
+
+.discover-loading,
+.discover-error {
+  padding: var(--spacing-6);
+  border-radius: 8px;
+  background: rgba(35, 38, 46, 0.5);
+  border: 1px solid var(--fw-border-color-medium);
+  text-align: center;
+  color: rgba(200, 210, 220, 0.85);
+}
+
+.discover-error {
+  border-color: var(--fw-status-error);
+  color: var(--fw-status-error);
+}
+
+.discover-hero {
+  padding: var(--spacing-5);
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(41, 44, 54, 0.9), rgba(28, 30, 38, 0.9));
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  box-shadow: 0 12px 24px rgba(0, 0, 0, 0.45);
+}
+
+.discover-hero__intro {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: var(--spacing-4);
+  gap: var(--spacing-3);
+  flex-wrap: wrap;
+}
+
+.discover-hero__intro p {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: #fff;
+  margin: 0;
+}
+
+.discover-hero__intro span {
+  color: rgba(200, 210, 220, 0.8);
+  font-weight: 600;
+}
+
+.discover-hero__cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(240px, 1fr));
+  gap: var(--spacing-4);
+}
+
+.discover-hero-card {
+  display: flex;
+  gap: var(--spacing-3);
+  padding: var(--spacing-3);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.02);
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  color: inherit;
+  text-decoration: none;
+  transition: transform var(--transition-fast), border var(--transition-fast);
+}
+
+.discover-hero-card:hover {
+  transform: translateY(-2px);
+  border-color: var(--fw-accent-primary);
+}
+
+.discover-hero-card__thumb {
+  width: 72px;
+  height: 72px;
+  border-radius: 6px;
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 2rem;
+  color: rgba(255, 255, 255, 0.8);
+}
+
+.discover-hero-card__thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.discover-hero-card__meta h3 {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+
+.discover-hero-card__meta p {
+  margin: var(--spacing-1) 0;
+  color: rgba(200, 210, 220, 0.8);
+}
+
+.discover-hero-card__stats {
+  display: flex;
+  gap: var(--spacing-2);
+  font-size: var(--text-sm);
+  color: rgba(200, 210, 220, 0.8);
+}
+
+.discover-section {
+  padding: var(--spacing-5);
+  border-radius: 10px;
+  border: 1px solid var(--fw-border-color-medium);
+  background: rgba(24, 26, 32, 0.8);
+}
+
+.discover-section__header {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: var(--spacing-2);
+  align-items: baseline;
+  margin-bottom: var(--spacing-4);
+}
+
+.discover-section__header h2 {
+  margin: 0;
+  font-size: var(--text-xl);
+  color: #fff;
+}
+
+.discover-section__header span {
+  color: rgba(200, 210, 220, 0.7);
+  font-weight: 600;
+  font-size: var(--text-sm);
+}
+
+.discover-category-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--spacing-4);
+}
+
+.discover-category-card {
+  border: 1px solid var(--fw-border-color-medium);
+  border-radius: 10px;
+  padding: var(--spacing-4);
+  background: rgba(20, 22, 28, 0.9);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.02);
+}
+
+.discover-category-card__header {
+  display: flex;
+  gap: var(--spacing-3);
+  align-items: center;
+}
+
+.discover-category-card__icon {
+  font-size: 2rem;
+}
+
+.discover-category-card__header h3 {
+  margin: 0;
+  font-size: var(--text-lg);
+}
+
+.discover-category-card__header p {
+  margin: 0;
+  color: rgba(200, 210, 220, 0.7);
+}
+
+.discover-category-card__games {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+}
+
+.discover-chip {
+  border: 1px solid rgba(230, 126, 34, 0.4);
+  background: transparent;
+  color: rgba(230, 126, 34, 0.9);
+  padding: var(--spacing-1) var(--spacing-2);
+  border-radius: 999px;
+  cursor: pointer;
+  font-size: var(--text-xs);
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.discover-chip:hover {
+  background: rgba(230, 126, 34, 0.1);
+}
+
+.discover-category-card__action {
+  align-self: flex-start;
+  padding: var(--spacing-2) var(--spacing-3);
+  border-radius: 6px;
+  border: 1px solid var(--fw-accent-primary);
+  background: transparent;
+  color: var(--fw-accent-primary);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background var(--transition-fast);
+}
+
+.discover-category-card__action:hover {
+  background: rgba(230, 126, 34, 0.15);
+}
+
+.discover-fresh-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: var(--spacing-3);
+}
+
+.discover-fresh-card {
+  padding: var(--spacing-3);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  background: rgba(255, 255, 255, 0.02);
+  text-decoration: none;
+  color: inherit;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.discover-fresh-card__meta {
+  display: flex;
+  justify-content: space-between;
+  font-size: var(--text-xs);
+  color: rgba(200, 210, 220, 0.75);
+}
+
+.discover-fresh-card__stats {
+  display: flex;
+  gap: var(--spacing-2);
+  font-size: var(--text-sm);
+  color: rgba(200, 210, 220, 0.8);
+}
+
+.discover-curated-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--spacing-3);
+}
+
+.discover-curated-card {
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: var(--spacing-3);
+  background: rgba(15, 16, 22, 0.85);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+}
+
+.discover-curated-card__game {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+  text-decoration: none;
+  color: var(--fw-accent-primary);
+}
+
+.discover-curated-card__empty {
+  color: rgba(200, 210, 220, 0.6);
+  margin: 0;
+}
+
+.discover-longtail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: var(--spacing-3);
+}
+
+.discover-longtail-card {
+  border: 1px solid rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  padding: var(--spacing-3);
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  text-decoration: none;
+  color: inherit;
+  background: rgba(8, 9, 14, 0.9);
+}
+
+.discover-longtail-card__rank {
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--fw-accent-primary);
+}
+
+.discover-longtail-card__body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+}
+
+.discover-longtail-card__body span {
+  color: rgba(200, 210, 220, 0.65);
+  font-size: var(--text-sm);
+}
+
+.discover-longtail-card__boost {
+  font-weight: 700;
+  color: var(--fw-status-success);
+}
+
+.discover-active-filter {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: var(--spacing-3);
+  padding: var(--spacing-3);
+  border: 1px solid var(--fw-accent-primary);
+  border-radius: 6px;
+  color: var(--fw-accent-primary);
+  margin-bottom: var(--spacing-4);
+}
+
+.discover-active-filter button {
+  background: transparent;
+  border: 1px solid var(--fw-accent-primary);
+  color: var(--fw-accent-primary);
+  padding: var(--spacing-1) var(--spacing-2);
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.homepage-divider {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.05);
+  margin: var(--spacing-8) 0;
+}
+
 .homepage-sort-select {
   padding: var(--spacing-3) var(--spacing-4);
   padding-right: var(--spacing-8);
@@ -260,6 +600,14 @@
 
 @media (max-width: 768px) {
   .games-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .discover-hero__cards,
+  .discover-category-grid,
+  .discover-fresh-grid,
+  .discover-curated-grid,
+  .discover-longtail-grid {
     grid-template-columns: 1fr;
   }
   

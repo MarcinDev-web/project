@@ -8,6 +8,7 @@
  * - Convert presets to assets for AssetPalette integration
  */
 
+import type { BlockTextures } from '@engine/blocks';
 import type { AssetPreset, Asset } from '../types/BlockAssetTypes';
 import { storageLoad, storageSave } from '../../utils/storage';
 import { Logger } from '../../utils/logger';
@@ -68,12 +69,12 @@ export class NpcPresetManager {
       return false;
     }
 
+    const { npcConfig, ...otherUpdates } = updates;
+
     const updated: AssetPreset = {
       ...existing,
-      ...updates,
-      // Only update npcConfig if explicitly provided (not undefined)
-      // This preserves existing npcConfig when updates don't include it
-      npcConfig: updates.npcConfig !== undefined ? updates.npcConfig : existing.npcConfig,
+      ...otherUpdates,
+      ...(npcConfig !== undefined ? { npcConfig } : {}),
     };
 
     this.presets.set(id, updated);
@@ -147,15 +148,21 @@ export class NpcPresetManager {
         id: `npc-${presetId}`,
         name: preset.name,
         category,
-        textures: {
-          top: { color },
-          bottom: { color },
-          front: { color },
-          back: { color },
-          left: { color },
-          right: { color },
-        },
+        textures: this.createUniformTextures(color),
       },
+    };
+  }
+
+  private createUniformTextures(color: [number, number, number, number]): BlockTextures {
+    const makeFace = () => ({ color: [...color] as [number, number, number, number] });
+    return {
+      top: makeFace(),
+      bottom: makeFace(),
+      sides: makeFace(),
+      front: makeFace(),
+      back: makeFace(),
+      left: makeFace(),
+      right: makeFace(),
     };
   }
 

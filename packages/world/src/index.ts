@@ -89,6 +89,7 @@ export { WeaponPickupSystem } from './systems/WeaponPickupSystem.js';
 export { InventorySystem } from './systems/InventorySystem.js';
 export { InteractionSystem } from './systems/InteractionSystem.js';
 export type { InteractionSystemConfig } from './systems/InteractionSystem.js';
+export { PvPRespawnManager } from './utils/PvPRespawnManager.js';
 export { InteractableComponent } from './components/InteractableComponent.js';
 export type { InteractableComponentJSON } from './components/InteractableComponent.js';
 export { InteractionPromptUI } from './systems/InteractionPromptUI.js';

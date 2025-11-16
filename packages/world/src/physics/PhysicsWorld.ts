@@ -56,6 +56,13 @@ export class PhysicsWorld {
   }
 
   /**
+   * Get the scene currently simulated by this physics world.
+   */
+  getScene(): Scene {
+    return this.scene;
+  }
+
+  /**
    * Starts the physics simulation
    */
   start(): void {

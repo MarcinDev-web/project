@@ -75,6 +75,7 @@ export function example3_Loadouts(entity: Entity) {
   // Quick setup with preset loadout
   WeaponLoadouts.assaultRifle(entity);
   WeaponLoadouts.sniper(entity);
+  WeaponLoadouts.pistol(entity);
   WeaponLoadouts.closeQuarters(entity);
 }
 

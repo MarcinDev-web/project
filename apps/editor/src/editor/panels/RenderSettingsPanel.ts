@@ -13,7 +13,6 @@
  */
 
 import type { EditorState } from '../core/state';
-import { effect } from '@preact/signals-core';
 
 export interface RenderSettingsPanelConfig {
   state: EditorState;
@@ -33,13 +32,12 @@ export interface RenderSettings {
 
 export class RenderSettingsPanel {
   private container: HTMLElement | null = null;
-  private state: EditorState;
-  private onSettingsChanged?: (settings: RenderSettings) => void;
+  private onSettingsChanged:
+    | ((settings: RenderSettings) => void)
+    | undefined;
   private settings: RenderSettings;
-  private cleanupEffects: (() => void)[] = [];
 
   constructor(config: RenderSettingsPanelConfig) {
-    this.state = config.state;
     this.onSettingsChanged = config.onSettingsChanged;
     
     // Load saved settings from localStorage
@@ -54,14 +52,6 @@ export class RenderSettingsPanel {
       enableScreenLOD: saved.enableScreenLOD ?? false,
       shadowQuality: saved.shadowQuality ?? 'med',
     };
-
-    // Persist settings when they change
-    this.cleanupEffects.push(
-      effect(() => {
-        this.saveSettings(this.settings);
-        this.onSettingsChanged?.(this.settings);
-      })
-    );
   }
 
   /**
@@ -177,9 +167,14 @@ export class RenderSettingsPanel {
         const target = e.target as HTMLInputElement;
         const setting = target.dataset.setting as keyof RenderSettings;
         if (setting && typeof this.settings[setting] === 'boolean') {
-          (this.settings[setting] as boolean) = target.checked;
-          this.onSettingsChanged?.(this.settings);
-          this.saveSettings(this.settings);
+          const newValue = target.checked;
+          const oldValue = this.settings[setting] as boolean;
+          // Only update if value actually changed
+          if (newValue !== oldValue) {
+            (this.settings[setting] as boolean) = newValue;
+            this.onSettingsChanged?.(this.settings);
+            this.saveSettings(this.settings);
+          }
         }
       });
     });
@@ -190,9 +185,14 @@ export class RenderSettingsPanel {
         const target = e.target as HTMLSelectElement;
         const setting = target.dataset.setting as keyof RenderSettings;
         if (setting) {
-          (this.settings[setting] as string) = target.value;
-          this.onSettingsChanged?.(this.settings);
-          this.saveSettings(this.settings);
+          const newValue = target.value;
+          const oldValue = String(this.settings[setting]);
+          // Only update if value actually changed
+          if (newValue !== oldValue) {
+            (this.settings[setting] as string) = newValue;
+            this.onSettingsChanged?.(this.settings);
+            this.saveSettings(this.settings);
+          }
         }
       });
     });
@@ -209,10 +209,19 @@ export class RenderSettingsPanel {
    * Updates render settings.
    */
   updateSettings(settings: Partial<RenderSettings>): void {
+    const prevSettings = { ...this.settings };
     this.settings = { ...this.settings, ...settings };
-    this.updateUI();
-    this.saveSettings(this.settings);
-    this.onSettingsChanged?.(this.settings);
+    
+    // Only persist and notify if settings actually changed
+    const hasChanges = Object.keys(settings).some(
+      key => prevSettings[key as keyof RenderSettings] !== this.settings[key as keyof RenderSettings]
+    );
+    
+    if (hasChanges) {
+      this.updateUI();
+      this.saveSettings(this.settings);
+      this.onSettingsChanged?.(this.settings);
+    }
   }
 
   /**
@@ -256,8 +265,6 @@ export class RenderSettingsPanel {
    */
   dispose(): void {
     this.unmount();
-    this.cleanupEffects.forEach((cleanup) => cleanup());
-    this.cleanupEffects = [];
   }
 }
 
