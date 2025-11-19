@@ -6,6 +6,7 @@
  */
 
 import { Logger } from '@engine/core/utils';
+import { FULLSCREEN_VERTEX_SHADER } from './PostProcessUtils';
 
 export interface SSAOConfig {
   /** Sample count (16, 32, or 64 - higher = better quality, slower) */
@@ -169,13 +170,7 @@ export class SSAOPass {
         }),
         vertex: {
           module: this.device.createShaderModule({
-            code: `
-struct VSOut { @builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32> };
-@vertex fn vs_fullscreen(@builtin(vertex_index) vid:u32)->VSOut{
-  var o:VSOut; let x=f32((vid<<1u)&2u); let y=f32(vid&2u); 
-  o.pos=vec4<f32>(x*2.0-1.0, y*-2.0+1.0, 0.0, 1.0); 
-  o.uv=vec2<f32>(x,y); return o;
-}`,
+            code: FULLSCREEN_VERTEX_SHADER,
           }),
           entryPoint: 'vs_fullscreen',
         },

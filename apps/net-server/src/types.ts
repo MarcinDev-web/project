@@ -3,6 +3,7 @@
  */
 
 import type { SceneData } from '@engine/world';
+import type { GameProjectConfig } from '@shared/types/project';
 
 /**
  * Project metadata without the scene data.
@@ -14,6 +15,7 @@ export interface ProjectMetadata {
   updatedAt: number;
   thumbnail?: string;
   marketplaceItemId?: string;
+  description?: string;
 }
 
 /**
@@ -22,6 +24,7 @@ export interface ProjectMetadata {
 export interface ProjectData {
   metadata: ProjectMetadata;
   scene: SceneData;
+  config?: GameProjectConfig;
 }
 
 /**

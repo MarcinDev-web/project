@@ -18,11 +18,30 @@ export interface HeightmapTerrainData {
 }
 
 /**
+ * Serialized Heightmap terrain data
+ */
+export interface SerializedHeightmapData {
+  resolution: number;
+  size: number;
+  heights: number[];
+  minHeight?: number;
+  maxHeight?: number;
+}
+
+/**
  * Voxel terrain data (chunks)
  */
 export interface VoxelTerrainData {
   chunkSize: number; // voxels per chunk side (typically 16)
   chunks: Map<string, Uint8Array>; // chunk key -> voxel data
+}
+
+/**
+ * Serialized Voxel terrain data
+ */
+export interface SerializedVoxelTerrainData {
+  chunkSize: number;
+  chunks: Array<[string, number[]]>;
 }
 
 /**
@@ -35,6 +54,15 @@ export interface TextureLayer {
 }
 
 /**
+ * Serialized Texture layer
+ */
+export interface SerializedTextureLayer {
+  textureId: string;
+  scale: number;
+  blendFactor?: number[];
+}
+
+/**
  * Terrain component data
  */
 export interface TerrainData {
@@ -42,6 +70,20 @@ export interface TerrainData {
   heightmap?: HeightmapTerrainData;
   voxels?: VoxelTerrainData;
   textureLayers?: TextureLayer[];
+  metadata?: {
+    version: string;
+    createdAt: number;
+  };
+}
+
+/**
+ * Serialized Terrain component data
+ */
+export interface SerializedTerrainData {
+  type: TerrainType;
+  heightmap?: SerializedHeightmapData;
+  voxels?: SerializedVoxelTerrainData;
+  textureLayers?: SerializedTextureLayer[];
   metadata?: {
     version: string;
     createdAt: number;
@@ -127,20 +169,8 @@ export class TerrainComponent extends Component {
     return clone;
   }
 
-  toJSON(): {
-    type: TerrainType;
-    heightmap?: HeightmapTerrainData;
-    voxels?: { chunkSize: number; chunks: Array<[string, number[]]> };
-    textureLayers?: TextureLayer[];
-    metadata?: { version: string; createdAt: number };
-  } {
-    const json: {
-      type: TerrainType;
-      heightmap?: HeightmapTerrainData;
-      voxels?: { chunkSize: number; chunks: Array<[string, number[]]> };
-      textureLayers?: TextureLayer[];
-      metadata?: { version: string; createdAt: number };
-    } = {
+  toJSON(): SerializedTerrainData {
+    const json: SerializedTerrainData = {
       type: this.terrainData.type,
       ...(this.terrainData.metadata ? { metadata: { ...this.terrainData.metadata } } : {}),
     };
@@ -148,7 +178,7 @@ export class TerrainComponent extends Component {
     if (this.terrainData.heightmap) {
       json.heightmap = {
         ...this.terrainData.heightmap,
-        heights: this.terrainData.heightmap.heights, // Float32Array will be serialized as array
+        heights: Array.from(this.terrainData.heightmap.heights),
       };
     }
 
@@ -165,12 +195,12 @@ export class TerrainComponent extends Component {
 
     if (this.terrainData.textureLayers) {
       json.textureLayers = this.terrainData.textureLayers.map((layer) => {
-        const serializedLayer: TextureLayer = {
+        const serializedLayer: SerializedTextureLayer = {
           textureId: layer.textureId,
           scale: layer.scale,
         };
         if (layer.blendFactor) {
-          serializedLayer.blendFactor = Array.from(layer.blendFactor) as unknown as Float32Array;
+          serializedLayer.blendFactor = Array.from(layer.blendFactor);
         }
         return serializedLayer;
       });
@@ -179,24 +209,23 @@ export class TerrainComponent extends Component {
     return json;
   }
 
-  fromJSON(data: {
-    type?: TerrainType;
-    heightmap?: HeightmapTerrainData;
-    voxels?: { chunkSize: number; chunks: Array<[string, number[]]> };
-    textureLayers?: TextureLayer[];
-    metadata?: { version: string; createdAt: number };
-  }): void {
+  fromJSON(data: Partial<SerializedTerrainData>): void {
     if (data.type) {
       this.terrainData.type = data.type;
     }
 
     if (data.heightmap) {
+      // Validation
+      const expectedLength = data.heightmap.resolution * data.heightmap.resolution;
+      if (data.heightmap.heights.length !== expectedLength) {
+        throw new Error(
+          `Invalid heightmap data: expected ${expectedLength} heights for resolution ${data.heightmap.resolution}, got ${data.heightmap.heights.length}`
+        );
+      }
+
       this.terrainData.heightmap = {
         ...data.heightmap,
-        heights:
-          data.heightmap.heights instanceof Float32Array
-            ? data.heightmap.heights
-            : new Float32Array(data.heightmap.heights),
+        heights: new Float32Array(data.heightmap.heights),
       };
     }
 
@@ -218,9 +247,7 @@ export class TerrainComponent extends Component {
           scale: layer.scale,
         };
         if (layer.blendFactor) {
-          deserializedLayer.blendFactor = Array.isArray(layer.blendFactor)
-            ? new Float32Array(layer.blendFactor)
-            : layer.blendFactor;
+          deserializedLayer.blendFactor = new Float32Array(layer.blendFactor);
         }
         return deserializedLayer;
       });

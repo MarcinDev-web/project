@@ -6,6 +6,7 @@ import type { Scene } from '../core/Scene.js';
 import type { Entity } from '../core/Entity.js';
 import { ProjectileComponent } from '../components/ProjectileComponent.js';
 import { HealthComponent } from '../components/HealthComponent.js';
+import { ShieldComponent } from '../components/ShieldComponent.js';
 import type { PhysicsSystem, CollisionEvent } from '../physics/PhysicsSystem.js';
 import type { ProjectileHitEvent } from '../types/weapon.js';
 import type { Vec3 } from '@engine/core/math';
@@ -126,10 +127,18 @@ export class ProjectileSystem {
 
     // Apply damage to hit entity
     const health = hitEntity.getComponent(HealthComponent);
+    const shield = hitEntity.getComponent(ShieldComponent);
     let damageDealt = 0;
 
     if (health) {
-      damageDealt = health.takeDamage(projectile.damage);
+      let finalDamage = projectile.damage;
+      
+      // Absorb damage with shield first
+      if (shield && shield.currentShield > 0) {
+        finalDamage = shield.absorbDamage(finalDamage);
+      }
+
+      damageDealt = health.takeDamage(finalDamage);
     }
 
     // Emit hit event

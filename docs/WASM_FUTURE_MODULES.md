@@ -6,6 +6,7 @@ This document outlines potential additional WASM modules for Forge Engine.
 
 Current WASM modules:
 - `crates/collision` - OBB collision detection (production)
+- `crates/mesh-processor` - Mesh processing (normals, UVs)
 
 ## Candidate Modules
 
@@ -32,30 +33,7 @@ Current WASM modules:
 
 ---
 
-### 2. Mesh Processing (`crates/mesh-wasm`)
-
-**Purpose:** Mesh operations and transformations  
-**Potential Features:**
-- Mesh simplification (decimation)
-- UV unwrapping
-- Normal recalculation
-- Mesh optimization
-
-**Benefits:**
-- Faster mesh processing
-- Better asset pipeline performance
-- Offload heavy computations
-
-**Considerations:**
-- Current mesh needs are handled by glTF
-- May not provide significant benefit
-- Integration complexity
-
-**Priority:** Low (only if mesh processing becomes frequent bottleneck)
-
----
-
-### 3. Audio Processing (`crates/audio-wasm`)
+### 2. Audio Processing (`crates/audio-wasm`)
 
 **Purpose:** Audio synthesis and processing  
 **Potential Features:**
@@ -110,5 +88,4 @@ When implementing a new WASM module:
 ---
 
 **Status:** Planning document - no implementation planned  
-**Last Updated:** 2025-01-27
-
+**Last Updated:** 2025-11-19

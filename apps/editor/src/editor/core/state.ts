@@ -11,7 +11,7 @@ const DEFAULT_HISTORY_LIMIT = 100;
 
 export type EditorMode = 'edit' | 'play';
 export type BuildMode = 'free' | 'limited';
-export type EasyPlacePattern = 'single' | 'line' | 'grid' | 'circle';
+export type EasyPlacePattern = 'single' | 'line' | 'grid' | 'circle' | 'wall';
 export type RotationSnapMode = 'free' | '15deg' | '45deg' | '90deg';
 export type CameraType = 'free-fly' | 'fps' | 'third-person';
 export type CameraMode = 'orbit' | 'free-fly';
@@ -29,6 +29,7 @@ export interface EasyPlaceSettings {
   autoEnable: boolean; // Auto-enable when entering placement mode
   gridSpacing: number;
   lineSpacing: number;
+  wallHeight: number;
   circleRadius: number;
   circleCount: number;
 }
@@ -185,6 +186,7 @@ export class EditorState {
       autoEnable: false,
       gridSpacing: 1.0,
       lineSpacing: 1.0,
+      wallHeight: 3,
       circleRadius: 3.0,
       circleCount: 8,
     });

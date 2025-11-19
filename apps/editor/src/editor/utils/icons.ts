@@ -35,6 +35,7 @@ export type IconName =
   | 'sphere'
   | 'cylinder'
   | 'chevron-down'
+  | 'chevron-left'
   | 'chevron-right'
   | 'chevron-up'
   | 'eye'
@@ -161,6 +162,7 @@ function getIconPath(name: IconName): string | string[] {
     sphere: 'M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z M2 12h20',
     cylinder: 'M21 8a9 9 0 1 1-18 0M21 8v8a9 9 0 1 1-18 0V8',
     'chevron-down': 'M6 9l6 6 6-6',
+    'chevron-left': 'M15 18l-6-6 6-6',
     'chevron-right': 'M9 18l6-6-6-6',
     'chevron-up': 'M18 15l-6-6-6 6',
     eye: 'M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6z',

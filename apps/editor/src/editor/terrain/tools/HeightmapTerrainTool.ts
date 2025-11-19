@@ -133,12 +133,9 @@ export class HeightmapTerrainTool {
 
     // Use image dimensions or config resolution (whichever is valid power of 2 + 1)
     const imageResolution = Math.min(image.width, image.height);
-    const isValidResolution = (n: number): boolean => {
-      return n > 1 && ((n - 1) & ((n - 1) - 1)) === 0;
-    };
 
     let resolution = config.resolution ?? imageResolution;
-    if (!isValidResolution(resolution)) {
+    if (!HeightmapTerrain.isValidResolution(resolution)) {
       // Find nearest valid resolution
       resolution = Math.pow(2, Math.floor(Math.log2(resolution))) + 1;
     }
@@ -251,22 +248,19 @@ export class HeightmapTerrainTool {
       return;
     }
 
+    const heightmapData = terrainComp.terrainData.heightmap;
     const config: HeightmapTerrainConfig = {
-      resolution: terrainComp.terrainData.heightmap.resolution,
-      size: terrainComp.terrainData.heightmap.size,
+      resolution: heightmapData.resolution,
+      size: heightmapData.size,
+      minHeight: heightmapData.minHeight,
+      maxHeight: heightmapData.maxHeight,
     };
-    if (terrainComp.terrainData.heightmap.minHeight !== undefined) {
-      config.minHeight = terrainComp.terrainData.heightmap.minHeight;
-    }
-    if (terrainComp.terrainData.heightmap.maxHeight !== undefined) {
-      config.maxHeight = terrainComp.terrainData.heightmap.maxHeight;
-    }
+
     const terrain = new HeightmapTerrain(config);
-    terrain.importData(terrainComp.terrainData.heightmap);
+    terrain.useData(heightmapData);
     terrain.generateNoise(scale, amplitude);
 
-    // Update component
-    terrainComp.terrainData.heightmap = terrain.exportData();
+    // Update mesh (data is modified in place)
     this.updateTerrainMesh(entity, terrain);
   }
 
@@ -279,22 +273,21 @@ export class HeightmapTerrainTool {
       return;
     }
 
+    const heightmapData = terrainComp.terrainData.heightmap;
     const config: HeightmapTerrainConfig = {
-      resolution: terrainComp.terrainData.heightmap.resolution,
-      size: terrainComp.terrainData.heightmap.size,
+      resolution: heightmapData.resolution,
+      size: heightmapData.size,
+      minHeight: heightmapData.minHeight,
+      maxHeight: heightmapData.maxHeight,
     };
-    if (terrainComp.terrainData.heightmap.minHeight !== undefined) {
-      config.minHeight = terrainComp.terrainData.heightmap.minHeight;
-    }
-    if (terrainComp.terrainData.heightmap.maxHeight !== undefined) {
-      config.maxHeight = terrainComp.terrainData.heightmap.maxHeight;
-    }
+
     const terrain = new HeightmapTerrain(config);
-    terrain.importData(terrainComp.terrainData.heightmap);
+    terrain.useData(heightmapData);
     terrain.smooth(iterations);
 
-    // Update component
-    terrainComp.terrainData.heightmap = terrain.exportData();
+    // Update component data (smooth might swap buffers)
+    terrainComp.terrainData.heightmap.heights = terrain.getHeights();
+    
     this.updateTerrainMesh(entity, terrain);
   }
 

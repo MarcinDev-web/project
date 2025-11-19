@@ -7,6 +7,7 @@
 import type { Vec3 } from '@engine/core/math';
 import type { HeightmapTerrainData } from '@engine/world/components/TerrainComponent';
 import { crossVec3, normalizeVec3, subVec3 } from '@engine/core/math';
+import { init, type WasmMeshProcessor } from '@engine/wasm-mesh';
 
 /**
  * Generated mesh data
@@ -30,12 +31,29 @@ export interface TerrainMeshOptions {
   generateNormals?: boolean;
   /** Generate UVs (required for texturing) */
   generateUVs?: boolean;
+  /** Use box projection for UVs (requires normals, uses WASM if available) */
+  useBoxProjection?: boolean;
 }
 
 /**
  * TerrainMeshGenerator - Generates mesh from heightmap data
  */
 export class TerrainMeshGenerator {
+  private static wasmProcessor: WasmMeshProcessor | null = null;
+
+  /**
+   * Initialize WASM processor
+   */
+  static async init(): Promise<void> {
+    if (!this.wasmProcessor) {
+      try {
+        this.wasmProcessor = await init();
+      } catch (e) {
+        console.warn('Failed to load WASM mesh processor, falling back to JS', e);
+      }
+    }
+  }
+
   /**
    * Generates mesh data from heightmap terrain
    */
@@ -128,6 +146,18 @@ export class TerrainMeshGenerator {
       TerrainMeshGenerator.calculateNormals(vertices, indices, normals, vertexCount);
     }
 
+    // Apply box projection if requested (better for steep terrain/cliffs)
+    if (generateUVs && options.useBoxProjection && generateNormals) {
+      if (TerrainMeshGenerator.wasmProcessor) {
+        try {
+          const result = TerrainMeshGenerator.wasmProcessor.computeUvsBox(vertices, normals);
+          uvs.set(result);
+        } catch (e) {
+          console.warn('WASM box UV projection failed', e);
+        }
+      }
+    }
+
     return {
       vertices,
       indices,
@@ -147,6 +177,17 @@ export class TerrainMeshGenerator {
     normals: Float32Array,
     vertexCount: number
   ): void {
+    // Try WASM first
+    if (TerrainMeshGenerator.wasmProcessor) {
+      try {
+        const result = TerrainMeshGenerator.wasmProcessor.computeNormalsU16(vertices, indices);
+        normals.set(result);
+        return;
+      } catch (e) {
+        console.warn('WASM normal calculation failed, falling back to JS', e);
+      }
+    }
+
     // Initialize normals to zero
     for (let i = 0; i < vertexCount * 3; i++) {
       normals[i] = 0;

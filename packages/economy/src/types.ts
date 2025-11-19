@@ -49,38 +49,40 @@ export interface CurrencyBalance {
 /**
  * Transaction status.
  */
-export enum TransactionStatus {
+export const TransactionStatus = {
   /** Transaction is pending execution */
-  PENDING = 'pending',
+  PENDING: 'pending',
   /** Transaction completed successfully */
-  COMPLETED = 'completed',
+  COMPLETED: 'completed',
   /** Transaction failed */
-  FAILED = 'failed',
+  FAILED: 'failed',
   /** Transaction was cancelled */
-  CANCELLED = 'cancelled',
-}
+  CANCELLED: 'cancelled',
+} as const;
+export type TransactionStatus = typeof TransactionStatus[keyof typeof TransactionStatus];
 
 /**
  * Transaction type.
  */
-export enum TransactionType {
+export const TransactionType = {
   /** Deposit currency into wallet */
-  DEPOSIT = 'deposit',
+  DEPOSIT: 'deposit',
   /** Withdraw currency from wallet */
-  WITHDRAWAL = 'withdrawal',
+  WITHDRAWAL: 'withdrawal',
   /** Transfer currency between wallets */
-  TRANSFER = 'transfer',
+  TRANSFER: 'transfer',
   /** Exchange one currency for another */
-  EXCHANGE = 'exchange',
+  EXCHANGE: 'exchange',
   /** Purchase in-game item */
-  PURCHASE = 'purchase',
+  PURCHASE: 'purchase',
   /** Marketplace transaction */
-  MARKETPLACE = 'marketplace',
+  MARKETPLACE: 'marketplace',
   /** Platform fee/burn */
-  FEE = 'fee',
+  FEE: 'fee',
   /** Creator payout */
-  PAYOUT = 'payout',
-}
+  PAYOUT: 'payout',
+} as const;
+export type TransactionType = typeof TransactionType[keyof typeof TransactionType];
 
 /**
  * Player/wallet identifier.
@@ -96,21 +98,23 @@ export type CreatorId = string;
 /**
  * Item category for anti-P2W compliance
  */
-export enum ItemCategory {
+export const ItemCategory = {
   /** Cosmetic only - always allowed */
-  COSMETIC = 'cosmetic',
+  COSMETIC: 'cosmetic',
   /** Progression boost - only in Casual games */
-  PROGRESSION_BOOST = 'progression_boost',
+  PROGRESSION_BOOST: 'progression_boost',
   /** Competitive advantage - FORBIDDEN */
-  COMPETITIVE_ADVANTAGE = 'competitive_advantage',
-}
+  COMPETITIVE_ADVANTAGE: 'competitive_advantage',
+} as const;
+export type ItemCategory = typeof ItemCategory[keyof typeof ItemCategory];
 
 /**
  * Game mode classification for P2W compliance
  */
-export enum GameMode {
+export const GameMode = {
   /** Casual - progression boosts allowed */
-  CASUAL = 'casual',
+  CASUAL: 'casual',
   /** Competitive - only cosmetics allowed */
-  COMPETITIVE = 'competitive',
-}
+  COMPETITIVE: 'competitive',
+} as const;
+export type GameMode = typeof GameMode[keyof typeof GameMode];

@@ -78,6 +78,9 @@ export const inputMessageSchema = z.object({
   moveDirection: z.tuple([z.number(), z.number()]).optional(),
   cameraForward: positionSchema.optional(),
   cameraRight: positionSchema.optional(),
+  actorId: z.string().min(1).optional(),
+  intentSignature: z.string().min(32).optional(),
+  intentDeltaMs: z.number().int().nonnegative().optional(),
   timestamp: z.number().int().nonnegative().optional(),
 });
 

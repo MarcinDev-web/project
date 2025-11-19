@@ -6,18 +6,21 @@
   "workspaces": [
     "packages/*",
     "apps/*",
+    "services/*",
+    "services/*/*",
     "shared"
   ],
   "scripts": {
-    "prebuild": "node -e \"console.log('Warning: Skipping wasm-pack installation, will use pre-built WASM files')\"",
+    "prebuild": "node ./scripts/verify-wasm-build.js",
     "postinstall": "node -e \"\"",
-    "build": "pnpm -w --filter @engine/core build && pnpm -w --filter @engine/microblocks build && pnpm -w --filter @engine/blocks build && pnpm -w --filter @engine/world build && pnpm -w --filter @engine/stdlib build && pnpm -w --filter @engine/camera build && pnpm -w --filter @engine/script build && pnpm -w --filter @engine/avatar build && pnpm -w --filter \"@apps/net-server...\" --filter \"!@engine/test-utils\" --filter \"!@engine/gateway\" --filter \"!@engine/editor-utils\" build",
+    "build": "pnpm -w --filter @engine/core build && pnpm -w --filter @engine/microblocks build && pnpm -w --filter @engine/blocks build && pnpm -w --filter @engine/script build && pnpm -w --filter @engine/world build && pnpm -w --filter @engine/stdlib build && pnpm -w --filter @engine/camera build && pnpm -w --filter @engine/avatar build && pnpm -w --filter \"@apps/net-server...\" --filter \"!@engine/test-utils\" --filter \"!@engine/gateway\" --filter \"!@engine/editor-utils\" build",
     "build:all": "pnpm -r build",
     "dev": "pnpm --filter @apps/editor dev",
     "test": "pnpm -r test",
     "lint": "pnpm --filter '!@engine/test-utils' -r lint",
     "clean": "pnpm -r clean && rm -rf node_modules",
     "build:wasm": "wasm-pack build crates/collision --target bundler --out-dir ../../packages/wasm-collision/pkg",
+    "build:physics-wasm": "wasm-pack build crates/physics --target bundler --out-dir ../../packages/wasm-physics/pkg",
     "dev:editor": "pnpm --filter @apps/editor dev",
     "dev:platform": "pnpm --filter @apps/platform dev",
     "dev:server": "pnpm --filter @apps/net-server dev",
@@ -33,7 +36,8 @@
     "test:ci": "vitest run --project unit --coverage.enabled=false --reporter=verbose",
     "test:coverage": "vitest run --coverage.enabled",
     "test:unit:coverage": "vitest run --project unit --coverage.enabled",
-    "precommit": "pnpm --filter '!@engine/test-utils' -r lint && pnpm test:changed",
+    "precommit": "pnpm verify:cost && pnpm --filter '!@engine/test-utils' -r lint && pnpm test:changed",
+    "verify:cost": "tsx scripts/verify-cost-budgets.ts",
     "commitlint": "commitlint --edit",
     "commitlint:last": "commitlint --from HEAD~1 --to HEAD --verbose",
     "test:headless": "cd packages/world && pnpm test",
@@ -41,7 +45,8 @@
     "measure:heap": "node --expose-gc --import tsx scripts/measure-heap.ts",
     "measure:heap:60s": "node --expose-gc --import tsx scripts/measure-heap.ts --duration=60 --entities=1000",
     "docker:push": "powershell -ExecutionPolicy Bypass -File scripts/docker-push.ps1",
-    "dev:all": "powershell -ExecutionPolicy Bypass -File scripts/dev-orchestration.ps1"
+    "dev:all": "powershell -ExecutionPolicy Bypass -File scripts/dev-orchestration.ps1",
+    "verify:wasm": "node ./scripts/verify-wasm-build.js"
   },
   "keywords": [],
   "author": "",

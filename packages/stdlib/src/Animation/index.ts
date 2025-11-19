@@ -7,4 +7,6 @@ export * from './interpolation';
 export * from './SkeletalAnimation';
 export * from './Skeleton';
 export * from './types';
-
+export * from './AnimationNode';
+export * from './BlendTree1D';
+export * from './AnimationLayer';

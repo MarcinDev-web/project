@@ -1,4 +1,4 @@
-import { AnimationController } from './AnimationController';
+import type { AnimationNode } from './AnimationNode';
 import type {
   AnimationParameter,
   AnimationParameterType,
@@ -10,7 +10,7 @@ import type {
 
 export interface AnimationStateConfig {
   name: string;
-  controller: AnimationController;
+  controller: AnimationNode;
   transitions?: AnimationTransitionConfig[];
 }
 
@@ -33,7 +33,7 @@ interface CompiledTransition {
 
 interface CompiledState {
   name: string;
-  controller: AnimationController;
+  controller: AnimationNode;
   transitions: CompiledTransition[];
 }
 
@@ -104,7 +104,7 @@ export class AnimationStateMachine {
     }
   }
 
-  getSamples(): { primary: AnimationController; secondary: AnimationController | null; blendWeight: number } {
+  getSamples(): { primary: AnimationNode; secondary: AnimationNode | null; blendWeight: number } {
     if (!this.currentState) {
       throw new Error('AnimationStateMachine has no active state');
     }
@@ -135,7 +135,7 @@ export class AnimationStateMachine {
       this.currentState.controller.pause();
     }
     if (resetTime) {
-      target.controller.time.value = 0;
+      target.controller.setNormalizedTime(0);
     }
     if (autoPlay) {
       target.controller.play();
@@ -548,7 +548,7 @@ export class AnimationStateMachine {
     }
     // Reset target time if requested
     if (options?.resetTime) {
-      target.controller.time.value = 0;
+      target.controller.setNormalizedTime(0);
     }
     // Ensure target playback state per options (default autoPlay=true)
     if (options?.autoPlay === false) {
@@ -606,4 +606,3 @@ export class AnimationStateMachine {
     return base;
   }
 }
-

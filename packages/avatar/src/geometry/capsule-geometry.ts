@@ -36,6 +36,7 @@ export function generateCapsuleY(options: CapsuleOptions = {}): CustomMeshData {
 		hemisphereSegments = 8,
 		insideOut = false,
 	} = options;
+
 	// Validate input parameters
 	if (radius <= 0) {
 		throw new Error(`generateCapsuleY: "radius" must be > 0 (got ${radius})`);
@@ -112,7 +113,7 @@ export function generateCapsuleY(options: CapsuleOptions = {}): CustomMeshData {
 	// Build vertices
 	// 1) Top pole (single vertex)
 	const topPoleY = halfCyl + radius;
-	const topSphereCenterY = halfCyl + radius; // Center of top hemisphere sphere
+	const topSphereCenterY = halfCyl; // Center of top hemisphere sphere
 	positions.push(0, topPoleY, 0);
 	normals.push(0, 1, 0); // Point straight up
 	uvs.push(0.5, 0); // Center of top UV
@@ -141,7 +142,7 @@ export function generateCapsuleY(options: CapsuleOptions = {}): CustomMeshData {
 
 	// 5) Bottom hemisphere (from 0..pi/2, excluding pole and cylinder edge)
 	// Skip the last ring (h=hemisphereSegments) which has ringR=0 and would create degenerate triangles
-	const bottomSphereCenterY = -halfCyl - radius; // Center of bottom hemisphere sphere
+	const bottomSphereCenterY = -halfCyl; // Center of bottom hemisphere sphere
 	for (let h = 1; h < hemisphereSegments; h++) {
 		const t = h / hemisphereSegments; // 0..1
 		const phi = (t * Math.PI) / 2; // 0..pi/2
@@ -231,5 +232,3 @@ export function generateCapsuleY(options: CapsuleOptions = {}): CustomMeshData {
 		indices: indexArray,
 	};
 }
-
-

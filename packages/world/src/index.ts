@@ -14,7 +14,16 @@ export * from './core/index.js';
 export { Component } from './components/Component.js';
 export { registerComponent, getComponentConstructor } from './components/registry.js';
 export { CameraComponent } from './components/CameraComponent.js';
-export { CharacterController, type CharacterInput, type CharacterControllerData } from './components/CharacterController.js';
+export {
+  CharacterController,
+  type CharacterInput,
+  type CharacterControllerData,
+  CharacterState,
+  type CharacterControllerConfig,
+  DEFAULT_CHARACTER_CONFIG,
+} from './components/CharacterController.js';
+export * from './net/InputChannel.js';
+export * from './sim/AuthoritativeWorld.js';
 
 // Movement interfaces
 export * from './movement/MovementInterface.js';
@@ -58,6 +67,10 @@ export {
   SpeedZoneComponent,
   type SpeedZoneComponentJSON,
 } from './components/SpeedZoneComponent.js';
+export { MicroBlockComponent } from './components/MicroBlockComponent.js';
+export { ShieldComponent, type ShieldComponentJSON } from './components/ShieldComponent.js';
+export { PowerUpComponent, type PowerUpComponentJSON, type PowerUpType, type ActiveBuff } from './components/PowerUpComponent.js';
+export { PowerUpPickupComponent, type PowerUpPickupComponentJSON } from './components/PowerUpPickupComponent.js';
 
 // Explicit exports for utility types
 export type { RgbaColor } from './utils/colors.js';
@@ -89,11 +102,17 @@ export { WeaponPickupSystem } from './systems/WeaponPickupSystem.js';
 export { InventorySystem } from './systems/InventorySystem.js';
 export { InteractionSystem } from './systems/InteractionSystem.js';
 export type { InteractionSystemConfig } from './systems/InteractionSystem.js';
+export { CheckpointSystem, type CheckpointActivation } from './systems/CheckpointSystem.js';
 export { PvPRespawnManager } from './utils/PvPRespawnManager.js';
+export { RespawnManager, type RespawnOptions, type RespawnResult } from './managers/RespawnManager.js';
+export { PvPScoreboard, type PlayerStats } from './utils/PvPScoreboard.js';
 export { InteractableComponent } from './components/InteractableComponent.js';
 export type { InteractableComponentJSON } from './components/InteractableComponent.js';
 export { InteractionPromptUI } from './systems/InteractionPromptUI.js';
 export type { InteractionPromptUIStyle } from './systems/InteractionPromptUI.js';
+export { MicroBlockSystem, type MicroBlockSystemConfig } from './systems/MicroBlockSystem.js';
+export { MicroBlockMesher } from './utils/MicroBlockMesher.js';
+export { PowerUpSystem } from './systems/PowerUpSystem.js';
 
 // Physics (selective to avoid duplicates with systems)
 export { PhysicsWorld } from './physics/PhysicsWorld.js';

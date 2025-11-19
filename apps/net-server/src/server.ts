@@ -124,7 +124,7 @@ const WS_PORT = process.env.WS_PORT
   : process.env.NODE_ENV === 'test' || process.env.VITEST
     ? getTestPort(3001)
     : 3001;
-const DATA_DIR = process.env.DATA_DIR || './data';
+const DATA_DIR = process.env.DATA_DIR || path.resolve(process.cwd(), 'data');
 const THUMBNAIL_DIR = path.join(DATA_DIR, 'thumbnails');
 const isProduction = process.env.NODE_ENV === 'production';
 

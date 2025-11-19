@@ -7,6 +7,7 @@ import type { Entity } from '../core/Entity.js';
 import { WeaponComponent } from '../components/WeaponComponent.js';
 import { ProjectileComponent } from '../components/ProjectileComponent.js';
 import { HealthComponent } from '../components/HealthComponent.js';
+import { ShieldComponent } from '../components/ShieldComponent.js';
 import { PhysicsComponent, RigidbodyType } from '../components/PhysicsComponent.js';
 import { InventoryComponent } from '../components/InventoryComponent.js';
 import { AttachmentComponent } from '../components/AttachmentComponent.js';
@@ -321,14 +322,21 @@ export class WeaponSystem {
     if (hit) {
       // Apply damage to hit entity (with armor penetration if applicable)
       const health = hit.entity.getComponent(HealthComponent);
+      const shield = hit.entity.getComponent(ShieldComponent);
+      
       if (health) {
         // For now, apply full damage. Armor system can be added later
         // If armor exists, apply penetration: finalDamage = damage * (1 - armor * (1 - penetration))
-        const finalDamage = damage;
+        let finalDamage = damage;
         if (ammoEffects.armorPenetration !== undefined && ammoEffects.armorPenetration > 0) {
           // Armor penetration reduces armor effectiveness
           // This is a placeholder - full armor system needed
           // For now, we just apply the damage
+        }
+
+        // Absorb damage with shield first
+        if (shield && shield.currentShield > 0) {
+          finalDamage = shield.absorbDamage(finalDamage);
         }
 
         const damageDealt = health.takeDamage(finalDamage);

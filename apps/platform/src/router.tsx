@@ -2,7 +2,6 @@ import { createBrowserRouter, Navigate } from 'react-router-dom';
 import { HomePage } from './pages/HomePage';
 import { LoginPage } from './pages/LoginPage';
 import { RegisterPage } from './pages/RegisterPage';
-import { MarketplacePage } from './pages/MarketplacePage';
 import { MarketplaceItemPage } from './pages/MarketplaceItemPage';
 import { ProfilePage } from './pages/ProfilePage';
 import { EditorPage } from './pages/EditorPage';
@@ -19,7 +18,7 @@ import { CommunityHubPage } from './pages/CommunityHubPage';
 import { CategoryPage } from './pages/CategoryPage';
 import { ThreadPage } from './pages/ThreadPage';
 import { NewThreadPage } from './pages/NewThreadPage';
-import { ShopPage } from './pages/ShopPage';
+import { StorePage } from './pages/StorePage';
 import { PurchaseHistoryPage } from './pages/PurchaseHistoryPage';
 import { ShopManagementPage } from './pages/admin/ShopManagementPage';
 import { ForumManagementPage } from './pages/admin/ForumManagementPage';
@@ -75,7 +74,7 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
   },
   {
     path: '/marketplace',
-    element: <MarketplacePage />,
+    element: <StorePage />,
   },
   {
     path: '/marketplace/:id',
@@ -241,7 +240,7 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
     path: '/shop',
     element: (
       <ProtectedRoute>
-        <ShopPage />
+        <StorePage />
       </ProtectedRoute>
     ),
   },

@@ -3,6 +3,8 @@
  */
 
 import type { Vec3 } from '@engine/core/math';
+import type { GameProjectConfig } from '@shared/types/project';
+import { createDefaultGameProjectConfig } from '@shared/types/project';
 
 // Simplified PlayManifest interface (matches structure from build data)
 interface PlayManifest {
@@ -14,6 +16,12 @@ interface PlayManifest {
   simulation?: {
     fixedDeltaTime?: number;
     maxSubsteps?: number;
+    enableMultiplayer?: boolean;
+  };
+  gameplay?: {
+    respawnEnabled?: boolean;
+    maxPlayers?: number;
+    allowJoinInProgress?: boolean;
   };
   pawn?: {
     cameraTarget?: {
@@ -66,6 +74,7 @@ interface PlayManifest {
         jump?: string[];
         sprint?: string[];
         interact?: string[];
+        crouch?: string[];
       };
     };
   };
@@ -75,6 +84,12 @@ export interface BuildData {
   sceneJSON: string;
   playerStart?: { position: Vec3; rotation: number };
   manifest?: PlayManifest | null;
+}
+
+interface ProjectData {
+  metadata: any;
+  scene: any;
+  config?: GameProjectConfig;
 }
 
 /**
@@ -96,6 +111,60 @@ export async function loadBuildData(buildId: string): Promise<BuildData> {
   
   const data = await response.json();
   
+  // Handle ProjectData format (from Studio/Editor)
+  // ProjectData has 'scene' (object) and 'config' (object)
+  if (data.scene && typeof data.scene === 'object' && !data.sceneJSON) {
+    const projectData = data as ProjectData;
+    const config = projectData.config || createDefaultGameProjectConfig();
+    
+    // Convert scene object to JSON string for hydration
+    const sceneJSON = JSON.stringify(projectData.scene);
+    
+    // Extract spawn position and rotation
+    const spawnPos = config.world.spawn.position;
+    const spawnRotQuat = config.world.spawn.rotation;
+    
+    // Convert Quaternion [x, y, z, w] to Yaw (rotation around Y axis)
+    let spawnYaw = 0;
+    if (spawnRotQuat) {
+      const [x, y, z, w] = spawnRotQuat;
+      // Extract yaw from quaternion: atan2(2(wy + zx), 1 - 2(y^2 + z^2))
+      const siny_cosp = 2 * (w * y + z * x);
+      const cosy_cosp = 1 - 2 * (y * y + z * z);
+      spawnYaw = Math.atan2(siny_cosp, cosy_cosp);
+    }
+
+    // Create manifest from config
+    const manifest: PlayManifest = {
+      version: 1,
+      playerStart: {
+        position: spawnPos,
+        rotation: spawnYaw
+      },
+      simulation: {
+        enableMultiplayer: config.gameplay.maxPlayers > 1
+      },
+      gameplay: {
+        maxPlayers: config.gameplay.maxPlayers,
+        allowJoinInProgress: config.gameplay.allowJoinInProgress,
+        respawnEnabled: config.gameplay.respawnEnabled
+      },
+      controller: {
+        preferences: {
+          fov: config.camera.fov
+        }
+      }
+    };
+    
+    return {
+      sceneJSON,
+      playerStart: { position: spawnPos, rotation: spawnYaw },
+      manifest
+    };
+  }
+  
+  // Legacy format handling
+  
   // Validate structure - buildData powinien zawierać sceneJSON
   if (!data.sceneJSON) {
     throw new Error('Invalid build data: missing sceneJSON');
@@ -112,4 +181,3 @@ export async function loadBuildData(buildId: string): Promise<BuildData> {
     manifest: data.manifest ?? null,
   };
 }
-

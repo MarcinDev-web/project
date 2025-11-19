@@ -21,6 +21,11 @@ import {
   transformDirectionByRotation,
 } from './GizmoMath';
 
+// Temporary variables to avoid allocations in hot paths
+const TEMP_VEC3_A: Vec3 = [0, 0, 0];
+const TEMP_VEC3_B: Vec3 = [0, 0, 0];
+const TEMP_VEC3_C: Vec3 = [0, 0, 0];
+
 export interface GizmoControllerOptions {
   state: EditorState;
   selection: SelectionManager;
@@ -162,7 +167,10 @@ export class GizmoController {
     const axisLength = DEFAULT_GIZMO_CONFIG.axisLength * (scale / 10); // Normalize scale
 
     // Update axes
-    this.updateAxes(worldPosition, originX, originY, rect, axisLength, selected[0]!);
+    const primary = selected[0];
+    if (primary) {
+      this.updateAxes(worldPosition, originX, originY, rect, axisLength, primary);
+    }
 
     // Update plane handles
     this.updatePlanes(originX, originY, axisLength);
@@ -184,11 +192,11 @@ export class GizmoController {
     const cameraRot = this.options.getCameraRotation?.() ?? [0, 0, 0, 1];
     
     // Camera forward for visibility calculation
-    const cameraForward: Vec3 = [
-      -2 * (cameraRot[0] * cameraRot[2] + cameraRot[3] * cameraRot[1]),
-      -2 * (cameraRot[1] * cameraRot[2] - cameraRot[3] * cameraRot[0]),
-      -(1 - 2 * (cameraRot[0] * cameraRot[0] + cameraRot[1] * cameraRot[1])),
-    ];
+    // Optimized: reuse TEMP_VEC3_A instead of allocating new array
+    TEMP_VEC3_A[0] = -2 * (cameraRot[0] * cameraRot[2] + cameraRot[3] * cameraRot[1]);
+    TEMP_VEC3_A[1] = -2 * (cameraRot[1] * cameraRot[2] - cameraRot[3] * cameraRot[0]);
+    TEMP_VEC3_A[2] = -(1 - 2 * (cameraRot[0] * cameraRot[0] + cameraRot[1] * cameraRot[1]));
+    const cameraForward = TEMP_VEC3_A;
 
     (['x', 'y', 'z'] as AxisKey[]).forEach((axis) => {
       const visual = this.renderer.axisVisuals[axis];
@@ -202,11 +210,11 @@ export class GizmoController {
         );
       }
 
-      const target: Vec3 = [
-        worldPosition[0] + worldDir[0] * axisLength,
-        worldPosition[1] + worldDir[1] * axisLength,
-        worldPosition[2] + worldDir[2] * axisLength,
-      ];
+      // Optimized: reuse TEMP_VEC3_B for target position
+      TEMP_VEC3_B[0] = worldPosition[0] + worldDir[0] * axisLength;
+      TEMP_VEC3_B[1] = worldPosition[1] + worldDir[1] * axisLength;
+      TEMP_VEC3_B[2] = worldPosition[2] + worldDir[2] * axisLength;
+      const target = TEMP_VEC3_B;
 
       const screen = this.options.projectWorldToScreen(target);
       if (!screen) {

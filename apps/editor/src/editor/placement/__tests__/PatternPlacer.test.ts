@@ -59,6 +59,36 @@ describe('PatternPlacer', () => {
     });
   });
 
+  describe('generateWallPattern', () => {
+    it('should generate wall pattern with correct dimensions', () => {
+      const positions = patternPlacer.generateWallPattern({
+        start: [0, 0, 0],
+        end: [10, 0, 0],
+        height: 3,
+        spacing: 2,
+      });
+
+      // Length is 10, spacing 2 -> 6 columns (0, 2, 4, 6, 8, 10)
+      // Height 3 -> 3 rows
+      // Total = 6 * 3 = 18
+      expect(positions.length).toBe(18);
+    });
+
+    it('should stack positions vertically', () => {
+      const positions = patternPlacer.generateWallPattern({
+        start: [0, 0, 0],
+        end: [0, 0, 0], // Single column
+        height: 3,
+        spacing: 1,
+      });
+
+      expect(positions.length).toBe(3);
+      expect(positions[0]?.position).toEqual([0, 0, 0]);
+      expect(positions[1]?.position).toEqual([0, 1, 0]);
+      expect(positions[2]?.position).toEqual([0, 2, 0]);
+    });
+  });
+
   describe('generateGridPattern', () => {
     it('should generate grid pattern with correct dimensions', () => {
       const positions = patternPlacer.generateGridPattern({

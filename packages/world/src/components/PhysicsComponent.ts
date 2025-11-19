@@ -159,6 +159,9 @@ export class PhysicsComponent extends Component {
   /** Whether this body is awake (actively simulated) */
   private _isAwake: boolean = true;
 
+  /** Internal Rapier ID (for RapierPhysicsSystem) */
+  _rapierId: number = -1;
+
   /** Sleep threshold - if velocity is below this, body may sleep */
   sleepThreshold: number = 0.01;
 

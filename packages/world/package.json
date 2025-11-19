@@ -58,6 +58,18 @@
                         "development": "./src/types/*.ts",
                         "test": "./src/types/*.ts",
                         "default": "./dist/types/*.js"
+                    },
+                    "./net/InputChannel":  {
+                        "import": "./dist/net/InputChannel.js",
+                        "development": "./src/net/InputChannel.ts",
+                        "test": "./src/net/InputChannel.ts",
+                        "default": "./dist/net/InputChannel.js"
+                    },
+                    "./sim/AuthoritativeWorld":  {
+                        "import": "./dist/sim/AuthoritativeWorld.js",
+                        "development": "./src/sim/AuthoritativeWorld.ts",
+                        "test": "./src/sim/AuthoritativeWorld.ts",
+                        "default": "./dist/sim/AuthoritativeWorld.js"
                     }
                 },
     "scripts":  {
@@ -74,7 +86,10 @@
                          "@engine/animation":  "workspace:*",
                          "@engine/blocks":  "workspace:*",
                          "@engine/economy":  "workspace:*",
+                         "@engine/microblocks":  "workspace:*",
                          "@engine/script":  "workspace:*",
+                         "@engine/wasm-collision": "workspace:*",
+                         "@engine/wasm-physics": "workspace:*",
                          "gl-matrix":  "^3.4.4"
                      },
     "devDependencies":  {

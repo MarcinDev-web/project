@@ -3,6 +3,7 @@ import { FOV_RADIANS } from '@engine/gfx-webgpu/config';
 import type { Scene, Entity } from '@engine/world';
 import type { OrbitControls } from '@engine/camera';
 import type { EditorCameraController } from '@engine/camera';
+import { ensureWasmCollisionInit, getWasmCollisionSync } from '../../wasm/collision';
 
 export interface SceneBounds {
 	min: Vec3;
@@ -23,6 +24,13 @@ function isExcludedEntity(entity: Entity): boolean {
 export function computeSceneBounds(scene: Scene): SceneBounds | null {
 	const entities = scene.getAllEntities();
 	if (entities.length === 0) return null;
+
+	ensureWasmCollisionInit();
+	const wasm = getWasmCollisionSync();
+	const useWasm = Boolean(wasm);
+	const worldMatrices = useWasm ? new Float32Array(entities.length * 16) : null;
+	const halfExtents = useWasm ? new Float32Array(entities.length * 3) : null;
+	let soaCount = 0;
 
 	let hasAny = false;
 	let minX = Number.POSITIVE_INFINITY;
@@ -77,10 +85,58 @@ export function computeSceneBounds(scene: Scene): SceneBounds | null {
 		if (aMaxY > maxY) maxY = aMaxY;
 		if (aMaxZ > maxZ) maxZ = aMaxZ;
 		hasAny = true;
+
+		if (useWasm && worldMatrices && halfExtents) {
+			const matBase = soaCount * 16;
+			worldMatrices[matBase + 0] = world[0] ?? 1;
+			worldMatrices[matBase + 1] = world[1] ?? 0;
+			worldMatrices[matBase + 2] = world[2] ?? 0;
+			worldMatrices[matBase + 3] = world[3] ?? 0;
+			worldMatrices[matBase + 4] = world[4] ?? 0;
+			worldMatrices[matBase + 5] = world[5] ?? 1;
+			worldMatrices[matBase + 6] = world[6] ?? 0;
+			worldMatrices[matBase + 7] = world[7] ?? 0;
+			worldMatrices[matBase + 8] = world[8] ?? 0;
+			worldMatrices[matBase + 9] = world[9] ?? 0;
+			worldMatrices[matBase + 10] = world[10] ?? 1;
+			worldMatrices[matBase + 11] = world[11] ?? 0;
+			worldMatrices[matBase + 12] = world[12] ?? 0;
+			worldMatrices[matBase + 13] = world[13] ?? 0;
+			worldMatrices[matBase + 14] = world[14] ?? 0;
+			worldMatrices[matBase + 15] = world[15] ?? 1;
+
+			const halfBase = soaCount * 3;
+			halfExtents[halfBase + 0] = hx;
+			halfExtents[halfBase + 1] = hy;
+			halfExtents[halfBase + 2] = hz;
+			soaCount++;
+		}
 	}
 
 	if (!hasAny || !Number.isFinite(minX)) {
 		return null;
+	}
+
+	if (useWasm && wasm && worldMatrices && halfExtents && soaCount > 0) {
+		try {
+			const wasmBounds = wasm.computeSceneBounds(
+				worldMatrices.subarray(0, soaCount * 16),
+				halfExtents.subarray(0, soaCount * 3)
+			);
+			if (wasmBounds && wasmBounds.length >= 6) {
+				const min: Vec3 = [wasmBounds[0], wasmBounds[1], wasmBounds[2]];
+				const max: Vec3 = [wasmBounds[3], wasmBounds[4], wasmBounds[5]];
+				if (
+					min.every(Number.isFinite) &&
+					max.every(Number.isFinite)
+				) {
+					return { min, max };
+				}
+			}
+		} catch (error) {
+			// eslint-disable-next-line no-console
+			console.warn('[cameraFraming] WASM scene bounds failed, falling back to TS:', error);
+		}
 	}
 
 	return {

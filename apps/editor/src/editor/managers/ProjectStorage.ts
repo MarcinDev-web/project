@@ -1,16 +1,20 @@
 import type { SceneData } from '@engine/world';
 
+import type { GameProjectConfig } from '@shared/types/project';
+
 export interface ProjectMetadata {
   id: string;
   name: string;
   createdAt: number;
   updatedAt: number;
+  description?: string;
   thumbnail?: string; // data URL of scene preview
 }
 
 export interface ProjectData {
   metadata: ProjectMetadata;
   scene: SceneData;
+  config?: GameProjectConfig;
 }
 
 /**

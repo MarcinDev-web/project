@@ -265,32 +265,6 @@ export function HomePage() {
                 </section>
               )}
 
-              {discover.curated.length > 0 && (
-                <section className="discover-section">
-                  <div className="discover-section__header">
-                    <h2>Curated spotlights</h2>
-                    <span>Hand-picked themes refreshed automatically</span>
-                  </div>
-                  <div className="discover-curated-grid">
-                    {discover.curated.map((pick: DiscoverCuratedPick) => (
-                      <article key={pick.id} className="discover-curated-card">
-                        <div>
-                          <h3>{pick.title}</h3>
-                          <p>{pick.description}</p>
-                        </div>
-                        {pick.game ? (
-                          <Link to={`/marketplace/${pick.game.id}`} className="discover-curated-card__game">
-                            <strong>{pick.game.title}</strong>
-                            <span>{pick.reason}</span>
-                          </Link>
-                        ) : (
-                          <p className="discover-curated-card__empty">No pick yet — keep building!</p>
-                        )}
-                      </article>
-                    ))}
-                  </div>
-                </section>
-              )}
 
               {discover.fairness.slots.length > 0 && (
                 <section className="discover-section">
@@ -354,9 +328,22 @@ export function HomePage() {
           <div className="homepage-loading">Loading games...</div>
         ) : filteredGames.length === 0 ? (
           <div className="homepage-empty">
-            {search || activeTags.length > 0
-              ? 'No games found with the current filters'
-              : 'No games available yet'}
+            <div className="homepage-empty__icon">⚡</div>
+            <h3 className="homepage-empty__title">
+              {search || activeTags.length > 0
+                ? 'No matches found'
+                : 'Start Your Journey'}
+            </h3>
+            <p className="homepage-empty__text">
+              {search || activeTags.length > 0
+                ? "We couldn't find any games matching your filters. Try adjusting your search or keywords."
+                : 'Be the first to create a world in Forge. Your imagination is the only limit.'}
+            </p>
+            {!(search || activeTags.length > 0) && (
+              <Link to="/editor" className="homepage-empty__cta">
+                <span>🔨</span> Create New Game
+              </Link>
+            )}
           </div>
         ) : (
           <div className="games-grid">

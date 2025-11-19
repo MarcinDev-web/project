@@ -159,6 +159,12 @@ export class TerrainSculptTool {
         this.applyPinch(worldPosition, strength);
         break;
     }
+
+    // Update mesh to visualize changes immediately
+    // Note: This might be slow for large terrains. Consider optimizing to update only affected chunks.
+    if (this.heightmapTool && this.terrainEntity) {
+      this.heightmapTool.updateTerrainMesh(this.terrainEntity, this.heightmapTerrain);
+    }
   }
 
   /**

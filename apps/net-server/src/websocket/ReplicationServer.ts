@@ -19,6 +19,8 @@ import type {
   PingMessage,
   PongMessage,
   MessageTypingMessage,
+  AuthRefreshMessage,
+  AuthRefreshSuccessMessage,
 } from '../types/websocket.js';
 
 /**
@@ -122,6 +124,9 @@ export class ReplicationServer {
         case 'message:typing':
           await this.handleMessageTyping(ws, message as MessageTypingMessage);
           break;
+        case 'auth:refresh':
+          await this.handleAuthRefresh(ws, message as AuthRefreshMessage);
+          break;
         default:
           this.sendError(ws, `Unknown message type: ${message.type}`);
       }
@@ -129,6 +134,13 @@ export class ReplicationServer {
       console.error('Error handling WebSocket message:', error);
       this.sendError(ws, 'Failed to process message', 'INVALID_MESSAGE');
     }
+  }
+
+  /**
+   * Register an already authenticated connection (from handshake).
+   */
+  registerAuthenticatedConnection(ws: WebSocket, userId: string, token: string, expiresAt: number | null): void {
+    this.registerConnection(ws, userId, token, expiresAt);
   }
 
   /**
@@ -163,7 +175,17 @@ export class ReplicationServer {
       this.sessionManager.setUserOnline(verification.user.id, ws);
 
       // Join session
-      this.sessionManager.joinSession(message.sessionId, verification.user.id, publicUser, ws);
+      try {
+        this.sessionManager.joinSession(message.sessionId, verification.user.id, publicUser, ws);
+      } catch (error) {
+        if (error instanceof Error) {
+          this.sendError(ws, error.message, 'JOIN_FAILED');
+        } else {
+          this.sendError(ws, 'Failed to join session', 'JOIN_FAILED');
+        }
+        return;
+      }
+
       this.sessionManager.setUserData(verification.user.id, publicUser);
 
       // Notify other users
@@ -391,6 +413,38 @@ export class ReplicationServer {
       this.messageHandler.handleTyping(message.conversationId, userId, message.typing, ws);
     } catch (error) {
       console.error('Error handling typing indicator:', error);
+    }
+  }
+
+  /**
+   * Handle token refresh.
+   */
+  async handleAuthRefresh(ws: WebSocket, message: AuthRefreshMessage): Promise<void> {
+    try {
+      const verification = await this.authManager.verifyTokenWithExpiration(message.token);
+      if (!verification.user) {
+        this.sendError(ws, 'Invalid token', 'AUTH_FAILED');
+        return;
+      }
+
+      // Update connection info
+      const userId = this.getUserIdFromConnection(ws);
+      if (userId && userId !== verification.user.id) {
+        this.sendError(ws, 'User mismatch', 'AUTH_FAILED');
+        return;
+      }
+
+      this.registerConnection(ws, verification.user.id, message.token, verification.expiresAt);
+
+      // Send confirmation
+      const successMessage: AuthRefreshSuccessMessage = {
+        type: 'auth:refresh-success',
+        timestamp: Date.now(),
+      };
+      this.sendToWebSocket(ws, successMessage);
+    } catch (error) {
+      console.error('Error refreshing token:', error);
+      this.sendError(ws, 'Failed to refresh token', 'AUTH_FAILED');
     }
   }
 

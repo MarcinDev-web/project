@@ -1,3 +1,5 @@
+import { createPostProcessPipeline } from './PostProcessUtils';
+
 /**
  * FXAA (Fast Approximate Anti-Aliasing) Post-Processing Pass
  * 
@@ -49,40 +51,25 @@ export class FXAAPass {
         @group(0) @binding(0) var srcTex: texture_2d<f32>;
         @group(0) @binding(1) var srcSmp: sampler;
 
-        struct VSOut {
-          @builtin(position) pos: vec4<f32>,
-          @location(0) uv: vec2<f32>,
-        }
-
-        @vertex
-        fn vs(@builtin(vertex_index) vid: u32) -> VSOut {
-          var o: VSOut;
-          let x = f32((vid << 1u) & 2u);
-          let y = f32(vid & 2u);
-          o.pos = vec4<f32>(x * 2.0 - 1.0, y * -2.0 + 1.0, 0.0, 1.0);
-          o.uv = vec2<f32>(x, y);
-          return o;
-        }
-
         fn fxaaLuma(rgb: vec3<f32>) -> f32 {
           return dot(rgb, vec3<f32>(0.299, 0.587, 0.114));
         }
 
         @fragment
-        fn fs(input: VSOut) -> @location(0) vec4<f32> {
+        fn fs(@builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
           let texSize = vec2<f32>(textureDimensions(srcTex, 0));
           let texelSize = 1.0 / texSize;
           
           // Sample center and neighbors
-          let center = textureSample(srcTex, srcSmp, input.uv).rgb;
-          let n = textureSample(srcTex, srcSmp, input.uv + vec2<f32>(0.0, texelSize.y)).rgb;
-          let s = textureSample(srcTex, srcSmp, input.uv - vec2<f32>(0.0, texelSize.y)).rgb;
-          let e = textureSample(srcTex, srcSmp, input.uv + vec2<f32>(texelSize.x, 0.0)).rgb;
-          let w = textureSample(srcTex, srcSmp, input.uv - vec2<f32>(texelSize.x, 0.0)).rgb;
-          let ne = textureSample(srcTex, srcSmp, input.uv + texelSize).rgb;
-          let nw = textureSample(srcTex, srcSmp, input.uv + vec2<f32>(-texelSize.x, texelSize.y)).rgb;
-          let se = textureSample(srcTex, srcSmp, input.uv + vec2<f32>(texelSize.x, -texelSize.y)).rgb;
-          let sw = textureSample(srcTex, srcSmp, input.uv - texelSize).rgb;
+          let center = textureSample(srcTex, srcSmp, uv).rgb;
+          let n = textureSample(srcTex, srcSmp, uv + vec2<f32>(0.0, texelSize.y)).rgb;
+          let s = textureSample(srcTex, srcSmp, uv - vec2<f32>(0.0, texelSize.y)).rgb;
+          let e = textureSample(srcTex, srcSmp, uv + vec2<f32>(texelSize.x, 0.0)).rgb;
+          let w = textureSample(srcTex, srcSmp, uv - vec2<f32>(texelSize.x, 0.0)).rgb;
+          let ne = textureSample(srcTex, srcSmp, uv + texelSize).rgb;
+          let nw = textureSample(srcTex, srcSmp, uv + vec2<f32>(-texelSize.x, texelSize.y)).rgb;
+          let se = textureSample(srcTex, srcSmp, uv + vec2<f32>(texelSize.x, -texelSize.y)).rgb;
+          let sw = textureSample(srcTex, srcSmp, uv - texelSize).rgb;
 
           // Calculate luma
           let lumaCenter = fxaaLuma(center);
@@ -144,8 +131,8 @@ export class FXAAPass {
           }
           
           // Sample along edge
-          let uv1 = input.uv - uvOffset;
-          let uv2 = input.uv + uvOffset;
+          let uv1 = uv - uvOffset;
+          let uv2 = uv + uvOffset;
           
           let lumaEnd1 = fxaaLuma(textureSample(srcTex, srcSmp, uv1).rgb);
           let lumaEnd2 = fxaaLuma(textureSample(srcTex, srcSmp, uv2).rgb);
@@ -171,11 +158,11 @@ export class FXAAPass {
           var distance1: f32;
           var distance2: f32;
           if (isHorizontal) {
-            distance1 = input.uv.x - uv1.x;
-            distance2 = uv2.x - input.uv.x;
+            distance1 = uv.x - uv1.x;
+            distance2 = uv2.x - uv.x;
           } else {
-            distance1 = input.uv.y - uv1.y;
-            distance2 = uv2.y - input.uv.y;
+            distance1 = uv.y - uv1.y;
+            distance2 = uv2.y - uv.y;
           }
           
           let distance = min(distance1, distance2);
@@ -188,7 +175,7 @@ export class FXAAPass {
           let blendFactor = max(goodSpan, subpixBlend);
 
           // Blend samples
-          let uvBlend = input.uv;
+          let uvBlend = uv;
           if (isHorizontal) {
             uvBlend.y += pixelOffset * stepLength;
           } else {
@@ -196,7 +183,7 @@ export class FXAAPass {
           }
 
           let color1 = textureSample(srcTex, srcSmp, uvBlend).rgb;
-          let color2 = textureSample(srcTex, srcSmp, input.uv).rgb;
+          let color2 = textureSample(srcTex, srcSmp, uv).rgb;
           let color = mix(color1, color2, blendFactor);
           
           return vec4<f32>(color, 1.0);
@@ -204,22 +191,14 @@ export class FXAAPass {
       `,
     });
 
-    const pipelineLayout = this.device.createPipelineLayout({
-      label: 'fxaa-pl',
-      bindGroupLayouts: [this.bindGroupLayout],
-    });
-
-    this.pipeline = this.device.createRenderPipeline({
-      label: 'fxaa-pipeline',
-      layout: pipelineLayout,
-      vertex: { module: shader, entryPoint: 'vs' },
-      fragment: {
-        module: shader,
-        entryPoint: 'fs',
-        targets: [{ format: 'bgra8unorm' }],
-      },
-      primitive: { topology: 'triangle-list' },
-    });
+    this.pipeline = createPostProcessPipeline(
+      this.device,
+      'fxaa-pipeline',
+      [this.bindGroupLayout],
+      shader,
+      'fs',
+      [{ format: 'bgra8unorm' }]
+    );
   }
 
   /**

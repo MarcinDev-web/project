@@ -1,6 +1,7 @@
-import { describe, it, expect, beforeEach, beforeAll} from 'vitest';
+import { describe, it, expect, beforeEach, beforeAll } from 'vitest';
 import { ProjectStorage, type ProjectData, type ProjectMetadata } from './ProjectStorage';
 import type { SceneData } from '@engine/world';
+import { createDefaultGameProjectConfig } from '@shared/types/project';
 import 'fake-indexeddb/auto';
 
 describe('ProjectStorage', () => {
@@ -33,7 +34,11 @@ describe('ProjectStorage', () => {
       updatedAt: Date.now(),
     };
 
-    const project: ProjectData = { metadata, scene: sceneData };
+    const project: ProjectData = {
+      metadata,
+      scene: sceneData,
+      config: createDefaultGameProjectConfig(metadata.name, 'Sample project'),
+    };
 
     await storage.saveProject(project);
     const loaded = await storage.loadProject('test-project');
@@ -42,6 +47,8 @@ describe('ProjectStorage', () => {
     expect(loaded?.metadata.id).toBe('test-project');
     expect(loaded?.metadata.name).toBe('Test Project');
     expect(loaded?.scene.name).toBe('Test Scene');
+    expect(loaded?.config?.info.name).toBe('Test Project');
+    expect(loaded?.config?.info.description).toBe('Sample project');
   });
 
   it('returns null for non-existent project', async () => {

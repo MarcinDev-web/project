@@ -192,12 +192,11 @@ describe('AntiP2WCompliance', () => {
       expect(compliance.isDisposed()).toBe(true);
     });
 
-    it('should clear games on dispose', () => {
+    it('should throw when accessing games after dispose', () => {
       compliance.registerGame('game1', GameMode.CASUAL, 'creator1');
       compliance.dispose();
       
-      expect(compliance.getAllGames().length).toBe(0);
+      expect(() => compliance.getAllGames()).toThrow('disposed');
     });
   });
 });
-

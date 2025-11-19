@@ -1,6 +1,23 @@
+import { createPostProcessPipeline, FULLSCREEN_VERTEX_SHADER } from './PostProcessUtils';
+
+export enum TonemapMode {
+  ACES = 0,
+  Reinhard = 1,
+  Cineon = 2,
+  Linear = 3,
+}
+
 export interface TonemapConfig {
   /** Quantization steps (0 = disabled, >0 = number of color bands for NPR effect) */
   quantizeSteps?: number;
+  /** Tonemapping algorithm */
+  mode?: TonemapMode;
+  /** Vignette intensity (0-1) */
+  vignetteIntensity?: number;
+  /** Vignette smoothness (0-1) */
+  vignetteSmoothness?: number;
+  /** Chromatic aberration intensity (0-1) */
+  aberrationIntensity?: number;
 }
 
 export class TonemapLutPass {
@@ -16,25 +33,32 @@ export class TonemapLutPass {
   private cachedSrcView: GPUTextureView | null = null;
   private cachedBloomView: GPUTextureView | null = null;
   private cachedSSAOView: GPUTextureView | null = null;
-  private quantizeSteps: number = 0;
+  
+  private config: Required<TonemapConfig> = {
+    quantizeSteps: 0,
+    mode: TonemapMode.ACES,
+    vignetteIntensity: 0.0,
+    vignetteSmoothness: 0.5,
+    aberrationIntensity: 0.0,
+  };
 
   constructor(device: GPUDevice) {
     this.device = device;
   }
 
   /**
-   * Sets quantization steps for NPR color banding (0 = disabled)
+   * Sets tonemap configuration
    */
-  setQuantizeSteps(steps: number): void {
-    this.quantizeSteps = Math.max(0, Math.floor(steps));
+  setConfig(config: TonemapConfig): void {
+    this.config = { ...this.config, ...config };
     this.updateConfigBuffer();
   }
 
   /**
-   * Gets current quantization steps
+   * Gets current configuration
    */
-  getQuantizeSteps(): number {
-    return this.quantizeSteps;
+  getConfig(): Readonly<Required<TonemapConfig>> {
+    return this.config;
   }
 
   private createIdentityLUT(size = 16): Uint8Array {
@@ -112,32 +136,15 @@ export class TonemapLutPass {
     if (!this.configBuffer) {
       this.configBuffer = this.device.createBuffer({
         label: 'tonemap-config',
-        size: 4, // f32 quantizeSteps
+        size: 32, // 8 floats (aligned to 16 bytes)
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       });
       this.updateConfigBuffer();
     }
 
     if (!this.pipeline) {
-      // Load code from file path in build systems; here we inline compile by importing via bundler
-      // In this environment, we expect bundler to resolve shader code from file system.
-      const layout = this.device.createPipelineLayout({
-        label: 'tonemap-lut-pl',
-        bindGroupLayouts: [this.bindGroupLayout, this.configLayout],
-      });
-      this.pipeline = this.device.createRenderPipeline({
-        label: 'tonemap-lut-pipeline',
-        layout,
-        vertex: {
-          module: this.device.createShaderModule({ code: `
-struct VSOut { @builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32> };
-@vertex fn vs_fullscreen(@builtin(vertex_index) vid:u32)->VSOut{ var o:VSOut; let x=f32((vid<<1u)&2u); let y=f32(vid&2u); o.pos=vec4<f32>(x*2.0-1.0, y*-2.0+1.0, 0.0, 1.0); o.uv=vec2<f32>(x,y); return o; }
-` }),
-          entryPoint: 'vs_fullscreen',
-        },
-        fragment: {
-          module: this.device.createShaderModule({
-            code: `
+      const shader = this.device.createShaderModule({
+        code: `
 @group(0) @binding(0) var srcTex : texture_2d<f32>;
 @group(0) @binding(1) var srcSmp : sampler;
 @group(0) @binding(2) var lut3d : texture_3d<f32>;
@@ -146,6 +153,13 @@ struct VSOut { @builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32> };
 
 struct TonemapConfig {
   quantizeSteps: f32,
+  mode: f32,
+  vignetteIntensity: f32,
+  vignetteSmoothness: f32,
+  aberrationIntensity: f32,
+  _pad0: f32,
+  _pad1: f32,
+  _pad2: f32,
 }
 
 @group(1) @binding(0) var<uniform> config: TonemapConfig;
@@ -167,9 +181,35 @@ fn ACESFilm(x: vec3<f32>) -> vec3<f32> {
   return clamp((x * (a * x + b)) / (x * (c * x + d) + e), vec3<f32>(0.0), vec3<f32>(1.0));
 }
 
+// Reinhard Tone Mapping
+fn Reinhard(x: vec3<f32>) -> vec3<f32> {
+  return x / (x + vec3<f32>(1.0));
+}
+
+// Cineon Tone Mapping
+fn Cineon(x: vec3<f32>) -> vec3<f32> {
+  let a = x * (x * 0.22 + 0.025) + 0.004; // Optimized fit
+  let b = x * (x * 0.22 + 0.3) + 0.06;
+  return clamp((a / b) - 0.0667, vec3<f32>(0.0), vec3<f32>(1.0));
+}
+
 @fragment fn fs_main(@builtin(position) pos: vec4<f32>, @location(0) v_uv:vec2<f32>) -> @location(0) vec4<f32> {
-  // Sample HDR color (FP16 format)
-  var hdr = vec3<f32>(textureSample(srcTex, srcSmp, v_uv).xyz);
+  // Chromatic Aberration
+  var uv = v_uv;
+  var color = vec3<f32>(0.0);
+  
+  if (config.aberrationIntensity > 0.001) {
+    let dist = distance(v_uv, vec2<f32>(0.5));
+    let offset = dist * config.aberrationIntensity * 0.02;
+    
+    color.r = textureSample(srcTex, srcSmp, v_uv + vec2<f32>(offset, 0.0)).r;
+    color.g = textureSample(srcTex, srcSmp, v_uv).g;
+    color.b = textureSample(srcTex, srcSmp, v_uv - vec2<f32>(offset, 0.0)).b;
+  } else {
+    color = textureSample(srcTex, srcSmp, v_uv).rgb;
+  }
+  
+  var hdr = color;
   
   // Add bloom (already in HDR)
   let bloom = vec3<f32>(textureSample(bloomTex, srcSmp, v_uv).xyz);
@@ -179,17 +219,35 @@ fn ACESFilm(x: vec3<f32>) -> vec3<f32> {
   let ssao = textureSample(ssaoTex, srcSmp, v_uv).r;
   hdr *= mix(1.0, ssao, 0.5);
   
-  // Apply ACES tonemapping (handles HDR -> LDR conversion)
-  var aces = ACESFilm(hdr);
+  // Apply Tonemapping
+  var mapped = hdr;
+  let mode = i32(config.mode);
+  
+  if (mode == 0) { // ACES
+    mapped = ACESFilm(hdr);
+  } else if (mode == 1) { // Reinhard
+    mapped = Reinhard(hdr);
+  } else if (mode == 2) { // Cineon
+    mapped = Cineon(hdr);
+  } else { // Linear (3)
+    mapped = clamp(hdr, vec3<f32>(0.0), vec3<f32>(1.0));
+  }
+  
+  // Apply Vignette
+  if (config.vignetteIntensity > 0.001) {
+    let dist = distance(v_uv, vec2<f32>(0.5));
+    let vignette = smoothstep(0.8, 0.8 - config.vignetteSmoothness, dist * (1.0 + config.vignetteIntensity));
+    mapped *= vignette;
+  }
   
   // Apply quantization for NPR effect if enabled
   if (config.quantizeSteps > 0.5) {
     let step = 1.0 / config.quantizeSteps;
-    aces = floor(aces / step + 0.5) * step;
+    mapped = floor(mapped / step + 0.5) * step;
   }
   
   // Gamma correction (sRGB)
-  let ldr = pow(aces, vec3<f32>(1.0/2.2));
+  let ldr = pow(mapped, vec3<f32>(1.0/2.2));
   
   // Apply dithering to reduce banding (subtle, skip if quantizing)
   var finalColor = ldr;
@@ -201,7 +259,22 @@ fn ACESFilm(x: vec3<f32>) -> vec3<f32> {
   return vec4<f32>(finalColor, 1.0);
 }
 `,
-          }),
+      });
+
+      const layout = this.device.createPipelineLayout({
+        label: 'tonemap-lut-pl',
+        bindGroupLayouts: [this.bindGroupLayout, this.configLayout],
+      });
+
+      this.pipeline = this.device.createRenderPipeline({
+        label: 'tonemap-lut-pipeline',
+        layout,
+        vertex: {
+          module: this.device.createShaderModule({ code: FULLSCREEN_VERTEX_SHADER }),
+          entryPoint: 'vs_fullscreen',
+        },
+        fragment: {
+          module: shader,
           entryPoint: 'fs_main',
           targets: [{ format: presentationFormat }],
         },
@@ -311,12 +384,19 @@ fn ACESFilm(x: vec3<f32>) -> vec3<f32> {
   }
 
   /**
-   * Updates config buffer with current quantization settings
+   * Updates config buffer with current settings
    */
   private updateConfigBuffer(): void {
     if (!this.configBuffer) return;
-    const data = new Float32Array(1);
-    data[0] = this.quantizeSteps;
+    const data = new Float32Array(8);
+    data[0] = this.config.quantizeSteps;
+    data[1] = this.config.mode;
+    data[2] = this.config.vignetteIntensity;
+    data[3] = this.config.vignetteSmoothness;
+    data[4] = this.config.aberrationIntensity;
+    data[5] = 0; // pad
+    data[6] = 0; // pad
+    data[7] = 0; // pad
     this.device.queue.writeBuffer(this.configBuffer, 0, data);
   }
 
@@ -340,5 +420,3 @@ fn ACESFilm(x: vec3<f32>) -> vec3<f32> {
     this.cachedSSAOView = null;
   }
 }
-
-

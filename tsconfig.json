@@ -47,6 +47,8 @@
       "@engine/gfx-webgpu/*": ["./packages/gfx-webgpu/src/*"],
       "@engine/script": ["./packages/script/src"],
       "@engine/script/*": ["./packages/script/src/*"],
+      "@engine/script-runtime": ["./packages/script-runtime/src"],
+      "@engine/script-runtime/*": ["./packages/script-runtime/src/*"],
       "@engine/input": ["./packages/input/src"],
       "@engine/input/*": ["./packages/input/src/*"],
       "@engine/camera": ["./packages/camera/src"],
@@ -83,6 +85,8 @@
   "include": [
     "packages/*/src/**/*",
     "apps/*/src/**/*",
+    "services/*/src/**/*",
+    "services/*/*/src/**/*",
     "shared/**/*"
   ],
   "exclude": [

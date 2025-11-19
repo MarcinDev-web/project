@@ -40,7 +40,9 @@ export type WebSocketMessageType =
   | 'forum:post:deleted'
   | 'forum:reaction:new'
   | 'forum:reaction:removed'
-  | 'forum:vote:changed';
+  | 'forum:vote:changed'
+  | 'auth:refresh'
+  | 'auth:refresh-success';
 
 /**
  * Base WebSocket message structure.
@@ -111,6 +113,9 @@ export interface InputMessage extends WebSocketMessage {
   moveDirection?: [number, number]; // [forward, right] normalized
   cameraForward?: [number, number, number];
   cameraRight?: [number, number, number];
+  actorId?: string;
+  intentSignature?: string;
+  intentDeltaMs?: number;
 }
 
 /**
@@ -411,6 +416,21 @@ export interface ForumVoteChangedMessage extends WebSocketMessage {
 }
 
 /**
+ * Auth refresh message (client -> server).
+ */
+export interface AuthRefreshMessage extends WebSocketMessage {
+  type: 'auth:refresh';
+  token: string;
+}
+
+/**
+ * Auth refresh success message (server -> client).
+ */
+export interface AuthRefreshSuccessMessage extends WebSocketMessage {
+  type: 'auth:refresh-success';
+}
+
+/**
  * Collaboration session data.
  */
 export interface CollaborationSession {
@@ -419,5 +439,6 @@ export interface CollaborationSession {
   ownerId: string;
   createdAt: number;
   users: Map<string, PublicUser>; // userId -> user
+  maxPlayers?: number;
+  allowJoinInProgress?: boolean;
 }
-

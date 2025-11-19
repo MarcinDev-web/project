@@ -9,6 +9,7 @@
     "noEmit": false,
     "emitDeclarationOnly": false,
     "verbatimModuleSyntax": false,
+    "allowJs": false,
     "paths": {
       "@engine/core": ["../core/dist"],
       "@engine/core/*": ["../core/dist/*"],
@@ -23,7 +24,11 @@
       "@engine/stdlib": ["../stdlib/dist"],
       "@engine/stdlib/*": ["../stdlib/dist/*"],
       "@engine/voxel": ["../voxel/dist"],
-      "@engine/voxel/*": ["../voxel/dist/*"]
+      "@engine/voxel/*": ["../voxel/dist/*"],
+      "@engine/microblocks": ["../microblocks/dist"],
+      "@engine/microblocks/*": ["../microblocks/dist/*"],
+      "@engine/wasm-collision": ["../wasm-collision/dist"],
+      "@engine/wasm-collision/*": ["../wasm-collision/dist/*"]
     }
   },
   "include": ["src/**/*"],
@@ -38,9 +43,9 @@
     { "path": "../core/tsconfig.build.json" },
     { "path": "../animation/tsconfig.json" },
     { "path": "../blocks" },
-    { "path": "../economy" }
+    { "path": "../economy" },
+    { "path": "../microblocks/tsconfig.build.json" }
     // Note: script is excluded here to handle circular dependency
     // Script is built separately before world, then world is rebuilt with script reference
   ]
 }
-

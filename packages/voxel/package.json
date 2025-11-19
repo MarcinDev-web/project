@@ -28,7 +28,8 @@
   },
   "dependencies": {
     "@engine/core": "workspace:*",
-    "@engine/world": "workspace:*"
+    "@engine/world": "workspace:*",
+    "@engine/wasm-mesh": "workspace:*"
   },
   "devDependencies": {
     "@engine/test-utils": "workspace:*",

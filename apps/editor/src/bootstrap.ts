@@ -4,8 +4,10 @@ import { Logger } from './utils/logger';
 import { registerBuiltInLogicCubes } from '@engine/script';
 import { LogicCubeLibrary } from '@engine/editor-utils';
 import { ensureWasmCollisionInit } from './wasm/collision';
+import { TerrainMeshGenerator } from '@engine/voxel/terrain';
 import { warmupCollisionWorker } from './wasm/collisionWorkerClient';
 import { login, createReplicationClient, createSession, saveSnapshot, loadLatestSnapshot } from './editor/net/collab';
+import { EOSClient } from './bootstrap/EOSClient';
 
 export async function bootstrap(): Promise<void> {
   const { canvas, statusEl } = requireEditorDom();
@@ -97,10 +99,21 @@ export async function bootstrap(): Promise<void> {
   }
 
   const app = new EditorApp({ canvas, statusEl });
+  const eosClient = new EOSClient({
+    sanctionsEndpoint: import.meta.env?.VITE_EOS_SANCTIONS_URL ?? '/trust/eos/events',
+    reportsEndpoint: import.meta.env?.VITE_EOS_REPORT_URL ?? '/trust/reports',
+    enabled: import.meta.env?.VITE_ENABLE_EOS !== 'false',
+  });
+  try {
+    await eosClient.initialize();
+  } catch (error) {
+    Logger.warn('EOS client init failed', error as Error);
+  }
 
   // Background warm-up: init WASM (in-thread) and Worker to avoid first-use jank
   try {
     ensureWasmCollisionInit();
+    TerrainMeshGenerator.init();
     warmupCollisionWorker();
   } catch {}
 

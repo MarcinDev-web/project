@@ -34,11 +34,12 @@ export function avatarSkeletonToSkeleton(avatarSkeleton: AvatarSkeleton): Skelet
       parentIndex,
       bindPosition: [...localTransform.position],
       bindRotation: [...localTransform.rotation],
-      bindScale: [1, 1, 1], // AvatarSkeleton doesn't use scale, default to [1,1,1]
+      bindScale: [...localTransform.scale],
     });
     
     // Release pooled Vec3 after cloning
     pool.release(localTransform.position);
+    pool.release(localTransform.scale);
   }
 
   return new Skeleton(bones);

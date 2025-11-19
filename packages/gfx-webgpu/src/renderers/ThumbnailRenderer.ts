@@ -57,35 +57,33 @@ export class ThumbnailRenderer {
     const size = Math.max(64, Math.min(512, options?.size ?? 128));
 
     // Geometry: single instance of default cube
-  const geom: GeometryData = {
-    vertices: DEFAULT_GEOMETRY.vertices,
-    indices: DEFAULT_GEOMETRY.indices,
-    instanceCount: 1,
-    opaqueCount: 1,
-    instanceOffsetData: new Float32Array([0, 0, 0]),
-    instanceColorScaleData: new Float32Array([
-      preset.color[0],
-      preset.color[1],
-      preset.color[2],
-      Math.max(preset.scale[0], preset.scale[1], preset.scale[2]),
-    ]),
-    instanceSecondaryColorData: new Float32Array([
-      preset.color[0],
-      preset.color[1],
-      preset.color[2],
-      1,
-    ]),
-    instanceEmissiveColorData: new Float32Array([0, 0, 0, 0]),
-    instanceMaterialParamsData: new Float32Array([
-      preset.color[3] ?? 1,
-      0,
-      1,
-      0,
-    ]),
-    instanceRotationData: new Float32Array([0, 0, 0, 1]),
-    instanceMaterialIdData: new Float32Array([0]),
-  };
-  const {
+    const maxScale = Math.max(preset.scale[0], preset.scale[1], preset.scale[2]);
+    const instanceBoundsData = new Float32Array([0, 0, 0, Math.max(maxScale * 0.5, 0.001)]);
+    const geom: GeometryData = {
+      vertices: DEFAULT_GEOMETRY.vertices,
+      indices: DEFAULT_GEOMETRY.indices,
+      instanceCount: 1,
+      opaqueCount: 1,
+      instanceOffsetData: new Float32Array([0, 0, 0]),
+      instanceColorScaleData: new Float32Array([preset.color[0], preset.color[1], preset.color[2], maxScale]),
+      instanceSecondaryColorData: new Float32Array([
+        preset.color[0],
+        preset.color[1],
+        preset.color[2],
+        1,
+      ]),
+      instanceEmissiveColorData: new Float32Array([0, 0, 0, 0]),
+      instanceMaterialParamsData: new Float32Array([
+        preset.color[3] ?? 1,
+        0,
+        1,
+        0,
+      ]),
+      instanceRotationData: new Float32Array([0, 0, 0, 1]),
+      instanceMaterialIdData: new Float32Array([0]),
+      instanceBoundsData,
+    };
+    const {
     vertexBuffer,
     indexBuffer,
     instanceOffsetBuffer,
@@ -94,8 +92,8 @@ export class ThumbnailRenderer {
     instanceEmissiveColorBuffer,
     instanceMaterialParamsBuffer,
     instanceRotationBuffer,
-    instanceMaterialIdBuffer,
-  } = createGeometryBuffers(device, geom);
+      instanceMaterialIdBuffer,
+    } = createGeometryBuffers(device, geom);
 
     // Uniforms and materials (use atlas to match main pipeline)
     const { uniformBuffer, uniformBindGroupLayout } = createUniformResources(device, {

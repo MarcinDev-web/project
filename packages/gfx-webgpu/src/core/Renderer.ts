@@ -224,7 +224,7 @@ export interface Renderer {
 // Lightweight grid renderer interface used by the core renderer
 export interface GridRenderer {
   initialize(device: GPUDevice, format: GPUTextureFormat, depthFormat: GPUTextureFormat): Promise<void>;
-  render(passEncoder: GPURenderPassEncoder, viewProjectionMatrix: Float32Array): void;
+  render(passEncoder: GPURenderPassEncoder, viewProjectionMatrix: Float32Array, eyePosition?: Float32Array | number[]): void;
   dispose(): void;
   /** Optional method to control grid visibility */
   setVisible?(visible: boolean): void;

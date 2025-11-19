@@ -39,6 +39,13 @@ export interface CirclePatternConfig {
   startAngle?: number; // Starting angle in radians
 }
 
+export interface WallPatternConfig {
+  start: Vec3;
+  end: Vec3;
+  height: number;
+  spacing: number;
+}
+
 /**
  * Generates positions for pattern-based placement
  */
@@ -131,6 +138,31 @@ export class PatternPlacer {
         center[2] + Math.sin(angle) * radius,
       ];
       positions.push({ position, valid: true });
+    }
+
+    return positions;
+  }
+
+  /**
+   * Generates positions for a wall pattern (vertical grid)
+   */
+  generateWallPattern(config: WallPatternConfig): PatternPosition[] {
+    const { start, end, height, spacing } = config;
+    const positions: PatternPosition[] = [];
+
+    // Calculate base line positions
+    const basePositions = this.generateLinePattern({ start, end, spacing });
+
+    // Extrude upwards
+    for (const base of basePositions) {
+      for (let y = 0; y < height; y++) {
+        const position: Vec3 = [
+          base.position[0],
+          base.position[1] + y * spacing,
+          base.position[2],
+        ];
+        positions.push({ position, valid: true });
+      }
     }
 
     return positions;

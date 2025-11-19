@@ -1,0 +1,22 @@
+[sources.intent_metrics]
+  type = "file"
+  include = ["/var/log/intent/*.json"]
+  ignore_older_secs = 600
+
+[transforms.intent_parse]
+  type = "remap"
+  inputs = ["intent_metrics"]
+  source = '''
+.msg = parse_json!(.message)
+.timestamp = to_timestamp!(.msg.timestamp)
+.actor_id = .msg.actor_id
+.inputs_per_second = to_float!(.msg.inputs_per_second)
+'''
+
+[sinks.kafka_metrics]
+  type = "kafka"
+  inputs = ["intent_parse"]
+  bootstrap_servers = "kafka.observability.svc.cluster.local:9092"
+  topic = "intent-metrics"
+  encoding.codec = "json"
+

@@ -23,6 +23,16 @@ export interface MicroBlock {
 }
 
 /**
+ * Mesh data structure compatible with engine mesh components
+ */
+export interface MicroBlockMeshData {
+  vertices: Float32Array;
+  indices: Uint16Array;
+  uvs?: Float32Array;
+  normals?: Float32Array;
+}
+
+/**
  * Chunk coordinate in chunk space
  */
 export interface MicroBlockChunk {
@@ -33,7 +43,7 @@ export interface MicroBlockChunk {
   /** Whether this chunk needs remeshing */
   dirty: boolean;
   /** Generated mesh data (cached) */
-  mesh?: import('@engine/world').CustomMeshData;
+  mesh?: MicroBlockMeshData;
 }
 
 /**
@@ -58,4 +68,3 @@ export interface MicroBlockComponentData {
   storeData: MicroBlockStoreData;
   chunkSize: number;
 }
-

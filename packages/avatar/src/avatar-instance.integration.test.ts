@@ -128,7 +128,6 @@ describe('AvatarInstance Integration', () => {
       expect(() => {
         avatar.getRootEntity();
         avatar.getSkeleton();
-        avatar.getAnimator();
         avatar.serializeLoadout();
       }).not.toThrow();
     });

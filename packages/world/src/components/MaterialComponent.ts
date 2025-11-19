@@ -26,11 +26,10 @@ export class MaterialComponent extends Component {
   private _accentColor: RgbaColor = [1, 1, 1, 1];
   private _emissiveColor: RgbaColor = [0, 0, 0, 1];
   private _emissiveIntensity = 0;
-  private _opacity = 1;
+  private _alphaMode: AlphaMode = 'opaque';
 
   metallic = 0;
   roughness = 1;
-  alphaMode: AlphaMode = 'opaque';
   flags = 0;
 
   /**
@@ -45,12 +44,12 @@ export class MaterialComponent extends Component {
 
   set materialId(value: number) {
     if (!Number.isFinite(value) || value < 0) {
-      console.warn(`[MaterialComponent] Invalid materialId ${value}, clamping to 0`);
+      // console.warn(`[MaterialComponent] Invalid materialId ${value}, clamping to 0`);
       this._materialId = 0;
     } else if (value > MaterialComponent.MAX_MATERIAL_ID) {
-      console.warn(
-        `[MaterialComponent] materialId ${value} exceeds MAX_MATERIAL_ID (${MaterialComponent.MAX_MATERIAL_ID}), clamping to max`
-      );
+      // console.warn(
+      //   `[MaterialComponent] materialId ${value} exceeds MAX_MATERIAL_ID (${MaterialComponent.MAX_MATERIAL_ID}), clamping to max`
+      // );
       this._materialId = MaterialComponent.MAX_MATERIAL_ID;
     } else {
       this._materialId = Math.floor(value);
@@ -63,7 +62,10 @@ export class MaterialComponent extends Component {
 
   set primaryColor(color: RgbaColor) {
     this._primaryColor = cloneColor(color);
-    this.opacity = color[3] ?? 1;
+    // Ensure alphaMode is consistent with opacity if not explicitly set
+    if (this._primaryColor[3] < 0.999 && this._alphaMode === 'opaque') {
+      this._alphaMode = 'blend';
+    }
     this.updateFlags();
   }
 
@@ -102,12 +104,22 @@ export class MaterialComponent extends Component {
   }
 
   get opacity(): number {
-    return this._opacity;
+    return this._primaryColor[3];
   }
 
   set opacity(value: number) {
-    this._opacity = Number.isFinite(value) ? value : 1;
-    this.alphaMode = this._opacity < 0.999 ? 'blend' : 'opaque';
+    const newOpacity = Number.isFinite(value) ? value : 1;
+    this._primaryColor[3] = newOpacity;
+    // Do NOT automatically change alphaMode here to avoid destroying 'mask' mode
+    this.updateFlags();
+  }
+
+  get alphaMode(): AlphaMode {
+    return this._alphaMode;
+  }
+
+  set alphaMode(value: AlphaMode) {
+    this._alphaMode = value;
     this.updateFlags();
   }
 
@@ -134,7 +146,9 @@ export class MaterialComponent extends Component {
         Math.abs(this._emissiveColor[1]) +
         Math.abs(this._emissiveColor[2]));
     if (emissiveStrength > 1e-4) flags |= MaterialComponent.FLAG_EMISSIVE;
-    if (this.alphaMode === 'blend' || this.opacity < 0.999) {
+    
+    // Check opacity from primaryColor
+    if (this._alphaMode === 'blend' || this._primaryColor[3] < 0.999) {
       flags |= MaterialComponent.FLAG_TRANSPARENT;
     }
     this.flags = flags;
@@ -142,17 +156,20 @@ export class MaterialComponent extends Component {
 
   clone(): MaterialComponent {
     const copy = new MaterialComponent();
-    copy.primaryColor = [...this.primaryColor];
-    copy.secondaryColor = [...this.secondaryColor];
-    copy.accentColor = [...this.accentColor];
-    copy.emissiveColor = [...this.emissiveColor];
+    // Direct copy to avoid double allocation and side effects
+    copy._primaryColor = [...this._primaryColor];
+    copy._secondaryColor = [...this._secondaryColor];
+    copy._accentColor = [...this._accentColor];
+    copy._emissiveColor = [...this._emissiveColor];
+    
     copy.metallic = this.metallic;
     copy.roughness = this.roughness;
-    copy.emissiveIntensity = this.emissiveIntensity;
-    copy.opacity = this.opacity;
-    copy.alphaMode = this.alphaMode;
+    copy._emissiveIntensity = this._emissiveIntensity;
+    // copy.opacity is derived from primaryColor, no need to copy separately
+    copy._alphaMode = this._alphaMode;
     copy.flags = this.flags;
-    copy.materialId = this._materialId; // Use private field to avoid warning in clone
+    copy._materialId = this._materialId;
+    
     return copy;
   }
 
@@ -170,13 +187,13 @@ export class MaterialComponent extends Component {
     flags: number;
   } {
     return {
-      primaryColor: [...this.primaryColor],
-      secondaryColor: [...this.secondaryColor],
-      accentColor: [...this.accentColor],
-      emissiveColor: [...this.emissiveColor],
-      emissiveIntensity: this.emissiveIntensity,
-      opacity: this.opacity,
-      alphaMode: this.alphaMode,
+      primaryColor: [...this._primaryColor],
+      secondaryColor: [...this._secondaryColor],
+      accentColor: [...this._accentColor],
+      emissiveColor: [...this._emissiveColor],
+      emissiveIntensity: this._emissiveIntensity,
+      opacity: this._primaryColor[3],
+      alphaMode: this._alphaMode,
       metallic: this.metallic,
       roughness: this.roughness,
       materialId: this._materialId,
@@ -198,21 +215,42 @@ export class MaterialComponent extends Component {
     flags?: number;
     color?: RgbaColor; // legacy fallback
   }): void {
-    if (data.primaryColor) this.primaryColor = data.primaryColor;
-    else if (data.color) this.primaryColor = data.color; // legacy support
-    if (data.secondaryColor) this.secondaryColor = data.secondaryColor;
-    if (data.accentColor) this.accentColor = data.accentColor;
-    if (data.emissiveColor) this.emissiveColor = data.emissiveColor;
-    if (typeof data.emissiveIntensity === 'number') this.emissiveIntensity = data.emissiveIntensity;
-    if (typeof data.opacity === 'number') {
-      this.opacity = data.opacity;
-      this.alphaMode = this.opacity < 0.999 ? 'blend' : this.alphaMode;
-    }
-    if (data.alphaMode) this.alphaMode = data.alphaMode;
+    // Set simple properties first
     if (typeof data.metallic === 'number') this.metallic = data.metallic;
     if (typeof data.roughness === 'number') this.roughness = data.roughness;
-    if (typeof data.materialId === 'number') this.materialId = data.materialId; // Use setter for validation
+    if (typeof data.materialId === 'number') this.materialId = data.materialId;
+    if (typeof data.emissiveIntensity === 'number') this._emissiveIntensity = data.emissiveIntensity;
+    
+    // Colors
+    if (data.secondaryColor) this._secondaryColor = cloneColor(data.secondaryColor);
+    if (data.accentColor) this._accentColor = cloneColor(data.accentColor);
+    if (data.emissiveColor) this._emissiveColor = cloneColor(data.emissiveColor);
+
+    // Primary color & Opacity handling
+    // 1. Set primary color if available
+    if (data.primaryColor) {
+      this._primaryColor = cloneColor(data.primaryColor);
+    } else if (data.color) {
+      this._primaryColor = cloneColor(data.color);
+    }
+
+    // 2. Override opacity if explicitly provided (legacy support or specific override)
+    if (typeof data.opacity === 'number') {
+      this._primaryColor[3] = data.opacity;
+    }
+
+    // 3. Set alpha mode explicitly if provided
+    if (data.alphaMode) {
+      this._alphaMode = data.alphaMode;
+    } else {
+      // Auto-detect if not provided
+      this._alphaMode = this._primaryColor[3] < 0.999 ? 'blend' : 'opaque';
+    }
+
+    // 4. Flags - allow override but updateFlags will recalculate based on state
     if (typeof data.flags === 'number') this.flags = data.flags;
+    
+    // Final consistency check
     this.updateFlags();
   }
 }

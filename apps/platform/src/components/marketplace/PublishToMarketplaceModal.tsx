@@ -5,6 +5,7 @@ import { studioApi, type StudioProject, type AvatarPreset } from '../../api/stud
 import { marketplaceApi } from '../../api/marketplace';
 import { useToast } from '../../contexts/ToastContext';
 import './PublishToMarketplaceModal.css';
+import type { GameProjectConfig } from '@shared/types/project';
 
 interface PublishToMarketplaceModalProps {
   type: 'build' | 'avatar';
@@ -23,6 +24,7 @@ export function PublishToMarketplaceModal({ type, onClose, onPublished }: Publis
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [tagsInput, setTagsInput] = useState('');
+  const [selectedConfig, setSelectedConfig] = useState<GameProjectConfig | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
@@ -41,8 +43,18 @@ export function PublishToMarketplaceModal({ type, onClose, onPublished }: Publis
       const project = projects.find((p) => p.id === selectedProjectId);
       if (project) {
         setTitle(project.name);
-        setDescription(project.description || '');
-        setTagsInput(project.tags?.join(', ') || '');
+        const config = project.projectData?.config ?? null;
+        setSelectedConfig(config);
+
+        const resolvedDescription =
+          project.description || config?.info.description || '';
+        setDescription(resolvedDescription);
+
+        const tags = [...(project.tags ?? [])];
+        if (config?.info.genre && !tags.includes(config.info.genre)) {
+          tags.push(config.info.genre);
+        }
+        setTagsInput(tags.join(', '));
       }
     } else if (selectedAvatarId && type === 'avatar') {
       const avatar = avatars.find((a) => a.id === selectedAvatarId);
@@ -51,6 +63,9 @@ export function PublishToMarketplaceModal({ type, onClose, onPublished }: Publis
         setDescription(avatar.description || '');
         setTagsInput(avatar.tags?.join(', ') || '');
       }
+      setSelectedConfig(null);
+    } else {
+      setSelectedConfig(null);
     }
   }, [selectedProjectId, selectedAvatarId, projects, avatars, type]);
 
@@ -190,6 +205,34 @@ export function PublishToMarketplaceModal({ type, onClose, onPublished }: Publis
                   ))}
                 </select>
               )}
+            </div>
+          )}
+
+          {type === 'build' && selectedConfig && (
+            <div className="publish-modal-config-preview">
+              <h4>Konfiguracja gry</h4>
+              <ul>
+                <li>
+                  <strong>Widoczność:</strong> {selectedConfig.info.visibility}
+                </li>
+                <li>
+                  <strong>Gatunek:</strong> {selectedConfig.info.genre}
+                </li>
+                <li>
+                  <strong>Max graczy:</strong> {selectedConfig.gameplay.maxPlayers}
+                  {selectedConfig.gameplay.allowJoinInProgress ? ' (join in progress: on)' : ''}
+                </li>
+                <li>
+                  <strong>Respawn:</strong> {selectedConfig.gameplay.respawnEnabled ? 'włączony' : 'wyłączony'}
+                </li>
+                <li>
+                  <strong>Spawn:</strong>{' '}
+                  {selectedConfig.world.spawn.position.map((v) => v.toFixed(2)).join(', ')}
+                </li>
+                <li>
+                  <strong>FOV kamery:</strong> {selectedConfig.camera.fov}°
+                </li>
+              </ul>
             </div>
           )}
 

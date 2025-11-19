@@ -22,7 +22,7 @@ export function avatarAnimationToClip(animation: AvatarAnimation): AnimationClip
   }
 
   // Group keyframes by joint and property
-  const tracksMap = new Map<string, Map<number, { position?: number[]; rotation?: number[] }>>();
+  const tracksMap = new Map<string, Map<number, { position?: number[]; rotation?: number[]; scale?: number[] }>>();
 
   // First pass: collect all keyframes
   for (const frame of animation.frames) {
@@ -43,6 +43,9 @@ export function avatarAnimationToClip(animation: AvatarAnimation): AnimationClip
       }
       if (keyframe.rotation) {
         frameData.rotation = [...keyframe.rotation];
+      }
+      if (keyframe.scale) {
+        frameData.scale = [...keyframe.scale];
       }
       jointTracks.set(time, frameData);
     }
@@ -85,6 +88,24 @@ export function avatarAnimationToClip(animation: AvatarAnimation): AnimationClip
         interpolation: 'linear',
         valueType: 'quat',
         keyframes: rotationKeyframes.map((kf) => ({ time: kf.time, value: kf.value as Quat })),
+      });
+    }
+
+    // Create scale track
+    const scaleKeyframes: Array<{ time: number; value: number[] }> = [];
+    for (const [time, data] of jointTracks.entries()) {
+      if (data.scale) {
+        scaleKeyframes.push({ time, value: data.scale });
+      }
+    }
+    if (scaleKeyframes.length > 0) {
+      scaleKeyframes.sort((a, b) => a.time - b.time);
+      tracks.push({
+        id: `${jointName}_scale`,
+        target: { type: 'bone', bone: jointName, property: 'scale' },
+        interpolation: 'linear',
+        valueType: 'vec3',
+        keyframes: scaleKeyframes.map((kf) => ({ time: kf.time, value: kf.value as Vec3 })),
       });
     }
   }

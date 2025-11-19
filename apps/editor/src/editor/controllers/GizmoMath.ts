@@ -1,6 +1,9 @@
 import type { Vec3, Quat, Mat4 } from '@engine/core/math';
 import { dotVec3, mat4FromQuatTranslation } from '@engine/core/math';
 
+// Shared temporary variables to avoid allocations
+const TEMP_MAT4 = new Float32Array(16) as Mat4;
+
 /**
  * Calculate the angle between a direction vector and the camera's forward direction.
  * Returns angle in degrees.
@@ -62,13 +65,12 @@ export function projectScreenDeltaToPlane(
 export function getCameraBasisVectors(
   cameraRotation: Quat
 ): { right: Vec3; up: Vec3; forward: Vec3 } {
-  const rotMat = new Float32Array(16) as Mat4;
-  mat4FromQuatTranslation(rotMat, cameraRotation, [0, 0, 0]);
+  mat4FromQuatTranslation(TEMP_MAT4, cameraRotation, [0, 0, 0]);
   
   return {
-    right: [rotMat[0] ?? 0, rotMat[1] ?? 0, rotMat[2] ?? 0],
-    up: [rotMat[4] ?? 0, rotMat[5] ?? 0, rotMat[6] ?? 0],
-    forward: [-(rotMat[8] ?? 0), -(rotMat[9] ?? 0), -(rotMat[10] ?? 0)],
+    right: [TEMP_MAT4[0] ?? 0, TEMP_MAT4[1] ?? 0, TEMP_MAT4[2] ?? 0],
+    up: [TEMP_MAT4[4] ?? 0, TEMP_MAT4[5] ?? 0, TEMP_MAT4[6] ?? 0],
+    forward: [-(TEMP_MAT4[8] ?? 0), -(TEMP_MAT4[9] ?? 0), -(TEMP_MAT4[10] ?? 0)],
   };
 }
 
@@ -79,12 +81,11 @@ export function transformDirectionByRotation(
   direction: Vec3,
   rotation: Quat
 ): Vec3 {
-  const rotMat = new Float32Array(16) as Mat4;
-  mat4FromQuatTranslation(rotMat, rotation, [0, 0, 0]);
+  mat4FromQuatTranslation(TEMP_MAT4, rotation, [0, 0, 0]);
   return [
-    direction[0] * (rotMat[0] ?? 0) + direction[1] * (rotMat[4] ?? 0) + direction[2] * (rotMat[8] ?? 0),
-    direction[0] * (rotMat[1] ?? 0) + direction[1] * (rotMat[5] ?? 0) + direction[2] * (rotMat[9] ?? 0),
-    direction[0] * (rotMat[2] ?? 0) + direction[1] * (rotMat[6] ?? 0) + direction[2] * (rotMat[10] ?? 0),
+    direction[0] * (TEMP_MAT4[0] ?? 0) + direction[1] * (TEMP_MAT4[4] ?? 0) + direction[2] * (TEMP_MAT4[8] ?? 0),
+    direction[0] * (TEMP_MAT4[1] ?? 0) + direction[1] * (TEMP_MAT4[5] ?? 0) + direction[2] * (TEMP_MAT4[9] ?? 0),
+    direction[0] * (TEMP_MAT4[2] ?? 0) + direction[1] * (TEMP_MAT4[6] ?? 0) + direction[2] * (TEMP_MAT4[10] ?? 0),
   ];
 }
 
@@ -213,4 +214,3 @@ export function getPlaneAxes(plane: 'xy' | 'xz' | 'yz'): [Vec3, Vec3] {
       ];
   }
 }
-

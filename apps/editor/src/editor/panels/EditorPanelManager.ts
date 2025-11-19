@@ -78,6 +78,9 @@ export interface EditorPanelManagerConfig {
   npcPresetManager?: NpcPresetManager | null;
   onImportMarketplaceBuild?: (itemId: string) => Promise<void>;
   onMarketplaceAssetPurchased?: (itemId: string) => void;
+  onTerrainCreated?: (entity: Entity) => void;
+  onUIElementCreated?: (entity: Entity) => void;
+  onSceneModified?: (description: string) => void;
 }
 
 /**
@@ -108,6 +111,7 @@ export class EditorPanelManager {
   private assetPalette: AssetPalette | null = null;
   private assetBrowserWrapper: { refresh: () => void } | null = null;
   private resizableSidebar: ResizableSidebar | null = null;
+  private resizableInspector: ResizableSidebar | null = null;
   private marketplacePanel: MarketplacePanel | null = null;
 
   constructor(private readonly config: EditorPanelManagerConfig) {}
@@ -172,6 +176,7 @@ export class EditorPanelManager {
       selection: this.config.selection,
       onConfigChanged: () => {
         this.config.updateSceneBuffers();
+        this.config.onSceneModified?.('Logic updated');
         this.refreshProperties();
       },
     });
@@ -312,6 +317,7 @@ export class EditorPanelManager {
       scene: this.config.scene,
       onConfigChanged: () => {
         this.config.updateSceneBuffers();
+        this.config.onSceneModified?.('Weapon updated');
         this.refreshProperties();
       },
       updateSceneBuffers: this.config.updateSceneBuffers,
@@ -375,6 +381,8 @@ export class EditorPanelManager {
         this.config.selection.select(elementEntity);
         this.refreshProperties();
         this.config.updateSceneBuffers();
+        // Notify parent to record history
+        this.config.onUIElementCreated?.(elementEntity);
       },
     });
 
@@ -385,6 +393,8 @@ export class EditorPanelManager {
         terrainStudio,
         onTerrainCreated: (entity) => {
           this.config.updateSceneBuffers();
+          // Notify parent to record history
+          this.config.onTerrainCreated?.(entity);
           // Optionally select the new terrain entity
           this.config.selection.select(entity);
           this.refreshProperties();
@@ -581,6 +591,20 @@ export class EditorPanelManager {
       storageKey: 'editor-sidebar-width',
       onResize: (width) => {
         console.log('Sidebar resized to:', width);
+      },
+    });
+
+    // Make inspector resizable
+    this.resizableInspector = new ResizableSidebar({
+      element: inspectorContainer,
+      minWidth: 250,
+      maxWidth: 600,
+      defaultWidth: 320,
+      snapPoints: [280, 320, 400, 500],
+      storageKey: 'editor-inspector-width',
+      side: 'right',
+      onResize: (width) => {
+        console.log('Inspector resized to:', width);
       },
     });
 
@@ -932,6 +956,9 @@ export class EditorPanelManager {
 
     this.resizableSidebar?.dispose();
     this.resizableSidebar = null;
+
+    this.resizableInspector?.dispose();
+    this.resizableInspector = null;
 
     this.assetPalette?.dispose();
     this.assetPalette = null;

@@ -70,6 +70,9 @@ export class LocalPlayerController implements PlayerController {
   private profileSwitcher: ProfileSwitcher | null = null;
   private lastProfileSwitchKeys: Set<string> = new Set();
 
+  // Callback for multiplayer input replication
+  public onMultiplayerInput?: (input: CharacterInput) => void;
+
   constructor(options: LocalPlayerControllerOptions) {
     this.id = options.id;
     this.preferences = options.preferences;
@@ -181,8 +184,8 @@ export class LocalPlayerController implements PlayerController {
     };
 
     // Process multiplayer input replication (if callback is set)
-    if ((this as any).onMultiplayerInput) {
-      (this as any).onMultiplayerInput(characterInput);
+    if (this.onMultiplayerInput) {
+      this.onMultiplayerInput(characterInput);
     }
 
     if (this.characterSystem) {

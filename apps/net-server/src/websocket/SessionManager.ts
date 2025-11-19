@@ -20,7 +20,11 @@ export class SessionManager {
   /**
    * Create a new collaboration session.
    */
-  async createSession(projectId: string, ownerId: string): Promise<CollaborationSession> {
+  async createSession(
+    projectId: string,
+    ownerId: string,
+    options?: { maxPlayers?: number; allowJoinInProgress?: boolean }
+  ): Promise<CollaborationSession> {
     const sessionId = `session_${Date.now()}_${Math.random().toString(36).substring(7)}`;
 
     const ownerUser = await this.getPublicUser(ownerId);
@@ -31,6 +35,8 @@ export class SessionManager {
       ownerId,
       createdAt: Date.now(),
       users: new Map([[ownerId, ownerUser]]),
+      maxPlayers: options?.maxPlayers,
+      allowJoinInProgress: options?.allowJoinInProgress,
     };
 
     this.sessions.set(sessionId, session);
@@ -46,6 +52,20 @@ export class SessionManager {
     const session = this.sessions.get(sessionId);
     if (!session) {
       throw new Error('Session not found');
+    }
+
+    // Check max players
+    if (session.maxPlayers !== undefined && session.users.size >= session.maxPlayers) {
+      throw new Error('Session is full');
+    }
+
+    // Check join in progress
+    if (session.allowJoinInProgress === false && !session.users.has(userId)) {
+      // Allow if user was already in session (reconnect)
+      // But if it's a new user and join in progress is disabled, block
+      // Note: logic might need refinement based on whether game has started
+      // For now, we'll assume if session exists, game is in progress
+      throw new Error('Join in progress is disabled');
     }
 
     // Add user to session

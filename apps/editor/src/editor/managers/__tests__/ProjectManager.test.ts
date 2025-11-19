@@ -139,11 +139,18 @@ describe('ProjectManager - Templates', () => {
   });
 
   it('falls back to empty project when template application fails', async () => {
-    applyToMock.mockRejectedValue(new Error('boom'));
+    // First call fails, second call (fallback) succeeds
+    applyToMock
+      .mockRejectedValueOnce(new Error('boom'))
+      .mockResolvedValueOnce(undefined);
 
     await manager.newProjectFromTemplate(templateMeta);
 
-    expect(applyToMock).toHaveBeenCalled();
+    // Should have been called twice: once for requested template, once for empty fallback
+    expect(applyToMock).toHaveBeenCalledTimes(2);
+    expect(applyToMock).toHaveBeenNthCalledWith(1, scene, templateMeta.id, { clear: true });
+    expect(applyToMock).toHaveBeenNthCalledWith(2, scene, 'template:empty', { clear: true });
+
     expect(showStatusMessage).toHaveBeenLastCalledWith(
       'Template failed, created empty project',
       1500
@@ -151,6 +158,5 @@ describe('ProjectManager - Templates', () => {
     if (typeof window !== 'undefined') {
       expect(window.alert).toHaveBeenCalled();
     }
-    expect(scene.rootEntities.some((entity: SceneEntity) => entity.name === 'Environment')).toBe(true);
   });
 });

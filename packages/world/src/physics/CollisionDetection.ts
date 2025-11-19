@@ -12,6 +12,7 @@ import type {
   ContactPoint,
 } from '../components/PhysicsComponent.js';
 import { normalizeVec3Out, quatToMatrix3 } from '@engine/core/math';
+import type { WasmCollision, TrsArray } from '@engine/wasm-collision';
 
 /**
  * Collision pair result
@@ -37,6 +38,23 @@ export interface ColliderTransform {
  */
 export class CollisionDetection {
   private static readonly EPSILON = 0.0001;
+  private static wasm: WasmCollision | null = null;
+
+  /**
+   * Initialize with WASM module
+   */
+  static init(wasm: WasmCollision): void {
+    this.wasm = wasm;
+  }
+
+  /**
+   * Batch check all colliders using WASM
+   * Returns Uint32Array of colliding pairs [idxA1, idxB1, idxA2, idxB2, ...]
+   */
+  static batchCheckAll(trsArray: TrsArray): Uint32Array | null {
+    if (!this.wasm) return null;
+    return this.wasm.batchCheckAll(trsArray);
+  }
 
   /**
    * Main collision detection dispatch
@@ -47,6 +65,51 @@ export class CollisionDetection {
     colliderB: AnyCollider,
     transformB: ColliderTransform
   ): CollisionInfo {
+    // Fast path: use WASM if available and shapes are supported
+    // Currently WASM returns boolean only, no contact points.
+    // So we can only use WASM for boolean checks or trigger checks where contacts aren't needed.
+    // BUT: PhysicsSystem uses contacts for resolution.
+    // So for now, we might only be able to use WASM for trigger checks or simple overlap tests unless we extend WASM to return contact info.
+    // The plan said: "Migracja Narrow Phase: Zmodyfikować CollisionDetection.ts, aby delegował obliczenia do @engine/wasm-collision."
+    // And "Zachować TS jako fallback".
+    // If WASM doesn't return contact points, we can't use it for physical collision resolution yet.
+    // HOWEVER, looking at WasmCollision interface I added:
+    // obbIntersect, sphereSphereIntersect etc return boolean.
+    // So full physics resolution (which needs normal/depth/contactPoint) cannot be fully offloaded yet without contact generation in Rust.
+    // But we can use it for early out? If !intersect -> return false.
+    // If intersect -> calculate contacts in TS (expensive part is finding IF they intersect, but generating contacts is also work).
+    
+    // Let's see: OBB-OBB SAT in TS does both intersection and depth calculation.
+    // If we use WASM for boolean check, we save time if there is NO collision.
+    // If there IS collision, we run TS to get contacts.
+    // This is a valid optimization if WASM check is significantly faster than TS check.
+    
+    // Or maybe the plan implied we should move contact generation to WASM too?
+    // "Implementacja prymitywów w Rust" - done.
+    // "Migracja Narrow Phase" - implies using it.
+    
+    // For now, I will use WASM for the boolean check. If it returns false, we return no collision immediately.
+    // If it returns true, we proceed to TS implementation to get contact points.
+    // This assumes WASM is faster even with the overhead of FFI call.
+    
+    // For Trigger events, we don't strictly need contact points, just boolean overlap.
+    // PhysicsSystem uses `detectCollision` for both. 
+    // `detectCollision` returns `CollisionInfo` which includes contacts.
+    // If I can distinguish if contacts are needed, I could optimize.
+    
+    // Let's try to use WASM as an early rejection filter.
+    
+    if (this.wasm) {
+      const isCollision = this.checkWasmCollision(colliderA, transformA, colliderB, transformB);
+      if (!isCollision) {
+        return { hasCollision: false, contacts: [] };
+      }
+      // If WASM says collision, we fall through to TS to calculate contact points.
+      // Note: For triggers we effectively double-check (WASM yes -> TS yes). 
+      // Optimization: If contacts are not needed (e.g. triggers), we could skip TS.
+      // But `detectCollision` interface requires contacts.
+    }
+
     // Get world positions including collider offsets
     const posA = this.getWorldPosition(colliderA.center, transformA);
     const posB = this.getWorldPosition(colliderB.center, transformB);
@@ -130,6 +193,110 @@ export class CollisionDetection {
   }
 
   /**
+   * Check collision utilizing WASM module
+   * Returns true if collision detected, false otherwise
+   */
+  private static checkWasmCollision(
+    colliderA: AnyCollider,
+    transformA: ColliderTransform,
+    colliderB: AnyCollider,
+    transformB: ColliderTransform
+  ): boolean {
+    if (!this.wasm) return true; // If WASM missing, assume true to let TS handle it (or false? better safe fallback is check TS)
+    // Actually if WASM missing we shouldn't be here.
+
+    const posA = this.getWorldPosition(colliderA.center, transformA);
+    const posB = this.getWorldPosition(colliderB.center, transformB);
+
+    // Helper to prepare Float32Arrays
+    // Note: Allocating Float32Arrays every frame per pair is expensive!
+    // The original TS code uses local variables and avoids allocations.
+    // The WASM wrapper expects Float32Array.
+    // To make this performant, we MUST use scratch buffers or pooled arrays.
+    // Since we are inside a static method, we could use static scratch buffers.
+    
+    // Use scratch buffers for FFI
+    this.fillScratchBuffers(posA, transformA, posB, transformB);
+
+    // Dispatch
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
+    if (colliderA.shape === 'box' && colliderB.shape === 'box') {
+      this.fillBoxBuffers(colliderA, transformA, colliderB, transformB);
+      return this.wasm.obbIntersect(this.scratchObbA, this.scratchObbB);
+    }
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-enum-comparison
+    if (colliderA.shape === 'sphere' && colliderB.shape === 'sphere') {
+      const radA = colliderA.radius * Math.max(transformA.scale[0], Math.max(transformA.scale[1], transformA.scale[2])); // Approximate scale
+      const radB = colliderB.radius * Math.max(transformB.scale[0], Math.max(transformB.scale[1], transformB.scale[2]));
+      return this.wasm.sphereSphereIntersect(this.scratchVecA, radA, this.scratchVecB, radB);
+    }
+    // ... other shapes ...
+    
+    // For now, since setting up efficient FFI without allocations is complex and requires architecture changes (scratch buffers),
+    // and the immediate goal is functional integration, I will implement simple FFI calls.
+    // Optimizing FFI allocation is a separate task (SharedArrayBuffer/Wasm memory view).
+    
+    // Wait, `WasmCollision` interface expects `Float32Array`. 
+    // Creating `new Float32Array([x,y,z])` is an allocation.
+    // We should define static scratch buffers on `CollisionDetection`.
+    
+    return true; // Fallback to TS if shape combo not optimized yet
+  }
+
+  // Scratch buffers for WASM FFI to avoid garbage
+  private static scratchVecA = new Float32Array(3);
+  private static scratchVecB = new Float32Array(3);
+  private static scratchQuatA = new Float32Array(4);
+  private static scratchQuatB = new Float32Array(4);
+  private static scratchScaleA = new Float32Array(3);
+  private static scratchScaleB = new Float32Array(3);
+  
+  private static scratchObbA = {
+    center: new Float32Array(3),
+    axes: new Float32Array(9),
+    half: new Float32Array(3)
+  };
+  private static scratchObbB = {
+    center: new Float32Array(3),
+    axes: new Float32Array(9),
+    half: new Float32Array(3)
+  };
+
+  private static fillScratchBuffers(posA: Vec3, tA: ColliderTransform, posB: Vec3, tB: ColliderTransform) {
+    this.scratchVecA.set(posA);
+    this.scratchVecB.set(posB);
+    this.scratchQuatA.set(tA.rotation);
+    this.scratchQuatB.set(tB.rotation);
+    this.scratchScaleA.set(tA.scale);
+    this.scratchScaleB.set(tB.scale);
+  }
+
+  private static fillBoxBuffers(boxA: BoxCollider, tA: ColliderTransform, boxB: BoxCollider, tB: ColliderTransform) {
+    // Fill OBB A
+    this.scratchObbA.center.set(this.scratchVecA);
+    // We need rotation matrix for axes
+    const matA = quatToMatrix3(tA.rotation);
+    this.scratchObbA.axes.set(matA); // This allocates new array in `quatToMatrix3`. 
+    // Optimization: `quatToMatrix3` returns `[number,...]`. We need to write to `Float32Array`.
+    // Ideally `quatToMatrix3` should support writing to output array.
+    // Looking at `core/math`: `quatToMatrix3(q)` returns `Vec3` (actually array of 9 numbers).
+    // We can manually convert or assume cost is acceptable for now.
+    
+    // half sizes
+    this.scratchObbA.half[0] = boxA.size[0] * tA.scale[0] * 0.5;
+    this.scratchObbA.half[1] = boxA.size[1] * tA.scale[1] * 0.5;
+    this.scratchObbA.half[2] = boxA.size[2] * tA.scale[2] * 0.5;
+
+    // Fill OBB B
+    this.scratchObbB.center.set(this.scratchVecB);
+    const matB = quatToMatrix3(tB.rotation);
+    this.scratchObbB.axes.set(matB);
+    this.scratchObbB.half[0] = boxB.size[0] * tB.scale[0] * 0.5;
+    this.scratchObbB.half[1] = boxB.size[1] * tB.scale[1] * 0.5;
+    this.scratchObbB.half[2] = boxB.size[2] * tB.scale[2] * 0.5;
+  }
+
+  /**
    * Gets world position of collider center
    */
   private static getWorldPosition(center: Vec3, transform: ColliderTransform): Vec3 {
@@ -155,6 +322,7 @@ export class CollisionDetection {
     rotB: Quat,
     scaleB: Vec3
   ): CollisionInfo {
+    // ... existing implementation ...
     // Convert to OBB representation
     const obbA = this.boxToOBB(boxA, posA, rotA, scaleA);
     const obbB = this.boxToOBB(boxB, posB, rotB, scaleB);

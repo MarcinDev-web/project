@@ -9,10 +9,12 @@ import { CameraComponent } from '@engine/world';
 import { PhysicsWorld } from '@engine/world';
 import { CharacterControllerSystem, GroundDetectionSystem } from '@engine/stdlib/CharacterController';
 import { BlockBehaviorSystem, UISystem, InteractionSystem } from '@engine/world/systems';
+import { AnimationSystem } from '@engine/stdlib/Animation';
 import { MeshComponent, InteractableComponent } from '@engine/world';
 import { registerTemplates, applyTo } from '@engine/world-templates';
-import { createFlatPlatformTemplate, createStarterBlockTemplate } from '@engine/world-templates';
+import { createFlatPlatformTemplate, createStarterBlockTemplate, createEmptyTemplate } from '@engine/world-templates';
 import { ShareClient } from '@engine/net';
+import { PredictionBridge } from './runtime/PredictionBridge';
 
 export interface EditorAppOptions {
   canvas: HTMLCanvasElement;
@@ -30,6 +32,10 @@ export class EditorApp {
   private blockBehaviorSystem: BlockBehaviorSystem | null = null;
   private uiSystem: UISystem | null = null;
   private interactionSystem: InteractionSystem | null = null;
+  private animationSystem: AnimationSystem | null = null;
+  private currentAnimationScene: Scene | null = null;
+  private readonly predictionBridge: PredictionBridge;
+  private predictionTick = 0;
 
   private renderer: Renderer | null = null;
   private editor: EditorUI | null = null;
@@ -46,6 +52,7 @@ export class EditorApp {
 
   constructor(private readonly config: EditorAppOptions) {
     this.controls = createOrbitControls(config.canvas, { initialDistance: 18 });
+    this.predictionBridge = new PredictionBridge({ scene: this.scene });
   }
 
   public async start(): Promise<void> {
@@ -66,6 +73,7 @@ export class EditorApp {
         registerTemplates([
           createFlatPlatformTemplate(),
           createStarterBlockTemplate(),
+          createEmptyTemplate(),
         ]);
         // Load default template (starter block) immediately before initializing renderer/UI
         this.config.statusEl.textContent = 'Loading default scene…';
@@ -79,6 +87,7 @@ export class EditorApp {
         scene: this.scene,
         shouldSimulate: () => this.editor?.isPlayMode() === true,
         onFrameUpdate: (deltaTime: number) => {
+          this.predictionBridge.captureLocalState(this.predictionTick++);
           // Update brand watermark (FORGE ENGINE branding with FPS)
           this.editor?.updateBrandWatermark();
 
@@ -89,7 +98,22 @@ export class EditorApp {
               if (this.uiSystem && !(this.uiSystem as any).uiRoot) {
                 this.uiSystem.initialize();
               }
-              this.editor.getModeManager()?.updatePlayMode(deltaTime);
+
+              const modeManager = this.editor.getModeManager();
+              if (modeManager) {
+                // Ensure AnimationSystem is using the correct scene (runtime vs authoring)
+                const activeScene = modeManager.getActiveScene();
+                if (this.animationSystem && this.currentAnimationScene !== activeScene) {
+                  this.animationSystem = new AnimationSystem(activeScene);
+                  this.currentAnimationScene = activeScene;
+                }
+                // Update animation system BEFORE avatar/character updates
+                // This ensures the skeleton is up-to-date for the current frame
+                this.animationSystem?.update(deltaTime);
+                
+                modeManager.updatePlayMode(deltaTime);
+              }
+
               // Update UI system
               if (this.uiSystem) {
                 this.uiSystem.update();
@@ -139,6 +163,8 @@ export class EditorApp {
       this.characterSystem = new CharacterControllerSystem(this.scene, this.physicsWorld);
       this.blockBehaviorSystem = new BlockBehaviorSystem(this.scene, this.physicsWorld.getSystem());
       this.uiSystem = new UISystem(this.scene);
+      this.animationSystem = new AnimationSystem(this.scene);
+      this.currentAnimationScene = this.scene;
       this.interactionSystem = new InteractionSystem(this.scene, {
         canvas: this.config.canvas,
         maxRange: 10.0,
@@ -256,6 +282,9 @@ export class EditorApp {
       this.interactionSystem = null;
     }
 
+    this.animationSystem = null;
+    this.currentAnimationScene = null;
+
     try {
       this.controls.cleanup();
     } catch (error) {
@@ -311,6 +340,10 @@ export class EditorApp {
   private readonly updateSceneBuffers = (): void => {
     this.renderer?.updateScene();
   };
+
+  getPredictionBridge(): PredictionBridge {
+    return this.predictionBridge;
+  }
 
   private readonly updateCameraMatrices = (): void => {
     const aspect = this.config.canvas.width / this.config.canvas.height;

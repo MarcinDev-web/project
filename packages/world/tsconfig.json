@@ -16,8 +16,8 @@
     "paths": {
       "@engine/core": ["../core/dist"],
       "@engine/core/*": ["../core/dist/*"],
-      "@engine/animation": ["../animation/dist"],
-      "@engine/animation/*": ["../animation/dist/*"],
+      "@engine/animation": ["../animation/dist/src"],
+      "@engine/animation/*": ["../animation/dist/src/*"],
       "@engine/economy": ["../economy/dist/src"],
       "@engine/economy/*": ["../economy/dist/src/*"],
       "@engine/world-server": ["../world-server/dist"],

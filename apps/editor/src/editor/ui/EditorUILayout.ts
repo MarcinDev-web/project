@@ -15,6 +15,8 @@
  * - Professional aesthetics
  */
 
+import { createIcon } from '../utils/icons';
+
 export interface EditorUILayoutConfig {
   canvas: HTMLCanvasElement;
   statusEl: HTMLElement;
@@ -219,23 +221,22 @@ export class EditorUILayout {
     button.setAttribute('title', `Toggle ${label} Panel (${shortcut})`);
     
     // Icon direction based on collapsed state and position
-    let icon: string;
+    let iconName: 'chevron-left' | 'chevron-right';
     if (position === 'left') {
       // Left toggle: points right when collapsed, left when open
-      icon = isCollapsed
-        ? '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l4 4-4 4"/></svg>'
-        : '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4L6 8l4 4"/></svg>';
+      iconName = isCollapsed ? 'chevron-right' : 'chevron-left';
     } else {
       // Right toggle: points left when collapsed, right when open
-      icon = isCollapsed
-        ? '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4L6 8l4 4"/></svg>'
-        : '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l4 4-4 4"/></svg>';
+      iconName = isCollapsed ? 'chevron-left' : 'chevron-right';
     }
     
-    button.innerHTML = `
-      ${icon}
-      <span class="panel-toggle-label">${label}</span>
-    `;
+    const icon = createIcon(iconName, 16);
+    button.appendChild(icon);
+    
+    const labelSpan = document.createElement('span');
+    labelSpan.className = 'panel-toggle-label';
+    labelSpan.textContent = label;
+    button.appendChild(labelSpan);
     
     button.addEventListener('click', onClick);
     
@@ -378,14 +379,33 @@ export class EditorUILayout {
     this.inspector.setAttribute('aria-hidden', String(this.inspectorCollapsed));
     
     // Update toggle button icon direction
-    const icon = this.inspectorCollapsed
-      ? '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M10 4L6 8l4 4"/></svg>'
-      : '<svg width="16" height="16" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M6 4l4 4-4 4"/></svg>';
+    const iconName = this.inspectorCollapsed ? 'chevron-left' : 'chevron-right';
     
-    this.inspectorToggle.innerHTML = `
-      ${icon}
-      <span class="panel-toggle-label">Inspector</span>
-    `;
+    this.inspectorToggle.innerHTML = '';
+    const icon = createIcon(iconName, 16);
+    this.inspectorToggle.appendChild(icon);
+    
+    const labelSpan = document.createElement('span');
+    labelSpan.className = 'panel-toggle-label';
+    labelSpan.textContent = 'Inspector';
+    this.inspectorToggle.appendChild(labelSpan);
+  }
+
+  /**
+   * Sets the visibility of a panel (hides it completely, including toggle button).
+   * Used for global preferences (e.g. "Show Inspector").
+   */
+  setPanelVisible(panel: 'sidebar' | 'inspector', visible: boolean): void {
+    const element = panel === 'sidebar' ? this.sidebar : this.inspector;
+    const toggle = panel === 'sidebar' ? null : this.inspectorToggle;
+
+    if (element) {
+      element.style.display = visible ? '' : 'none';
+    }
+
+    if (toggle) {
+      toggle.style.display = visible ? '' : 'none';
+    }
   }
 
   /**

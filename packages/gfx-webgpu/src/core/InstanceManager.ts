@@ -11,7 +11,8 @@ import type { Entity, Scene } from '@engine/world';
 import { MaterialComponent, MeshComponent } from '@engine/world';
 import type { Frustum } from './FrustumCuller';
 import { Logger } from '@engine/core/utils';
-import { generateSphereMesh, generateCapsuleY, generateHeroicTorsoMesh } from '@engine/avatar';
+import { generateCapsuleY, generateHeroicTorsoMesh } from '@engine/avatar';
+import { generateSphereMesh, generateCylinderMesh, generatePlaneMesh, generateCapsuleMesh } from '../utils/geometry';
 
 export interface InstanceData {
   instanceCount: number;
@@ -106,14 +107,64 @@ export class InstanceDataBuilder {
       }
 
       // Fallback: generate geometry for procedural mesh types if meshData is missing
-      let fallbackGeometry: ReturnType<typeof generateSphereMesh> | null = null;
+      // Use 'any' to allow assignment of different return types (interleaved vs separate)
+      // GeometryCache handles both formats now.
+      let fallbackGeometry: any = null;
       
       if (meshComponent.meshType === 'sphere') {
         try {
-          fallbackGeometry = generateSphereMesh(16);
+          const opts = meshComponent.options || {};
+          fallbackGeometry = generateSphereMesh(
+            opts.radius ?? 1,
+            opts.segments ?? 16,
+            opts.segments ?? 16
+          );
         } catch (error) {
           Logger.warn(
             `[InstanceManager] Failed to generate fallback sphere geometry for entity "${entity.name || entity.id || 'unnamed'}":`,
+            error
+          );
+        }
+      } else if (meshComponent.meshType === 'cylinder') {
+        try {
+          const opts = meshComponent.options || {};
+          fallbackGeometry = generateCylinderMesh(
+            opts.radius ?? 0.5,
+            opts.radius ?? 0.5,
+            opts.height ?? 1,
+            opts.segments ?? 16
+          );
+        } catch (error) {
+          Logger.warn(
+            `[InstanceManager] Failed to generate fallback cylinder geometry for entity "${entity.name || entity.id || 'unnamed'}":`,
+            error
+          );
+        }
+      } else if (meshComponent.meshType === 'plane') {
+        try {
+          const opts = meshComponent.options || {};
+          fallbackGeometry = generatePlaneMesh(
+            opts.width ?? 1,
+            opts.depth ?? 1,
+            opts.segments ?? 1
+          );
+        } catch (error) {
+          Logger.warn(
+            `[InstanceManager] Failed to generate fallback plane geometry for entity "${entity.name || entity.id || 'unnamed'}":`,
+            error
+          );
+        }
+      } else if (meshComponent.meshType === 'capsule') {
+        try {
+          const opts = meshComponent.options || {};
+          fallbackGeometry = generateCapsuleMesh(
+            opts.radius ?? 0.5,
+            opts.height ?? 1,
+            opts.segments ?? 16
+          );
+        } catch (error) {
+          Logger.warn(
+            `[InstanceManager] Failed to generate fallback capsule geometry for entity "${entity.name || entity.id || 'unnamed'}":`,
             error
           );
         }
@@ -254,6 +305,12 @@ export class InstanceDataBuilder {
       this.rotationBuffer[index * 4 + 3] = rot[3];
 
       // Material ID (for texture atlas)
+      // Check MeshComponent for material override first, then MaterialComponent
+      const meshComponent = entity.getComponent(MeshComponent);
+      // Note: MeshComponent.materialAssetId is a string ID, we need numeric ID for atlas
+      // Currently MaterialComponent.materialId is the numeric atlas index.
+      // If MeshComponent has materialAssetId, we might need to resolve it to a numeric ID.
+      // For now, stick to MaterialComponent.materialId as the source of truth for rendering.
       this.materialIdBuffer[index] = material?.materialId ?? 0;
 
       const maxExtent = Math.max(scale[0], scale[1], scale[2]);

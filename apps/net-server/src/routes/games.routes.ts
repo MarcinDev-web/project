@@ -459,6 +459,8 @@ async function fetchGameSummaries(
     ...(tagList.length > 0 && { tags: tagList }),
   });
 
+  console.log(`[Games API] Found ${publishedProjects.length} published projects`);
+
   if (!publishedProjects.length) {
     return [];
   }
@@ -468,6 +470,8 @@ async function fetchGameSummaries(
     public: true,
     limit: 1000,
   });
+
+  console.log(`[Games API] Found ${marketplaceBuilds.length} public marketplace builds`);
 
   const buildsById = new Map<string, MarketplaceItem>();
   const buildsByAuthor = new Map<string, MarketplaceItem[]>();
@@ -491,9 +495,14 @@ async function fetchGameSummaries(
     let linkedItem: MarketplaceItem | undefined;
     for (const id of candidateIds) {
       const match = buildsById.get(id);
-      if (match && match.type === 'build') {
-        linkedItem = match;
-        break;
+      console.log(`[Games API] Looking for marketplace item ${id}: ${match ? 'found' : 'NOT FOUND'}`);
+      if (match) {
+        console.log(`[Games API] Item ${id} type: ${match.type}, public: ${match.public}`);
+        if (match.type === 'build') {
+          linkedItem = match;
+          console.log(`[Games API] Linked item found by ID: ${linkedItem.id}`);
+          break;
+        }
       }
     }
 
@@ -508,8 +517,11 @@ async function fetchGameSummaries(
     }
 
     if (!linkedItem) {
+      console.log(`[Games API] Project ${project.id} ("${project.name}") has no linked marketplace item, skipping`);
       continue;
     }
+
+    console.log(`[Games API] Project ${project.id} ("${project.name}") linked to marketplace item ${linkedItem.id}`);
 
     if (!metadata.marketplaceItemId) {
       const backfilledData: StudioProject['projectData'] = {
@@ -533,8 +545,12 @@ async function fetchGameSummaries(
     }
 
     const playersOnline = gameSessionTracker.getPlayerCount(linkedItem.id);
-    summaries.push(buildSummary(project, linkedItem, playersOnline));
+    const summary = buildSummary(project, linkedItem, playersOnline);
+    summaries.push(summary);
+    console.log(`[Games API] Added game: ${summary.title} (${summary.id})`);
   }
+
+  console.log(`[Games API] Total summaries created: ${summaries.length}`);
 
   if (search && search.length > 0) {
     const term = search.toLowerCase();

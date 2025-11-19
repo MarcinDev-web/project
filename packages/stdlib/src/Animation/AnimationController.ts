@@ -1,6 +1,7 @@
 import { signal, type Signal } from '@preact/signals-core';
 import { AnimationClip } from './AnimationClip';
 import type { AnimationSample } from './types';
+import type { AnimationNode } from './AnimationNode';
 
 export interface AnimationControllerOptions {
   clip: AnimationClip;
@@ -9,7 +10,7 @@ export interface AnimationControllerOptions {
   loop?: boolean;
 }
 
-export class AnimationController {
+export class AnimationController implements AnimationNode {
   readonly clip: AnimationClip;
   readonly time: Signal<number>;
   readonly playing: Signal<boolean>;
@@ -62,5 +63,20 @@ export class AnimationController {
   sample(): AnimationSample[] {
     return this.clip.sample(this.time.value);
   }
-}
 
+  getDuration(): number {
+    return this.clip.duration;
+  }
+
+  getNormalizedTime(): number {
+    return this.clip.duration > 0 ? this.time.value / this.clip.duration : 0;
+  }
+
+  setNormalizedTime(time: number): void {
+    this.time.value = time * this.clip.duration;
+  }
+
+  getWeight(): number {
+    return this.weight.value;
+  }
+}

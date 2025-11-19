@@ -1,5 +1,5 @@
 import {
-  mat4FromQuatTranslation,
+  mat4FromQuatTranslationScale,
   quatMultiplyOut,
   quatNormalizeOut,
   vec3Equals,
@@ -34,11 +34,13 @@ export interface AvatarJointDefinition {
   parent: AvatarJointName | null;
   defaultPosition: Vec3;
   defaultRotation?: Quat;
+  defaultScale?: Vec3;
 }
 
 export interface AvatarJointTransform {
   position: Vec3;
   rotation: Quat;
+  scale: Vec3;
 }
 
 type MutableVec3 = [number, number, number];
@@ -49,14 +51,18 @@ interface AvatarJointState {
   readonly parentIndex: number | null;
   readonly defaultPosition: Vec3;
   readonly defaultRotation: Quat;
+  readonly defaultScale: Vec3;
   readonly localPosition: MutableVec3;
   readonly localRotation: MutableQuat;
+  readonly localScale: MutableVec3;
   readonly worldPosition: MutableVec3;
   readonly worldRotation: MutableQuat;
+  readonly worldScale: MutableVec3;
   readonly worldMatrix: Mat4;
 }
 
 const IDENTITY_QUAT: Quat = [0, 0, 0, 1];
+const IDENTITY_SCALE: Vec3 = [1, 1, 1];
 
 const TMP_ROTATED: MutableVec3 = [0, 0, 0];
 
@@ -140,15 +146,19 @@ export class AvatarSkeleton {
       }
       this.nameToIndex.set(definition.name, index);
       const defaultRotation = normalizeQuat(definition.defaultRotation ?? IDENTITY_QUAT);
+      const defaultScale = [...(definition.defaultScale ?? IDENTITY_SCALE)] as Vec3;
       return {
         name: definition.name,
         parentIndex,
         defaultPosition: [...definition.defaultPosition] as Vec3,
         defaultRotation,
+        defaultScale,
         localPosition: [...definition.defaultPosition] as MutableVec3,
         localRotation: [...defaultRotation] as MutableQuat,
+        localScale: [...defaultScale] as MutableVec3,
         worldPosition: [0, 0, 0],
         worldRotation: [0, 0, 0, 1],
+        worldScale: [1, 1, 1],
         worldMatrix: new Float32Array(16),
       } satisfies AvatarJointState;
     });
@@ -159,6 +169,7 @@ export class AvatarSkeleton {
     for (const joint of this.joints) {
       copyVec3(joint.localPosition, joint.defaultPosition);
       copyQuat(joint.localRotation, joint.defaultRotation);
+      copyVec3(joint.localScale, joint.defaultScale);
     }
     this.markAllDirty();
   }
@@ -242,9 +253,14 @@ export class AvatarSkeleton {
     position[0] = joint.localPosition[0];
     position[1] = joint.localPosition[1];
     position[2] = joint.localPosition[2];
+    const scale = pool.acquire();
+    scale[0] = joint.localScale[0];
+    scale[1] = joint.localScale[1];
+    scale[2] = joint.localScale[2];
     return {
       position,
       rotation: [...joint.localRotation],
+      scale,
     };
   }
 
@@ -267,6 +283,15 @@ export class AvatarSkeleton {
     }
   }
 
+  setLocalScale(name: AvatarJointName, scale: Vec3): void {
+    const joint = this.getJoint(name);
+    // Only mark dirty if scale actually changed
+    if (!vec3Equals(joint.localScale, scale)) {
+      copyVec3(joint.localScale, scale);
+      this.markJointDirty(name);
+    }
+  }
+
   applyLocalPose(pose: Partial<Record<AvatarJointName, Partial<AvatarJointTransform>>>): void {
     for (const [key, transform] of Object.entries(pose)) {
       const jointName = key as AvatarJointName;
@@ -278,6 +303,9 @@ export class AvatarSkeleton {
       }
       if (transform.rotation) {
         this.setLocalRotation(jointName, transform.rotation);
+      }
+      if (transform.scale) {
+        this.setLocalScale(jointName, transform.scale);
       }
     }
   }
@@ -299,9 +327,14 @@ export class AvatarSkeleton {
     position[0] = joint.worldPosition[0];
     position[1] = joint.worldPosition[1];
     position[2] = joint.worldPosition[2];
+    const scale = pool.acquire();
+    scale[0] = joint.worldScale[0];
+    scale[1] = joint.worldScale[1];
+    scale[2] = joint.worldScale[2];
     return {
       position,
       rotation: [...joint.worldRotation],
+      scale,
     };
   }
 
@@ -367,19 +400,34 @@ export class AvatarSkeleton {
       if (joint.parentIndex === null) {
         copyVec3(joint.worldPosition, joint.localPosition);
         copyQuat(joint.worldRotation, joint.localRotation);
+        copyVec3(joint.worldScale, joint.localScale);
       } else {
         const parent = this.joints[joint.parentIndex];
         if (!parent) {
           throw new Error(`Parent joint missing for "${joint.name}"`);
         }
-        rotateVec3(TMP_ROTATED, joint.localPosition, parent.worldRotation);
+        
+        // Scale local position by parent world scale
+        // scaledLocalPos = localPosition * parent.worldScale
+        // We reuse TMP_ROTATED for intermediate scaled vector to avoid allocation
+        TMP_ROTATED[0] = joint.localPosition[0] * parent.worldScale[0];
+        TMP_ROTATED[1] = joint.localPosition[1] * parent.worldScale[1];
+        TMP_ROTATED[2] = joint.localPosition[2] * parent.worldScale[2];
+
+        rotateVec3(TMP_ROTATED, TMP_ROTATED, parent.worldRotation);
         joint.worldPosition[0] = parent.worldPosition[0] + TMP_ROTATED[0];
         joint.worldPosition[1] = parent.worldPosition[1] + TMP_ROTATED[1];
         joint.worldPosition[2] = parent.worldPosition[2] + TMP_ROTATED[2];
+        
         quatMultiplyOut(joint.worldRotation, parent.worldRotation, joint.localRotation);
         quatNormalizeOut(joint.worldRotation, joint.worldRotation);
+
+        // World scale = parent scale * local scale
+        joint.worldScale[0] = parent.worldScale[0] * joint.localScale[0];
+        joint.worldScale[1] = parent.worldScale[1] * joint.localScale[1];
+        joint.worldScale[2] = parent.worldScale[2] * joint.localScale[2];
       }
-      mat4FromQuatTranslation(joint.worldMatrix, joint.worldRotation, joint.worldPosition);
+      mat4FromQuatTranslationScale(joint.worldMatrix, joint.worldRotation, joint.worldPosition, joint.worldScale);
     }
     this.worldDirty = false;
   }

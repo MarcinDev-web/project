@@ -1,4 +1,5 @@
 import type { CharacterInput } from '@engine/world';
+import type { IntentFrame, InputChannel } from '@engine/world/net/InputChannel';
 import { ReplicationClient } from '../ReplicationClient';
 import type { InputMessage } from '../types/replication';
 import { ErrorHandler, type ErrorCallback } from './ErrorHandler';
@@ -36,6 +37,8 @@ export interface InputReplicatorConfig {
   enableTimestampSync?: boolean; // Default: true
   /** Error handler for error reporting (optional, creates default if not provided). */
   errorHandler?: ErrorHandler;
+  /** Optional intent channel enforcing intent-only pipeline. */
+  intentChannel?: InputChannel;
 }
 
 /**
@@ -47,13 +50,17 @@ export interface InputReplicatorConfig {
  * - Lag compensation via buffering
  */
 export class InputReplicator {
-  private readonly config: Required<Omit<InputReplicatorConfig, 'errorHandler'>> & { errorHandler: ErrorHandler };
+  private readonly config: Required<Omit<InputReplicatorConfig, 'errorHandler' | 'intentChannel'>> & {
+    errorHandler: ErrorHandler;
+    intentChannel: InputChannel | null;
+  };
   private inputBuffer: BufferedInputEvent[] = [];
   private sequenceNumber = 0;
   private lastSentInput: CharacterInput | null = null;
   private lastSendTime = 0;
   private readonly sendThrottle = 50; // Minimum 50ms between sends (20 updates/second)
   private errorCallbacks: ErrorCallback[] = [];
+  private readonly intentChannel: InputChannel | null;
 
   constructor(config: InputReplicatorConfig) {
     // Create or use provided error handler
@@ -73,7 +80,10 @@ export class InputReplicator {
       enableTimestampSync: config.enableTimestampSync ?? true,
       errorHandler,
       replicationClient: config.replicationClient,
+      intentChannel: config.intentChannel ?? null,
     };
+
+    this.intentChannel = config.intentChannel ?? null;
   }
 
   /**
@@ -82,6 +92,17 @@ export class InputReplicator {
    */
   recordInput(input: CharacterInput): void {
     const now = Date.now();
+
+    if (this.intentChannel) {
+      const frame = this.intentChannel.push(input);
+      if (!frame) {
+        return;
+      }
+      this.sendIntentFrame(frame);
+      this.lastSentInput = { ...frame.input };
+      this.lastSendTime = frame.timestamp;
+      return;
+    }
     
     // Throttle sends
     if (now - this.lastSendTime < this.sendThrottle) {
@@ -117,6 +138,17 @@ export class InputReplicator {
    * Send input immediately (for critical actions like jump).
    */
   sendImmediate(input: CharacterInput): void {
+    if (this.intentChannel) {
+      const frame = this.intentChannel.push(input);
+      if (!frame) {
+        return;
+      }
+      this.sendIntentFrame(frame);
+      this.lastSentInput = { ...frame.input };
+      this.lastSendTime = frame.timestamp;
+      return;
+    }
+
     const now = Date.now();
     this.sendInput(input, now);
     this.lastSentInput = { ...input };
@@ -251,13 +283,19 @@ export class InputReplicator {
    * Uses dedicated InputMessage type instead of operations.
    * Includes retry logic for network failures.
    */
-  private sendInputEvent(event: BufferedInputEvent): void {
+  private sendInputEvent(
+    event: BufferedInputEvent,
+    intentMeta?: { actorId?: string; signature?: string; deltaMs?: number }
+  ): void {
     const message: Omit<InputMessage, 'type' | 'timestamp' | 'sessionId' | 'userId'> = {
       sequence: event.sequence,
       inputType: event.type,
       ...(event.moveDirection && { moveDirection: event.moveDirection }),
       ...(event.cameraForward && { cameraForward: event.cameraForward }),
       ...(event.cameraRight && { cameraRight: event.cameraRight }),
+      ...(intentMeta?.actorId && { actorId: intentMeta.actorId }),
+      ...(intentMeta?.signature && { intentSignature: intentMeta.signature }),
+      ...(intentMeta?.deltaMs !== undefined && { intentDeltaMs: intentMeta.deltaMs }),
     };
     
     // Use error handler's retry logic for network operations
@@ -336,6 +374,32 @@ export class InputReplicator {
     };
 
     this.inputBuffer.push(event);
+  }
+
+  private sendIntentFrame(frame: IntentFrame): void {
+    const moveDirection: [number, number] | undefined =
+      frame.input.moveDirection ? [frame.input.moveDirection[2], frame.input.moveDirection[0]] : undefined;
+    const cameraForward: [number, number, number] | undefined = frame.input.cameraForward
+      ? [...frame.input.cameraForward]
+      : undefined;
+    const cameraRight: [number, number, number] | undefined = frame.input.cameraRight
+      ? [...frame.input.cameraRight]
+      : undefined;
+
+    const event: BufferedInputEvent = {
+      type: frame.input.jump ? 'jump' : frame.input.sprint ? 'sprint' : 'move',
+      timestamp: frame.timestamp,
+      sequence: frame.sequence,
+      ...(moveDirection && { moveDirection }),
+      ...(cameraForward && { cameraForward }),
+      ...(cameraRight && { cameraRight }),
+    };
+
+    this.sendInputEvent(event, {
+      actorId: frame.actorId,
+      signature: frame.signature,
+      deltaMs: frame.deltaMs,
+    });
   }
 
   /**

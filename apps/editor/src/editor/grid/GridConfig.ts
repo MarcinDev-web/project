@@ -37,6 +37,14 @@ export interface GridConfig {
   /** Interval for major lines (every N cells) */
   majorLineInterval: number;
 
+  /** Infinite grid settings */
+  infinite?: boolean;
+  fadeDistance?: number;
+  axisColors?: {
+    x: string;
+    z: string;
+  };
+
   /** Line widths */
   lineWidth: {
     /** Width of major lines in pixels */
@@ -63,6 +71,12 @@ export const DEFAULT_GRID_CONFIG: GridConfig = {
     origin: '#ff0000',
   },
   majorLineInterval: 5,
+  infinite: true,
+  fadeDistance: 100,
+  axisColors: {
+    x: '#e95959', // Red-ish
+    z: '#5959e9', // Blue-ish
+  },
   lineWidth: {
     major: 2,
     minor: 1,

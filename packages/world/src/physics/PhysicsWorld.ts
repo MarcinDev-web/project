@@ -38,17 +38,27 @@ import {
   type RaycastOptions,
 } from './PhysicsRaycast.js';
 
+import { RapierPhysicsSystem } from './RapierPhysicsSystem.js';
+
 /**
  * PhysicsWorld manages physics simulation for a scene
  */
 export class PhysicsWorld {
-  private system: PhysicsSystem;
+  private system: PhysicsSystem | RapierPhysicsSystem;
   private scene: Scene;
   private isRunning: boolean = false;
 
   constructor(scene: Scene, config?: Partial<PhysicsConfig>) {
     this.scene = scene;
-    this.system = new PhysicsSystem(scene, config);
+    
+    // Default to Rapier if useWasm is true (default)
+    const useWasm = config?.useWasm ?? true;
+    if (useWasm) {
+        this.system = new RapierPhysicsSystem(scene, config);
+    } else {
+        this.system = new PhysicsSystem(scene, config);
+    }
+
     const runtime = scene.scriptRuntime;
     if (runtime) {
       runtime.physicsWorld = this;
@@ -311,7 +321,7 @@ export class PhysicsWorld {
   /**
    * Gets the underlying physics system (for advanced usage)
    */
-  getSystem(): PhysicsSystem {
+  getSystem(): PhysicsSystem | RapierPhysicsSystem {
     return this.system;
   }
 

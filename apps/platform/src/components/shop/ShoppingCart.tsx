@@ -16,6 +16,7 @@ export interface CartItem {
 export interface ShoppingCartProps {
   items: CartItem[];
   total?: { currency: string; amount: number };
+  totals?: { currency: string; amount: number }[];
   onRemove?: (itemId: string, itemType: CartItem['type']) => void;
   onClear?: () => void;
   onCheckout?: () => void;
@@ -25,6 +26,7 @@ export interface ShoppingCartProps {
 export function ShoppingCart({
   items,
   total,
+  totals,
   onRemove,
   onClear,
   onCheckout,
@@ -40,24 +42,30 @@ export function ShoppingCart({
     );
   }
 
+  const fallbackTotals = totals ?? (total ? [total] : []);
+
   return (
     <Card className="shopping-cart">
       <div className="cart-header">
-        <h3>Shopping Cart</h3>
+        <div>
+          <p className="shop-kicker">Cart</p>
+          <h3>Ready to checkout</h3>
+          <p className="cart-subtitle">{items.length} item(s) prepared for checkout.</p>
+        </div>
         {items.length > 0 && onClear && (
           <Button variant="secondary" onClick={onClear} size="small">
             Clear
           </Button>
         )}
       </div>
-      <div className="cart-items">
+      <div className="cart-items" aria-busy={loading}>
         {items.map((item, index) => (
           <div key={`${item.itemId}-${item.type}-${index}`} className="cart-item">
             <div className="cart-item-info">
               <div className="cart-item-name">{item.name || item.itemId}</div>
               <div className="cart-item-meta">
                 <span className="cart-item-type">{item.type}</span>
-                <span className="cart-item-quantity">Qty: {item.quantity}</span>
+                <span className="cart-item-quantity">x{item.quantity}</span>
                 {item.price && (
                   <span className="cart-item-price">
                     {item.price.amount * item.quantity} {item.price.currency}
@@ -77,10 +85,17 @@ export function ShoppingCart({
           </div>
         ))}
       </div>
-      {total && (
+      {fallbackTotals.length > 0 && (
         <div className="cart-footer">
           <div className="cart-total">
-            <strong>Total: {total.amount} {total.currency}</strong>
+            {fallbackTotals.map((entry) => (
+              <div key={entry.currency} className="cart-total-row">
+                <span className="cart-total-label">{entry.currency}</span>
+                <span className="cart-total-value">
+                  {entry.amount} {entry.currency}
+                </span>
+              </div>
+            ))}
           </div>
           {onCheckout && (
             <Button onClick={onCheckout} disabled={loading || items.length === 0}>
@@ -92,4 +107,3 @@ export function ShoppingCart({
     </Card>
   );
 }
-

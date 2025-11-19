@@ -1,4 +1,4 @@
-import { extractFrustumPlanes, type Mat4 } from '@engine/core/math';
+import { extractFrustumPlanes, type Mat4, type FrustumPlane } from '@engine/core/math';
 import { Logger } from '@engine/core/utils';
 import type { GeometryData, FrameResources } from '../resources/resources';
 import { buildIndirectDrawArgs } from './InstancePipelineTypes';
@@ -160,12 +160,13 @@ export class GpuInstancePipeline {
   private readonly device: GPUDevice;
   private readonly uniformBuffer: GPUBuffer;
   private readonly compactParamBuffer: GPUBuffer;
-  private classifyPipeline: GPUComputePipeline;
-  private compactPipeline: GPUComputePipeline;
-  private finalizePipeline: GPUComputePipeline;
-  private classifyBindGroupLayout: GPUBindGroupLayout;
-  private compactBindGroupLayout: GPUBindGroupLayout;
-  private finalizeBindGroupLayout: GPUBindGroupLayout;
+  private readonly frustumPlanes: FrustumPlane[] = new Array(6);
+  private classifyPipeline!: GPUComputePipeline;
+  private compactPipeline!: GPUComputePipeline;
+  private finalizePipeline!: GPUComputePipeline;
+  private classifyBindGroupLayout!: GPUBindGroupLayout;
+  private compactBindGroupLayout!: GPUBindGroupLayout;
+  private finalizeBindGroupLayout!: GPUBindGroupLayout;
   private countsBuffer: GPUBuffer | null = null;
   private opaqueIndicesBuffer: GPUBuffer | null = null;
   private transparentIndicesBuffer: GPUBuffer | null = null;
@@ -336,7 +337,7 @@ export class GpuInstancePipeline {
   }
 
   private updateUniforms(viewProjection: Mat4, instanceCount: number, indexCount: number): void {
-    const planes = extractFrustumPlanes([], viewProjection);
+    const planes = extractFrustumPlanes(this.frustumPlanes, viewProjection);
     const data = new Float32Array(FRUSTUM_UNIFORM_SIZE / 4);
     for (let i = 0; i < 6; i++) {
       const plane = planes[i]!;
@@ -454,7 +455,13 @@ export class GpuInstancePipeline {
 
   private writeZeroDrawArgs(frameResources: FrameResources): void {
     const data = buildIndirectDrawArgs(0, 0, 0);
-    this.device.queue.writeBuffer(frameResources.instanceIndirectArgsBuffer, 0, data);
+    this.device.queue.writeBuffer(
+      frameResources.instanceIndirectArgsBuffer,
+      0,
+      data.buffer as ArrayBuffer,
+      data.byteOffset,
+      data.byteLength
+    );
   }
 }
 

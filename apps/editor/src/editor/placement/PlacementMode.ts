@@ -200,6 +200,11 @@ export class PlacementMode {
       return;
     }
 
+    // Safety check: Ensure position is finite to prevent transform errors
+    if (!Number.isFinite(worldPosition[0]) || !Number.isFinite(worldPosition[1]) || !Number.isFinite(worldPosition[2])) {
+      return;
+    }
+
     // Increment update ID to track the latest request
     // This prevents race conditions where old collision checks complete after new ones
     const updateId = ++this.lastUpdateId;

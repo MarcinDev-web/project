@@ -55,6 +55,7 @@ import { EditorPanelManager } from '../panels/EditorPanelManager';
 import { EditorVisualManager } from '../visuals/EditorVisualManager';
 import { EditorUILayout } from './EditorUILayout';
 import { QuickMenu } from './QuickMenu';
+import { FloatingToolbar } from './FloatingToolbar';
 import { KeyboardShortcutsModal } from './KeyboardShortcutsModal';
 import { LoginModal } from './LoginModal';
 import { RegisterModal } from './RegisterModal';
@@ -120,6 +121,7 @@ export class EditorUI {
   private panelManager: EditorPanelManager | null = null;
   private visualManager: EditorVisualManager | null = null;
   private quickMenu: QuickMenu | null = null;
+  private floatingToolbar: FloatingToolbar | null = null;
   private templatePicker: TemplatePickerModal | null = null;
   private loginModal: LoginModal | null = null;
   private registerModal: RegisterModal | null = null;
@@ -584,7 +586,6 @@ export class EditorUI {
       state: this.state,
       projectManager: this.projectManager,
       onNewProject: () => this.startNewProjectFlow(),
-      onLoadTemplate: () => this.loadTemplate(),
       onUndo: () => this.undo(),
       onRedo: () => this.redo(),
       canUndo: () => this.state?.history.canUndo() ?? false,
@@ -607,7 +608,6 @@ export class EditorUI {
         } catch {}
       },
       onOpenAssets: () => {}, // Removed: assetsDropdown no longer exists
-      onOpenBlockEditor: () => this.openBlockEditor(),
       onOpenScriptWorkbench: () => this.openScriptWorkbench(),
       onOpenUIEditor: () => this.openUIEditor(),
       onToggleCollaboration: () => this.toggleCollaborationPanel(),
@@ -721,6 +721,19 @@ export class EditorUI {
     this.quickMenu.mount();
     this.quickMenu.setPlayMode(this.state.editorMode.value === 'play');
     this.disposables.add(() => this.quickMenu?.dispose());
+
+    // Floating Toolbar (Move/Rotate/Scale)
+    this.floatingToolbar = new FloatingToolbar({
+      state: this.state,
+      onGizmoModeChange: (mode) => {
+        if (!this.state) return;
+        this.state.gizmoMode.value = mode;
+        this.visualManager?.updateGizmoOverlay();
+      },
+    });
+    const canvasContainer = containers.canvasContainer || document.body;
+    this.floatingToolbar.mount(canvasContainer);
+    this.disposables.add(() => this.floatingToolbar?.dispose());
 
     this.pauseMenu = new PauseMenu({
       onResume: () => this.resumePlayMode(),
@@ -866,6 +879,18 @@ export class EditorUI {
       onMarketplaceAssetPurchased: (itemId: string) => {
         // Refresh asset palette to show newly purchased asset
         this.panelManager?.getAssetPalette()?.refresh();
+      },
+      onTerrainCreated: (_entity) => {
+        this.config.updateSceneBuffers();
+        this.recordSnapshot('Create terrain');
+      },
+      onUIElementCreated: (_entity) => {
+        this.config.updateSceneBuffers();
+        this.recordSnapshot('Create UI element');
+      },
+      onSceneModified: (description) => {
+        this.config.updateSceneBuffers();
+        this.recordSnapshot(description);
       },
     });
     this.panelManager.mount(containers.sidebar, containers.inspector);
@@ -1039,10 +1064,14 @@ export class EditorUI {
     const uiPrefsEffect = effect(() => {
       const prefs = this.state!.uiPreferences.value;
 
+      // Update layout visibility (handles containers and toggle buttons)
+      this.layout?.setPanelVisible('inspector', prefs.showInspector);
+
       this.panelManager?.setVisibility({
         sidebar: true,
         inspector: prefs.showInspector,
       });
+
 
       // Removed: unifiedBuildPanel no longer exists
 
@@ -1760,10 +1789,40 @@ export class EditorUI {
     }
   }
 
+  private readonly undoHandlers = new Set<() => boolean>();
+  private readonly redoHandlers = new Set<() => boolean>();
+
+  /**
+   * Registers a custom undo handler.
+   * @param handler Function that returns true if it handled the undo, false otherwise.
+   * @returns Disposal function to unregister.
+   */
+  public registerUndoHandler(handler: () => boolean): () => void {
+    this.undoHandlers.add(handler);
+    return () => this.undoHandlers.delete(handler);
+  }
+
+  /**
+   * Registers a custom redo handler.
+   * @param handler Function that returns true if it handled the redo, false otherwise.
+   * @returns Disposal function to unregister.
+   */
+  public registerRedoHandler(handler: () => boolean): () => void {
+    this.redoHandlers.add(handler);
+    return () => this.redoHandlers.delete(handler);
+  }
+
   /**
    * Undo last action.
    */
   public undo(): void {
+    // specific handlers first (LIFO order would be better but Set iteration is insertion order)
+    // We iterate in reverse to give latest handlers priority (e.g. active modal/mode)
+    const handlers = Array.from(this.undoHandlers).reverse();
+    for (const handler of handlers) {
+      if (handler()) return;
+    }
+
     if (!this.state) return;
     const snapshot = this.state.history.undo();
     if (!snapshot) return;
@@ -1775,6 +1834,11 @@ export class EditorUI {
    * Redo last undone action.
    */
   public redo(): void {
+    const handlers = Array.from(this.redoHandlers).reverse();
+    for (const handler of handlers) {
+      if (handler()) return;
+    }
+
     if (!this.state) return;
     const snapshot = this.state.history.redo();
     if (!snapshot) return;

@@ -15,6 +15,7 @@ export interface ShopAssetCardProps {
     price: { currency: string; amount: number };
     previewUrl?: string;
     available: boolean;
+    createdAt?: number;
   };
   owned?: boolean;
   onAddToCart?: () => void;
@@ -22,14 +23,24 @@ export interface ShopAssetCardProps {
 
 export function ShopAssetCard({ asset, owned, onAddToCart }: ShopAssetCardProps) {
   const canPurchase = asset.available && !owned;
+  const isNew = asset.createdAt ? Date.now() - asset.createdAt < 1000 * 60 * 60 * 24 * 7 : false;
 
   return (
     <Card className="shop-asset-card">
-      {asset.previewUrl && (
-        <div className="shop-asset-preview">
-          <img src={asset.previewUrl} alt={asset.name} />
+      <div className="shop-card-visual">
+        {asset.previewUrl ? (
+          <div className="shop-asset-preview">
+            <img src={asset.previewUrl} alt={asset.name} />
+          </div>
+        ) : (
+          <div className="shop-item-placeholder">Preview not available</div>
+        )}
+        <div className="shop-card-badges">
+          {owned && <span className="shop-badge success">Owned</span>}
+          {!owned && asset.available && isNew && <span className="shop-badge">New</span>}
+          {!asset.available && <span className="shop-badge warning">Unavailable</span>}
         </div>
-      )}
+      </div>
       <div className="shop-asset-content">
         <h3 className="shop-asset-name">{asset.name}</h3>
         {asset.description && (
@@ -40,21 +51,26 @@ export function ShopAssetCard({ asset, owned, onAddToCart }: ShopAssetCardProps)
           {asset.category && (
             <span className="shop-asset-category">{asset.category}</span>
           )}
+          <span className={`shop-status ${asset.available ? 'positive' : ''}`}>
+            {asset.available ? 'Ready to download' : 'Temporarily unavailable'}
+          </span>
         </div>
         <div className="shop-asset-footer">
-          <div className="shop-asset-price">
-            {asset.price.amount} {asset.price.currency}
+          <div className="shop-price-block">
+            <span className="shop-price-chip">
+              {asset.price.amount} {asset.price.currency}
+            </span>
+            {asset.category && <span className="shop-muted-tag">{asset.category}</span>}
           </div>
           {owned ? (
-            <Button disabled>Owned</Button>
+            <Button disabled size="small">Owned</Button>
           ) : !canPurchase ? (
-            <Button disabled>Unavailable</Button>
+            <Button disabled size="small">Unavailable</Button>
           ) : (
-            <Button onClick={onAddToCart}>Add to Cart</Button>
+            <Button onClick={onAddToCart} size="small">Add to cart</Button>
           )}
         </div>
       </div>
     </Card>
   );
 }
-

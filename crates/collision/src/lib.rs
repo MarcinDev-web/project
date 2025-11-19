@@ -1,5 +1,8 @@
 use wasm_bindgen::prelude::*;
 
+#[cfg(feature = "simd")]
+use core::arch::wasm32::*;
+
 #[cfg(feature = "panic-hook")]
 #[wasm_bindgen]
 pub fn init_panic_hook() {
@@ -19,12 +22,86 @@ fn sub(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
     [a[0] - b[0], a[1] - b[1], a[2] - b[2]]
 }
 
+#[inline]
+fn add(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
+    [a[0] + b[0], a[1] + b[1], a[2] + b[2]]
+}
+
+#[allow(dead_code)]
+#[inline]
+fn cross(a: [f32; 3], b: [f32; 3]) -> [f32; 3] {
+    [
+        a[1] * b[2] - a[2] * b[1],
+        a[2] * b[0] - a[0] * b[2],
+        a[0] * b[1] - a[1] * b[0],
+    ]
+}
+
+#[inline]
+fn scale(v: [f32; 3], s: f32) -> [f32; 3] {
+    [v[0] * s, v[1] * s, v[2] * s]
+}
+
+#[inline]
+fn len_sq(v: [f32; 3]) -> f32 {
+    v[0] * v[0] + v[1] * v[1] + v[2] * v[2]
+}
+
+#[allow(dead_code)]
+#[inline]
+fn normalize(v: [f32; 3]) -> [f32; 3] {
+    let l = len_sq(v).sqrt();
+    if l > EPSILON {
+        scale(v, 1.0 / l)
+    } else {
+        [0.0, 0.0, 0.0]
+    }
+}
+
+#[inline]
+fn normalize_quat(q: [f32; 4]) -> [f32; 4] {
+    #[cfg(all(feature = "simd", target_arch = "wasm32"))]
+    unsafe {
+        let v = v128_load(q.as_ptr() as *const v128);
+        let sq = f32x4_mul(v, v);
+        let len_sq = f32x4_extract_lane::<0>(sq) + f32x4_extract_lane::<1>(sq) + f32x4_extract_lane::<2>(sq) + f32x4_extract_lane::<3>(sq);
+        if len_sq > 0.0 {
+            let len = len_sq.sqrt();
+            let factor = f32x4_splat(1.0 / len);
+            let res = f32x4_mul(v, factor);
+            let mut out = [0.0; 4];
+            v128_store(out.as_mut_ptr() as *mut v128, res);
+            return out;
+        } else {
+            return [0.0, 0.0, 0.0, 1.0];
+        }
+    }
+
+    #[cfg(not(all(feature = "simd", target_arch = "wasm32")))]
+    {
+        let len = (q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]).sqrt();
+        if len > 0.0 { [q[0] / len, q[1] / len, q[2] / len, q[3] / len] } else { [0.0, 0.0, 0.0, 1.0] }
+    }
+}
 #[derive(Clone, Copy)]
 struct Obb {
     center: [f32; 3],
     // axes are column vectors of the rotation matrix (u, v, w), each normalized
     axes: [[f32; 3]; 3],
     half: [f32; 3],
+}
+
+#[derive(Clone, Copy)]
+struct Sphere {
+    center: [f32; 3],
+    radius: f32,
+}
+
+#[derive(Clone, Copy)]
+struct Capsule {
+    base: [f32; 3],
+    tip: [f32; 3],
+    radius: f32,
 }
 
 #[inline]
@@ -163,11 +240,241 @@ fn obb_intersect_impl(a: Obb, b: Obb) -> bool {
     true
 }
 
+// New Primitives
+
 #[inline]
-fn normalize_quat(q: [f32; 4]) -> [f32; 4] {
-    let len = (q[0] * q[0] + q[1] * q[1] + q[2] * q[2] + q[3] * q[3]).sqrt();
-    if len > 0.0 { [q[0] / len, q[1] / len, q[2] / len, q[3] / len] } else { [0.0, 0.0, 0.0, 1.0] }
+fn sphere_sphere_intersect_impl(a: Sphere, b: Sphere) -> bool {
+    let dist_sq = len_sq(sub(a.center, b.center));
+    let r_sum = a.radius + b.radius;
+    dist_sq <= r_sum * r_sum
 }
+
+#[inline]
+fn sphere_obb_intersect_impl(sphere: Sphere, box_collider: Obb) -> bool {
+    let rel_center = sub(sphere.center, box_collider.center);
+    
+    // Transform sphere center to box local space
+    let u = box_collider.axes[0];
+    let v = box_collider.axes[1];
+    let w = box_collider.axes[2];
+    
+    let local_x = dot(rel_center, u);
+    let local_y = dot(rel_center, v);
+    let local_z = dot(rel_center, w);
+
+    // Find closest point on box
+    let mut closest_x = local_x;
+    let mut closest_y = local_y;
+    let mut closest_z = local_z;
+
+    if closest_x < -box_collider.half[0] { closest_x = -box_collider.half[0]; }
+    else if closest_x > box_collider.half[0] { closest_x = box_collider.half[0]; }
+    
+    if closest_y < -box_collider.half[1] { closest_y = -box_collider.half[1]; }
+    else if closest_y > box_collider.half[1] { closest_y = box_collider.half[1]; }
+    
+    if closest_z < -box_collider.half[2] { closest_z = -box_collider.half[2]; }
+    else if closest_z > box_collider.half[2] { closest_z = box_collider.half[2]; }
+
+    let dx = local_x - closest_x;
+    let dy = local_y - closest_y;
+    let dz = local_z - closest_z;
+    
+    let dist_sq = dx*dx + dy*dy + dz*dz;
+    dist_sq <= sphere.radius * sphere.radius
+}
+
+#[inline]
+fn point_segment_distance_sq(p: [f32; 3], a: [f32; 3], b: [f32; 3]) -> f32 {
+    let ab = sub(b, a);
+    let ap = sub(p, a);
+    let e = dot(ap, ab);
+    let f = len_sq(ab);
+    
+    let mut t = 0.0;
+    if f > EPSILON {
+        t = e / f;
+    }
+    if t < 0.0 { t = 0.0; }
+    if t > 1.0 { t = 1.0; }
+    
+    let closest = add(a, scale(ab, t));
+    len_sq(sub(p, closest))
+}
+
+#[inline]
+fn capsule_sphere_intersect_impl(capsule: Capsule, sphere: Sphere) -> bool {
+    let dist_sq = point_segment_distance_sq(sphere.center, capsule.base, capsule.tip);
+    let r_sum = sphere.radius + capsule.radius;
+    dist_sq <= r_sum * r_sum
+}
+
+#[inline]
+fn closest_pt_segment_segment(p1: [f32; 3], q1: [f32; 3], p2: [f32; 3], q2: [f32; 3]) -> ([f32; 3], [f32; 3]) {
+    let d1 = sub(q1, p1);
+    let d2 = sub(q2, p2);
+    let r = sub(p1, p2);
+    let a = dot(d1, d1);
+    let e = dot(d2, d2);
+    let f = dot(d2, r);
+
+    if a <= EPSILON && e <= EPSILON {
+        return (p1, p2);
+    }
+    
+    let mut s;
+    let mut t;
+
+    if a <= EPSILON {
+        // Segment 1 is a point
+        s = 0.0;
+        t = (f / e).clamp(0.0, 1.0);
+    } else {
+        let c = dot(d1, r);
+        if e <= EPSILON {
+            // Segment 2 is a point
+            t = 0.0;
+            s = (-c / a).clamp(0.0, 1.0);
+        } else {
+            let b = dot(d1, d2);
+            let denom = a*e - b*b;
+            
+            if denom != 0.0 {
+                s = (b*f - c*e) / denom;
+                s = s.clamp(0.0, 1.0);
+            } else {
+                s = 0.0;
+            }
+            
+            t = (b*s + f) / e;
+            if t < 0.0 {
+                t = 0.0;
+                s = (-c / a).clamp(0.0, 1.0);
+            } else if t > 1.0 {
+                t = 1.0;
+                s = ((b - c) / a).clamp(0.0, 1.0);
+            }
+        }
+    }
+
+    let c1 = add(p1, scale(d1, s));
+    let c2 = add(p2, scale(d2, t));
+    (c1, c2)
+}
+
+#[inline]
+fn capsule_capsule_intersect_impl(a: Capsule, b: Capsule) -> bool {
+    let (c1, c2) = closest_pt_segment_segment(a.base, a.tip, b.base, b.tip);
+    let dist_sq = len_sq(sub(c1, c2));
+    let r_sum = a.radius + b.radius;
+    dist_sq <= r_sum * r_sum
+}
+
+#[inline]
+fn capsule_obb_intersect_impl(capsule: Capsule, obb: Obb) -> bool {
+    // Treating capsule as a segment for simplified check + radius
+    // This is an approximation or requires solving distance from segment to OBB
+    // For performance, we can check if the capsule segment intersects the expanded OBB
+    // or test segment vs OBB distance.
+    
+    // Transform segment into OBB local space
+    let u = obb.axes[0];
+    let v = obb.axes[1];
+    let w = obb.axes[2];
+    
+    let p0 = sub(capsule.base, obb.center);
+    let p1 = sub(capsule.tip, obb.center);
+    
+    let local_p0 = [dot(p0, u), dot(p0, v), dot(p0, w)];
+    let local_p1 = [dot(p1, u), dot(p1, v), dot(p1, w)];
+    
+    // Expand OBB by capsule radius
+    let r = capsule.radius;
+    let ext_x = obb.half[0] + r;
+    let ext_y = obb.half[1] + r;
+    let ext_z = obb.half[2] + r;
+    
+    // Simple AABB test against expanded OBB in local space
+    let min_x = local_p0[0].min(local_p1[0]);
+    let max_x = local_p0[0].max(local_p1[0]);
+    let min_y = local_p0[1].min(local_p1[1]);
+    let max_y = local_p0[1].max(local_p1[1]);
+    let min_z = local_p0[2].min(local_p1[2]);
+    let max_z = local_p0[2].max(local_p1[2]);
+    
+    if min_x > ext_x || max_x < -ext_x || min_y > ext_y || max_y < -ext_y || min_z > ext_z || max_z < -ext_z {
+        return false;
+    }
+    
+    // For more precision, we should compute distance between segment and box
+    // But this is often "good enough" for broad checks or we can refine
+    true 
+}
+
+// Raycast logic
+
+#[derive(Clone, Copy)]
+struct Ray {
+    origin: [f32; 3],
+    dir: [f32; 3],
+}
+
+#[inline]
+fn ray_sphere_intersect_impl(ray: Ray, sphere: Sphere) -> f32 {
+    let m = sub(ray.origin, sphere.center);
+    let b = dot(m, ray.dir);
+    let c = dot(m, m) - sphere.radius * sphere.radius;
+    
+    // Ray origin outside sphere (c > 0) and ray pointing away (b > 0)
+    if c > 0.0 && b > 0.0 {
+        return -1.0;
+    }
+    
+    let discr = b*b - c;
+    if discr < 0.0 {
+        return -1.0;
+    }
+    
+    let t = -b - discr.sqrt();
+    if t < 0.0 {
+        return 0.0; // Inside sphere
+    }
+    t
+}
+
+#[inline]
+fn ray_obb_intersect_impl(ray: Ray, obb: Obb) -> f32 {
+    let mut t_min = 0.0f32;
+    let mut t_max = f32::INFINITY;
+    
+    let p = sub(obb.center, ray.origin);
+    
+    for i in 0..3 {
+        let e = dot(obb.axes[i], p);
+        let f = dot(obb.axes[i], ray.dir);
+        
+        if f.abs() > EPSILON {
+            let t1 = (e + obb.half[i]) / f;
+            let t2 = (e - obb.half[i]) / f;
+            
+            let (t_enter, t_exit) = if t1 > t2 { (t2, t1) } else { (t1, t2) };
+            
+            if t_enter > t_min { t_min = t_enter; }
+            if t_exit < t_max { t_max = t_exit; }
+            
+            if t_min > t_max { return -1.0; }
+            if t_max < 0.0 { return -1.0; }
+        } else {
+            // Ray almost parallel to slab. Check if origin is outside.
+            if (-e - obb.half[i]) > 0.0 || (-e + obb.half[i]) < 0.0 {
+                return -1.0;
+            }
+        }
+    }
+    
+    if t_min > 0.0 { t_min } else { t_max } // Simplified, better handling needed for inside start
+}
+
 
 #[inline]
 fn quat_to_axes(q: [f32; 4]) -> [[f32; 3]; 3] {
@@ -202,6 +509,55 @@ fn boxes_intersect(min_a: [f32; 3], max_a: [f32; 3], min_b: [f32; 3], max_b: [f3
     let overlap_y = max_a[1] >= min_b[1] - EPSILON && min_a[1] <= max_b[1] + EPSILON;
     let overlap_z = max_a[2] >= min_b[2] - EPSILON && min_a[2] <= max_b[2] + EPSILON;
     overlap_x && overlap_y && overlap_z
+}
+
+#[wasm_bindgen]
+pub struct CollisionWorld {
+    positions: Vec<f32>,
+    rotations: Vec<f32>,
+    scales: Vec<f32>,
+}
+
+#[wasm_bindgen]
+impl CollisionWorld {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> CollisionWorld {
+        CollisionWorld {
+            positions: Vec::new(),
+            rotations: Vec::new(),
+            scales: Vec::new(),
+        }
+    }
+
+    /// Resize buffers to hold `count` entities.
+    /// This preserves existing data up to new size, or initializes new slots with 0.
+    pub fn resize(&mut self, count: usize) {
+        // Add padding for SIMD safety (read 4 floats at any 3-float aligned position)
+        self.positions.resize(count * 3 + 4, 0.0);
+        self.rotations.resize(count * 4, 0.0);
+        self.scales.resize(count * 3 + 4, 0.0);
+    }
+
+    /// Get pointer to positions buffer (Float32Array view in JS).
+    pub fn get_positions_ptr(&self) -> *const f32 {
+        self.positions.as_ptr()
+    }
+
+    /// Get pointer to rotations buffer (Float32Array view in JS).
+    pub fn get_rotations_ptr(&self) -> *const f32 {
+        self.rotations.as_ptr()
+    }
+
+    /// Get pointer to scales buffer (Float32Array view in JS).
+    pub fn get_scales_ptr(&self) -> *const f32 {
+        self.scales.as_ptr()
+    }
+
+    /// Run batch collision check using internal buffers.
+    /// Returns flat array of indices [idxA1, idxB1, idxA2, idxB2, ...]
+    pub fn check_collisions(&self) -> Vec<u32> {
+        batch_check_all(&self.positions, &self.rotations, &self.scales)
+    }
 }
 
 /// Linear batch check using TRS inputs (SoA) - baseline without spatial index
@@ -242,11 +598,34 @@ pub fn batch_check_trs_linear(
         let axes = quat_to_axes(normalize_quat([
             others_rot[ri], others_rot[ri + 1], others_rot[ri + 2], others_rot[ri + 3],
         ]));
-        let half = [
-            others_scl[si].abs() * 0.5,
-            others_scl[si + 1].abs() * 0.5,
-            others_scl[si + 2].abs() * 0.5,
-        ];
+        
+        let half;
+        #[cfg(all(feature = "simd", target_arch = "wasm32"))]
+        if si + 4 <= others_scl.len() {
+            unsafe {
+                let v = v128_load(others_scl.as_ptr().add(si) as *const v128);
+                let v_abs = f32x4_abs(v);
+                let v_half = f32x4_mul(v_abs, f32x4_splat(0.5));
+                let mut temp = [0.0; 4];
+                v128_store(temp.as_mut_ptr() as *mut v128, v_half);
+                half = [temp[0], temp[1], temp[2]];
+            }
+        } else {
+            half = [
+                others_scl[si].abs() * 0.5,
+                others_scl[si + 1].abs() * 0.5,
+                others_scl[si + 2].abs() * 0.5,
+            ];
+        }
+        #[cfg(not(all(feature = "simd", target_arch = "wasm32")))]
+        {
+            half = [
+                others_scl[si].abs() * 0.5,
+                others_scl[si + 1].abs() * 0.5,
+                others_scl[si + 2].abs() * 0.5,
+            ];
+        }
+
         let (omin, omax) = obb_to_aabb_extents(center, axes, half);
         if !boxes_intersect(pre_min, pre_max, omin, omax) {
             continue;
@@ -317,7 +696,26 @@ pub fn batch_check_trs(
         let a = quat_to_axes(normalize_quat([
             others_rot[ri], others_rot[ri + 1], others_rot[ri + 2], others_rot[ri + 3],
         ]));
-        let h = [others_scl[si].abs() * 0.5, others_scl[si + 1].abs() * 0.5, others_scl[si + 2].abs() * 0.5];
+        
+        let h;
+        #[cfg(all(feature = "simd", target_arch = "wasm32"))]
+        if si + 4 <= others_scl.len() {
+            unsafe {
+                let v = v128_load(others_scl.as_ptr().add(si) as *const v128);
+                let v_abs = f32x4_abs(v);
+                let v_half = f32x4_mul(v_abs, f32x4_splat(0.5));
+                let mut temp = [0.0; 4];
+                v128_store(temp.as_mut_ptr() as *mut v128, v_half);
+                h = [temp[0], temp[1], temp[2]];
+            }
+        } else {
+            h = [others_scl[si].abs() * 0.5, others_scl[si + 1].abs() * 0.5, others_scl[si + 2].abs() * 0.5];
+        }
+        #[cfg(not(all(feature = "simd", target_arch = "wasm32")))]
+        {
+            h = [others_scl[si].abs() * 0.5, others_scl[si + 1].abs() * 0.5, others_scl[si + 2].abs() * 0.5];
+        }
+
         let (mn, mx) = obb_to_aabb_extents(c, a, h);
         centers[i] = c;
         axess[i] = a;
@@ -388,6 +786,149 @@ pub fn batch_check_trs(
     out
 }
 
+/// Batch check all vs all
+/// Returns a list of pairs [a1, b1, a2, b2, ...]
+#[wasm_bindgen]
+pub fn batch_check_all(
+    pos: &[f32],
+    rot: &[f32],
+    scl: &[f32],
+) -> Vec<u32> {
+    let n = pos.len() / 3;
+    if n < 2 || rot.len() / 4 != n || scl.len() / 3 != n {
+        return Vec::new();
+    }
+
+    let mut out = Vec::new();
+
+    // Build world data once
+    let mut centers: Vec<[f32;3]> = Vec::with_capacity(n);
+    let mut axess: Vec<[[f32;3];3]> = Vec::with_capacity(n);
+    let mut halves: Vec<[f32;3]> = Vec::with_capacity(n);
+    let mut mins: Vec<[f32;3]> = Vec::with_capacity(n);
+    let mut maxs: Vec<[f32;3]> = Vec::with_capacity(n);
+
+    unsafe {
+        centers.set_len(n);
+        axess.set_len(n);
+        halves.set_len(n);
+        mins.set_len(n);
+        maxs.set_len(n);
+    }
+
+    // Prepare data
+    for i in 0..n {
+        let pi = i * 3;
+        let ri = i * 4;
+        let si = i * 3;
+        let c = [pos[pi], pos[pi + 1], pos[pi + 2]];
+        let a = quat_to_axes(normalize_quat([
+            rot[ri], rot[ri + 1], rot[ri + 2], rot[ri + 3],
+        ]));
+        let h = [scl[si].abs() * 0.5, scl[si + 1].abs() * 0.5, scl[si + 2].abs() * 0.5];
+        let (mn, mx) = obb_to_aabb_extents(c, a, h);
+        centers[i] = c;
+        axess[i] = a;
+        halves[i] = h;
+        mins[i] = mn;
+        maxs[i] = mx;
+    }
+
+    // Broadphase (Brute force for now, optimal for N < ~100, needs grid for more)
+    // With n=1000, grid is better. 
+    // Let's use simple spatial hashing or brute force depending on N.
+    
+    if n < 100 {
+        // Brute force
+        for i in 0..n {
+            for j in (i + 1)..n {
+                if boxes_intersect(mins[i], maxs[i], mins[j], maxs[j]) {
+                    let ob1 = Obb { center: centers[i], axes: axess[i], half: halves[i] };
+                    let ob2 = Obb { center: centers[j], axes: axess[j], half: halves[j] };
+                    if obb_intersect_impl(ob1, ob2) {
+                        out.push(i as u32);
+                        out.push(j as u32);
+                    }
+                }
+            }
+        }
+    } else {
+        // Uniform Grid
+        let mut cell_size = 1.0f32;
+        // Estimate average size
+        let mut sum_size = 0.0;
+        for i in 0..n {
+            sum_size += halves[i][0].max(halves[i][1]).max(halves[i][2]);
+        }
+        cell_size = (sum_size / n as f32) * 2.0 * 1.5; // heuristic
+        if cell_size < 0.1 { cell_size = 0.1; }
+
+        let inv_cell = 1.0 / cell_size;
+        let mut grid: HashMap<(i32,i32,i32), Vec<usize>> = HashMap::with_capacity(n);
+
+        for i in 0..n {
+            let x0 = (mins[i][0] * inv_cell).floor() as i32;
+            let y0 = (mins[i][1] * inv_cell).floor() as i32;
+            let z0 = (mins[i][2] * inv_cell).floor() as i32;
+            let x1 = (maxs[i][0] * inv_cell).floor() as i32;
+            let y1 = (maxs[i][1] * inv_cell).floor() as i32;
+            let z1 = (maxs[i][2] * inv_cell).floor() as i32;
+
+            for x in x0..=x1 {
+                for y in y0..=y1 {
+                    for z in z0..=z1 {
+                        grid.entry((x,y,z)).or_default().push(i);
+                    }
+                }
+            }
+        }
+
+        // Iterate cells and check collisions
+        // To avoid duplicates, only check if indexA < indexB
+        // And to avoid checking same pair multiple times across cells, we need a way to dedupe.
+        // Simple set or just re-check index condition.
+        // Better: Iterate unique pairs.
+        // Or: Sort pairs?
+        
+        // Simplified: Iterate all cells, check all pairs in cell. 
+        // Deduplication is tricky.
+        // Let's stick to "candidates check" approach.
+        // Create a list of candidate pairs, sort and dedupe? O(K log K) where K is collisions.
+        
+        let mut candidates = Vec::new();
+        for (_, indices) in grid {
+             if indices.len() < 2 { continue; }
+             for i in 0..indices.len() {
+                 for j in (i+1)..indices.len() {
+                     let idx1 = indices[i];
+                     let idx2 = indices[j];
+                     if idx1 < idx2 {
+                         candidates.push((idx1, idx2));
+                     } else {
+                         candidates.push((idx2, idx1));
+                     }
+                 }
+             }
+        }
+        
+        candidates.sort_unstable();
+        candidates.dedup();
+        
+        for (i, j) in candidates {
+            if boxes_intersect(mins[i], maxs[i], mins[j], maxs[j]) {
+                let ob1 = Obb { center: centers[i], axes: axess[i], half: halves[i] };
+                let ob2 = Obb { center: centers[j], axes: axess[j], half: halves[j] };
+                if obb_intersect_impl(ob1, ob2) {
+                    out.push(i as u32);
+                    out.push(j as u32);
+                }
+            }
+        }
+    }
+
+    out
+}
+
 #[wasm_bindgen]
 pub fn obb_intersect(
     a_center: &[f32],
@@ -403,6 +944,111 @@ pub fn obb_intersect(
     let a = obb_from_slices(a_center, a_axes, a_half);
     let b = obb_from_slices(b_center, b_axes, b_half);
     obb_intersect_impl(a, b)
+}
+
+#[wasm_bindgen]
+pub fn sphere_sphere_intersect(
+    a_center: &[f32],
+    a_radius: f32,
+    b_center: &[f32],
+    b_radius: f32,
+) -> bool {
+    if a_center.len() != 3 || b_center.len() != 3 { return false; }
+    sphere_sphere_intersect_impl(
+        Sphere { center: load_center(a_center), radius: a_radius },
+        Sphere { center: load_center(b_center), radius: b_radius }
+    )
+}
+
+#[wasm_bindgen]
+pub fn sphere_obb_intersect(
+    s_center: &[f32],
+    s_radius: f32,
+    b_center: &[f32],
+    b_axes: &[f32],
+    b_half: &[f32],
+) -> bool {
+    if s_center.len() != 3 || b_center.len() != 3 || b_axes.len() != 9 || b_half.len() != 3 { return false; }
+    sphere_obb_intersect_impl(
+        Sphere { center: load_center(s_center), radius: s_radius },
+        obb_from_slices(b_center, b_axes, b_half)
+    )
+}
+
+#[wasm_bindgen]
+pub fn capsule_sphere_intersect(
+    c_base: &[f32],
+    c_tip: &[f32],
+    c_radius: f32,
+    s_center: &[f32],
+    s_radius: f32,
+) -> bool {
+    if c_base.len() != 3 || c_tip.len() != 3 || s_center.len() != 3 { return false; }
+    capsule_sphere_intersect_impl(
+        Capsule { base: load_center(c_base), tip: load_center(c_tip), radius: c_radius },
+        Sphere { center: load_center(s_center), radius: s_radius }
+    )
+}
+
+#[wasm_bindgen]
+pub fn capsule_obb_intersect(
+    c_base: &[f32],
+    c_tip: &[f32],
+    c_radius: f32,
+    b_center: &[f32],
+    b_axes: &[f32],
+    b_half: &[f32],
+) -> bool {
+    if c_base.len() != 3 || c_tip.len() != 3 || b_center.len() != 3 || b_axes.len() != 9 || b_half.len() != 3 { return false; }
+    capsule_obb_intersect_impl(
+        Capsule { base: load_center(c_base), tip: load_center(c_tip), radius: c_radius },
+        obb_from_slices(b_center, b_axes, b_half)
+    )
+}
+
+#[wasm_bindgen]
+pub fn capsule_capsule_intersect(
+    a_base: &[f32],
+    a_tip: &[f32],
+    a_radius: f32,
+    b_base: &[f32],
+    b_tip: &[f32],
+    b_radius: f32,
+) -> bool {
+    if a_base.len() != 3 || a_tip.len() != 3 || b_base.len() != 3 || b_tip.len() != 3 { return false; }
+    capsule_capsule_intersect_impl(
+        Capsule { base: load_center(a_base), tip: load_center(a_tip), radius: a_radius },
+        Capsule { base: load_center(b_base), tip: load_center(b_tip), radius: b_radius }
+    )
+}
+
+#[wasm_bindgen]
+pub fn ray_sphere_intersect(
+    ray_origin: &[f32],
+    ray_dir: &[f32],
+    s_center: &[f32],
+    s_radius: f32,
+) -> f32 {
+    if ray_origin.len() != 3 || ray_dir.len() != 3 || s_center.len() != 3 { return -1.0; }
+    ray_sphere_intersect_impl(
+        Ray { origin: load_center(ray_origin), dir: load_center(ray_dir) },
+        Sphere { center: load_center(s_center), radius: s_radius }
+    )
+}
+
+#[wasm_bindgen]
+pub fn ray_obb_intersect(
+    ray_origin: &[f32],
+    ray_dir: &[f32],
+    b_center: &[f32],
+    b_axes: &[f32],
+    b_half: &[f32],
+) -> f32 {
+    if ray_origin.len() != 3 || ray_dir.len() != 3 || b_center.len() != 3 || b_axes.len() != 9 || b_half.len() != 3 { return -1.0; }
+    ray_obb_intersect_impl(
+        Ray { origin: load_center(ray_origin), dir: load_center(ray_dir) },
+        obb_from_slices(b_center, b_axes, b_half)
+    )
 }
 
 #[wasm_bindgen]
@@ -449,6 +1095,104 @@ pub fn batch_check(
         }
     }
     result
+}
+
+/// Computes global scene bounds (AABB) from world matrices and local half-extents.
+/// Returns None if inputs are invalid or empty.
+#[wasm_bindgen]
+pub fn compute_scene_bounds(world_mats: &[f32], half_extents: &[f32]) -> Option<Vec<f32>> {
+    if world_mats.len() % 16 != 0 {
+        return None;
+    }
+    let count = world_mats.len() / 16;
+    if count == 0 || half_extents.len() / 3 != count {
+        return None;
+    }
+
+    let mut min_x = f32::INFINITY;
+    let mut min_y = f32::INFINITY;
+    let mut min_z = f32::INFINITY;
+    let mut max_x = f32::NEG_INFINITY;
+    let mut max_y = f32::NEG_INFINITY;
+    let mut max_z = f32::NEG_INFINITY;
+    let mut has_any = false;
+
+    for i in 0..count {
+        let mat_base = i * 16;
+        let half_base = i * 3;
+        let hx = half_extents[half_base].abs();
+        let hy = half_extents[half_base + 1].abs();
+        let hz = half_extents[half_base + 2].abs();
+
+        if !hx.is_finite() || !hy.is_finite() || !hz.is_finite() {
+            continue;
+        }
+
+        let m0 = world_mats[mat_base];
+        let m1 = world_mats[mat_base + 1];
+        let m2 = world_mats[mat_base + 2];
+        let m4 = world_mats[mat_base + 4];
+        let m5 = world_mats[mat_base + 5];
+        let m6 = world_mats[mat_base + 6];
+        let m8 = world_mats[mat_base + 8];
+        let m9 = world_mats[mat_base + 9];
+        let m10 = world_mats[mat_base + 10];
+        let cx = world_mats[mat_base + 12];
+        let cy = world_mats[mat_base + 13];
+        let cz = world_mats[mat_base + 14];
+
+        if !cx.is_finite() || !cy.is_finite() || !cz.is_finite() {
+            continue;
+        }
+
+        let ex = m0.abs() * hx + m4.abs() * hy + m8.abs() * hz;
+        let ey = m1.abs() * hx + m5.abs() * hy + m9.abs() * hz;
+        let ez = m2.abs() * hx + m6.abs() * hy + m10.abs() * hz;
+
+        if !ex.is_finite() || !ey.is_finite() || !ez.is_finite() {
+            continue;
+        }
+
+        let minx = cx - ex;
+        let miny = cy - ey;
+        let minz = cz - ez;
+        let maxx = cx + ex;
+        let maxy = cy + ey;
+        let maxz = cz + ez;
+
+        if minx < min_x {
+            min_x = minx;
+        }
+        if miny < min_y {
+            min_y = miny;
+        }
+        if minz < min_z {
+            min_z = minz;
+        }
+        if maxx > max_x {
+            max_x = maxx;
+        }
+        if maxy > max_y {
+            max_y = maxy;
+        }
+        if maxz > max_z {
+            max_z = maxz;
+        }
+        has_any = true;
+    }
+
+    if !has_any
+        || !min_x.is_finite()
+        || !min_y.is_finite()
+        || !min_z.is_finite()
+        || !max_x.is_finite()
+        || !max_y.is_finite()
+        || !max_z.is_finite()
+    {
+        None
+    } else {
+        Some(vec![min_x, min_y, min_z, max_x, max_y, max_z])
+    }
 }
 
 #[cfg(test)]
@@ -501,6 +1245,47 @@ mod tests {
         let idx = batch_check_trs(&pre_pos, &pre_rot, &pre_scl, &others_pos, &others_rot, &others_scl);
         assert_eq!(idx, vec![0u32]);
     }
+
+    #[test]
+    fn batch_all_indices() {
+        // Two objects intersecting at origin
+        let pos = vec![0.0, 0.0, 0.0, 0.5, 0.0, 0.0]; 
+        let rot = vec![0.0,0.0,0.0,1.0,  0.0,0.0,0.0,1.0];
+        let scl = vec![1.0,1.0,1.0, 1.0,1.0,1.0];
+        
+        let pairs = batch_check_all(&pos, &rot, &scl);
+        // Should detect collision between index 0 and 1
+        assert_eq!(pairs.len(), 2);
+        assert_eq!(pairs[0], 0);
+        assert_eq!(pairs[1], 1);
+    }
+
+    #[test]
+    fn scene_bounds_single_cube() {
+        let world = vec![
+            1.0, 0.0, 0.0, 0.0,
+            0.0, 1.0, 0.0, 0.0,
+            0.0, 0.0, 1.0, 0.0,
+            0.0, 0.0, 0.0, 1.0,
+        ];
+        let half = vec![0.5, 0.5, 0.5];
+        let bounds = compute_scene_bounds(&world, &half).expect("bounds");
+        assert_eq!(bounds, vec![-0.5, -0.5, -0.5, 0.5, 0.5, 0.5]);
+    }
+
+    #[test]
+    fn scene_bounds_invalid_lengths() {
+        let world = vec![1.0; 15]; // not divisible by 16
+        let half = vec![0.5, 0.5, 0.5];
+        assert!(compute_scene_bounds(&world, &half).is_none());
+    }
+    
+    #[test]
+    fn sphere_sphere() {
+        let s1 = Sphere { center: [0.0, 0.0, 0.0], radius: 1.0 };
+        let s2 = Sphere { center: [1.5, 0.0, 0.0], radius: 1.0 };
+        assert!(sphere_sphere_intersect_impl(s1, s2));
+        let s3 = Sphere { center: [2.1, 0.0, 0.0], radius: 1.0 };
+        assert!(!sphere_sphere_intersect_impl(s1, s3));
+    }
 }
-
-

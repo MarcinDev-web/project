@@ -87,7 +87,7 @@ export class ForwardPlus {
         }
 
         struct Uniforms {
-          viewProjection: mat4x4<f32>,
+          projectionMatrix: mat4x4<f32>,
           viewMatrix: mat4x4<f32>,
           cameraPos: vec3<f32>,
           screenWidth: f32,
@@ -102,36 +102,10 @@ export class ForwardPlus {
         @group(0) @binding(2) var<storage, read_write> lightIndices: array<atomic<u32>>;
         @group(0) @binding(3) var<storage, read_write> lightGrid: array<vec2<u32>>; // offset, count
 
-        fn computeTileFrustum(tileX: u32, tileY: u32, tileSize: u32) -> array<vec4<f32>, 4> {
-          // Simplified: use view-projection inverse (passed as uniform)
-          // For now, compute tile bounds in screen space and convert to view space
-          let screenWidth = uniforms.screenWidth;
-          let screenHeight = uniforms.screenHeight;
-          
-          // Compute tile corners in NDC [-1, 1]
-          let minX = (f32(tileX * tileSize) / screenWidth) * 2.0 - 1.0;
-          let maxX = (f32((tileX + 1) * tileSize) / screenWidth) * 2.0 - 1.0;
-          let minY = 1.0 - (f32((tileY + 1) * tileSize) / screenHeight) * 2.0;
-          let maxY = 1.0 - (f32(tileY * tileSize) / screenHeight) * 2.0;
-          
-          // Use near and far plane Z for depth bounds
-          let nearZ = -1.0;
-          let farZ = 1.0;
-          
-          // Create corners in NDC, then transform (simplified - just use depth bounds)
-          let corners = array<vec4<f32>, 4>(
-            vec4<f32>(minX, minY, nearZ, 1.0),
-            vec4<f32>(maxX, minY, nearZ, 1.0),
-            vec4<f32>(maxX, maxY, farZ, 1.0),
-            vec4<f32>(minX, maxY, farZ, 1.0)
-          );
-          
-          return corners;
-        }
-
-        fn testLightSphere(lightPos: vec3<f32>, lightRange: f32, plane: vec4<f32>) -> bool {
-          let dist = dot(vec4<f32>(lightPos, 1.0), plane);
-          return dist >= -lightRange;
+        // Creates a plane passing through origin and two points (in View Space)
+        // Normal points "inward" relative to the winding order of p1 -> p2
+        fn createPlane(p1: vec3<f32>, p2: vec3<f32>) -> vec3<f32> {
+          return normalize(cross(p1, p2));
         }
 
         @compute @workgroup_size(16, 16, 1)
@@ -149,55 +123,55 @@ export class ForwardPlus {
           
           let tileIndex = tileY * tilesX + tileX;
           
-          // Compute tile frustum
-          let corners = computeTileFrustum(tileX, tileY, tileSize);
-          
-          // Compute tile bounds in NDC
+          // 1. Calculate Tile Bounds in NDC [-1, 1]
           let screenWidth = uniforms.screenWidth;
           let screenHeight = uniforms.screenHeight;
+          
           let minX = (f32(tileX * tileSize) / screenWidth) * 2.0 - 1.0;
           let maxX = (f32((tileX + 1) * tileSize) / screenWidth) * 2.0 - 1.0;
+          // Flip Y for NDC (top is +1 in some systems, but here we map 0..H to +1..-1 usually)
+          // Standard WebGPU NDC: Y is up (+1), down (-1). Screen: Y is down.
           let minY = 1.0 - (f32((tileY + 1) * tileSize) / screenHeight) * 2.0;
           let maxY = 1.0 - (f32(tileY * tileSize) / screenHeight) * 2.0;
           
-          // Cull lights for this tile (simplified frustum culling)
+          // 2. Unproject to View Space (at Z = -1.0)
+          // P00 = 1/(aspect*tan(fov/2)), P11 = 1/tan(fov/2)
+          let p00 = uniforms.projectionMatrix[0][0];
+          let p11 = uniforms.projectionMatrix[1][1];
+          
+          // View space direction vectors (Z = -1.0)
+          let viewBL = vec3<f32>(minX / p00, minY / p11, -1.0);
+          let viewBR = vec3<f32>(maxX / p00, minY / p11, -1.0);
+          let viewTR = vec3<f32>(maxX / p00, maxY / p11, -1.0);
+          let viewTL = vec3<f32>(minX / p00, maxY / p11, -1.0);
+          
+          // 3. Create Frustum Planes (Normals pointing inward)
+          let planeLeft   = createPlane(viewTL, viewBL);
+          let planeRight  = createPlane(viewBR, viewTR);
+          let planeBottom = createPlane(viewBL, viewBR);
+          let planeTop    = createPlane(viewTR, viewTL);
+          
           var lightCount = 0u;
           let maxLightsPerTile = 256u;
           
-          // Compute tile center in screen space
-          let tileCenterX = (minX + maxX) * 0.5;
-          let tileCenterY = (minY + maxY) * 0.5;
-          
           for (var i = 0u; i < uniforms.lightCount && lightCount < maxLightsPerTile; i++) {
             let light = lights[i];
-            let lightPos = light.position;
-            let lightRange = light.range;
             
-            // Transform light to view space
-            let viewLightPos = uniforms.viewMatrix * vec4<f32>(lightPos, 1.0);
-            let viewLight = viewLightPos.xyz / max(viewLightPos.w, 1e-6);
+            // Transform light to View Space
+            let viewPos4 = uniforms.viewMatrix * vec4<f32>(light.position, 1.0);
+            let viewPos = viewPos4.xyz;
+            let r = light.range;
             
-            // Simple visibility test: check if light sphere intersects view frustum
-            // For simplicity, just check if light is within reasonable bounds
             var visible = true;
             
-            // Check depth range (simplified)
-            if (viewLight.z < -200.0 || viewLight.z > 2000.0) {
-              visible = false;
-            }
+            // Near plane check (approximate)
+            if (viewPos.z - r > -0.1) { visible = false; }
             
-            // Check if light is within range of tile (simplified)
-            if (visible) {
-              // Project light to screen space (simplified)
-              let screenPos = uniforms.viewProjection * vec4<f32>(lightPos, 1.0);
-              let screen = screenPos.xy / max(screenPos.w, 1e-6);
-              
-              // Check if light sphere overlaps tile
-              let distToTileCenter = length(screen - vec2<f32>(tileCenterX, tileCenterY));
-              if (distToTileCenter > lightRange * 0.1 + 0.5) { // Rough estimate
-                visible = false;
-              }
-            }
+            // Plane checks: dot(N, P) < -r means sphere is fully outside
+            if (visible && dot(planeLeft, viewPos)   < -r) { visible = false; }
+            if (visible && dot(planeRight, viewPos)  < -r) { visible = false; }
+            if (visible && dot(planeTop, viewPos)    < -r) { visible = false; }
+            if (visible && dot(planeBottom, viewPos) < -r) { visible = false; }
             
             if (visible) {
               let index = atomicAdd(&lightIndices[tileIndex * maxLightsPerTile + lightCount], 1u);
@@ -262,7 +236,7 @@ export class ForwardPlus {
    */
   cullLights(
     encoder: GPUCommandEncoder,
-    viewProjectionMatrix: Mat4,
+    projectionMatrix: Mat4,
     viewMatrix: Mat4,
     cameraPos: Vec3,
     screenWidth: number,
@@ -272,23 +246,32 @@ export class ForwardPlus {
     this.initialize();
     if (!this.lightCullPipeline || !this.lightBuffer || !this.lightIndexBuffer || !this.lightGridBuffer) return;
 
-    // Create uniform buffer
-    const uniforms = new Float32Array(20); // 16 (mat4) + 3 (vec3) + 1 (f32) + 4 (u32/f32)
-    uniforms.set(viewProjectionMatrix, 0);
-    uniforms.set(viewMatrix, 16);
-    uniforms[28] = cameraPos[0];
-    uniforms[29] = cameraPos[1];
-    uniforms[30] = cameraPos[2];
-    uniforms[31] = screenWidth;
-    uniforms[32] = screenHeight;
-    uniforms[33] = lightCount;
+    // Create uniform buffer with correct layout
+    // struct Uniforms {
+    //   projectionMatrix: mat4x4<f32>, // 0-64
+    //   viewMatrix: mat4x4<f32>,       // 64-128
+    //   cameraPos: vec3<f32>,          // 128-140
+    //   screenWidth: f32,              // 140-144
+    //   screenHeight: f32,             // 144-148
+    //   lightCount: u32,               // 148-152
+    // }
+    const uniformData = new Float32Array(40); // 160 bytes
+    uniformData.set(projectionMatrix, 0);
+    uniformData.set(viewMatrix, 16);
+    uniformData[32] = cameraPos[0];
+    uniformData[33] = cameraPos[1];
+    uniformData[34] = cameraPos[2];
+    uniformData[35] = screenWidth;
+    uniformData[36] = screenHeight;
+    const uintView = new Uint32Array(uniformData.buffer);
+    uintView[37] = lightCount;
     
     const uniformBuffer = this.device.createBuffer({
       label: 'forward-plus-uniforms',
-      size: uniforms.byteLength,
+      size: uniformData.byteLength,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
-    this.device.queue.writeBuffer(uniformBuffer, 0, uniforms);
+    this.device.queue.writeBuffer(uniformBuffer, 0, uniformData);
 
     // Clear light indices and grid
     const clearData = new Uint32Array(this.maxLights * 1024);

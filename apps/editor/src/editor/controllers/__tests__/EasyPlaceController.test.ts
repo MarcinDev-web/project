@@ -9,6 +9,24 @@ import { Scene } from '@engine/world';
 import { Entity } from '@engine/world';
 import { EditorState } from '../../core/state';
 import { SelectionManager } from '@engine/world';
+import { PatternPlacer } from '../../placement/PatternPlacer';
+
+// Mock PatternPlacer
+vi.mock('../../placement/PatternPlacer', () => {
+  return {
+    PatternPlacer: vi.fn().mockImplementation(() => ({
+      generateLinePattern: vi.fn().mockReturnValue([]),
+      generateGridPattern: vi.fn().mockReturnValue([]),
+      generateCirclePattern: vi.fn().mockReturnValue([]),
+      generateWallPattern: vi.fn().mockReturnValue([]),
+      validatePositions: vi.fn().mockResolvedValue(undefined),
+      createPreviewEntities: vi.fn(),
+      clearPreviewEntities: vi.fn(),
+      getValidCount: vi.fn().mockReturnValue(0),
+      getPreviewEntities: vi.fn().mockReturnValue([]),
+    })),
+  };
+});
 
 describe('EasyPlaceController', () => {
   let controller: EasyPlaceController;
@@ -16,6 +34,7 @@ describe('EasyPlaceController', () => {
   let state: EditorState;
   let canvas: HTMLCanvasElement;
   let mockConfig: any;
+  let mockPatternPlacer: any;
 
   beforeEach(() => {
     // Create canvas mock
@@ -72,7 +91,13 @@ describe('EasyPlaceController', () => {
       onStatusMessage: vi.fn(),
     };
 
+    // Clear mock instances
+    (PatternPlacer as unknown as ReturnType<typeof vi.fn>).mockClear();
+
     controller = new EasyPlaceController(mockConfig);
+    
+    // Get the mock instance of PatternPlacer
+    mockPatternPlacer = (PatternPlacer as unknown as ReturnType<typeof vi.fn>).mock.results[0].value;
   });
 
   describe('initialization', () => {
@@ -1034,6 +1059,12 @@ describe('EasyPlaceController', () => {
       state.easyPlacePattern.value = 'grid';
       controller.initialize();
 
+      // Mock pattern generation
+      mockPatternPlacer.generateGridPattern.mockReturnValue([
+        { position: [0, 0, 0], valid: true },
+        { position: [1, 0, 0], valid: true },
+      ]);
+
       const click1 = new MouseEvent('click', { bubbles: true });
       canvas.dispatchEvent(click1);
       await Promise.resolve();
@@ -1045,7 +1076,10 @@ describe('EasyPlaceController', () => {
       await Promise.resolve();
       await Promise.resolve();
 
-      expect(mockConfig.placementMode.placeEntityFromTemplate).toHaveBeenCalled();
+      expect(mockPatternPlacer.generateGridPattern).toHaveBeenCalled();
+      expect(mockPatternPlacer.validatePositions).toHaveBeenCalled();
+      expect(mockConfig.placementMode.placeEntityFromTemplate).toHaveBeenCalledTimes(2);
+      
       const firstCall = mockConfig.placementMode.placeEntityFromTemplate.mock.calls[0];
       expect(firstCall?.[1]?.asset).toBe(asset);
       expect(firstCall?.[1]?.emitPlacementConfirmed).toBe(false);
@@ -1058,31 +1092,115 @@ describe('EasyPlaceController', () => {
       state.easyPlaceSettings.value.lineSpacing = 2;
       controller.initialize();
 
+      // Mock pattern generation with one invalid position
+      mockPatternPlacer.generateLinePattern.mockReturnValue([
+        { position: [0, 0, 0], valid: true },
+        { position: [2, 0, 0], valid: false }, // Invalid
+      ]);
+
       const click1 = new MouseEvent('click', { bubbles: true });
       canvas.dispatchEvent(click1);
       await Promise.resolve();
 
       preview.transform.position = [2, 0, 0];
 
-      let callIndex = 0;
-      mockConfig.collisionDetector.checkCollisionOBB.mockImplementation(() => {
-        const result =
-          callIndex === 0
-            ? { hasCollision: true, collidingEntities: [] }
-            : { hasCollision: false, collidingEntities: [] };
-        callIndex++;
-        return Promise.resolve(result);
-      });
-      mockConfig.placementMode.placeEntityFromTemplate.mockClear();
+      const click2 = new MouseEvent('click', { bubbles: true });
+      canvas.dispatchEvent(click2);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      // Should only place the valid one
+      expect(mockConfig.placementMode.placeEntityFromTemplate).toHaveBeenCalledTimes(1);
+      const callArgs = mockConfig.placementMode.placeEntityFromTemplate.mock.calls[0];
+      expect(callArgs?.[1]?.position).toEqual([0, 0, 0]);
+    });
+
+    it('should handle wall pattern', async () => {
+      state.easyPlacePattern.value = 'wall';
+      state.easyPlaceSettings.value.wallHeight = 3;
+      controller.initialize();
+
+      // Mock pattern generation
+      mockPatternPlacer.generateWallPattern.mockReturnValue([
+        { position: [0, 0, 0], valid: true },
+        { position: [0, 1, 0], valid: true },
+        { position: [0, 2, 0], valid: true },
+      ]);
+
+      const click1 = new MouseEvent('click', { bubbles: true });
+      canvas.dispatchEvent(click1);
+      await Promise.resolve();
+
+      preview.transform.position = [2, 0, 0];
 
       const click2 = new MouseEvent('click', { bubbles: true });
       canvas.dispatchEvent(click2);
       await Promise.resolve();
       await Promise.resolve();
 
-      expect(mockConfig.placementMode.placeEntityFromTemplate).toHaveBeenCalledTimes(1);
-      const callArgs = mockConfig.placementMode.placeEntityFromTemplate.mock.calls[0];
-      expect(callArgs?.[1]?.position).toEqual([2, 0, 0]);
+      expect(mockPatternPlacer.generateWallPattern).toHaveBeenCalled();
+      expect(mockConfig.placementMode.placeEntityFromTemplate).toHaveBeenCalledTimes(3);
+      expect(mockConfig.recordSnapshot).toHaveBeenCalledWith('Easy Place wall pattern');
+    });
+  });
+
+  describe('keyboard shortcuts', () => {
+    it('should cycle patterns with M key', () => {
+      state.easyPlaceMode.value = true;
+      state.easyPlacePattern.value = 'single';
+      mockConfig.placementMode.isActive.mockReturnValue(true);
+      controller.initialize();
+
+      const keyEvent = new KeyboardEvent('keydown', { key: 'm' });
+      
+      // single -> line
+      window.dispatchEvent(keyEvent);
+      expect(state.easyPlacePattern.value).toBe('line');
+      expect(mockConfig.onStatusMessage).toHaveBeenCalledWith('Pattern: line', 1000);
+
+      // line -> grid
+      window.dispatchEvent(keyEvent);
+      expect(state.easyPlacePattern.value).toBe('grid');
+
+      // grid -> circle
+      window.dispatchEvent(keyEvent);
+      expect(state.easyPlacePattern.value).toBe('circle');
+
+      // circle -> wall
+      window.dispatchEvent(keyEvent);
+      expect(state.easyPlacePattern.value).toBe('wall');
+
+      // wall -> single
+      window.dispatchEvent(keyEvent);
+      expect(state.easyPlacePattern.value).toBe('single');
+    });
+
+    it('should reset active pattern when cycling', async () => {
+      state.easyPlaceMode.value = true;
+      state.easyPlacePattern.value = 'line';
+      mockConfig.placementMode.isActive.mockReturnValue(true);
+      
+      // Setup preview entity
+      const preview = new Entity('preview');
+      preview.transform.position = [0, 0, 0];
+      mockConfig.placementMode.getPreviewEntity.mockReturnValue(preview);
+      
+      controller.initialize();
+
+      // Start a pattern
+      const clickEvent = new MouseEvent('click', { bubbles: true });
+      canvas.dispatchEvent(clickEvent);
+      await Promise.resolve();
+
+      expect(controller.getPatternState().active).toBe(true);
+
+      // Cycle pattern
+      const keyEvent = new KeyboardEvent('keydown', { key: 'm' });
+      window.dispatchEvent(keyEvent);
+
+      // Should reset pattern state
+      expect(controller.getPatternState().active).toBe(false);
+      expect(mockPatternPlacer.clearPreviewEntities).toHaveBeenCalled();
     });
   });
 

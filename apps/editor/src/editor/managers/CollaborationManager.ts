@@ -234,7 +234,12 @@ export class CollaborationManager {
     this.multiplayerGameplayManager = new MultiplayerGameplayManager(
       this.replicationClient,
       this.config.scene,
-      physicsWorld
+      physicsWorld,
+      undefined,
+      {
+        intentSigningKey: this.config.jwtToken,
+        intentKeyId: 'editor-collab',
+      }
     );
 
     // Start multiplayer session (reuses existing connection)

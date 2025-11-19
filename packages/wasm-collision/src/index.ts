@@ -22,10 +22,33 @@ export interface TrsArray {
   scales: Float32Array; // length 3 * N
 }
 
+export interface CollisionWorld {
+  free(): void;
+  resize(count: number): void;
+  get_positions_ptr(): number;
+  get_rotations_ptr(): number;
+  get_scales_ptr(): number;
+  check_collisions(): Uint32Array;
+}
+
 export interface WasmCollision {
   obbIntersect(a: ObbFlat, b: ObbFlat): boolean;
+  sphereSphereIntersect(aCenter: Float32Array, aRadius: number, bCenter: Float32Array, bRadius: number): boolean;
+  sphereObbIntersect(sCenter: Float32Array, sRadius: number, bCenter: Float32Array, bAxes: Float32Array, bHalf: Float32Array): boolean;
+  capsuleSphereIntersect(cBase: Float32Array, cTip: Float32Array, cRadius: number, sCenter: Float32Array, sRadius: number): boolean;
+  capsuleObbIntersect(cBase: Float32Array, cTip: Float32Array, cRadius: number, bCenter: Float32Array, bAxes: Float32Array, bHalf: Float32Array): boolean;
+  capsuleCapsuleIntersect(aBase: Float32Array, aTip: Float32Array, aRadius: number, bBase: Float32Array, bTip: Float32Array, bRadius: number): boolean;
+  raySphereIntersect(rayOrigin: Float32Array, rayDir: Float32Array, sCenter: Float32Array, sRadius: number): number;
+  rayObbIntersect(rayOrigin: Float32Array, rayDir: Float32Array, bCenter: Float32Array, bAxes: Float32Array, bHalf: Float32Array): number;
   batchCheck(preview: ObbFlat, others: ObbFlatArray): Uint32Array;
   batchCheckTrs(preview: Trs, others: TrsArray): Uint32Array;
+  batchCheckAll(others: TrsArray): Uint32Array;
+  computeSceneBounds(worldMatrices: Float32Array, halfExtents: Float32Array): Float32Array | null;
+  
+  // New API for zero-copy access
+  CollisionWorld: new () => CollisionWorld;
+  memory: WebAssembly.Memory;
+  
   dispose(): void;
 }
 
@@ -86,6 +109,69 @@ export async function init(): Promise<WasmCollision> {
   ) => boolean;
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+  const sphere_sphere_intersect = mod.sphere_sphere_intersect as (
+    a_center: Float32Array,
+    a_radius: number,
+    b_center: Float32Array,
+    b_radius: number
+  ) => boolean;
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+  const sphere_obb_intersect = mod.sphere_obb_intersect as (
+    s_center: Float32Array,
+    s_radius: number,
+    b_center: Float32Array,
+    b_axes: Float32Array,
+    b_half: Float32Array
+  ) => boolean;
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+  const capsule_sphere_intersect = mod.capsule_sphere_intersect as (
+    c_base: Float32Array,
+    c_tip: Float32Array,
+    c_radius: number,
+    s_center: Float32Array,
+    s_radius: number
+  ) => boolean;
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+  const capsule_obb_intersect = mod.capsule_obb_intersect as (
+    c_base: Float32Array,
+    c_tip: Float32Array,
+    c_radius: number,
+    b_center: Float32Array,
+    b_axes: Float32Array,
+    b_half: Float32Array
+  ) => boolean;
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+  const capsule_capsule_intersect = mod.capsule_capsule_intersect as (
+    a_base: Float32Array,
+    a_tip: Float32Array,
+    a_radius: number,
+    b_base: Float32Array,
+    b_tip: Float32Array,
+    b_radius: number
+  ) => boolean;
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+  const ray_sphere_intersect = mod.ray_sphere_intersect as (
+    ray_origin: Float32Array,
+    ray_dir: Float32Array,
+    s_center: Float32Array,
+    s_radius: number
+  ) => number;
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+  const ray_obb_intersect = mod.ray_obb_intersect as (
+    ray_origin: Float32Array,
+    ray_dir: Float32Array,
+    b_center: Float32Array,
+    b_axes: Float32Array,
+    b_half: Float32Array
+  ) => number;
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   const batch_check = mod.batch_check as (
     pre_center: Float32Array,
     pre_axes: Float32Array,
@@ -105,14 +191,66 @@ export async function init(): Promise<WasmCollision> {
     others_scl: Float32Array
   ) => Uint32Array;
 
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+  const batch_check_all = mod.batch_check_all as (
+    pos: Float32Array,
+    rot: Float32Array,
+    scl: Float32Array
+  ) => Uint32Array;
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+  const compute_scene_bounds =
+    typeof mod.compute_scene_bounds === 'function'
+      ? (mod.compute_scene_bounds as (
+          worldMatrices: Float32Array,
+          halfExtents: Float32Array
+        ) => Float32Array | undefined)
+      : null;
+
+  // Capture memory buffer
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+  const wasmMemory = mod.initSync 
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+    ? mod.wasm.memory // Bundler might expose `wasm` on the module
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    : (await (window as any).wasm_bindgen).memory; // Fallback for some targets
+
+  // Ideally, use the memory exported by the module
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+  const memory = mod.memory || wasmMemory;
+
   const api: WasmCollision = {
     obbIntersect: (a, b) => {
+      return obb_intersect(a.center, a.axes, a.half, b.center, b.axes, b.half);
+    },
+    sphereSphereIntersect: (aCenter, aRadius, bCenter, bRadius) => {
+      return sphere_sphere_intersect(aCenter, aRadius, bCenter, bRadius);
+    },
+    sphereObbIntersect: (sCenter, sRadius, bCenter, bAxes, bHalf) => {
+      return sphere_obb_intersect(sCenter, sRadius, bCenter, bAxes, bHalf);
+    },
+    capsuleSphereIntersect: (cBase, cTip, cRadius, sCenter, sRadius) => {
+      return capsule_sphere_intersect(cBase, cTip, cRadius, sCenter, sRadius);
+    },
+    capsuleObbIntersect: (cBase, cTip, cRadius, bCenter, bAxes, bHalf) => {
+      return capsule_obb_intersect(cBase, cTip, cRadius, bCenter, bAxes, bHalf);
+    },
+    capsuleCapsuleIntersect: (aBase, aTip, aRadius, bBase, bTip, bRadius) => {
+      return capsule_capsule_intersect(aBase, aTip, aRadius, bBase, bTip, bRadius);
+    },
+    raySphereIntersect: (rayOrigin, rayDir, sCenter, sRadius) => {
+      return ray_sphere_intersect(rayOrigin, rayDir, sCenter, sRadius);
+    },
+    rayObbIntersect: (rayOrigin, rayDir, bCenter, bAxes, bHalf) => {
+      return ray_obb_intersect(rayOrigin, rayDir, bCenter, bAxes, bHalf);
+    },
+    computeSceneBounds: (worldMatrices, halfExtents) => {
       try {
-        return obb_intersect(a.center, a.axes, a.half, b.center, b.axes, b.half);
+        if (!compute_scene_bounds) return null;
+        const bounds = compute_scene_bounds(worldMatrices, halfExtents);
+        return bounds ?? null;
       } catch (error) {
-        // Log error for debugging
-        console.error('[wasm-collision] obbIntersect error:', error);
-        // Re-throw to allow caller to fallback to TypeScript implementation
+        console.error('[wasm-collision] computeSceneBounds error:', error);
         throw error;
       }
     },
@@ -146,6 +284,17 @@ export async function init(): Promise<WasmCollision> {
         throw error;
       }
     },
+    batchCheckAll: (others) => {
+      try {
+        return batch_check_all(others.positions, others.rotations, others.scales);
+      } catch (error) {
+        console.error('[wasm-collision] batchCheckAll error:', error);
+        throw error;
+      }
+    },
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-unsafe-member-access
+    CollisionWorld: mod.CollisionWorld,
+    memory: memory as WebAssembly.Memory,
     dispose: () => {
       // No explicit deinit required; allow GC to reclaim module when unused.
       isReady = false;

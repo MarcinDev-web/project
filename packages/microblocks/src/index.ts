@@ -7,9 +7,6 @@
 
 // Core classes
 export { MicroBlockStore, MICRO_BLOCK_SIZE, DEFAULT_CHUNK_SIZE } from './MicroBlockStore';
-export { MicroBlockMesher } from './MicroBlockMesher';
-export { MicroBlockComponent } from './MicroBlockComponent';
-export { MicroBlockSystem } from './MicroBlockSystem';
 
 // Types
 export type {
@@ -22,9 +19,9 @@ export type {
   MicroBlockChunkData,
   MicroBlockStoreData,
   MicroBlockComponentData,
+  MicroBlockMeshData,
 } from './types';
 
 // Presets
 export { MICRO_BLOCK_PRESETS, createMicroBlockFromPreset } from './presets';
 export type { MicroBlockPreset } from './presets';
-

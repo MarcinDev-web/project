@@ -8,12 +8,14 @@
     "sourceMap": true,
     "skipLibCheck": true,
     "paths": {
+      "@engine/animation": ["../animation/dist/src"],
+      "@engine/animation/*": ["../animation/dist/src/*"],
       "@engine/economy": ["../economy/dist/src"],
       "@engine/economy/*": ["../economy/dist/src/*"],
-      "@engine/net-protocol": ["../net-protocol/dist"],
-      "@engine/net-protocol/*": ["../net-protocol/dist/*"],
-      "@engine/voxel": ["../voxel/dist"],
-      "@engine/voxel/*": ["../voxel/dist/*"],
+      "@engine/net-protocol": ["../net-protocol/dist/src"],
+      "@engine/net-protocol/*": ["../net-protocol/dist/src/*"],
+      "@engine/voxel": ["../voxel/dist/src"],
+      "@engine/voxel/*": ["../voxel/dist/src/*"],
       "@engine/world": ["../world/dist"],
       "@engine/world/*": ["../world/dist/*"]
     }
@@ -22,7 +24,7 @@
   "exclude": ["__tests__", "dist", "node_modules"],
   "references": [
     { "path": "../core/tsconfig.build.json" },
-    { "path": "../world" },
+    { "path": "../world/tsconfig.build.json" },
     { "path": "../net-protocol" },
     { "path": "../voxel" },
     { "path": "../economy" }

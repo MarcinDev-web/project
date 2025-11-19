@@ -21,9 +21,7 @@
     "lint": "eslint src --max-warnings=0"
   },
   "dependencies": {
-    "@engine/core": "workspace:*",
-    "@engine/world": "workspace:*",
-    "@engine/gfx-webgpu": "workspace:*"
+    "@engine/core": "workspace:*"
   },
   "devDependencies": {
     "@engine/test-utils": "workspace:*",
@@ -31,4 +29,3 @@
     "vitest": "^2.1.3"
   }
 }
-

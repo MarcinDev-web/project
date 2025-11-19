@@ -26,6 +26,7 @@
     "@engine/world-templates": "workspace:*",
     "@engine/voxel": "workspace:*",
     "@engine/economy": "workspace:*",
+    "@engine/wasm-mesh": "workspace:*",
     "@webgpu/types": "^0.1.65",
     "@gltf-transform/core": "^3.10.1",
     "@gltf-transform/extensions": "^3.10.1",

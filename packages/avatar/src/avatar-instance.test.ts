@@ -25,7 +25,6 @@ describe('AvatarInstance', () => {
       expect(avatar.getRootEntity().parent).toBe(parentEntity);
       expect(avatar.getRootEntity().userData.isAvatarInstanceRoot).toBe(true);
       expect(avatar.getSkeleton()).toBeDefined();
-      expect(avatar.getAnimator()).toBeDefined();
     });
 
     it('should create avatar instance with custom name', () => {
@@ -74,16 +73,6 @@ describe('AvatarInstance', () => {
 
       expect(skeleton).toBeDefined();
       expect(skeleton.getJointNames().length).toBeGreaterThan(0);
-    });
-  });
-
-  describe('getAnimator', () => {
-    it('should throw error when called (deprecated and removed)', () => {
-      const avatar = new AvatarInstance(parentEntity);
-      
-      expect(() => {
-        avatar.getAnimator();
-      }).toThrow('getAnimator() has been removed');
     });
   });
 

@@ -3,12 +3,11 @@
   "compilerOptions": {
     "composite": true,
     "rootDir": "./src",
+    "baseUrl": ".",
     "skipLibCheck": true,
     "paths": {
       "@engine/core": ["../core/dist"],
-      "@engine/core/*": ["../core/dist/*"],
-      "@engine/world": ["../world/dist"],
-      "@engine/world/*": ["../world/dist/*"]
+      "@engine/core/*": ["../core/dist/*"]
     }
   },
   "include": ["src/**/*.ts"],
@@ -22,6 +21,8 @@
     "**/test-utils",
     "src/**/*.test.ts",
     "src/**/*.spec.ts"
+  ],
+  "references": [
+    { "path": "../core/tsconfig.build.json" }
   ]
 }
-

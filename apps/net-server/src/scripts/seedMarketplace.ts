@@ -4,6 +4,7 @@
 
 import { MarketplaceStorage } from '../storage/MarketplaceStorage.js';
 import { MarketplaceStorageDB } from '../storage/MarketplaceStorageDB.js';
+import { StudioProjectsStorageDB } from '../storage/StudioProjectsStorage.js';
 import { GameSessionTracker } from '../websocket/GameSessionTracker.js';
 import { generateAndSaveThumbnail } from '../utils/thumbnailGenerator.js';
 import { createDbPool } from '../lib/db.js';
@@ -137,6 +138,16 @@ const mockBuilds = [
     tags: ['hospital', 'medical', 'public', 'building'],
     public: true,
   },
+  {
+    type: 'build' as const,
+    title: 'Competitive PvP Arena',
+    description: 'High-intensity PvP combat arena with weapons, spawn points, and respawn system. Battle other players in this competitive multiplayer experience.',
+    authorId: 'mock_user_pvp',
+    authorName: 'System',
+    fileUrl: '',
+    tags: ['pvp', 'arena', 'battle', 'combat', 'shooter', 'multiplayer'],
+    public: true,
+  },
 ];
 
 // Mock avatars data
@@ -263,10 +274,14 @@ export async function seedMarketplace(tracker?: GameSessionTracker): Promise<voi
 
     // Initialize build storage if database is available
     let buildStorage: BuildStorage | null = null;
+    let studioStorage: StudioProjectsStorageDB | null = null;
     if (dbPool) {
       try {
         buildStorage = new BuildStorage(dbPool);
         console.log('Build storage initialized');
+        studioStorage = new StudioProjectsStorageDB(dbPool);
+        await studioStorage.initialize();
+        console.log('Studio projects storage initialized');
       } catch (error) {
         console.warn('Failed to initialize build storage:', error);
       }
@@ -276,18 +291,35 @@ export async function seedMarketplace(tracker?: GameSessionTracker): Promise<voi
 
     // Check if marketplace already has items
     const existing = await storage.getItems({ limit: 1 });
-    if (existing.length > 0) {
-      console.log('Marketplace already has items. Skipping seed.');
-      return;
+    const shouldSeed = existing.length === 0;
+    
+    if (shouldSeed) {
+      console.log('Seeding marketplace with mock builds and avatars...');
+    } else {
+      console.log('Marketplace already has items. Checking if PVP game exists...');
+      
+      // Check if PVP game already exists
+      const pvpGames = await storage.getItems({ 
+        tags: ['pvp'],
+        type: 'build',
+        public: true 
+      });
+      
+      if (pvpGames.length > 0) {
+        console.log('PVP game already exists. Skipping seed.');
+        return;
+      }
+      
+      console.log('PVP game not found. Adding PVP game to marketplace...');
     }
-
-    console.log('Seeding marketplace with mock builds and avatars...');
 
     // Use provided tracker or create a new one
     const trackerToUse = tracker ?? gameSessionTracker;
 
-    // Combine all mock items
-    const allMockItems = [...mockBuilds, ...mockAvatars];
+    // Combine all mock items (only if seeding everything, otherwise just PVP game)
+    const allMockItems = shouldSeed 
+      ? [...mockBuilds, ...mockAvatars]
+      : [mockBuilds.find(b => b.tags.includes('pvp'))!].filter(Boolean);
 
     for (const mockItem of allMockItems) {
       // Create item first to get the ID
@@ -317,8 +349,14 @@ export async function seedMarketplace(tracker?: GameSessionTracker): Promise<voi
       }
 
       // Simulate some downloads and likes for variety
-      const downloads = Math.floor(Math.random() * 1000) + 10;
-      const likes = Math.floor(Math.random() * 500) + 5;
+      // PVP game gets higher stats to ensure visibility
+      const isPvpGame = item.tags.includes('pvp');
+      const downloads = isPvpGame 
+        ? Math.floor(Math.random() * 500) + 50  // 50-550 for PVP
+        : Math.floor(Math.random() * 1000) + 10;
+      const likes = isPvpGame
+        ? Math.floor(Math.random() * 200) + 25  // 25-225 for PVP
+        : Math.floor(Math.random() * 500) + 5;
 
       // Update with correct fileUrl, simulated stats and thumbnail
       await storage.updateItem(item.id, {
@@ -403,6 +441,41 @@ export async function seedMarketplace(tracker?: GameSessionTracker): Promise<voi
             trackerToUse.joinGame(item.id, mockUserId);
           }
           console.log(`  → ${playersOnline} mock players online`);
+        }
+      }
+
+      // For PVP game, also create a published project in StudioProjectsStorage
+      if (item.type === 'build' && item.tags.includes('pvp') && studioStorage && buildStorage) {
+        try {
+          // Update projectData with marketplace link
+          const savedBuildData = await buildStorage.getBuild(item.id);
+          if (savedBuildData) {
+            const projectDataWithMarketplace: ProjectData = {
+              ...savedBuildData,
+              metadata: {
+                ...savedBuildData.metadata,
+                marketplaceItemId: item.id,
+              },
+            };
+
+            // Create published project
+            const project = await studioStorage.createProject(item.authorId, {
+              name: item.title,
+              description: item.description,
+              tags: item.tags,
+              projectData: projectDataWithMarketplace,
+              ...(item.thumbnailUrl && { thumbnailUrl: item.thumbnailUrl }),
+            });
+
+            // Publish the project
+            await studioStorage.updateProject(item.authorId, project.id, {
+              isPublished: true,
+            });
+
+            console.log(`  → Created and published PVP project: ${project.id}`);
+          }
+        } catch (error) {
+          console.warn(`  → Failed to create published project for PVP game:`, error);
         }
       }
     }

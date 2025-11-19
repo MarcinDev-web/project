@@ -39,6 +39,7 @@ import { PausedState } from '../core/states/PausedState.js';
 import { DisconnectedState } from '../core/states/DisconnectedState.js';
 import { ReplicationClient, MultiplayerGameplayManager, ReplicationState } from '@engine/net';
 import { MultiplayerAPI } from '../utils/multiplayerApi.js';
+import { CheckpointSystem, RespawnManager } from '@engine/world';
 
 // PlayManifest interface
 interface PlayManifest {
@@ -60,6 +61,9 @@ interface PlayManifest {
     enableAI: boolean;
     enableScripts: boolean;
     enableMultiplayer?: boolean;
+  };
+  gameplay?: {
+    respawnEnabled?: boolean;
   };
   controller: {
     preferences: {
@@ -142,6 +146,9 @@ function createDefaultManifest(): PlayManifest {
       enableAI: true,
       enableScripts: true,
       enableMultiplayer: false,
+    },
+    gameplay: {
+      respawnEnabled: true,
     },
     controller: {
       preferences: {
@@ -258,6 +265,8 @@ export class PlayerModeManager {
   private replicationClient: ReplicationClient | null = null;
   private multiplayerGameplayManager: MultiplayerGameplayManager | null = null;
   
+  private checkpointSystem: CheckpointSystem;
+
   constructor(config: PlayerModeManagerConfig) {
     this.canvas = config.canvas;
     this.scene = config.scene;
@@ -301,6 +310,9 @@ export class PlayerModeManager {
     
     this.inputContext = new InputContextManager(this.canvas);
     
+    this.checkpointSystem = new CheckpointSystem();
+    this.checkpointSystem.initialize(this.scene);
+
     // Initialize state machine
     this.stateMachine = new PlayerStateMachine();
     this.setupStates(config);
@@ -381,7 +393,12 @@ export class PlayerModeManager {
           this.multiplayerGameplayManager = new MultiplayerGameplayManager(
             this.replicationClient,
             this.scene,
-            this.physicsWorld
+            this.physicsWorld,
+            undefined,
+            {
+              intentSigningKey: jwtToken,
+              intentKeyId: 'player-runtime',
+            }
           );
           
           // Subscribe to MultiplayerGameplayManager errors
@@ -577,7 +594,17 @@ export class PlayerModeManager {
       if (manifest.simulation.enableMultiplayer && this.multiplayerGameplayManager && this.playerEntity) {
         // Use buildId as sessionId for game sessions
         const sessionId = this.buildId ?? 'default-session';
-        await this.multiplayerGameplayManager.startSession(sessionId, this.playerEntity);
+        
+        // Pass gameplay settings
+        const gameplayConfig = manifest.gameplay;
+        const maxPlayers = typeof gameplayConfig?.maxPlayers === 'number' ? gameplayConfig.maxPlayers : undefined;
+        const allowJoinInProgress = gameplayConfig?.allowJoinInProgress;
+
+        await this.multiplayerGameplayManager.startSession(
+          sessionId, 
+          this.playerEntity, 
+          { maxPlayers, allowJoinInProgress }
+        );
       }
       
       // Fetch and apply user avatar loadout
@@ -646,6 +673,20 @@ export class PlayerModeManager {
     
     // Update FPS camera
     this.fpsCamera.update();
+    
+    // Update checkpoint system
+    const playerPos = this.getPlayerPosition();
+    if (playerPos) {
+      this.checkpointSystem.update(playerPos);
+    }
+
+    // Check for death/respawn
+    if (this.playerEntity) {
+      const health = this.playerEntity.getComponent(HealthComponent);
+      if (health && health.currentHealth <= 0) {
+        this.handlePlayerDeath();
+      }
+    }
     
     // Update avatar visuals and animation
     this.updateAvatar(deltaTime);
@@ -841,6 +882,36 @@ export class PlayerModeManager {
     Logger.info(`Player spawned at position: ${position[0]}, ${position[1]}, ${position[2]}`);
   }
   
+  private handlePlayerDeath(): void {
+    const respawnEnabled = this.manifest?.gameplay?.respawnEnabled ?? true;
+    
+    if (respawnEnabled) {
+      this.respawnPlayer();
+    }
+  }
+
+  private respawnPlayer(): void {
+    if (!this.playerEntity) return;
+
+    // Get spawn point
+    const defaultSpawn = {
+      position: this.manifest?.playerStart.position ?? [0, 2, 0],
+      rotation: this.manifest?.playerStart.rotation ?? 0,
+    };
+    
+    const respawnManager = new RespawnManager({
+      defaultSpawn,
+      checkpointSystem: this.checkpointSystem,
+    });
+    
+    const result = respawnManager.respawn(this.playerEntity);
+    
+    // Reset rotation (camera)
+    this.fpsCamera.setYawPitch(result.rotation, 0);
+    
+    Logger.info('Player respawned');
+  }
+
   private attachAvatarToPlayer(): void {
     if (!this.playerEntity) return;
     

@@ -6,6 +6,7 @@ import wasm from 'vite-plugin-wasm';
 import { engineAliases } from './shared/config/aliases';
 
 const __dirname = resolve(fileURLToPath(import.meta.url), '..');
+const sharedRoot = resolve(__dirname, 'shared');
 
 function getSuggestedThreadCount() {
   if (typeof (os as any).availableParallelism === 'function') {
@@ -19,6 +20,13 @@ const cpuCount = getSuggestedThreadCount();
 
 export default defineWorkspace([
   {
+    resolve: {
+      alias: {
+        ...engineAliases(__dirname),
+        '@shared': sharedRoot,
+        '@shared/types': resolve(sharedRoot, 'types'),
+      },
+    },
     test: {
       name: 'unit',
       setupFiles: [
@@ -53,11 +61,6 @@ export default defineWorkspace([
         exclude: [],
       },
       resolve: {
-        alias: {
-          ...engineAliases(__dirname),
-          '@shared': resolve(__dirname, 'shared'),
-          '@shared/*': resolve(__dirname, 'shared/*'),
-        },
         conditions: ['development', 'test', 'import', 'module'],
         dedupe: ['@engine/core', '@engine/world', '@engine/animation', '@engine/avatar', '@engine/camera'],
         preserveSymlinks: false,
@@ -332,4 +335,3 @@ export default defineWorkspace([
     },
   },
 ]);
-

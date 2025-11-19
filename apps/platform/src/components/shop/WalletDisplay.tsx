@@ -29,6 +29,7 @@ export function WalletDisplay({ balances, loading }: WalletDisplayProps) {
     currency,
     balance: balanceMap.get(currency) ?? 0,
   }));
+  const formatBalance = (value: number) => new Intl.NumberFormat('pl-PL', { maximumFractionDigits: 0 }).format(value);
 
   if (loading) {
     return (
@@ -41,11 +42,13 @@ export function WalletDisplay({ balances, loading }: WalletDisplayProps) {
   return (
     <Card className="wallet-display">
       <h3>Wallet</h3>
+      <p className="wallet-subtitle">Live wallet balances synced from the server.</p>
       <div className="wallet-balances">
         {displayBalances.map((balance) => (
           <div key={balance.currency} className="wallet-balance">
+            <span className="wallet-currency-label">{balance.currency}</span>
             <span className="wallet-currency-amount">
-              {balance.currency}{balance.balance}
+              {formatBalance(balance.balance)}
             </span>
           </div>
         ))}

@@ -1,3 +1,5 @@
+import { createPostProcessPipeline } from './PostProcessUtils';
+
 /**
  * Outline Post-Processing Pass
  * 
@@ -109,21 +111,6 @@ export class OutlinePass {
     const edgeDetectShader = this.device.createShaderModule({
       label: 'outline-edge-detect-shader',
       code: /* wgsl */ `
-        struct VSOut {
-          @builtin(position) pos: vec4<f32>,
-          @location(0) uv: vec2<f32>,
-        }
-
-        @vertex
-        fn vs(@builtin(vertex_index) vid: u32) -> VSOut {
-          var o: VSOut;
-          let x = f32((vid << 1u) & 2u);
-          let y = f32(vid & 2u);
-          o.pos = vec4<f32>(x * 2.0 - 1.0, y * -2.0 + 1.0, 0.0, 1.0);
-          o.uv = vec2<f32>(x, y);
-          return o;
-        }
-
         @group(0) @binding(0) var normalTex: texture_2d<f32>;
         @group(0) @binding(1) var depthTex: texture_depth_2d;
         @group(0) @binding(2) var smp: sampler;
@@ -136,24 +123,24 @@ export class OutlinePass {
 
         // Sample depth and normal, detect edges
         @fragment
-        fn fs(input: VSOut) -> @location(0) vec4<f32> {
+        fn fs(@builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
           let texSize = vec2<f32>(textureDimensions(normalTex, 0));
           let texelSize = 1.0 / texSize;
           
           // Sample center
-          let centerDepth = textureSample(depthTex, smp, input.uv).r;
-          let centerNormal = textureSample(normalTex, smp, input.uv).rgb;
+          let centerDepth = textureSample(depthTex, smp, uv).r;
+          let centerNormal = textureSample(normalTex, smp, uv).rgb;
           
           // Sample neighbors
-          let depthN = textureSample(depthTex, smp, input.uv + vec2<f32>(0.0, texelSize.y)).r;
-          let depthS = textureSample(depthTex, smp, input.uv - vec2<f32>(0.0, texelSize.y)).r;
-          let depthE = textureSample(depthTex, smp, input.uv + vec2<f32>(texelSize.x, 0.0)).r;
-          let depthW = textureSample(depthTex, smp, input.uv - vec2<f32>(texelSize.x, 0.0)).r;
+          let depthN = textureSample(depthTex, smp, uv + vec2<f32>(0.0, texelSize.y)).r;
+          let depthS = textureSample(depthTex, smp, uv - vec2<f32>(0.0, texelSize.y)).r;
+          let depthE = textureSample(depthTex, smp, uv + vec2<f32>(texelSize.x, 0.0)).r;
+          let depthW = textureSample(depthTex, smp, uv - vec2<f32>(texelSize.x, 0.0)).r;
           
-          let normalN = textureSample(normalTex, smp, input.uv + vec2<f32>(0.0, texelSize.y)).rgb;
-          let normalS = textureSample(normalTex, smp, input.uv - vec2<f32>(0.0, texelSize.y)).rgb;
-          let normalE = textureSample(normalTex, smp, input.uv + vec2<f32>(texelSize.x, 0.0)).rgb;
-          let normalW = textureSample(normalTex, smp, input.uv - vec2<f32>(texelSize.x, 0.0)).rgb;
+          let normalN = textureSample(normalTex, smp, uv + vec2<f32>(0.0, texelSize.y)).rgb;
+          let normalS = textureSample(normalTex, smp, uv - vec2<f32>(0.0, texelSize.y)).rgb;
+          let normalE = textureSample(normalTex, smp, uv + vec2<f32>(texelSize.x, 0.0)).rgb;
+          let normalW = textureSample(normalTex, smp, uv - vec2<f32>(texelSize.x, 0.0)).rgb;
           
           // Depth-based edge detection
           let depthDiff = abs(depthN - centerDepth) + abs(depthS - centerDepth) + 
@@ -180,21 +167,6 @@ export class OutlinePass {
     const compositeShader = this.device.createShaderModule({
       label: 'outline-composite-shader',
       code: /* wgsl */ `
-        struct VSOut {
-          @builtin(position) pos: vec4<f32>,
-          @location(0) uv: vec2<f32>,
-        }
-
-        @vertex
-        fn vs(@builtin(vertex_index) vid: u32) -> VSOut {
-          var o: VSOut;
-          let x = f32((vid << 1u) & 2u);
-          let y = f32(vid & 2u);
-          o.pos = vec4<f32>(x * 2.0 - 1.0, y * -2.0 + 1.0, 0.0, 1.0);
-          o.uv = vec2<f32>(x, y);
-          return o;
-        }
-
         @group(0) @binding(0) var sceneTex: texture_2d<f32>;
         @group(0) @binding(1) var edgeTex: texture_2d<f32>;
         @group(0) @binding(2) var smp: sampler;
@@ -206,9 +178,9 @@ export class OutlinePass {
         }
 
         @fragment
-        fn fs(input: VSOut) -> @location(0) vec4<f32> {
-          let scene = textureSample(sceneTex, smp, input.uv).rgb;
-          let edge = textureSample(edgeTex, smp, input.uv).a;
+        fn fs(@builtin(position) pos: vec4<f32>, @location(0) uv: vec2<f32>) -> @location(0) vec4<f32> {
+          let scene = textureSample(sceneTex, smp, uv).rgb;
+          let edge = textureSample(edgeTex, smp, uv).a;
           
           // Composite: overlay edge on scene
           let outlineColor = mix(scene, config.color, edge);
@@ -219,39 +191,23 @@ export class OutlinePass {
     });
 
     // Create pipelines
-    const edgeDetectPipelineLayout = this.device.createPipelineLayout({
-      label: 'outline-edge-detect-pl',
-      bindGroupLayouts: [this.edgeDetectLayout],
-    });
+    this.edgeDetectPipeline = createPostProcessPipeline(
+      this.device,
+      'outline-edge-detect-pipeline',
+      [this.edgeDetectLayout],
+      edgeDetectShader,
+      'fs',
+      [{ format: 'rgba16float' }]
+    );
 
-    this.edgeDetectPipeline = this.device.createRenderPipeline({
-      label: 'outline-edge-detect-pipeline',
-      layout: edgeDetectPipelineLayout,
-      vertex: { module: edgeDetectShader, entryPoint: 'vs' },
-      fragment: {
-        module: edgeDetectShader,
-        entryPoint: 'fs',
-        targets: [{ format: 'rgba16float' }],
-      },
-      primitive: { topology: 'triangle-list' },
-    });
-
-    const compositePipelineLayout = this.device.createPipelineLayout({
-      label: 'outline-composite-pl',
-      bindGroupLayouts: [this.compositeLayout],
-    });
-
-    this.compositePipeline = this.device.createRenderPipeline({
-      label: 'outline-composite-pipeline',
-      layout: compositePipelineLayout,
-      vertex: { module: compositeShader, entryPoint: 'vs' },
-      fragment: {
-        module: compositeShader,
-        entryPoint: 'fs',
-        targets: [{ format: 'bgra8unorm' }],
-      },
-      primitive: { topology: 'triangle-list' },
-    });
+    this.compositePipeline = createPostProcessPipeline(
+      this.device,
+      'outline-composite-pipeline',
+      [this.compositeLayout],
+      compositeShader,
+      'fs',
+      [{ format: 'bgra8unorm' }]
+    );
   }
 
   /**

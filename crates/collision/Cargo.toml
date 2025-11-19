@@ -16,6 +16,7 @@ criterion = "0.5"
 
 [features]
 default = []
+simd = []
 panic-hook = ["console_error_panic_hook"]
 
 [profile.release]

@@ -1,11 +1,28 @@
 import { type TemplateMetadata } from '@engine/world-templates';
 import { createIcon } from '../utils/icons';
+import {
+  createDefaultGameProjectConfig,
+  type GameGenre,
+  type GameVisibility,
+} from '@shared/types/project';
 
 export interface NewProjectConfig {
   name: string;
   description?: string;
   template?: TemplateMetadata | null;
   saveImmediately: boolean;
+  configOverrides?: NewProjectConfigOverrides;
+}
+
+export interface NewProjectConfigOverrides {
+  visibility?: GameVisibility;
+  genre?: GameGenre;
+  maxPlayers?: number;
+  allowJoinInProgress?: boolean;
+  respawnEnabled?: boolean;
+  spawnPosition?: [number, number, number];
+  spawnYaw?: number;
+  cameraFov?: number;
 }
 
 export interface NewProjectDialogResult {
@@ -15,6 +32,7 @@ export interface NewProjectDialogResult {
 export interface NewProjectDialogOptions {
   defaultName?: string;
   defaultSaveImmediately?: boolean;
+  defaultDescription?: string;
 }
 
 export class NewProjectDialog {
@@ -29,7 +47,24 @@ export class NewProjectDialog {
       return Promise.resolve(null);
     }
 
-    const { defaultName = 'My Project', defaultSaveImmediately = false } = options;
+    const { defaultName = 'My Project', defaultSaveImmediately = false, defaultDescription } = options;
+    const defaultConfig = createDefaultGameProjectConfig(defaultName, defaultDescription);
+    const clampNumber = (value: number, min?: number, max?: number): number => {
+      let v = value;
+      if (min !== undefined) v = Math.max(min, v);
+      if (max !== undefined) v = Math.min(max, v);
+      return v;
+    };
+    const parseNumber = (value: string, fallback: number, min?: number, max?: number): number => {
+      const num = Number(value);
+      if (!Number.isFinite(num)) return fallback;
+      return clampNumber(num, min, max);
+    };
+    const parseInteger = (value: string, fallback: number, min?: number, max?: number): number => {
+      const num = Number.parseInt(value, 10);
+      if (!Number.isFinite(num)) return fallback;
+      return clampNumber(num, min, max);
+    };
 
     return new Promise<NewProjectDialogResult | null>((resolve) => {
       this.resolver = resolve;
@@ -94,6 +129,9 @@ export class NewProjectDialog {
       descInput.className = 'form-textarea';
       descInput.placeholder = 'Brief description of your project...';
       descInput.rows = 2;
+      if (defaultDescription) {
+        descInput.value = defaultDescription;
+      }
       descGroup.appendChild(descLabel);
       descGroup.appendChild(descInput);
       form.appendChild(descGroup);
@@ -149,6 +187,194 @@ export class NewProjectDialog {
       templateSection.appendChild(templateContainer);
       form.appendChild(templateSection);
 
+      // Gameplay configuration
+      const configSection = document.createElement('div');
+      configSection.className = 'new-project-config-section';
+      Object.assign(configSection.style, {
+        marginTop: '1rem',
+        padding: '1rem',
+        border: '1px solid rgba(255, 255, 255, 0.08)',
+        borderRadius: '12px',
+        background: 'rgba(255, 255, 255, 0.03)',
+      });
+
+      const configHeading = document.createElement('h3');
+      configHeading.className = 'new-project-config-title';
+      configHeading.textContent = 'Game Configuration';
+      Object.assign(configHeading.style, {
+        margin: '0 0 0.75rem 0',
+        fontSize: '1rem',
+        fontWeight: '600',
+      });
+      configSection.appendChild(configHeading);
+
+      const configGrid = document.createElement('div');
+      configGrid.className = 'new-project-config-grid';
+      Object.assign(configGrid.style, {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))',
+        gap: '0.75rem',
+      });
+
+      // Visibility
+      const visibilityGroup = document.createElement('div');
+      visibilityGroup.className = 'form-group';
+      const visibilityLabel = document.createElement('label');
+      visibilityLabel.textContent = 'Visibility';
+      visibilityLabel.className = 'form-label';
+      const visibilitySelect = document.createElement('select');
+      visibilitySelect.className = 'form-select';
+      const visOptions: GameVisibility[] = ['private', 'unlisted', 'public'];
+      for (const option of visOptions) {
+        const opt = document.createElement('option');
+        opt.value = option;
+        opt.textContent = option.charAt(0).toUpperCase() + option.slice(1);
+        if (option === defaultConfig.info.visibility) opt.selected = true;
+        visibilitySelect.appendChild(opt);
+      }
+      visibilityGroup.appendChild(visibilityLabel);
+      visibilityGroup.appendChild(visibilitySelect);
+      configGrid.appendChild(visibilityGroup);
+
+      // Genre
+      const genreGroup = document.createElement('div');
+      genreGroup.className = 'form-group';
+      const genreLabel = document.createElement('label');
+      genreLabel.textContent = 'Genre';
+      genreLabel.className = 'form-label';
+      const genreSelect = document.createElement('select');
+      genreSelect.className = 'form-select';
+      const genreOptions: GameGenre[] = ['sandbox', 'pvp', 'co-op', 'adventure'];
+      for (const option of genreOptions) {
+        const opt = document.createElement('option');
+        opt.value = option;
+        opt.textContent = option.toUpperCase();
+        if (option === defaultConfig.info.genre) opt.selected = true;
+        genreSelect.appendChild(opt);
+      }
+      genreGroup.appendChild(genreLabel);
+      genreGroup.appendChild(genreSelect);
+      configGrid.appendChild(genreGroup);
+
+      // Max players
+      const maxPlayersGroup = document.createElement('div');
+      maxPlayersGroup.className = 'form-group';
+      const maxPlayersLabel = document.createElement('label');
+      maxPlayersLabel.textContent = 'Max players';
+      maxPlayersLabel.className = 'form-label';
+      const maxPlayersInput = document.createElement('input');
+      maxPlayersInput.type = 'number';
+      maxPlayersInput.min = '1';
+      maxPlayersInput.max = '64';
+      maxPlayersInput.value = String(defaultConfig.gameplay.maxPlayers);
+      maxPlayersInput.className = 'form-input';
+      maxPlayersGroup.appendChild(maxPlayersLabel);
+      maxPlayersGroup.appendChild(maxPlayersInput);
+      configGrid.appendChild(maxPlayersGroup);
+
+      // Allow join in progress
+      const joinGroup = document.createElement('div');
+      joinGroup.className = 'form-group form-group-checkbox';
+      const joinCheckbox = document.createElement('input');
+      joinCheckbox.type = 'checkbox';
+      joinCheckbox.id = 'allow-join-progress';
+      joinCheckbox.className = 'form-checkbox';
+      joinCheckbox.checked = defaultConfig.gameplay.allowJoinInProgress;
+      const joinLabel = document.createElement('label');
+      joinLabel.setAttribute('for', 'allow-join-progress');
+      joinLabel.className = 'form-label form-label-checkbox';
+      joinLabel.textContent = 'Allow join in progress';
+      joinGroup.appendChild(joinCheckbox);
+      joinGroup.appendChild(joinLabel);
+      configGrid.appendChild(joinGroup);
+
+      // Respawn toggle
+      const respawnGroup = document.createElement('div');
+      respawnGroup.className = 'form-group form-group-checkbox';
+      const respawnCheckbox = document.createElement('input');
+      respawnCheckbox.type = 'checkbox';
+      respawnCheckbox.id = 'respawn-enabled';
+      respawnCheckbox.className = 'form-checkbox';
+      respawnCheckbox.checked = defaultConfig.gameplay.respawnEnabled;
+      const respawnLabel = document.createElement('label');
+      respawnLabel.setAttribute('for', 'respawn-enabled');
+      respawnLabel.className = 'form-label form-label-checkbox';
+      respawnLabel.textContent = 'Enable respawn';
+      respawnGroup.appendChild(respawnCheckbox);
+      respawnGroup.appendChild(respawnLabel);
+      configGrid.appendChild(respawnGroup);
+
+      // Camera FOV
+      const fovGroup = document.createElement('div');
+      fovGroup.className = 'form-group';
+      const fovLabel = document.createElement('label');
+      fovLabel.textContent = 'Camera FOV';
+      fovLabel.className = 'form-label';
+      const fovInput = document.createElement('input');
+      fovInput.type = 'number';
+      fovInput.min = '40';
+      fovInput.max = '120';
+      fovInput.step = '1';
+      fovInput.value = String(defaultConfig.camera.fov);
+      fovInput.className = 'form-input';
+      fovGroup.appendChild(fovLabel);
+      fovGroup.appendChild(fovInput);
+      configGrid.appendChild(fovGroup);
+
+      // Spawn position
+      const spawnGroup = document.createElement('div');
+      spawnGroup.className = 'form-group';
+      const spawnLabel = document.createElement('label');
+      spawnLabel.textContent = 'Spawn position (X, Y, Z)';
+      spawnLabel.className = 'form-label';
+      const spawnInputsWrapper = document.createElement('div');
+      spawnInputsWrapper.className = 'spawn-inputs';
+      Object.assign(spawnInputsWrapper.style, {
+        display: 'grid',
+        gridTemplateColumns: 'repeat(3, minmax(0, 1fr))',
+        gap: '0.5rem',
+      });
+      const [x, y, z] = defaultConfig.world.spawn.position;
+      const spawnXInput = document.createElement('input');
+      spawnXInput.type = 'number';
+      spawnXInput.step = '0.1';
+      spawnXInput.value = String(x);
+      spawnXInput.className = 'form-input';
+      const spawnYInput = document.createElement('input');
+      spawnYInput.type = 'number';
+      spawnYInput.step = '0.1';
+      spawnYInput.value = String(y);
+      spawnYInput.className = 'form-input';
+      const spawnZInput = document.createElement('input');
+      spawnZInput.type = 'number';
+      spawnZInput.step = '0.1';
+      spawnZInput.value = String(z);
+      spawnZInput.className = 'form-input';
+      spawnInputsWrapper.appendChild(spawnXInput);
+      spawnInputsWrapper.appendChild(spawnYInput);
+      spawnInputsWrapper.appendChild(spawnZInput);
+      spawnGroup.appendChild(spawnLabel);
+      spawnGroup.appendChild(spawnInputsWrapper);
+      configGrid.appendChild(spawnGroup);
+
+      // Spawn yaw
+      const yawGroup = document.createElement('div');
+      yawGroup.className = 'form-group';
+      const yawLabel = document.createElement('label');
+      yawLabel.textContent = 'Spawn yaw (deg)';
+      yawLabel.className = 'form-label';
+      const yawInput = document.createElement('input');
+      yawInput.type = 'number';
+      yawInput.step = '1';
+      yawInput.value = '0';
+      yawInput.className = 'form-input';
+      yawGroup.appendChild(yawLabel);
+      yawGroup.appendChild(yawInput);
+      configGrid.appendChild(yawGroup);
+
+      configSection.appendChild(configGrid);
+      form.appendChild(configSection);
+
       // Save immediately option
       const saveGroup = document.createElement('div');
       saveGroup.className = 'form-group form-group-checkbox';
@@ -189,7 +415,25 @@ export class NewProjectDialog {
       
       form.addEventListener('submit', (e) => {
         e.preventDefault();
-        this.submit(nameInput.value.trim(), descInput.value.trim(), saveCheckbox.checked);
+        this.submit(
+          nameInput.value.trim(),
+          descInput.value.trim(),
+          saveCheckbox.checked,
+          {
+            visibility: visibilitySelect.value as GameVisibility,
+            genre: genreSelect.value as GameGenre,
+            maxPlayers: parseInteger(maxPlayersInput.value, defaultConfig.gameplay.maxPlayers, 1, 64),
+            allowJoinInProgress: joinCheckbox.checked,
+            respawnEnabled: respawnCheckbox.checked,
+            spawnPosition: [
+              parseNumber(spawnXInput.value, defaultConfig.world.spawn.position[0]),
+              parseNumber(spawnYInput.value, defaultConfig.world.spawn.position[1]),
+              parseNumber(spawnZInput.value, defaultConfig.world.spawn.position[2]),
+            ],
+            spawnYaw: parseNumber(yawInput.value, 0),
+            cameraFov: parseNumber(fovInput.value, defaultConfig.camera.fov, 40, 120),
+          }
+        );
       });
 
       footer.appendChild(cancelBtn);
@@ -278,7 +522,12 @@ export class NewProjectDialog {
     }
   }
 
-  private submit(name: string, description: string, saveImmediately: boolean): void {
+  private submit(
+    name: string,
+    description: string,
+    saveImmediately: boolean,
+    overrides: NewProjectConfigOverrides
+  ): void {
     if (!name.trim()) {
       return;
     }
@@ -289,6 +538,7 @@ export class NewProjectDialog {
       ...(trimmedDescription ? { description: trimmedDescription } : {}),
       template: this.templateSelected,
       saveImmediately,
+      configOverrides: overrides,
     };
 
     this.close({ config });

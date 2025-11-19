@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { InputReplicator } from '../src/multiplayer/InputReplicator';
 import { ReplicationClient } from '../src/ReplicationClient';
 import type { CharacterInput } from '@engine/world';
+import { InputChannel, HmacIntentAuthenticator } from '@engine/world/net/InputChannel';
 import type { InputMessage } from '../src/types/replication';
 
 /**
@@ -343,6 +344,37 @@ describe('InputReplicator', () => {
 
       expect(inputReplicator.getCurrentSequence()).toBe(0);
       expect(sequenceBefore).toBeGreaterThan(0);
+    });
+  });
+
+  describe('intent channel integration', () => {
+    it('embeds signature metadata when intent channel is enabled', () => {
+      const authenticator = new HmacIntentAuthenticator({ secret: 'integration-secret', keyId: 'integration' });
+      let now = 1000;
+      const intentChannel = new InputChannel({
+        actorId: 'player-intent',
+        authenticator,
+        clock: () => now,
+      });
+      inputReplicator = new InputReplicator({
+        replicationClient: mockReplicationClient,
+        intentChannel,
+      });
+
+      const input: CharacterInput = {
+        moveDirection: [0, 0, 1],
+        jump: false,
+        sprint: true,
+      };
+
+      inputReplicator.recordInput(input);
+      const sentMessage = sentInputs[0];
+      expect(sentMessage?.actorId).toBe('player-intent');
+      expect(sentMessage?.intentSignature).toEqual(expect.any(String));
+      expect(sentMessage?.intentDeltaMs).toBe(0);
+      now += 20;
+      inputReplicator.recordInput(input);
+      expect(sentInputs[1]?.intentDeltaMs).toBeGreaterThan(0);
     });
   });
 });

@@ -77,7 +77,7 @@ export interface FrameRenderContext {
   geometry: GeometryData;
   environmentRenderer: EnvironmentRenderer | null;
   waterRenderer: WaterRenderer | null;
-  gridRenderer: { render?: (p: GPURenderPassEncoder, vp: Mat4) => void } | null;
+  gridRenderer: { render?: (p: GPURenderPassEncoder, vp: Mat4, eye?: Vec3 | number[]) => void } | null;
   logicConnectionRenderer: LogicConnectionRenderer | null;
   onGpuTimings?: (timings: { label: string; timeMs: number }[]) => void;
   onCpuTimings?: (timings: {
@@ -265,7 +265,7 @@ export class FrameRenderer {
 
     this.runShadowPass(ctx, featureFlags, encoder, frameResources, geometry, viewMatrix, projectionMatrix);
 
-    this.runForwardPlus(ctx, featureFlags, encoder, viewProjectionMatrix, viewMatrix, eyePosition);
+    this.runForwardPlus(ctx, featureFlags, encoder, projectionMatrix, viewMatrix, eyePosition);
     const usedGpuInstancePipeline = this.runComputePrepass(
       ctx,
       featureFlags,
@@ -297,7 +297,7 @@ export class FrameRenderer {
       entities: this.customGeometryEntitiesCache,
     });
     this.renderWater(ctx, renderPass, viewProjectionMatrix, eyePosition);
-    this.renderGrid(ctx, renderPass, viewProjectionMatrix);
+    this.renderGrid(ctx, renderPass, viewProjectionMatrix, eyePosition);
     this.renderLogicConnections(ctx, renderPass, viewProjectionMatrix, eyePosition);
 
     renderPass.end();
@@ -910,11 +910,11 @@ export class FrameRenderer {
     ctx: FrameRenderContext,
     featureFlags: ResolvedFeatureFlags,
     encoder: GPUCommandEncoder,
-    viewProjectionMatrix: Mat4,
+    projectionMatrix: Mat4 | undefined,
     viewMatrix: Mat4 | undefined,
     eyePosition: Vec3
   ): void {
-    if (!featureFlags.enableForwardPlus || !ctx.lightingData || !viewMatrix) {
+    if (!featureFlags.enableForwardPlus || !ctx.lightingData || !viewMatrix || !projectionMatrix) {
       return;
     }
     try {
@@ -939,7 +939,7 @@ export class FrameRenderer {
         this.forwardPlus.updateLights(pointLights);
         this.forwardPlus.cullLights(
           encoder,
-          viewProjectionMatrix,
+          projectionMatrix,
           viewMatrix,
           eyePosition,
           ctx.canvas.width,
@@ -1028,7 +1028,13 @@ export class FrameRenderer {
     const opaqueCount = Math.min(Math.max(geometry.opaqueCount ?? totalInstances, 0), totalInstances);
     const transparentCount = Math.max(totalInstances - opaqueCount, 0);
     const args = buildIndirectDrawArgs(geometry.indices.length, opaqueCount, transparentCount);
-    device.queue.writeBuffer(frameResources.instanceIndirectArgsBuffer, 0, args);
+    device.queue.writeBuffer(
+      frameResources.instanceIndirectArgsBuffer,
+      0,
+      args.buffer as ArrayBuffer,
+      args.byteOffset,
+      args.byteLength
+    );
   }
 
   private beginMainPass(
@@ -1204,14 +1210,15 @@ export class FrameRenderer {
   private renderGrid(
     ctx: FrameRenderContext,
     passEncoder: GPURenderPassEncoder,
-    viewProjectionMatrix: Mat4
+    viewProjectionMatrix: Mat4,
+    eyePosition?: Vec3
   ): void {
     const { gridRenderer } = ctx;
     if (!gridRenderer?.render) {
       return;
     }
     try {
-      gridRenderer.render(passEncoder, viewProjectionMatrix);
+      gridRenderer.render(passEncoder, viewProjectionMatrix, eyePosition);
     } catch (err) {
       this.errorMetrics.gridRenderErrors++;
       this.errorMetrics.lastErrorTime = performance.now();

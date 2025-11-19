@@ -18,7 +18,7 @@ import type { EditorState } from '../core/state';
 import { Logger } from '../../utils/logger';
 import { Entity } from '@engine/world';
 import type { Vec3, Mat4 } from '@engine/core/math';
-import { mat4Invert, mat4GetTranslationOut, mat4GetRotationOut } from '@engine/core/math';
+import { mat4Invert, mat4GetTranslationOut, mat4GetRotationOut, transformVec3ByQuatOut } from '@engine/core/math';
 import type { PhysicsWorld } from '@engine/world';
 import { CharacterController, CharacterState } from '@engine/world/components/CharacterController';
 import { PhysicsComponent, RigidbodyType } from '@engine/world/components/PhysicsComponent';
@@ -30,15 +30,7 @@ import type { FPSCamera } from '@engine/camera';
 // Note: FPSCamera and ThirdPersonCamera are not used in editor, only in play mode
 import type { CharacterControllerSystem, GroundDetectionSystem } from '@engine/stdlib/CharacterController';
 import type { CharacterInputHandler } from '@engine/input';
-import {
-  AvatarInstance,
-  DEFAULT_AVATAR_LOADOUT,
-  type AvatarLoadout,
-  IDLE_ANIMATION,
-  RUN_ANIMATION,
-  WALK_ANIMATION,
-  JUMP_ANIMATION,
-} from '@engine/avatar';
+import { PlayModeAvatarManager } from './PlayModeAvatarManager';
 import { PlayModeStateMachine, PlayModeStateType } from '../core/PlayModeStateMachine';
 import { WorldManager } from '../core/WorldManager';
 import { InputContextManager, EditorInputContext } from '@engine/input';
@@ -50,12 +42,12 @@ import { PlayingState } from '../states/PlayingState';
 import { PausedState } from '../states/PausedState';
 import { ReturnState } from '../states/ReturnState';
 import { computeEntityPath, resolveEntityByPath } from '@engine/editor-utils';
-import { DefaultControllerFactory, PlayerSession } from '@engine/stdlib/CharacterController';
+import { DefaultControllerFactory, PlayerSession, LocalPlayerController } from '@engine/stdlib/CharacterController';
 import type { PlayManifest } from '../core/PlayManifest';
 import { LoadingOverlay } from '../ui/LoadingOverlay';
 import { CancellationToken } from '../core/cancellation/CancellationToken';
 import type { LoadingStepsRegistry } from '../core/LoadingStepsRegistry';
-import { CheckpointSystem } from '../systems/CheckpointSystem';
+import { CheckpointSystem, RespawnManager } from '@engine/world';
 import type { BlockBehaviorSystem } from '@engine/world/systems';
 
 export interface EditorModeManagerConfig {
@@ -97,9 +89,7 @@ export class EditorModeManager {
   private playerEntity: Entity | null = null;
   private playerScene: Scene | null = null;
   private playerSession: PlayerSession | null = null;
-  private avatarInstance: AvatarInstance | null = null;
-  private avatarVisualRoot: Entity | null = null;
-  private lastPlayedAnim: 'idle' | 'walk' | 'run' | 'jump' | null = null;
+  private avatarManager: PlayModeAvatarManager;
   
   // Temporary camera entity for edit mode (bridges CameraDirector to renderer)
   private editorCameraEntity: Entity | null = null;
@@ -129,6 +119,9 @@ export class EditorModeManager {
   private readonly _cameraWorldScratch: Mat4 = new Float32Array(16) as Mat4;
   private readonly _cameraPosScratch: Vec3 = [0, 0, 0] as Vec3;
   private readonly _cameraRotScratch: [number, number, number, number] = [0, 0, 0, 1];
+  private readonly _forwardScratch: Vec3 = [0, 0, 0] as Vec3;
+  private readonly _rightScratch: Vec3 = [0, 0, 0] as Vec3;
+  private readonly _rotateScratch: Vec3 = [0, 0, 0] as Vec3;
 
   // Follow camera (collaboration): userId being followed (remote cursor)
   private followingUserId: string | null = null;
@@ -160,6 +153,8 @@ export class EditorModeManager {
     this.inputContext = new InputContextManager(config.canvas);
     this.checkpointSystem = new CheckpointSystem();
     this.checkpointSystem.initialize(config.scene);
+    
+    this.avatarManager = new PlayModeAvatarManager();
     
     // Initialize state machine
     this.stateMachine = new PlayModeStateMachine();
@@ -649,16 +644,24 @@ export class EditorModeManager {
 
   private getMutableCameraForward(): Vec3 {
     const forward = this.getFPSCamera()?.getForwardDirection();
-    return forward ? this.cloneVec3(forward) : [0, 0, -1];
+    if (forward) {
+      this._forwardScratch[0] = forward[0];
+      this._forwardScratch[1] = forward[1];
+      this._forwardScratch[2] = forward[2];
+      return this._forwardScratch;
+    }
+    return [0, 0, -1];
   }
 
   private getMutableCameraRight(): Vec3 {
     const right = this.getFPSCamera()?.getRightDirection();
-    return right ? this.cloneVec3(right) : [1, 0, 0];
-  }
-
-  private cloneVec3(vec: Readonly<Vec3>): Vec3 {
-    return [vec[0], vec[1], vec[2]] as Vec3;
+    if (right) {
+      this._rightScratch[0] = right[0];
+      this._rightScratch[1] = right[1];
+      this._rightScratch[2] = right[2];
+      return this._rightScratch;
+    }
+    return [1, 0, 0];
   }
 
   private setScriptSystemEnabled(enabled: boolean): void {
@@ -791,7 +794,9 @@ export class EditorModeManager {
     }
 
     // Update avatar visuals and animation
-    this.updateAvatar(deltaTime);
+    if (this.playerEntity) {
+      this.avatarManager.update(deltaTime, this.playerEntity);
+    }
   }
 
   dispose(): void {
@@ -834,17 +839,7 @@ export class EditorModeManager {
   }
 
   private rotateVectorByQuat(v: [number, number, number], q: [number, number, number, number]): [number, number, number] {
-    const [x, y, z] = v;
-    const [qx, qy, qz, qw] = q;
-    // t = 2 * cross(q.xyz, v)
-    const tx = 2 * (qy * z - qz * y);
-    const ty = 2 * (qz * x - qx * z);
-    const tz = 2 * (qx * y - qy * x);
-    // v' = v + qw * t + cross(q.xyz, t)
-    const vx = x + qw * tx + (qy * tz - qz * ty);
-    const vy = y + qw * ty + (qz * tx - qx * tz);
-    const vz = z + qw * tz + (qx * ty - qy * tx);
-    return [vx, vy, vz];
+    return transformVec3ByQuatOut(this._rotateScratch, v as Vec3, q as any);
   }
 
   private configureController(manifest: PlayManifest): void {
@@ -893,36 +888,24 @@ export class EditorModeManager {
       rotation: contextManifest?.playerStart.rotation ?? 0,
     };
 
-    // Get respawn data from checkpoint system (falls back to default if no checkpoint)
-    const respawnData = this.checkpointSystem.getRespawnData(defaultSpawn);
+    const respawnManager = new RespawnManager({
+      defaultSpawn,
+      checkpointSystem: this.checkpointSystem,
+    });
 
-    // Update player position and rotation
-    player.transform.position = respawnData.position;
-    player.transform.setEulerAngles(0, respawnData.rotation, 0);
-
-    // Reset physics (velocity, etc.)
-    const physics = player.getComponent(PhysicsComponent);
-    if (physics && this.physicsWorld) {
-      // Reset velocity
-      physics.velocity[0] = 0;
-      physics.velocity[1] = 0;
-      physics.velocity[2] = 0;
-      physics.angularVelocity[0] = 0;
-      physics.angularVelocity[1] = 0;
-      physics.angularVelocity[2] = 0;
-    }
+    const result = respawnManager.respawn(player);
 
     // Update camera to player position
     const forward = player.transform.getForward();
-    this.cameraDirector.setPlayerPose(respawnData.position, forward);
+    this.cameraDirector.setPlayerPose(result.position, forward);
 
     // Reset FPS camera yaw/pitch
     const fpsCamera = this.getFPSCamera();
     if (fpsCamera) {
-      fpsCamera.setYawPitch(respawnData.rotation, 0);
+      fpsCamera.setYawPitch(result.rotation, 0);
     }
 
-    Logger.debug('[EditorModeManager] Player respawned at checkpoint/default spawn:', respawnData.position);
+    Logger.debug('[EditorModeManager] Player respawned at checkpoint/default spawn:', result.position);
   }
 
   private async spawnPlayer(position: Vec3, rotation: number): Promise<Entity> {
@@ -988,9 +971,11 @@ export class EditorModeManager {
 
       // Set multiplayer input callback if collaboration is active
       if (this.config.collaborationManager?.isCollaborating()) {
-        (localController as any).onMultiplayerInput = (input: CharacterInput) => {
+        if (localController instanceof LocalPlayerController) {
+          localController.onMultiplayerInput = (input: CharacterInput) => {
           this.config.collaborationManager?.processMultiplayerInput(input);
         };
+        }
       }
 
       const session = new PlayerSession({
@@ -1010,9 +995,9 @@ export class EditorModeManager {
     this.playerEntity = player;
 
     // Attach visual avatar under the player for play mode
-    this.attachAvatarToPlayer();
+    this.avatarManager.attachAvatarToPlayer(player, contextManifest);
     // Load and apply user's saved avatar (best-effort, async)
-    void this.loadAndApplyUserAvatar();
+    void this.avatarManager.loadAndApplyUserAvatar();
 
     // Start multiplayer gameplay if collaboration is active
     if (this.config.collaborationManager?.isCollaborating()) {
@@ -1065,16 +1050,7 @@ export class EditorModeManager {
     }
 
     // Cleanup avatar visuals
-    if (this.avatarInstance) {
-      try {
-        this.avatarInstance.dispose();
-      } catch {
-        // ignore
-      }
-      this.avatarInstance = null;
-    }
-    this.avatarVisualRoot = null;
-    this.lastPlayedAnim = null;
+    this.avatarManager.dispose();
 
     if (this.playerEntity) {
       const scenes = new Set<Scene>();
@@ -1108,189 +1084,5 @@ export class EditorModeManager {
     this.playerSession = null;
   }
 
-  /**
-   * Create and attach AvatarInstance visuals under the player entity,
-   * offset so feet are on the ground and hide obstructing FPS parts.
-   */
-  private attachAvatarToPlayer(): void {
-    if (!this.playerEntity) return;
-
-    // Cleanup previous visuals if any
-    if (this.avatarInstance) {
-      try {
-        this.avatarInstance.dispose();
-      } catch {
-        // ignore
-      }
-      this.avatarInstance = null;
-    }
-    if (this.avatarVisualRoot && this.avatarVisualRoot.parent) {
-      try {
-        this.avatarVisualRoot.parent.removeChild(this.avatarVisualRoot);
-      } catch {
-        // ignore
-      }
-    }
-    this.avatarVisualRoot = null;
-
-    const visualRoot = new Entity('PlayerAvatarVisual');
-    visualRoot.userData.isPlayerAvatarVisual = true;
-
-    // Offset avatar so feet align with ground: use collider center Y from manifest (or default)
-    const manifest = this.stateMachine.getContext().manifest as PlayManifest | null;
-    const centerY = manifest?.pawn.physics.collider.center[1] ?? 0.85;
-    visualRoot.transform.position = [0, -centerY, 0];
-    visualRoot.transform.scale = [1, 1, 1];
-
-    this.playerEntity.addChild(visualRoot);
-    this.avatarVisualRoot = visualRoot;
-
-    // Instantiate avatar with default loadout for now (can be replaced with user profile later)
-    const avatar = new AvatarInstance(visualRoot, {
-      name: 'EditorPlayModeAvatar',
-      loadout: DEFAULT_AVATAR_LOADOUT,
-      strictMode: true,
-    });
-
-    // Hide head-related slots for FPS to avoid clipping
-    try {
-      avatar.setSlotVisible('HeadSlot', false);
-      avatar.setSlotVisible('HairSlot', false);
-      avatar.setSlotVisible('FaceOverlaySlot', false);
-    } catch {
-      // non-fatal
-    }
-
-    this.avatarInstance = avatar;
-    this.lastPlayedAnim = null;
-  }
-
-  /**
-   * Update avatar visuals and drive animations based on CharacterController state.
-   */
-  private updateAvatar(deltaTime: number): void {
-    if (!this.avatarInstance || !this.playerEntity) return;
-
-    // Tick avatar internal animator
-    this.avatarInstance.update(deltaTime);
-
-    // Drive animation from character state
-    const controller = this.playerEntity.getComponent(CharacterController);
-    if (!controller) return;
-
-    let desired: 'idle' | 'walk' | 'run' | 'jump' = 'idle';
-    switch (controller.state) {
-      case CharacterState.Running:
-        desired = 'run';
-        break;
-      case CharacterState.Walking:
-        desired = 'walk';
-        break;
-      case CharacterState.Jumping:
-      case CharacterState.Falling:
-        desired = 'jump';
-        break;
-      case CharacterState.Idle:
-      case CharacterState.Landing:
-      default:
-        desired = 'idle';
-        break;
-    }
-
-    if (desired !== this.lastPlayedAnim) {
-      switch (desired) {
-        case 'run':
-          this.avatarInstance.playAnimation(RUN_ANIMATION);
-          break;
-        case 'walk':
-          this.avatarInstance.playAnimation(WALK_ANIMATION);
-          break;
-        case 'jump':
-          this.avatarInstance.playAnimation(JUMP_ANIMATION);
-          break;
-        case 'idle':
-        default:
-          this.avatarInstance.playAnimation(IDLE_ANIMATION);
-          break;
-      }
-      this.lastPlayedAnim = desired;
-    }
-  }
-
-  /**
-   * Load user's saved avatar and apply to current avatar instance.
-   */
-  private async loadAndApplyUserAvatar(): Promise<void> {
-    try {
-      const loadout = await this.fetchUserAvatarLoadout();
-      if (loadout && this.avatarInstance) {
-        this.avatarInstance.applyLoadout(loadout);
-      }
-    } catch {
-      // Ignore failures, default avatar remains
-    }
-  }
-
-  /**
-   * Fetch current user's avatar loadout from API.
-   */
-  private async fetchUserAvatarLoadout(): Promise<AvatarLoadout | null> {
-    interface AvatarLoadoutData {
-      version: number;
-      parts: Record<
-        string,
-        {
-          mesh: string;
-          mat?: string;
-          material?: string;
-          colors?: Record<string, [number, number, number, number]>;
-        }
-      >;
-    }
-
-    // Get current user
-    let userId: string | null = null;
-    try {
-      const meResp = await fetch('/api/auth/me', { credentials: 'include' });
-      if (!meResp.ok) return null;
-      const me = (await meResp.json()) as { id?: string };
-      userId = me?.id ?? null;
-      if (!userId) return null;
-    } catch {
-      return null;
-    }
-
-    // Get avatar loadout
-    try {
-      const resp = await fetch(`/api/users/${encodeURIComponent(userId)}/avatar-loadout`, {
-        credentials: 'include',
-      });
-      if (!resp.ok) return null; // Includes 404 (no saved loadout)
-      const data = (await resp.json()) as AvatarLoadoutData;
-      return this.convertAvatarLoadoutData(data);
-    } catch {
-      return null;
-    }
-  }
-
-  private convertAvatarLoadoutData(data: {
-    version: number;
-    parts: Record<
-      string,
-      { mesh: string; mat?: string; material?: string; colors?: Record<string, [number, number, number, number]> }
-    >;
-  }): AvatarLoadout {
-    const parts: AvatarLoadout['parts'] = {};
-    for (const [slot, part] of Object.entries(data.parts || {})) {
-      if (!part) continue;
-      (parts as any)[slot] = {
-        mesh: part.mesh,
-        ...(part.mat && { mat: part.mat }),
-        ...(part.material && { material: part.material }),
-        ...(part.colors && { colors: part.colors }),
-      };
-    }
-    return { version: data.version, parts };
-  }
 }
 

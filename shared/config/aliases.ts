@@ -15,12 +15,25 @@ const pickPackagesRoot = (rootDir: string): string => {
 	return path.resolve(rootDir, '../../packages');
 };
 
+const pickSharedRoot = (rootDir: string): string => {
+	const candidates = [
+		path.resolve(rootDir, 'shared'),
+		path.resolve(rootDir, '../shared'),
+		path.resolve(rootDir, '../../shared'),
+	];
+	for (const candidate of candidates) {
+		if (fs.existsSync(candidate)) return candidate;
+	}
+	return path.resolve(rootDir, '../../shared');
+};
+
 /**
  * Returns Vite/Vitest-compatible alias map for @engine/* packages
  * Pass __dirname of the consuming config file.
  */
 export const engineAliases = (rootDir: string): Record<string, string> => {
 	const pkgs = pickPackagesRoot(rootDir);
+	const shared = pickSharedRoot(rootDir);
 	const p = (...segs: string[]) => path.resolve(pkgs, ...segs);
 	return {
 		'@engine/core': p('core/src'),
@@ -46,6 +59,8 @@ export const engineAliases = (rootDir: string): Record<string, string> => {
 		'@engine/voxel': p('voxel/src'),
 		'@engine/voxel/terrain': p('voxel/src/terrain'),
 		'@engine/wasm-collision': p('wasm-collision/src'),
+		'@shared': shared,
+		'@shared/types': path.resolve(shared, 'types'),
 	};
 };
 

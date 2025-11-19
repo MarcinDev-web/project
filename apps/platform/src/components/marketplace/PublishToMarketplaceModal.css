@@ -155,6 +155,33 @@
   border-top: 1px solid var(--border-default);
 }
 
+.publish-modal-config-preview {
+  padding: var(--spacing-4);
+  margin-bottom: var(--spacing-5);
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+}
+
+.publish-modal-config-preview h4 {
+  margin: 0 0 var(--spacing-3) 0;
+  font-size: var(--text-lg);
+  color: var(--text-1);
+}
+
+.publish-modal-config-preview ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: grid;
+  gap: var(--spacing-2);
+}
+
+.publish-modal-config-preview li {
+  color: var(--text-2);
+  font-size: var(--text-sm);
+}
+
 /* Mobile responsive */
 @media (max-width: 768px) {
   .publish-to-marketplace-modal {

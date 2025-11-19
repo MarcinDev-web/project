@@ -32,12 +32,7 @@ export class HeightmapTerrain {
       ...config,
     };
 
-    // Validate resolution (should be power of 2 + 1)
-    const isValidResolution = (n: number): boolean => {
-      return n > 1 && ((n - 1) & ((n - 1) - 1)) === 0;
-    };
-
-    if (!isValidResolution(config.resolution)) {
+    if (!HeightmapTerrain.isValidResolution(config.resolution)) {
       throw new Error(
         `Heightmap resolution must be power of 2 + 1 (e.g., 65, 129, 257). Got: ${config.resolution}`
       );
@@ -45,6 +40,13 @@ export class HeightmapTerrain {
 
     const totalVertices = config.resolution * config.resolution;
     this.heights = new Float32Array(totalVertices);
+  }
+
+  /**
+   * Validates if resolution is power of 2 + 1
+   */
+  static isValidResolution(n: number): boolean {
+    return n > 1 && ((n - 1) & ((n - 1) - 1)) === 0;
   }
 
   /**
@@ -287,6 +289,20 @@ export class HeightmapTerrain {
     if (data.maxHeight !== undefined) this.config.maxHeight = data.maxHeight;
 
     this.heights = new Float32Array(data.heights);
+    this.dirty = true;
+  }
+
+  /**
+   * Uses existing terrain data (no copy)
+   * Warning: This shares the buffer with the source data.
+   */
+  useData(data: HeightmapTerrainData): void {
+    this.config.resolution = data.resolution;
+    this.config.size = data.size;
+    if (data.minHeight !== undefined) this.config.minHeight = data.minHeight;
+    if (data.maxHeight !== undefined) this.config.maxHeight = data.maxHeight;
+
+    this.heights = data.heights;
     this.dirty = true;
   }
 

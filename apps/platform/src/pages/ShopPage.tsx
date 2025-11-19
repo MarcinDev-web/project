@@ -2,7 +2,7 @@
  * Shop Page
  */
 
-import { useState, useEffect } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Layout } from '../components/layout/Layout';
 import { ShopItemCard } from '../components/shop/ShopItemCard';
 import { ShopAssetCard } from '../components/shop/ShopAssetCard';
@@ -11,11 +11,29 @@ import { WalletDisplay } from '../components/shop/WalletDisplay';
 import { shopApi, type ShopItem, type Asset, type CartItem, type WalletBalance } from '../api/shop';
 import { useAuth } from '../contexts/AuthContext';
 
-type TabType = 'items' | 'assets' | 'marketplace';
+const ITEM_FILTERS: Array<{ label: string; value: ShopItem['category'] | 'all' }> = [
+  { label: 'All items', value: 'all' },
+  { label: 'Consumables', value: 'consumable' },
+  { label: 'Cosmetics', value: 'cosmetic' },
+  { label: 'Upgrades', value: 'upgrade' },
+  { label: 'Collectibles', value: 'collectible' },
+];
+
+const ASSET_FILTERS: Array<{ label: string; value: Asset['type'] | 'all' }> = [
+  { label: 'All assets', value: 'all' },
+  { label: 'Materials', value: 'material' },
+  { label: 'Models', value: 'model' },
+  { label: 'Textures', value: 'texture' },
+  { label: 'Scripts', value: 'script' },
+];
+
+type TabType = 'items' | 'assets';
 
 export function ShopPage() {
   const { user } = useAuth();
   const [activeTab, setActiveTab] = useState<TabType>('items');
+  const [activeFilter, setActiveFilter] = useState<string>('all');
+  const [searchTerm, setSearchTerm] = useState('');
   const [items, setItems] = useState<ShopItem[]>([]);
   const [assets, setAssets] = useState<Asset[]>([]);
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -25,8 +43,12 @@ export function ShopPage() {
   const [ownedItems, setOwnedItems] = useState<Set<string>>(new Set());
 
   useEffect(() => {
+    setActiveFilter('all');
+  }, [activeTab]);
+
+  useEffect(() => {
     void loadData();
-  }, [activeTab, user]);
+  }, [user]);
 
   const loadData = async () => {
     if (!user) {
@@ -36,25 +58,19 @@ export function ShopPage() {
 
     setLoading(true);
     try {
-      // Load items/assets based on active tab
-      if (activeTab === 'items') {
-        const response = await shopApi.getItems({ limit: 50 });
-        setItems(response.items);
-      } else if (activeTab === 'assets') {
-        const response = await shopApi.getAssets({ limit: 50 });
-        setAssets(response.items);
-      }
+      const [itemsResponse, assetsResponse, cartResponse, walletResponse, ownedResponse] = await Promise.all([
+        shopApi.getItems({ limit: 50 }),
+        shopApi.getAssets({ limit: 50 }),
+        shopApi.getCart(),
+        shopApi.getWallet(),
+        shopApi.getOwned(),
+      ]);
 
-      // Load cart
-      const cartResponse = await shopApi.getCart();
+      setItems(itemsResponse.items);
+      setAssets(assetsResponse.items);
       setCart(cartResponse.items);
-
-      // Load wallet
-      const walletResponse = await shopApi.getWallet();
       setWallet(walletResponse.balances);
 
-      // Load owned items
-      const ownedResponse = await shopApi.getOwned();
       const ownedSet = new Set<string>();
       for (const item of ownedResponse.items) {
         ownedSet.add(`${item.itemId}:${item.itemType}`);
@@ -97,6 +113,20 @@ export function ShopPage() {
     }
   };
 
+  const handleClearCart = async () => {
+    if (!user) return;
+
+    setCartLoading(true);
+    try {
+      await shopApi.clearCart();
+      setCart([]);
+    } catch (error) {
+      console.error('Failed to clear cart:', error);
+    } finally {
+      setCartLoading(false);
+    }
+  };
+
   const handleCheckout = async () => {
     if (!user || cart.length === 0) return;
 
@@ -104,7 +134,6 @@ export function ShopPage() {
     try {
       const result = await shopApi.checkout();
       if (result.success) {
-        // Reload data after successful checkout
         await loadData();
         alert('Purchase successful!');
       } else {
@@ -118,14 +147,61 @@ export function ShopPage() {
     }
   };
 
-  const calculateTotal = (): { currency: string; amount: number } | undefined => {
-    // Simple calculation - in production, use API endpoint
-    if (cart.length === 0) return undefined;
-    
-    // Note: This is a simplified calculation
-    // In production, calculate total via API
-    return { currency: 'coins', amount: 0 };
-  };
+  const filteredItems = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    return items.filter((item) => {
+      const matchesSearch =
+        !query ||
+        item.name.toLowerCase().includes(query) ||
+        (item.description?.toLowerCase().includes(query) ?? false);
+      const matchesFilter = activeFilter === 'all' || item.category === activeFilter;
+      return matchesSearch && matchesFilter;
+    });
+  }, [items, searchTerm, activeFilter]);
+
+  const filteredAssets = useMemo(() => {
+    const query = searchTerm.trim().toLowerCase();
+    return assets.filter((asset) => {
+      const matchesSearch =
+        !query ||
+        asset.name.toLowerCase().includes(query) ||
+        (asset.description?.toLowerCase().includes(query) ?? false);
+      const matchesFilter = activeFilter === 'all' || asset.type === activeFilter || asset.category === activeFilter;
+      return matchesSearch && matchesFilter;
+    });
+  }, [assets, searchTerm, activeFilter]);
+
+  const catalogLookup = useMemo(() => {
+    const lookup = new Map<string, { name: string; price: { currency: string; amount: number } }>();
+    for (const item of items) {
+      lookup.set(`${item.id}:shop-item`, { name: item.name, price: item.price });
+    }
+    for (const asset of assets) {
+      lookup.set(`${asset.id}:asset`, { name: asset.name, price: asset.price });
+    }
+    return lookup;
+  }, [items, assets]);
+
+  const cartItems = useMemo(() => {
+    return cart.map((item) => {
+      const details = catalogLookup.get(`${item.itemId}:${item.type}`);
+      return {
+        ...item,
+        name: details?.name ?? item.itemId,
+        price: details?.price,
+      };
+    });
+  }, [cart, catalogLookup]);
+
+  const cartTotals = useMemo(() => {
+    const totals = new Map<string, number>();
+    for (const item of cartItems) {
+      if (!item.price) continue;
+      const { currency, amount } = item.price;
+      totals.set(currency, (totals.get(currency) ?? 0) + amount * item.quantity);
+    }
+    return Array.from(totals.entries()).map(([currency, amount]) => ({ currency, amount }));
+  }, [cartItems]);
 
   if (!user) {
     return (
@@ -138,65 +214,129 @@ export function ShopPage() {
     );
   }
 
-  const cartItems = cart.map(item => ({
-    ...item,
-    name: item.itemId, // Would need to fetch item names
-  }));
-  const cartTotal = calculateTotal();
+  const activeFilters = activeTab === 'items' ? ITEM_FILTERS : ASSET_FILTERS;
+  const visibleItems = activeTab === 'items' ? filteredItems : filteredAssets;
+  const heroStats = [
+    { label: 'Virtual items', value: items.length },
+    { label: 'Creator assets', value: assets.length },
+    { label: 'Owned', value: ownedItems.size },
+  ];
+  const featuredBalances = wallet.slice(0, 3);
 
   return (
     <Layout>
       <div className="shop-page">
-        <h1>Shop</h1>
+        <section className="shop-hero">
+          <div className="shop-hero__content">
+            <p className="shop-eyebrow">Marketplace</p>
+            <h1>Forge Shop</h1>
+            <p className="shop-hero__subtitle">
+              Curated items, assets, and add-ons tailored to your world-building workflow.
+            </p>
+            <div className="shop-hero__stats">
+              {heroStats.map((stat) => (
+                <div key={stat.label} className="shop-hero__stat">
+                  <span className="shop-hero__stat-value">{stat.value}</span>
+                  <span className="shop-hero__stat-label">{stat.label}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="shop-hero__panel">
+            <div className="shop-hero__panel-header">
+              <p className="shop-eyebrow">Wallet snapshot</p>
+              <span className="shop-pill">Synced</span>
+            </div>
+            <div className="shop-hero__balances">
+              {featuredBalances.length === 0 && <span className="shop-muted">No funds available.</span>}
+              {featuredBalances.map((balance) => (
+                <div key={balance.currency} className="shop-hero__balance">
+                  <span className="shop-hero__balance-label">{balance.currency}</span>
+                  <span className="shop-hero__balance-value">{balance.balance}</span>
+                </div>
+              ))}
+            </div>
+            <div className="shop-hero__hint">
+              Instant fulfillment, secure checkout, unified pricing for your team.
+            </div>
+          </div>
+        </section>
+
+        <div className="shop-toolbar">
+          <div className="shop-search">
+            <input
+              type="search"
+              placeholder="Search by name or description..."
+              value={searchTerm}
+              onChange={(event) => setSearchTerm(event.target.value)}
+            />
+          </div>
+          <div className="shop-tabs">
+            <button
+              onClick={() => setActiveTab('items')}
+              className={`shop-tab-button ${activeTab === 'items' ? 'active' : ''}`}
+            >
+              Virtual Items ({items.length})
+            </button>
+            <button
+              onClick={() => setActiveTab('assets')}
+              className={`shop-tab-button ${activeTab === 'assets' ? 'active' : ''}`}
+            >
+              Assets ({assets.length})
+            </button>
+          </div>
+        </div>
+
+        <div className="shop-filters">
+          {activeFilters.map((filter) => (
+            <button
+              key={filter.value}
+              onClick={() => setActiveFilter(filter.value)}
+              className={`shop-filter-chip ${activeFilter === filter.value ? 'active' : ''}`}
+            >
+              {filter.label}
+            </button>
+          ))}
+        </div>
 
         <div className="shop-content-wrapper">
           <div className="shop-main-content">
-            {/* Tabs */}
-            <div className="shop-tabs">
-              <button
-                onClick={() => setActiveTab('items')}
-                className={`shop-tab-button ${activeTab === 'items' ? 'active' : ''}`}
-              >
-                Virtual Items
-              </button>
-              <button
-                onClick={() => setActiveTab('assets')}
-                className={`shop-tab-button ${activeTab === 'assets' ? 'active' : ''}`}
-              >
-                Assets
-              </button>
+            <div className="shop-grid-header">
+              <div>
+                <p className="shop-kicker">{activeTab === 'items' ? 'Virtual items' : 'Creator assets'}</p>
+                <h2 className="shop-section-title">
+                  {activeTab === 'items' ? 'Equip your worlds' : 'Expand your creator toolkit'}
+                </h2>
+                <p className="shop-section-subtitle">
+                  {activeTab === 'items'
+                    ? 'Skins, boosts, and collectibles ready to drop in.'
+                    : 'Materials, models, and scripts for fast production.'}
+                </p>
+              </div>
+              <span className="shop-pill neutral">{visibleItems.length} results</span>
             </div>
 
-            {/* Content */}
             {loading ? (
               <div className="shop-loading">
-                Loading...
+                Loading shop content...
+              </div>
+            ) : visibleItems.length === 0 ? (
+              <div className="shop-empty-state">
+                <p>No results for the current filters.</p>
+                <p className="shop-muted">Try adjusting the search or category.</p>
               </div>
             ) : (
-              <>
-                {activeTab === 'items' && items.length === 0 ? (
-                  <div className="shop-empty-state">
-                    <p>No virtual items available at the moment.</p>
-                  </div>
-                ) : (
-                  <div className="shop-items-grid">
-                    {activeTab === 'items' && items.map((item) => (
+              <div className="shop-items-grid">
+                {activeTab === 'items'
+                  ? visibleItems.map((item) => (
                       <ShopItemCard
                         key={item.id}
                         item={item}
                         owned={ownedItems.has(`${item.id}:shop-item`)}
                         onAddToCart={() => handleAddToCart(item.id, 'shop-item')}
                       />
-                    ))}
-                  </div>
-                )}
-                {activeTab === 'assets' && assets.length === 0 ? (
-                  <div className="shop-empty-state">
-                    <p>No assets available at the moment.</p>
-                  </div>
-                ) : (
-                  <div className="shop-items-grid">
-                    {activeTab === 'assets' && assets.map((asset) => (
+                    ))
+                  : visibleItems.map((asset) => (
                       <ShopAssetCard
                         key={asset.id}
                         asset={asset}
@@ -204,20 +344,18 @@ export function ShopPage() {
                         onAddToCart={() => handleAddToCart(asset.id, 'asset')}
                       />
                     ))}
-                  </div>
-                )}
-              </>
+              </div>
             )}
           </div>
 
-          {/* Sidebar */}
           <div className="shop-sidebar">
             <WalletDisplay balances={wallet} loading={loading} />
-            <div style={{ marginTop: '1rem' }}>
+            <div className="shop-sidebar-card">
               <ShoppingCart
                 items={cartItems}
-                {...(cartTotal ? { total: cartTotal } : {})}
+                totals={cartTotals}
                 onRemove={handleRemoveFromCart}
+                onClear={handleClearCart}
                 onCheckout={handleCheckout}
                 loading={cartLoading}
               />

@@ -156,6 +156,17 @@ export class EasyPlaceController {
       () => this.handleWindowBlur(),
       { signal: this.abortController.signal }
     );
+
+    // Cycle patterns with 'M'
+    window.addEventListener(
+      'keydown',
+      (event: KeyboardEvent) => {
+        if (event.key.toLowerCase() === 'm' && this.isEasyPlaceActive()) {
+          this.cyclePattern();
+        }
+      },
+      { signal: this.abortController.signal }
+    );
   }
 
   /**
@@ -264,6 +275,17 @@ export class EasyPlaceController {
           positions = this.patternPlacer.generateLinePattern({
             start: this.patternState.startPosition,
             end: this.patternState.endPosition,
+            spacing: settings.lineSpacing,
+          });
+        }
+        break;
+
+      case 'wall':
+        if (this.patternState.endPosition) {
+          positions = this.patternPlacer.generateWallPattern({
+            start: this.patternState.startPosition,
+            end: this.patternState.endPosition,
+            height: settings.wallHeight,
             spacing: settings.lineSpacing,
           });
         }
@@ -546,6 +568,15 @@ export class EasyPlaceController {
         });
         break;
 
+      case 'wall':
+        positions = this.patternPlacer.generateWallPattern({
+          start: this.patternState.startPosition,
+          end: currentPosition,
+          height: settings.wallHeight,
+          spacing: settings.lineSpacing,
+        });
+        break;
+
       case 'grid':
         positions = this.patternPlacer.generateGridPattern({
           center: this.patternState.startPosition,
@@ -580,6 +611,23 @@ export class EasyPlaceController {
    */
   getPatternState(): PatternState {
     return { ...this.patternState };
+  }
+
+  /**
+   * Cycles through available patterns
+   */
+  private cyclePattern(): void {
+    const patterns: EasyPlacePattern[] = ['single', 'line', 'grid', 'circle', 'wall'];
+    const current = this.config.state.easyPlacePattern.value;
+    const index = patterns.indexOf(current);
+    const next = patterns[(index + 1) % patterns.length];
+    this.config.state.easyPlacePattern.value = next;
+    this.config.onStatusMessage?.(`Pattern: ${next}`, 1000);
+    
+    // Reset current pattern state if active
+    if (this.patternState.active) {
+      this.resetPatternState();
+    }
   }
 
   /**

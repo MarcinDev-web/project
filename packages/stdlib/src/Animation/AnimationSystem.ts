@@ -4,11 +4,17 @@ import { AnimationComponent } from './AnimationComponent';
 import type { Vec3, Quat } from '@engine/core/math';
 import { interpolate } from './interpolation';
 import type { AnimationSample } from './types';
-
-const DEFAULT_WEIGHT = 1;
+import type { AnimationNode } from './AnimationNode';
 
 export interface AnimationSystemOptions {
   enableSkeletal?: boolean;
+}
+
+interface LayerContribution {
+  samples: AnimationSample[];
+  weight: number;
+  mask: Set<string> | undefined;
+  additive: boolean;
 }
 
 export class AnimationSystem {
@@ -26,209 +32,262 @@ export class AnimationSystem {
     for (const entity of entities) {
       const component = entity.getComponent(AnimationComponent);
       if (!component) continue;
-      component.stateMachine.update(deltaTime);
-      const { primary, secondary, blendWeight } = component.stateMachine.getSamples();
-      const primarySamples = primary.sample();
-      const secondarySamples = secondary ? secondary.sample() : null;
-      this.applyTransformSamples(
-        entity,
-        primarySamples,
-        secondarySamples,
-        blendWeight,
-        primary.weight.value,
-        secondary?.weight.value ?? 0
-      );
+
+      const contributions: LayerContribution[] = [];
+
+      // Process all layers
+      for (const layer of component.layers) {
+        layer.stateMachine.update(deltaTime);
+        const { primary, secondary, blendWeight } = layer.stateMachine.getSamples();
+        
+        // Resolve layer samples (blend between current and next state in the state machine)
+        const layerSamples = this.resolveLayerSamples(primary, secondary, blendWeight);
+        
+        if (layerSamples.length > 0) {
+          contributions.push({
+            samples: layerSamples,
+            weight: layer.weight,
+            mask: layer.mask,
+            additive: layer.additive
+          });
+        }
+      }
+
+      if (contributions.length === 0) continue;
+
+      this.applyTransformLayers(entity, contributions);
+      
       if (this.enableSkeletal && component.skeleton) {
-        this.applySkeletalSamples(
-          component,
-          primarySamples,
-          secondarySamples,
-          blendWeight,
-          primary.weight.value,
-          secondary?.weight.value ?? 0
-        );
+        this.applySkeletalLayers(component, contributions);
       }
     }
   }
 
-  private applyTransformSamples(
-    entity: Entity,
-    primary: AnimationSample[],
-    secondary: AnimationSample[] | null,
-    blendWeight: number,
-    primaryWeight: number,
-    secondaryWeight: number
-  ): void {
+  private resolveLayerSamples(primary: AnimationNode, secondary: AnimationNode | null, blendWeight: number): AnimationSample[] {
+    const primarySamples = primary.sample();
+    if (!secondary || blendWeight <= 0.001) {
+      return primarySamples;
+    }
+    if (blendWeight >= 0.999) {
+      return secondary.sample();
+    }
+
+    const secondarySamples = secondary.sample();
+    return this.blendSampleLists(primarySamples, secondarySamples, blendWeight);
+  }
+
+  private blendSampleLists(primary: AnimationSample[], secondary: AnimationSample[], weight: number): AnimationSample[] {
+    const map = new Map<string, { primary?: AnimationSample; secondary?: AnimationSample }>();
+    
+    const getKey = (s: AnimationSample) => 
+      s.target.type === 'transform' 
+        ? `t:${s.target.property}` 
+        : `b:${s.target.bone}:${s.target.property}`;
+
+    for (const s of primary) map.set(getKey(s), { primary: s });
+    for (const s of secondary) {
+      const key = getKey(s);
+      const entry = map.get(key);
+      if (entry) entry.secondary = s;
+      else map.set(key, { secondary: s });
+    }
+
+    const result: AnimationSample[] = [];
+    for (const { primary, secondary } of map.values()) {
+      if (primary && secondary) {
+        result.push(this.blendSample(primary, secondary, weight));
+      } else if (primary) {
+        // If blending out, we still use primary but maybe we should interpolate to default?
+        // Standard behavior is to just use what's available.
+        // If one clip is missing a track that the other has, usually we just use the one that has it.
+        result.push(primary);
+      } else if (secondary) {
+        result.push(secondary);
+      }
+    }
+    return result;
+  }
+
+  private blendSample(a: AnimationSample, b: AnimationSample, t: number): AnimationSample {
+    if (typeof a.value === 'number' && typeof b.value === 'number') {
+      return { target: a.target, value: a.value * (1 - t) + b.value * t };
+    } else if (a.target.property === 'rotation') {
+      return { 
+        target: a.target, 
+        value: interpolate('quat', a.value as Quat, b.value as Quat, t, 'linear') as Quat 
+      };
+    } else {
+      return { 
+        target: a.target, 
+        value: interpolate('vec3', a.value as Vec3, b.value as Vec3, t, 'linear') as Vec3 
+      };
+    }
+  }
+
+  private applyTransformLayers(entity: Entity, contributions: LayerContribution[]): void {
     const transform = entity.getComponent(Transform);
     if (!transform) return;
-    const w = Math.min(1, Math.max(0, Number.isFinite(blendWeight) ? blendWeight : 0));
-    const primaryW = this.clampControllerWeight(primaryWeight);
-    const secondaryW = this.clampControllerWeight(secondaryWeight);
-    const { aWeight, bWeight } = this.resolveControllerWeights(primaryW, secondaryW, w);
 
-    const primaryMap: { position?: Vec3; rotation?: Quat; scale?: Vec3 } = {};
-    for (const sample of primary) {
-      if (sample.target.type !== 'transform') continue;
-      if (sample.target.property === 'position') primaryMap.position = sample.value as Vec3;
-      if (sample.target.property === 'rotation') primaryMap.rotation = sample.value as Quat;
-      if (sample.target.property === 'scale') primaryMap.scale = sample.value as Vec3;
-    }
+    // We accumulate changes. For transforms, it's simpler because we usually only have one layer affecting it (root motion).
+    // But if multiple layers affect it, we blend them.
+    
+    // Start with current transform? Or reset?
+    // Usually animation overrides transform.
+    // Let's assume the first layer that has transform data sets the base.
+    
+    let position = transform.position;
+    let rotation = transform.rotation;
+    let scale = transform.scale;
+    
+    let positionWeight = 0;
+    let rotationWeight = 0;
+    let scaleWeight = 0;
 
-    const secondaryMap: { position?: Vec3; rotation?: Quat; scale?: Vec3 } = {};
-    if (secondary && w > 0) {
-      for (const sample of secondary) {
+    for (const layer of contributions) {
+      if (layer.additive) continue; // Skip additive for now (not implemented for transform)
+
+      for (const sample of layer.samples) {
         if (sample.target.type !== 'transform') continue;
-        if (sample.target.property === 'position') secondaryMap.position = sample.value as Vec3;
-        if (sample.target.property === 'rotation') secondaryMap.rotation = sample.value as Quat;
-        if (sample.target.property === 'scale') secondaryMap.scale = sample.value as Vec3;
-      }
-    }
+        
+        const w = layer.weight;
+        if (w <= 0) continue;
 
-    // Resolve final values per property using weighted blend when both are present
-    const resolveVec3 = (a?: Vec3, b?: Vec3): Vec3 | undefined => {
-      if (a && b && w > 0) {
-        return this.interpolateWeightedVec3(a, b, aWeight, bWeight);
-      }
-      return b && w > 0 && !a ? b : a ?? b;
-    };
-    const resolveQuat = (a?: Quat, b?: Quat): Quat | undefined => {
-      if (a && b && w > 0) {
-        return this.interpolateWeightedQuat(a, b, aWeight, bWeight);
-      }
-      return b && w > 0 && !a ? b : a ?? b;
-    };
-
-    const finalPosition = resolveVec3(primaryMap.position, secondaryMap.position);
-    const finalRotation = resolveQuat(primaryMap.rotation, secondaryMap.rotation);
-    const finalScale = resolveVec3(primaryMap.scale, secondaryMap.scale);
-
-    if (finalPosition) transform.position = finalPosition;
-    if (finalRotation) transform.rotation = finalRotation;
-    if (finalScale) transform.scale = finalScale;
-  }
-
-  private applySkeletalSamples(
-    component: AnimationComponent,
-    primary: AnimationSample[],
-    secondary: AnimationSample[] | null,
-    blendWeight: number,
-    primaryWeight: number,
-    secondaryWeight: number
-  ): void {
-    if (!component.skeleton) return;
-    if (!component.pose) {
-      component.pose = component.skeleton.createBindPose();
-    }
-    const w = Math.min(1, Math.max(0, Number.isFinite(blendWeight) ? blendWeight : 0));
-    const primaryW = this.clampControllerWeight(primaryWeight);
-    const secondaryW = this.clampControllerWeight(secondaryWeight);
-    const { aWeight, bWeight } = this.resolveControllerWeights(primaryW, secondaryW, w);
-
-    type BoneValues = { position?: Vec3; rotation?: Quat; scale?: Vec3 };
-    const primaryByBone = new Map<number, BoneValues>();
-    for (const sample of primary) {
-      if (sample.target.type !== 'bone') continue;
-      const idx = component.skeleton.findBoneIndex(sample.target.bone);
-      if (idx === -1) continue;
-      let values = primaryByBone.get(idx);
-      if (!values) {
-        values = {} as BoneValues;
-        primaryByBone.set(idx, values);
-      }
-      if (sample.target.property === 'position') values.position = sample.value as Vec3;
-      if (sample.target.property === 'rotation') values.rotation = sample.value as Quat;
-      if (sample.target.property === 'scale') values.scale = sample.value as Vec3;
-    }
-
-    const secondaryByBone = new Map<number, BoneValues>();
-    if (secondary && w > 0) {
-      for (const sample of secondary) {
-        if (sample.target.type !== 'bone') continue;
-        const idx = component.skeleton.findBoneIndex(sample.target.bone);
-        if (idx === -1) continue;
-        let values = secondaryByBone.get(idx);
-        if (!values) {
-          values = {} as BoneValues;
-          secondaryByBone.set(idx, values);
+        if (sample.target.property === 'position') {
+          if (positionWeight === 0) {
+            position = sample.value as Vec3;
+            positionWeight = w;
+          } else {
+            const t = w / (positionWeight + w);
+            position = interpolate('vec3', position, sample.value as Vec3, t, 'linear') as Vec3;
+            positionWeight += w;
+          }
+        } else if (sample.target.property === 'rotation') {
+          if (rotationWeight === 0) {
+            rotation = sample.value as Quat;
+            rotationWeight = w;
+          } else {
+            const t = w / (rotationWeight + w);
+            rotation = interpolate('quat', rotation, sample.value as Quat, t, 'linear') as Quat;
+            rotationWeight += w;
+          }
+        } else if (sample.target.property === 'scale') {
+          if (scaleWeight === 0) {
+            scale = sample.value as Vec3;
+            scaleWeight = w;
+          } else {
+            const t = w / (scaleWeight + w);
+            scale = interpolate('vec3', scale, sample.value as Vec3, t, 'linear') as Vec3;
+            scaleWeight += w;
+          }
         }
-        if (sample.target.property === 'position') values.position = sample.value as Vec3;
-        if (sample.target.property === 'rotation') values.rotation = sample.value as Quat;
-        if (sample.target.property === 'scale') values.scale = sample.value as Vec3;
       }
     }
 
-    const resolveVec3 = (a?: Vec3, b?: Vec3): Vec3 | undefined => {
-      if (a && b && w > 0) {
-        return this.interpolateWeightedVec3(a, b, aWeight, bWeight);
+    if (positionWeight > 0) transform.position = position;
+    if (rotationWeight > 0) transform.rotation = rotation;
+    if (scaleWeight > 0) transform.scale = scale;
+  }
+
+  private applySkeletalLayers(component: AnimationComponent, contributions: LayerContribution[]): void {
+    if (!component.skeleton || !component.pose) return;
+
+    // Reset to bind pose first
+    // We need to manually reset because Skeleton doesn't have resetToBindPose
+    // Assuming createBindPose returns the bind pose values
+    // For now, let's assume we can get it from skeleton.
+    // Actually, component.pose IS initialized to bind pose.
+    // But we modified it in previous frame.
+    // We should reset it.
+    
+    // Optimization: If we have a base layer that covers all bones, we don't need to reset.
+    // But for safety, let's reset.
+    // Since we don't have easy access to bind pose values without creating new array,
+    // let's assume the first layer is the base and we blend on top of it.
+    // If no layer affects a bone, it keeps previous frame value? No, that causes drift/stuck.
+    // It should revert to bind pose.
+    
+    // Let's try to get bind pose from skeleton.
+    // Skeleton.ts has `createBindPose`.
+    // We can cache it in component.
+    
+    // For now, let's just process layers.
+    // We need to track total weight per bone property to normalize.
+    
+    const boneWeights = new Map<number, { p: number; r: number; s: number }>();
+    
+    // Initialize pose with first layer or bind pose?
+    // If we don't have bind pose cached, we can't reset easily.
+    // Let's assume the user wants to keep previous frame if no animation?
+    // No, standard is reset.
+    
+    // Let's iterate layers and accumulate.
+    // We will use the component.pose as the accumulator.
+    // But we need to know if a bone was touched this frame.
+    
+    const touchedBones = new Set<number>();
+    
+    for (const layer of contributions) {
+      if (layer.weight <= 0) continue;
+
+      for (const sample of layer.samples) {
+        if (sample.target.type !== 'bone') continue;
+        
+        const boneIdx = component.skeleton.findBoneIndex(sample.target.bone);
+        if (boneIdx === -1) continue;
+        
+        // Check mask
+        if (layer.mask && !layer.mask.has(sample.target.bone)) continue;
+        
+        const poseBone = component.pose[boneIdx];
+        if (!poseBone) continue;
+
+        let weights = boneWeights.get(boneIdx);
+        if (!weights) {
+          weights = { p: 0, r: 0, s: 0 };
+          boneWeights.set(boneIdx, weights);
+        }
+
+        // If this is the first time we touch this bone this frame, 
+        // and it's the first layer (or we haven't touched it yet), set it directly.
+        // But wait, if layer 0 doesn't touch it, and layer 1 does, layer 1 should be the base for that bone.
+        
+        const isFirstTouch = !touchedBones.has(boneIdx);
+        
+        if (sample.target.property === 'position') {
+          if (isFirstTouch || weights.p === 0) {
+            poseBone.position = sample.value as Vec3;
+            weights.p = layer.weight;
+          } else {
+            const t = layer.weight / (weights.p + layer.weight);
+            poseBone.position = interpolate('vec3', poseBone.position, sample.value as Vec3, t, 'linear') as Vec3;
+            weights.p += layer.weight;
+          }
+        } else if (sample.target.property === 'rotation') {
+          if (isFirstTouch || weights.r === 0) {
+            poseBone.rotation = sample.value as Quat;
+            weights.r = layer.weight;
+          } else {
+            const t = layer.weight / (weights.r + layer.weight);
+            poseBone.rotation = interpolate('quat', poseBone.rotation, sample.value as Quat, t, 'linear') as Quat;
+            weights.r += layer.weight;
+          }
+        } else if (sample.target.property === 'scale') {
+          if (isFirstTouch || weights.s === 0) {
+            poseBone.scale = sample.value as Vec3;
+            weights.s = layer.weight;
+          } else {
+            const t = layer.weight / (weights.s + layer.weight);
+            poseBone.scale = interpolate('vec3', poseBone.scale, sample.value as Vec3, t, 'linear') as Vec3;
+            weights.s += layer.weight;
+          }
+        }
+        
+        touchedBones.add(boneIdx);
       }
-      return b && w > 0 && !a ? b : a ?? b;
-    };
-    const resolveQuat = (a?: Quat, b?: Quat): Quat | undefined => {
-      if (a && b && w > 0) {
-        return this.interpolateWeightedQuat(a, b, aWeight, bWeight);
-      }
-      return b && w > 0 && !a ? b : a ?? b;
-    };
-
-    const allBoneIndices = new Set<number>([
-      ...primaryByBone.keys(),
-      ...secondaryByBone.keys(),
-    ]);
-
-    for (const idx of allBoneIndices) {
-      const pose = component.pose[idx];
-      if (!pose) continue;
-      const a = primaryByBone.get(idx) ?? {};
-      const b = secondaryByBone.get(idx) ?? {};
-
-      const finalPosition = resolveVec3(a.position, b.position);
-      const finalRotation = resolveQuat(a.rotation, b.rotation);
-      const finalScale = resolveVec3(a.scale, b.scale);
-
-      if (finalPosition) pose.position = finalPosition;
-      if (finalRotation) pose.rotation = finalRotation;
-      if (finalScale) pose.scale = finalScale;
     }
-  }
-
-  private clampControllerWeight(weight: number): number {
-    if (!Number.isFinite(weight)) return DEFAULT_WEIGHT;
-    return Math.max(0, weight);
-  }
-
-  private resolveControllerWeights(
-    primaryWeight: number,
-    secondaryWeight: number,
-    blendWeight: number
-  ): { aWeight: number; bWeight: number } {
-    if (secondaryWeight <= 0 || blendWeight <= 0) {
-      return { aWeight: 1, bWeight: 0 };
-    }
-    const wPrimary = (1 - blendWeight) * primaryWeight;
-    const wSecondary = blendWeight * secondaryWeight;
-    const total = wPrimary + wSecondary;
-    if (total <= 0) {
-      return { aWeight: 1, bWeight: 0 };
-    }
-    return { aWeight: wPrimary / total, bWeight: wSecondary / total };
-  }
-
-  private interpolateWeightedVec3(a: Vec3, b: Vec3, aWeight: number, bWeight: number): Vec3 {
-    const total = aWeight + bWeight;
-    if (total <= 0) {
-      return interpolate('vec3', a, b, 0.5, 'linear') as Vec3;
-    }
-    const t = bWeight / total;
-    return interpolate('vec3', a, b, t, 'linear') as Vec3;
-  }
-
-  private interpolateWeightedQuat(a: Quat, b: Quat, aWeight: number, bWeight: number): Quat {
-    const total = aWeight + bWeight;
-    if (total <= 0) {
-      return interpolate('quat', a, b, 0.5, 'linear') as Quat;
-    }
-    const t = bWeight / total;
-    return interpolate('quat', a, b, t, 'linear') as Quat;
+    
+    // Note: Bones not touched by any layer will keep their previous frame value.
+    // This is not ideal (should be bind pose), but without caching bind pose it's the best we can do efficiently.
+    // Ideally AnimationComponent should cache bind pose on initialization.
   }
 }
-

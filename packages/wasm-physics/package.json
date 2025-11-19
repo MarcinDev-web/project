@@ -1,0 +1,33 @@
+{
+  "name": "@engine/wasm-physics",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./pkg/physics.js": "./pkg/physics.js"
+  },
+  "files": [
+    "dist",
+    "pkg",
+    "src"
+  ],
+  "scripts": {
+    "build:wasm": "wasm-pack build ../../crates/physics --target web --out-dir ../../packages/wasm-physics/pkg",
+    "build:wasm:skip": "node -e \"process.exit(require('fs').existsSync('pkg/physics.js') ? (console.log('Skipping WASM build - using pre-built WASM files from pkg/'), 0) : (console.error('ERROR: Pre-built WASM files not found in pkg/ and cannot build (cargo missing)'), 1))\"",
+    "build:ts": "tsc -p tsconfig.json",
+    "build": "pnpm run build:wasm:skip && pnpm run build:ts",
+    "build:full": "pnpm run build:wasm && pnpm run build:ts",
+    "clean": "rimraf dist pkg",
+    "lint": "eslint src --max-warnings=0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.2",
+    "rimraf": "^6.0.1",
+    "typescript": "^5.9.3"
+  }
+}
+

@@ -17,6 +17,10 @@ import { DisposableGroup } from '@engine/core';
 export interface ModelBuilderModeConfig {
   /** Enable undo/redo */
   enableHistory?: boolean;
+  /** Callback to register undo handler with main editor */
+  registerUndo?: (handler: () => boolean) => () => void;
+  /** Callback to register redo handler with main editor */
+  registerRedo?: (handler: () => boolean) => () => void;
   /** Logger for debugging */
   logger?: {
     debug: (...args: unknown[]) => void;
@@ -58,6 +62,8 @@ export class ModelBuilderMode {
     rotation: 0,
   };
   private isActive = false;
+  private undoHandlerCleanup: (() => void) | null = null;
+  private redoHandlerCleanup: (() => void) | null = null;
 
   constructor(
     scene: Scene,
@@ -87,6 +93,12 @@ export class ModelBuilderMode {
     if (this.isActive) return;
     this.isActive = true;
     this.logger?.debug('ModelBuilderMode activated');
+
+    // Register undo/redo handlers
+    if (this.config.registerUndo && this.config.registerRedo) {
+      this.undoHandlerCleanup = this.config.registerUndo(() => this.undo());
+      this.redoHandlerCleanup = this.config.registerRedo(() => this.redo());
+    }
   }
 
   /**
@@ -96,6 +108,12 @@ export class ModelBuilderMode {
     if (!this.isActive) return;
     this.isActive = false;
     this.logger?.debug('ModelBuilderMode deactivated');
+
+    // Unregister handlers
+    this.undoHandlerCleanup?.();
+    this.undoHandlerCleanup = null;
+    this.redoHandlerCleanup?.();
+    this.redoHandlerCleanup = null;
   }
 
   /**

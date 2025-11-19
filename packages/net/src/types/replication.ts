@@ -95,6 +95,9 @@ export interface InputMessage extends WebSocketMessage {
   moveDirection?: [number, number]; // [forward, right] normalized
   cameraForward?: [number, number, number];
   cameraRight?: [number, number, number];
+  actorId?: string;
+  intentSignature?: string;
+  intentDeltaMs?: number;
 }
 
 /**

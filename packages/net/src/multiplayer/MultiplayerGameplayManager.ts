@@ -1,12 +1,19 @@
 import type { Entity, Scene, CharacterController, PhysicsWorld, CharacterInput } from '@engine/world';
 import { CharacterController as CharacterControllerClass, Entity as EntityClass } from '@engine/world';
+import { InputChannel, HmacIntentAuthenticator } from '@engine/world/net/InputChannel';
 import { ReplicationClient, type PublicUser } from '../ReplicationClient';
 import { ReplicationState } from '../types/replication';
 import { PlayerSync } from './PlayerSync';
 import { InputReplicator } from './InputReplicator';
 import { PhysicsSync } from './PhysicsSync';
+import { OperationReplicator } from '../collaboration/OperationReplicator';
 import { ErrorHandler, type ErrorCallback } from './ErrorHandler';
 import { ValidationError, StateError, ErrorFactory, ErrorSeverity } from './errors';
+
+interface MultiplayerSecurityOptions {
+  intentSigningKey?: string;
+  intentKeyId?: string;
+}
 
 /**
  * Network multiplayer manager for gameplay mode.
@@ -27,17 +34,23 @@ export class MultiplayerGameplayManager {
   private playerSync: PlayerSync | null = null;
   private inputReplicator: InputReplicator | null = null;
   private physicsSync: PhysicsSync | null = null;
+  private operationReplicator: OperationReplicator | null = null;
   private sessionId: string | null = null;
   private isConnected = false;
   private unsubscribeStateChange: (() => void) | null = null;
   private wasConnectedBefore = false; // Track if we were connected before (for reconnection)
   private errorCallbacks: ErrorCallback[] = [];
+  private readonly intentSigningKey: string | null;
+  private readonly intentKeyId: string;
+  private intentChannel: InputChannel | null = null;
+  private intentAuthenticator: HmacIntentAuthenticator | null = null;
 
   constructor(
     replicationClient: ReplicationClient,
     scene: Scene,
     physicsWorld: PhysicsWorld,
-    errorHandler?: ErrorHandler
+    errorHandler?: ErrorHandler,
+    securityOptions?: MultiplayerSecurityOptions
   ) {
     // Create or use provided error handler
     this.errorHandler = errorHandler ?? new ErrorHandler();
@@ -56,6 +69,8 @@ export class MultiplayerGameplayManager {
     this.replicationClient = replicationClient;
     this.scene = scene;
     this.physicsWorld = physicsWorld;
+    this.intentSigningKey = securityOptions?.intentSigningKey ?? null;
+    this.intentKeyId = securityOptions?.intentKeyId ?? 'client-intent';
 
     // Subscribe to state changes to handle connection, disconnection, and reconnection
     this.unsubscribeStateChange = this.replicationClient.onStateChange((state) => {
@@ -162,9 +177,11 @@ export class MultiplayerGameplayManager {
     }
 
     if (!this.inputReplicator) {
+      const intentChannel = this.ensureIntentChannel();
       this.inputReplicator = new InputReplicator({
         replicationClient: this.replicationClient,
         errorHandler: this.errorHandler,
+        ...(intentChannel && { intentChannel }),
       });
       
       // Subscribe to InputReplicator errors
@@ -184,6 +201,26 @@ export class MultiplayerGameplayManager {
       // Subscribe to PhysicsSync errors
       this.physicsSync.onError((error) => {
         this.errorHandler.handleError(error);
+      });
+    }
+
+    if (!this.operationReplicator) {
+      this.operationReplicator = new OperationReplicator({
+        scene: this.scene,
+        replicationClient: this.replicationClient,
+        enableBuffering: true,
+        enableConflictResolution: true,
+      });
+      
+      this.operationReplicator.onOperationFailed((op, error) => {
+        this.errorHandler.handleError(
+          new StateError('Operation replication failed', {
+            code: 'OPERATION_FAILED',
+            context: { operationId: op.id, type: op.type },
+            retryable: true,
+            cause: error,
+          })
+        );
       });
     }
 
@@ -267,7 +304,7 @@ export class MultiplayerGameplayManager {
             code: 'CONNECTION_FAILED',
             context: { sessionId },
             retryable: true,
-            cause: error instanceof Error ? error : undefined,
+            ...(error instanceof Error ? { cause: error } : {}),
           })
         );
         throw error;
@@ -309,9 +346,11 @@ export class MultiplayerGameplayManager {
     }
 
     if (!this.inputReplicator) {
+      const intentChannel = this.ensureIntentChannel();
       this.inputReplicator = new InputReplicator({
         replicationClient: this.replicationClient,
         errorHandler: this.errorHandler,
+        ...(intentChannel && { intentChannel }),
       });
       
       // Subscribe to InputReplicator errors
@@ -331,6 +370,26 @@ export class MultiplayerGameplayManager {
       // Subscribe to PhysicsSync errors
       this.physicsSync.onError((error) => {
         this.errorHandler.handleError(error);
+      });
+    }
+
+    if (!this.operationReplicator) {
+      this.operationReplicator = new OperationReplicator({
+        scene: this.scene,
+        replicationClient: this.replicationClient,
+        enableBuffering: true,
+        enableConflictResolution: true,
+      });
+      
+      this.operationReplicator.onOperationFailed((op, error) => {
+        this.errorHandler.handleError(
+          new StateError('Operation replication failed', {
+            code: 'OPERATION_FAILED',
+            context: { operationId: op.id, type: op.type },
+            retryable: true,
+            cause: error,
+          })
+        );
       });
     }
 
@@ -360,6 +419,11 @@ export class MultiplayerGameplayManager {
     if (this.physicsSync) {
       this.physicsSync.dispose();
       this.physicsSync = null;
+    }
+
+    if (this.operationReplicator) {
+      this.operationReplicator.dispose();
+      this.operationReplicator = null;
     }
 
     // Remove remote player avatars
@@ -428,7 +492,7 @@ export class MultiplayerGameplayManager {
           code: 'SYNC_UPDATE_FAILED',
           context: { component: 'PlayerSync' },
           retryable: true,
-          cause: error instanceof Error ? error : undefined,
+          ...(error instanceof Error ? { cause: error } : {}),
         })
       );
     }
@@ -441,7 +505,7 @@ export class MultiplayerGameplayManager {
           code: 'SYNC_UPDATE_FAILED',
           context: { component: 'PhysicsSync' },
           retryable: true,
-          cause: error instanceof Error ? error : undefined,
+          ...(error instanceof Error ? { cause: error } : {}),
         })
       );
     }
@@ -473,7 +537,7 @@ export class MultiplayerGameplayManager {
           code: 'INPUT_SET_FAILED',
           context: { input },
           retryable: false,
-          cause: error instanceof Error ? error : undefined,
+          ...(error instanceof Error ? { cause: error } : {}),
         })
       );
       return;
@@ -494,11 +558,35 @@ export class MultiplayerGameplayManager {
             code: 'INPUT_REPLICATION_FAILED',
             context: { input },
             retryable: true,
-            cause: error instanceof Error ? error : undefined,
+            ...(error instanceof Error ? { cause: error } : {}),
           })
         );
       }
     }
+  }
+
+  private ensureIntentChannel(): InputChannel | null {
+    if (!this.intentSigningKey) {
+      return null;
+    }
+    if (!this.intentAuthenticator) {
+      this.intentAuthenticator = new HmacIntentAuthenticator({
+        secret: this.intentSigningKey,
+        keyId: this.intentKeyId,
+      });
+    }
+    if (!this.intentChannel) {
+      this.intentChannel = new InputChannel({
+        actorId: this.getLocalUserId() ?? 'anonymous',
+        authenticator: this.intentAuthenticator,
+      });
+    } else {
+      const localUserId = this.getLocalUserId();
+      if (localUserId) {
+        this.intentChannel.setActorId(localUserId);
+      }
+    }
+    return this.intentChannel;
   }
 
   /**
@@ -553,7 +641,7 @@ export class MultiplayerGameplayManager {
           code: 'AVATAR_SPAWN_FAILED',
           context: { userId, user },
           retryable: true,
-          cause: error instanceof Error ? error : undefined,
+          ...(error instanceof Error ? { cause: error } : {}),
         })
       );
       throw error;
@@ -569,7 +657,7 @@ export class MultiplayerGameplayManager {
             code: 'PLAYER_REGISTRATION_FAILED',
             context: { userId },
             retryable: true,
-            cause: error instanceof Error ? error : undefined,
+            ...(error instanceof Error ? { cause: error } : {}),
           })
         );
       }
@@ -607,7 +695,7 @@ export class MultiplayerGameplayManager {
           code: 'AVATAR_SPAWN_FAILED',
           context: { user },
           retryable: true,
-          cause: error instanceof Error ? error : undefined,
+          ...(error instanceof Error ? { cause: error } : {}),
         })
       );
     }
@@ -637,7 +725,7 @@ export class MultiplayerGameplayManager {
               code: 'PLAYER_UNREGISTRATION_FAILED',
               context: { userId },
               retryable: false,
-              cause: error instanceof Error ? error : undefined,
+              ...(error instanceof Error ? { cause: error } : {}),
             })
           );
         }
@@ -654,7 +742,7 @@ export class MultiplayerGameplayManager {
             code: 'AVATAR_REMOVAL_FAILED',
             context: { userId },
             retryable: false,
-            cause: error instanceof Error ? error : undefined,
+            ...(error instanceof Error ? { cause: error } : {}),
           })
         );
       }
@@ -679,6 +767,10 @@ export class MultiplayerGameplayManager {
     // Update PlayerSync userId
     if (this.playerSync) {
       this.playerSync.setLocalUserId(localUserId);
+    }
+
+    if (this.intentChannel) {
+      this.intentChannel.setActorId(localUserId);
     }
   }
 
@@ -747,7 +839,7 @@ export class MultiplayerGameplayManager {
           code: 'RECONNECTION_FAILED',
           context: { sessionId: this.sessionId },
           retryable: true,
-          cause: error instanceof Error ? error : undefined,
+          ...(error instanceof Error ? { cause: error } : {}),
         })
       );
       throw error;
@@ -788,10 +880,16 @@ export class MultiplayerGameplayManager {
   }
 
   /**
+   * Get operation replicator instance.
+   */
+  getOperationReplicator(): OperationReplicator | null {
+    return this.operationReplicator;
+  }
+
+  /**
    * Check if currently connected.
    */
   isConnectedToServer(): boolean {
     return this.isConnected && this.replicationClient.getState() === ReplicationState.Joined;
   }
 }
-

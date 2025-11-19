@@ -1,0 +1,22 @@
+{
+  "name": "@services/content-pipeline",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "./dist/ingest.js",
+  "types": "./dist/ingest.d.ts",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "dependencies": {
+    "@engine/script": "workspace:*"
+  },
+  "devDependencies": {
+    "@types/node": "^24.7.2",
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.3"
+  }
+}
+

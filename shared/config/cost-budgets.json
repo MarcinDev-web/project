@@ -1,0 +1,8 @@
+{
+  "features": [
+    { "id": "edge-input", "cpuBudget": 0.25, "bandwidthGb": 15 },
+    { "id": "session-pods", "cpuBudget": 4, "bandwidthGb": 50 },
+    { "id": "observability", "cpuBudget": 0.5, "bandwidthGb": 5 }
+  ]
+}
+

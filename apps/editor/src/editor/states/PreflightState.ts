@@ -452,7 +452,17 @@ export class PreflightState implements IPlayModeState {
     errors: string[],
     warnings: string[]
   ): void {
-    const validTypes: string[] = ['cube', 'sphere', 'custom', 'avatar_torso', 'terrain'];
+    const validTypes: string[] = [
+      'cube',
+      'sphere',
+      'cylinder',
+      'plane',
+      'capsule',
+      'custom',
+      'avatar_torso',
+      'terrain',
+      'capsule_y',
+    ];
     if (!validTypes.includes(mesh.meshType)) {
       errors.push(`MeshComponent on ${label} has invalid meshType: ${mesh.meshType}`);
     }
@@ -591,4 +601,3 @@ export class PreflightState implements IPlayModeState {
     }
   }
 }
-

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { InputReplicator } from './InputReplicator';
 import { ReplicationClient } from '../ReplicationClient';
 import type { CharacterInput } from '@engine/world';
+import { InputChannel, HmacIntentAuthenticator } from '@engine/world/net/InputChannel';
 
 describe('InputReplicator', () => {
   let replicationClient: ReplicationClient;
@@ -208,6 +209,33 @@ describe('InputReplicator', () => {
 
     const buffered = inputReplicator.getBufferedInputs(0, 100);
     expect(buffered.length).toBe(0);
+  });
+
+  it('attaches intent metadata when intent channel is provided', () => {
+    const authenticator = new HmacIntentAuthenticator({ secret: 'unit-secret', keyId: 'unit' });
+    const intentChannel = new InputChannel({
+      actorId: 'player-7',
+      authenticator,
+      clock: () => Date.now(),
+    });
+
+    inputReplicator = new InputReplicator({
+      replicationClient,
+      intentChannel,
+    });
+
+    inputReplicator.recordInput({
+      moveDirection: [0, 0, 1],
+      sprint: true,
+      jump: false,
+    });
+
+    expect(replicationClient.sendInput).toHaveBeenCalledWith(
+      expect.objectContaining({
+        actorId: 'player-7',
+        intentSignature: expect.any(String),
+      })
+    );
   });
 });
 

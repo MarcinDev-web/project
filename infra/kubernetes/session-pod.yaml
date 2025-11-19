@@ -1,0 +1,46 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: session-sim-worker
+  labels:
+    app: session-sim
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: session-sim
+  template:
+    metadata:
+      labels:
+        app: session-sim
+    spec:
+      containers:
+        - name: sim-worker
+          image: registry.example.com/ugc/session-worker:latest
+          env:
+            - name: AUTHORITY_ENDPOINT
+              value: https://authority.internal.svc.cluster.local
+            - name: INPUT_GATEWAY_URL
+              value: https://edge-input.example.com
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 5
+            periodSeconds: 10
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+            initialDelaySeconds: 10
+            periodSeconds: 20
+

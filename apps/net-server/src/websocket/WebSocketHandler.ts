@@ -29,6 +29,7 @@ export class WebSocketHandler {
   private readonly wss: WebSocketServer;
   private readonly replicationServer: ReplicationServer;
   private readonly sessionManager: SessionManager;
+  private readonly authManager: AuthManager;
   private readonly connections = new Map<WebSocket, string>(); // ws -> userId
   private readonly connectionTimes = new Map<WebSocket, number>(); // ws -> last activity time
   private readonly ipConnectionCounts = new Map<string, number>(); // ip -> connection count
@@ -48,6 +49,7 @@ export class WebSocketHandler {
     corsConfig?: CorsConfig
   ) {
     this.sessionManager = sessionManager;
+    this.authManager = authManager;
     this.replicationServer = new ReplicationServer(sessionManager, authManager, messageHandler);
     this.friendsStorage = friendsStorage ?? null;
     this.corsConfig = corsConfig ?? getCorsConfig();
@@ -108,7 +110,7 @@ export class WebSocketHandler {
   /**
    * Handle new WebSocket connection.
    */
-  private handleConnection(ws: WebSocket, req: IncomingMessage): void {
+  private async handleConnection(ws: WebSocket, req: IncomingMessage): Promise<void> {
     // Get client IP
     const forwardedFor = req.headers['x-forwarded-for'];
     const forwardedIp = Array.isArray(forwardedFor) ? forwardedFor[0] : forwardedFor;
@@ -154,7 +156,53 @@ export class WebSocketHandler {
     }
 
     // Set up connection metadata
-    const userId: string | null = null;
+    let userId: string | null = null;
+
+    // Handshake Authentication
+    let token: string | undefined;
+
+    // 1. Check Query String
+    if (req.url) {
+      try {
+        const url = new URL(req.url, 'http://localhost');
+        token = url.searchParams.get('token') || undefined;
+      } catch {
+        // Ignore invalid URLs
+      }
+    }
+
+    // 2. Check Protocol Header (if no token in query)
+    if (!token && req.headers['sec-websocket-protocol']) {
+      const protocols = req.headers['sec-websocket-protocol'].split(',').map((p) => p.trim());
+      // Look for a token-like string (simple heuristic: length > 20)
+      for (const protocol of protocols) {
+        if (protocol.length > 20) {
+          token = protocol;
+          break;
+        }
+      }
+    }
+
+    // 3. Verify Token
+    if (token) {
+      try {
+        const verification = await this.authManager.verifyTokenWithExpiration(token);
+        if (verification.user) {
+          userId = verification.user.id;
+          this.setConnectionUser(ws, userId);
+
+          // Register with ReplicationServer
+          this.replicationServer.registerAuthenticatedConnection(
+            ws,
+            userId,
+            token,
+            verification.expiresAt
+          );
+        }
+      } catch (error) {
+        // Token invalid, ignore (will fall back to unauthenticated or fail later)
+      }
+    }
 
     // Handle incoming messages with size validation
     ws.on('message', async (data: Buffer) => {

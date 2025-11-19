@@ -1,11 +1,11 @@
 import type { Entity } from '@engine/world';
-import { CharacterController } from '@engine/world';
+import { CharacterController, HealthComponent, ShieldComponent, PowerUpComponent } from '@engine/world';
 import { ReplicationClient } from '../ReplicationClient';
 import type { PlayerUpdateMessage } from '../types/replication';
 import { ReplicationState } from '../types/replication';
 import type { Vec3 } from '@engine/core/math';
 import { ErrorHandler, type ErrorCallback } from './ErrorHandler';
-import { ValidationError, SyncError, StateError, ErrorFactory, ErrorSeverity } from './errors';
+import { SyncError, StateError, ErrorFactory } from './errors';
 
 /**
  * Remote player data for interpolation.
@@ -218,6 +218,11 @@ export class PlayerSync {
       return;
     }
 
+    // Gather additional state
+    const health = entity.getComponent(HealthComponent);
+    const shield = entity.getComponent(ShieldComponent);
+    const powerUp = entity.getComponent(PowerUpComponent);
+
     this.config.replicationClient.sendPlayerUpdate({
       playerId: localUserId, // Use userId instead of entity.id
       position: [...position] as [number, number, number],
@@ -225,7 +230,11 @@ export class PlayerSync {
       ...(velocity !== undefined && this.isValidVelocity(velocity) && { velocity }),
       state: {
         isGrounded: controller.isGrounded,
-        // Add other relevant state
+        health: health ? health.currentHealth : undefined,
+        maxHealth: health ? health.maxHealth : undefined,
+        shield: shield ? shield.currentShield : undefined,
+        maxShield: shield ? shield.maxShield : undefined,
+        buffs: powerUp ? Array.from(powerUp.buffs.entries()) : undefined,
       },
     });
 
@@ -426,6 +435,52 @@ export class PlayerSync {
     }
     player.lastUpdateTime = message.timestamp;
     player.interpolationTime = 0; // Reset interpolation
+
+    // Apply state updates
+    if (message.state) {
+      const entity = player.entity;
+      
+      // Health
+      if (typeof message.state.health === 'number') {
+        let health = entity.getComponent(HealthComponent);
+        if (!health) {
+          health = new HealthComponent();
+          entity.addComponent(health);
+        }
+        if (typeof message.state.maxHealth === 'number') {
+          health.maxHealth = message.state.maxHealth;
+        }
+        health.currentHealth = message.state.health;
+      }
+
+      // Shield
+      if (typeof message.state.shield === 'number') {
+        let shield = entity.getComponent(ShieldComponent);
+        if (!shield) {
+          shield = new ShieldComponent();
+          entity.addComponent(shield);
+        }
+        if (typeof message.state.maxShield === 'number') {
+          shield.maxShield = message.state.maxShield;
+        }
+        shield.currentShield = message.state.shield;
+      }
+
+      // Buffs
+      if (Array.isArray(message.state.buffs)) {
+        let powerUp = entity.getComponent(PowerUpComponent);
+        if (!powerUp) {
+          powerUp = new PowerUpComponent();
+          entity.addComponent(powerUp);
+        }
+        // Clear existing buffs and apply new ones
+        // Note: This might be too aggressive if we want to interpolate, but for buffs it's usually fine
+        powerUp.buffs.clear();
+        for (const [type, buff] of message.state.buffs as any[]) {
+          powerUp.buffs.set(type, buff);
+        }
+      }
+    }
   }
 
   /**

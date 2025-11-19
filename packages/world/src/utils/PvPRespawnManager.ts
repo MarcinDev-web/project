@@ -32,12 +32,14 @@ export interface PvPRespawnManagerOptions {
  */
 export class PvPRespawnManager {
   private readonly scene: Scene;
-  private spawnPoints: Entity[];
-  private readonly weaponPickupSystem?: WeaponPickupSystem;
+  private spawnPoints: Entity[] = [];
+  private readonly weaponPickupSystem: WeaponPickupSystem | undefined;
   private readonly respawnDelay: number;
   private readonly resetHealth: boolean;
-  private readonly onBeforeRespawn?: (entity: Entity) => void;
-  private readonly onAfterRespawn?: (entity: Entity, spawnPoint: Entity) => void;
+  private readonly onBeforeRespawn: ((entity: Entity) => void) | undefined;
+  private readonly onAfterRespawn:
+    | ((entity: Entity, spawnPoint: Entity) => void)
+    | undefined;
   private readonly selectSpawnPoint: (spawnPoints: Entity[], entity: Entity) => Entity;
   private readonly tracked = new Set<Entity>();
   private readonly pending = new Map<Entity, number>();
@@ -45,7 +47,7 @@ export class PvPRespawnManager {
 
   constructor(options: PvPRespawnManagerOptions) {
     this.scene = options.scene;
-    this.spawnPoints = [...options.spawnPoints];
+    this.setSpawnPoints(options.spawnPoints);
     this.weaponPickupSystem = options.weaponPickupSystem;
     this.respawnDelay = options.respawnDelay ?? 4;
     this.resetHealth = options.resetHealth !== false;
@@ -53,7 +55,7 @@ export class PvPRespawnManager {
     this.onAfterRespawn = options.onAfterRespawn;
     this.selectSpawnPoint =
       options.selectSpawnPoint ??
-      ((spawnPoints, entity) => {
+      ((spawnPoints, _entity) => {
         if (spawnPoints.length === 0) {
           throw new Error('PvPRespawnManager: No spawn points configured');
         }
@@ -63,6 +65,7 @@ export class PvPRespawnManager {
   }
 
   register(entity: Entity): void {
+    this.assertEntityScene(entity, 'player');
     this.tracked.add(entity);
   }
 
@@ -76,7 +79,10 @@ export class PvPRespawnManager {
   }
 
   setSpawnPoints(spawnPoints: Entity[]): void {
-    this.spawnPoints = [...spawnPoints];
+    this.spawnPoints = spawnPoints.map((point) => {
+      this.assertEntityScene(point, 'spawn point');
+      return point;
+    });
   }
 
   scheduleRespawn(entity: Entity, delay?: number): void {
@@ -91,7 +97,9 @@ export class PvPRespawnManager {
     if (!this.tracked.has(entity)) {
       return;
     }
+    this.assertEntityScene(entity, 'player');
     const targetSpawn = spawnPoint ?? this.selectSpawnPoint(this.spawnPoints, entity);
+    this.assertEntityScene(targetSpawn, 'spawn point');
     this.onBeforeRespawn?.(entity);
     spawnPlayerAtSpawnPoint(entity, targetSpawn, this.weaponPickupSystem);
     if (this.resetHealth) {
@@ -116,6 +124,15 @@ export class PvPRespawnManager {
   dispose(): void {
     this.tracked.clear();
     this.pending.clear();
+  }
+
+  private assertEntityScene(entity: Entity, kind: 'player' | 'spawn point'): void {
+    const entityScene = entity.scene;
+    if (entityScene && entityScene !== this.scene) {
+      throw new Error(
+        `PvPRespawnManager: ${kind} "${entity.name}" belongs to a different scene`
+      );
+    }
   }
 
   private resetEntityHealth(entity: Entity): void {

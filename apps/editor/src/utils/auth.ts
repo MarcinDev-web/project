@@ -229,6 +229,7 @@ export async function getWallet(): Promise<Wallet> {
       'Content-Type': 'application/json',
     },
     credentials: 'include',
+    body: null,
   });
 
   if (!response.ok) {
@@ -257,3 +258,45 @@ export async function getCoins(): Promise<number> {
   }
 }
 
+export interface AvatarLoadoutData {
+  version: number;
+  parts: Record<
+    string,
+    {
+      mesh: string;
+      mat?: string;
+      material?: string;
+      colors?: Record<string, [number, number, number, number]>;
+    }
+  >;
+}
+
+/**
+ * Get user avatar loadout
+ */
+export async function getUserAvatarLoadout(userId: string): Promise<AvatarLoadoutData | null> {
+  const { token } = getTokens();
+  
+  try {
+    const headers: Record<string, string> = {
+        'Content-Type': 'application/json',
+    };
+    if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+    }
+
+    const response = await fetch(`${API_BASE_URL}/users/${encodeURIComponent(userId)}/avatar-loadout`, {
+      method: 'GET',
+      headers,
+      credentials: 'include',
+    });
+
+    if (!response.ok) {
+      return null;
+    }
+
+    return await response.json();
+  } catch {
+    return null;
+  }
+}

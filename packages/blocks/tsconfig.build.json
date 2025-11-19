@@ -1,0 +1,28 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "composite": true,
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "skipLibCheck": true,
+    "paths": {
+      "@engine/core": ["../core/dist"],
+      "@engine/core/*": ["../core/dist/*"],
+      "@engine/microblocks": ["../microblocks/dist"],
+      "@engine/microblocks/*": ["../microblocks/dist/*"]
+    }
+  },
+  "include": ["src/**/*"],
+  "exclude": [
+    "__tests__",
+    "**/*.test.ts",
+    "**/*.spec.ts",
+    "dist",
+    "node_modules"
+  ],
+  "references": [
+    { "path": "../core/tsconfig.build.json" },
+    { "path": "../microblocks/tsconfig.build.json" }
+  ]
+}
+

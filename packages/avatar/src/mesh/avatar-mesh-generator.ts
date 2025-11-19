@@ -25,6 +25,7 @@ function isProceduralMeshType(meshType: MeshKind): meshType is ProceduralMeshTyp
  */
 export class AvatarMeshGenerator {
   private readonly sphereSegments: number;
+  private static readonly cache = new Map<string, CustomMeshData>();
 
   constructor(options: AvatarMeshGeneratorOptions = {}) {
     const segments = options.sphereSegments ?? 16;
@@ -49,15 +50,32 @@ export class AvatarMeshGenerator {
       return null;
     }
 
-    if (meshType === 'avatar_torso') {
-      return this.generateTorsoMesh(partId);
-    } else if (meshType === 'sphere') {
-      return this.generateSphereMesh(partId);
-    } else if (meshType === 'capsule_y') {
-      return this.generateCapsuleY(partId);
+    // Check cache
+    const cacheKey = this.getCacheKey(meshType);
+    if (AvatarMeshGenerator.cache.has(cacheKey)) {
+      return AvatarMeshGenerator.cache.get(cacheKey)!;
     }
-    // This should never happen due to type guard, but TypeScript needs it
-    return null;
+
+    let mesh: CustomMeshData | null = null;
+    if (meshType === 'avatar_torso') {
+      mesh = this.generateTorsoMesh(partId);
+    } else if (meshType === 'sphere') {
+      mesh = this.generateSphereMesh(partId);
+    } else if (meshType === 'capsule_y') {
+      mesh = this.generateCapsuleY(partId);
+    }
+
+    if (mesh) {
+      AvatarMeshGenerator.cache.set(cacheKey, mesh);
+    }
+    return mesh;
+  }
+
+  private getCacheKey(meshType: ProceduralMeshType): string {
+    if (meshType === 'avatar_torso') {
+      return 'avatar_torso'; // Torso doesn't depend on segments
+    }
+    return `${meshType}:${this.sphereSegments}`;
   }
 
   private generateTorsoMesh(partId: string): CustomMeshData | null {

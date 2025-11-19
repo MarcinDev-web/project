@@ -7,30 +7,22 @@ import type { GridConfig } from './GridConfig';
 import { DEFAULT_GRID_CONFIG, validateGridConfig } from './GridConfig';
 import { Logger } from '../../utils/logger';
 import { createGridShaderCode, GridShaderEntryPoint } from './GridShader';
-import type { Mat4 } from '@engine/core/math';
-
-/**
- * Grid line vertex: position (vec3) + color (vec4)
- */
-interface GridVertex {
-  position: [number, number, number];
-  color: [number, number, number, number];
-}
+import type { Mat4, Vec3 } from '@engine/core/math';
 
 /**
  * Parsed color from hex string to RGBA [0-1]
  */
-function parseColorHex(hex: string): [number, number, number, number] {
+function parseColorHex(hex: string): Float32Array {
   const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
   if (!result) {
-    return [1, 1, 1, 1]; // fallback to white
+    return new Float32Array([1, 1, 1, 1]); // fallback to white
   }
-  return [
+  return new Float32Array([
     Number.parseInt(result[1]!, 16) / 255,
     Number.parseInt(result[2]!, 16) / 255,
     Number.parseInt(result[3]!, 16) / 255,
     1.0,
-  ];
+  ]);
 }
 
 /**
@@ -42,8 +34,6 @@ export class GridRenderer {
   private pipeline: GPURenderPipeline | null = null;
   private uniformBuffer: GPUBuffer | null = null;
   private uniformBindGroup: GPUBindGroup | null = null;
-  private vertexBuffer: GPUBuffer | null = null;
-  private vertexCount = 0;
   private visible = true;
 
   constructor(config: Partial<GridConfig> = {}) {
@@ -75,10 +65,14 @@ export class GridRenderer {
         code: createGridShaderCode(),
       });
 
-      // Create uniform buffer (4x4 matrix = 64 bytes)
+      // Uniform buffer size: 256 bytes (aligned)
+      // Layout:
+      // 0-64: ViewProjection Matrix
+      // 64-76: Eye Position
+      // 80-192: Grid Params & Colors
       this.uniformBuffer = device.createBuffer({
         label: 'Grid Uniform Buffer',
-        size: 64,
+        size: 256,
         usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       });
 
@@ -88,7 +82,7 @@ export class GridRenderer {
         entries: [
           {
             binding: 0,
-            visibility: GPUShaderStage.VERTEX,
+            visibility: GPUShaderStage.VERTEX | GPUShaderStage.FRAGMENT,
             buffer: { type: 'uniform' },
           },
         ],
@@ -106,7 +100,7 @@ export class GridRenderer {
         ],
       });
 
-      // Create render pipeline for line rendering
+      // Create render pipeline for infinite grid (quad)
       this.pipeline = device.createRenderPipeline({
         label: 'Grid Render Pipeline',
         layout: device.createPipelineLayout({
@@ -115,35 +109,33 @@ export class GridRenderer {
         vertex: {
           module: shaderModule,
           entryPoint: GridShaderEntryPoint.VERTEX,
-          buffers: [
-            {
-              arrayStride: 7 * 4, // 3 floats (position) + 4 floats (color)
-              attributes: [
-                {
-                  shaderLocation: 0, // position
-                  offset: 0,
-                  format: 'float32x3',
-                },
-                {
-                  shaderLocation: 1, // color
-                  offset: 12,
-                  format: 'float32x4',
-                },
-              ],
-            },
-          ],
+          buffers: [], // No vertex buffers, we generate quad in shader
         },
         fragment: {
           module: shaderModule,
           entryPoint: GridShaderEntryPoint.FRAGMENT,
-          targets: [{ format }],
+          targets: [{
+            format,
+            blend: {
+              color: {
+                srcFactor: 'src-alpha',
+                dstFactor: 'one-minus-src-alpha',
+                operation: 'add',
+              },
+              alpha: {
+                srcFactor: 'src-alpha',
+                dstFactor: 'one-minus-src-alpha',
+                operation: 'add',
+              },
+            },
+          }],
         },
         primitive: {
-          topology: 'line-list',
+          topology: 'triangle-list',
           cullMode: 'none',
         },
         depthStencil: {
-          depthWriteEnabled: false, // Grid doesn't write depth
+          depthWriteEnabled: false,
           depthCompare: 'less-equal',
           format: depthFormat,
         },
@@ -152,240 +144,125 @@ export class GridRenderer {
         },
       });
 
-      // Generate grid geometry
-      this.updateGridGeometry();
+      // Initialize uniforms
+      this.updateUniforms();
     } catch (error) {
       Logger.error('Failed to initialize grid renderer:', error as unknown as Error);
-      // Clean up partially created GPU resources
-      if (this.vertexBuffer) {
-        this.vertexBuffer.destroy();
-        this.vertexBuffer = null;
-      }
-      if (this.uniformBuffer) {
-        this.uniformBuffer.destroy();
-        this.uniformBuffer = null;
-      }
-      this.pipeline = null;
-      this.uniformBindGroup = null;
-      // keep this.device to allow retry
+      this.dispose();
       throw error;
     }
   }
 
   /**
-   * Generates grid line geometry based on current configuration.
+   * Updates uniform buffer with current config and eye position.
    */
-  private updateGridGeometry(): void {
-    if (!this.device) return;
+  private updateUniforms(eyePosition: Vec3 | Float32Array | number[] = [0, 0, 0]): void {
+    if (!this.device || !this.uniformBuffer) return;
 
-    const vertices = this.generateGridVertices();
-    this.vertexCount = vertices.length;
+    const {
+      cellSize,
+      fadeDistance = 100,
+      majorLineInterval,
+      colors,
+      axisColors,
+      lineWidth
+    } = this.config;
 
-    if (this.vertexCount === 0) {
-      return;
-    }
+    // Create data buffer for everything except ViewProjection (which is updated per-frame)
+    // Starting at offset 64 (16 floats)
+    const data = new Float32Array(48); // 192 bytes -> 48 floats
+    
+    // EyePos at local index 0 (offset 64 in buffer)
+    data[0] = eyePosition[0];
+    data[1] = eyePosition[1];
+    data[2] = eyePosition[2];
+    // padding at 3
+    
+    // Params at local index 4 (offset 80)
+    data[4] = cellSize;
+    data[5] = fadeDistance;
+    data[6] = majorLineInterval;
+    data[7] = lineWidth.minor;
+    
+    // Params at local index 8 (offset 96)
+    data[8] = lineWidth.major;
+    // padding 9, 10, 11
+    
+    // Colors starting at local index 12 (offset 112)
+    const minor = parseColorHex(colors.minorLine);
+    const major = parseColorHex(colors.majorLine);
+    const axisX = parseColorHex(axisColors?.x || '#e95959');
+    const axisZ = parseColorHex(axisColors?.z || '#5959e9');
+    const origin = parseColorHex(colors.origin);
 
-    // Pack vertices into Float32Array
-    const vertexData = new Float32Array(this.vertexCount * 7);
-    for (let i = 0; i < vertices.length; i++) {
-      const vertex = vertices[i]!;
-      const offset = i * 7;
-      vertexData[offset + 0] = vertex.position[0];
-      vertexData[offset + 1] = vertex.position[1];
-      vertexData[offset + 2] = vertex.position[2];
-      vertexData[offset + 3] = vertex.color[0];
-      vertexData[offset + 4] = vertex.color[1];
-      vertexData[offset + 5] = vertex.color[2];
-      vertexData[offset + 6] = vertex.color[3];
-    }
+    data.set(minor, 12);
+    data.set(major, 16);
+    data.set(axisX, 20);
+    data.set(axisZ, 24);
+    data.set(origin, 28);
 
-    // Create or recreate vertex buffer
-    if (this.vertexBuffer) {
-      this.vertexBuffer.destroy();
-    }
-
-    this.vertexBuffer = this.device.createBuffer({
-      label: 'Grid Vertex Buffer',
-      size: vertexData.byteLength,
-      usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
-      mappedAtCreation: true,
-    });
-
-    new Float32Array(this.vertexBuffer.getMappedRange()).set(vertexData);
-    this.vertexBuffer.unmap();
-  }
-
-  /**
-   * Generates grid line vertices based on configuration.
-   */
-  private generateGridVertices(): GridVertex[] {
-    const vertices: GridVertex[] = [];
-    const { cellSize, extent, planes, colors, majorLineInterval } = this.config;
-
-    if (!planes.horizontal && !planes.vertical) {
-      return vertices; // No grid to render
-    }
-
-    const minorColor = parseColorHex(colors.minorLine);
-    const majorColor = parseColorHex(colors.majorLine);
-    const originColor = parseColorHex(colors.origin);
-
-    const halfExtent = extent * cellSize;
-    const numLines = extent * 2 + 1;
-
-    // Generate horizontal grid lines (XZ plane, Y=0)
-    if (planes.horizontal) {
-      // Lines parallel to X axis (varying Z)
-      for (let i = 0; i < numLines; i++) {
-        const z = (i - extent) * cellSize;
-        const isMajor = i % majorLineInterval === extent % majorLineInterval;
-        const isOrigin = Math.abs(z) < 0.001;
-
-        const color = isOrigin ? originColor : isMajor ? majorColor : minorColor;
-
-        vertices.push({
-          position: [-halfExtent, 0, z],
-          color,
-        });
-        vertices.push({
-          position: [halfExtent, 0, z],
-          color,
-        });
-      }
-
-      // Lines parallel to Z axis (varying X)
-      for (let i = 0; i < numLines; i++) {
-        const x = (i - extent) * cellSize;
-        const isMajor = i % majorLineInterval === extent % majorLineInterval;
-        const isOrigin = Math.abs(x) < 0.001;
-
-        const color = isOrigin ? originColor : isMajor ? majorColor : minorColor;
-
-        vertices.push({
-          position: [x, 0, -halfExtent],
-          color,
-        });
-        vertices.push({
-          position: [x, 0, halfExtent],
-          color,
-        });
-      }
-    }
-
-    // Generate vertical grid lines (XY plane at Z=0 and YZ plane at X=0)
-    if (planes.vertical) {
-      // XY plane (Z=0)
-      for (let i = 0; i < numLines; i++) {
-        const y = (i - extent) * cellSize;
-        const isMajor = i % majorLineInterval === extent % majorLineInterval;
-        const isOrigin = Math.abs(y) < 0.001;
-        const color = isOrigin ? originColor : isMajor ? majorColor : minorColor;
-
-        // Lines parallel to X axis (varying Y)
-        vertices.push({ position: [-halfExtent, y, 0], color });
-        vertices.push({ position: [halfExtent, y, 0], color });
-      }
-      for (let i = 0; i < numLines; i++) {
-        const x = (i - extent) * cellSize;
-        const isMajor = i % majorLineInterval === extent % majorLineInterval;
-        const isOrigin = Math.abs(x) < 0.001;
-        const color = isOrigin ? originColor : isMajor ? majorColor : minorColor;
-
-        // Lines parallel to Y axis (varying X)
-        vertices.push({ position: [x, -halfExtent, 0], color });
-        vertices.push({ position: [x, halfExtent, 0], color });
-      }
-
-      // YZ plane (X=0)
-      for (let i = 0; i < numLines; i++) {
-        const y = (i - extent) * cellSize;
-        const isMajor = i % majorLineInterval === extent % majorLineInterval;
-        const isOrigin = Math.abs(y) < 0.001;
-        const color = isOrigin ? originColor : isMajor ? majorColor : minorColor;
-
-        // Lines parallel to Z axis (varying Y)
-        vertices.push({ position: [0, y, -halfExtent], color });
-        vertices.push({ position: [0, y, halfExtent], color });
-      }
-      for (let i = 0; i < numLines; i++) {
-        const z = (i - extent) * cellSize;
-        const isMajor = i % majorLineInterval === extent % majorLineInterval;
-        const isOrigin = Math.abs(z) < 0.001;
-        const color = isOrigin ? originColor : isMajor ? majorColor : minorColor;
-
-        // Lines parallel to Y axis (varying Z)
-        vertices.push({ position: [0, -halfExtent, z], color });
-        vertices.push({ position: [0, halfExtent, z], color });
-      }
-    }
-
-    return vertices;
+    // Write to buffer at offset 64
+    this.device.queue.writeBuffer(
+      this.uniformBuffer,
+      64,
+      data.buffer,
+      0,
+      data.byteLength
+    );
   }
 
   /**
    * Renders the grid.
    * @param passEncoder - Render pass encoder
    * @param viewProjectionMatrix - Combined view-projection matrix
+   * @param eyePosition - Camera world position (optional, defaults to 0,0,0)
    */
-  render(passEncoder: GPURenderPassEncoder, viewProjectionMatrix: Mat4): void {
-    if (!this.visible || !this.pipeline || !this.vertexBuffer || this.vertexCount === 0) {
+  render(
+    passEncoder: GPURenderPassEncoder, 
+    viewProjectionMatrix: Mat4 | Float32Array, 
+    eyePosition?: Vec3 | Float32Array | number[]
+  ): void {
+    if (!this.visible || !this.pipeline || !this.uniformBindGroup) {
       return;
     }
 
-    if (!this.device || !this.uniformBuffer || !this.uniformBindGroup) {
+    if (!this.device || !this.uniformBuffer) {
       return;
     }
 
-    // Update uniform buffer with view-projection matrix
+    // Update ViewProjection Matrix (Offset 0)
+    const vpBuffer = viewProjectionMatrix instanceof Float32Array 
+      ? viewProjectionMatrix 
+      : (viewProjectionMatrix as any).buffer;
+      
     this.device.queue.writeBuffer(
       this.uniformBuffer,
       0,
-      viewProjectionMatrix.buffer,
-      viewProjectionMatrix.byteOffset,
+      vpBuffer,
+      (viewProjectionMatrix as any).byteOffset || 0,
       64
     );
 
-    // Render grid lines
+    // Update other uniforms if eye position is provided
+    if (eyePosition) {
+      this.updateUniforms(eyePosition);
+    }
+
+    // Draw full-screen quad (6 vertices) which is transformed in vertex shader
     passEncoder.setPipeline(this.pipeline);
     passEncoder.setBindGroup(0, this.uniformBindGroup);
-    passEncoder.setVertexBuffer(0, this.vertexBuffer);
-    passEncoder.draw(this.vertexCount, 1, 0, 0);
+    passEncoder.draw(6, 1, 0, 0);
   }
 
   /**
-   * Updates grid configuration and regenerates geometry if needed.
+   * Updates grid configuration.
    */
   setConfig(config: Partial<GridConfig>): void {
-    const prevCellSize = this.config.cellSize;
-    const prevExtent = this.config.extent;
-    const prevPlanes = { ...this.config.planes };
-    const prevColors = { ...this.config.colors };
-    const prevMajorInterval = this.config.majorLineInterval;
-
     this.config = { ...this.config, ...config };
-
-    const validationErrors = validateGridConfig(this.config);
-    if (validationErrors.length > 0) {
-      Logger.warn('Grid config validation errors:', new Error(validationErrors.join(', ')));
-    }
-
-    // Check if geometry needs regeneration
-    const geometryChanged =
-      prevCellSize !== this.config.cellSize ||
-      prevExtent !== this.config.extent ||
-      prevPlanes.horizontal !== this.config.planes.horizontal ||
-      prevColors.minorLine !== this.config.colors.minorLine ||
-      prevColors.majorLine !== this.config.colors.majorLine ||
-      prevColors.origin !== this.config.colors.origin ||
-      prevMajorInterval !== this.config.majorLineInterval;
-
-    if (geometryChanged) {
-      this.updateGridGeometry();
-    }
-
     if (config.visible !== undefined) {
       this.visible = config.visible;
     }
+    this.updateUniforms();
   }
 
   /**
@@ -420,10 +297,6 @@ export class GridRenderer {
    * Cleans up GPU resources.
    */
   dispose(): void {
-    if (this.vertexBuffer) {
-      this.vertexBuffer.destroy();
-      this.vertexBuffer = null;
-    }
     if (this.uniformBuffer) {
       this.uniformBuffer.destroy();
       this.uniformBuffer = null;

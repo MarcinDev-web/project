@@ -6,6 +6,7 @@ import {
   type AnimationStateConfig,
   type AnimationTransitionConfig,
 } from './AnimationStateMachine';
+import { AnimationLayer } from './AnimationLayer';
 import { Skeleton, type PoseBone } from './Skeleton';
 import type {
   AnimationComponentJSON,
@@ -24,8 +25,23 @@ export class AnimationComponent extends Component {
   pose: PoseBone[] | null = null;
   clips = new Map<string, AnimationClip>();
   controllers = new Map<string, AnimationController>();
-  stateMachine = new AnimationStateMachine();
+  
+  layers: AnimationLayer[] = [];
+  
   private activeStateName: string | null = null;
+
+  constructor() {
+    super();
+    // Initialize with a default base layer
+    this.layers.push(new AnimationLayer('Base Layer'));
+  }
+
+  get stateMachine(): AnimationStateMachine {
+    if (this.layers.length === 0) {
+      this.layers.push(new AnimationLayer('Base Layer'));
+    }
+    return this.layers[0]!.stateMachine;
+  }
 
   onAttach(): void {
     super.onAttach();
@@ -135,6 +151,25 @@ export class AnimationComponent extends Component {
       this.activeStateName = name;
     } catch {
       // Ignore unknown states to avoid crashing the component
+    }
+  }
+  
+  addLayer(name: string, weight: number = 1.0, additive: boolean = false): AnimationLayer {
+    const layer = new AnimationLayer(name);
+    layer.weight = weight;
+    layer.additive = additive;
+    this.layers.push(layer);
+    return layer;
+  }
+  
+  getLayer(name: string): AnimationLayer | undefined {
+    return this.layers.find(l => l.name === name);
+  }
+  
+  removeLayer(name: string): void {
+    const index = this.layers.findIndex(l => l.name === name);
+    if (index > 0) { // Cannot remove base layer
+      this.layers.splice(index, 1);
     }
   }
 
@@ -260,22 +295,30 @@ export class AnimationComponent extends Component {
     clone.setParameters({ ...parameters });
 
     const clonedStates = this.getStates().map((state) => {
-      const cloneController = controllerMap.get(state.controller)
-        ?? clone.controllers.get(state.controller.clip.name)
-        ?? clone.controllers.get(state.name);
-      if (!cloneController) {
-        const base = {
-          name: state.name,
-          controller: clone.controllers.values().next().value ?? clone.addClip(
-            AnimationClip.fromJSON(state.controller.clip.toJSON())
-          ),
-        } as const;
+      // Handle AnimationNode (Controller or BlendTree)
+      // For now, we only support cloning simple Controllers in this basic clone()
+      // BlendTrees would need more complex cloning logic
+      if (state.controller instanceof AnimationController) {
+        const cloneController = controllerMap.get(state.controller)
+          ?? clone.controllers.get(state.controller.clip.name)
+          ?? clone.controllers.get(state.name);
+          
+        if (!cloneController) {
+          const base = {
+            name: state.name,
+            controller: clone.controllers.values().next().value ?? clone.addClip(
+              AnimationClip.fromJSON(state.controller.clip.toJSON())
+            ),
+          } as const;
+          const transitions = this.cloneTransitions(state.transitions);
+          return transitions ? { ...base, transitions } : base;
+        }
+        const base = { name: state.name, controller: cloneController } as const;
         const transitions = this.cloneTransitions(state.transitions);
         return transitions ? { ...base, transitions } : base;
       }
-      const base = { name: state.name, controller: cloneController } as const;
-      const transitions = this.cloneTransitions(state.transitions);
-      return transitions ? { ...base, transitions } : base;
+      // Fallback for non-controller nodes (skip or basic clone)
+      return state;
     });
     clone.setStates(clonedStates);
 
@@ -295,9 +338,16 @@ export class AnimationComponent extends Component {
     const transitions = state.transitions
       ?.map((transition) => this.serializeTransition(transition))
       .filter((transition): transition is AnimationTransitionJSON => Boolean(transition));
+    
+    // Only serialize if controller is AnimationController
+    let clipName = '';
+    if (state.controller instanceof AnimationController) {
+      clipName = state.controller.clip.name;
+    }
+    
     return {
       name: state.name,
-      clip: state.controller.clip.name,
+      clip: clipName,
       ...(transitions && transitions.length > 0 ? { transitions } : {}),
     };
   }
@@ -386,4 +436,3 @@ export class AnimationComponent extends Component {
 }
 
 registerComponent(AnimationComponent.type, AnimationComponent);
-

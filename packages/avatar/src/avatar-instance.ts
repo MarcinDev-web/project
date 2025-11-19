@@ -1,4 +1,4 @@
-import { Entity } from '@engine/world';
+import { Entity, MaterialComponent } from '@engine/world';
 import { AnimationComponent } from '@engine/stdlib/Animation';
 import { getVec3Pool } from '@engine/core/utils/Vec3Pool';
 import type { AvatarAnimation } from './animation';
@@ -110,16 +110,6 @@ export class AvatarInstance {
   }
 
   /**
-   * @deprecated Use getAnimationComponent() instead. This method has been removed.
-   * @throws Error if called - use getAnimationComponent() instead.
-   */
-  getAnimator(): never {
-    throw new Error(
-      'getAnimator() has been removed. Use getAnimationComponent() or getOrCreateAnimationComponent() instead.',
-    );
-  }
-
-  /**
    * Get AnimationComponent from the root entity or parent entity.
    * Returns null if not found.
    */
@@ -157,6 +147,11 @@ export class AvatarInstance {
   }
 
   update(_deltaTime: number): void {
+    // WARNING: This update must run BEFORE AnimationSystem in the frame cycle.
+    // AnimationComponent is updated by AnimationSystem.
+    // This method syncs the result of AnimationComponent to the AvatarSkeleton and visual entities.
+    // If this runs before AnimationSystem, we are rendering the previous frame's pose.
+    
     // AnimationComponent is updated by AnimationSystem, so we don't need to call animator.update()
     // But we keep it for backward compatibility if someone is using the old animator directly
     // this.animator.update(deltaTime); // Removed - AnimationSystem handles this
@@ -203,7 +198,9 @@ export class AvatarInstance {
       if (poseBone.rotation) {
         this.skeleton.setLocalRotation(jointName, poseBone.rotation);
       }
-      // Note: AvatarSkeleton doesn't support scale, so we skip it
+      if (poseBone.scale) {
+        this.skeleton.setLocalScale(jointName, poseBone.scale);
+      }
     }
   }
 
@@ -244,6 +241,7 @@ export class AvatarInstance {
   }
 
   dispose(): void {
+    this.stopAnimation();
     // Collect slots before iteration to avoid modifying map during iteration
     const slots = Array.from(this.slotEntities.keys());
     for (const slot of slots) {
@@ -279,8 +277,10 @@ export class AvatarInstance {
   }
 
   setSlot(slot: AvatarSlot, part: AvatarLoadoutPart | null): void {
-    this.mountManager.unmountSlot(slot);
+    const existingSelection = this.selections.get(slot);
+    
     if (!part) {
+      this.mountManager.unmountSlot(slot);
       this.selections.delete(slot);
       return;
     }
@@ -304,6 +304,23 @@ export class AvatarInstance {
       ...(colors ? { colors } : {}),
       ...(materialId ? { materialId } : {}),
     };
+
+    // Optimization: If part ID is same, just update colors/material instead of full rebuild
+    if (existingSelection && existingSelection.id === part.mesh) {
+      const entity = this.slotEntities.get(slot);
+      if (entity) {
+        this.selections.set(slot, selection);
+        
+        // Re-apply colors and materials
+        const appliedColors = this.colorManager.applyColorSlots(entity, selection);
+        selection.appliedColors = appliedColors;
+        this.materialManager.applyMaterial(entity, selection, appliedColors);
+        return;
+      }
+    }
+
+    // Full mount (different part or first time)
+    this.mountManager.unmountSlot(slot);
     this.selections.set(slot, selection);
     this.mountManager.mountPart(selection);
   }
@@ -342,6 +359,27 @@ export class AvatarInstance {
   }
 
   /**
+   * Set global transparency for the avatar.
+   * useful for "ghost" mode or fading out.
+   * 
+   * @param opacity - Opacity value from 0.0 to 1.0
+   */
+  setTransparency(opacity: number): void {
+    const clampedOpacity = Math.max(0, Math.min(1, opacity));
+    const alphaMode = clampedOpacity < 0.999 ? 'blend' : 'opaque';
+    
+    // Update all slots
+    for (const entity of this.slotEntities.values()) {
+      const material = entity.getComponent(MaterialComponent);
+      if (material) {
+        material.opacity = clampedOpacity;
+        material.alphaMode = alphaMode;
+        material.updateFlags();
+      }
+    }
+  }
+
+  /**
    * Get slot entity (for external manipulation)
    */
   getSlotEntity(slot: AvatarSlot): Entity | undefined {
@@ -363,8 +401,10 @@ export class AvatarInstance {
         const local = this.skeleton.getLocalTransform(name);
         jointEntity.transform.position = local.position;
         jointEntity.transform.rotation = local.rotation;
+        jointEntity.transform.scale = local.scale;
         // Release pooled Vec3 after assignment (setter clones it internally)
         pool.release(local.position);
+        pool.release(local.scale);
         this.skeleton.markJointClean(name);
       });
     } else {
@@ -377,8 +417,10 @@ export class AvatarInstance {
         const local = this.skeleton.getLocalTransform(name);
         jointEntity.transform.position = local.position;
         jointEntity.transform.rotation = local.rotation;
+        jointEntity.transform.scale = local.scale;
         // Release pooled Vec3 after assignment (setter clones it internally)
         pool.release(local.position);
+        pool.release(local.scale);
         this.skeleton.markJointClean(name);
       }
     }
@@ -392,9 +434,10 @@ export class AvatarInstance {
       const local = this.skeleton.getLocalTransform(name);
       entity.transform.position = local.position;
       entity.transform.rotation = local.rotation;
+      entity.transform.scale = local.scale;
       // Release pooled Vec3 after assignment (setter clones it internally)
       pool.release(local.position);
-      entity.transform.scale = [1, 1, 1];
+      pool.release(local.scale);
 
       if (parentName) {
         const parentEntity = this.jointEntities.get(parentName);
@@ -424,4 +467,3 @@ export class AvatarInstance {
     return definition;
   }
 }
-

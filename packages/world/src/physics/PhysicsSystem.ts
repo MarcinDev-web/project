@@ -14,6 +14,7 @@ import { ObjectPool } from '@engine/core/utils';
 import { Octree, type OctreeConfig, DEFAULT_OCTREE_CONFIG } from './Octree.js';
 import { BoundingVolume } from './BoundingVolume.js';
 import type { Joint } from './Joint.js';
+import { init as initWasm, type CollisionWorld, type WasmCollision } from '@engine/wasm-collision';
 // Avoid static import from '@engine/script' to prevent world↔script circular dependency during build
 
 /**
@@ -64,6 +65,8 @@ export interface PhysicsConfig {
   octreeConfig?: Partial<OctreeConfig>;
   /** World bounds for octree (default: auto-calculated) */
   worldBounds?: { min: Vec3; max: Vec3 };
+  /** Enable WASM acceleration if available (default: true) */
+  useWasm: boolean;
 }
 
 /**
@@ -80,6 +83,7 @@ export const DEFAULT_PHYSICS_CONFIG: PhysicsConfig = {
     min: [-100, -100, -100],
     max: [100, 100, 100],
   },
+  useWasm: true,
 };
 
 /**
@@ -138,6 +142,10 @@ export class PhysicsSystem {
   private readonly tmpQuatA: [number, number, number, number] = [0, 0, 0, 1];
   private readonly tmpQuatB: [number, number, number, number] = [0, 0, 0, 1];
 
+  /** Zero-Copy WASM Collision World */
+  private collisionWorld: CollisionWorld | null = null;
+  private wasmModule: WasmCollision | null = null;
+
   /** Pool of CollisionEvent wrappers to reduce per-frame allocations */
   private readonly collisionEventPool = new ObjectPool<CollisionEvent>(
     () => ({
@@ -165,6 +173,27 @@ export class PhysicsSystem {
         this.config.worldBounds,
         this.config.octreeConfig ?? DEFAULT_OCTREE_CONFIG
       );
+    }
+
+    // Initialize WASM if enabled
+    if (this.config.useWasm) {
+      this.initializeWasm().catch((err) => {
+        console.warn('Failed to initialize WASM collision module, falling back to JS', err);
+      });
+    }
+  }
+
+  private async initializeWasm() {
+    try {
+      const wasm = await initWasm();
+      this.wasmModule = wasm;
+      CollisionDetection.init(wasm);
+
+      if (wasm.CollisionWorld) {
+        this.collisionWorld = new wasm.CollisionWorld();
+      }
+    } catch (error) {
+      console.warn('WASM collision init failed:', error);
     }
   }
 
@@ -369,7 +398,76 @@ export class PhysicsSystem {
   private detectCollisions(entities: Entity[]): CollisionEvent[] {
     this.collisionsScratch.length = 0;
 
-    // Update octree if enabled
+    if (this.config.useWasm && this.collisionWorld && this.wasmModule) {
+      // Zero-Copy WASM Batch Check
+      const dynamicEntities: Entity[] = [];
+      for (const e of entities) {
+        const p = e.getComponent(PhysicsComponent);
+        if (p && p.colliders.length > 0) {
+          dynamicEntities.push(e);
+        }
+      }
+
+      if (dynamicEntities.length > 1) {
+        const count = dynamicEntities.length;
+        
+        // Resize buffers if needed
+        this.collisionWorld.resize(count);
+
+        // Get views into WASM memory
+        const memory = this.wasmModule.memory;
+        const posPtr = this.collisionWorld.get_positions_ptr();
+        const rotPtr = this.collisionWorld.get_rotations_ptr();
+        const sclPtr = this.collisionWorld.get_scales_ptr();
+
+        const positions = new Float32Array(memory.buffer, posPtr, count * 3);
+        const rotations = new Float32Array(memory.buffer, rotPtr, count * 4);
+        const scales = new Float32Array(memory.buffer, sclPtr, count * 3);
+
+        // Write directly to WASM memory
+        for (let i = 0; i < count; i++) {
+          const e = dynamicEntities[i]!;
+          const t = e.transform;
+          
+          // Position
+          positions[i * 3] = t.position[0];
+          positions[i * 3 + 1] = t.position[1];
+          positions[i * 3 + 2] = t.position[2];
+          
+          // Rotation
+          rotations[i * 4] = t.rotation[0];
+          rotations[i * 4 + 1] = t.rotation[1];
+          rotations[i * 4 + 2] = t.rotation[2];
+          rotations[i * 4 + 3] = t.rotation[3];
+          
+          // Scale
+          scales[i * 3] = t.scale[0];
+          scales[i * 3 + 1] = t.scale[1];
+          scales[i * 3 + 2] = t.scale[2];
+        }
+
+        // Run collision check inside WASM
+        const collidingPairsIndices = this.collisionWorld.check_collisions();
+
+        // Process pairs
+        if (collidingPairsIndices.length > 0) {
+          for (let k = 0; k < collidingPairsIndices.length; k += 2) {
+            const idxA = collidingPairsIndices[k];
+            const idxB = collidingPairsIndices[k+1];
+            if (idxA === undefined || idxB === undefined) continue;
+            
+            const entityA = dynamicEntities[idxA];
+            const entityB = dynamicEntities[idxB];
+            if (!entityA || !entityB) continue;
+
+            this.checkPair(entityA, entityB);
+          }
+          return this.collisionsScratch;
+        }
+      }
+    }
+
+    // Fallback to Octree or Brute Force if WASM disabled or failed
     if (this.octree) {
       this.updateOctree(entities);
     }
@@ -378,7 +476,6 @@ export class PhysicsSystem {
     this.pairsScratch.length = 0;
     if (this.octree) {
       const pairsFromTree = this.octree.queryPairs();
-      // copy into scratch to allow downstream reuse and centralized clearing
       for (let i = 0; i < pairsFromTree.length; i++) {
         const p = pairsFromTree[i]!;
         this.pairsScratch.push(p);
@@ -390,20 +487,25 @@ export class PhysicsSystem {
     // Narrow phase: check each pair for actual collision
     for (let k = 0; k < this.pairsScratch.length; k++) {
       const pair = this.pairsScratch[k]!;
-      const entityA = pair[0];
-      const entityB = pair[1];
+      this.checkPair(pair[0], pair[1]);
+    }
+
+    return this.collisionsScratch;
+  }
+
+  private checkPair(entityA: Entity, entityB: Entity) {
       const physicsA = entityA.getComponent(PhysicsComponent);
       const physicsB = entityB.getComponent(PhysicsComponent);
 
-      if (!physicsA || !physicsB) continue;
-      if (physicsA.colliders.length === 0 || physicsB.colliders.length === 0) continue;
+      if (!physicsA || !physicsB) return;
+      if (physicsA.colliders.length === 0 || physicsB.colliders.length === 0) return;
 
       // Skip if both are static or kinematic (they don't interact)
       if (
         physicsA.rigidbodyType !== RigidbodyType.Dynamic &&
         physicsB.rigidbodyType !== RigidbodyType.Dynamic
       ) {
-        continue;
+        return;
       }
 
       // Check each collider pair
@@ -444,9 +546,6 @@ export class PhysicsSystem {
           }
         }
       }
-    }
-
-    return this.collisionsScratch;
   }
 
   private getBroadPhasePairsBruteForceInto(entities: Entity[], out: Array<[Entity, Entity]>): void {

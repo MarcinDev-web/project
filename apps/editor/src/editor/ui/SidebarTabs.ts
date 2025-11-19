@@ -116,7 +116,11 @@ export class SidebarTabs {
     config.content.style.display = 'none';
     
     // Track scroll position for this panel
-    const scrollableElement = config.content.querySelector('.custom-scrollbar') as HTMLElement;
+    // Try to find a specific scrollable element, or fallback to content itself
+    const scrollableElement = (config.content.classList.contains('custom-scrollbar') 
+      ? config.content 
+      : config.content.querySelector('.custom-scrollbar')) as HTMLElement || config.content;
+      
     if (scrollableElement) {
       scrollableElement.addEventListener('scroll', () => {
         this.scrollPositions.set(config.id, scrollableElement.scrollTop);
@@ -172,7 +176,10 @@ export class SidebarTabs {
 
     // Restore scroll position for the activated tab
     requestAnimationFrame(() => {
-      const scrollableElement = config.content.querySelector('.custom-scrollbar') as HTMLElement;
+      const scrollableElement = (config.content.classList.contains('custom-scrollbar') 
+        ? config.content 
+        : config.content.querySelector('.custom-scrollbar')) as HTMLElement || config.content;
+        
       if (scrollableElement) {
         const savedScroll = this.scrollPositions.get(tabId) || 0;
         scrollableElement.scrollTop = savedScroll;

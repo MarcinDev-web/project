@@ -525,6 +525,7 @@ export function createGeometryBuffers(
   instanceMaterialIdBuffer: GPUBuffer; // NEW
   instanceMaterialIdStagingBuffer: GPUBuffer;
   instanceBoundsBuffer: GPUBuffer;
+  instanceIndirectArgsBuffer: GPUBuffer;
 } {
   // Validate provided geometry early to surface issues before GPU resource creation.
   validateGeometryData(geometry);
@@ -684,7 +685,13 @@ export function createGeometryBuffers(
   const opaqueCount = Math.min(Math.max(geometry.opaqueCount ?? geometry.instanceCount, 0), geometry.instanceCount);
   const transparentCount = Math.max(geometry.instanceCount - opaqueCount, 0);
   const indirectArgs = buildIndirectDrawArgs(indexCount, opaqueCount, transparentCount);
-  device.queue.writeBuffer(instanceIndirectArgsBuffer, 0, indirectArgs);
+  device.queue.writeBuffer(
+    instanceIndirectArgsBuffer,
+    0,
+    indirectArgs.buffer as ArrayBuffer,
+    indirectArgs.byteOffset,
+    indirectArgs.byteLength
+  );
 
   return {
     vertexBuffer,

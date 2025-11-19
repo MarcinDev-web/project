@@ -33,6 +33,10 @@ export interface ModelBuilderManagerConfig {
     warn: (...args: unknown[]) => void;
     error: (msg: string, error?: Error) => void;
   };
+  /** Callback to register undo handler with main editor */
+  registerUndo?: (handler: () => boolean) => () => void;
+  /** Callback to register redo handler with main editor */
+  registerRedo?: (handler: () => boolean) => () => void;
 }
 
 /**
@@ -111,6 +115,8 @@ export class ModelBuilderManager {
     // Create ModelBuilderMode
     const builderModeConfig: ModelBuilderModeConfig = {
       enableHistory: true,
+      registerUndo: this.config.registerUndo,
+      registerRedo: this.config.registerRedo,
     };
 
     if (this.logger) {
