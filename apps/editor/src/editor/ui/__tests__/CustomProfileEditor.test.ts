@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { showCustomProfileEditor } from '../CustomProfileEditor';
+import { showCustomProfileEditor } from '../features/CustomProfileEditor';
 import { MovementProfileRegistry } from '@engine/stdlib/MovementProfiles';
 
 describe.skip('CustomProfileEditor', () => {

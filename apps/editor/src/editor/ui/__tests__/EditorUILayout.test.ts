@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { EditorUILayout, type EditorUILayoutConfig, type SceneMetrics } from '../EditorUILayout';
+import { EditorUILayout, type EditorUILayoutConfig, type SceneMetrics } from '../layout/EditorUILayout';
 
 describe.skip('EditorUILayout', () => {
   let canvas: HTMLCanvasElement;

@@ -20,9 +20,6 @@ export const TopBar = memo(function TopBar() {
           <NavLink to="/marketplace" isActive={isActive('/marketplace')}>
             Marketplace
           </NavLink>
-          <NavLink to="/shop" isActive={isActive('/shop')}>
-            Shop
-          </NavLink>
           <NavLink to="/news" isActive={isActive('/news')}>
             News
           </NavLink>

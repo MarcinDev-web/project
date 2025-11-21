@@ -5,9 +5,9 @@ import type { EditorState } from '../core/state';
 import { ProjectStorage, type ProjectData, type ProjectMetadata } from './ProjectStorage';
 import { Logger } from '../../utils/logger';
 import { ShareClient } from '@engine/net';
-import { NewProjectDialog, type NewProjectConfig } from '../ui/NewProjectDialog';
-import { SaveProjectDialog, type ValidationResult } from '../ui/SaveProjectDialog';
-import { LoadProjectDialog } from '../ui/LoadProjectDialog';
+import { NewProjectDialog, type NewProjectConfig } from '../ui/modals/NewProjectDialog';
+import { SaveProjectDialog, type ValidationResult } from '../ui/modals/SaveProjectDialog';
+import { LoadProjectDialog } from '../ui/modals/LoadProjectDialog';
 import { MarketplaceApiClient } from '../../utils/marketplaceApi';
 import {
   createDefaultGameProjectConfig,

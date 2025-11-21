@@ -4,6 +4,7 @@ import { Button } from '../shared/Button';
 import { TeamMembersList } from './TeamMembersList';
 import { TeamInvitations } from './TeamInvitations';
 import { InviteMemberDialog } from './InviteMemberDialog';
+import { EditTeamDialog } from './EditTeamDialog';
 import { studioApi, type StudioTeam, type TeamMember, type TeamInvitation } from '../../api/studio';
 import { useToast } from '../../contexts/ToastContext';
 import { useAuth } from '../../contexts/AuthContext';
@@ -18,6 +19,7 @@ export function TeamManagement() {
   const [loading, setLoading] = useState(true);
   const [showInviteDialog, setShowInviteDialog] = useState(false);
   const [showCreateDialog, setShowCreateDialog] = useState(false);
+  const [showEditDialog, setShowEditDialog] = useState(false);
   const [teamName, setTeamName] = useState('');
   const [teamDescription, setTeamDescription] = useState('');
 
@@ -114,7 +116,37 @@ export function TeamManagement() {
     }
   };
 
+  const handleLeaveTeam = async () => {
+    if (!user) return;
+    
+    if (!window.confirm('Czy na pewno chcesz opuścić ekipę? Utracisz dostęp do współdzielonych projektów.')) {
+      return;
+    }
+
+    try {
+      await studioApi.removeMember(user.id);
+      showToast('Opuściłeś ekipę', 'success');
+      setTeam(null);
+      setMembers([]);
+      setInvitations([]);
+      // Refresh to show empty state or whatever is appropriate
+      void loadData();
+    } catch (error) {
+      console.error('Failed to leave team:', error);
+      showToast('Nie udało się opuścić ekipy', 'error');
+    }
+  };
+
+  const handleTeamUpdate = () => {
+    showToast('Ekipa zaktualizowana', 'success');
+    void loadData();
+  };
+
   const isOwner = team && user && team.studioOwnerId === user.id;
+
+  const getTeamInitials = (name: string) => {
+    return name.substring(0, 2).toUpperCase();
+  };
 
   if (loading) {
     return (
@@ -130,45 +162,48 @@ export function TeamManagement() {
     return (
       <div className="team-setup">
         <Card>
-          <h2>Utwórz Ekipę</h2>
-          <p>Zaproś użytkowników do współpracy w swoim studio gier!</p>
+          <div className="empty-team-state">
+             <div className="empty-team-icon">🚀</div>
+             <h2>Utwórz Ekipę</h2>
+             <p>Zaproś użytkowników do współpracy w swoim studio gier!</p>
 
-          {!showCreateDialog ? (
-            <Button variant="primary" onClick={() => setShowCreateDialog(true)}>
-              Utwórz Ekipę
-            </Button>
-          ) : (
-            <div className="create-team-form">
-              <div className="form-group">
-                <label htmlFor="team-name">Nazwa ekipy *</label>
-                <input
-                  id="team-name"
-                  type="text"
-                  value={teamName}
-                  onChange={(e) => setTeamName(e.target.value)}
-                  placeholder="Moja Ekipa"
-                />
+            {!showCreateDialog ? (
+              <Button variant="primary" onClick={() => setShowCreateDialog(true)}>
+                Utwórz Ekipę
+              </Button>
+            ) : (
+              <div className="create-team-form">
+                <div className="form-group">
+                  <label htmlFor="team-name">Nazwa ekipy *</label>
+                  <input
+                    id="team-name"
+                    type="text"
+                    value={teamName}
+                    onChange={(e) => setTeamName(e.target.value)}
+                    placeholder="Moja Ekipa"
+                  />
+                </div>
+                <div className="form-group">
+                  <label htmlFor="team-description">Opis (opcjonalnie)</label>
+                  <textarea
+                    id="team-description"
+                    value={teamDescription}
+                    onChange={(e) => setTeamDescription(e.target.value)}
+                    placeholder="Opisz swoją ekipę..."
+                    rows={3}
+                  />
+                </div>
+                <div className="project-editor-actions">
+                  <Button variant="secondary" onClick={() => setShowCreateDialog(false)}>
+                    Anuluj
+                  </Button>
+                  <Button variant="primary" onClick={handleCreateTeam} disabled={!teamName.trim()}>
+                    Utwórz
+                  </Button>
+                </div>
               </div>
-              <div className="form-group">
-                <label htmlFor="team-description">Opis (opcjonalnie)</label>
-                <textarea
-                  id="team-description"
-                  value={teamDescription}
-                  onChange={(e) => setTeamDescription(e.target.value)}
-                  placeholder="Opisz swoją ekipę..."
-                  rows={3}
-                />
-              </div>
-              <div className="project-editor-actions">
-                <Button variant="secondary" onClick={() => setShowCreateDialog(false)}>
-                  Anuluj
-                </Button>
-                <Button variant="primary" onClick={handleCreateTeam} disabled={!teamName.trim()}>
-                  Utwórz
-                </Button>
-              </div>
-            </div>
-          )}
+            )}
+          </div>
         </Card>
       </div>
     );
@@ -176,31 +211,61 @@ export function TeamManagement() {
 
   return (
     <div className="team-management">
-      <div className="team-header">
-        <div>
-          <h2>{team.name}</h2>
-          {team.description && <p className="team-description">{team.description}</p>}
-        </div>
-        {isOwner && (
-          <Button variant="primary" onClick={() => setShowInviteDialog(true)}>
-            + Zaproś Członka
-          </Button>
-        )}
+      <div className="team-banner">
+         <div className="team-banner-content">
+            <div className="team-avatar-large">
+               {getTeamInitials(team.name)}
+            </div>
+            <div className="team-info-large">
+               <h2>{team.name}</h2>
+               {team.description && <p className="team-description">{team.description}</p>}
+               <div className="team-stats-badges">
+                  <span className="team-badge">
+                    👥 {members.length} Członków
+                  </span>
+                  <span className="team-badge">
+                    📅 Utworzono {new Date().getFullYear()}
+                  </span>
+               </div>
+            </div>
+            <div className="team-actions-large">
+              {isOwner ? (
+                <>
+                  <Button variant="secondary" onClick={() => setShowEditDialog(true)} style={{ marginRight: '8px' }}>
+                    Edytuj
+                  </Button>
+                  <Button variant="primary" onClick={() => setShowInviteDialog(true)}>
+                    + Zaproś
+                  </Button>
+                </>
+              ) : (
+                <Button variant="danger" onClick={handleLeaveTeam}>
+                  Opuść Ekipę
+                </Button>
+              )}
+            </div>
+         </div>
       </div>
 
-      <div className="team-sections">
-        <Card>
-          <h3>Członkowie Ekipy ({members.length})</h3>
+      <div className="team-content-grid">
+        <div className="team-section-main">
+          <div className="section-header">
+            <h3>Członkowie Ekipy</h3>
+            <span className="count-badge">{members.length}</span>
+          </div>
           <TeamMembersList
             members={members}
             currentUserId={user?.id || ''}
             isOwner={!!isOwner}
             onRemoveMember={isOwner ? handleRemoveMember : undefined}
           />
-        </Card>
+        </div>
 
-        <Card>
-          <h3>Zaproszenia</h3>
+        <div className="team-section-side">
+          <div className="section-header">
+            <h3>Zaproszenia</h3>
+            {invitations.length > 0 && <span className="count-badge">{invitations.length}</span>}
+          </div>
           <TeamInvitations
             invitations={invitations}
             currentUserId={user?.id || ''}
@@ -208,7 +273,7 @@ export function TeamManagement() {
             onAccept={handleAcceptInvitation}
             onDecline={handleDeclineInvitation}
           />
-        </Card>
+        </div>
       </div>
 
       {showInviteDialog && (
@@ -218,7 +283,17 @@ export function TeamManagement() {
           onInvite={handleInvite}
         />
       )}
+
+      {showEditDialog && (
+        <EditTeamDialog
+          isOpen={showEditDialog}
+          onClose={() => setShowEditDialog(false)}
+          onUpdate={handleTeamUpdate}
+          teamId={team.id}
+          initialName={team.name}
+          initialDescription={team.description}
+        />
+      )}
     </div>
   );
 }
-

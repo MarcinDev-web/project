@@ -31,6 +31,9 @@ import {
   GPU_TIMESTAMP_PAIRS,
   TIMESTAMP_INDICES,
 } from '../config';
+
+const ESTIMATED_TRIANGLES_PER_UNKNOWN_ENTITY = 12;
+
 import { ForwardPlus, type PointLight } from '../lighting/ForwardPlus';
 import { ScreenSpaceLOD } from './ScreenSpaceLOD';
 import { UniformManager } from './UniformManager';
@@ -451,7 +454,7 @@ export class FrameRenderer {
         customGeometryTriangles += count;
       } else {
         // Fallback estimate if count not tracked yet
-        customGeometryTriangles += 12;
+        customGeometryTriangles += ESTIMATED_TRIANGLES_PER_UNKNOWN_ENTITY;
       }
     }
 
@@ -652,14 +655,21 @@ export class FrameRenderer {
   }
   
   /**
-   * Cleans up visible entities cache if it exceeds maximum size.
-   * This prevents unbounded memory growth.
+   * Cleans up caches to prevent unbounded memory growth.
    */
-  private cleanupVisibleEntitiesCache(): void {
+  private cleanupCaches(currentInstanceCount: number): void {
     if (this.visibleEntitiesCache.length > this.MAX_VISIBLE_ENTITIES_CACHE_SIZE) {
-      // Keep only the most recent entries (half of max size)
-      const keepCount = Math.floor(this.MAX_VISIBLE_ENTITIES_CACHE_SIZE / 2);
-      this.visibleEntitiesCache = this.visibleEntitiesCache.slice(-keepCount);
+      // Reset with a new array to release memory of the oversized one
+      // We don't need to preserve content as it is regenerated every frame
+      this.visibleEntitiesCache = [];
+    }
+
+    // Trim scratch buffer if it's significantly larger than needed
+    // Minimum size of 64k elements (256KB) to prevent thrashing for small counts
+    const minSize = 65536;
+    if (this.instanceScaleScratch.length > Math.max(currentInstanceCount * 4, minSize)) {
+      const newSize = Math.max(currentInstanceCount * 2, minSize);
+      this.instanceScaleScratch = new Float32Array(newSize);
     }
   }
   
@@ -744,8 +754,6 @@ export class FrameRenderer {
 
   private submitAndCleanup(device: GPUDevice, commandBuffer: GPUCommandBuffer, encoder: GPUCommandEncoder): void {
     device.queue.submit([commandBuffer]);
-    // Clear bloom temp textures reference - they'll be destroyed in next frame by BloomPass
-    (encoder as any).__bloomTempTextures = undefined;
   }
 
   private updateScene(
@@ -774,11 +782,12 @@ export class FrameRenderer {
       // Update custom geometry triangle counts
       this.updateCustomGeometryTriangleCounts(customGeometry);
       
-      // Cleanup visible entities cache if it grows too large
-      this.cleanupVisibleEntitiesCache();
-
       const instanceStart = performance.now();
       const sceneData = this.instanceBuilder.build(defaultGeometry);
+
+      // Cleanup caches based on current instance count
+      this.cleanupCaches(sceneData.instanceCount);
+
       const instanceData: InstanceBufferData = {
         instanceOffsetData: sceneData.instanceOffsetData,
         instanceColorScaleData: sceneData.instanceColorScaleData,

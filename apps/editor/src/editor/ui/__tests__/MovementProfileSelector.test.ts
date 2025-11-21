@@ -2,7 +2,7 @@
  * @vitest-environment jsdom
  */
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { createMovementProfileSelector } from '../MovementProfileSelector';
+import { createMovementProfileSelector } from '../features/MovementProfileSelector';
 import { PRESET_PROFILES, MovementProfileRegistry } from '@engine/stdlib/MovementProfiles';
 
 describe('MovementProfileSelector', () => {

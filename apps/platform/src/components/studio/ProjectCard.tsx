@@ -48,6 +48,7 @@ export function ProjectCard({
   const handleAccessChanged = () => {
     void handleLoadAccess();
   };
+
   return (
     <Card hoverable>
       <div className="project-card">
@@ -82,15 +83,15 @@ export function ProjectCard({
           )}
         </div>
         <div className="project-actions">
-          <Link to={`/editor?project=${project.id}`}>
-            <Button variant="secondary" style={{ width: '100%', marginBottom: '0.5rem' }}>
+          <Link to={`/editor?project=${project.id}`} style={{ display: 'contents' }}>
+            <Button variant="secondary" style={{ width: '100%' }}>
               Edytuj
             </Button>
           </Link>
           {!project.isPublished && onPublish && (
             <Button
               variant="primary"
-              style={{ width: '100%', marginBottom: '0.5rem' }}
+              style={{ width: '100%' }}
               onClick={() => onPublish(project.id)}
             >
               Opublikuj
@@ -99,10 +100,10 @@ export function ProjectCard({
           {isTeamOwner && team && (
             <Button
               variant="secondary"
-              style={{ width: '100%', marginBottom: '0.5rem' }}
+              style={{ width: '100%' }}
               onClick={handleShowShare}
             >
-              {projectAccess?.access ? 'Zarządzaj dostępem' : 'Udostępnij ekipie'}
+              {projectAccess?.access ? 'Zarządzaj' : 'Udostępnij'}
             </Button>
           )}
           <Button
@@ -136,4 +137,3 @@ export function ProjectCard({
     </Card>
   );
 }
-

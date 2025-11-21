@@ -1,0 +1,93 @@
+.voting {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--spacing-1);
+}
+
+.button {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: var(--spacing-1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--forum-vote-neutral);
+  width: 32px;
+  height: 32px;
+  border-radius: var(--radius-md);
+  transition: all 0.2s ease;
+}
+
+.button:hover:not(:disabled) {
+  background: var(--forum-bg-input);
+  background: var(--surface-3);
+}
+
+.button:disabled {
+  cursor: not-allowed;
+  opacity: 0.5;
+}
+
+.button:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: 2px;
+}
+
+.upvote {
+  color: var(--forum-vote-neutral);
+}
+
+.upvote:hover:not(:disabled) {
+  color: var(--forum-upvote-hover);
+  background: rgba(255, 69, 0, 0.1);
+}
+
+.upvote.active {
+  color: var(--forum-upvote-active);
+}
+
+.downvote {
+  color: var(--forum-vote-neutral);
+}
+
+.downvote:hover:not(:disabled) {
+  color: var(--forum-downvote-hover);
+  background: rgba(113, 147, 255, 0.1);
+}
+
+.downvote.active {
+  color: var(--forum-downvote-active);
+}
+
+.score {
+  font-size: var(--text-base);
+  font-weight: var(--font-semibold);
+  color: var(--text-2);
+  min-width: 24px;
+  text-align: center;
+  line-height: 1.2;
+}
+
+.scorePositive {
+  color: var(--forum-upvote);
+}
+
+.scoreNegative {
+  color: var(--forum-downvote-active);
+}
+
+/* High contrast mode support */
+@media (prefers-contrast: high) {
+  .button {
+    border: 1px solid currentColor;
+  }
+}
+
+/* Reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .button {
+    transform: none;
+  }
+}

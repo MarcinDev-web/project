@@ -12,7 +12,7 @@ export function RegisterPage() {
 
   return (
     <Layout>
-      <div className="page-container" style={{ maxWidth: '500px', marginTop: 'var(--spacing-12)' }}>
+      <div className="auth-page-container">
         <RegisterForm />
       </div>
     </Layout>

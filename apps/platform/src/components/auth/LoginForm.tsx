@@ -104,7 +104,7 @@ export function LoginForm() {
             className="auth-form-checkbox"
           />
           <label htmlFor="rememberMe" className="auth-form-checkbox-label">
-            Zapamiętaj mnie
+            Remember me
           </label>
         </div>
         {error && (

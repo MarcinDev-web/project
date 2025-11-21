@@ -1,3 +1,4 @@
+import styles from './ThreadCard.module.css';
 import { Link } from 'react-router-dom';
 import { Card } from '../shared/Card';
 import { VotingButtons } from './VotingButtons';
@@ -80,8 +81,8 @@ export function ThreadCard({ thread, onVote, showCategory = false }: ThreadCardP
       style={{ textDecoration: 'none', display: 'block' }}
       aria-label={`Thread: ${thread.title}`}
     >
-      <Card variant="thread" hoverable={false}>
-        <div className="forum-thread-card__voting">
+      <Card variant="thread" hoverable={false} className={styles.card}>
+        <div className={styles.voting}>
           <VotingButtons
             score={score}
             userVote={userVote}
@@ -92,8 +93,8 @@ export function ThreadCard({ thread, onVote, showCategory = false }: ThreadCardP
           />
         </div>
 
-        <div className="forum-thread-card__content">
-          <div className="forum-thread-card__header">
+        <div className={styles.content}>
+          <div className={styles.header}>
             <ThreadBadges 
               isPinned={thread.isPinned} 
               isLocked={thread.isLocked} 
@@ -102,21 +103,21 @@ export function ThreadCard({ thread, onVote, showCategory = false }: ThreadCardP
             />
           </div>
 
-          <h3 className="forum-thread-card__title">
+          <h3 className={styles.title}>
             {thread.title}
           </h3>
 
-          <p className="forum-thread-card__preview">
+          <p className={styles.preview}>
             {preview}
           </p>
 
-          <div className="forum-thread-card__meta">
+          <div className={styles.meta}>
             {userProfile && (
               <>
                 <img
                   src={userProfile.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random`}
                   alt={displayName}
-                  className="forum-thread-card__avatar"
+                  className={styles.avatar}
                 />
                 <Link
                   to={`/profile/${thread.authorId}`}

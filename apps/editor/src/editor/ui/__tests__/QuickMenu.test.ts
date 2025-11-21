@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { QuickMenu } from '../QuickMenu';
+import { QuickMenu } from '../features/QuickMenu';
 import { EditorState } from '../../core/state';
 import { Scene } from '@engine/world';
 import { initBrowserPolyfills } from '../../../test/setup';

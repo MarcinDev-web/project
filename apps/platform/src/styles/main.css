@@ -15,12 +15,9 @@
 @import './layout.css';
 
 /* Components - Reuse from editor */
-@import '../../../../apps/editor/styles/components/buttons.css';
-@import '../../../../apps/editor/styles/components/inputs.css';
+@import '@engine/ui/styles.css';
 @import '../../../../apps/editor/styles/components/forms.css';
-@import '../../../../apps/editor/styles/components/cards.css';
 @import '../../../../apps/editor/styles/components/lists.css';
-@import '../../../../apps/editor/styles/components/modals.css';
 @import '../../../../apps/editor/styles/components/notifications.css';
 @import '../../../../apps/editor/styles/components/badges.css';
 @import '../../../../apps/editor/styles/components/tabs.css';
@@ -40,4 +37,5 @@
 /* Forum styles */
 @import './forum-tokens.css';
 @import './forum.css';
+@import './community-hub.css';
 

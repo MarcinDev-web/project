@@ -1,3 +1,4 @@
+import styles from './PostCard.module.css';
 import { Link } from 'react-router-dom';
 import { Card } from '../shared/Card';
 import { VotingButtons } from './VotingButtons';
@@ -114,8 +115,8 @@ export function PostCard({ post, threadAuthorId, onUpdate, onReply }: PostCardPr
   const canEdit = user && (user.id === post.authorId || user.role === 'admin' || user.role === 'moderator');
 
   return (
-    <Card variant="post">
-      <div className="forum-post__voting">
+    <Card variant="post" className={styles.card}>
+      <div className={styles.voting}>
         <VotingButtons
           score={score.score}
           userVote={userVote}
@@ -126,20 +127,20 @@ export function PostCard({ post, threadAuthorId, onUpdate, onReply }: PostCardPr
         />
       </div>
 
-      <div className="forum-post__content">
-        <div className="forum-post__header">
+      <div className={styles.content}>
+        <div className={styles.header}>
           {userProfile && (
             <img
               src={userProfile.avatarUrl || `https://ui-avatars.com/api/?name=${encodeURIComponent(displayName)}&background=random`}
               alt={displayName}
-              className="forum-post__avatar"
+              className={styles.avatar}
             />
           )}
           
-          <div className="forum-post__author">
+          <div className={styles.author}>
             <Link
               to={`/profile/${post.authorId}`}
-              className="forum-post__author-name"
+              className={styles.authorName}
             >
               {displayName}
             </Link>
@@ -248,11 +249,11 @@ export function PostCard({ post, threadAuthorId, onUpdate, onReply }: PostCardPr
           </div>
         ) : (
           <>
-            <div className="forum-post__body">
+            <div className={styles.body}>
               <PostContent content={post.content} />
             </div>
 
-            <div className="forum-post__footer">
+            <div className={styles.footer}>
               <ForumReactions
                 reactions={post.reactions}
                 onAddReaction={(emoji) => {

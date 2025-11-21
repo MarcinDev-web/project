@@ -38,84 +38,96 @@ export function TeamInvitations({
   if (allInvitations.length === 0) {
     return (
       <Card>
-        <p>{isOwner ? 'Brak zaproszeń' : 'Brak oczekujących zaproszeń'}</p>
+        <div className="studio-empty-state">
+          <p>{isOwner ? 'Brak zaproszeń' : 'Brak oczekujących zaproszeń'}</p>
+        </div>
       </Card>
     );
   }
 
+  const getInitials = (name: string) => {
+    return name.substring(0, 2).toUpperCase();
+  };
+
+  const getDisplayName = (invitation: TeamInvitation) => {
+    return invitation.inviteeUsername || 
+           invitation.inviteeEmail?.split('@')[0] || 
+           invitation.inviteeUserId || 
+           'Nieznany';
+  };
+
   return (
-    <div className="team-invitations-list">
+    <div className="team-invitations-grid">
       {allInvitations.map((invitation) => {
         const isForMe = invitation.inviteeUserId === currentUserId;
         const isExpired = invitation.expiresAt < Date.now();
         const canAccept = isForMe && invitation.status === 'pending' && !isExpired;
+        const displayName = getDisplayName(invitation);
+        const initials = getInitials(displayName);
 
         return (
-          <Card key={invitation.id} hoverable={false}>
-            <div className="invitation-item">
-              <div className="invitation-info">
-                <div className="invitation-header">
-                  <strong>
-                    {invitation.inviteeUsername ||
-                      invitation.inviteeEmail ||
-                      invitation.inviteeUserId ||
-                      'Nieznany użytkownik'}
-                  </strong>
-                </div>
-                <div className="invitation-meta">
-                  <span className={`invitation-status status-${invitation.status}`}>
-                    {invitation.status === 'pending' && isExpired
-                      ? '⏰ Wygasło'
-                      : invitation.status === 'pending'
-                        ? '⏳ Oczekujące'
-                        : invitation.status === 'accepted'
-                          ? '✅ Zaakceptowane'
-                          : invitation.status === 'declined'
-                            ? '❌ Odrzucone'
-                            : '⏰ Wygasło'}
-                  </span>
-                  <span className="invitation-date">
-                    {new Date(invitation.createdAt).toLocaleDateString('pl-PL')}
-                  </span>
-                  {invitation.status === 'pending' && !isExpired && (
-                    <span className="invitation-expires">
-                      Wygasa: {new Date(invitation.expiresAt).toLocaleDateString('pl-PL')}
-                    </span>
-                  )}
-                </div>
+          <div key={invitation.id} className="invitation-card">
+            <div className="invitation-avatar">
+              {initials}
+            </div>
+            
+            <div className="invitation-content">
+              <div className="invitation-main-info">
+                <span className="invitation-name">{displayName}</span>
+                {invitation.inviteeEmail && invitation.inviteeEmail !== displayName && (
+                  <span className="invitation-email">{invitation.inviteeEmail}</span>
+                )}
               </div>
-              <div className="invitation-actions">
-                {canAccept && (
-                  <>
-                    {onAccept && (
-                      <Button
-                        variant="primary"
-                        size="small"
-                        onClick={() => onAccept(invitation.id)}
-                      >
-                        Zaakceptuj
-                      </Button>
-                    )}
-                    {onDecline && (
-                      <Button
-                        variant="secondary"
-                        size="small"
-                        onClick={() => onDecline(invitation.id)}
-                      >
-                        Odrzuć
-                      </Button>
-                    )}
-                  </>
-                )}
-                {!canAccept && invitation.status === 'pending' && (
-                  <span className="invitation-note">Oczekuje na odpowiedź</span>
-                )}
+
+              <div className="invitation-details">
+                <span className={`status-badge status-${invitation.status}`}>
+                  {invitation.status === 'pending' && isExpired
+                    ? '⏰ Wygasło'
+                    : invitation.status === 'pending'
+                      ? '⏳ Oczekujące'
+                      : invitation.status === 'accepted'
+                        ? '✅ Zaakceptowane'
+                        : invitation.status === 'declined'
+                          ? '❌ Odrzucone'
+                          : '⏰ Wygasło'}
+                </span>
+                <span className="invitation-date">
+                   Wysłano: {new Date(invitation.createdAt).toLocaleDateString('pl-PL')}
+                </span>
               </div>
             </div>
-          </Card>
+
+            <div className="invitation-actions-area">
+              {canAccept ? (
+                <div className="action-buttons">
+                  {onAccept && (
+                    <Button
+                      variant="primary"
+                      size="small"
+                      onClick={() => onAccept(invitation.id)}
+                    >
+                      Zaakceptuj
+                    </Button>
+                  )}
+                  {onDecline && (
+                    <Button
+                      variant="secondary"
+                      size="small"
+                      onClick={() => onDecline(invitation.id)}
+                    >
+                      Odrzuć
+                    </Button>
+                  )}
+                </div>
+              ) : (
+                invitation.status === 'pending' && (
+                  <span className="invitation-note">Oczekuje na odpowiedź</span>
+                )
+              )}
+            </div>
+          </div>
         );
       })}
     </div>
   );
 }
-

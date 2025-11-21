@@ -1,0 +1,26 @@
+{
+  "name": "@engine/asset-pipeline",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+        "types": "./dist/index.d.ts",
+        "import": "./dist/index.js",
+        "development": "./src/index.ts",
+        "test": "./src/index.ts",
+        "default": "./dist/index.js"
+    }
+  },
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "test": "vitest run",
+    "lint": "eslint src --max-warnings=0"
+  },
+  "devDependencies": {
+    "typescript": "^5.9.3",
+    "vitest": "^2.1.3"
+  }
+}

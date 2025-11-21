@@ -1053,12 +1053,14 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       const aspect = canvas.width / canvas.height;
 
       // Update camera matrices using CameraSystem
-      const { viewProjection: viewProjectionMatrix, eyePosition: eyePos } = cameraSystem.updateCamera(
+      cameraSystem.updateCamera(
         currentCameraEntity,
         currentScene,
         getOrbitState,
         aspect
       );
+      const viewProjectionMatrix = cameraSystem.getViewProjectionMatrix();
+      const eyePos = cameraSystem.getEyePosition();
       const eyeX = eyePos[0];
       const eyeY = eyePos[1];
       const eyeZ = eyePos[2];

@@ -26,14 +26,12 @@ export function ForumCategoryList({ categories, onCategoryUpdate }: ForumCategor
           className="forum-category-card"
           aria-label={`Category: ${category.name}`}
         >
-          {category.icon && (
-            <span 
-              className="forum-category-card__icon"
-              style={{ color: category.color || 'var(--text-1)' }}
-            >
-              {category.icon}
-            </span>
-          )}
+          <span 
+            className="forum-category-card__icon"
+            style={{ color: category.color || 'var(--text-1)' }}
+          >
+            {category.icon || '📁'}
+          </span>
           <div className="forum-category-card__content">
             <h3 className="forum-category-card__title">
               {category.name}

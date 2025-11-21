@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Card } from '../shared/Card';
 import { Button } from '../shared/Button';
 import { messagesApi, type Conversation, type Message } from '../../api/messages';
 import { profilesApi, type UserProfile } from '../../api/profiles';
@@ -13,6 +12,7 @@ export function MessagesTab() {
   const [searchParams, setSearchParams] = useSearchParams();
   const targetUserId = searchParams.get('user');
   const [conversations, setConversations] = useState<Conversation[]>([]);
+  const [filteredConversations, setFilteredConversations] = useState<Conversation[]>([]);
   const [selectedConversation, setSelectedConversation] = useState<Conversation | null>(null);
   const [messages, setMessages] = useState<Message[]>([]);
   const [messageContent, setMessageContent] = useState('');
@@ -24,6 +24,7 @@ export function MessagesTab() {
   const [userProfiles, setUserProfiles] = useState<Map<string, UserProfile>>(new Map());
   const [onlineUsers, setOnlineUsers] = useState<Set<string>>(new Set());
   const [sendingToAll, setSendingToAll] = useState(false);
+  const [searchTerm, setSearchTerm] = useState('');
 
   // Debug: log admin status
   useEffect(() => {
@@ -158,6 +159,22 @@ export function MessagesTab() {
     }
   }, [user]);
 
+  // Filter conversations when search term or conversations change
+  useEffect(() => {
+    if (!searchTerm) {
+      setFilteredConversations(conversations);
+      return;
+    }
+    
+    const term = searchTerm.toLowerCase();
+    const filtered = conversations.filter(conv => {
+      const displayName = getConversationDisplayName(conv).toLowerCase();
+      const lastMessage = conv.lastMessage?.toLowerCase() || '';
+      return displayName.includes(term) || lastMessage.includes(term);
+    });
+    setFilteredConversations(filtered);
+  }, [searchTerm, conversations, userProfiles]); // userProfiles needed for display name updates
+
   // Auto-select conversation when targetUserId is provided in URL
   useEffect(() => {
     if (targetUserId && conversations.length > 0 && !selectedConversation) {
@@ -234,6 +251,7 @@ export function MessagesTab() {
       const data = await messagesApi.getConversations();
       console.log('Conversations loaded:', data);
       setConversations(data);
+      setFilteredConversations(data);
       
       // Load profiles for all participants
       const profilePromises: Promise<void>[] = [];
@@ -267,10 +285,6 @@ export function MessagesTab() {
       
       await Promise.all(profilePromises);
       setUserProfiles(newProfiles);
-      console.log('User profiles loaded:', { 
-        profilesCount: newProfiles.size, 
-        profiles: Array.from(newProfiles.entries()).map(([id, profile]) => ({ id, email: profile.email, displayName: profile.displayName }))
-      });
       
       // Load initial online status for friends
       try {
@@ -282,15 +296,6 @@ export function MessagesTab() {
       }
     } catch (error) {
       console.error('Failed to load conversations:', error);
-      console.error('Error details:', {
-        message: error instanceof Error ? error.message : String(error),
-        status: (error as any)?.status,
-        apiError: (error as any)?.apiError,
-      });
-      // Only show alert for actual errors, not for empty results
-      if (error instanceof Error && error.message !== 'Request failed') {
-        alert(`Failed to load conversations: ${error.message}`);
-      }
     } finally {
       setLoading(false);
     }
@@ -469,306 +474,185 @@ export function MessagesTab() {
   };
 
   return (
-    <div>
-      <div style={{ display: 'grid', gridTemplateColumns: '280px 1fr', gap: 'var(--spacing-4)', maxWidth: '900px', margin: '0 auto' }}>
-        {/* Conversations list */}
-        <Card>
-          <h2 style={{ marginTop: 0, marginBottom: 'var(--spacing-3)', fontSize: 'var(--text-lg)' }}>Conversations</h2>
-          {loading ? (
-            <div>Loading...</div>
-          ) : conversations.length === 0 ? (
-            <p style={{ color: 'var(--text-2)' }}>No conversations</p>
-          ) : (
-            <div style={{ 
-              display: 'flex', 
-              flexDirection: 'column', 
-              gap: 'var(--spacing-2)',
-              maxHeight: '500px',
-              overflowY: 'auto'
-            }}>
-              {conversations.map(conv => {
-                const otherUserId = conv.type === 'group' ? null : conv.participants.find(id => id !== user?.id);
-                const avatarUrl = getConversationAvatar(conv);
-                const displayName = getConversationDisplayName(conv);
-                const unreadCount = conv.unreadCount ?? 0;
-                
-                return (
-                  <button
-                    key={conv.id}
-                    onClick={() => setSelectedConversation(conv)}
-                    style={{
-                      padding: 'var(--spacing-3)',
-                      background: selectedConversation?.id === conv.id 
-                        ? 'var(--bg-button-active)' 
-                        : 'transparent',
-                      border: 'none',
-                      borderRadius: 'var(--radius-md)',
-                      color: 'var(--text-1)',
-                      textAlign: 'left',
-                      cursor: 'pointer',
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: 'var(--spacing-3)',
-                      position: 'relative',
-                    }}
-                  >
-                    <div style={{
-                      width: '40px',
-                      height: '40px',
-                      borderRadius: '50%',
-                      background: avatarUrl ? `url(${avatarUrl}) center/cover` : 'var(--bg-button)',
-                      display: 'flex',
-                      alignItems: 'center',
-                      justifyContent: 'center',
-                      fontSize: 'var(--text-lg)',
-                      flexShrink: 0,
-                      position: 'relative',
-                    }}>
-                      {!avatarUrl && (displayName.charAt(0).toUpperCase() || conv.type === 'group' ? '👥' : '?')}
-                      {conv.type === 'direct' && otherUserId && onlineUsers.has(otherUserId) && (
-                        <div style={{
-                          position: 'absolute',
-                          bottom: 0,
-                          right: 0,
-                          width: '12px',
-                          height: '12px',
-                          borderRadius: '50%',
-                          background: '#4ade80',
-                          border: '2px solid var(--bg-panel)',
-                        }} />
-                      )}
-                      {conv.type === 'group' && (
-                        <div style={{
-                          position: 'absolute',
-                          bottom: 0,
-                          right: 0,
-                          width: '12px',
-                          height: '12px',
-                          borderRadius: '50%',
-                          background: 'var(--bg-button-primary)',
-                          border: '2px solid var(--bg-panel)',
-                          display: 'flex',
-                          alignItems: 'center',
-                          justifyContent: 'center',
-                          fontSize: '8px',
-                        }}>
-                          👥
-                        </div>
-                      )}
-                    </div>
-                    <div style={{ flex: 1, minWidth: 0 }}>
-                      <div style={{ 
-                        fontSize: 'var(--text-sm)', 
-                        fontWeight: unreadCount > 0 ? 'var(--font-bold)' : 'var(--font-medium)',
-                        display: 'flex',
-                        alignItems: 'center',
-                        gap: 'var(--spacing-2)',
-                      }}>
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {displayName}
-                        </span>
-                        {unreadCount > 0 && (
-                          <span style={{
-                            background: 'var(--bg-button-primary)',
-                            color: 'white',
-                            borderRadius: '50%',
-                            minWidth: '20px',
-                            height: '20px',
-                            display: 'flex',
-                            alignItems: 'center',
-                            justifyContent: 'center',
-                            fontSize: 'var(--text-xs)',
-                            padding: '0 var(--spacing-1)',
-                          }}>
-                            {unreadCount > 99 ? '99+' : unreadCount}
-                          </span>
-                        )}
-                      </div>
-                      {conv.lastMessage && (
-                        <div style={{ 
-                          fontSize: 'var(--text-xs)', 
-                          color: 'var(--text-2)',
-                          overflow: 'hidden',
-                          textOverflow: 'ellipsis',
-                          whiteSpace: 'nowrap',
-                          marginTop: 'var(--spacing-1)',
-                        }}>
-                          {conv.lastMessage}
-                        </div>
-                      )}
-                      <div style={{
-                        fontSize: 'var(--text-xs)',
-                        color: 'var(--text-3)',
-                        marginTop: 'var(--spacing-1)',
-                      }}>
-                        {new Date(conv.lastMessageAt).toLocaleDateString('en-US', {
-                          month: 'short',
-                          day: 'numeric',
-                          ...(new Date().getTime() - conv.lastMessageAt > 86400000 * 7 && {
-                            year: 'numeric',
-                          }),
-                        })}
-                      </div>
-                    </div>
-                  </button>
-                );
-              })}
-            </div>
-          )}
-        </Card>
+    <div className="messages-layout">
+      {/* Conversations Sidebar */}
+      <div className="conversations-sidebar">
+        <div className="conversations-header">
+          <h2 className="conversations-title">Messages</h2>
+          <div className="conversations-search">
+            <input
+              type="text"
+              className="forge-input"
+              placeholder="Search conversations..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+            />
+          </div>
+        </div>
 
-        {/* Messages */}
-        <Card style={{ display: 'flex', flexDirection: 'column', ...(selectedConversation ? { height: '100%' } : {}) }}>
-          {selectedConversation ? (
-            <>
-              <div style={{
-                flex: 1,
-                minHeight: 0,
-                overflowY: 'auto',
-                marginBottom: 'var(--spacing-2)',
-                borderBottom: '1px solid var(--border-default)',
-                paddingBottom: 'var(--spacing-2)',
-              }}>
-                {messages.map(msg => (
-                  <div
-                    key={msg.id}
-                    style={{
-                      marginBottom: 'var(--spacing-2)',
-                      textAlign: msg.fromUserId === user?.id ? 'right' : 'left',
-                    }}
-                  >
-                    <div style={{
-                      display: 'inline-block',
-                      padding: 'var(--spacing-1) var(--spacing-2)',
-                      background: msg.fromUserId === user?.id
-                        ? 'var(--bg-button-primary)'
-                        : 'var(--bg-button)',
-                      borderRadius: 'var(--radius-md)',
-                      maxWidth: '70%',
-                    }}>
-                      <p style={{ margin: 0, fontSize: 'var(--text-sm)', color: msg.fromUserId === user?.id ? 'white' : 'var(--text-1)' }}>
-                        {msg.content}
-                      </p>
-                      <div style={{ display: 'flex', gap: 'var(--spacing-1)', alignItems: 'center', justifyContent: msg.fromUserId === user?.id ? 'flex-end' : 'flex-start', marginTop: '2px' }}>
-                        <span style={{
-                          fontSize: '10px',
-                          color: msg.fromUserId === user?.id ? 'rgba(255,255,255,0.7)' : 'var(--text-3)',
-                        }}>
-                          {new Date(msg.createdAt).toLocaleTimeString()}
-                        </span>
-                        {msg.fromUserId === user?.id && (
-                          <span style={{
-                            fontSize: '10px',
-                            color: 'rgba(255,255,255,0.7)',
-                          }}>
-                            {msg.status === 'sending' ? '○' : 
-                             msg.read ? '✓✓' : 
-                             msg.status === 'delivered' ? '✓✓' : '✓'}
-                          </span>
-                        )}
-                      </div>
+        <div className="conversations-list">
+          {loading ? (
+            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-2)' }}>Loading...</div>
+          ) : filteredConversations.length === 0 ? (
+            <div style={{ padding: '20px', textAlign: 'center', color: 'var(--text-2)' }}>
+              {searchTerm ? 'No conversations found' : 'No conversations yet'}
+            </div>
+          ) : (
+            filteredConversations.map(conv => {
+              const otherUserId = conv.type === 'group' ? null : conv.participants.find(id => id !== user?.id);
+              const avatarUrl = getConversationAvatar(conv);
+              const displayName = getConversationDisplayName(conv);
+              const unreadCount = conv.unreadCount ?? 0;
+              
+              return (
+                <button
+                  key={conv.id}
+                  onClick={() => setSelectedConversation(conv)}
+                  className={`conversation-item ${selectedConversation?.id === conv.id ? 'active' : ''}`}
+                >
+                  <div className="conversation-avatar" style={{
+                    backgroundImage: avatarUrl ? `url(${avatarUrl})` : undefined
+                  }}>
+                    {!avatarUrl && (displayName.charAt(0).toUpperCase() || (conv.type === 'group' ? '👥' : '?'))}
+                    {conv.type === 'direct' && otherUserId && onlineUsers.has(otherUserId) && (
+                      <div className="friend-status online" style={{ bottom: 0, right: 0 }} />
+                    )}
+                  </div>
+                  <div className="conversation-info">
+                    <div className="conversation-top">
+                      <span className="conversation-name">{displayName}</span>
+                      <span className="conversation-time">
+                        {new Date(conv.lastMessageAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                      </span>
+                    </div>
+                    <div className="conversation-bottom">
+                      <span className="conversation-preview">
+                        {conv.lastMessage || 'No messages yet'}
+                      </span>
+                      {unreadCount > 0 && (
+                        <span className="conversation-unread">{unreadCount > 99 ? '99+' : unreadCount}</span>
+                      )}
                     </div>
                   </div>
-                ))}
-                {typingUsers.size > 0 && (
-                  <div style={{ 
-                    marginTop: 'var(--spacing-1)',
-                    fontSize: 'var(--text-xs)',
-                    color: 'var(--text-2)',
-                    fontStyle: 'italic',
-                  }}>
-                    {Array.from(typingUsers).map(userId => (
-                      <div key={userId}>
-                        User {userId.substring(0, 8)} is typing...
-                      </div>
-                    ))}
-                  </div>
-                )}
-                <div ref={messagesEndRef} />
-              </div>
-              <div style={{ display: 'flex', gap: 'var(--spacing-2)' }}>
-                <input
-                  type="text"
-                  value={messageContent}
-                  onChange={handleInputChange}
-                  onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-                  placeholder="Type a message..."
-                  style={{
-                    flex: 1,
-                    padding: 'var(--spacing-1) var(--spacing-2)',
-                    background: 'var(--bg-button)',
-                    border: '1px solid var(--border-default)',
-                    borderRadius: 'var(--radius-md)',
-                    color: 'var(--text-1)',
-                    fontSize: 'var(--text-sm)',
-                  }}
-                />
-                {isAdmin && (
-                  <Button 
-                    onClick={handleSendToAll} 
-                    disabled={!messageContent.trim() || sendingToAll}
-                    variant="danger"
-                    size="small"
-                    style={{
-                      opacity: sendingToAll ? 0.6 : 1,
-                      fontSize: 'var(--text-xs)',
-                      padding: 'var(--spacing-1) var(--spacing-2)',
-                    }}
-                  >
-                    {sendingToAll ? 'Sending...' : 'Send to All'}
-                  </Button>
-                )}
-                <Button onClick={handleSendMessage} size="small">Send</Button>
-              </div>
-            </>
-          ) : (
-            <>
-              {isAdmin && (
-                <div style={{ 
-                  marginBottom: 'var(--spacing-3)', 
-                  paddingBottom: 'var(--spacing-3)',
-                  borderBottom: '1px solid var(--border-default)',
+                </button>
+              );
+            })
+          )}
+        </div>
+      </div>
+
+      {/* Chat Area */}
+      <div className="chat-area">
+        {selectedConversation ? (
+          <>
+            <div className="chat-header">
+              <div className="chat-user-info">
+                <div className="conversation-avatar" style={{
+                  width: '36px', height: '36px', fontSize: '1rem',
+                  backgroundImage: getConversationAvatar(selectedConversation) ? `url(${getConversationAvatar(selectedConversation)})` : undefined
                 }}>
-                  <h3 style={{ marginTop: 0, marginBottom: 'var(--spacing-2)', fontSize: 'var(--text-md)' }}>Send Message to All Users</h3>
-                  <div style={{ display: 'flex', gap: 'var(--spacing-2)' }}>
-                    <input
-                      type="text"
-                      value={messageContent}
-                      onChange={(e) => setMessageContent(e.target.value)}
-                      onKeyPress={(e) => e.key === 'Enter' && handleSendToAll()}
-                      placeholder="Type a message to send to all users..."
-                      style={{
-                        flex: 1,
-                        padding: 'var(--spacing-1) var(--spacing-2)',
-                        background: 'var(--bg-button)',
-                        border: '1px solid var(--border-default)',
-                        borderRadius: 'var(--radius-md)',
-                        color: 'var(--text-1)',
-                        fontSize: 'var(--text-sm)',
-                      }}
-                    />
-                    <Button 
-                      onClick={handleSendToAll} 
-                      disabled={!messageContent.trim() || sendingToAll}
-                      variant="danger"
-                      size="small"
-                      style={{
-                        opacity: sendingToAll ? 0.6 : 1,
-                      }}
-                    >
-                      {sendingToAll ? 'Sending...' : 'Send to All'}
-                    </Button>
+                  {!getConversationAvatar(selectedConversation) && 
+                   (getConversationDisplayName(selectedConversation).charAt(0).toUpperCase())}
+                </div>
+                <span style={{ fontWeight: 600, color: 'var(--text-1)' }}>
+                  {getConversationDisplayName(selectedConversation)}
+                </span>
+              </div>
+            </div>
+
+            <div className="chat-messages">
+              {messages.map(msg => (
+                <div key={msg.id} className={`message-group ${msg.fromUserId === user?.id ? 'sent' : 'received'}`}>
+                  <div className="message-bubble">
+                    {msg.content}
+                  </div>
+                  <div className="message-status">
+                    <span className="message-time">
+                      {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                    </span>
+                    {msg.fromUserId === user?.id && (
+                      <span style={{ fontSize: '10px', color: 'rgba(255,255,255,0.7)' }}>
+                        {msg.status === 'sending' ? '○' : 
+                         msg.read ? '✓✓' : 
+                         msg.status === 'delivered' ? '✓✓' : '✓'}
+                      </span>
+                    )}
                   </div>
                 </div>
+              ))}
+              
+              {typingUsers.size > 0 && (
+                <div className="chat-typing">
+                  {Array.from(typingUsers).map(userId => (
+                    <span key={userId}>
+                      User {userId.substring(0, 8)} is typing...
+                    </span>
+                  ))}
+                </div>
               )}
-              <div style={{ textAlign: 'center', padding: 'var(--spacing-6)', color: 'var(--text-2)', fontSize: 'var(--text-sm)' }}>
-                Select a conversation to view messages
-              </div>
-            </>
-          )}
-        </Card>
+              <div ref={messagesEndRef} />
+            </div>
+
+            {/* Admin Broadcast Input - Only visible if user is admin */}
+            {isAdmin && (
+               <div className="admin-broadcast-bar">
+                 <span style={{ fontSize: '12px', color: 'var(--text-2)', fontWeight: 'bold' }}>ADMIN:</span>
+                 <input
+                    type="text"
+                    placeholder="Type to send to EVERYONE (Broadcast)"
+                    value={messageContent} 
+                    onChange={handleInputChange}
+                    style={{ 
+                      flex: 1, 
+                      background: 'transparent', 
+                      border: 'none', 
+                      color: 'var(--text-1)', 
+                      fontSize: '12px',
+                      borderBottom: '1px dashed rgba(239, 68, 68, 0.5)' 
+                    }}
+                 />
+                 <Button 
+                   onClick={handleSendToAll} 
+                   variant="danger" 
+                   size="small"
+                   disabled={!messageContent.trim() || sendingToAll}
+                   style={{ padding: '2px 8px', fontSize: '10px' }}
+                 >
+                   Broadcast
+                 </Button>
+               </div>
+            )}
+
+            <div className="chat-input-area">
+              <textarea
+                className="chat-input"
+                placeholder="Type a message..."
+                value={messageContent}
+                onChange={handleInputChange}
+                onKeyPress={(e) => {
+                  if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    handleSendMessage();
+                  }
+                }}
+                rows={1}
+              />
+              <button className="chat-send-btn" onClick={handleSendMessage}>
+                <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <line x1="22" y1="2" x2="11" y2="13"></line>
+                  <polygon points="22 2 15 22 11 13 2 9 22 2"></polygon>
+                </svg>
+              </button>
+            </div>
+          </>
+        ) : (
+          <div className="empty-chat-state">
+            <div className="empty-icon">💬</div>
+            <h3>Select a conversation</h3>
+            <p>Choose a conversation from the list to start chatting</p>
+          </div>
+        )}
       </div>
     </div>
   );
 }
-

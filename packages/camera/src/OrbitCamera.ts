@@ -1,3 +1,5 @@
+import { damp } from './utils/Damper';
+
 /** Default yaw/pitch rotation speed (radians per pixel). */
 export const ROTATE_SPEED = 0.005;
 /** Default zoom multiplier applied per wheel step. */
@@ -12,6 +14,8 @@ export const MAX_DISTANCE = 100;
 export const PITCH_LIMIT = Math.PI / 2 - 0.01;
 /** Default initial camera distance. */
 export const INITIAL_DISTANCE = 40;
+/** Default damping time constant (tau). Higher = smoother/slower. */
+export const DEFAULT_DAMPING = 0.1;
 
 /**
  * Current orbit control state expressed in yaw, pitch and distance.
@@ -41,17 +45,21 @@ export interface OrbitControlsConfig {
   pitchLimit?: number;
   /** Starting camera distance. Defaults to `INITIAL_DISTANCE`. */
   initialDistance?: number;
+  /** Damping time constant (tau). Set 0 to disable. Defaults to `DEFAULT_DAMPING` (0.1). */
+  damping?: number;
 }
 
 /**
  * OrbitCamera provides orbit-style mouse controls for a canvas element.
  *
  * Interactions:
- * - Left mouse drag: adjust yaw and pitch.
+ * - Left mouse/touch drag: adjust yaw and pitch.
  * - Mouse wheel: zoom in/out with clamped distance.
  *
- * Cursor is set to `grab`/`grabbing` while active. Call `cleanup` to remove
- * listeners and restore cursor styles.
+ * Features:
+ * - Smooth damping (inertia)
+ * - Touch support (Pointer Events)
+ * - Zero-allocation update loop
  */
 export class OrbitCamera {
   private readonly canvas: HTMLCanvasElement;
@@ -62,15 +70,26 @@ export class OrbitCamera {
   private readonly minDistance: number;
   private readonly maxDistance: number;
   private readonly pitchLimit: number;
+  private readonly dampingTau: number;
 
+  // Current smoothed state (for rendering)
   private yaw = 0;
   private pitch = 0;
   private distance: number;
+
+  // Target state (from input)
+  private targetYaw = 0;
+  private targetPitch = 0;
+  private targetDistance: number;
+
   private isDragging = false;
   private enabled = true;
   private lastX = 0;
   private lastY = 0;
   private activeDragController: AbortController | null = null;
+
+  // Time tracking for auto-update compatibility
+  private lastFrameTime = 0;
 
   constructor(canvas: HTMLCanvasElement, config?: OrbitControlsConfig) {
     this.canvas = canvas;
@@ -81,33 +100,75 @@ export class OrbitCamera {
     this.minDistance = config?.minDistance ?? MIN_DISTANCE;
     this.maxDistance = config?.maxDistance ?? MAX_DISTANCE;
     this.pitchLimit = config?.pitchLimit ?? PITCH_LIMIT;
-    this.distance = config?.initialDistance ?? INITIAL_DISTANCE;
+    this.dampingTau = config?.damping ?? DEFAULT_DAMPING;
+
+    const initialDist = config?.initialDistance ?? INITIAL_DISTANCE;
+    this.distance = this.targetDistance = initialDist;
+    // Initial yaw/pitch are 0
+    this.yaw = this.targetYaw = 0;
+    this.pitch = this.targetPitch = 0;
 
     this.setupEventListeners();
     this.updateCursor();
+    this.lastFrameTime = performance.now();
   }
 
   /**
-   * Returns the current immutable control state.
+   * Returns the current smoothed control state.
+   *
+   * @deprecated usage: For smoother animations, prefer calling `update(dt)` explicitly in your loop.
+   * This method contains an auto-update mechanism for backward compatibility.
    */
   getState(): OrbitControlsState {
+    // Compatibility hack: if update() isn't being called manually,
+    // we try to infer a delta time and update internal state.
+    const now = performance.now();
+    const dt = (now - this.lastFrameTime) / 1000;
+    if (dt > 0) {
+      // Cap dt to avoid huge jumps if the tab was backgrounded
+      const safeDt = dt > 0.1 ? 0.1 : dt;
+      this.update(safeDt);
+    }
+    // Note: update() updates lastFrameTime, so the next call to getState
+    // in the same frame will have dt ~ 0 and essentially be a no-op, which is correct.
+
     return { yaw: this.yaw, pitch: this.pitch, distance: this.distance };
   }
 
   /**
-   * Sets yaw/pitch/distance at once (values are clamped).
+   * Explicitly updates the camera physics.
+   * Call this once per frame with the delta time in seconds.
    */
-  setState(state: { yaw: number; pitch: number; distance: number }): void {
+  update(dt: number): void {
+    this.lastFrameTime = performance.now();
+
+    if (this.dampingTau > 0) {
+      this.yaw = damp(this.yaw, this.targetYaw, this.dampingTau, dt);
+      this.pitch = damp(this.pitch, this.targetPitch, this.dampingTau, dt);
+      this.distance = damp(this.distance, this.targetDistance, this.dampingTau, dt);
+    } else {
+      this.yaw = this.targetYaw;
+      this.pitch = this.targetPitch;
+      this.distance = this.targetDistance;
+    }
+  }
+
+  /**
+   * Sets yaw/pitch/distance immediately (bypassing smoothing).
+   */
+  setState(state: Partial<OrbitControlsState>): void {
     if (typeof state.yaw === 'number' && Number.isFinite(state.yaw)) {
-      this.yaw = state.yaw;
+      this.yaw = this.targetYaw = state.yaw;
     }
     if (typeof state.pitch === 'number' && Number.isFinite(state.pitch)) {
       const p = state.pitch;
-      this.pitch = p > this.pitchLimit ? this.pitchLimit : p < -this.pitchLimit ? -this.pitchLimit : p;
+      const clamped = p > this.pitchLimit ? this.pitchLimit : p < -this.pitchLimit ? -this.pitchLimit : p;
+      this.pitch = this.targetPitch = clamped;
     }
     if (typeof state.distance === 'number' && Number.isFinite(state.distance)) {
       const d = state.distance;
-      this.distance = d < this.minDistance ? this.minDistance : d > this.maxDistance ? this.maxDistance : d;
+      const clamped = d < this.minDistance ? this.minDistance : d > this.maxDistance ? this.maxDistance : d;
+      this.distance = this.targetDistance = clamped;
     }
     this.updateCursor();
   }
@@ -116,7 +177,7 @@ export class OrbitCamera {
    * Applies one of preset camera states.
    * Alias for `setState()` - provided for semantic clarity when setting preset views.
    */
-  setPreset(state: { yaw: number; pitch: number; distance: number }): void {
+  setPreset(state: Partial<OrbitControlsState>): void {
     this.setState(state);
   }
 
@@ -142,6 +203,13 @@ export class OrbitCamera {
    * Removes all event listeners and resets cursor changes.
    */
   cleanup(): void {
+    this.dispose();
+  }
+
+  /**
+   * Disposes resources and event listeners.
+   */
+  dispose(): void {
     this.controller.abort();
     this.canvas.style.cursor = '';
     this.isDragging = false;
@@ -160,43 +228,58 @@ export class OrbitCamera {
   private setupEventListeners(): void {
     const { signal } = this.controller;
 
-    const handleMouseDown = (event: MouseEvent) => {
-      if (!this.enabled || event.button !== 0) return;
+    // Use Pointer Events for unified Mouse/Touch support
+    const handlePointerDown = (event: PointerEvent) => {
+      if (!this.enabled || !event.isPrimary || event.button !== 0) return;
+
+      this.canvas.setPointerCapture(event.pointerId);
       event.preventDefault();
       event.stopPropagation();
+
       this.isDragging = true;
       this.lastX = event.clientX;
       this.lastY = event.clientY;
       this.updateCursor();
 
-      // Per-drag listeners, cleaned up on mouseup or global cleanup
+      // Per-drag listeners
       const dragController = new AbortController();
       const dragSignal = dragController.signal;
       this.activeDragController = dragController;
+
       // Ensure top-level cleanup also aborts any in-flight drag listeners
       signal.addEventListener('abort', () => dragController.abort(), { once: true });
 
-      const handleMouseMove = (moveEvent: MouseEvent) => {
+      const handlePointerMove = (moveEvent: PointerEvent) => {
         if (!this.isDragging) return;
+        // Prevent scrolling on mobile
+        moveEvent.preventDefault();
+
         const dx = moveEvent.clientX - this.lastX;
         const dy = moveEvent.clientY - this.lastY;
         this.lastX = moveEvent.clientX;
         this.lastY = moveEvent.clientY;
-        this.yaw += dx * this.rotateSpeed;
-        this.pitch += dy * this.rotateSpeed;
-        if (this.pitch > this.pitchLimit) this.pitch = this.pitchLimit;
-        if (this.pitch < -this.pitchLimit) this.pitch = -this.pitchLimit;
+
+        // Update TARGETS, not current state
+        this.targetYaw += dx * this.rotateSpeed;
+        this.targetPitch += dy * this.rotateSpeed;
+
+        // Clamp target pitch
+        if (this.targetPitch > this.pitchLimit) this.targetPitch = this.pitchLimit;
+        if (this.targetPitch < -this.pitchLimit) this.targetPitch = -this.pitchLimit;
       };
 
-      const handleMouseUp = () => {
+      const handlePointerUp = (upEvent: PointerEvent) => {
         this.isDragging = false;
+        this.canvas.releasePointerCapture(upEvent.pointerId);
         this.updateCursor();
         dragController.abort();
         this.activeDragController = null;
       };
 
-      window.addEventListener('mousemove', handleMouseMove, { signal: dragSignal });
-      window.addEventListener('mouseup', handleMouseUp, { signal: dragSignal });
+      window.addEventListener('pointermove', handlePointerMove, { signal: dragSignal });
+      window.addEventListener('pointerup', handlePointerUp, { signal: dragSignal });
+      // Also handle cancel (e.g. alt-tab)
+      window.addEventListener('pointercancel', handlePointerUp, { signal: dragSignal });
     };
 
     const handleWheel = (event: WheelEvent) => {
@@ -205,14 +288,21 @@ export class OrbitCamera {
       // Normalize delta across devices/browsers and apply exponential zoom for smoother feel
       const deltaNormalized =
         event.deltaMode === 0 /* DOM_DELTA_PIXEL */ ? (event.deltaY ?? 0) / 50 : (event.deltaY ?? 0);
+
       const scale = Math.exp((deltaNormalized ?? 0) * (this.zoomSpeed ?? ZOOM_SPEED) * this.zoomMultiplier);
-      this.distance *= scale;
-      if (this.distance < this.minDistance) this.distance = this.minDistance;
-      if (this.distance > this.maxDistance) this.distance = this.maxDistance;
+
+      // Update TARGET distance
+      this.targetDistance *= scale;
+
+      // Clamp target distance
+      if (this.targetDistance < this.minDistance) this.targetDistance = this.minDistance;
+      if (this.targetDistance > this.maxDistance) this.targetDistance = this.maxDistance;
     };
 
-    this.canvas.addEventListener('mousedown', handleMouseDown, { signal });
+    this.canvas.addEventListener('pointerdown', handlePointerDown, { signal });
     this.canvas.addEventListener('wheel', handleWheel, { passive: false, signal });
+    // Disable context menu to allow right-click usage in future if needed
+    this.canvas.addEventListener('contextmenu', (e) => e.preventDefault(), { signal });
   }
 }
 
@@ -220,16 +310,16 @@ export class OrbitCamera {
  * Public API for backward compatibility with createOrbitControls function
  */
 export interface OrbitControls {
-  /** Returns the current immutable control state. */
+  /** Returns the current immutable control state. Auto-updates if called in a loop. */
   getState(): OrbitControlsState;
   /** Removes all event listeners and resets cursor changes. */
   cleanup(): void;
   /** Enables or disables camera interaction (used when UI is focused). */
   setEnabled(enabled: boolean): void;
   /** Sets yaw/pitch/distance at once (values are clamped). */
-  setState(state: { yaw: number; pitch: number; distance: number }): void;
+  setState(state: Partial<OrbitControlsState>): void;
   /** Applies one of preset camera states. */
-  setPreset(state: { yaw: number; pitch: number; distance: number }): void;
+  setPreset(state: Partial<OrbitControlsState>): void;
 }
 
 /**
@@ -252,4 +342,3 @@ export function createOrbitControls(
     setPreset: (state) => camera.setPreset(state),
   };
 }
-

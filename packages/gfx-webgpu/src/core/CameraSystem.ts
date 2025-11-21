@@ -32,29 +32,27 @@ export class CameraSystem {
   private projectionMatrix: Float32Array;
   private viewMatrix: Float32Array;
   private viewProjectionMatrix: Float32Array;
+  private eyePosition: Float32Array;
 
   constructor() {
     this.projectionMatrix = new Float32Array(16);
     this.viewMatrix = new Float32Array(16);
     this.viewProjectionMatrix = new Float32Array(16);
+    this.eyePosition = new Float32Array(3);
   }
 
   /**
    * Updates camera matrices from entity camera or orbit controls.
-   * Returns matrices and eye position.
+   * Internal state is updated; use getters to retrieve matrices.
    */
   updateCamera(
     cameraEntity: Entity | null,
     scene: Scene | null,
     getOrbitState: () => OrbitControlsState,
     aspect: number
-  ): CameraMatrices {
+  ): void {
     const camera = cameraEntity ?? scene?.primaryCamera ?? null;
     const cameraComponent = camera?.getComponent(CameraComponent) ?? null;
-
-    let eyeX = 0;
-    let eyeY = 0;
-    let eyeZ = 0;
 
     if (camera && cameraComponent) {
       // Use entity-based camera
@@ -63,9 +61,9 @@ export class CameraSystem {
       mat4Multiply(this.viewProjectionMatrix, this.projectionMatrix, this.viewMatrix);
 
       const worldPos = camera.transform.getWorldPosition();
-      eyeX = worldPos[0];
-      eyeY = worldPos[1];
-      eyeZ = worldPos[2];
+      this.eyePosition[0] = worldPos[0];
+      this.eyePosition[1] = worldPos[1];
+      this.eyePosition[2] = worldPos[2];
     } else {
       // Fallback to orbit controls
       const { yaw, pitch, distance } = getOrbitState();
@@ -73,20 +71,14 @@ export class CameraSystem {
 
       const actualYaw = yaw;
       const actualPitch = pitch;
-      eyeX = Math.cos(actualPitch) * Math.sin(actualYaw) * distance;
-      eyeY = Math.sin(actualPitch) * distance;
-      eyeZ = Math.cos(actualPitch) * Math.cos(actualYaw) * distance;
+      
+      this.eyePosition[0] = Math.cos(actualPitch) * Math.sin(actualYaw) * distance;
+      this.eyePosition[1] = Math.sin(actualPitch) * distance;
+      this.eyePosition[2] = Math.cos(actualPitch) * Math.cos(actualYaw) * distance;
 
-      mat4LookAt(this.viewMatrix, [eyeX, eyeY, eyeZ], [0, 0, 0], [0, 1, 0]);
+      mat4LookAt(this.viewMatrix, this.eyePosition as unknown as Vec3, [0, 0, 0], [0, 1, 0]);
       mat4Multiply(this.viewProjectionMatrix, this.projectionMatrix, this.viewMatrix);
     }
-
-    return {
-      projection: this.projectionMatrix,
-      view: this.viewMatrix,
-      viewProjection: this.viewProjectionMatrix,
-      eyePosition: [eyeX, eyeY, eyeZ],
-    };
   }
 
   /**
@@ -109,5 +101,11 @@ export class CameraSystem {
   getViewMatrix(): Mat4 {
     return this.viewMatrix;
   }
-}
 
+  /**
+   * Gets the current eye position (reused buffer).
+   */
+  getEyePosition(): Vec3 {
+    return this.eyePosition as unknown as Vec3;
+  }
+}

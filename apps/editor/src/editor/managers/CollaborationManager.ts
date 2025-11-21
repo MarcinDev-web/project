@@ -10,7 +10,7 @@ import {
   MultiplayerGameplayManager,
   type PublicUser,
 } from '@engine/net';
-import { CollaborationPanel } from '../ui/CollaborationPanel';
+import { CollaborationPanel } from '../ui/features/CollaborationPanel';
 import type { Vec3 } from '@engine/core/math';
 import type { Entity } from '@engine/world';
 import type { CharacterInput } from '@engine/world';

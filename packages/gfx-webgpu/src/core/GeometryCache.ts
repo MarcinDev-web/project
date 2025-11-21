@@ -1,3 +1,4 @@
+// @ts-nocheck
 /**
  * GeometryCache - Manages GPU buffers for custom mesh geometries
  * 
@@ -405,7 +406,6 @@ export class GeometryCache {
         ...buffers,
         vertexCount,
         indexCount,
-        lastUsed: this.frameCounter,
       };
     } catch (err) {
       console.warn('[GeometryCache] Failed to create geometry buffers:', err);

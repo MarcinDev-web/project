@@ -4,7 +4,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { EditorUI } from '../EditorUI';
+import { EditorUI } from '../layout/EditorUI';
 import { Scene, SelectionManager } from '@engine/world';
 import { createOrbitControls } from '@engine/camera';
 import type { Renderer } from '@engine/gfx-webgpu';

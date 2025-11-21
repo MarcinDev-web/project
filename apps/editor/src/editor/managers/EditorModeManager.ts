@@ -44,7 +44,7 @@ import { ReturnState } from '../states/ReturnState';
 import { computeEntityPath, resolveEntityByPath } from '@engine/editor-utils';
 import { DefaultControllerFactory, PlayerSession, LocalPlayerController } from '@engine/stdlib/CharacterController';
 import type { PlayManifest } from '../core/PlayManifest';
-import { LoadingOverlay } from '../ui/LoadingOverlay';
+import { LoadingOverlay } from '../ui/hud/LoadingOverlay';
 import { CancellationToken } from '../core/cancellation/CancellationToken';
 import type { LoadingStepsRegistry } from '../core/LoadingStepsRegistry';
 import { CheckpointSystem, RespawnManager } from '@engine/world';

@@ -104,10 +104,12 @@ export class BlockDefinitionGenerator {
       for (let x = 0; x < chunkSize; x++) {
         for (let y = 0; y < chunkSize; y++) {
           for (let z = 0; z < chunkSize; z++) {
+            // Use center of block to avoid floating point precision issues at boundaries
+            const halfBlock = blockSize * 0.5;
             const worldPos: [number, number, number] = [
-              chunkWorldMinX + x * blockSize,
-              chunkWorldMinY + y * blockSize,
-              chunkWorldMinZ + z * blockSize,
+              chunkWorldMinX + x * blockSize + halfBlock,
+              chunkWorldMinY + y * blockSize + halfBlock,
+              chunkWorldMinZ + z * blockSize + halfBlock,
             ];
 
             const block = store.getBlock(worldPos);
@@ -240,10 +242,12 @@ export class BlockDefinitionGenerator {
       for (let x = 0; x < chunkSize; x++) {
         for (let y = 0; y < chunkSize; y++) {
           for (let z = 0; z < chunkSize; z++) {
+            // Use center of block to avoid floating point precision issues at boundaries
+            const halfBlock = blockSize * 0.5;
             const worldPos: [number, number, number] = [
-              chunkWorldMinX + x * blockSize,
-              chunkWorldMinY + y * blockSize,
-              chunkWorldMinZ + z * blockSize,
+              chunkWorldMinX + x * blockSize + halfBlock,
+              chunkWorldMinY + y * blockSize + halfBlock,
+              chunkWorldMinZ + z * blockSize + halfBlock,
             ];
 
             const block = store.getBlock(worldPos);
@@ -289,4 +293,3 @@ export class BlockDefinitionGenerator {
     };
   }
 }
-

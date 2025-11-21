@@ -965,8 +965,8 @@ export class EnvironmentRenderer {
     // Create sampler for HDR texture
     const hdrSampler = this.device.createSampler({
       label: 'hdr-sampler',
-      magFilter: 'linear',
-      minFilter: 'linear',
+      magFilter: 'nearest',
+      minFilter: 'nearest',
       addressModeU: 'clamp-to-edge',
       addressModeV: 'clamp-to-edge',
     });
@@ -978,12 +978,12 @@ export class EnvironmentRenderer {
         {
           binding: 0,
           visibility: GPUShaderStage.FRAGMENT,
-          sampler: {},
+          sampler: { type: 'non-filtering' },
         },
         {
           binding: 1,
           visibility: GPUShaderStage.FRAGMENT,
-          texture: {},
+          texture: { sampleType: 'unfilterable-float' },
         },
       ],
     });
@@ -1043,7 +1043,7 @@ fn dirToEquirectUV(dir: vec3<f32>) -> vec2<f32> {
 fn fs(input: VSOut) -> @location(0) vec4<f32> {
   let dir = faceUVToDir(faceInfo.faceIndex, input.uv);
   let uv = dirToEquirectUV(dir);
-  let color = textureSample(hdrTexture, hdrSampler, uv);
+  let color = textureSampleLevel(hdrTexture, hdrSampler, uv, 0.0);
   return color;
 }
 `,

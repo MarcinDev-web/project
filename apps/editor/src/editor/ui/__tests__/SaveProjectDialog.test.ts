@@ -5,7 +5,7 @@
  */
 
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
-import { SaveProjectDialog, SaveProjectDialogOptions, SaveProjectDialogResult, ValidationResult } from '../SaveProjectDialog';
+import { SaveProjectDialog, SaveProjectDialogOptions, SaveProjectDialogResult, ValidationResult } from '../modals/SaveProjectDialog';
 import { initBrowserPolyfills } from '../../../test/setup';
 
 describe('SaveProjectDialog', () => {

@@ -208,36 +208,26 @@ export class ModelBuilder {
 
     // Get all chunks from temp store
     const chunks = tempStore.getAllChunks();
+    const chunkSize = this.store.chunkSize;
+    const chunkStrideSq = chunkSize * chunkSize;
+
     for (const chunk of chunks) {
-      // Calculate chunk world bounds
-      const chunkWorldMinX = chunk.coord[0] * MICRO_BLOCK_SIZE * this.store.chunkSize;
-      const chunkWorldMinY = chunk.coord[1] * MICRO_BLOCK_SIZE * this.store.chunkSize;
-      const chunkWorldMinZ = chunk.coord[2] * MICRO_BLOCK_SIZE * this.store.chunkSize;
+      // Iterate only over existing blocks in the sparse chunk
+      for (const [index, block] of chunk.blocks) {
+        // Decode flat index to local coordinates within chunk
+        const z = Math.floor(index / chunkStrideSq);
+        const rem = index % chunkStrideSq;
+        const y = Math.floor(rem / chunkSize);
+        const x = rem % chunkSize;
 
-      // Iterate through all possible positions in chunk
-      for (let x = 0; x < this.store.chunkSize; x++) {
-        for (let y = 0; y < this.store.chunkSize; y++) {
-          for (let z = 0; z < this.store.chunkSize; z++) {
-            const localInChunk: LocalPos = [x, y, z];
-            const worldInChunk: Vec3 = [
-              chunkWorldMinX + x * MICRO_BLOCK_SIZE,
-              chunkWorldMinY + y * MICRO_BLOCK_SIZE,
-              chunkWorldMinZ + z * MICRO_BLOCK_SIZE,
-            ];
-            
-            const block = tempStore.getBlock(worldInChunk);
-            if (block) {
-              const targetPos: LocalPos = [
-                x + chunk.coord[0] * this.store.chunkSize + offset[0],
-                y + chunk.coord[1] * this.store.chunkSize + offset[1],
-                z + chunk.coord[2] * this.store.chunkSize + offset[2],
-              ];
+        const targetPos: LocalPos = [
+          x + chunk.coord[0] * chunkSize + offset[0],
+          y + chunk.coord[1] * chunkSize + offset[1],
+          z + chunk.coord[2] * chunkSize + offset[2],
+        ];
 
-              if (this.isWithinBounds(targetPos)) {
-                this.placeBlock(targetPos, block);
-              }
-            }
-          }
+        if (this.isWithinBounds(targetPos)) {
+          this.placeBlock(targetPos, block);
         }
       }
     }
@@ -277,6 +267,9 @@ export class ModelBuilder {
         }
       }
     }
+
+    // Clear the region first to ensure we don't leave "ghost" blocks
+    this.clearRegion(bounds);
 
     // Mirror blocks
     const axisIndex = axis === 'x' ? 0 : axis === 'y' ? 1 : 2;

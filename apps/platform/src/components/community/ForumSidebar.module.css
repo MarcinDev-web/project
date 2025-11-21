@@ -1,0 +1,162 @@
+.sidebar {
+  background: var(--forum-bg-sidebar);
+  border-radius: var(--radius-lg);
+  padding: var(--forum-spacing-sidebar);
+  border: 1px solid var(--forum-border-default);
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-6);
+}
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-2);
+}
+
+.title {
+  padding-left: var(--spacing-2);
+  margin-bottom: var(--spacing-2);
+  font-size: var(--text-xs);
+  font-weight: var(--font-bold);
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.userCard {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  padding: var(--spacing-2);
+  border-radius: var(--radius-md);
+  text-decoration: none;
+  color: var(--text-1);
+}
+
+.userCard:hover {
+  background: var(--forum-bg-input);
+}
+
+.avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: var(--radius-full);
+  object-fit: cover;
+  border: 2px solid var(--surface-1);
+}
+
+.userInfo {
+  flex: 1;
+  min-width: 0;
+}
+
+.displayName {
+  font-size: var(--text-sm);
+  font-weight: var(--font-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.role {
+  font-size: var(--text-xs);
+  color: var(--text-3);
+}
+
+.nav {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-1);
+}
+
+/* Category Navigation Styles */
+.categoryNav {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.categoryItem {
+  margin-bottom: var(--spacing-1);
+}
+
+.link {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-2) var(--spacing-3);
+  border-radius: var(--radius-md);
+  color: var(--text-2);
+  text-decoration: none;
+  font-size: var(--text-sm);
+}
+
+.link:hover {
+  background: var(--forum-bg-input);
+  color: var(--text-1);
+}
+
+.linkActive {
+  background: var(--forum-bg-input-focus);
+  color: var(--text-1);
+  font-weight: var(--font-semibold);
+}
+
+.linkActive:hover {
+  background: var(--forum-bg-input-focus);
+}
+
+.link:focus-visible {
+  outline: 2px solid var(--focus-ring-color);
+  outline-offset: 2px;
+}
+
+.linkIcon {
+  font-size: var(--text-lg);
+  flex-shrink: 0;
+}
+
+.linkName {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.linkCount {
+  font-size: var(--text-xs);
+  color: var(--text-3);
+  margin-left: auto;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .sidebar {
+    padding: var(--spacing-3);
+  }
+  
+  .link {
+    padding: var(--spacing-2);
+    font-size: var(--text-xs);
+  }
+  
+  /* Mobile drawer logic handled by CSS class if applied externally */
+  .mobileOpen {
+    display: block;
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 1000;
+    background: var(--forum-bg-sidebar);
+    padding: var(--spacing-4);
+    overflow-y: auto;
+    max-height: none;
+  }
+}

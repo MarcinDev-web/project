@@ -13,6 +13,8 @@ export default defineConfig({
       '@engine/core/*': resolve(rootDir, 'packages/core/src/*'),
       '@engine/world': resolve(rootDir, 'packages/world/src'),
       '@engine/world/*': resolve(rootDir, 'packages/world/src/*'),
+      '@engine/asset-pipeline': resolve(rootDir, 'packages/asset-pipeline/src'),
+      '@engine/asset-pipeline/*': resolve(rootDir, 'packages/asset-pipeline/src/*'),
       '@engine/test-utils': resolve(rootDir, 'packages/test-utils/src'),
     },
     conditions: ['development', 'test', 'import', 'module'],

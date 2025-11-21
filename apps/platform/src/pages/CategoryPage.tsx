@@ -147,55 +147,32 @@ export function CategoryPage() {
           )}
 
           {/* Sort buttons */}
-          <Card>
-            <div style={{ display: 'flex', gap: 'var(--spacing-2)' }}>
-              <button
-                onClick={() => handleSortChange('hot')}
-                style={{
-                  padding: 'var(--spacing-2) var(--spacing-4)',
-                  background: sortBy === 'hot' ? 'var(--bg-button-primary)' : 'var(--bg-button)',
-                  color: sortBy === 'hot' ? 'white' : 'var(--text-1)',
-                  border: 'none',
-                  borderRadius: 'var(--radius-md)',
-                  cursor: 'pointer',
-                  fontSize: 'var(--text-sm)',
-                  fontWeight: sortBy === 'hot' ? 'var(--font-semibold)' : 'var(--font-medium)',
-                }}
-              >
-                Hot
-              </button>
-              <button
-                onClick={() => handleSortChange('new')}
-                style={{
-                  padding: 'var(--spacing-2) var(--spacing-4)',
-                  background: sortBy === 'new' ? 'var(--bg-button-primary)' : 'var(--bg-button)',
-                  color: sortBy === 'new' ? 'white' : 'var(--text-1)',
-                  border: 'none',
-                  borderRadius: 'var(--radius-md)',
-                  cursor: 'pointer',
-                  fontSize: 'var(--text-sm)',
-                  fontWeight: sortBy === 'new' ? 'var(--font-semibold)' : 'var(--font-medium)',
-                }}
-              >
-                New
-              </button>
-              <button
-                onClick={() => handleSortChange('top')}
-                style={{
-                  padding: 'var(--spacing-2) var(--spacing-4)',
-                  background: sortBy === 'top' ? 'var(--bg-button-primary)' : 'var(--bg-button)',
-                  color: sortBy === 'top' ? 'white' : 'var(--text-1)',
-                  border: 'none',
-                  borderRadius: 'var(--radius-md)',
-                  cursor: 'pointer',
-                  fontSize: 'var(--text-sm)',
-                  fontWeight: sortBy === 'top' ? 'var(--font-semibold)' : 'var(--font-medium)',
-                }}
-              >
-                Top
-              </button>
-            </div>
-          </Card>
+          <div className="forum-sort-controls">
+            <button
+              onClick={() => handleSortChange('hot')}
+              className={`forum-sort-button ${sortBy === 'hot' ? 'forum-sort-button--active' : ''}`}
+              aria-pressed={sortBy === 'hot'}
+            >
+              <span>🔥</span>
+              Hot
+            </button>
+            <button
+              onClick={() => handleSortChange('new')}
+              className={`forum-sort-button ${sortBy === 'new' ? 'forum-sort-button--active' : ''}`}
+              aria-pressed={sortBy === 'new'}
+            >
+              <span>✨</span>
+              New
+            </button>
+            <button
+              onClick={() => handleSortChange('top')}
+              className={`forum-sort-button ${sortBy === 'top' ? 'forum-sort-button--active' : ''}`}
+              aria-pressed={sortBy === 'top'}
+            >
+              <span>📈</span>
+              Top
+            </button>
+          </div>
 
           {/* Thread list */}
           {loading ? (

@@ -9,8 +9,8 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { EditorState } from '../state';
 import { Scene, Entity } from '@engine/world';
 import { ScriptComponent } from '@engine/script';
-import { AdaptiveUIManager } from '../../ui/AdaptiveUIManager';
-import { FeatureIntroduction } from '../../ui/FeatureIntroduction';
+import { AdaptiveUIManager } from '../../ui/system/AdaptiveUIManager';
+import { FeatureIntroduction } from '../../ui/onboarding/FeatureIntroduction';
 import { persistUIPreferences, restoreUIPreferences } from '../EditorPersistence';
 
 // WorkflowPresets feature was removed - tests removed

@@ -3,6 +3,7 @@
  * 
  * Supports:
  * - PNG, JPG, WebP formats
+ * - Compressed formats (KTX2, etc.) via handlers
  * - Data URLs
  * - Async loading with progress
  * - Image preprocessing (resize, flip, etc.)
@@ -10,38 +11,29 @@
  */
 
 import { globalTextureCache } from './TextureCache';
+import { 
+  TextureLoader as AssetTextureLoader, 
+  type TextureLoadOptions as AssetTextureLoadOptions, 
+  type RawTexture,
+  type TextureLoaderHandler 
+} from '@engine/asset-pipeline';
 
-export interface TextureLoadOptions {
-  /** Resize texture to this size (maintains aspect ratio if only width or height specified) */
-  width?: number;
-  height?: number;
-  /** Flip texture vertically (useful for WebGL) */
-  flipY?: boolean;
-  /** Generate mipmaps */
-  generateMipmaps?: boolean;
+export interface TextureLoadOptions extends AssetTextureLoadOptions {
   /** Cache loaded texture */
   cache?: boolean;
-  /** Texture ID for caching */
-  cacheId?: string;
 }
 
-export interface LoadedTexture {
-  /** Texture ID */
-  id: string;
-  /** Raw RGBA pixel data */
-  data: Uint8Array;
-  /** Width in pixels */
-  width: number;
-  /** Height in pixels */
-  height: number;
-  /** Original image element (for debugging) */
-  image?: HTMLImageElement;
-  /** Mipmaps if generated */
-  mipmaps?: Uint8Array[];
-}
+export type LoadedTexture = RawTexture;
 
 export class TextureLoader {
-  private loadingTextures: Map<string, Promise<LoadedTexture>> = new Map();
+  private loader = new AssetTextureLoader();
+
+  /**
+   * Register a handler for a specific file extension
+   */
+  public registerHandler(extension: string, handler: TextureLoaderHandler): void {
+    this.loader.registerHandler(extension, handler);
+  }
 
   /**
    * Load texture from URL or data URL
@@ -61,185 +53,28 @@ export class TextureLoader {
           data: cached.data,
           width: cached.width,
           height: cached.height,
+          format: cached.format,
           ...(cached.mipmaps !== undefined ? { mipmaps: cached.mipmaps } : {}),
         };
       }
     }
 
-    // Check if already loading
-    if (this.loadingTextures.has(url)) {
-      return this.loadingTextures.get(url)!;
+    // Load using asset pipeline
+    const texture = await this.loader.load(url, options);
+
+    // Add to cache if enabled
+    if (options.cache !== false) {
+      globalTextureCache.add(
+        cacheId,
+        texture.data,
+        texture.width,
+        texture.height,
+        texture.mipmaps,
+        texture.format
+      );
     }
 
-    // Start loading
-    const promise = this.loadInternal(url, options);
-    this.loadingTextures.set(url, promise);
-
-    try {
-      const texture = await promise;
-      
-      // Add to cache if enabled
-      if (options.cache !== false) {
-        globalTextureCache.add(
-          cacheId,
-          texture.data,
-          texture.width,
-          texture.height,
-          texture.mipmaps
-        );
-      }
-
-      return texture;
-    } finally {
-      this.loadingTextures.delete(url);
-    }
-  }
-
-  /**
-   * Internal loading implementation
-   */
-  private async loadInternal(
-    url: string,
-    options: TextureLoadOptions
-  ): Promise<LoadedTexture> {
-    // Load image
-    const image = await this.loadImage(url);
-
-    // Create canvas for pixel extraction
-    const canvas = document.createElement('canvas');
-    let width = options.width || image.width;
-    let height = options.height || image.height;
-
-    // Maintain aspect ratio if only one dimension specified
-    if (options.width && !options.height) {
-      height = (image.height / image.width) * options.width;
-    } else if (options.height && !options.width) {
-      width = (image.width / image.height) * options.height;
-    }
-
-    canvas.width = width;
-    canvas.height = height;
-
-    const ctx = canvas.getContext('2d');
-    if (!ctx) {
-      throw new Error('Failed to get 2D context');
-    }
-
-    // Apply flip if needed
-    if (options.flipY) {
-      ctx.translate(0, height);
-      ctx.scale(1, -1);
-    }
-
-    // Draw and extract pixels
-    ctx.drawImage(image, 0, 0, width, height);
-    const imageData = ctx.getImageData(0, 0, width, height);
-    const data = new Uint8Array(imageData.data);
-
-    // Generate mipmaps if requested
-    let mipmaps: Uint8Array[] | undefined;
-    if (options.generateMipmaps) {
-      mipmaps = this.generateMipmaps(data, width, height);
-    }
-
-    return {
-      id: options.cacheId || url,
-      data,
-      width,
-      height,
-      image,
-      ...(mipmaps !== undefined ? { mipmaps } : {}),
-    };
-  }
-
-  /**
-   * Load image from URL
-   */
-  private loadImage(url: string): Promise<HTMLImageElement> {
-    return new Promise((resolve, reject) => {
-      const image = new Image();
-      
-      image.onload = () => resolve(image);
-      image.onerror = () => reject(new Error(`Failed to load image: ${url}`));
-      
-      // Enable CORS for external images
-      image.crossOrigin = 'anonymous';
-      image.src = url;
-    });
-  }
-
-  /**
-   * Generate mipmaps using box filter
-   */
-  private generateMipmaps(
-    baseData: Uint8Array,
-    baseWidth: number,
-    baseHeight: number
-  ): Uint8Array[] {
-    const mipmaps: Uint8Array[] = [baseData];
-    let currentWidth = baseWidth;
-    let currentHeight = baseHeight;
-    let currentData = baseData;
-
-    while (currentWidth > 1 || currentHeight > 1) {
-      const newWidth = Math.max(1, Math.floor(currentWidth / 2));
-      const newHeight = Math.max(1, Math.floor(currentHeight / 2));
-      const newData = this.downsample(currentData, currentWidth, currentHeight, newWidth, newHeight);
-
-      mipmaps.push(newData);
-      currentData = newData;
-      currentWidth = newWidth;
-      currentHeight = newHeight;
-    }
-
-    return mipmaps;
-  }
-
-  /**
-   * Downsample texture data
-   */
-  private downsample(
-    srcData: Uint8Array,
-    srcWidth: number,
-    srcHeight: number,
-    dstWidth: number,
-    dstHeight: number
-  ): Uint8Array {
-    const dstData = new Uint8Array(dstWidth * dstHeight * 4);
-    const xRatio = srcWidth / dstWidth;
-    const yRatio = srcHeight / dstHeight;
-
-    for (let y = 0; y < dstHeight; y++) {
-      for (let x = 0; x < dstWidth; x++) {
-        const srcX = Math.floor(x * xRatio);
-        const srcY = Math.floor(y * yRatio);
-
-        let r = 0, g = 0, b = 0, a = 0;
-        let count = 0;
-
-        for (let dy = 0; dy < Math.ceil(yRatio); dy++) {
-          for (let dx = 0; dx < Math.ceil(xRatio); dx++) {
-            const sx = Math.min(srcX + dx, srcWidth - 1);
-            const sy = Math.min(srcY + dy, srcHeight - 1);
-            const srcIdx = (sy * srcWidth + sx) * 4;
-
-            r += srcData[srcIdx + 0]!;
-            g += srcData[srcIdx + 1]!;
-            b += srcData[srcIdx + 2]!;
-            a += srcData[srcIdx + 3]!;
-            count++;
-          }
-        }
-
-        const dstIdx = (y * dstWidth + x) * 4;
-        dstData[dstIdx + 0] = Math.round(r / count);
-        dstData[dstIdx + 1] = Math.round(g / count);
-        dstData[dstIdx + 2] = Math.round(b / count);
-        dstData[dstIdx + 3] = Math.round(a / count);
-      }
-    }
-
-    return dstData;
+    return texture;
   }
 
   /**
@@ -270,37 +105,14 @@ export class TextureLoader {
     height: number,
     options: TextureLoadOptions = {}
   ): LoadedTexture {
-    let processedData = data;
-    let processedWidth = width;
-    let processedHeight = height;
-
-    // Resize if needed
-    if ((options.width && options.width !== width) || (options.height && options.height !== height)) {
-      const newWidth = options.width || width;
-      const newHeight = options.height || height;
-      processedData = this.downsample(data, width, height, newWidth, newHeight);
-      processedWidth = newWidth;
-      processedHeight = newHeight;
-    }
-
-    // Generate mipmaps if requested
-    let mipmaps: Uint8Array[] | undefined;
-    if (options.generateMipmaps) {
-      mipmaps = this.generateMipmaps(processedData, processedWidth, processedHeight);
-    }
+    const texture = this.loader.createFromPixels(id, data, width, height, options);
 
     // Add to cache if enabled
     if (options.cache !== false) {
-      globalTextureCache.add(id, processedData, processedWidth, processedHeight, mipmaps);
+      globalTextureCache.add(id, texture.data, texture.width, texture.height, texture.mipmaps, texture.format);
     }
 
-    return {
-      id,
-      data: processedData,
-      width: processedWidth,
-      height: processedHeight,
-      ...(mipmaps !== undefined ? { mipmaps } : {}),
-    };
+    return texture;
   }
 
   /**
@@ -314,23 +126,17 @@ export class TextureLoader {
     a: number = 255,
     size: number = 4
   ): LoadedTexture {
-    const data = new Uint8Array(size * size * 4);
+    const texture = this.loader.createSolidColor(id, r, g, b, a, size);
     
-    for (let i = 0; i < size * size; i++) {
-      data[i * 4 + 0] = r;
-      data[i * 4 + 1] = g;
-      data[i * 4 + 2] = b;
-      data[i * 4 + 3] = a;
-    }
-
-    return this.createFromPixels(id, data, size, size, { cache: true });
+    globalTextureCache.add(id, texture.data, texture.width, texture.height, texture.mipmaps, texture.format);
+    return texture;
   }
 
   /**
    * Clear loading queue
    */
   public clearQueue(): void {
-    this.loadingTextures.clear();
+    this.loader.clearQueue();
   }
 }
 
@@ -338,4 +144,3 @@ export class TextureLoader {
  * Global texture loader instance
  */
 export const globalTextureLoader = new TextureLoader();
-

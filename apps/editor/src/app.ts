@@ -3,7 +3,7 @@ import { initRenderer, type Renderer } from '@engine/gfx-webgpu';
 import { Scene, Raycaster, SelectionManager } from '@engine/world';
 import { mat4LookAt, mat4Multiply, mat4Perspective, mat4Invert, mat4GetTranslationOut, mat4GetRotationOut, type Mat4, type Vec3, type Quat } from '@engine/core/math';
 import { FOV_RADIANS, Z_FAR, Z_NEAR } from '@engine/gfx-webgpu/config';
-import { EditorUI } from './editor/ui/EditorUI';
+import { EditorUI } from './editor/ui/layout/EditorUI';
 import { Logger } from './utils/logger';
 import { CameraComponent } from '@engine/world';
 import { PhysicsWorld } from '@engine/world';

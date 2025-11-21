@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { Scene, Entity, SelectionManager } from '@engine/world';
 import { createOrbitControls } from '@engine/camera';
-import { EditorUI } from '../../editor/ui/EditorUI';
+import { EditorUI } from '../../editor/ui/layout/EditorUI';
 import type { Renderer } from '@engine/gfx-webgpu';
 
 function createMockRenderer(): Renderer {

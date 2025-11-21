@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { EditorUI } from '../EditorUI';
+import { EditorUI } from '../layout/EditorUI';
 import { SelectionManager } from '@engine/world';
 import { Scene } from '@engine/world';
 import type { OrbitControls } from '@engine/camera';

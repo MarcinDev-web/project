@@ -1,7 +1,14 @@
 import type { Vec3, Mat4 } from '@engine/core/math';
-import { mat4LookAt } from '@engine/core/math';
-import type { PhysicsWorld } from '@engine/world';
+import { 
+  mat4LookAt, 
+  lerpVec3Out, 
+  subVec3Out, 
+  scaleVec3Out, 
+  addVec3Out 
+} from '@engine/core/math';
+import type { PhysicsWorld, Entity } from '@engine/world';
 import { damp } from './utils/Damper';
+import type { IDisposable } from '@engine/core';
 
 /**
  * Configuration for ThirdPersonCamera
@@ -37,23 +44,6 @@ function clamp(value: number, min: number, max: number): number {
 }
 
 /**
- * Lerp between two numbers
- */
-function lerp(a: number, b: number, t: number): number {
-  return a + (b - a) * t;
-}
-
-/**
- * Lerp between two Vec3s
- */
-function lerpVec3(out: Vec3, a: Vec3, b: Vec3, t: number): Vec3 {
-  out[0] = lerp(a[0], b[0], t);
-  out[1] = lerp(a[1], b[1], t);
-  out[2] = lerp(a[2], b[2], t);
-  return out;
-}
-
-/**
  * ThirdPersonCamera provides over-the-shoulder camera controls for gameplay.
  *
  * Features:
@@ -62,10 +52,11 @@ function lerpVec3(out: Vec3, a: Vec3, b: Vec3, t: number): Vec3 {
  * - Auto-rotation: gradually rotates to follow player forward direction
  * - Collision-aware: pulls camera closer when hitting walls
  * - Smooth follow: lerp camera position to target position
+ * - Zero-allocation update loop for high performance
  *
  * This is for gameplay third-person perspective.
  */
-export class ThirdPersonCamera {
+export class ThirdPersonCamera implements IDisposable {
   private readonly canvas: HTMLCanvasElement;
   private readonly physicsWorld: PhysicsWorld | null;
   private readonly viewMatrix: Mat4;
@@ -101,6 +92,18 @@ export class ThirdPersonCamera {
   // Direction vectors (cached)
   private readonly forward: Vec3 = [0, 0, -1];
   private readonly right: Vec3 = [1, 0, 0];
+
+  // Scratch vectors for zero-allocation math in hot paths
+  private readonly _scratchVec3: Vec3 = [0, 0, 0];
+  private readonly _desiredPos: Vec3 = [0, 0, 0];
+  private readonly _rayDir: Vec3 = [0, 0, 0];
+  private readonly _targetLookAt: Vec3 = [0, 0, 0];
+  private readonly _ignoreEntities: Entity[] = [];
+  private readonly _raycastOptions = {
+    maxDistance: 0,
+    ignoreEntities: this._ignoreEntities,
+    hitTriggers: false,
+  };
 
   // Event listeners (for cleanup)
   private readonly boundHandlers = {
@@ -228,27 +231,26 @@ export class ThirdPersonCamera {
     }
 
     // Calculate desired camera position
-    const desiredPosition = this.calculateDesiredPosition(playerPosition);
+    this.calculateDesiredPositionOut(playerPosition, this._desiredPos);
 
-    // Check for collisions and adjust position
-    const finalPosition = this.resolveCollision(playerPosition, desiredPosition);
+    // Check for collisions and adjust position (modifies this._desiredPos in-place)
+    this.resolveCollisionMutate(playerPosition, this._desiredPos);
 
     // Smooth follow
     const lerpFactor = clamp(this.followSpeed * deltaTime, 0, 1);
-    lerpVec3(this.position, this.position, finalPosition, lerpFactor);
+    lerpVec3Out(this.position, this.position, this._desiredPos, lerpFactor);
   }
 
   /**
    * Get the current view matrix
    */
   getViewMatrix(playerPosition: Vec3): Mat4 {
-    const target: Vec3 = [
-      playerPosition[0],
-      playerPosition[1] + this.height * 0.7, // Look slightly above player pivot
-      playerPosition[2],
-    ];
+    // Reuse cached vector for target to avoid allocation
+    this._targetLookAt[0] = playerPosition[0];
+    this._targetLookAt[1] = playerPosition[1] + this.height * 0.7; // Look slightly above player pivot
+    this._targetLookAt[2] = playerPosition[2];
     
-    mat4LookAt(this.viewMatrix, this.position, target, [0, 1, 0]);
+    mat4LookAt(this.viewMatrix, this.position, this._targetLookAt, [0, 1, 0]);
     return this.viewMatrix;
   }
 
@@ -354,7 +356,7 @@ export class ThirdPersonCamera {
 
   // ========== Private Methods ==========
 
-  private calculateDesiredPosition(playerPosition: Vec3): Vec3 {
+  private calculateDesiredPositionOut(playerPosition: Vec3, out: Vec3): void {
     // Calculate camera offset based on yaw, pitch, distance, and shoulder offset
     const cosPitch = Math.cos(this.pitch);
     const sinPitch = Math.sin(this.pitch);
@@ -370,64 +372,52 @@ export class ThirdPersonCamera {
     const shoulderX = cosYaw * this.shoulderOffset;
     const shoulderZ = sinYaw * this.shoulderOffset;
 
-    return [
-      playerPosition[0] - behindX + shoulderX,
-      playerPosition[1] + this.height - behindY,
-      playerPosition[2] - behindZ + shoulderZ,
-    ] as Vec3;
+    out[0] = playerPosition[0] - behindX + shoulderX;
+    out[1] = playerPosition[1] + this.height - behindY;
+    out[2] = playerPosition[2] - behindZ + shoulderZ;
   }
 
-  private resolveCollision(playerPosition: Vec3, desiredPosition: Vec3): Vec3 {
-    if (!this.physicsWorld) {
-      return desiredPosition;
-    }
+  private resolveCollisionMutate(playerPosition: Vec3, desiredPosition: Vec3): void {
+    if (!this.physicsWorld) return;
 
+    // Reuse scratch vectors
     // Raycast from player to desired camera position
-    const direction: Vec3 = [
-      desiredPosition[0] - playerPosition[0],
-      desiredPosition[1] - playerPosition[1],
-      desiredPosition[2] - playerPosition[2],
-    ];
+    // Direction = Desired - Player
+    subVec3Out(this._rayDir, desiredPosition, playerPosition);
 
-    const distanceToCamera = Math.sqrt(
-      direction[0] * direction[0] +
-      direction[1] * direction[1] +
-      direction[2] * direction[2]
-    );
+    // Calculate magnitude
+    const dx = this._rayDir[0];
+    const dy = this._rayDir[1];
+    const dz = this._rayDir[2];
+    const distanceToCamera = Math.hypot(dx, dy, dz);
 
-    if (distanceToCamera < 0.01) {
-      return desiredPosition;
-    }
+    if (distanceToCamera < 0.01) return;
 
     // Normalize direction
-    const dirNorm: Vec3 = [
-      direction[0] / distanceToCamera,
-      direction[1] / distanceToCamera,
-      direction[2] / distanceToCamera,
-    ];
+    const invDist = 1 / distanceToCamera;
+    this._rayDir[0] *= invDist;
+    this._rayDir[1] *= invDist;
+    this._rayDir[2] *= invDist;
+
+    // Reuse option object to avoid garbage
+    this._raycastOptions.maxDistance = distanceToCamera + this.collisionRadius;
+    // ignoreEntities is already set to empty array or whatever is needed
 
     // Cast ray from player to camera
     const hit = this.physicsWorld.raycast(
       playerPosition,
-      dirNorm,
-      {
-        maxDistance: distanceToCamera + this.collisionRadius,
-        ignoreEntities: [],
-        hitTriggers: false,
-      }
+      this._rayDir,
+      this._raycastOptions
     );
 
     if (hit && hit.distance < distanceToCamera) {
       // Pull camera closer to avoid clipping through walls
       const safeDist = Math.max(hit.distance - this.collisionRadius, 0.5); // Minimum distance of 0.5
-      return [
-        playerPosition[0] + dirNorm[0] * safeDist,
-        playerPosition[1] + dirNorm[1] * safeDist,
-        playerPosition[2] + dirNorm[2] * safeDist,
-      ] as Vec3;
+      
+      // desiredPosition = playerPosition + dirNorm * safeDist
+      scaleVec3Out(this._scratchVec3, this._rayDir, safeDist);
+      addVec3Out(desiredPosition, playerPosition, this._scratchVec3);
     }
-
-    return desiredPosition;
   }
 
   private updateDirectionVectors(): void {
@@ -552,4 +542,3 @@ export class ThirdPersonCamera {
     }
   }
 }
-

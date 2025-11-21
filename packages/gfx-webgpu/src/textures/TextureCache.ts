@@ -9,6 +9,8 @@
  * - Reference counting
  */
 
+import type { TextureFormat } from '@engine/asset-pipeline';
+
 export interface CachedTexture {
   /** Unique identifier */
   id: string;
@@ -18,6 +20,8 @@ export interface CachedTexture {
   width: number;
   /** Height in pixels */
   height: number;
+  /** Texture format */
+  format: TextureFormat;
   /** GPU texture handle (WebGL texture) */
   gpuHandle?: WebGLTexture;
   /** Last access timestamp */
@@ -90,7 +94,8 @@ export class TextureCache {
     data: Uint8Array,
     width: number,
     height: number,
-    mipmaps?: Uint8Array[]
+    mipmaps?: Uint8Array[],
+    format: TextureFormat = 'rgba8unorm'
   ): CachedTexture {
     // Check if already cached
     if (this.cache.has(id)) {
@@ -112,6 +117,7 @@ export class TextureCache {
       data,
       width,
       height,
+      format,
       lastAccessed: Date.now(),
       refCount: 1,
       byteSize,
@@ -365,4 +371,3 @@ export class TextureCache {
  * Can be used across the application
  */
 export const globalTextureCache = new TextureCache();
-

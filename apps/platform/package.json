@@ -15,6 +15,7 @@
     "@engine/camera": "workspace:*",
     "@engine/core": "workspace:*",
     "@engine/gfx-webgpu": "workspace:*",
+    "@engine/ui": "workspace:*",
     "@engine/world": "workspace:*",
     "@vercel/analytics": "^1.5.0",
     "react": "^18.3.1",

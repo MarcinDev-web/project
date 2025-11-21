@@ -79,8 +79,9 @@
                          "@engine/world":  "workspace:*",
                          "@engine/avatar":  "workspace:*",
                          "@engine/blocks":  "workspace:*",
-                         "@engine/editor-utils":  "workspace:*",
-                         "gl-matrix":  "^3.4.4"
+    "@engine/editor-utils":  "workspace:*",
+    "@engine/asset-pipeline":  "workspace:*",
+    "gl-matrix":  "^3.4.4"
                      },
     "devDependencies":  {
                             "@webgpu/types":  "^0.1.65",

@@ -1,5 +1,5 @@
+import styles from './VotingButtons.module.css';
 import { useState } from 'react';
-import type { ReactNode } from 'react';
 
 export interface VotingButtonsProps {
   score: number;
@@ -41,17 +41,17 @@ export function VotingButtons({
   };
 
   const scoreClass = score > 0 
-    ? 'forum-voting__score--positive' 
+    ? styles.scorePositive
     : score < 0 
-    ? 'forum-voting__score--negative' 
+    ? styles.scoreNegative
     : '';
 
   return (
-    <div className={`forum-voting forum-voting--size-${size} ${className}`}>
+    <div className={`${styles.voting} ${className}`}>
       <button
         type="button"
-        className={`forum-voting__button forum-voting__button--upvote ${
-          userVote === 'up' ? 'active' : ''
+        className={`${styles.button} ${styles.upvote} ${
+          userVote === 'up' ? styles.active : ''
         }`}
         onClick={() => handleVote('up')}
         disabled={disabled || isVoting}
@@ -61,14 +61,14 @@ export function VotingButtons({
         ▲
       </button>
       
-      <div className={`forum-voting__score ${scoreClass}`}>
+      <div className={`${styles.score} ${scoreClass}`}>
         {score}
       </div>
       
       <button
         type="button"
-        className={`forum-voting__button forum-voting__button--downvote ${
-          userVote === 'down' ? 'active' : ''
+        className={`${styles.button} ${styles.downvote} ${
+          userVote === 'down' ? styles.active : ''
         }`}
         onClick={() => handleVote('down')}
         disabled={disabled || isVoting}

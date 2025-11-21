@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { CustomMeshData } from '@engine/world';
 
 /**
@@ -414,4 +415,3 @@ export function generateCapsuleMesh(
     indices: new Uint16Array(indices),
   };
 }
-

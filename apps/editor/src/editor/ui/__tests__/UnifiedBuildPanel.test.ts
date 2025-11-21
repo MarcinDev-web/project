@@ -3,7 +3,7 @@
  */
 
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
-import { UnifiedBuildPanel } from '../UnifiedBuildPanel';
+import { UnifiedBuildPanel } from '../features/UnifiedBuildPanel';
 import { Scene } from '@engine/world';
 import { EditorState } from '../../core/state';
 import { PlacementMode } from '../../placement/PlacementMode';

@@ -11,20 +11,20 @@ const COUNTS_BUFFER_SIZE = 16; // opaque + transparent with padding
 
 const INSTANCE_PIPELINE_SHADER = /* wgsl */ `
 struct InstanceUniforms {
-  planes: array<vec4<f32>, 6>;
-  misc: vec4<f32>;
+  planes: array<vec4<f32>, 6>,
+  misc: vec4<f32>,
 };
 
 struct VisibilityCounters {
-  opaque: atomic<u32>;
-  transparent: atomic<u32>;
+  opaque: atomic<u32>,
+  transparent: atomic<u32>,
 };
 
 struct CompactParams {
-  components: u32;
-  _pad0: u32;
-  _pad1: u32;
-  _pad2: u32;
+  components: u32,
+  _pad0: u32,
+  _pad1: u32,
+  _pad2: u32,
 };
 
 @group(0) @binding(0) var<uniform> classifyUniforms: InstanceUniforms;
@@ -167,6 +167,7 @@ export class GpuInstancePipeline {
   private classifyBindGroupLayout!: GPUBindGroupLayout;
   private compactBindGroupLayout!: GPUBindGroupLayout;
   private finalizeBindGroupLayout!: GPUBindGroupLayout;
+  private emptyBindGroupLayout: GPUBindGroupLayout;
   private countsBuffer: GPUBuffer | null = null;
   private opaqueIndicesBuffer: GPUBuffer | null = null;
   private transparentIndicesBuffer: GPUBuffer | null = null;
@@ -183,6 +184,10 @@ export class GpuInstancePipeline {
       label: 'gpu-instance-compact-params',
       size: COMPACT_UNIFORM_SIZE,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    this.emptyBindGroupLayout = device.createBindGroupLayout({
+      label: 'gpu-instance-empty-bind-group',
+      entries: [],
     });
     this.initializePipelines();
   }
@@ -283,7 +288,7 @@ export class GpuInstancePipeline {
     this.compactPipeline = this.device.createComputePipeline({
       label: 'gpu-instance-compact-pipeline',
       layout: this.device.createPipelineLayout({
-        bindGroupLayouts: [this.compactBindGroupLayout],
+        bindGroupLayouts: [this.emptyBindGroupLayout, this.compactBindGroupLayout],
       }),
       compute: {
         module,
@@ -294,7 +299,7 @@ export class GpuInstancePipeline {
     this.finalizePipeline = this.device.createComputePipeline({
       label: 'gpu-instance-finalize-pipeline',
       layout: this.device.createPipelineLayout({
-        bindGroupLayouts: [this.finalizeBindGroupLayout],
+        bindGroupLayouts: [this.emptyBindGroupLayout, this.emptyBindGroupLayout, this.finalizeBindGroupLayout],
       }),
       compute: {
         module,
@@ -382,7 +387,7 @@ export class GpuInstancePipeline {
 
     const pass = params.encoder.beginComputePass({ label: 'gpu-instance-classify-pass' });
     pass.setPipeline(this.classifyPipeline);
-    pass.setBindGroup(0, bindGroup);
+    pass.setBindGroup(1, bindGroup);
     pass.dispatchWorkgroups(Math.ceil(instanceCount / WORKGROUP_SIZE));
     pass.end();
   }
@@ -428,7 +433,7 @@ export class GpuInstancePipeline {
 
     const pass = encoder.beginComputePass({ label: 'gpu-instance-compact-pass' });
     pass.setPipeline(this.compactPipeline);
-    pass.setBindGroup(0, bindGroup);
+    pass.setBindGroup(1, bindGroup);
     pass.dispatchWorkgroups(Math.ceil(instanceCount / WORKGROUP_SIZE));
     pass.end();
   }
@@ -448,7 +453,7 @@ export class GpuInstancePipeline {
 
     const pass = encoder.beginComputePass({ label: 'gpu-instance-finalize-pass' });
     pass.setPipeline(this.finalizePipeline);
-    pass.setBindGroup(0, bindGroup);
+    pass.setBindGroup(2, bindGroup);
     pass.dispatchWorkgroups(1);
     pass.end();
   }

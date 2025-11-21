@@ -1,7 +1,7 @@
 import { describe, it, expect, beforeEach } from 'vitest';
 import { EditorState } from '../state';
 import { Scene } from '@engine/world';
-import { EditorPanelManager } from '../../panels/EditorPanelManager';
+import { EditorPanelManager } from '../../panels/core/EditorPanelManager';
 import { SelectionManager } from '@engine/world';
 
 describe.skip('Phase 2 Integration', () => {

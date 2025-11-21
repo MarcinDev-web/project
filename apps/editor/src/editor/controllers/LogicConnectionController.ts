@@ -9,7 +9,7 @@ import type { LogicPort } from '@engine/script';
 import { LogicCubeComponent } from '@engine/script';
 import { LogicCubeLibrary } from '@engine/editor-utils';
 import { Logger } from '../../utils/logger';
-import { showPortSelectionModal } from '../ui/PortSelectionModal';
+import { showPortSelectionModal } from '../ui/modals/PortSelectionModal';
 
 type ConnectionMode = 'idle' | 'selecting-source' | 'selecting-target';
 

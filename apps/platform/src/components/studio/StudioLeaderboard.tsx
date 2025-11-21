@@ -95,17 +95,19 @@ export function StudioLeaderboard() {
 
         <div className="leaderboard-list">
           {leaderboard.leaderboard.length === 0 ? (
-            <p>Brak danych w rankingu</p>
+            <div className="studio-empty">
+              <p>Brak danych w rankingu</p>
+            </div>
           ) : (
             <table className="leaderboard-table">
               <thead>
                 <tr>
-                  <th>Pozycja</th>
-                  <th>Studio</th>
-                  <th>Wyświetlenia</th>
-                  <th>Pobrania</th>
-                  <th>Polubienia</th>
-                  <th>Projekty</th>
+                  <th style={{ width: '10%' }}>Pozycja</th>
+                  <th style={{ width: '40%' }}>Studio</th>
+                  <th className="text-right" style={{ width: '12%' }}>Wyświetlenia</th>
+                  <th className="text-right" style={{ width: '12%' }}>Pobrania</th>
+                  <th className="text-right" style={{ width: '12%' }}>Polubienia</th>
+                  <th className="text-right" style={{ width: '14%' }}>Projekty</th>
                 </tr>
               </thead>
               <tbody>
@@ -117,22 +119,31 @@ export function StudioLeaderboard() {
                       className={isCurrentUser ? 'current-user' : ''}
                     >
                       <td className="rank-cell">
-                        {entry.rank <= 3 && (
-                          <span className="medal">
-                            {entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : '🥉'}
-                          </span>
-                        )}
-                        <strong>#{entry.rank}</strong>
+                        <div className={`rank-badge rank-${entry.rank}`}>
+                          {entry.rank <= 3 ? (
+                            <span className="medal-icon">
+                              {entry.rank === 1 ? '🥇' : entry.rank === 2 ? '🥈' : '🥉'}
+                            </span>
+                          ) : (
+                            <span className="rank-number">#{entry.rank}</span>
+                          )}
+                        </div>
                       </td>
                       <td>
-                        <Link to={`/profile/${entry.userId}`} className="leaderboard-user-link">
-                          {entry.userName || entry.userId}
-                        </Link>
+                        <div className="studio-info-cell">
+                          <div className="studio-avatar-placeholder">
+                            {entry.userName ? entry.userName.charAt(0).toUpperCase() : '?'}
+                          </div>
+                          <Link to={`/profile/${entry.userId}`} className="leaderboard-user-link">
+                            {entry.userName || entry.userId}
+                          </Link>
+                          {isCurrentUser && <span className="current-user-badge">Ty</span>}
+                        </div>
                       </td>
-                      <td>{entry.views.toLocaleString()}</td>
-                      <td>{entry.downloads.toLocaleString()}</td>
-                      <td>{entry.likes.toLocaleString()}</td>
-                      <td>{entry.projects}</td>
+                      <td className="text-right font-mono">{entry.views.toLocaleString()}</td>
+                      <td className="text-right font-mono">{entry.downloads.toLocaleString()}</td>
+                      <td className="text-right font-mono">{entry.likes.toLocaleString()}</td>
+                      <td className="text-right font-mono">{entry.projects}</td>
                     </tr>
                   );
                 })}

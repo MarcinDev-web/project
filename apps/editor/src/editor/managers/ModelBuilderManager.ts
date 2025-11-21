@@ -14,7 +14,7 @@ import { ModelBuilderController } from '../controllers/ModelBuilderController';
 import type { ModelBuilderControllerConfig } from '../controllers/ModelBuilderController';
 import { BuildBoundsVisualizer } from '../model-builder/BuildBoundsVisualizer';
 import { MicroBlockPreview } from '../model-builder/MicroBlockPreview';
-import { ModelBuilderPanel } from '../panels/ModelBuilderPanel';
+import { ModelBuilderPanel } from '../panels/content/ModelBuilderPanel';
 import type { BuildBounds, ModelBuilderConfig } from '@engine/blocks';
 import type { ModelBuilderSceneConfig } from '../model-builder/ModelBuilderScene';
 import { DisposableGroup } from '@engine/core';

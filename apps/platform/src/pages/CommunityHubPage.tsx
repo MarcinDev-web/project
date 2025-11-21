@@ -32,7 +32,7 @@ export function CommunityHubPage() {
     <Layout>
       <div className="page-container">
         <div className="community-hub-header">
-          <h1>Community</h1>
+          <h1>Community Hub</h1>
         </div>
 
         {/* Tab Navigation */}
@@ -45,7 +45,7 @@ export function CommunityHubPage() {
             className={`community-hub-tab ${activeTab === 'community' ? 'community-hub-tab--active' : ''}`}
           >
             <span className="community-hub-tab__icon">💬</span>
-            <span className="community-hub-tab__label">Community</span>
+            <span className="community-hub-tab__label">Forum</span>
           </button>
           <button
             role="tab"

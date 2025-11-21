@@ -31,63 +31,82 @@ export function TeamMembersList({
   if (members.length === 0) {
     return (
       <Card>
-        <p>Brak członków w ekipie</p>
+        <div className="studio-empty-state">
+          <p>Brak członków w ekipie</p>
+        </div>
       </Card>
     );
   }
 
-  return (
-    <div className="team-members-list">
-      <table className="team-members-table">
-        <thead>
-          <tr>
-            <th>Użytkownik</th>
-            <th>Rola</th>
-            <th>Dołączył</th>
-            {isOwner && <th>Akcje</th>}
-          </tr>
-        </thead>
-        <tbody>
-          {members.map((member) => {
-            const isCurrentUser = member.userId === currentUserId;
-            const canRemove = isOwner && !isCurrentUser && member.role !== 'owner';
+  const getInitials = (name: string) => {
+    return name.substring(0, 2).toUpperCase();
+  };
 
-            return (
-              <tr key={member.userId} className={isCurrentUser ? 'current-user' : ''}>
-                <td>
-                  <div className="member-info">
-                    <strong>{member.userName || member.userEmail || member.userId}</strong>
-                    {member.userEmail && member.userName && (
-                      <span className="member-email">{member.userEmail}</span>
-                    )}
-                  </div>
-                </td>
-                <td>
-                  <span className={`member-role role-${member.role}`}>
-                    {member.role === 'owner' ? '👑 Właściciel' : '👤 Członek'}
-                  </span>
-                </td>
-                <td>{new Date(member.joinedAt).toLocaleDateString('pl-PL')}</td>
-                {isOwner && (
-                  <td>
-                    {canRemove && onRemoveMember && (
-                      <Button
-                        variant="danger"
-                        size="small"
-                        onClick={() => onRemoveMember(member.userId)}
-                      >
-                        Usuń
-                      </Button>
-                    )}
-                    {!canRemove && <span className="no-action">-</span>}
-                  </td>
+  const getDisplayName = (member: TeamMember) => {
+    return member.userName || member.userEmail.split('@')[0] || 'Użytkownik';
+  };
+
+  return (
+    <div className="team-members-grid">
+      {members.map((member) => {
+        const isCurrentUser = member.userId === currentUserId;
+        const canRemove = isOwner && !isCurrentUser && member.role !== 'owner';
+        const displayName = getDisplayName(member);
+        const initials = getInitials(displayName);
+
+        return (
+          <div 
+            key={member.userId} 
+            className={`team-member-card ${isCurrentUser ? 'current-user' : ''}`}
+          >
+            <div className="member-avatar">
+              {initials}
+            </div>
+            
+            <div className="member-details">
+              <div className="member-header">
+                <span className="member-name" title={displayName}>
+                  {displayName}
+                </span>
+                {isCurrentUser && <span className="badge badge-you">Ty</span>}
+              </div>
+              
+              <div className="member-meta">
+                <span className={`member-role-badge role-${member.role}`}>
+                  {member.role === 'owner' ? '👑 Właściciel' : '👤 Członek'}
+                </span>
+                <span className="member-date">
+                  {new Date(member.joinedAt).toLocaleDateString('pl-PL')}
+                </span>
+              </div>
+              
+              {member.userEmail && member.userEmail !== displayName && (
+                 <div className="member-email-text" title={member.userEmail}>
+                   {member.userEmail}
+                 </div>
+              )}
+            </div>
+
+            {isOwner && (
+              <div className="member-actions">
+                {canRemove && onRemoveMember ? (
+                  <Button
+                    variant="danger"
+                    size="small"
+                    onClick={() => onRemoveMember(member.userId)}
+                    className="btn-icon-only"
+                    title="Usuń z ekipy"
+                  >
+                    ✕
+                  </Button>
+                ) : (
+                  <div className="action-placeholder"></div>
                 )}
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
+              </div>
+            )}
+          </div>
+        );
+      })}
     </div>
   );
 }
-

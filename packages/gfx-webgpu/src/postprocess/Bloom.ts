@@ -453,8 +453,6 @@ struct BlurParams {
       }
     }
     
-    // Update temp textures array on encoder with all textures (blur + upsample)
-    (encoder as any).__bloomTempTextures = tempTextures;
     
     // Move current frame textures to previous (they'll be destroyed after submit)
     // Store new textures as current (they'll be destroyed in next frame)

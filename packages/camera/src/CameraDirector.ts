@@ -6,6 +6,7 @@ import type { OrbitControls } from './OrbitCamera';
 import type { FPSCamera } from './FPSCamera';
 import type { EditorCameraController } from './EditorCameraController';
 import type { ThirdPersonCamera } from './ThirdPersonCamera';
+import type { IFPSCameraCollisionProvider } from './types';
 import { FPSRaycastCollision } from './collision/FPSRaycastCollision';
 
 // Default rendering config constants
@@ -42,6 +43,7 @@ export interface CameraDirectorConfig {
   canvas: HTMLCanvasElement;
   scene?: Scene;
   physicsWorld?: PhysicsWorld | null;
+  fpsCollisionProvider?: IFPSCameraCollisionProvider;
   logger?: {
     debug: (...args: unknown[]) => void;
     warn: (...args: unknown[]) => void;
@@ -66,7 +68,6 @@ export class CameraDirector {
   private readonly editorCamera: EditorCameraController | null;
   private readonly thirdPersonCamera: ThirdPersonCamera | null;
   private readonly canvas: HTMLCanvasElement;
-  private readonly scene: Scene | null;
   private readonly physicsWorld: PhysicsWorld | null;
   
   private currentFov: number = FOV_RADIANS;
@@ -106,7 +107,6 @@ export class CameraDirector {
     this.editorCamera = config.editorCamera;
     this.thirdPersonCamera = config.thirdPersonCamera ?? null;
     this.canvas = config.canvas;
-    this.scene = config.scene ?? null;
     this.physicsWorld = config.physicsWorld ?? null;
     
     this.logger = config.logger ?? {
@@ -123,17 +123,24 @@ export class CameraDirector {
     // Enable the default camera mode (free-fly for editor)
     this.enableCameraForMode(this.currentMode);
 
-    // Setup collision detection for FPS camera if physics world is available
-    if (this.fpsCamera && this.physicsWorld) {
-      const collisionProvider = new FPSRaycastCollision({
-        physics: this.physicsWorld,
-        radius: this.collisionRadius,
-        backoff: 0.03,
-        maxIters: 2,
-        sampleCount: 6,
-      });
-      this.fpsCamera.setCollisionProvider(collisionProvider);
-      this.fpsCamera.setCollisionEnabled(true);
+    // Setup collision detection for FPS camera
+    if (this.fpsCamera) {
+      if (config.fpsCollisionProvider) {
+        // Use injected provider
+        this.fpsCamera.setCollisionProvider(config.fpsCollisionProvider);
+        this.fpsCamera.setCollisionEnabled(true);
+      } else if (this.physicsWorld) {
+        // Default to internal raycast provider for backward compatibility
+        const collisionProvider = new FPSRaycastCollision({
+          physics: this.physicsWorld,
+          radius: this.collisionRadius,
+          backoff: 0.03,
+          maxIters: 2,
+          sampleCount: 6,
+        });
+        this.fpsCamera.setCollisionProvider(collisionProvider);
+        this.fpsCamera.setCollisionEnabled(true);
+      }
     }
   }
 
@@ -232,6 +239,8 @@ export class CameraDirector {
     if (this.currentMode === 'fps') {
       if (this.fpsCamera) {
         this.fpsCamera.update(deltaTime);
+      } else {
+        this.logger?.warn('fps mode but fpsCamera is null!');
       }
     }
     
@@ -240,6 +249,10 @@ export class CameraDirector {
       if (this.thirdPersonCamera && this.playerPosition) {
         const forward = this.playerForward ?? [0, 0, -1];
         this.thirdPersonCamera.update(this.playerPosition, forward, deltaTime);
+      } else {
+        if (!this.thirdPersonCamera) {
+          this.logger?.warn('third-person mode but thirdPersonCamera is null!');
+        }
       }
     }
     
@@ -508,8 +521,8 @@ export class CameraDirector {
           out[0] = this.playerPosition[0] + this.cameraOffset[0];
           out[1] = this.playerPosition[1] + this.cameraOffset[1];
           out[2] = this.playerPosition[2] + this.cameraOffset[2];
-          const resolved = this.resolveCameraCollision(out);
-          return resolved === out ? out : this.copyVec3(resolved, out);
+          // Collision is handled by FPSCamera provider now, no need for manual resolve here
+          return out;
         }
         return this.computeOrbitCameraPosition(out);
       case 'third-person':
@@ -573,7 +586,7 @@ export class CameraDirector {
             desiredCameraPosition = [eyeX, eyeY, eyeZ] as Vec3;
           }
 
-          const resolvedCameraPosition = this.resolveCameraCollision(desiredCameraPosition);
+          const resolvedCameraPosition = desiredCameraPosition;
           const eyeHeight = this.fpsCamera.getEyeHeight();
           const basePosition: Vec3 = [
             resolvedCameraPosition[0],
@@ -619,20 +632,11 @@ export class CameraDirector {
     }
   }
 
-  private resolveCameraCollision(playerPosition: Vec3): Vec3 {
-    // Collision detection is now handled by FPSCamera's collision provider
-    // This method is kept for backward compatibility but no longer performs collision
-    // The old implementation was moved to FPSRaycastCollision provider
-    // Scene is available here for future extensions if needed
-    void this.scene; // Suppress unused warning
-    return playerPosition;
-  }
-
   /**
    * Smooth interpolation function (ease-in-out)
+   * TODO: Move to @engine/core/math if used elsewhere
    */
   private smoothstep(t: number): number {
     return t * t * (3 - 2 * t);
   }
 }
-
