@@ -1,11 +1,28 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
+import { chatSystem, type ChatMessage } from '../../systems/ChatSystem.js';
 
 /**
- * Chat overlay component (placeholder - will be enhanced with multiplayer)
+ * Chat overlay component
  */
 export function ChatOverlay(): React.JSX.Element {
   const [isExpanded, setIsExpanded] = useState(false);
-  const [messages] = useState<Array<{ id: number; text: string; sender: string }>>([]);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    // Subscribe to chat system updates
+    const unsubscribe = chatSystem.subscribe((msgs) => {
+      setMessages(msgs);
+    });
+    return unsubscribe;
+  }, []);
+
+  // Auto-scroll to bottom on new messages
+  useEffect(() => {
+    if (messagesEndRef.current && isExpanded) {
+      messagesEndRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [messages, isExpanded]);
 
   return (
     <div style={styles.container}>
@@ -28,10 +45,17 @@ export function ChatOverlay(): React.JSX.Element {
             ) : (
               messages.map((msg) => (
                 <div key={msg.id} style={styles.message}>
-                  <span style={styles.sender}>{msg.sender}:</span> {msg.text}
+                  {msg.isSystem ? (
+                    <span style={styles.systemMessage}>{msg.message}</span>
+                  ) : (
+                    <>
+                      <span style={styles.sender}>{msg.displayName}:</span> {msg.message}
+                    </>
+                  )}
                 </div>
               ))
             )}
+            <div ref={messagesEndRef} />
           </div>
           <input
             style={styles.input}
@@ -39,8 +63,11 @@ export function ChatOverlay(): React.JSX.Element {
             placeholder="Type a message..."
             onKeyDown={(e) => {
               if (e.key === 'Enter') {
-                // TODO: Send message
-                e.currentTarget.value = '';
+                const value = e.currentTarget.value;
+                if (value.trim()) {
+                  chatSystem.sendMessage(value);
+                  e.currentTarget.value = '';
+                }
               }
             }}
           />
@@ -52,7 +79,7 @@ export function ChatOverlay(): React.JSX.Element {
             setIsExpanded(true);
           }}
         >
-          Chat
+          Chat {messages.length > 0 && `(${messages.length})`}
         </button>
       )}
     </div>
@@ -126,6 +153,10 @@ const styles: Record<string, React.CSSProperties> = {
     marginBottom: '0.5rem',
     wordBreak: 'break-word',
   },
+  systemMessage: {
+    color: '#ffff00',
+    fontStyle: 'italic',
+  },
   sender: {
     fontWeight: 500,
     color: '#4a9eff',
@@ -138,6 +169,6 @@ const styles: Record<string, React.CSSProperties> = {
     color: '#fff',
     fontSize: '0.875rem',
     outline: 'none',
+    margin: '0.5rem',
   },
 };
-

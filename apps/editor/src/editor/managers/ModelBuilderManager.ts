@@ -6,7 +6,6 @@
 
 import { Scene } from '@engine/world';
 import { ModelBuilder, BlockDefinitionGenerator } from '@engine/blocks';
-import { MicroBlockSystem } from '@engine/microblocks';
 import { ModelBuilderScene } from '../model-builder/ModelBuilderScene';
 import { ModelBuilderMode } from '../model-builder/ModelBuilderMode';
 import type { ModelBuilderModeConfig } from '../model-builder/ModelBuilderMode';
@@ -55,7 +54,6 @@ export class ModelBuilderManager {
   private visualizer: BuildBoundsVisualizer | null = null;
   private preview: MicroBlockPreview | null = null;
   private panel: ModelBuilderPanel | null = null;
-  private microBlockSystem: MicroBlockSystem | null = null;
   private isActive = false;
 
   constructor(scene: Scene, config: ModelBuilderManagerConfig) {
@@ -106,40 +104,27 @@ export class ModelBuilderManager {
     // Setup model entity
     this.builderScene.setupModel(this.builder);
 
-    // Create MicroBlockSystem
-    this.microBlockSystem = new MicroBlockSystem(this.builderScene.getScene(), {
-      enableAutoUpdate: true,
-      maxChunksPerFrame: 5,
-    });
-
     // Create ModelBuilderMode
     const builderModeConfig: ModelBuilderModeConfig = {
       enableHistory: true,
-      registerUndo: this.config.registerUndo,
-      registerRedo: this.config.registerRedo,
     };
+
+    if (this.config.registerUndo) {
+      builderModeConfig.registerUndo = this.config.registerUndo;
+    }
+
+    if (this.config.registerRedo) {
+      builderModeConfig.registerRedo = this.config.registerRedo;
+    }
 
     if (this.logger) {
       builderModeConfig.logger = this.logger;
     }
 
     this.builderMode = new ModelBuilderMode(
-      this.builderScene.getScene(),
       this.builderScene,
       this.builder,
       builderModeConfig
-    );
-
-    // Create controller
-    const controllerConfig: ModelBuilderControllerConfig | undefined = this.logger
-      ? { logger: this.logger }
-      : undefined;
-
-    this.controller = new ModelBuilderController(
-      this.builderScene.getScene(),
-      this.builder,
-      this.builderMode,
-      controllerConfig
     );
 
     // Create visualizer
@@ -150,6 +135,18 @@ export class ModelBuilderManager {
 
     // Create preview
     this.preview = new MicroBlockPreview(this.builderScene.getScene());
+
+    // Create controller
+    const controllerConfig: ModelBuilderControllerConfig | undefined = this.logger
+      ? { logger: this.logger }
+      : undefined;
+
+    this.controller = new ModelBuilderController(
+      this.builderScene.getScene(),
+      this.builderMode,
+      this.preview,
+      controllerConfig
+    );
 
     // Create panel
     this.panel = new ModelBuilderPanel(this.builderMode, this.builder);
@@ -192,10 +189,6 @@ export class ModelBuilderManager {
 
     if (this.builderMode) {
       this.builderMode.update(deltaTime);
-    }
-
-    if (this.microBlockSystem) {
-      this.microBlockSystem.update(deltaTime);
     }
 
     if (this.visualizer) {
@@ -285,11 +278,6 @@ export class ModelBuilderManager {
       this.builderMode = null;
     }
 
-    if (this.microBlockSystem) {
-      this.microBlockSystem.dispose();
-      this.microBlockSystem = null;
-    }
-
     if (this.builderScene) {
       this.builderScene.dispose();
       this.builderScene = null;
@@ -300,7 +288,11 @@ export class ModelBuilderManager {
       this.builder = null;
     }
 
-    this.controller = null;
+    if (this.controller) {
+      this.controller.dispose();
+      this.controller = null;
+    }
+
     this.isActive = false;
     this.disposables.dispose();
     this.logger?.debug('ModelBuilderManager disposed');

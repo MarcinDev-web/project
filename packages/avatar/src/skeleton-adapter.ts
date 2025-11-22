@@ -1,5 +1,5 @@
-import { Skeleton, type Bone } from '@engine/stdlib/Animation';
-import { getVec3Pool } from '@engine/core/utils/Vec3Pool';
+import { createSkeleton, type Skeleton, type Joint } from '@engine/animation';
+import { mat4Invert, type Mat4 } from '@engine/core/math';
 import type { AvatarSkeleton } from './skeleton';
 
 /**
@@ -12,36 +12,45 @@ import type { AvatarSkeleton } from './skeleton';
  * @returns Skeleton compatible with AnimationComponent
  */
 export function avatarSkeletonToSkeleton(avatarSkeleton: AvatarSkeleton): Skeleton {
-  const bones: Bone[] = [];
   const jointNames = avatarSkeleton.getJointNames();
-  const pool = getVec3Pool();
+  const jointCount = jointNames.length;
+  
+  const joints: Joint[] = [];
+  const parents = new Int16Array(jointCount);
+  const inverseBindMatrices = new Float32Array(jointCount * 16);
+  
+  // Reset skeleton to bind pose to ensure we capture bind matrices
+  avatarSkeleton.resetPose();
 
-  for (const jointName of jointNames) {
+  // Temporary matrix for inversion
+  const invMatrix = new Float32Array(16) as unknown as Mat4;
+
+  for (let i = 0; i < jointCount; i++) {
+    const jointName = jointNames[i]!;
     const parentName = avatarSkeleton.getParent(jointName);
-    const localTransform = avatarSkeleton.getLocalTransform(jointName);
     
     // Find parent index
     let parentIndex = -1;
     if (parentName) {
-      const parentIdx = jointNames.indexOf(parentName);
-      if (parentIdx !== -1) {
-        parentIndex = parentIdx;
-      }
+      parentIndex = jointNames.indexOf(parentName);
     }
-
-    bones.push({
-      name: jointName,
-      parentIndex,
-      bindPosition: [...localTransform.position],
-      bindRotation: [...localTransform.rotation],
-      bindScale: [...localTransform.scale],
-    });
+    parents[i] = parentIndex;
     
-    // Release pooled Vec3 after cloning
-    pool.release(localTransform.position);
-    pool.release(localTransform.scale);
+    joints.push({
+      name: jointName,
+    });
+
+    // Calculate Inverse Bind Matrix
+    // We assume the AvatarSkeleton is currently in its bind pose
+    const worldMatrix = avatarSkeleton.getWorldMatrix(jointName);
+    
+    // Invert world matrix
+    mat4Invert(invMatrix, worldMatrix);
+    
+    // Copy to flat array
+    inverseBindMatrices.set(invMatrix, i * 16);
   }
 
-  return new Skeleton(bones);
+  return createSkeleton(joints, parents, inverseBindMatrices);
 }
 

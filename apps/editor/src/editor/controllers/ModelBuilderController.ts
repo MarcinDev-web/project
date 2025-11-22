@@ -6,11 +6,37 @@
 
 import { Raycaster } from '@engine/world';
 import type { Scene, Entity, Ray, RaycastHit } from '@engine/world';
-import type { ModelBuilder } from '@engine/blocks';
 import type { ModelBuilderMode } from '../model-builder/ModelBuilderMode';
-import { MicroBlockComponent, MICRO_BLOCK_SIZE } from '@engine/microblocks';
+import { MicroBlockComponent } from '@engine/world';
+import { MICRO_BLOCK_SIZE } from '@engine/microblocks';
 import type { LocalPos } from '@engine/microblocks';
-import type { Vec3 } from '@engine/core/math';
+import type { InteractionTool } from '../input/InteractionTypes';
+import type { MicroBlockPreview } from '../model-builder/MicroBlockPreview';
+
+/**
+ * Key binding configuration
+ */
+export interface KeyBindingConfig {
+  undo: string[];
+  redo: string[];
+  rotate: string[];
+  toolPlace: string[];
+  toolRemove: string[];
+  toolPaint: string[];
+  toolSelect: string[];
+  toolBox: string[];
+}
+
+const DEFAULT_KEY_BINDINGS: KeyBindingConfig = {
+  undo: ['z'],
+  redo: ['y', 'Z'], // Z implies Shift+Z if checked correctly
+  rotate: ['r'],
+  toolPlace: ['1'],
+  toolRemove: ['2'],
+  toolPaint: ['3'],
+  toolSelect: ['4'],
+  toolBox: ['5'],
+};
 
 /**
  * Configuration for ModelBuilderController
@@ -22,6 +48,8 @@ export interface ModelBuilderControllerConfig {
     warn: (...args: unknown[]) => void;
     error: (msg: string, error?: Error) => void;
   };
+  /** Custom key bindings */
+  keyBindings?: Partial<KeyBindingConfig>;
 }
 
 type ControllerLogger = NonNullable<ModelBuilderControllerConfig['logger']>;
@@ -29,50 +57,166 @@ type ControllerLogger = NonNullable<ModelBuilderControllerConfig['logger']>;
 /**
  * ModelBuilderController handles user input and raycasting
  */
-export class ModelBuilderController {
+export class ModelBuilderController implements InteractionTool {
+  name = 'ModelBuilder';
+  
   private readonly scene: Scene;
-  private readonly builder: ModelBuilder;
   private readonly mode: ModelBuilderMode;
+  private readonly preview: MicroBlockPreview;
   private readonly raycaster: Raycaster;
   private readonly logger: ControllerLogger;
-  private readonly scratchRay: Ray = {
-    origin: [0, 0, 0] as [number, number, number],
-    direction: [0, 0, 0] as [number, number, number],
-  };
+  private readonly keyBindings: KeyBindingConfig;
+  
   private cachedMicroBlockEntities: Entity[] = [];
   private cachedEntityCount = -1;
 
   private isDragging = false;
+  private boxStartPos: LocalPos | null = null;
   private lastHitPos: LocalPos | null = null;
 
   constructor(
     scene: Scene,
-    builder: ModelBuilder,
     mode: ModelBuilderMode,
+    preview: MicroBlockPreview,
     config?: ModelBuilderControllerConfig
   ) {
     this.scene = scene;
-    this.builder = builder;
     this.mode = mode;
+    this.preview = preview;
     this.raycaster = new Raycaster();
     this.logger = config?.logger ?? {
       debug: console.debug.bind(console),
       warn: console.warn.bind(console),
       error: (msg, err) => console.error(msg, err),
     };
+    this.keyBindings = { ...DEFAULT_KEY_BINDINGS, ...config?.keyBindings };
     this.logger.debug('ModelBuilderController initialized');
+  }
+
+  /**
+   * Checks if this tool wants to handle the input at the given ray.
+   */
+  checkHit(ray: Ray): boolean {
+    if (!this.mode.isModeActive()) {
+      this.preview.hidePreview();
+      return false;
+    }
+
+    const hitPos = this.raycast(ray);
+    return hitPos !== null;
+  }
+
+  /**
+   * Called when the tool becomes active (mousedown on a claimed hit).
+   */
+  onPointerDown(event: PointerEvent, ray: Ray): void {
+    if (!this.mode.isModeActive()) return;
+
+    // Handle Pipette (Alt+Click)
+    if (event.altKey) {
+      const hitPos = this.raycast(ray);
+      if (hitPos) {
+        this.mode.pickBlock(hitPos);
+        this.updatePreview(hitPos, true);
+      }
+      return;
+    }
+
+    // Left click
+    if (event.button === 0) {
+      const toolState = this.mode.getToolState();
+
+      // Handle Box Tool
+      if (toolState.mode === 'box') {
+        const hitPos = this.raycast(ray);
+        if (hitPos) {
+          this.isDragging = true;
+          this.boxStartPos = hitPos;
+          this.lastHitPos = hitPos; // Track current pos for preview
+        }
+        return;
+      }
+
+      this.handleDragStart(ray);
+      this.handleClick(ray, 'left');
+    }
+  }
+
+  /**
+   * Called on mouse move.
+   */
+  onPointerMove(_event: PointerEvent, ray: Ray): void {
+    if (!this.mode.isModeActive()) return;
+
+    const hitPos = this.raycast(ray);
+    const toolState = this.mode.getToolState();
+
+    // Update Preview
+    if (hitPos) {
+      if (this.isDragging && toolState.mode === 'box' && this.boxStartPos) {
+        // Box Preview
+        this.preview.showBoxPreview(this.boxStartPos, hitPos, true);
+      } else {
+        // Standard Preview
+        if (toolState.mode === 'remove') {
+          this.updatePreview(hitPos, false); // Red
+        } else if (toolState.mode === 'select') {
+          this.preview.hidePreview();
+        } else if (toolState.mode === 'box') {
+           // Show single block preview when just hovering in box mode
+           this.updatePreview(hitPos, true);
+        } else {
+          this.updatePreview(hitPos, true); // Green
+        }
+      }
+    } else {
+      this.preview.hidePreview();
+    }
+
+    // Handle dragging
+    if (this.isDragging && hitPos) {
+      if (toolState.mode === 'box') {
+        // Just update lastHitPos for reference, actual preview is handled above
+        this.lastHitPos = hitPos;
+      } else {
+        this.handleDrag(ray);
+      }
+    }
+  }
+
+  /**
+   * Called on mouse up if the tool was active.
+   */
+  onPointerUp(_event: PointerEvent, _ray: Ray): void {
+    const toolState = this.mode.getToolState();
+
+    if (this.isDragging && toolState.mode === 'box' && this.boxStartPos && this.lastHitPos) {
+      // Place Box
+      this.mode.placeBox(this.boxStartPos, this.lastHitPos);
+      this.boxStartPos = null;
+    }
+
+    this.handleDragEnd();
+  }
+
+  /**
+   * Called to cancel the current operation (e.g. Esc key).
+   */
+  cancel(): void {
+    this.handleDragEnd();
+    this.boxStartPos = null;
+    this.preview.hidePreview();
   }
 
   /**
    * Performs raycast and returns hit position in local coordinates
    */
-  raycast(rayOrigin: Vec3, rayDirection: Vec3): LocalPos | null {
+  raycast(ray: Ray): LocalPos | null {
     const targetEntities = this.getMicroBlockEntities();
     if (targetEntities.length === 0) {
       return null;
     }
 
-    const ray = this.updateRay(rayOrigin, rayDirection);
     const hit: RaycastHit | null = this.raycaster.raycastClosest(ray, targetEntities);
     if (!hit) {
       return null;
@@ -81,11 +225,21 @@ export class ModelBuilderController {
     return this.toLocalPos(hit.point);
   }
 
+  private updatePreview(pos: LocalPos, isValid: boolean): void {
+    const toolState = this.mode.getToolState();
+    
+    this.preview.showPreview(pos, {
+      type: toolState.shape,
+      materialId: toolState.materialId,
+      rotation: toolState.rotation
+    }, isValid);
+  }
+
   /**
    * Handles mouse click
    */
-  handleClick(rayOrigin: Vec3, rayDirection: Vec3, button: 'left' | 'right'): void {
-    const hitPos = this.raycast(rayOrigin, rayDirection);
+  handleClick(ray: Ray, button: 'left' | 'right'): void {
+    const hitPos = this.raycast(ray);
     if (!hitPos) return;
 
     const toolState = this.mode.getToolState();
@@ -96,21 +250,7 @@ export class ModelBuilderController {
       } else if (toolState.mode === 'remove') {
         this.mode.removeBlock(hitPos);
       } else if (toolState.mode === 'paint') {
-        // Paint mode: place block if empty, otherwise change material
-        const store = this.builder.getStore();
-        const worldPos: Vec3 = [
-          hitPos[0] * MICRO_BLOCK_SIZE,
-          hitPos[1] * MICRO_BLOCK_SIZE,
-          hitPos[2] * MICRO_BLOCK_SIZE,
-        ];
-        const existing = store.getBlock(worldPos);
-        if (existing) {
-          // Change material of existing block
-          this.mode.removeBlock(hitPos);
-          this.mode.placeBlock(hitPos);
-        } else {
-          this.mode.placeBlock(hitPos);
-        }
+        this.mode.paintBlock(hitPos);
       }
     } else if (button === 'right') {
       if (toolState.mode === 'place' || toolState.mode === 'paint') {
@@ -124,8 +264,8 @@ export class ModelBuilderController {
   /**
    * Handles mouse drag start
    */
-  handleDragStart(rayOrigin: Vec3, rayDirection: Vec3): void {
-    const hitPos = this.raycast(rayOrigin, rayDirection);
+  handleDragStart(ray: Ray): void {
+    const hitPos = this.raycast(ray);
     if (hitPos) {
       this.isDragging = true;
       this.lastHitPos = hitPos;
@@ -135,13 +275,12 @@ export class ModelBuilderController {
   /**
    * Handles mouse drag
    */
-  handleDrag(rayOrigin: Vec3, rayDirection: Vec3): void {
+  handleDrag(ray: Ray): void {
     if (!this.isDragging) return;
 
-    const hitPos = this.raycast(rayOrigin, rayDirection);
+    const hitPos = this.raycast(ray);
     if (!hitPos) return;
 
-    // Only place/remove if position changed
     if (this.lastHitPos && (
       hitPos[0] !== this.lastHitPos[0] ||
       hitPos[1] !== this.lastHitPos[1] ||
@@ -149,10 +288,12 @@ export class ModelBuilderController {
     )) {
       const toolState = this.mode.getToolState();
       
-      if (toolState.mode === 'place' || toolState.mode === 'paint') {
+      if (toolState.mode === 'place') {
         this.mode.placeBlock(hitPos);
       } else if (toolState.mode === 'remove') {
         this.mode.removeBlock(hitPos);
+      } else if (toolState.mode === 'paint') {
+        this.mode.paintBlock(hitPos);
       }
 
       this.lastHitPos = hitPos;
@@ -175,37 +316,41 @@ export class ModelBuilderController {
     const shift = modifiers?.shift ?? false;
 
     // Undo/Redo
-    if (ctrl && key === 'z' && !shift) {
+    if (ctrl && this.keyBindings.undo.includes(key.toLowerCase()) && !shift) {
       return this.mode.undo();
     }
-    if (ctrl && key === 'z' && shift) {
+    if (ctrl && this.keyBindings.undo.includes(key.toLowerCase()) && shift) {
       return this.mode.redo();
     }
-    if (ctrl && key === 'y') {
+    if (ctrl && this.keyBindings.redo.includes(key)) {
       return this.mode.redo();
     }
 
     // Rotate block
-    if (key === 'r' || key === 'R') {
+    if (this.keyBindings.rotate.includes(key.toLowerCase())) {
       this.mode.rotateBlock();
       return true;
     }
 
     // Tool shortcuts
-    if (key === '1') {
+    if (this.keyBindings.toolPlace.includes(key)) {
       this.mode.setToolMode('place');
       return true;
     }
-    if (key === '2') {
+    if (this.keyBindings.toolRemove.includes(key)) {
       this.mode.setToolMode('remove');
       return true;
     }
-    if (key === '3') {
+    if (this.keyBindings.toolPaint.includes(key)) {
       this.mode.setToolMode('paint');
       return true;
     }
-    if (key === '4') {
+    if (this.keyBindings.toolSelect.includes(key)) {
       this.mode.setToolMode('select');
+      return true;
+    }
+    if (this.keyBindings.toolBox.includes(key)) {
+      this.mode.setToolMode('box');
       return true;
     }
 
@@ -219,24 +364,17 @@ export class ModelBuilderController {
     return this.lastHitPos;
   }
 
-  private updateRay(rayOrigin: Vec3, rayDirection: Vec3): Ray {
-    const ray = this.scratchRay;
-    const origin = ray.origin;
-    origin[0] = rayOrigin[0] ?? 0;
-    origin[1] = rayOrigin[1] ?? 0;
-    origin[2] = rayOrigin[2] ?? 0;
-
-    const direction = ray.direction;
-    direction[0] = rayDirection[0] ?? 0;
-    direction[1] = rayDirection[1] ?? 0;
-    direction[2] = rayDirection[2] ?? 0;
-
-    const length = Math.hypot(direction[0], direction[1], direction[2]) || 1;
-    direction[0] /= length;
-    direction[1] /= length;
-    direction[2] /= length;
-
-    return ray;
+  /**
+   * Cleans up resources
+   */
+  dispose(): void {
+    this.cachedMicroBlockEntities = [];
+    this.cachedEntityCount = -1;
+    this.isDragging = false;
+    this.lastHitPos = null;
+    this.boxStartPos = null;
+    this.preview.hidePreview();
+    this.logger.debug('ModelBuilderController disposed');
   }
 
   private getMicroBlockEntities(): Entity[] {
@@ -256,4 +394,3 @@ export class ModelBuilderController {
     ] as LocalPos;
   }
 }
-

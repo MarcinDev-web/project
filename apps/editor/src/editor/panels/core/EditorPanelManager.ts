@@ -266,6 +266,7 @@ export class EditorPanelManager {
     };
     this.npcPanel = new NpcPanel({
       assetPreset: defaultNpcPreset,
+      scene: this.config.scene,
       onConfigChanged: (config) => {
         // Update the preset with new config
         if (config && defaultNpcPreset.npcConfig) {
@@ -602,7 +603,6 @@ export class EditorPanelManager {
       defaultWidth: 320,
       snapPoints: [280, 320, 400, 500],
       storageKey: 'editor-inspector-width',
-      snapPoints: [280, 320, 400, 500],
       side: 'right',
       onResize: (width) => {
         console.log('Inspector resized to:', width);
@@ -935,6 +935,13 @@ export class EditorPanelManager {
    */
   isMounted(): boolean {
     return this.layersPanel !== null;
+  }
+
+  /**
+   * Switch to a specific tab in the sidebar.
+   */
+  public setTab(tabId: string): void {
+    this.sidebarTabs?.activateTab(tabId);
   }
 
   /**

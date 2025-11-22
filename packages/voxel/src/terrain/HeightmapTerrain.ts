@@ -7,6 +7,8 @@
 import type { Vec3 } from '@engine/core/math';
 import type { HeightmapTerrainData } from '@engine/world/components/TerrainComponent';
 
+import { init, type WasmVoxelEngine } from '@engine/wasm-voxel';
+
 /**
  * Configuration for heightmap terrain
  */
@@ -24,6 +26,7 @@ export class HeightmapTerrain {
   private config: HeightmapTerrainConfig;
   private heights: Float32Array;
   private dirty = true;
+  private static wasmEngine: WasmVoxelEngine | null = null;
 
   constructor(config: HeightmapTerrainConfig) {
     this.config = {
@@ -40,6 +43,22 @@ export class HeightmapTerrain {
 
     const totalVertices = config.resolution * config.resolution;
     this.heights = new Float32Array(totalVertices);
+
+    // Initialize WASM engine
+    HeightmapTerrain.initWasm();
+  }
+
+  /**
+   * Initialize WASM engine
+   */
+  static async initWasm(): Promise<void> {
+    if (!this.wasmEngine) {
+      try {
+        this.wasmEngine = await init();
+      } catch (e) {
+        console.warn('Failed to load WASM voxel engine, falling back to JS', e);
+      }
+    }
   }
 
   /**
@@ -209,10 +228,43 @@ export class HeightmapTerrain {
 
   /**
    * Generates noise using simple algorithm (can be extended with better noise)
+   * @param seed - Optional seed for deterministic generation. Defaults to random.
    */
-  generateNoise(scale: number = 1, amplitude: number = 10): void {
-    const { resolution } = this.config;
+  generateNoise(scale: number = 1, amplitude: number = 10, seed?: number): void {
+    const { resolution, size } = this.config;
     const { minHeight = 0, maxHeight = 100 } = this.config;
+    
+    // Use provided seed or random if not provided (for editor tools)
+    // Note: For world generation, ALWAYS provide a seed.
+    const actualSeed = seed !== undefined ? seed : Math.random() * 10000;
+
+    // Try to use WASM implementation first
+    if (HeightmapTerrain.wasmEngine) {
+      try {
+        const noiseData = HeightmapTerrain.wasmEngine.generateHeightmap(
+          resolution,
+          resolution,
+          actualSeed, // seed
+          scale / resolution, // scale adjustment for Perlin
+          0, // offsetX
+          0, // offsetZ
+          4, // octaves
+          0.5, // persistence
+          2.0 // lacunarity
+        );
+
+        // Copy noise data to heights array and apply amplitude/base height
+        const baseHeight = (minHeight + maxHeight) * 0.5;
+        for (let i = 0; i < this.heights.length; i++) {
+            this.heights[i] = baseHeight + noiseData[i]! * amplitude;
+        }
+        
+        this.dirty = true;
+        return;
+      } catch (e) {
+        console.warn('WASM noise generation failed, falling back to JS', e);
+      }
+    }
 
     for (let z = 0; z < resolution; z++) {
       for (let x = 0; x < resolution; x++) {

@@ -1,6 +1,6 @@
 import type { Scene } from '@engine/world';
 import type { AuthoritativeStateDiff } from '@engine/world/sim/AuthoritativeWorld';
-import type { Vec3 } from '@engine/core/math';
+import { type Vec3, type Quat, quatToEuler, quatFromEulerOut } from '@engine/core/math';
 
 interface PredictionBridgeConfig {
   scene: Scene;
@@ -27,7 +27,7 @@ export class PredictionBridge {
     for (const entity of this.scene.getActiveEntities()) {
       snapshot.set(entity.id, {
         position: [...(entity.transform.position as Vec3)] as Vec3,
-        rotation: [...(entity.transform.rotation as Vec3)] as Vec3,
+        rotation: [...quatToEuler(entity.transform.rotation as Quat)] as Vec3,
       });
     }
     this.history.set(tick, snapshot);
@@ -42,8 +42,24 @@ export class PredictionBridge {
       const entity = this.scene.findEntityById(entry.id);
       if (!entity) continue;
       this.blendTransform(entity.transform.position as Vec3, entry.position);
-      this.blendTransform(entity.transform.rotation as Vec3, entry.rotation);
+      this.blendRotation(entity.transform.rotation as Quat, entry.rotation);
     }
+  }
+
+  private blendRotation(current: Quat, target: Vec3): void {
+    const currentEuler = quatToEuler(current);
+    const delta =
+      Math.abs(currentEuler[0] - target[0]) +
+      Math.abs(currentEuler[1] - target[1]) +
+      Math.abs(currentEuler[2] - target[2]);
+
+    if (delta < this.correctionThreshold) {
+      return;
+    }
+    currentEuler[0] = (currentEuler[0] + target[0]) / 2;
+    currentEuler[1] = (currentEuler[1] + target[1]) / 2;
+    currentEuler[2] = (currentEuler[2] + target[2]) / 2;
+    quatFromEulerOut(current, currentEuler);
   }
 
   private blendTransform(current: Vec3, target: Vec3): void {

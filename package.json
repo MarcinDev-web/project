@@ -19,8 +19,13 @@
     "test": "pnpm -r test",
     "lint": "pnpm --filter '!@engine/test-utils' -r lint",
     "clean": "pnpm -r clean && rm -rf node_modules",
-    "build:wasm": "wasm-pack build crates/collision --target bundler --out-dir ../../packages/wasm-collision/pkg",
-    "build:physics-wasm": "wasm-pack build crates/physics --target bundler --out-dir ../../packages/wasm-physics/pkg",
+    "build:wasm": "pnpm build:collision-wasm && pnpm build:physics-wasm && pnpm build:animation-wasm && pnpm build:voxel-wasm && pnpm build:mesh-wasm && pnpm build:render-logic-wasm",
+    "build:collision-wasm": "wasm-pack build crates/collision --target web --out-dir ../../packages/wasm-collision/pkg",
+    "build:physics-wasm": "wasm-pack build crates/physics --target web --out-dir ../../packages/wasm-physics/pkg",
+    "build:animation-wasm": "wasm-pack build crates/animation --target web --out-dir ../../packages/wasm-animation/pkg",
+    "build:voxel-wasm": "wasm-pack build crates/voxel-engine --target web --out-dir ../../packages/wasm-voxel/pkg",
+    "build:mesh-wasm": "wasm-pack build crates/mesh-processor --target web --out-dir ../../packages/wasm-mesh/pkg",
+    "build:render-logic-wasm": "wasm-pack build crates/render-logic --target web --out-dir ../../packages/wasm-render-logic/pkg",
     "dev:editor": "pnpm --filter @apps/editor dev",
     "dev:platform": "pnpm --filter @apps/platform dev",
     "dev:server": "pnpm --filter @apps/net-server dev",
@@ -46,7 +51,10 @@
     "measure:heap:60s": "node --expose-gc --import tsx scripts/measure-heap.ts --duration=60 --entities=1000",
     "docker:push": "powershell -ExecutionPolicy Bypass -File scripts/docker-push.ps1",
     "dev:all": "powershell -ExecutionPolicy Bypass -File scripts/dev-orchestration.ps1",
-    "verify:wasm": "node ./scripts/verify-wasm-build.js"
+    "verify:wasm": "node ./scripts/verify-wasm-build.js",
+    "test:e2e": "playwright test",
+    "typecheck": "tsc -b tsconfig.json --noEmit",
+    "prepare": "powershell -ExecutionPolicy Bypass -File scripts/install-git-hooks.ps1"
   },
   "keywords": [],
   "author": "",
@@ -87,5 +95,16 @@
     "draco3dgltf": "^1.5.7",
     "gl-matrix": "^3.4.4",
     "pnpm": "^10.19.0"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "bcrypt",
+      "prisma",
+      "@prisma/engines",
+      "@prisma/client",
+      "msgpackr-extract",
+      "wrtc",
+      "esbuild"
+    ]
   }
 }

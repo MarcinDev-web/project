@@ -9,7 +9,7 @@ export const ZOOM_MULTIPLIER = 0.4;
 /** Minimum allowed camera distance. */
 export const MIN_DISTANCE = 0.75;
 /** Maximum allowed camera distance. */
-export const MAX_DISTANCE = 100;
+export const MAX_DISTANCE = 500;
 /** Maximum absolute pitch (in radians) away from horizon. */
 export const PITCH_LIMIT = Math.PI / 2 - 0.01;
 /** Default initial camera distance. */
@@ -45,6 +45,10 @@ export interface OrbitControlsConfig {
   pitchLimit?: number;
   /** Starting camera distance. Defaults to `INITIAL_DISTANCE`. */
   initialDistance?: number;
+  /** Starting camera yaw (radians). Defaults to 0. */
+  initialYaw?: number;
+  /** Starting camera pitch (radians). Defaults to 0. */
+  initialPitch?: number;
   /** Damping time constant (tau). Set 0 to disable. Defaults to `DEFAULT_DAMPING` (0.1). */
   damping?: number;
 }
@@ -104,9 +108,9 @@ export class OrbitCamera {
 
     const initialDist = config?.initialDistance ?? INITIAL_DISTANCE;
     this.distance = this.targetDistance = initialDist;
-    // Initial yaw/pitch are 0
-    this.yaw = this.targetYaw = 0;
-    this.pitch = this.targetPitch = 0;
+    // Initial yaw/pitch
+    this.yaw = this.targetYaw = config?.initialYaw ?? 0;
+    this.pitch = this.targetPitch = config?.initialPitch ?? 0;
 
     this.setupEventListeners();
     this.updateCursor();

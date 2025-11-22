@@ -4,6 +4,7 @@ import { ReplicationClient } from '../ReplicationClient';
 import type { PlayerUpdateMessage } from '../types/replication';
 import { ReplicationState } from '../types/replication';
 import type { Vec3 } from '@engine/core/math';
+import { lerpVec3, quatSlerp } from '@engine/core/math';
 import { ErrorHandler, type ErrorCallback } from './ErrorHandler';
 import { SyncError, StateError, ErrorFactory } from './errors';
 
@@ -488,25 +489,38 @@ export class PlayerSync {
    */
   private updateRemotePlayers(deltaTime: number): void {
     const deltaMs = deltaTime * 1000;
+    const SMOOTHING_SPEED = 10.0; // Interpolation speed factor
 
     for (const remotePlayer of this.remotePlayers.values()) {
       remotePlayer.interpolationTime += deltaMs;
 
-      // Apply position with optional velocity-based prediction
+      // Calculate target position
+      let targetPosition: Vec3;
+      
+      // Apply prediction if enabled
       if (this.config.enablePrediction && remotePlayer.velocity) {
-        const predictionTime = Math.min(remotePlayer.interpolationTime / 1000, 0.1); // Max 100ms prediction
+        // Cap prediction time to avoid overshooting on lag
+        const predictionTime = Math.min(remotePlayer.interpolationTime / 1000, 0.1); 
         this.tempVec3[0] = remotePlayer.position[0] + remotePlayer.velocity[0] * predictionTime;
         this.tempVec3[1] = remotePlayer.position[1] + remotePlayer.velocity[1] * predictionTime;
         this.tempVec3[2] = remotePlayer.position[2] + remotePlayer.velocity[2] * predictionTime;
-        remotePlayer.entity.transform.position = this.tempVec3;
+        targetPosition = [this.tempVec3[0], this.tempVec3[1], this.tempVec3[2]];
       } else {
-        // Apply position directly (use setter)
-        remotePlayer.entity.transform.position = remotePlayer.position;
+        targetPosition = remotePlayer.position;
       }
 
-      // Apply rotation if available
+      // Interpolate position
+      const currentPosition = remotePlayer.entity.transform.position;
+      // Use exponential smoothing (lerp towards target)
+      const t = Math.min(deltaTime * SMOOTHING_SPEED, 1.0);
+      const newPosition = lerpVec3(currentPosition, targetPosition, t);
+      remotePlayer.entity.transform.position = newPosition;
+
+      // Interpolate rotation if available
       if (remotePlayer.rotation) {
-        remotePlayer.entity.transform.rotation = remotePlayer.rotation;
+        const currentRotation = remotePlayer.entity.transform.rotation;
+        const newRotation = quatSlerp(currentRotation, remotePlayer.rotation, t);
+        remotePlayer.entity.transform.rotation = newRotation;
       }
     }
   }

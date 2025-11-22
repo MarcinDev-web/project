@@ -3,7 +3,8 @@ import { storageLoad, storageSave } from '../../utils/storage';
 import type { EditorState } from './state';
 
 export function restoreCamera(controls: OrbitControls): void {
-  const cam = storageLoad<{ yaw: number; pitch: number; distance: number }>('camera');
+  // Using 'camera_v2' to invalidate old low-angle camera state
+  const cam = storageLoad<{ yaw: number; pitch: number; distance: number }>('camera_v2');
   if (
     cam &&
     Number.isFinite(cam.yaw) &&
@@ -16,7 +17,7 @@ export function restoreCamera(controls: OrbitControls): void {
 
 export function persistCamera(controls: OrbitControls): void {
   const { yaw, pitch, distance } = controls.getState();
-  storageSave('camera', { yaw, pitch, distance });
+  storageSave('camera_v2', { yaw, pitch, distance });
 }
 
 export function persistLastPlacementPreset(state: EditorState): void {

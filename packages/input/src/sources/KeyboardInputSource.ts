@@ -175,10 +175,6 @@ export class KeyboardInputSource implements InputSource {
     const isMovementKey = ['KeyW', 'KeyA', 'KeyS', 'KeyD'].includes(event.code);
     
     if (!this._enabled) {
-      // Debug: log when keys are pressed but input is disabled
-      if (isMovementKey || ['Space', 'ShiftLeft', 'ShiftRight'].includes(event.code)) {
-        console.log('[KeyboardInputSource] Key pressed but disabled:', event.code, '_enabled:', this._enabled);
-      }
       return;
     }
     

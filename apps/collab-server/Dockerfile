@@ -49,6 +49,11 @@ COPY packages/avatar/package.json ./packages/avatar/
 COPY packages/microblocks/package.json ./packages/microblocks/
 COPY packages/net/package.json ./packages/net/
 COPY packages/world-templates/package.json ./packages/world-templates/
+COPY packages/asset-pipeline/package.json ./packages/asset-pipeline/
+COPY packages/wasm-mesh/package.json ./packages/wasm-mesh/
+COPY packages/wasm-physics/package.json ./packages/wasm-physics/
+COPY packages/ui/package.json ./packages/ui/
+COPY packages/script-runtime/package.json ./packages/script-runtime/
 
 # Install dependencies (production + dev for build)
 RUN pnpm install --no-frozen-lockfile --prefer-offline
@@ -72,11 +77,14 @@ RUN DATABASE_URL="postgresql://dummy:dummy@localhost:5432/dummy" pnpm -C apps/co
 RUN find packages -type d -name dist -exec rm -rf {} + 2>/dev/null || true && \
     find packages -name "*.tsbuildinfo" -delete 2>/dev/null || true && \
     pnpm --filter @engine/core build && \
+    pnpm --filter @engine/asset-pipeline build && \
     pnpm --filter @engine/animation build && \
     pnpm --filter @engine/economy build && \
-    (cd packages/world && pnpm exec tsc --project tsconfig.build.json --skipLibCheck --noEmit false) && \
     pnpm --filter @engine/microblocks build && \
     pnpm --filter @engine/blocks build && \
+    pnpm --filter @engine/wasm-collision build && \
+    pnpm --filter @engine/wasm-physics build && \
+    (cd packages/world && pnpm exec tsc --project tsconfig.build.json --skipLibCheck --noEmit false) && \
     (cd packages/world && pnpm exec tsc -b tsconfig.build.json) && \
     pnpm --filter @engine/stdlib build && \
     pnpm --filter @engine/script build && \

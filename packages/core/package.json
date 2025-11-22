@@ -83,6 +83,7 @@
     "jsdom": "^27.0.0"
   },
   "dependencies": {
-    "gl-matrix": "^3.4.4"
+    "gl-matrix": "^3.4.4",
+    "@engine/wasm-render-logic": "workspace:*"
   }
 }

@@ -1,5 +1,5 @@
 import { Entity, Scene } from '@engine/world';
-import { EnvironmentComponent, LightComponent, MeshComponent, MaterialComponent, InteractableComponent } from '@engine/world';
+import { EnvironmentComponent, LightComponent, MeshComponent, MaterialComponent } from '@engine/world';
 import type { TemplateProvider } from '../../types';
 
 /**
@@ -11,10 +11,10 @@ export function createStarterBlockTemplate(): TemplateProvider {
     meta: {
       id: 'template:starter-block',
       kind: 'template',
-      name: 'Starter Block',
-      description: 'Single small block at origin with basic lighting',
-      tags: ['starter', 'minimal'],
-      version: '1.0.0',
+      name: 'Starter Platform',
+      description: 'Blue platform at origin with basic lighting',
+      tags: ['starter', 'minimal', 'platform'],
+      version: '1.1.0',
     },
     build: () => {
       const scene = new Scene('Starter Block');
@@ -52,26 +52,28 @@ export function createStarterBlockTemplate(): TemplateProvider {
       ambient.addComponent(amb);
       scene.addEntity(ambient);
 
-      // Single small block (1x1x1) centered at origin, resting on ground plane (y=0..1)
-      const block = new Entity('StarterBlock');
+      // Blue platform (10x0.5x10) centered at origin, top surface at y=0
+      const platform = new Entity('StarterPlatform');
       const mesh = new MeshComponent();
-      mesh.meshType = 'cube';
-      block.addComponent(mesh);
+      mesh.meshType = 'box'; // Use box to allow non-uniform scaling
+      // Specify dimensions in options instead of transform scale
+      mesh.options = { 
+        width: 10, 
+        height: 0.5, 
+        depth: 10 
+      };
+      platform.addComponent(mesh);
 
       const mat = new MaterialComponent();
-      mat.color = [0.25, 0.25, 0.26, 1];
-      block.addComponent(mat);
+      mat.color = [0.2, 0.5, 0.9, 1]; // Blue
+      mat.emissiveColor = [0.2, 0.5, 0.9, 1]; // Self-illuminated for visibility debug
+      mat.emissiveIntensity = 0.2;
+      platform.addComponent(mat);
 
-      // Make block interactable
-      const interactable = new InteractableComponent();
-      interactable.interactionRange = 5.0;
-      interactable.promptText = 'Kliknij aby interakować';
-      interactable.cooldown = 0.5;
-      block.addComponent(interactable);
-
-      block.transform.scale = [1, 1, 1];
-      block.transform.position = [0, 0.5, 0];
-      scene.addEntity(block);
+      // Platform geometry
+      platform.transform.scale = [1, 1, 1]; // Scale is baked into mesh
+      platform.transform.position = [0, -0.25, 0];
+      scene.addEntity(platform);
 
       return scene;
     },

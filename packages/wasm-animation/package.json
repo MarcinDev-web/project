@@ -1,0 +1,18 @@
+{
+  "name": "@engine/wasm-animation",
+  "version": "0.1.0",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "build": "wasm-pack build ../../crates/animation --target bundler --out-dir ../../packages/wasm-animation/pkg"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.9.3"
+  }
+}
+

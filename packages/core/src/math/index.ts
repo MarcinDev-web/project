@@ -1090,3 +1090,5 @@ export function frustumPlaneTestAABB(aabbMin: Vec3, aabbMax: Vec3, plane: Frustu
   // Distance from plane to farthest positive corner
   return nx * px + ny * py + nz * pz + plane.d;
 }
+
+export { cullAABBBatch } from './culling.js';

@@ -2,8 +2,7 @@
  * Forum Storage DB - PostgreSQL implementation using Prisma
  */
 
-import type { PrismaClient as PrismaClientType } from '../../node_modules/.prisma/net-client/index.js';
-import { Prisma } from '../../node_modules/.prisma/net-client/index.js';
+import { PrismaClient as PrismaClientType, Prisma } from '@engine/database';
 import type {
   ForumCategory,
   ForumThread,

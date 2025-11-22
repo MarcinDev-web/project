@@ -221,8 +221,8 @@ pnpm test:unit:fast
 
 **Documentation:**
 - [TEST_COMMANDS_CHEATSHEET.md](TEST_COMMANDS_CHEATSHEET.md) - Command reference
-- [docs/TESTING.md](docs/TESTING.md) - Testing philosophy
-- [docs/TESTING_AUTOMATION.md](docs/TESTING_AUTOMATION.md) - Full guide
+- [docs/TESTING.md](docs/testing/TESTING.md) - Testing philosophy
+- [docs/TESTING_AUTOMATION.md](docs/testing/TESTING_AUTOMATION.md) - Full guide
 
 ---
 
@@ -283,9 +283,9 @@ pnpm test:unit:fast
 
 - **[docs/guidelines/TEAM_ONBOARDING.md](docs/guidelines/TEAM_ONBOARDING.md)** - New developers start here
 - **[docs/guidelines/PACKAGE_GUIDELINES.md](docs/guidelines/PACKAGE_GUIDELINES.md)** - Where code belongs
-- **[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)** - System architecture
-- **[docs/TESTING.md](docs/TESTING.md)** - Testing philosophy
-- **[docs/PERFORMANCE.md](docs/PERFORMANCE.md)** - Performance guidelines
+- **[docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md)** - System architecture
+- **[docs/testing/TESTING.md](docs/testing/TESTING.md)** - Testing philosophy
+- **[docs/performance/PERFORMANCE.md](docs/performance/PERFORMANCE.md)** - Performance guidelines
 
 ---
 

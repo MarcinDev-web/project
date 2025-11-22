@@ -2,7 +2,7 @@
  * FloatingHints - Contextual action hints
  * 
  * Inspired by:
- * - Minecraft: Action prompts (e.g., "Press E to open inventory")
+ * - Action prompts (e.g., "Press E to open inventory")
  * - Modern games: Context-sensitive UI hints
  * - Dark Souls: Item pickup hints
  * 

@@ -9,12 +9,15 @@ import type { Clipboard } from '../utils/Clipboard';
 import type { Entity } from '@engine/world';
 import type { BlockDragController } from './BlockDragController';
 import { QuaternionHelper } from '../utils/QuaternionHelper';
+import { frameEditorCameraToScene } from '../utils/cameraFraming';
+import type { EditorCameraController } from '@engine/camera';
 
 export interface KeyboardHandlerOptions {
   state: EditorState;
   scene: Scene;
   selection: SelectionManager;
   controls: OrbitControls;
+  canvas: HTMLCanvasElement;
   statusEl: HTMLElement;
   snapSystem: SnapSystem | null;
   placementMode: PlacementMode | null;
@@ -27,6 +30,7 @@ export interface KeyboardHandlerOptions {
   showLoadDialog: () => Promise<void>;
   openBlockEditor: () => void;
   exitPlayMode?: () => void;
+  editorCamera?: EditorCameraController | null;
 }
 
 interface Command {
@@ -282,11 +286,19 @@ export class KeyboardHandler {
 
     this.registerCommand('f', {
       shortcut: 'f',
-      canExecute: () => !!selection.primarySelection,
+      canExecute: () => true,
       execute: () => {
-        const { distance } = controls.getState();
-        controls.setState({ yaw: 0, pitch: 0, distance });
-        requestAnimationFrame(() => this.options.updateGizmoOverlay());
+        const selected = Array.from(selection.selectedEntities);
+        if (this.options.editorCamera) {
+          frameEditorCameraToScene({
+            scene,
+            canvas: this.options.canvas,
+            editorCamera: this.options.editorCamera,
+            controls,
+            ...(selected.length > 0 ? { entities: selected } : {}),
+          });
+          requestAnimationFrame(() => this.options.updateGizmoOverlay());
+        }
       },
     });
 

@@ -114,14 +114,20 @@ export class PlayIntroState implements IPlayModeState {
       this.deps.initializeCheckpoints?.(scene);
       
       // Use camera position as fallback reference for raycast
-      const cameraPosition = this.deps.cameraDirector.getViewMatrix ? 
-        this.extractCameraPosition(this.deps.cameraDirector.getViewMatrix()) :
-        [0, 10, 0] as Vec3;
+      let cameraPosition: Vec3 = [0, 10, 0];
+      let cameraYaw = 0;
+
+      if (this.deps.cameraDirector.getViewMatrix) {
+        const viewMatrix = this.deps.cameraDirector.getViewMatrix();
+        cameraPosition = this.extractCameraPosition(viewMatrix);
+        cameraYaw = this.extractCameraYaw(viewMatrix);
+      }
       
       const spawnResult = SpawnPointSystem.findSpawnPoint(
         scene,
         physicsWorld,
-        cameraPosition
+        cameraPosition,
+        cameraYaw
       );
 
       Logger.debug('Spawn point found:', spawnResult.source, 'at', spawnResult.position);
@@ -237,6 +243,18 @@ export class PlayIntroState implements IPlayModeState {
     const z = -(m[8]! * m[12]! + m[9]! * m[13]! + m[10]! * m[14]!);
     
     return [x, y, z];
+  }
+
+  /**
+   * Extract camera yaw from view matrix
+   */
+  private extractCameraYaw(viewMatrix: Float32Array): number {
+    // View matrix 3rd row (indices 2, 6, 10) is the "backward" vector (local +Z)
+    // Forward is -Z, so we negate
+    const forwardX = -viewMatrix[2]!;
+    const forwardZ = -viewMatrix[10]!;
+    
+    return Math.atan2(forwardX, forwardZ);
   }
 }
 

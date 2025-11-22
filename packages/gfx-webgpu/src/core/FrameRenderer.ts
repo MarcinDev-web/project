@@ -12,11 +12,12 @@
  */
 
 import type { Scene, Entity } from '@engine/world';
-import { EnvironmentComponent } from '@engine/world';
+import { EnvironmentComponent, TransformComponent } from '@engine/world';
 import type { FrameResources, GeometryData } from '../resources/resources';
 import { FrustumCuller } from './FrustumCuller';
 import { InstanceDataBuilder, type CustomGeometryEntity } from './InstanceManager';
 import { GeometryCache } from './GeometryCache';
+import type { CollisionWorld, WasmCollision } from '@engine/wasm-collision';
 import { GpuInstancePipeline } from './GpuInstancePipeline';
 import type { EnvironmentRenderer } from '../renderers/EnvironmentRenderer';
 import type { WaterRenderer } from '../renderers/WaterRenderer';
@@ -59,6 +60,7 @@ interface ResolvedFeatureFlags extends PostProcessFeatureFlags {
   enableShadows: boolean;
   enableForwardPlus: boolean;
   enableScreenLOD: boolean;
+  enableSSGI?: boolean;
 }
 
 interface SceneUpdateResult {
@@ -98,6 +100,7 @@ export interface FrameRenderContext {
     enableBloom?: boolean;
     enableHDR?: boolean;
     enableSSAO?: boolean;
+    enableSSGI?: boolean;
     enableFXAA?: boolean;
     enableOutlines?: boolean;
     enableForwardPlus?: boolean;
@@ -182,6 +185,9 @@ export class FrameRenderer {
     lastErrorTime: 0,
   };
   private readonly MAX_VISIBLE_ENTITIES_CACHE_SIZE = 10000;
+  private collisionWorld: CollisionWorld | null = null;
+  private wasmCollision: WasmCollision | null = null;
+  private lastFrameVisibleIndices: Uint32Array | null = null;
 
   constructor(initialCapacity = 1000) {
     this.frustumCuller = new FrustumCuller();
@@ -190,6 +196,11 @@ export class FrameRenderer {
     this.customRenderer = new CustomGeometryRenderer(this.geometryCache);
     this.frameTargets = new FrameTargetManager();
     this.postProcess = new PostProcessPipeline();
+  }
+
+  setCollisionWorld(wasm: WasmCollision, world: CollisionWorld): void {
+    this.wasmCollision = wasm;
+    this.collisionWorld = world;
   }
 
   renderFrame(
@@ -224,6 +235,7 @@ export class FrameRenderer {
       enableHDR: featureFlags.enableHDR,
       enableBloom: featureFlags.enableBloom,
       enableSSAO: featureFlags.enableSSAO,
+      enableSSGI: featureFlags.enableSSGI,
       enableFXAA: featureFlags.enableFXAA,
       enableOutlines: featureFlags.enableOutlines,
     });
@@ -238,6 +250,7 @@ export class FrameRenderer {
       this.frameTargets.getBloomTexture(),
       this.frameTargets.getNormalTexture(),
       this.frameTargets.getSsaoTexture(),
+      this.frameTargets.getSsgiTexture(),
       this.frameTargets.getResolvedDepthTexture(),
       this.frameTargets.getTonemapTexture(),
     ].filter((t): t is GPUTexture => t !== null);
@@ -468,6 +481,7 @@ export class FrameRenderer {
       enableBloom: flags?.enableBloom !== false,
       enableHDR: flags?.enableHDR !== false,
       enableSSAO: flags?.enableSSAO !== false,
+      enableSSGI: flags?.enableSSGI === true,
       enableFXAA: flags?.enableFXAA === true,
       enableOutlines: flags?.enableOutlines === true,
       enableForwardPlus: flags?.enableForwardPlus !== false,
@@ -769,9 +783,129 @@ export class FrameRenderer {
     try {
       const configuredDevice = ctx.configuredDevice ?? ctx.device;
       const cullStart = performance.now();
-      const frustum = this.frustumCuller.extractFrustumFromVP(viewProjectionMatrix);
-      const allEntities = scene.getActiveEntities();
-      this.frustumCuller.cullEntitiesToArray(allEntities, frustum, this.visibleEntitiesCache);
+      
+      // Frustum Culling: Prefer WASM CollisionWorld if available
+      if (this.collisionWorld && this.wasmCollision && scene) {
+        // Sync all entity transforms to WASM
+        const allEntities = scene.getActiveEntities();
+        const count = allEntities.length;
+        
+        if (count > 0) {
+          // 1. Resize WASM world to fit entities
+          this.collisionWorld.resize(count);
+
+          // 2. Get pointers to WASM memory buffers
+          const posPtr = this.collisionWorld.get_positions_ptr();
+          const rotPtr = this.collisionWorld.get_rotations_ptr();
+          const sclPtr = this.collisionWorld.get_scales_ptr();
+
+          const memory = this.wasmCollision.memory;
+          if (memory) {
+             const f32 = new Float32Array(memory.buffer);
+             
+             // 3. Copy transform data to WASM memory
+             // Use integer division (>> 2) for byte->float offset conversion
+             const pStart = posPtr >> 2;
+             const rStart = rotPtr >> 2;
+             const sStart = sclPtr >> 2;
+             
+             for (let i = 0; i < count; i++) {
+               const entity = allEntities[i];
+               const transform = entity.getComponent(TransformComponent);
+               
+               // Calculate indices
+               const pBase = pStart + (i * 3);
+               const rBase = rStart + (i * 4);
+               const sBase = sStart + (i * 3);
+               
+               if (transform) {
+                 f32[pBase] = transform.position[0];
+                 f32[pBase + 1] = transform.position[1];
+                 f32[pBase + 2] = transform.position[2];
+
+                 f32[rBase] = transform.rotation[0];
+                 f32[rBase + 1] = transform.rotation[1];
+                 f32[rBase + 2] = transform.rotation[2];
+                 f32[rBase + 3] = transform.rotation[3];
+
+                 f32[sBase] = transform.scale[0];
+                 f32[sBase + 1] = transform.scale[1];
+                 f32[sBase + 2] = transform.scale[2];
+               } else {
+                 // Default transform (identity)
+                 f32[pBase] = 0; f32[pBase+1] = 0; f32[pBase+2] = 0;
+                 f32[rBase] = 0; f32[rBase+1] = 0; f32[rBase+2] = 0; f32[rBase+3] = 1;
+                 f32[sBase] = 1; f32[sBase+1] = 1; f32[sBase+2] = 1;
+               }
+             }
+             
+             // 4. Occlusion Culling & Frustum Query
+             const vp = viewProjectionMatrix instanceof Float32Array 
+               ? viewProjectionMatrix 
+               : new Float32Array(viewProjectionMatrix);
+
+             this.collisionWorld.clear_occlusion_buffer();
+             
+             // Use last frame's visible entities as potential occluders for this frame
+             // This exploits temporal coherence: what was visible is likely still visible and occluding
+             // We filter indices to ensure they are still valid (within range)
+             if (this.lastFrameVisibleIndices && this.lastFrameVisibleIndices.length > 0) {
+               // Note: Indices are valid only if entity count hasn't decreased or order changed significantly.
+               // Since we rebuild the world every frame in sequential order of activeEntities,
+               // indices from last frame are only valid if activeEntities array is somewhat stable.
+               // A more robust way would be to track Entity IDs, but for now we rely on stability.
+               // We clamp indices to be safe.
+               
+               // Filter valid indices
+               const validIndices = new Uint32Array(this.lastFrameVisibleIndices.length);
+               let validCount = 0;
+               for (let i = 0; i < this.lastFrameVisibleIndices.length; i++) {
+                 const idx = this.lastFrameVisibleIndices[i];
+                 if (idx < count) {
+                   validIndices[validCount++] = idx;
+                 }
+               }
+               
+               // Rasterize
+               const occluders = validIndices.subarray(0, validCount);
+               this.collisionWorld.rasterize_occluders(occluders, vp);
+             } else {
+               // First frame or no previous visible: Rasterize everything (or nothing?)
+               // Rasterizing everything is too slow. Rasterizing nothing means no occlusion culling this frame.
+               // Let's try rasterizing a subset? Or just nothing for the first frame.
+               // Occlusion will kick in from 2nd frame.
+             }
+
+             // 5. Query Frustum (with Occlusion check)
+             const visibleIndices = this.collisionWorld.query_frustum(vp);
+             
+             // Cache for next frame
+             this.lastFrameVisibleIndices = new Uint32Array(visibleIndices);
+
+             // 6. Update visible entities cache
+             this.visibleEntitiesCache.length = 0;
+             for (let i = 0; i < visibleIndices.length; i++) {
+               const idx = visibleIndices[i];
+               if (idx < count) {
+                 const entity = allEntities[idx];
+                 if (entity) this.visibleEntitiesCache.push(entity);
+               }
+             }
+          } else {
+             // Fallback if memory access fails
+             const frustum = this.frustumCuller.extractFrustumFromVP(viewProjectionMatrix);
+             this.frustumCuller.cullEntitiesToArray(allEntities, frustum, this.visibleEntitiesCache);
+          }
+        } else {
+          this.visibleEntitiesCache.length = 0;
+        }
+      } else {
+        // Fallback to TS implementation
+        const frustum = this.frustumCuller.extractFrustumFromVP(viewProjectionMatrix);
+        const allEntities = scene ? scene.getActiveEntities() : [];
+        this.frustumCuller.cullEntitiesToArray(allEntities, frustum, this.visibleEntitiesCache);
+      }
+
       const cullingTime = performance.now() - cullStart;
 
       const { defaultGeometry, customGeometry } = this.instanceBuilder.separateCustomGeometry(
@@ -1276,6 +1410,7 @@ export class FrameRenderer {
         enableHDR: featureFlags.enableHDR,
         enableBloom: featureFlags.enableBloom,
         enableSSAO: featureFlags.enableSSAO,
+        enableSSGI: featureFlags.enableSSGI,
         enableFXAA: featureFlags.enableFXAA,
       },
       targets: {
@@ -1283,6 +1418,7 @@ export class FrameRenderer {
         bloomView: targetState.bloomView,
         normalView: targetState.normalView,
         ssaoView: targetState.ssaoView,
+        ssgiView: targetState.ssgiView,
         resolvedDepthView: targetState.resolvedDepthView,
         tonemapIntermediateView: targetState.tonemapIntermediateView,
         needsDepthStore: targetState.needsDepthStore,

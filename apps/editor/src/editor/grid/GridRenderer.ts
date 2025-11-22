@@ -1,6 +1,6 @@
 /**
  * GridRenderer - Renders a 3D grid for the editor.
- * Displays a Minecraft-style ground plane grid with configurable cell size and extent.
+ * Displays a voxel-style ground plane grid with configurable cell size and extent.
  */
 
 import type { GridConfig } from './GridConfig';
@@ -13,16 +13,29 @@ import type { Mat4, Vec3 } from '@engine/core/math';
  * Parsed color from hex string to RGBA [0-1]
  */
 function parseColorHex(hex: string): Float32Array {
-  const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-  if (!result) {
-    return new Float32Array([1, 1, 1, 1]); // fallback to white
+  // Try 8-digit hex (RRGGBBAA)
+  let result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (result) {
+    return new Float32Array([
+      Number.parseInt(result[1]!, 16) / 255,
+      Number.parseInt(result[2]!, 16) / 255,
+      Number.parseInt(result[3]!, 16) / 255,
+      Number.parseInt(result[4]!, 16) / 255,
+    ]);
   }
-  return new Float32Array([
-    Number.parseInt(result[1]!, 16) / 255,
-    Number.parseInt(result[2]!, 16) / 255,
-    Number.parseInt(result[3]!, 16) / 255,
-    1.0,
-  ]);
+
+  // Try 6-digit hex (RRGGBB)
+  result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
+  if (result) {
+    return new Float32Array([
+      Number.parseInt(result[1]!, 16) / 255,
+      Number.parseInt(result[2]!, 16) / 255,
+      Number.parseInt(result[3]!, 16) / 255,
+      1.0,
+    ]);
+  }
+
+  return new Float32Array([1, 1, 1, 1]); // fallback to white
 }
 
 /**
@@ -165,7 +178,10 @@ export class GridRenderer {
       majorLineInterval,
       colors,
       axisColors,
-      lineWidth
+      lineWidth,
+      height = 0,
+      highlightPosition,
+      highlightColor = '#ffffff40',
     } = this.config;
 
     // Create data buffer for everything except ViewProjection (which is updated per-frame)
@@ -176,7 +192,7 @@ export class GridRenderer {
     data[0] = eyePosition[0];
     data[1] = eyePosition[1];
     data[2] = eyePosition[2];
-    // padding at 3
+    data[3] = height; // gridHeight at 76
     
     // Params at local index 4 (offset 80)
     data[4] = cellSize;
@@ -186,7 +202,9 @@ export class GridRenderer {
     
     // Params at local index 8 (offset 96)
     data[8] = lineWidth.major;
-    // padding 9, 10, 11
+    data[9] = highlightPosition ? 1.0 : 0.0; // hasHighlight
+    data[10] = highlightPosition ? highlightPosition[0] : 0.0; // highlightX
+    data[11] = highlightPosition ? highlightPosition[2] : 0.0; // highlightZ
     
     // Colors starting at local index 12 (offset 112)
     const minor = parseColorHex(colors.minorLine);
@@ -194,12 +212,14 @@ export class GridRenderer {
     const axisX = parseColorHex(axisColors?.x || '#e95959');
     const axisZ = parseColorHex(axisColors?.z || '#5959e9');
     const origin = parseColorHex(colors.origin);
+    const highlight = parseColorHex(highlightColor);
 
     data.set(minor, 12);
     data.set(major, 16);
     data.set(axisX, 20);
     data.set(axisZ, 24);
     data.set(origin, 28);
+    data.set(highlight, 32);
 
     // Write to buffer at offset 64
     this.device.queue.writeBuffer(
@@ -231,15 +251,20 @@ export class GridRenderer {
     }
 
     // Update ViewProjection Matrix (Offset 0)
-    const vpBuffer = viewProjectionMatrix instanceof Float32Array 
-      ? viewProjectionMatrix 
+    const isFloat32Array = viewProjectionMatrix instanceof Float32Array;
+    const vpBuffer = isFloat32Array
+      ? viewProjectionMatrix.buffer
       : (viewProjectionMatrix as any).buffer;
+
+    const vpOffset = isFloat32Array
+      ? viewProjectionMatrix.byteOffset
+      : ((viewProjectionMatrix as any).byteOffset || 0);
       
     this.device.queue.writeBuffer(
       this.uniformBuffer,
       0,
       vpBuffer,
-      (viewProjectionMatrix as any).byteOffset || 0,
+      vpOffset,
       64
     );
 
@@ -252,6 +277,29 @@ export class GridRenderer {
     passEncoder.setPipeline(this.pipeline);
     passEncoder.setBindGroup(0, this.uniformBindGroup);
     passEncoder.draw(6, 1, 0, 0);
+  }
+
+  /**
+   * Sets the grid height.
+   */
+  setHeight(height: number): void {
+    this.config.height = height;
+    // We don't call updateUniforms here because we might not have eyePosition.
+    // It will be updated on next render.
+  }
+
+  /**
+   * Sets the highlighted cell position.
+   * @param position - Position to highlight, or null to disable highlight.
+   */
+  setHighlight(position: [number, number, number] | null): void {
+    if (position) {
+      this.config.highlightPosition = position;
+    } else {
+      this.config.highlightPosition = undefined;
+    }
+    // We don't call updateUniforms here because we might not have eyePosition.
+    // It will be updated on next render.
   }
 
   /**

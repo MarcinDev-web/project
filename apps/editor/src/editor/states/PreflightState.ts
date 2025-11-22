@@ -140,7 +140,7 @@ export class PreflightState implements IPlayModeState {
       if (!playerStart) {
         // Create default player start
         warnings.push('No PlayerStart entity found, using default position');
-        context.data.set('playerStartPosition', [0, 2, 0]);
+        context.data.set('playerStartPosition', [0, 5, 0]);
         context.data.set('playerStartRotation', 0);
       } else {
         context.data.set('playerStartPosition', playerStart.position);

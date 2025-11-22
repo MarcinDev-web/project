@@ -4,8 +4,7 @@
  * Creates a closed square room with blue walls, good lighting, and orbit camera setup
  */
 
-import { Scene, Entity, TransformComponent, MeshComponent, MaterialComponent, LightComponent, CameraComponent } from '@engine/world';
-import { MicroBlockComponent } from '@engine/microblocks';
+import { Scene, Entity, Transform, MeshComponent, MaterialComponent, LightComponent, CameraComponent, MicroBlockComponent } from '@engine/world';
 import { OrbitCameraComponent, OrbitCameraSystem } from '@engine/camera';
 import type { ModelBuilder } from '@engine/blocks';
 import type { Vec3 } from '@engine/core/math';
@@ -30,6 +29,37 @@ export interface ModelBuilderSceneConfig {
 }
 
 /**
+ * Default configuration constants
+ */
+const DEFAULT_CONFIG = {
+  roomSize: 4,
+  modelPosition: [0, 0, 0] as Vec3,
+  cameraDistance: 3,
+  wallThickness: 0.1,
+  colors: {
+    wall: [0.4, 0.6, 0.9, 1] as [number, number, number, number], // Light blue
+    modelPlaceholder: [0.8, 0.8, 0.8, 1] as [number, number, number, number],
+  },
+  lighting: {
+    directional: {
+      color: [1, 1, 1] as Vec3,
+      intensity: 1.2,
+      direction: [0, -1, 0] as Vec3,
+    },
+    point: {
+      color: [1, 1, 0.95] as Vec3,
+      intensity: 0.8,
+      rangeMultiplier: 1.5,
+    },
+    fill: {
+      color: [0.9, 0.95, 1] as Vec3,
+      intensity: 0.5,
+      rangeMultiplier: 1.5,
+    },
+  },
+};
+
+/**
  * ModelBuilderScene creates a blue room environment for model building
  */
 export class ModelBuilderScene {
@@ -37,8 +67,8 @@ export class ModelBuilderScene {
   private readonly roomSize: number;
   private readonly modelPosition: Vec3;
   private readonly cameraDistance: number;
-  private readonly logger: ModelBuilderSceneConfig['logger'];
   private readonly disposables = new DisposableGroup();
+  private readonly logger: ModelBuilderSceneConfig['logger'];
 
   private modelEntity: Entity | null = null;
   private cameraEntity: Entity | null = null;
@@ -47,14 +77,10 @@ export class ModelBuilderScene {
   private roomEntities: Entity[] = [];
 
   constructor(config?: ModelBuilderSceneConfig) {
-    this.roomSize = config?.roomSize ?? 4;
-    this.modelPosition = config?.modelPosition ?? [0, 0, 0];
-    this.cameraDistance = config?.cameraDistance ?? 3;
-    this.logger = config?.logger ?? {
-      debug: console.debug.bind(console),
-      warn: console.warn.bind(console),
-      error: (msg, err) => console.error(msg, err),
-    };
+    this.roomSize = config?.roomSize ?? DEFAULT_CONFIG.roomSize;
+    this.modelPosition = config?.modelPosition ?? DEFAULT_CONFIG.modelPosition;
+    this.cameraDistance = config?.cameraDistance ?? DEFAULT_CONFIG.cameraDistance;
+    this.logger = config?.logger;
 
     this.scene = new Scene('model-builder-scene');
     this.setupRoom();
@@ -104,12 +130,11 @@ export class ModelBuilderScene {
     // Remove existing model entity if any
     if (this.modelEntity) {
       this.scene.removeEntity(this.modelEntity);
-      this.modelEntity.dispose();
     }
 
     // Create new model entity
     const entity = new Entity('model-builder-model');
-    entity.addComponent(new TransformComponent({ position: this.modelPosition }));
+    entity.addComponent(new Transform(this.modelPosition));
 
     // Add MicroBlockComponent with builder's store
     const store = builder.getStore();
@@ -117,11 +142,13 @@ export class ModelBuilderScene {
     entity.addComponent(component);
 
     // Add mesh component (will be updated by MicroBlockSystem)
-    entity.addComponent(new MeshComponent());
+    const mesh = new MeshComponent();
+    // MicroBlockSystem will handle the mesh data
+    entity.addComponent(mesh);
 
     // Add material component
     const material = new MaterialComponent();
-    material.primaryColor = [0.8, 0.8, 0.8, 1];
+    material.primaryColor = DEFAULT_CONFIG.colors.modelPlaceholder;
     material.roughness = 0.3;
     material.metallic = 0;
     entity.addComponent(material);
@@ -142,8 +169,8 @@ export class ModelBuilderScene {
    */
   private setupRoom(): void {
     const halfSize = this.roomSize / 2;
-    const wallThickness = 0.1;
-    const blueColor: [number, number, number, number] = [0.4, 0.6, 0.9, 1]; // Light blue
+    const wallThickness = DEFAULT_CONFIG.wallThickness;
+    const blueColor = DEFAULT_CONFIG.colors.wall;
 
     // Floor
     const floor = this.createWall(
@@ -210,7 +237,7 @@ export class ModelBuilderScene {
     color: [number, number, number, number]
   ): Entity {
     const entity = new Entity(`room-${name}`);
-    entity.addComponent(new TransformComponent({ position, scale }));
+    entity.addComponent(new Transform(position, undefined, scale));
 
     const mesh = new MeshComponent();
     mesh.meshType = 'cube';
@@ -230,41 +257,43 @@ export class ModelBuilderScene {
    * Sets up lighting (directional + point lights)
    */
   private setupLighting(): void {
+    const lights = DEFAULT_CONFIG.lighting;
+
     // Main directional light (from top)
     const directionalLight = new Entity('directional-light');
-    directionalLight.addComponent(new TransformComponent({ position: [0, this.roomSize, 0] }));
+    directionalLight.addComponent(new Transform([0, this.roomSize, 0]));
 
     const dirLight = new LightComponent();
     dirLight.lightType = 'directional';
-    dirLight.color = [1, 1, 1];
-    dirLight.intensity = 1.2;
-    dirLight.direction = [0, -1, 0];
+    dirLight.color = lights.directional.color;
+    dirLight.intensity = lights.directional.intensity;
+    dirLight.direction = lights.directional.direction;
     directionalLight.addComponent(dirLight);
 
     this.scene.addEntity(directionalLight);
 
     // Additional point light for better illumination
     const pointLight = new Entity('point-light');
-    pointLight.addComponent(new TransformComponent({ position: [this.roomSize * 0.5, this.roomSize * 0.3, this.roomSize * 0.5] }));
+    pointLight.addComponent(new Transform([this.roomSize * 0.5, this.roomSize * 0.3, this.roomSize * 0.5]));
 
     const ptLight = new LightComponent();
     ptLight.lightType = 'point';
-    ptLight.color = [1, 1, 0.95];
-    ptLight.intensity = 0.8;
-    ptLight.range = this.roomSize * 1.5;
+    ptLight.color = lights.point.color;
+    ptLight.intensity = lights.point.intensity;
+    ptLight.range = this.roomSize * lights.point.rangeMultiplier;
     pointLight.addComponent(ptLight);
 
     this.scene.addEntity(pointLight);
 
     // Ambient fill light (second point light)
     const fillLight = new Entity('fill-light');
-    fillLight.addComponent(new TransformComponent({ position: [-this.roomSize * 0.5, this.roomSize * 0.3, -this.roomSize * 0.5] }));
+    fillLight.addComponent(new Transform([-this.roomSize * 0.5, this.roomSize * 0.3, -this.roomSize * 0.5]));
 
     const fillLightComp = new LightComponent();
     fillLightComp.lightType = 'point';
-    fillLightComp.color = [0.9, 0.95, 1];
-    fillLightComp.intensity = 0.5;
-    fillLightComp.range = this.roomSize * 1.5;
+    fillLightComp.color = lights.fill.color;
+    fillLightComp.intensity = lights.fill.intensity;
+    fillLightComp.range = this.roomSize * lights.fill.rangeMultiplier;
     fillLight.addComponent(fillLightComp);
 
     this.scene.addEntity(fillLight);
@@ -276,7 +305,7 @@ export class ModelBuilderScene {
   private setupCamera(): void {
     // Create camera entity
     this.cameraEntity = new Entity('model-builder-camera');
-    this.cameraEntity.addComponent(new TransformComponent({ position: [0, 0, this.cameraDistance] }));
+    this.cameraEntity.addComponent(new Transform([0, 0, this.cameraDistance]));
 
     // Add camera component
     const cameraComp = new CameraComponent();
@@ -301,7 +330,8 @@ export class ModelBuilderScene {
     this.scene.addEntity(this.cameraEntity);
 
     // Create camera system
-    this.cameraSystem = new OrbitCameraSystem(this.scene);
+    const systemConfig = this.logger ? { logger: this.logger } : undefined;
+    this.cameraSystem = new OrbitCameraSystem(this.scene, systemConfig);
   }
 
   /**
@@ -321,16 +351,24 @@ export class ModelBuilderScene {
     
     if (this.modelEntity) {
       this.scene.removeEntity(this.modelEntity);
-      this.modelEntity.dispose();
+      this.modelEntity = null;
     }
+
+    if (this.cameraEntity) {
+      this.scene.removeEntity(this.cameraEntity);
+      this.cameraEntity = null;
+    }
+    this.cameraComponent = null;
+
+    // Note: OrbitCameraSystem doesn't strictly require disposal if it just holds refs to scene components
+    // but if it did, we'd call it here. It is good practice to clear the reference.
+    this.cameraSystem = null;
 
     for (const entity of this.roomEntities) {
       this.scene.removeEntity(entity);
-      entity.dispose();
     }
     this.roomEntities = [];
 
     // Note: Scene disposal is handled by caller
   }
 }
-

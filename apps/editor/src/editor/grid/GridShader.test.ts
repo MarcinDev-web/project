@@ -35,21 +35,7 @@ describe('GridShader', () => {
 
       it('should declare uniform variable', () => {
         expect(shaderCode).toContain('@group(0) @binding(0)');
-        expect(shaderCode).toContain('var<uniform> gridUniforms : GridUniforms');
-      });
-    });
-
-    describe('vertex input structure', () => {
-      it('should define VertexInput struct', () => {
-        expect(shaderCode).toContain('struct VertexInput');
-      });
-
-      it('should have position attribute at location 0', () => {
-        expect(shaderCode).toContain('@location(0) position : vec3<f32>');
-      });
-
-      it('should have color attribute at location 1', () => {
-        expect(shaderCode).toContain('@location(1) color : vec4<f32>');
+        expect(shaderCode).toContain('var<uniform> u : GridUniforms');
       });
     });
 
@@ -62,8 +48,8 @@ describe('GridShader', () => {
         expect(shaderCode).toContain('@builtin(position) position : vec4<f32>');
       });
 
-      it('should have color output at location 0', () => {
-        expect(shaderCode).toMatch(/@location\(0\)\s+color\s*:\s*vec4<f32>/);
+      it('should have worldPos output at location 0', () => {
+        expect(shaderCode).toContain('@location(0) worldPos : vec3<f32>');
       });
     });
 
@@ -73,28 +59,26 @@ describe('GridShader', () => {
         expect(shaderCode).toContain('fn vs_grid');
       });
 
-      it('should accept VertexInput parameter', () => {
-        expect(shaderCode).toMatch(/fn vs_grid\s*\(\s*input\s*:\s*VertexInput\s*\)/);
+      it('should use vertex_index builtin', () => {
+        expect(shaderCode).toContain('@builtin(vertex_index) vertexIndex : u32');
       });
 
       it('should return VertexOutput', () => {
         expect(shaderCode).toMatch(/fn vs_grid[^{]+-> VertexOutput/);
       });
 
+      it('should calculate world position', () => {
+        expect(shaderCode).toContain('let worldPos = vec3<f32>');
+      });
+
       it('should transform position by viewProjectionMatrix', () => {
         expect(shaderCode).toContain(
-          'gridUniforms.viewProjectionMatrix * vec4<f32>(input.position, 1.0)'
+          'u.viewProjectionMatrix * vec4<f32>(worldPos, 1.0)'
         );
       });
 
-      it('should pass through color', () => {
-        expect(shaderCode).toContain('output.color = input.color');
-      });
-
       it('should return output', () => {
-        const vertexFunctionMatch = shaderCode.match(/@vertex\s+fn vs_grid[^}]+}/s);
-        expect(vertexFunctionMatch).toBeDefined();
-        expect(vertexFunctionMatch![0]).toContain('return output');
+        expect(shaderCode).toContain('return output;');
       });
     });
 
@@ -112,10 +96,10 @@ describe('GridShader', () => {
         expect(shaderCode).toMatch(/fn fs_grid[^{]+-> @location\(0\) vec4<f32>/);
       });
 
-      it('should return input color', () => {
-        const fragmentFunctionMatch = shaderCode.match(/@fragment\s+fn fs_grid[^}]+}/s);
-        expect(fragmentFunctionMatch).toBeDefined();
-        expect(fragmentFunctionMatch![0]).toContain('return input.color');
+      it('should calculate grid lines', () => {
+        expect(shaderCode).toContain('getGridLine');
+        expect(shaderCode).toContain('minorGrid');
+        expect(shaderCode).toContain('majorGrid');
       });
     });
 
@@ -133,11 +117,6 @@ describe('GridShader', () => {
         expect(shaderCode).toMatch(/@fragment\s+fn\s+\w+/);
       });
 
-      it('should use correct attribute syntax', () => {
-        // Check that attributes use @location properly
-        expect(shaderCode).toMatch(/@location\(\d+\)/g);
-      });
-
       it('should use correct builtin syntax', () => {
         expect(shaderCode).toContain('@builtin(position)');
       });
@@ -147,44 +126,11 @@ describe('GridShader', () => {
       });
     });
 
-    describe('shader consistency', () => {
-      it('should have matching input/output between vertex and fragment', () => {
-        // VertexOutput should be returned by vertex and accepted by fragment
-        const vertexOutputMatch = shaderCode.match(/fn vs_grid[^}]+-> VertexOutput/);
-        const fragmentInputMatch = shaderCode.match(/fn fs_grid\s*\([^)]*:\s*VertexOutput\)/);
-
-        expect(vertexOutputMatch).toBeDefined();
-        expect(fragmentInputMatch).toBeDefined();
-      });
-
-      it('should have consistent color data flow', () => {
-        // Color should flow: input -> vertex output -> fragment input -> fragment output
-        expect(shaderCode).toContain('input.color');
-        expect(shaderCode).toContain('output.color = input.color');
-        expect(shaderCode).toContain('return input.color');
-      });
-
-      it('should have consistent position data flow', () => {
-        // Position should be transformed in vertex shader
-        expect(shaderCode).toContain('input.position');
-        expect(shaderCode).toContain('viewProjectionMatrix * vec4<f32>(input.position, 1.0)');
-      });
-    });
-
     describe('type correctness', () => {
       it('should use f32 for floating point types', () => {
         expect(shaderCode).toContain('vec3<f32>');
         expect(shaderCode).toContain('vec4<f32>');
         expect(shaderCode).toContain('mat4x4<f32>');
-      });
-
-      it('should convert vec3 position to vec4 with w=1.0', () => {
-        expect(shaderCode).toContain('vec4<f32>(input.position, 1.0)');
-      });
-
-      it('should not use incorrect type conversions', () => {
-        // Should not cast position to vec3 after transformation
-        expect(shaderCode).not.toContain('vec3<f32>(gridUniforms.viewProjectionMatrix');
       });
     });
   });

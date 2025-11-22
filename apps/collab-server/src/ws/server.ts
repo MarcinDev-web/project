@@ -1,5 +1,5 @@
 import type { FastifyInstance } from 'fastify';
-import type { PrismaClient } from '../../node_modules/.prisma/collab-client/index.js';
+import { PrismaClient } from '@engine/database';
 import type { RawData, WebSocket } from 'ws';
 import {
   type CorsConfig,
@@ -12,7 +12,9 @@ import {
   cleanupConnection,
   type ConnectionMeta,
   type WsMessage,
+  WsMessageSchema,
 } from '../shared/messageRouter.js';
+import { GameServerDiscovery } from '../services/GameServerDiscovery.js';
 
 // Re-export for backward compatibility
 export { broadcastToSession } from '../shared/messageRouter.js';
@@ -24,6 +26,27 @@ export function createWsServer(
 ): void {
   const resolvedCorsConfig = corsConfig ?? getCorsConfig();
   const allowedOriginsDescription = describeAllowedOrigins(resolvedCorsConfig);
+  
+  // Initialize GameServerDiscovery
+  const discovery = new GameServerDiscovery(process.env.REDIS_URL || 'redis://localhost:6379');
+
+  // Endpoint to get available game server
+  app.post('/api/matchmaking/find', async (_req, reply) => {
+    const bestServer = await discovery.findBestServer();
+    if (!bestServer) {
+      return reply.status(503).send({ error: 'No game servers available' });
+    }
+    
+    // Return server info and a temporary token (mocked for now)
+    return {
+      host: bestServer.host,
+      port: bestServer.port,
+      // wsUrl: `ws://${bestServer.host}:${bestServer.port}/ws`, // In prod use wss
+      wsUrl: `ws://localhost:${bestServer.port}/ws`, // Localhost for dev
+      token: 'mock-zone-token' // In real impl, generate JWT signed by shared secret
+    };
+  });
+
   // @fastify/websocket v11 handler signature: (socket, request)
   app.get('/ws', { websocket: true }, (socket, req) => {
     const ws = socket as unknown as WebSocket;
@@ -55,8 +78,15 @@ export function createWsServer(
           const buffer = raw as ArrayBuffer | ArrayBufferView;
           text = Buffer.from(buffer as ArrayBuffer).toString('utf-8');
         }
-        const msg = JSON.parse(text) as WsMessage;
-        handleWsMessage(ws, msg);
+        const json = JSON.parse(text);
+        const result = WsMessageSchema.safeParse(json);
+
+        if (result.success) {
+          handleWsMessage(ws, result.data);
+        } else {
+           // Optionally log validation errors in debug mode
+           // console.debug('Invalid WS message structure:', result.error);
+        }
       } catch {
         // ignore invalid
       }

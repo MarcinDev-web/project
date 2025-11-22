@@ -1,5 +1,5 @@
 /**
- * AssetPalette - Simplified Build Menu (Minecraft Creative Style)
+ * AssetPalette - Simplified Build Menu (Creative Style)
  * 
  * Features:
  * - Bottom hotbar (1-9 keys for quick access)

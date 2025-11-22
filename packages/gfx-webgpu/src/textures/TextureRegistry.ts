@@ -25,7 +25,7 @@ export interface TextureSet {
  * Note: These are placeholder paths. In production:
  * - Replace with actual texture file paths
  * - Use asset bundler (Vite, Webpack) for proper asset management
- * - Consider using texture packs similar to Minecraft resource packs
+ * - Consider using texture packs
  */
 export const TEXTURE_REGISTRY: Record<string, TextureSet> = {
   // ===== BASIC MATERIALS =====
@@ -266,7 +266,7 @@ export function createPlaceholderDataUrl(
 }
 
 /**
- * Texture pack system (similar to Minecraft resource packs)
+ * Texture pack system
  */
 export interface TexturePack {
   id: string;

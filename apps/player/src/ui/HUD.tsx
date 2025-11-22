@@ -4,6 +4,7 @@ import { Minimap } from './components/Minimap.js';
 import { Inventory } from './components/Inventory.js';
 import { ChatOverlay } from './components/ChatOverlay.js';
 import { SettingsMenu } from './components/SettingsMenu.js';
+import { DebugOverlay } from './components/DebugOverlay.js';
 import type { Vec3 } from '@engine/core/math';
 
 export interface HUDProps {
@@ -42,6 +43,7 @@ export function HUD(props: HUDProps): React.JSX.Element {
 
   const [showInventory, setShowInventory] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
 
   // Handle keyboard shortcuts
   useEffect(() => {
@@ -55,6 +57,9 @@ export function HUD(props: HUDProps): React.JSX.Element {
         } else if (showSettings) {
           setShowSettings(false);
         }
+      } else if (event.key === 'F3') {
+        event.preventDefault();
+        setShowDebug((prev) => !prev);
       }
     };
 
@@ -74,6 +79,9 @@ export function HUD(props: HUDProps): React.JSX.Element {
 
       {/* Chat Overlay */}
       <ChatOverlay />
+
+      {/* Debug Overlay (toggle with F3) */}
+      {showDebug && <DebugOverlay />}
 
       {/* Inventory (toggle with Tab) */}
       {showInventory && (

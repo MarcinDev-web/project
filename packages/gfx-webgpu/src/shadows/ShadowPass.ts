@@ -1,7 +1,7 @@
 import type { GeometryData } from '../resources/resources';
 import { MaterialComponent } from '@engine/world';
 import type { Mat4, Vec3 } from '@engine/core/math';
-import { computeCascades } from './ShadowCascades';
+import { ShadowCascadeCalculator } from './ShadowCascades';
 import { TIMESTAMP_INDICES } from '../config';
 import { Z_NEAR, Z_FAR } from '../config';
 
@@ -16,6 +16,8 @@ export class ShadowPass {
   private comparisonSampler: GPUSampler | null = null;
 
   private readonly atlasSize = 2048;
+
+  private shadowCalculator = new ShadowCascadeCalculator();
 
   // Shadow quality & blending
   private cascadeOverlap = 0.07; // fraction of cascade range used for blending
@@ -338,7 +340,7 @@ fn vs_main(
     }
 
     // Compute cascades
-    const cascades = computeCascades({
+    const cascades = this.shadowCalculator.compute({
       viewMatrix: params.viewMatrix,
       projectionMatrix: params.projectionMatrix,
       lightDirection: lightDir as unknown as Vec3,

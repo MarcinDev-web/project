@@ -108,8 +108,7 @@ export async function showPortSelectionModal(
 
       // Port icon based on type
       const iconName = getPortIcon(port.type);
-      const icon = createIcon(iconName as any, 20);
-      icon.className = 'port-selection-icon';
+      const icon = createIcon(iconName as any, 20, 'port-selection-icon');
       portItem.appendChild(icon);
 
       // Port info

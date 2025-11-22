@@ -7,7 +7,7 @@ import type {
 } from '@engine/stdlib/Animation/types';
 import type { AnimationStateConfig, AnimationTransitionConfig } from '@engine/stdlib/Animation/AnimationStateMachine';
 import type { AnimationController } from '@engine/stdlib/Animation/AnimationController';
-import { createIcon } from '../../utils/icons';
+import { createIcon } from '../../../utils/icons';
 
 interface AnimationSectionOptions {
   entity: Entity;

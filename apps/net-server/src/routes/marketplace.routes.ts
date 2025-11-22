@@ -305,7 +305,7 @@ export async function createMarketplaceRoutes(
         return reply.code(400).send({ error: 'Item ID required' });
       }
       
-      // Use resaleStorage if available, otherwise fallback to in-memory Map
+      // Use resaleStorage if available (DB or Redis), otherwise fallback to in-memory Map
       if (resaleStorage) {
         const listings = await resaleStorage.getListings(id);
         reply.send({ listings });
@@ -360,7 +360,7 @@ export async function createMarketplaceRoutes(
           });
         }
 
-        // Use resaleStorage if available, otherwise fallback to in-memory Map
+        // Use resaleStorage if available (DB or Redis), otherwise fallback to in-memory Map
         if (resaleStorage) {
           const listing = await resaleStorage.createListing(id, request.user.id, body.price);
           reply.send({ success: true, listing });
@@ -406,7 +406,7 @@ export async function createMarketplaceRoutes(
         const item = await marketplaceStorage.getItem(id);
         if (!item) return reply.code(404).send({ error: 'Item not found' });
 
-        // Find listing - use resaleStorage if available, otherwise fallback to in-memory Map
+        // Find listing - use resaleStorage if available (DB or Redis), otherwise fallback to in-memory Map
         let listing: { sellerId: string; price: CurrencyAmount; createdAt: number } | null = null;
         if (resaleStorage) {
           const dbListing = await resaleStorage.getListing(id, body.sellerId);
@@ -484,7 +484,7 @@ export async function createMarketplaceRoutes(
           }
         }
 
-        // Remove listing - use resaleStorage if available, otherwise fallback to in-memory Map
+        // Remove listing - use resaleStorage if available (DB or Redis), otherwise fallback to in-memory Map
         if (resaleStorage) {
           await resaleStorage.deleteListing(id, body.sellerId);
         } else {
@@ -966,7 +966,7 @@ export async function createMarketplaceRoutes(
 
   /**
    * GET /api/marketplace/:id/build
-   * Get build data for a marketplace item (like Kogama).
+   * Get build data for a marketplace item.
    * Returns the actual build/scene data that can be loaded in the editor.
    */
   app.get('/:id/build', async (request: FastifyRequest, reply: FastifyReply) => {

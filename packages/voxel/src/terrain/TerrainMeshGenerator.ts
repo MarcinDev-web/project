@@ -7,7 +7,8 @@
 import type { Vec3 } from '@engine/core/math';
 import type { HeightmapTerrainData } from '@engine/world/components/TerrainComponent';
 import { crossVec3, normalizeVec3, subVec3 } from '@engine/core/math';
-import { init, type WasmMeshProcessor } from '@engine/wasm-mesh';
+import { init as initMeshProcessor, type WasmMeshProcessor } from '@engine/wasm-mesh';
+import { init as initVoxelEngine, type WasmVoxelEngine } from '@engine/wasm-voxel';
 
 /**
  * Generated mesh data
@@ -40,6 +41,7 @@ export interface TerrainMeshOptions {
  */
 export class TerrainMeshGenerator {
   private static wasmProcessor: WasmMeshProcessor | null = null;
+  private static wasmVoxelEngine: WasmVoxelEngine | null = null;
 
   /**
    * Initialize WASM processor
@@ -47,9 +49,16 @@ export class TerrainMeshGenerator {
   static async init(): Promise<void> {
     if (!this.wasmProcessor) {
       try {
-        this.wasmProcessor = await init();
+        this.wasmProcessor = await initMeshProcessor();
       } catch (e) {
         console.warn('Failed to load WASM mesh processor, falling back to JS', e);
+      }
+    }
+    if (!this.wasmVoxelEngine) {
+      try {
+        this.wasmVoxelEngine = await initVoxelEngine();
+      } catch (e) {
+        console.warn('Failed to load WASM voxel engine, falling back to JS', e);
       }
     }
   }

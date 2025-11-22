@@ -8,7 +8,7 @@ import type { SelectionManager } from '@engine/world';
 import type { Entity } from '@engine/world';
 import { UICanvasComponent } from '@engine/world/components/UICanvasComponent';
 import { UIElementComponent, type UIElementType } from '@engine/world/components/UIElementComponent';
-import { UIEditorController } from '../../controllers/UIEditorController';
+import { UIEditorController, type AlignmentMode } from '../../controllers/UIEditorController';
 import { UIElementProperties } from './UIElementProperties';
 import { DisposableGroup } from '@engine/core/utils';
 
@@ -243,6 +243,62 @@ export class UIEditor {
       this.ensureUICanvas();
     });
     toolbar.appendChild(ensureCanvasBtn);
+
+    // Separator
+    const separator = document.createElement('div');
+    separator.style.width = '1px';
+    separator.style.height = '20px';
+    separator.style.background = 'rgba(255,255,255,0.2)';
+    separator.style.margin = '0 8px';
+    toolbar.appendChild(separator);
+
+    // Alignment Buttons
+    const alignmentGroup = document.createElement('div');
+    alignmentGroup.style.display = 'flex';
+    alignmentGroup.style.gap = '4px';
+
+    const createAlignBtn = (mode: AlignmentMode, icon: string, title: string) => {
+      const btn = document.createElement('button');
+      btn.innerHTML = icon;
+      btn.title = title;
+      btn.addEventListener('click', () => {
+        this.controller?.alignSelected(mode);
+      });
+      return btn;
+    };
+
+    alignmentGroup.appendChild(createAlignBtn('left', '⇠', 'Align Left'));
+    alignmentGroup.appendChild(createAlignBtn('center', '↔', 'Align Center'));
+    alignmentGroup.appendChild(createAlignBtn('right', '⇢', 'Align Right'));
+    alignmentGroup.appendChild(createAlignBtn('top', '⇡', 'Align Top'));
+    alignmentGroup.appendChild(createAlignBtn('middle', '↕', 'Align Middle'));
+    alignmentGroup.appendChild(createAlignBtn('bottom', '⇣', 'Align Bottom'));
+
+    toolbar.appendChild(alignmentGroup);
+
+    // Separator
+    const separator2 = separator.cloneNode() as HTMLElement;
+    toolbar.appendChild(separator2);
+
+    // Layer Buttons
+    const layerGroup = document.createElement('div');
+    layerGroup.style.display = 'flex';
+    layerGroup.style.gap = '4px';
+
+    const toFrontBtn = document.createElement('button');
+    toFrontBtn.innerHTML = '▲ Front';
+    toFrontBtn.title = 'Bring to Front';
+    toFrontBtn.addEventListener('click', () => this.controller?.bringToFront());
+    
+    const toBackBtn = document.createElement('button');
+    toBackBtn.innerHTML = '▼ Back';
+    toBackBtn.title = 'Send to Back';
+    toBackBtn.addEventListener('click', () => this.controller?.sendToBack());
+
+    layerGroup.appendChild(toFrontBtn);
+    layerGroup.appendChild(toBackBtn);
+
+    toolbar.appendChild(layerGroup);
 
     return toolbar;
   }
@@ -544,4 +600,3 @@ export class UIEditor {
     this.unmount();
   }
 }
-

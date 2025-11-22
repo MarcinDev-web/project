@@ -45,21 +45,59 @@ Complete documentation for the UGC 3D Platform project.
 ## 📖 Core Documentation
 
 ### Architecture & Design
-- **[ARCHITECTURE.md](./ARCHITECTURE.md)** - System architecture and package structure
-- **[PERFORMANCE.md](./PERFORMANCE.md)** - Performance guidelines and optimization
-- **[TESTING.md](./TESTING.md)** - Testing philosophy and practices
+- **[architecture/](./architecture/)** - System architecture and design
+  - [ARCHITECTURE.md](./architecture/ARCHITECTURE.md) - System architecture and package structure
+  - [ALIAS_CONFIGURATION.md](./architecture/ALIAS_CONFIGURATION.md) - Alias configuration guide
+  - [WASM_FUTURE_MODULES.md](./architecture/WASM_FUTURE_MODULES.md) - Future WASM modules
+
+### Performance
+- **[performance/](./performance/)** - Performance guidelines and optimization
+  - [PERFORMANCE.md](./performance/PERFORMANCE.md) - General performance guide
+  - [PERFORMANCE_OPTIMIZATIONS.md](./performance/PERFORMANCE_OPTIMIZATIONS.md) - Optimization techniques
+  - [SIMD_OPTIMIZATIONS.md](./performance/SIMD_OPTIMIZATIONS.md) - SIMD optimizations
+  - [MEASURE_JS_HEAP.md](./performance/MEASURE_JS_HEAP.md) - Memory profiling
+  - [BENCHMARKING_GUIDE.md](./performance/BENCHMARKING_GUIDE.md) - Benchmarking guide
+
+### Testing
+- **[testing/](./testing/)** - Testing philosophy and automation
+  - [TESTING.md](./testing/TESTING.md) - Testing philosophy
+  - [TESTING_AUTOMATION.md](./testing/TESTING_AUTOMATION.md) - Automation guide
+  - [TEST_OPTIMIZATION.md](./testing/TEST_OPTIMIZATION.md) - Test optimization
+
+### Gameplay & Analysis
+- **[gameplay/](./gameplay/)** - Gameplay systems analysis
+  - [GAMEPLAY_ANALYSIS.md](./gameplay/GAMEPLAY_ANALYSIS.md) - Gameplay analysis
+  - [MOVEMENT_ANALYSIS.md](./gameplay/MOVEMENT_ANALYSIS.md) - Movement system analysis
+  - [MULTIPLAYER_USAGE.md](./gameplay/MULTIPLAYER_USAGE.md) - Multiplayer usage
+  - [MULTIPLAYER_READINESS_REPORT.md](./gameplay/MULTIPLAYER_READINESS_REPORT.md) - Multiplayer readiness
+
+### Automation & Release
+- **[automation/](./automation/)** - Release and CI/CD automation
+  - [AUTOMATION_QUICK_START.md](./automation/AUTOMATION_QUICK_START.md) - Quick start for automation
+  - [AUTOMATION_ROADMAP.md](./automation/AUTOMATION_ROADMAP.md) - Roadmap
+  - [RELEASE_AUTOMATION.md](./automation/RELEASE_AUTOMATION.md) - Release process
+  - [RELEASE_API.md](./automation/RELEASE_API.md) - Release API
+
+### Branding
+- **[branding/](./branding/)** - Project branding
+  - [BRANDING.md](./branding/BRANDING.md) - Branding guidelines
+  - [BRANDING_CHANGELOG.md](./branding/BRANDING_CHANGELOG.md) - Branding changes
 
 ### Technical Details
 - **[technical/](./technical/)** - Technical specifications
   - [FRAME_MODEL.md](./technical/FRAME_MODEL.md) - Rendering frame model
   - [PLAY_MODE.md](./technical/PLAY_MODE.md) - Play mode state machine
-  - [WEBGPU_FEATURE_POLICY.md](./technical/WEBGPU_FEATURE_POLICY.md) - WebGPU feature tiers, adapter selection, device-loss & fallback
-  - [RUNTIME_DETERMINISM_AND_SERIALIZATION.md](./technical/RUNTIME_DETERMINISM_AND_SERIALIZATION.md) - Time model, RNG, units, serialization versioning
-  - [UGC_SECURITY_MODEL.md](./technical/UGC_SECURITY_MODEL.md) - UGC sandbox, capabilities, and asset validation pipeline
+  - [WEBGPU_FEATURE_POLICY.md](./technical/WEBGPU_FEATURE_POLICY.md) - WebGPU feature tiers
+  - [RUNTIME_DETERMINISM_AND_SERIALIZATION.md](./technical/RUNTIME_DETERMINISM_AND_SERIALIZATION.md) - Time model, RNG, units
+  - [UGC_SECURITY_MODEL.md](./technical/UGC_SECURITY_MODEL.md) - UGC sandbox
+  - [SECURITY.md](./technical/SECURITY.md) - General security guide
+  - [README_PLATFORM.md](./technical/README_PLATFORM.md) - Platform readme
 
 ### Architecture Decisions
 - **[adr/](./adr/)** - Architecture Decision Records
   - [001-modular-engine-architecture.md](./adr/001-modular-engine-architecture.md)
+  - [002-shader-tests.md](./adr/002-shader-tests.md)
+  - [003-wasm-collision.md](./adr/003-wasm-collision.md)
 
 ---
 
@@ -87,44 +125,12 @@ Complete documentation for the UGC 3D Platform project.
 
 ---
 
-## 🔧 Refactoring (October 2025) - Archived
-
-**Location:** [archive/](./archive/)
-
-**Note:** Refactoring documentation has been moved to the archive as the refactoring work is complete.
+## 🔧 Refactoring (October 2025) - Completed
 
 **Summary:**
 - Eliminated 6 major duplicates (-1823 lines)
 - Created @engine/editor-utils package
 - 100% import consistency achieved
-- Comprehensive documentation (24+ files)
-
-**Key archived files:**
-- [REFACTORING_COMPLETE.md](./archive/REFACTORING_COMPLETE.md) - Complete overview
-- [MIGRATION_SUCCESS_METRICS.md](./archive/MIGRATION_SUCCESS_METRICS.md) - Metrics and results
-
----
-
-## 🐛 Issues & Fixes
-
-**Location:** [issues/](./issues/)
-
-- **[SHADER_NON_UNIFORM_CONTROL_FLOW.md](./issues/SHADER_NON_UNIFORM_CONTROL_FLOW.md)** - WebGPU shader fix
-
----
-
-## 📊 Analysis & Reports
-
-**Current analyses:**
-- **[GAMEPLAY_ANALYSIS.md](./GAMEPLAY_ANALYSIS.md)** - Gameplay systems analysis
-- **[TEST_OPTIMIZATION.md](./TEST_OPTIMIZATION.md)** - Test optimization report
-- **[TESTING_AUTOMATION.md](./TESTING_AUTOMATION.md)** - Test automation guide
-- **[analysis/](./analysis/)** - Current analysis documents
-  - [HOTBAR_PLACEMENT_ANALYSIS.md](./analysis/HOTBAR_PLACEMENT_ANALYSIS.md) - Hotbar placement integration
-  - [PLACEMENT_ANALYSIS_PROBLEMS.md](./analysis/PLACEMENT_ANALYSIS_PROBLEMS.md) - Placement system issues
-
-**Archived analyses:**
-- See [archive/](./archive/) for historical analysis documents and completed refactoring documentation
 
 ---
 
@@ -140,12 +146,12 @@ Complete documentation for the UGC 3D Platform project.
 ### For New Developers
 1. Start: [guidelines/TEAM_ONBOARDING.md](./guidelines/TEAM_ONBOARDING.md)
 2. Read: [guidelines/PACKAGE_GUIDELINES.md](./guidelines/PACKAGE_GUIDELINES.md)
-3. Review: [ARCHITECTURE.md](./ARCHITECTURE.md)
+3. Review: [architecture/ARCHITECTURE.md](./architecture/ARCHITECTURE.md)
 
 ### For Contributors
 1. Before coding: [guidelines/PACKAGE_GUIDELINES.md](./guidelines/PACKAGE_GUIDELINES.md)
 2. Before PR: [guidelines/CODE_REVIEW_CHECKLIST.md](./guidelines/CODE_REVIEW_CHECKLIST.md)
-3. Testing: [TESTING.md](./TESTING.md)
+3. Testing: [testing/TESTING.md](./testing/TESTING.md)
 
 ### For Reviewers
 1. Use: [guidelines/CODE_REVIEW_CHECKLIST.md](./guidelines/CODE_REVIEW_CHECKLIST.md)
@@ -167,45 +173,27 @@ forge-engine/
 ├── TEST_COMMANDS_CHEATSHEET.md      # Testing commands
 └── docs/
     ├── README.md (this file)
-    ├── ARCHITECTURE.md              # System design ⭐
-    ├── PERFORMANCE.md               # Performance guide
-    ├── TESTING.md                   # Testing philosophy
+    ├── architecture/                # System design ⭐
+    │   └── ARCHITECTURE.md
+    ├── performance/                 # Performance guide
+    │   └── PERFORMANCE.md
+    ├── testing/                     # Testing philosophy
+    │   └── TESTING.md
     ├── guidelines/                  # Development guidelines ⭐
-    │   ├── README.md
-    │   ├── PACKAGE_GUIDELINES.md         # Where code belongs
-    │   ├── CODE_REVIEW_CHECKLIST.md      # PR review checklist
-    │   └── TEAM_ONBOARDING.md            # New dev guide
+    │   ├── PACKAGE_GUIDELINES.md    # Where code belongs
+    │   └── ...
     ├── deployment/                  # Deployment documentation
-    │   ├── RAILWAY_DEPLOYMENT.md         # Railway deployment guide
-    │   ├── VERCEL_DEPLOY.md              # Vercel deployment
-    │   ├── DOCKER_DEPLOYMENT_GUIDE.md    # Docker setup
-    │   └── [other deployment docs]
-    ├── archive/                     # Archived documentation
-    │   ├── REFACTORING_COMPLETE.md      # Oct 2025 refactoring summary
-    │   ├── MIGRATION_SUCCESS_METRICS.md
-    │   ├── [completed refactoring docs]
-    │   └── [historical analyses]
-    ├── analysis/                    # Current analysis documents
-    │   ├── HOTBAR_PLACEMENT_ANALYSIS.md
-    │   ├── MARKETPLACE_ANALYSIS.md
-    │   ├── PLACEMENT_ANALYSIS_PROBLEMS.md
-    │   └── [other analyses]
     ├── technical/                   # Technical specs
-    │   ├── FRAME_MODEL.md
-    │   ├── PLAY_MODE.md
-    │   ├── WEBGPU_FEATURE_POLICY.md
-    │   ├── UGC_SECURITY_MODEL.md
-    │   └── RUNTIME_DETERMINISM_AND_SERIALIZATION.md
-    ├── adr/                         # Architecture decisions
-    │   └── 001-modular-engine-architecture.md
-    ├── issues/                      # Issue documentation
-    │   └── SHADER_NON_UNIFORM_CONTROL_FLOW.md
-    └── [various docs]
+    │   └── ...
+    ├── gameplay/                    # Gameplay analysis
+    ├── automation/                  # Release automation
+    ├── branding/                    # Branding
+    └── adr/                         # Architecture decisions
 ```
 
 ---
 
-**Last Updated:** 2025-11-12  
+**Last Updated:** 2025-11-22
 **Maintainer:** Tech Team
 
-**Note:** Documentation has been reorganized. Historical analyses and completed refactoring documentation are now in [archive/](./archive/). Deployment documentation is in [deployment/](./deployment/).
+**Note:** Documentation has been reorganized to improve discoverability.

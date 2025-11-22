@@ -1,21 +1,21 @@
 /**
- * Block Library - Kogama/Roblox/Minecraft style blocks
+ * Block Library - Voxel style blocks
  *
  * Design principles:
- * - Simple, colorful aesthetic (Kogama/Roblox)
- * - Block-based voxel style (Minecraft)
+ * - Simple, colorful aesthetic
+ * - Block-based voxel style
  * - Support for both procedural and real textures
  * - Material-based rendering
  */
 
-import type { BlockCategory, BlockMaterialType, CTMConfig } from './types';
+import type { BlockCategory, BlockMaterialType, CTMConfig, PlacementConstraints, BlockSocket } from './types';
 import { CARTOON_PALETTE, getCartoonFaceTexture } from './palette';
 
 // Local type definition to avoid circular dependency with @engine/world
 export type RgbaColor = [number, number, number, number];
 
 // Re-export types
-export type { BlockCategory, BlockMaterialType, CTMConfig, CTMPattern } from './types';
+export type { BlockCategory, BlockMaterialType, CTMConfig, CTMPattern, PlacementConstraints, BlockSocket } from './types';
 
 export interface BlockFaceTexture {
   /** Base color for this face */
@@ -73,6 +73,10 @@ export interface BlockDefinition {
   };
   /** Connected textures configuration (optional) */
   ctm?: CTMConfig;
+  /** Placement constraints */
+  constraints?: PlacementConstraints;
+  /** Sockets for connections */
+  sockets?: BlockSocket[];
   /** Behavior properties (gameplay effects) */
   behavior?: {
     /** Friction multiplier applied to PhysicsComponent.material.friction (ice: 0.1, slime: 2.0) */
@@ -104,6 +108,9 @@ export const BLOCK_LIBRARY: Record<string, BlockDefinition> = {
       emissive: 0,
       roughness: 0.3,
       metallic: 0,
+    },
+    constraints: {
+      allowedSurfaces: ['grass'], // Example constraint
     },
   },
 

@@ -1,7 +1,7 @@
 /**
  * Connected Textures System (CTM)
  *
- * Inspired by Minecraft's Connected Textures Mod
+ * Inspired by Connected Textures Mod
  * Allows blocks to have different textures based on neighboring blocks
  *
  * Features:
@@ -128,7 +128,7 @@ export class ConnectedTextureSystem {
 
   /**
    * Cross connection (16 textures for all combinations)
-   * Uses Minecraft CTM format
+   * Uses CTM format
    */
   private static getCrossIndex(face: CTMFace, neighbors: CTMNeighbors): CTMTextureIndex {
     // For simplicity, map to 4-way connection (simplified CTM)
@@ -383,7 +383,7 @@ export class CTMTextureMapper {
    * Get texture atlas index for cross pattern (4x4 grid)
    */
   public static getCrossAtlasIndex(neighbors: CTMNeighbors): number {
-    // Minecraft CTM format mapping
+    // CTM format mapping
     const hasTop = neighbors.top;
     const hasBottom = neighbors.bottom;
     const hasLeft = neighbors.west; // Assuming west is left

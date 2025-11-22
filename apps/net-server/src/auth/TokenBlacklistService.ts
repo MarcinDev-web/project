@@ -6,7 +6,7 @@
 import { readFile, writeFile, mkdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import path from 'node:path';
-import type { PrismaClient } from '../../node_modules/.prisma/net-client/index.js';
+import { PrismaClient } from '@engine/database';
 
 /**
  * Token blacklist entry with expiration.

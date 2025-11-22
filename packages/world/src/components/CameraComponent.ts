@@ -5,7 +5,7 @@ import type { Entity } from '../core/Entity.js';
 
 const DEFAULT_FOV = (60 * Math.PI) / 180; // 60 degrees in radians
 const DEFAULT_NEAR = 0.1;
-const DEFAULT_FAR = 100;
+const DEFAULT_FAR = 10000;
 
 export type ProjectionType = 'perspective';
 

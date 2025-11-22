@@ -5,7 +5,7 @@
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { getPrismaClient, ensureSchema } from '../../lib/db.js';
 import { BuildStorage } from '../BuildStorage.js';
-import type { PrismaClient } from '../../../node_modules/.prisma/net-client/index.js';
+import { PrismaClient } from '@engine/database';
 import type { ProjectData } from '../../types.js';
 
 describe('BuildStorage', () => {

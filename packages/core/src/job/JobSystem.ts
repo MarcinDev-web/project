@@ -51,6 +51,7 @@ interface WorkerPool {
   worker: Worker | null;
   busy: boolean;
   currentTaskId: number | null;
+  scriptUrl: string | undefined;
 }
 
 interface WorkerMessage {
@@ -92,6 +93,7 @@ export class JobSystem {
         worker: null,
         busy: false,
         currentTaskId: null,
+        scriptUrl: undefined,
       });
     }
   }
@@ -218,25 +220,41 @@ export class JobSystem {
       return;
     }
 
-    // Find available worker
-    const availableWorker = this.workerPool.find((pool) => !pool.busy);
+    // Find best available worker
+    // 1. Prefer worker with same script
+    // 2. Then undefined/empty worker
+    // 3. Then any free worker (will be repurposed)
+    
+    const queuedTask = this.backgroundQueue[0]; // Peek
+    if (!queuedTask) return;
 
-    if (!availableWorker) {
+    let workerPool = this.workerPool.find(
+      (p) => !p.busy && p.scriptUrl === queuedTask.task.workerScript
+    );
+
+    if (!workerPool) {
+      workerPool = this.workerPool.find((p) => !p.busy && !p.worker);
+    }
+
+    if (!workerPool) {
+      workerPool = this.workerPool.find((p) => !p.busy);
+    }
+
+    if (!workerPool) {
       return;
     }
 
-    const queuedTask = this.backgroundQueue.shift();
-    if (!queuedTask || queuedTask.cancelled) {
-      // Skip cancelled tasks
-      if (queuedTask) {
-        queuedTask.resolve();
-        this.tasks.delete(queuedTask.id);
-      }
+    // Remove from queue now that we have a worker
+    this.backgroundQueue.shift();
+
+    if (queuedTask.cancelled) {
+      queuedTask.resolve();
+      this.tasks.delete(queuedTask.id);
       this.processBackgroundQueue();
       return;
     }
 
-    void this.executeBackgroundTask(queuedTask, availableWorker);
+    void this.executeBackgroundTask(queuedTask, workerPool);
   }
 
   /**
@@ -277,9 +295,22 @@ export class JobSystem {
       }
 
       // Create or reuse worker
+      if (workerPool.worker && workerPool.scriptUrl !== queuedTask.task.workerScript) {
+        // Script mismatch, terminate old worker
+        try {
+          workerPool.worker.terminate();
+        } catch (e) {
+          console.warn('[JobSystem] Failed to terminate worker:', e);
+        }
+        workerPool.worker = null;
+        workerPool.scriptUrl = undefined;
+      }
+
       if (!workerPool.worker) {
         try {
-          workerPool.worker = new Worker(queuedTask.task.workerScript!, { type: 'module' });
+          const scriptUrl = queuedTask.task.workerScript!;
+          workerPool.worker = new Worker(scriptUrl, { type: 'module' });
+          workerPool.scriptUrl = scriptUrl;
         } catch (error) {
           console.warn('[JobSystem] Failed to create worker, falling back to main thread:', error);
           this.executeTaskAsync(queuedTask).then(resolve).catch(reject);
@@ -510,6 +541,7 @@ export class JobSystem {
           console.warn('[JobSystem] Error terminating worker during shutdown:', error);
         }
         pool.worker = null;
+        pool.scriptUrl = undefined;
       }
       pool.busy = false;
       pool.currentTaskId = null;

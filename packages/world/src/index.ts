@@ -105,6 +105,7 @@ export type { InteractionSystemConfig } from './systems/InteractionSystem.js';
 export { CheckpointSystem, type CheckpointActivation } from './systems/CheckpointSystem.js';
 export { PvPRespawnManager } from './utils/PvPRespawnManager.js';
 export { RespawnManager, type RespawnOptions, type RespawnResult } from './managers/RespawnManager.js';
+export { StaticBlockManager } from './managers/StaticBlockManager.js';
 export { PvPScoreboard, type PlayerStats } from './utils/PvPScoreboard.js';
 export { InteractableComponent } from './components/InteractableComponent.js';
 export type { InteractableComponentJSON } from './components/InteractableComponent.js';
@@ -126,3 +127,6 @@ export * from './physics/Joint.js';
 export * from './physics/Octree.js';
 export * from './physics/PhysicsRaycast.js';
 export * from './physics/inertia.js';
+
+// WASM Animation System
+export { WasmAnimationSystem } from './systems/WasmAnimationSystem.js';

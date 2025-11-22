@@ -1,6 +1,6 @@
 export const FOV_RADIANS = (2 * Math.PI) / 5;
 export const Z_NEAR = 0.1;
-export const Z_FAR = 100;
+export const Z_FAR = 10000;
 export const MSAA_SAMPLE_COUNT = 4;
 export const CLEAR_COLOR = { r: 0.02, g: 0.02, b: 0.03, a: 1.0 };
 export const DEFAULT_STATUS_MESSAGE = 'Rendering simple cubes…';

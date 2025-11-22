@@ -2,6 +2,132 @@
 import type { CustomMeshData } from '@engine/world';
 
 /**
+ * Generates a box mesh with specific dimensions.
+ * @param width Width (X axis)
+ * @param height Height (Y axis)
+ * @param depth Depth (Z axis)
+ * @param segments Number of segments per edge
+ */
+export function generateBoxMesh(width = 1, height = 1, depth = 1, segments = 1): CustomMeshData {
+  const w = width / 2;
+  const h = height / 2;
+  const d = depth / 2;
+  const seg = Math.max(1, Math.floor(segments));
+  
+  // 6 faces, each (seg+1)*(seg+1) vertices
+  const vertsPerFace = (seg + 1) * (seg + 1);
+  const trisPerFace = seg * seg * 2;
+  const faces = 6;
+
+  const vertices = new Float32Array(faces * vertsPerFace * 3);
+  const normals = new Float32Array(faces * vertsPerFace * 3);
+  const uvs = new Float32Array(faces * vertsPerFace * 2);
+  const indices = new Uint16Array(faces * trisPerFace * 3);
+
+  let vCursor = 0; // vertex cursor (floats)
+  let nCursor = 0; // normal cursor
+  let uCursor = 0; // uv cursor
+  let iCursor = 0; // index cursor
+  let vCount = 0;  // vertex count
+
+  // Helper to build a face
+  // u, v are basis vectors for the face
+  // origin is the starting corner
+  const buildFace = (
+    u: [number, number, number],
+    v: [number, number, number],
+    origin: [number, number, number],
+    normal: [number, number, number]
+  ) => {
+    const faceVertStart = vCount;
+
+    for (let iy = 0; iy <= seg; iy++) {
+      for (let ix = 0; ix <= seg; ix++) {
+        const ptX = origin[0] + (u[0] * ix * width) / seg + (v[0] * iy * height) / seg; // This mapping is tricky for generic box
+        // Better:
+        // origin is center + normal*dim/2?
+        // Let's use the standard "planes" approach
+      }
+    }
+  };
+
+  // Let's use a simpler approach iterating faces
+  const sides = [
+    { normal: [0, 0, 1], u: [1, 0, 0], v: [0, 1, 0], w: w, h: h, d: d, dims: [width, height] }, // Front (+Z)
+    { normal: [0, 0, -1], u: [-1, 0, 0], v: [0, 1, 0], w: w, h: h, d: -d, dims: [width, height] }, // Back (-Z)
+    { normal: [1, 0, 0], u: [0, 0, -1], v: [0, 1, 0], w: w, h: h, d: d, dims: [depth, height] }, // Right (+X)
+    { normal: [-1, 0, 0], u: [0, 0, 1], v: [0, 1, 0], w: -w, h: h, d: d, dims: [depth, height] }, // Left (-X)
+    { normal: [0, 1, 0], u: [1, 0, 0], v: [0, 0, -1], w: w, h: h, d: d, dims: [width, depth] }, // Top (+Y)
+    { normal: [0, -1, 0], u: [1, 0, 0], v: [0, 0, 1], w: w, h: -h, d: d, dims: [width, depth] }, // Bottom (-Y)
+  ];
+
+  // Correct logic:
+  // Center of face is normal * (dimension/2)
+  // U and V are tangent vectors
+  
+  const facesDef = [
+    { normal: [0, 0, 1], u: [1, 0, 0], v: [0, 1, 0], sizeU: width, sizeV: height, offset: [0, 0, d] }, // Front
+    { normal: [0, 0, -1], u: [-1, 0, 0], v: [0, 1, 0], sizeU: width, sizeV: height, offset: [0, 0, -d] }, // Back
+    { normal: [1, 0, 0], u: [0, 0, -1], v: [0, 1, 0], sizeU: depth, sizeV: height, offset: [w, 0, 0] }, // Right
+    { normal: [-1, 0, 0], u: [0, 0, 1], v: [0, 1, 0], sizeU: depth, sizeV: height, offset: [-w, 0, 0] }, // Left
+    { normal: [0, 1, 0], u: [1, 0, 0], v: [0, 0, -1], sizeU: width, sizeV: depth, offset: [0, h, 0] }, // Top
+    { normal: [0, -1, 0], u: [1, 0, 0], v: [0, 0, 1], sizeU: width, sizeV: depth, offset: [0, -h, 0] }, // Bottom
+  ];
+
+  for (const face of facesDef) {
+    const faceStartV = vCount;
+    
+    // Vertices
+    for (let iy = 0; iy <= seg; iy++) {
+      const yProgress = iy / seg; // 0..1
+      const yPos = yProgress * face.sizeV - face.sizeV / 2;
+      
+      for (let ix = 0; ix <= seg; ix++) {
+        const xProgress = ix / seg; // 0..1
+        const xPos = xProgress * face.sizeU - face.sizeU / 2;
+        
+        // Position = offset + u*xPos + v*yPos
+        vertices[vCursor++] = face.offset[0] + face.u[0] * xPos + face.v[0] * yPos;
+        vertices[vCursor++] = face.offset[1] + face.u[1] * xPos + face.v[1] * yPos;
+        vertices[vCursor++] = face.offset[2] + face.u[2] * xPos + face.v[2] * yPos;
+        
+        // Normal
+        normals[nCursor++] = face.normal[0];
+        normals[nCursor++] = face.normal[1];
+        normals[nCursor++] = face.normal[2];
+        
+        // UV
+        uvs[uCursor++] = xProgress;
+        uvs[uCursor++] = 1.0 - yProgress; // Flip V to match standard UV
+        
+        vCount++;
+      }
+    }
+    
+    // Indices
+    for (let iy = 0; iy < seg; iy++) {
+      for (let ix = 0; ix < seg; ix++) {
+        const row = seg + 1;
+        const a = faceStartV + iy * row + ix;
+        const b = faceStartV + (iy + 1) * row + ix;
+        const c = faceStartV + (iy + 1) * row + (ix + 1);
+        const d = faceStartV + iy * row + (ix + 1);
+        
+        indices[iCursor++] = a;
+        indices[iCursor++] = b;
+        indices[iCursor++] = d;
+        
+        indices[iCursor++] = b;
+        indices[iCursor++] = c;
+        indices[iCursor++] = d;
+      }
+    }
+  }
+
+  return { vertices, normals, uvs, indices };
+}
+
+/**
  * Generates a plane mesh.
  * @param width Width of the plane (X axis)
  * @param depth Depth of the plane (Z axis)
@@ -403,6 +529,78 @@ export function generateCapsuleMesh(
       const c = offset + (i + 1) * stride + (j + 1);
       const d = offset + i * stride + (j + 1);
       
+      indices.push(a, b, d);
+      indices.push(b, c, d);
+    }
+  }
+
+  return {
+    vertices: new Float32Array(vertices),
+    normals: new Float32Array(normals),
+    uvs: new Float32Array(uvs),
+    indices: new Uint16Array(indices),
+  };
+}
+
+/**
+ * Generates a torus mesh.
+ * @param radius Radius of the torus (distance from center to tube center)
+ * @param tube Radius of the tube
+ * @param radialSegments Segments around the tube cross-section
+ * @param tubularSegments Segments around the torus ring
+ * @param arc Central angle (defaults to Math.PI * 2)
+ */
+export function generateTorusMesh(
+  radius = 1,
+  tube = 0.4,
+  radialSegments = 8,
+  tubularSegments = 6,
+  arc = Math.PI * 2
+): CustomMeshData {
+  radialSegments = Math.floor(radialSegments);
+  tubularSegments = Math.floor(tubularSegments);
+
+  const vertices: number[] = [];
+  const normals: number[] = [];
+  const uvs: number[] = [];
+  const indices: number[] = [];
+
+  for (let j = 0; j <= radialSegments; j++) {
+    for (let i = 0; i <= tubularSegments; i++) {
+      const u = (i / tubularSegments) * arc;
+      const v = (j / radialSegments) * Math.PI * 2;
+
+      const cx = radius * Math.cos(u);
+      const cy = radius * Math.sin(u);
+
+      const x = (radius + tube * Math.cos(v)) * Math.cos(u);
+      const y = (radius + tube * Math.cos(v)) * Math.sin(u);
+      const z = tube * Math.sin(v);
+
+      vertices.push(x, y, z);
+
+      const nx = x - cx;
+      const ny = y - cy;
+      const nz = z;
+      const len = Math.sqrt(nx * nx + ny * ny + nz * nz);
+      
+      if (len > 0.0001) {
+        normals.push(nx / len, ny / len, nz / len);
+      } else {
+        normals.push(0, 0, 1);
+      }
+
+      uvs.push(i / tubularSegments, j / radialSegments);
+    }
+  }
+
+  for (let j = 1; j <= radialSegments; j++) {
+    for (let i = 1; i <= tubularSegments; i++) {
+      const a = (tubularSegments + 1) * j + i - 1;
+      const b = (tubularSegments + 1) * (j - 1) + i - 1;
+      const c = (tubularSegments + 1) * (j - 1) + i;
+      const d = (tubularSegments + 1) * j + i;
+
       indices.push(a, b, d);
       indices.push(b, c, d);
     }

@@ -35,6 +35,8 @@ describe('MultiplayerGameplayManager', () => {
         onUserLeftCallbacks.push(callback);
         return () => {};
       }),
+      onStateChange: vi.fn(() => () => {}),
+      onError: vi.fn(() => () => {}),
       onPlayerUpdate: vi.fn((callback) => {
         // Store callback if needed for testing
         return () => {};

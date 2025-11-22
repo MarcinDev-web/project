@@ -121,6 +121,34 @@
   cursor: se-resize;
 }
 
+.ui-editor-resize-handle.n {
+  top: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  cursor: n-resize;
+}
+
+.ui-editor-resize-handle.s {
+  bottom: -4px;
+  left: 50%;
+  transform: translateX(-50%);
+  cursor: s-resize;
+}
+
+.ui-editor-resize-handle.w {
+  left: -4px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: w-resize;
+}
+
+.ui-editor-resize-handle.e {
+  right: -4px;
+  top: 50%;
+  transform: translateY(-50%);
+  cursor: e-resize;
+}
+
 .ui-editor-component-list {
   width: 200px;
   border-right: 1px solid rgba(255, 255, 255, 0.1);

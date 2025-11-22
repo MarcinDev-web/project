@@ -1,21 +1,21 @@
 /**
  * PhysicsSystem - Main physics simulation system
  * Handles gravity, forces, velocity integration, and collision resolution
+ * Powered by Rust (wasm-physics)
  */
 
 import type { Scene } from '../core/Scene.js';
 import type { Entity } from '../core/Entity.js';
-import { PhysicsComponent, RigidbodyType } from '../components/PhysicsComponent.js';
-import { JointComponent } from '../components/JointComponent.js';
+import { PhysicsComponent, RigidbodyType, ColliderShape } from '../components/PhysicsComponent.js';
 import type { Vec3 } from '@engine/core/math';
-import { CollisionDetection, type ColliderTransform } from './CollisionDetection.js';
-import { quatMultiplyOut, quatFromAxisAngleOut, quatNormalizeOut } from '@engine/core/math';
-import { ObjectPool } from '@engine/core/utils';
-import { Octree, type OctreeConfig, DEFAULT_OCTREE_CONFIG } from './Octree.js';
-import { BoundingVolume } from './BoundingVolume.js';
-import type { Joint } from './Joint.js';
-import { init as initWasm, type CollisionWorld, type WasmCollision } from '@engine/wasm-collision';
-// Avoid static import from '@engine/script' to prevent world↔script circular dependency during build
+import { init as initWasm, PhysicsWorld, BodyType } from '@engine/wasm-physics';
+import { DEFAULT_OCTREE_CONFIG, type OctreeConfig } from './Octree.js';
+import { 
+    type Joint, 
+    JointType,
+    type AnyJointConfig 
+} from './Joint.js';
+import type { RaycastHit, RaycastOptions } from './PhysicsRaycast.js';
 
 /**
  * Collision event data
@@ -103,97 +103,39 @@ export class PhysicsSystem {
   /** Trigger exit event listeners */
   private triggerExitListeners: Array<(event: TriggerEvent) => void> = [];
 
-  /** Track previous frame's overlapping triggers */
-  private previousTriggers: Set<string> = new Set();
-  /** Scratch set reused each frame for current triggers */
-  private currentTriggersScratch: Set<string> = new Set();
-
-  /** Octree for spatial partitioning (broad phase) */
-  private octree: Octree | null = null;
-
-  /** Flag to rebuild octree next frame */
-  private needsOctreeRebuild = false;
-
-  /** Scratch arrays reused across frames to avoid allocations */
-  private pairsScratch: Array<[Entity, Entity]> = [];
-  private collisionsScratch: CollisionEvent[] = [];
-
-  /** Scratch transforms reused for collision checks to avoid object churn */
-  private readonly transformAPosition: Vec3 = [0, 0, 0];
-  private readonly transformARotation: [number, number, number, number] = [0, 0, 0, 1];
-  private readonly transformAScale: Vec3 = [1, 1, 1];
-  private readonly transformBPosition: Vec3 = [0, 0, 0];
-  private readonly transformBRotation: [number, number, number, number] = [0, 0, 0, 1];
-  private readonly transformBScale: Vec3 = [1, 1, 1];
-
-  private readonly colliderTransformA: ColliderTransform = {
-    position: this.transformAPosition,
-    rotation: this.transformARotation,
-    scale: this.transformAScale,
-  };
-  private readonly colliderTransformB: ColliderTransform = {
-    position: this.transformBPosition,
-    rotation: this.transformBRotation,
-    scale: this.transformBScale,
-  };
-
-  /** Scratch temporaries for quaternion/axis math */
-  private readonly tmpAxis: Vec3 = [0, 0, 0];
-  private readonly tmpQuatA: [number, number, number, number] = [0, 0, 0, 1];
-  private readonly tmpQuatB: [number, number, number, number] = [0, 0, 0, 1];
-
-  /** Zero-Copy WASM Collision World */
-  private collisionWorld: CollisionWorld | null = null;
-  private wasmModule: WasmCollision | null = null;
-
-  /** Pool of CollisionEvent wrappers to reduce per-frame allocations */
-  private readonly collisionEventPool = new ObjectPool<CollisionEvent>(
-    () => ({
-      entityA: null as unknown as Entity,
-      entityB: null as unknown as Entity,
-      physicsA: null as unknown as PhysicsComponent,
-      physicsB: null as unknown as PhysicsComponent,
-      normal: [0, 0, 0],
-      depth: 0,
-      contactPoint: [0, 0, 0],
-    }),
-    (e: { depth: number }) => {
-      e.depth = 0;
-    },
-    2048
-  );
+  /** WASM World */
+  private world: PhysicsWorld | null = null;
+  private initialized = false;
+  
+  private entityToBodyId = new Map<string, number>();
+  private bodyIdToEntity = new Map<number, Entity>();
+  private nextBodyId = 1;
+  private nextJointId = 1;
+  private joints = new Map<number, Joint>();
 
   constructor(scene: Scene, config: Partial<PhysicsConfig> = {}) {
     this.scene = scene;
     this.config = { ...DEFAULT_PHYSICS_CONFIG, ...config };
 
-    // Initialize octree if enabled
-    if (this.config.useSpatialPartitioning && this.config.worldBounds) {
-      this.octree = new Octree(
-        this.config.worldBounds,
-        this.config.octreeConfig ?? DEFAULT_OCTREE_CONFIG
-      );
-    }
-
-    // Initialize WASM if enabled
-    if (this.config.useWasm) {
-      this.initializeWasm().catch((err) => {
-        console.warn('Failed to initialize WASM collision module, falling back to JS', err);
-      });
-    }
+    this.init().catch((err) => {
+      console.error('Failed to initialize WASM physics', err);
+    });
   }
 
-  private async initializeWasm() {
-    try {
-      const wasm = await initWasm();
-      this.wasmModule = wasm;
-      CollisionDetection.init(wasm);
-
-      if (wasm.CollisionWorld) {
-        this.collisionWorld = new wasm.CollisionWorld();
+  private async init() {
+    if (this.config.useWasm) {
+      try {
+        await initWasm();
+        this.world = new PhysicsWorld(
+          this.config.gravity[0],
+          this.config.gravity[1],
+          this.config.gravity[2]
+        );
+        this.initialized = true;
+        console.log('WASM Physics initialized');
+      } catch (e) {
+        console.warn('WASM init failed, falling back?', e);
       }
-    } catch (error) {
-      console.warn('WASM collision init failed:', error);
     }
   }
 
@@ -202,83 +144,198 @@ export class PhysicsSystem {
    * Uses fixed timestep with accumulator for stability
    */
   update(deltaTime: number): void {
+    if (!this.initialized || !this.world) return;
+
     // Clamp deltaTime to prevent spiral of death
     const clampedDelta = Math.min(deltaTime, this.config.fixedTimestep * this.config.maxSubsteps);
     this.accumulator += clampedDelta;
 
+    // Sync entities to WASM before stepping
+    this.syncEntitiesToWasm();
+
     let steps = 0;
     while (this.accumulator >= this.config.fixedTimestep && steps < this.config.maxSubsteps) {
-      this.fixedUpdate(this.config.fixedTimestep);
+      this.world.step(this.config.fixedTimestep);
       this.accumulator -= this.config.fixedTimestep;
       steps++;
     }
+
+    // Sync back to entities
+    this.syncWasmToEntities();
+    
+    // Process Events
+    this.processEvents();
+
+    this.runScriptFixedUpdate(this.config.fixedTimestep * steps);
   }
 
-  /**
-   * Fixed timestep physics update
-   */
-  private fixedUpdate(dt: number): void {
-    const entities = this.getPhysicsEntities();
+  private syncEntitiesToWasm() {
+    if (!this.world) return;
 
-    // Step 1: Apply forces and integrate velocities
+    const entities = this.scene.queryEntities(PhysicsComponent);
+    const activeIds = new Set<number>();
+
     for (const entity of entities) {
       const physics = entity.getComponent(PhysicsComponent);
-      if (!physics || physics.rigidbodyType !== RigidbodyType.Dynamic || !physics.isAwake()) {
-        continue;
+      if (!physics) continue;
+
+      let bodyId = this.entityToBodyId.get(entity.id);
+
+      if (bodyId === undefined) {
+        // Create new body
+        bodyId = this.nextBodyId++;
+        this.entityToBodyId.set(entity.id, bodyId);
+        this.bodyIdToEntity.set(bodyId, entity);
+
+        let type = BodyType.Dynamic;
+        if (physics.rigidbodyType === RigidbodyType.Static) type = BodyType.Static;
+        if (physics.rigidbodyType === RigidbodyType.Kinematic) type = BodyType.Kinematic;
+
+        const t = entity.transform;
+        this.world.add_body(
+          bodyId,
+          type,
+          t.position[0], t.position[1], t.position[2],
+          t.rotation[0], t.rotation[1], t.rotation[2], t.rotation[3],
+          physics.mass,
+          physics.linearDrag,
+          physics.angularDrag,
+          physics.freezePositionX, physics.freezePositionY, physics.freezePositionZ
+        );
+
+        // Add Colliders
+        for (const col of physics.colliders) {
+          let shape = 0; // Box
+          let sx = 1, sy = 1, sz = 1;
+          
+          if (col.shape === ColliderShape.Box) {
+            shape = 0;
+            sx = col.size[0]; sy = col.size[1]; sz = col.size[2];
+          } else if (col.shape === ColliderShape.Sphere) {
+            shape = 1;
+            sx = col.radius;
+          } else if (col.shape === ColliderShape.Capsule) {
+            shape = 2;
+            sx = col.radius;
+            sy = col.height;
+          }
+          
+          // Offset defaults to 0 if undefined
+          const ox = (col as any).offset?.[0] ?? col.center[0] ?? 0;
+          const oy = (col as any).offset?.[1] ?? col.center[1] ?? 0;
+          const oz = (col as any).offset?.[2] ?? col.center[2] ?? 0;
+
+          this.world.add_collider(
+            bodyId,
+            shape,
+            sx, sy, sz,
+            ox, oy, oz,
+            col.isTrigger,
+            physics.material.friction,
+            physics.material.restitution
+          );
+        }
+      } else {
+        // Update Kinematic or Teleported bodies
+        if (physics.rigidbodyType === RigidbodyType.Kinematic) {
+             const t = entity.transform;
+             this.world.set_kinematic_target(
+                 bodyId,
+                 t.position[0], t.position[1], t.position[2],
+                 t.rotation[0], t.rotation[1], t.rotation[2], t.rotation[3]
+             );
+        }
       }
-
-      this.integrateForces(physics, dt);
+      
+      activeIds.add(bodyId);
     }
 
-    // Step 2: Detect collisions
-    const collisions = this.detectCollisions(entities);
+    // Remove stale bodies
+    for (const [id, bodyId] of this.entityToBodyId.entries()) {
+        if (!activeIds.has(bodyId)) {
+            this.world.remove_body(bodyId);
+            this.entityToBodyId.delete(id);
+            this.bodyIdToEntity.delete(bodyId);
+        }
+    }
+  }
 
-    // Step 3: Resolve collisions and joints (multiple iterations for stability)
-    for (let i = 0; i < this.config.solverIterations; i++) {
-      // Resolve collisions
-      for (const collision of collisions) {
-        this.resolveCollision(collision);
+  private syncWasmToEntities() {
+    if (!this.world) return;
+    
+    const buffer = this.world.sync_states(); 
+    // [id, x, y, z, qx, qy, qz, qw, ...]
+    
+    for (let i = 0; i < buffer.length; i += 8) {
+        const id = buffer[i];
+        if (id === undefined) continue;
+
+        const entity = this.bodyIdToEntity.get(id);
+        if (entity) {
+            const t = entity.transform;
+            t.position[0] = buffer[i+1] || 0;
+            t.position[1] = buffer[i+2] || 0;
+            t.position[2] = buffer[i+3] || 0;
+            t.rotation[0] = buffer[i+4] || 0;
+            t.rotation[1] = buffer[i+5] || 0;
+            t.rotation[2] = buffer[i+6] || 0;
+            t.rotation[3] = buffer[i+7] || 0;
+            t.position = t.position; // Trigger update
+            t.rotation = t.rotation;
+        }
+    }
+  }
+  
+  private processEvents() {
+      if (!this.world) return;
+      const events = this.world.get_event_buffer(); 
+      // [id1, id2, type, nx, ny, nz, depth, px, py, pz, ...]
+      
+      for (let i = 0; i < events.length; i += 10) {
+          const id1 = events[i];
+          const id2 = events[i+1];
+          // const type = events[i+2];
+          const nx = events[i+3] || 0;
+          const ny = events[i+4] || 0;
+          const nz = events[i+5] || 0;
+          const depth = events[i+6] || 0;
+          const px = events[i+7] || 0;
+          const py = events[i+8] || 0;
+          const pz = events[i+9] || 0;
+          
+          if (id1 === undefined || id2 === undefined) continue;
+
+          const entA = this.bodyIdToEntity.get(id1);
+          const entB = this.bodyIdToEntity.get(id2);
+          
+          if (entA && entB) {
+              const physA = entA.getComponent(PhysicsComponent);
+              const physB = entB.getComponent(PhysicsComponent);
+              if (physA && physB) {
+                  const evt: CollisionEvent = {
+                      entityA: entA,
+                      entityB: entB,
+                      physicsA: physA,
+                      physicsB: physB,
+                      normal: [nx, ny, nz],
+                      depth: depth,
+                      contactPoint: [px, py, pz]
+                  };
+                  this.fireCollisionEvent(evt);
+              }
+          }
       }
+  }
 
-      // Solve joint constraints
-      this.solveJoints(dt);
-    }
-
-    // Step 4: Integrate velocities to positions
-    for (const entity of entities) {
-      const physics = entity.getComponent(PhysicsComponent);
-      if (!physics || !physics.isAwake()) {
-        continue;
+  private fireCollisionEvent(event: CollisionEvent) {
+      for (const listener of this.collisionListeners) {
+          listener(event);
       }
-
-      if (physics.rigidbodyType === RigidbodyType.Dynamic) {
-        this.integrateVelocities(entity, physics, dt);
-      }
-
-      // Update sleep state
-      physics.updateSleepState(dt);
-    }
-
-    // Step 5: Fire collision events
-    for (const collision of collisions) {
-      this.fireCollisionEvent(collision);
-    }
-    // Release pooled events
-    for (let i = 0; i < collisions.length; i++) {
-      this.collisionEventPool.release(collisions[i]!);
-    }
-
-    // Step 6: Handle trigger events
-    this.handleTriggers(entities);
-
-    this.runScriptFixedUpdate(dt);
   }
 
   private runScriptFixedUpdate(dt: number): void {
-    // Query entities for any component that exposes getInstances() (ScriptComponent)
     const allEntities = this.scene.getAllEntities();
     for (const entity of allEntities) {
-      // Scan present component constructors on the entity
       const componentTypes = entity.getComponentTypes();
       for (const ctor of componentTypes) {
         // eslint-disable-next-line @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
@@ -293,605 +350,10 @@ export class PhysicsSystem {
             // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access
             behavior.onFixedUpdate(dt);
           } catch {
-            // ignore behavior errors to keep physics running
+            // ignore behavior errors
           }
         }
       }
-    }
-  }
-
-  /**
-   * Gets all entities with physics components
-   */
-  private getPhysicsEntities(): Entity[] {
-    return this.scene.queryEntities(PhysicsComponent);
-  }
-
-  /**
-   * Integrates forces to update velocities (first integration step)
-   */
-  private integrateForces(physics: PhysicsComponent, dt: number): void {
-    const invMass = physics.getInverseMass();
-    if (invMass === 0) return;
-
-    // Apply gravity
-    if (physics.useGravity) {
-      physics.velocity[0] += this.config.gravity[0] * dt;
-      physics.velocity[1] += this.config.gravity[1] * dt;
-      physics.velocity[2] += this.config.gravity[2] * dt;
-    }
-
-    // Apply accumulated forces (F = ma, so a = F/m = F * invMass)
-    const force = physics.consumeForce();
-    physics.velocity[0] += force[0] * invMass * dt;
-    physics.velocity[1] += force[1] * invMass * dt;
-    physics.velocity[2] += force[2] * invMass * dt;
-
-    // Apply linear drag (air resistance)
-    const dragFactor = Math.max(0, 1 - physics.linearDrag * dt);
-    physics.velocity[0] *= dragFactor;
-    physics.velocity[1] *= dragFactor;
-    physics.velocity[2] *= dragFactor;
-
-    // Apply accumulated torques to angular velocity using world inverse inertia tensor
-    const torque = physics.consumeTorque();
-    const IW = physics.getWorldInverseInertiaTensor();
-    // alpha = I_world^{-1} * torque
-    const ax = IW[0] * torque[0] + IW[3] * torque[1] + IW[6] * torque[2];
-    const ay = IW[1] * torque[0] + IW[4] * torque[1] + IW[7] * torque[2];
-    const az = IW[2] * torque[0] + IW[5] * torque[1] + IW[8] * torque[2];
-    physics.angularVelocity[0] += ax * dt;
-    physics.angularVelocity[1] += ay * dt;
-    physics.angularVelocity[2] += az * dt;
-
-    // Apply angular drag
-    const angularDragFactor = Math.max(0, 1 - physics.angularDrag * dt);
-    physics.angularVelocity[0] *= angularDragFactor;
-    physics.angularVelocity[1] *= angularDragFactor;
-    physics.angularVelocity[2] *= angularDragFactor;
-  }
-
-  /**
-   * Integrates velocities to update positions and rotations (second integration step)
-   */
-  private integrateVelocities(entity: Entity, physics: PhysicsComponent, dt: number): void {
-    const transform = entity.transform;
-    // Update position (use setter to mark transform dirty)
-    const pos = transform.position;
-    if (!physics.freezePositionX) pos[0] += physics.velocity[0] * dt;
-    if (!physics.freezePositionY) pos[1] += physics.velocity[1] * dt;
-    if (!physics.freezePositionZ) pos[2] += physics.velocity[2] * dt;
-    transform.position = pos;
-
-    // Update rotation from angular velocity
-    // Convert angular velocity to axis-angle
-    const angularSpeed = Math.sqrt(
-      physics.angularVelocity[0] ** 2 +
-        physics.angularVelocity[1] ** 2 +
-        physics.angularVelocity[2] ** 2
-    );
-
-    if (angularSpeed > 0.0001) {
-      const axis = this.tmpAxis;
-      axis[0] = physics.angularVelocity[0] / angularSpeed;
-      axis[1] = physics.angularVelocity[1] / angularSpeed;
-      axis[2] = physics.angularVelocity[2] / angularSpeed;
-      const angle = angularSpeed * dt;
-
-      // Apply constraints
-      if (physics.freezeRotationX) axis[0] = 0;
-      if (physics.freezeRotationY) axis[1] = 0;
-      if (physics.freezeRotationZ) axis[2] = 0;
-
-      const deltaQuat = this.tmpQuatA;
-      quatFromAxisAngleOut(deltaQuat, axis, angle);
-      const multiplied = this.tmpQuatB;
-      quatMultiplyOut(multiplied, transform.rotation, deltaQuat);
-      quatNormalizeOut(multiplied, multiplied);
-      transform.rotation = multiplied;
-    }
-  }
-
-  /**
-   * Detects all collisions between physics entities
-   */
-  private detectCollisions(entities: Entity[]): CollisionEvent[] {
-    this.collisionsScratch.length = 0;
-
-    if (this.config.useWasm && this.collisionWorld && this.wasmModule) {
-      // Zero-Copy WASM Batch Check
-      const dynamicEntities: Entity[] = [];
-      for (const e of entities) {
-        const p = e.getComponent(PhysicsComponent);
-        if (p && p.colliders.length > 0) {
-          dynamicEntities.push(e);
-        }
-      }
-
-      if (dynamicEntities.length > 1) {
-        const count = dynamicEntities.length;
-        
-        // Resize buffers if needed
-        this.collisionWorld.resize(count);
-
-        // Get views into WASM memory
-        const memory = this.wasmModule.memory;
-        const posPtr = this.collisionWorld.get_positions_ptr();
-        const rotPtr = this.collisionWorld.get_rotations_ptr();
-        const sclPtr = this.collisionWorld.get_scales_ptr();
-
-        const positions = new Float32Array(memory.buffer, posPtr, count * 3);
-        const rotations = new Float32Array(memory.buffer, rotPtr, count * 4);
-        const scales = new Float32Array(memory.buffer, sclPtr, count * 3);
-
-        // Write directly to WASM memory
-        for (let i = 0; i < count; i++) {
-          const e = dynamicEntities[i]!;
-          const t = e.transform;
-          
-          // Position
-          positions[i * 3] = t.position[0];
-          positions[i * 3 + 1] = t.position[1];
-          positions[i * 3 + 2] = t.position[2];
-          
-          // Rotation
-          rotations[i * 4] = t.rotation[0];
-          rotations[i * 4 + 1] = t.rotation[1];
-          rotations[i * 4 + 2] = t.rotation[2];
-          rotations[i * 4 + 3] = t.rotation[3];
-          
-          // Scale
-          scales[i * 3] = t.scale[0];
-          scales[i * 3 + 1] = t.scale[1];
-          scales[i * 3 + 2] = t.scale[2];
-        }
-
-        // Run collision check inside WASM
-        const collidingPairsIndices = this.collisionWorld.check_collisions();
-
-        // Process pairs
-        if (collidingPairsIndices.length > 0) {
-          for (let k = 0; k < collidingPairsIndices.length; k += 2) {
-            const idxA = collidingPairsIndices[k];
-            const idxB = collidingPairsIndices[k+1];
-            if (idxA === undefined || idxB === undefined) continue;
-            
-            const entityA = dynamicEntities[idxA];
-            const entityB = dynamicEntities[idxB];
-            if (!entityA || !entityB) continue;
-
-            this.checkPair(entityA, entityB);
-          }
-          return this.collisionsScratch;
-        }
-      }
-    }
-
-    // Fallback to Octree or Brute Force if WASM disabled or failed
-    if (this.octree) {
-      this.updateOctree(entities);
-    }
-
-    // Broad phase: get potential collision pairs
-    this.pairsScratch.length = 0;
-    if (this.octree) {
-      const pairsFromTree = this.octree.queryPairs();
-      for (let i = 0; i < pairsFromTree.length; i++) {
-        const p = pairsFromTree[i]!;
-        this.pairsScratch.push(p);
-      }
-    } else {
-      this.getBroadPhasePairsBruteForceInto(entities, this.pairsScratch);
-    }
-
-    // Narrow phase: check each pair for actual collision
-    for (let k = 0; k < this.pairsScratch.length; k++) {
-      const pair = this.pairsScratch[k]!;
-      this.checkPair(pair[0], pair[1]);
-    }
-
-    return this.collisionsScratch;
-  }
-
-  private checkPair(entityA: Entity, entityB: Entity) {
-      const physicsA = entityA.getComponent(PhysicsComponent);
-      const physicsB = entityB.getComponent(PhysicsComponent);
-
-      if (!physicsA || !physicsB) return;
-      if (physicsA.colliders.length === 0 || physicsB.colliders.length === 0) return;
-
-      // Skip if both are static or kinematic (they don't interact)
-      if (
-        physicsA.rigidbodyType !== RigidbodyType.Dynamic &&
-        physicsB.rigidbodyType !== RigidbodyType.Dynamic
-      ) {
-        return;
-      }
-
-      // Check each collider pair
-      for (const colliderA of physicsA.colliders) {
-        for (const colliderB of physicsB.colliders) {
-          // Fill scratch transforms (avoid per-pair object/array allocations)
-          entityA.transform.getWorldPositionInto(this.transformAPosition);
-          entityA.transform.getRotationInto(this.transformARotation);
-          entityA.transform.getScaleInto(this.transformAScale);
-          entityB.transform.getWorldPositionInto(this.transformBPosition);
-          entityB.transform.getRotationInto(this.transformBRotation);
-          entityB.transform.getScaleInto(this.transformBScale);
-
-          const result = CollisionDetection.detectCollision(
-            colliderA,
-            this.colliderTransformA,
-            colliderB,
-            this.colliderTransformB
-          );
-
-          if (result.hasCollision && result.contacts.length > 0) {
-            const contact = result.contacts[0]!;
-
-            // Skip if either is a trigger (triggers are handled separately)
-            if (colliderA.isTrigger || colliderB.isTrigger) {
-              continue;
-            }
-
-            const evt = this.collisionEventPool.acquire();
-            evt.entityA = entityA;
-            evt.entityB = entityB;
-            evt.physicsA = physicsA;
-            evt.physicsB = physicsB;
-            evt.normal = contact.normal;
-            evt.depth = contact.depth;
-            evt.contactPoint = contact.position;
-            this.collisionsScratch.push(evt);
-          }
-        }
-      }
-  }
-
-  private getBroadPhasePairsBruteForceInto(entities: Entity[], out: Array<[Entity, Entity]>): void {
-    for (let i = 0; i < entities.length; i++) {
-      const entityA = entities[i];
-      if (!entityA) continue;
-      for (let j = i + 1; j < entities.length; j++) {
-        const entityB = entities[j];
-        if (!entityB) continue;
-        out.push([entityA, entityB]);
-      }
-    }
-  }
-
-  /**
-   * Updates the octree with current entity positions
-   */
-  private updateOctree(entities: Entity[]): void {
-    if (!this.octree) return;
-
-    // Rebuild octree periodically or when flagged
-    if (this.needsOctreeRebuild) {
-      this.octree.clear();
-      this.needsOctreeRebuild = false;
-    }
-
-    // Update or insert entities
-    for (const entity of entities) {
-      const physics = entity.getComponent(PhysicsComponent);
-      if (!physics || physics.colliders.length === 0) continue;
-
-      const aabb = BoundingVolume.fromEntity(entity, physics);
-      this.octree.update(entity, aabb);
-    }
-  }
-
-  /**
-   * Forces a rebuild of the octree next frame
-   */
-  rebuildOctree(): void {
-    this.needsOctreeRebuild = true;
-  }
-
-  /**
-   * Resolves a collision using impulse-based method
-   */
-  private resolveCollision(collision: CollisionEvent): void {
-    const { entityA, entityB, physicsA, physicsB, normal, depth } = collision;
-
-    // Get inverse masses
-    const invMassA = physicsA.getInverseMass();
-    const invMassB = physicsB.getInverseMass();
-    const totalInvMass = invMassA + invMassB;
-
-    if (totalInvMass === 0) return; // Both are static/kinematic
-
-    // Position correction (prevent sinking)
-    const correctionPercent = 1.05; // Slightly overshoot to ensure separation in next frame
-    const slop = 0.0; // No allowance to ensure separation in tests
-    const correctionMagnitude = (Math.max(depth - slop, 0) / totalInvMass) * correctionPercent;
-
-    const correctionA = correctionMagnitude * invMassA;
-    const correctionB = correctionMagnitude * invMassB;
-
-    if (physicsA.rigidbodyType === RigidbodyType.Dynamic) {
-      const posA = entityA.transform.position;
-      if (!physicsA.freezePositionX) posA[0] -= normal[0] * correctionA;
-      if (!physicsA.freezePositionY) posA[1] -= normal[1] * correctionA;
-      if (!physicsA.freezePositionZ) posA[2] -= normal[2] * correctionA;
-      entityA.transform.position = posA;
-    }
-
-    if (physicsB.rigidbodyType === RigidbodyType.Dynamic) {
-      const posB = entityB.transform.position;
-      if (!physicsB.freezePositionX) posB[0] += normal[0] * correctionB;
-      if (!physicsB.freezePositionY) posB[1] += normal[1] * correctionB;
-      if (!physicsB.freezePositionZ) posB[2] += normal[2] * correctionB;
-      entityB.transform.position = posB;
-    }
-
-    // Velocity resolution (impulse-based)
-    // Calculate relative velocity
-    const relVel: Vec3 = [
-      physicsB.velocity[0] - physicsA.velocity[0],
-      physicsB.velocity[1] - physicsA.velocity[1],
-      physicsB.velocity[2] - physicsA.velocity[2],
-    ];
-
-    // Relative velocity along normal
-    const velAlongNormal = relVel[0] * normal[0] + relVel[1] * normal[1] + relVel[2] * normal[2];
-
-    // Don't resolve if velocities are separating
-    if (velAlongNormal > 0) return;
-
-    // Calculate restitution (bounciness) - use minimum of both materials
-    const restitution = Math.min(physicsA.material.restitution, physicsB.material.restitution);
-
-    // Calculate impulse magnitude
-    const impulseMagnitude = (-(1 + restitution) * velAlongNormal) / totalInvMass;
-
-    // Apply impulse
-    const impulse: Vec3 = [
-      normal[0] * impulseMagnitude,
-      normal[1] * impulseMagnitude,
-      normal[2] * impulseMagnitude,
-    ];
-
-    if (physicsA.rigidbodyType === RigidbodyType.Dynamic) {
-      physicsA.velocity[0] -= impulse[0] * invMassA;
-      physicsA.velocity[1] -= impulse[1] * invMassA;
-      physicsA.velocity[2] -= impulse[2] * invMassA;
-      physicsA.wakeUp();
-    }
-
-    if (physicsB.rigidbodyType === RigidbodyType.Dynamic) {
-      physicsB.velocity[0] += impulse[0] * invMassB;
-      physicsB.velocity[1] += impulse[1] * invMassB;
-      physicsB.velocity[2] += impulse[2] * invMassB;
-      physicsB.wakeUp();
-    }
-
-    // Apply friction
-    this.applyFriction(collision, totalInvMass, invMassA, invMassB);
-  }
-
-  /**
-   * Applies friction to collision
-   */
-  private applyFriction(
-    collision: CollisionEvent,
-    totalInvMass: number,
-    invMassA: number,
-    invMassB: number
-  ): void {
-    const { physicsA, physicsB, normal } = collision;
-
-    // Calculate relative velocity
-    const relVel: Vec3 = [
-      physicsB.velocity[0] - physicsA.velocity[0],
-      physicsB.velocity[1] - physicsA.velocity[1],
-      physicsB.velocity[2] - physicsA.velocity[2],
-    ];
-
-    // Remove normal component to get tangential velocity
-    const velAlongNormal = relVel[0] * normal[0] + relVel[1] * normal[1] + relVel[2] * normal[2];
-    const tangent: Vec3 = [
-      relVel[0] - normal[0] * velAlongNormal,
-      relVel[1] - normal[1] * velAlongNormal,
-      relVel[2] - normal[2] * velAlongNormal,
-    ];
-
-    const tangentLength = Math.sqrt(tangent[0] ** 2 + tangent[1] ** 2 + tangent[2] ** 2);
-    if (tangentLength < 0.0001) return;
-
-    // Normalize tangent
-    tangent[0] /= tangentLength;
-    tangent[1] /= tangentLength;
-    tangent[2] /= tangentLength;
-
-    // Calculate friction coefficient (average of both materials)
-    const friction = (physicsA.material.friction + physicsB.material.friction) / 2;
-
-    // Calculate friction impulse
-    const frictionMagnitude = (-tangentLength / totalInvMass) * friction;
-    const frictionImpulse: Vec3 = [
-      tangent[0] * frictionMagnitude,
-      tangent[1] * frictionMagnitude,
-      tangent[2] * frictionMagnitude,
-    ];
-
-    // Apply friction impulse
-    if (physicsA.rigidbodyType === RigidbodyType.Dynamic) {
-      physicsA.velocity[0] -= frictionImpulse[0] * invMassA;
-      physicsA.velocity[1] -= frictionImpulse[1] * invMassA;
-      physicsA.velocity[2] -= frictionImpulse[2] * invMassA;
-    }
-
-    if (physicsB.rigidbodyType === RigidbodyType.Dynamic) {
-      physicsB.velocity[0] += frictionImpulse[0] * invMassB;
-      physicsB.velocity[1] += frictionImpulse[1] * invMassB;
-      physicsB.velocity[2] += frictionImpulse[2] * invMassB;
-    }
-  }
-
-  /**
-   * Handles trigger collider enter/exit events
-   */
-  private handleTriggers(entities: Entity[]): void {
-    const currentTriggers = this.currentTriggersScratch;
-    currentTriggers.clear();
-
-    // Check all pairs for trigger overlaps
-    for (let i = 0; i < entities.length; i++) {
-      const entityA = entities[i];
-      if (!entityA) continue;
-      const physicsA = entityA.getComponent(PhysicsComponent);
-      if (!physicsA) continue;
-
-      for (let j = i + 1; j < entities.length; j++) {
-        const entityB = entities[j];
-        const physicsB = entityB?.getComponent(PhysicsComponent);
-        if (!entityB || !physicsB) continue;
-
-        // Check if either has a trigger collider
-        const hasTriggersA = physicsA.colliders.some((c) => c.isTrigger);
-        const hasTriggersB = physicsB.colliders.some((c) => c.isTrigger);
-
-        if (!hasTriggersA && !hasTriggersB) continue;
-
-        // Check overlap
-        let isOverlapping = false;
-        for (const colliderA of physicsA.colliders) {
-          for (const colliderB of physicsB.colliders) {
-            const transformA: ColliderTransform = {
-              position: entityA.transform.getWorldPosition(),
-              rotation: entityA.transform.rotation,
-              scale: entityA.transform.scale,
-            };
-            const transformB: ColliderTransform = {
-              position: entityB.transform.getWorldPosition(),
-              rotation: entityB.transform.rotation,
-              scale: entityB.transform.scale,
-            };
-
-            const result = CollisionDetection.detectCollision(
-              colliderA,
-              transformA,
-              colliderB,
-              transformB
-            );
-
-            if (result.hasCollision && (colliderA.isTrigger || colliderB.isTrigger)) {
-              isOverlapping = true;
-              break;
-            }
-          }
-          if (isOverlapping) break;
-        }
-
-        if (isOverlapping) {
-          const pairKey = `${entityA.id}-${entityB.id}`;
-          currentTriggers.add(pairKey);
-
-          // Fire enter event if new overlap
-          if (!this.previousTriggers.has(pairKey)) {
-            if (hasTriggersA) {
-              this.fireTriggerEnterEvent({ triggerEntity: entityA, otherEntity: entityB });
-            }
-            if (hasTriggersB) {
-              this.fireTriggerEnterEvent({ triggerEntity: entityB, otherEntity: entityA });
-            }
-          }
-        }
-      }
-    }
-
-    // Fire exit events for triggers that are no longer overlapping
-    for (const pairKey of this.previousTriggers) {
-      if (!currentTriggers.has(pairKey)) {
-        const [idA, idB] = pairKey.split('-');
-        const entityA = this.scene.findEntityById(idA ?? '');
-        const entityB = this.scene.findEntityById(idB ?? '');
-
-        if (entityA && entityB) {
-          const physicsA = entityA.getComponent(PhysicsComponent);
-          const physicsB = entityB.getComponent(PhysicsComponent);
-
-          if (physicsA?.colliders.some((c) => c.isTrigger)) {
-            this.fireTriggerExitEvent({ triggerEntity: entityA, otherEntity: entityB });
-          }
-          if (physicsB?.colliders.some((c) => c.isTrigger)) {
-            this.fireTriggerExitEvent({ triggerEntity: entityB, otherEntity: entityA });
-          }
-        }
-      }
-    }
-
-    // Swap sets to reuse allocations next frame
-    const tmp = this.previousTriggers;
-    this.previousTriggers = currentTriggers;
-    this.currentTriggersScratch = tmp;
-  }
-
-  /**
-   * Solves all joint constraints
-   */
-  private solveJoints(dt: number): void {
-    // Get all entities with joint components
-    const jointEntities = this.scene.queryEntities(JointComponent);
-
-    for (const entity of jointEntities) {
-      const jointComp = entity.getComponent(JointComponent) as JointComponent;
-      if (!jointComp) continue;
-
-      // Solve each joint constraint
-      for (const joint of jointComp.getEnabledJoints()) {
-        joint.solve(dt);
-      }
-
-      // Clean up broken joints immediately
-      jointComp.removeBrokenJoints();
-    }
-  }
-
-  /**
-
-   * Gets all joints in the scene
-   */
-  getAllJoints(): Joint[] {
-    const joints: Joint[] = [];
-    const jointEntities = this.scene.queryEntities(JointComponent);
-
-    for (const entity of jointEntities) {
-      const jointComp = entity.getComponent(JointComponent) as JointComponent;
-      if (jointComp) {
-        joints.push(...jointComp.joints);
-      }
-    }
-
-    return joints;
-  }
-
-  /**
-   * Fires collision event to all listeners
-   */
-  private fireCollisionEvent(event: CollisionEvent): void {
-    for (const listener of this.collisionListeners) {
-      listener(event);
-    }
-  }
-
-  /**
-   * Fires trigger enter event to all listeners
-   */
-  private fireTriggerEnterEvent(event: TriggerEvent): void {
-    for (const listener of this.triggerEnterListeners) {
-      listener(event);
-    }
-  }
-
-  /**
-   * Fires trigger exit event to all listeners
-   */
-  private fireTriggerExitEvent(event: TriggerEvent): void {
-    for (const listener of this.triggerExitListeners) {
-      listener(event);
     }
   }
 
@@ -931,6 +393,7 @@ export class PhysicsSystem {
    */
   setGravity(gravity: Vec3): void {
     this.config.gravity = [...gravity] as Vec3;
+    // TODO: Sync with WASM if supported in runtime (or recreate world)
   }
 
   /**
@@ -957,28 +420,197 @@ export class PhysicsSystem {
   /**
    * Gets octree statistics (if spatial partitioning is enabled)
    */
-  getOctreeStats(): {
-    nodeCount: number;
-    entityCount: number;
-    maxDepth: number;
-    avgEntitiesPerLeaf: number;
-  } | null {
-    return this.octree ? this.octree.getStats() : null;
+  getOctreeStats() {
+    return null;
   }
 
   /**
    * Enables or disables spatial partitioning
    */
   setSpatialPartitioning(enabled: boolean): void {
-    if (enabled && !this.octree && this.config.worldBounds) {
-      this.octree = new Octree(
-        this.config.worldBounds,
-        this.config.octreeConfig ?? DEFAULT_OCTREE_CONFIG
-      );
-      this.config.useSpatialPartitioning = true;
-    } else if (!enabled && this.octree) {
-      this.octree = null;
-      this.config.useSpatialPartitioning = false;
+    this.config.useSpatialPartitioning = enabled;
+  }
+  
+  rebuildOctree() {}
+
+  getPhysicsEntities(): Entity[] {
+      return Array.from(this.bodyIdToEntity.values());
+  }
+
+  // Joint Methods
+  addJoint(config: AnyJointConfig): Joint {
+    const id = this.nextJointId++;
+    const joint: Joint = {
+        id: `joint_${id}`,
+        ...config
+    } as any; // Casting as id type might mismatch string vs number in types. Using simplified Joint type here.
+
+    // TODO: Map to WASM add_joint
+    this.joints.set(id, joint);
+    
+    if (this.world && this.initialized) {
+        const bodyA = this.entityToBodyId.get(config.entityA.id);
+        const bodyB = this.entityToBodyId.get(config.entityB.id);
+        
+        if (bodyA !== undefined && bodyB !== undefined) {
+            const anchorA = config.localAnchorA || [0,0,0];
+            const anchorB = config.localAnchorB || [0,0,0];
+            const axisA = (config as any).axisA || [0,1,0];
+            const axisB = (config as any).axisB || [0,1,0];
+
+            let type = 0; // Fixed
+            let dist = 0, minD = 0, maxD = 0, stiff = 0, damp = 0;
+
+            if (config.type === JointType.Distance) {
+                type = 1;
+                dist = (config as any).distance || 1.0;
+            } else if (config.type === JointType.Spring) {
+                type = 2;
+                dist = (config as any).restLength || 1.0;
+                stiff = (config as any).stiffness || 10.0;
+                damp = (config as any).damping || 0.5;
+            } else if (config.type === JointType.Hinge) {
+                type = 3;
+            } else if (config.type === JointType.BallSocket) {
+                type = 4;
+            } else if (config.type === JointType.Slider) {
+                type = 5;
+            }
+
+            this.world.add_joint(
+                type,
+                bodyA, bodyB,
+                anchorA[0], anchorA[1], anchorA[2],
+                anchorB[0], anchorB[1], anchorB[2],
+                dist, minD, maxD,
+                stiff, damp,
+                axisA[0], axisA[1], axisA[2],
+                axisB[0], axisB[1], axisB[2]
+            );
+        }
     }
+    
+    return joint;
+  }
+
+  removeJoint(_joint: Joint): void {
+      // TODO: Implement removal in WASM
+  }
+
+  getAllJoints(): Joint[] {
+      return Array.from(this.joints.values());
+  }
+
+  addFixedJoint(
+    entityA: Entity,
+    entityB: Entity,
+    localAnchorA: Vec3 = [0, 0, 0],
+    localAnchorB: Vec3 = [0, 0, 0],
+    options?: { breakable?: boolean; breakForce?: number }
+  ): Joint {
+      return this.addJoint({
+          type: JointType.Fixed,
+          entityA, entityB,
+          localAnchorA, localAnchorB,
+          ...options
+      });
+  }
+
+  addDistanceJoint(
+    entityA: Entity,
+    entityB: Entity,
+    distance: number,
+    localAnchorA: Vec3 = [0, 0, 0],
+    localAnchorB: Vec3 = [0, 0, 0],
+    options?: { minDistance?: number; maxDistance?: number; damping?: number }
+  ): Joint {
+    return this.addJoint({
+        type: JointType.Distance,
+        entityA, entityB,
+        distance,
+        localAnchorA, localAnchorB,
+        ...options
+    });
+  }
+
+  addSpringJoint(
+    entityA: Entity,
+    entityB: Entity,
+    restLength: number,
+    stiffness: number,
+    damping: number,
+    localAnchorA: Vec3 = [0, 0, 0],
+    localAnchorB: Vec3 = [0, 0, 0],
+    options?: { minDistance?: number; maxDistance?: number }
+  ): Joint {
+    return this.addJoint({
+        type: JointType.Spring,
+        entityA, entityB,
+        restLength,
+        stiffness,
+        damping,
+        localAnchorA, localAnchorB,
+        ...options
+    });
+  }
+
+  addHingeJoint(
+    entityA: Entity,
+    entityB: Entity,
+    axisA: Vec3,
+    axisB: Vec3,
+    localAnchorA: Vec3 = [0, 0, 0],
+    localAnchorB: Vec3 = [0, 0, 0],
+    options?: any
+  ): Joint {
+    return this.addJoint({
+        type: JointType.Hinge,
+        entityA, entityB,
+        axisA, axisB,
+        localAnchorA, localAnchorB,
+        ...options
+    });
+  }
+
+  addBallSocketJoint(
+    entityA: Entity,
+    entityB: Entity,
+    localAnchorA: Vec3 = [0, 0, 0],
+    localAnchorB: Vec3 = [0, 0, 0],
+    options?: any
+  ): Joint {
+    return this.addJoint({
+        type: JointType.BallSocket,
+        entityA, entityB,
+        localAnchorA, localAnchorB,
+        ...options
+    });
+  }
+
+  addSliderJoint(
+    entityA: Entity,
+    entityB: Entity,
+    axisA: Vec3,
+    axisB: Vec3,
+    localAnchorA: Vec3 = [0, 0, 0],
+    localAnchorB: Vec3 = [0, 0, 0],
+    options?: any
+  ): Joint {
+    return this.addJoint({
+        type: JointType.Slider,
+        entityA, entityB,
+        axisA, axisB,
+        localAnchorA, localAnchorB,
+        ...options
+    });
+  }
+
+  // Raycast Stubs
+  raycast(_origin: Vec3, _direction: Vec3, _options?: RaycastOptions): RaycastHit | null {
+      return null;
+  }
+
+  raycastAll(_origin: Vec3, _direction: Vec3, _options?: RaycastOptions): RaycastHit[] {
+      return [];
   }
 }

@@ -21,16 +21,16 @@ function isExcludedEntity(entity: Entity): boolean {
 	return false;
 }
 
-export function computeSceneBounds(scene: Scene): SceneBounds | null {
-	const entities = scene.getAllEntities();
-	if (entities.length === 0) return null;
+export function computeSceneBounds(scene: Scene, entities?: Entity[]): SceneBounds | null {
+	const targets = entities ?? scene.getAllEntities();
+	if (targets.length === 0) return null;
 
 	ensureWasmCollisionInit();
 	const wasm = getWasmCollisionSync();
-	const useWasm = Boolean(wasm);
-	const worldMatrices = useWasm ? new Float32Array(entities.length * 16) : null;
-	const halfExtents = useWasm ? new Float32Array(entities.length * 3) : null;
 	let soaCount = 0;
+	const useWasm = Boolean(wasm);
+	const worldMatrices = useWasm ? new Float32Array(targets.length * 16) : null;
+	const halfExtents = useWasm ? new Float32Array(targets.length * 3) : null;
 
 	let hasAny = false;
 	let minX = Number.POSITIVE_INFINITY;
@@ -40,7 +40,7 @@ export function computeSceneBounds(scene: Scene): SceneBounds | null {
 	let maxY = Number.NEGATIVE_INFINITY;
 	let maxZ = Number.NEGATIVE_INFINITY;
 
-	for (const e of entities) {
+	for (const e of targets) {
 		// Skip inactive or excluded helpers
 		if (!e.active || isExcludedEntity(e)) continue;
 		const world = e.transform.getWorldMatrix();
@@ -150,13 +150,14 @@ export function frameEditorCameraToScene(opts: {
 	canvas: HTMLCanvasElement;
 	editorCamera: EditorCameraController;
 	controls: OrbitControls;
+	entities?: Entity[];
 	margin?: number;
 	fovRadians?: number;
 }): void {
-	const { scene, canvas, editorCamera, controls } = opts;
+	const { scene, canvas, editorCamera, controls, entities } = opts;
 	const margin = opts.margin ?? 0.8;
 	const vfov = opts.fovRadians ?? FOV_RADIANS;
-	const bounds = computeSceneBounds(scene);
+	const bounds = computeSceneBounds(scene, entities);
 	if (!bounds) {
 		// Default gentle oblique view at origin
 		const defaultYaw = Math.PI / 4; // 45°
@@ -221,5 +222,3 @@ export function frameEditorCameraToScene(opts: {
 	// Keep orbit controls state roughly in sync for persistence
 	controls.setState({ yaw, pitch, distance });
 }
-
-

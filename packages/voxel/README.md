@@ -18,5 +18,5 @@
 
 🔮 **Planowane** - Do implementacji w przyszłości
 
-Zobacz: [ARCHITECTURE.md](../../docs/ARCHITECTURE.md)
+Zobacz: [ARCHITECTURE.md](../../docs/architecture/ARCHITECTURE.md)
 

@@ -39,7 +39,8 @@
       "@engine/economy": ["../../packages/economy/src"],
       "@engine/economy/*": ["../../packages/economy/src/*"],
       "@engine/voxel": ["../../packages/voxel/src"],
-      "@engine/voxel/*": ["../../packages/voxel/src/*"]
+      "@engine/voxel/*": ["../../packages/voxel/src/*"],
+      "@shared/*": ["../../shared/*"]
     }
   },
   "include": ["src/**/*", "index.html"],

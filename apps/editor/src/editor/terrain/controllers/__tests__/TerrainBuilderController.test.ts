@@ -1,5 +1,6 @@
 /**
  * Tests for TerrainBuilderController
+ * @vitest-environment jsdom
  */
 
 import { describe, it, expect, beforeEach, vi } from 'vitest';
@@ -11,6 +12,12 @@ import { Entity } from '@engine/world';
 import { TerrainComponent } from '@engine/world/components/TerrainComponent';
 import { CameraComponent } from '@engine/world/components/CameraComponent';
 import { HeightmapTerrain } from '@engine/voxel/terrain';
+
+// Mock physics wasm to avoid loading issues
+vi.mock('@engine/wasm-physics', () => ({
+  default: {},
+  init: vi.fn().mockResolvedValue({}),
+}));
 
 describe('TerrainBuilderController', () => {
   let mockScene: Scene;
@@ -194,4 +201,3 @@ describe('TerrainBuilderController', () => {
     });
   });
 });
-

@@ -28,6 +28,23 @@ export class Animator {
     this.poseB = createPose(jointCount);
   }
 
+  get activeClip(): AnimationClip | null {
+    const state = this.controller.getState(this.currentStateName);
+    return state ? state.clip : null;
+  }
+
+  get activeTime(): number {
+    return this.currentTime;
+  }
+  
+  get currentController(): AnimatorController {
+      return this.controller;
+  }
+
+  get currentState(): string {
+      return this.currentStateName;
+  }
+
   setParameter(name: string, value: number | boolean): void {
     this.params[name] = value;
   }

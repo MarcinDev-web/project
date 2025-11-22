@@ -1,9 +1,18 @@
-import { describe, it, expect } from 'vitest';
+/**
+ * @vitest-environment jsdom
+ */
+import { describe, it, expect, vi } from 'vitest';
 import { Scene, Entity } from '@engine/world';
 import type { Vec3 } from '@engine/core/math';
 import { frameEditorCameraToScene, computeSceneBounds } from '../cameraFraming';
 import { createOrbitControls } from '@engine/camera';
 import { EditorCameraController } from '@engine/camera';
+
+// Mock physics wasm to avoid loading issues
+vi.mock('@engine/wasm-physics', () => ({
+  default: {},
+  init: vi.fn().mockResolvedValue({}),
+}));
 
 function makeCanvas(width = 1280, height = 720): HTMLCanvasElement {
 	const canvas = document.createElement('canvas');
@@ -31,6 +40,29 @@ describe('cameraFraming', () => {
 		expect(bounds!.max[0]).toBeGreaterThanOrEqual(3.5); // 3 + 0.5
 		expect(bounds!.min[1]).toBeLessThanOrEqual(-0.5);
 		expect(bounds!.max[1]).toBeGreaterThanOrEqual(3.5);
+	});
+
+	it('computes scene bounds for specific entities', () => {
+		const scene = new Scene('Test');
+		const a = new Entity('A');
+		a.transform.position = [-10, 0, 0] as Vec3;
+		scene.addEntity(a);
+
+		const b = new Entity('B');
+		b.transform.position = [10, 0, 0] as Vec3;
+		scene.addEntity(b);
+
+		// Compute bounds for only A
+		const boundsA = computeSceneBounds(scene, [a]);
+		expect(boundsA).not.toBeNull();
+		expect(boundsA!.min[0]).toBeCloseTo(-10.5);
+		expect(boundsA!.max[0]).toBeCloseTo(-9.5);
+
+		// Compute bounds for only B
+		const boundsB = computeSceneBounds(scene, [b]);
+		expect(boundsB).not.toBeNull();
+		expect(boundsB!.min[0]).toBeCloseTo(9.5);
+		expect(boundsB!.max[0]).toBeCloseTo(10.5);
 	});
 
 	it('frames editor camera to look at scene center', () => {
@@ -70,5 +102,3 @@ describe('cameraFraming', () => {
 		expect(dot).toBeGreaterThan(0.95);
 	});
 });
-
-

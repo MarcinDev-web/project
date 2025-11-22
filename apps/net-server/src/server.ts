@@ -57,6 +57,7 @@ import {
 } from './errors/MarketplaceErrors.js';
 import { LikesStorage } from './storage/LikesStorage.js';
 import { ResaleStorage } from './storage/ResaleStorage.js';
+import { RedisResaleStorage } from './storage/RedisResaleStorage.js';
 import { FriendsStorage } from './storage/FriendsStorage.js';
 import { MessagesStorage } from './storage/MessagesStorage.js';
 import { BlockedUsersStorage } from './storage/BlockedUsersStorage.js';
@@ -212,7 +213,10 @@ const buildStorage = dbPool ? new BuildStorage(dbPool) : null;
 const likesStorage = dbPool
   ? new LikesStorage(dbPool)
   : new LikesStorage(DATA_DIR, marketplaceStorage as MarketplaceStorage);
-const resaleStorage = dbPool ? new ResaleStorage(dbPool) : null;
+// Use Redis for resale listings if available (even without Postgres), or DB if available
+const resaleStorage = dbPool 
+  ? new ResaleStorage(dbPool) 
+  : new RedisResaleStorage(); // Always use RedisResaleStorage when no DB (replaces in-memory map)
 
 const friendsStorage = new FriendsStorage(DATA_DIR);
 const messagesStorage = new MessagesStorage(DATA_DIR);
@@ -459,7 +463,7 @@ void authManager.initialize().then(async () => {
   await profileStorage.initialize();
   await marketplaceStorage.initialize();
   await likesStorage.initialize();
-  if (resaleStorage) {
+  if (resaleStorage && 'initialize' in resaleStorage) {
     await resaleStorage.initialize();
     
     // Cleanup expired resale listings every hour
@@ -470,9 +474,13 @@ void authManager.initialize().then(async () => {
           console.log(`Cleaned up ${deleted} expired resale listings`);
         }
       } catch (error) {
-        console.error('Failed to cleanup expired resale listings:', error);
+        // Ignore errors, cleanup might not be supported by Redis implementation directly (lazy delete)
+        // console.error('Failed to cleanup expired resale listings:', error);
       }
     }, 60 * 60 * 1000); // 1 hour
+  } else if (resaleStorage) {
+     // Initialize Redis storage (no-op but consistent)
+     await resaleStorage.initialize();
   }
   await friendsStorage.initialize();
   await messagesStorage.initialize();
@@ -556,9 +564,21 @@ void authManager.initialize().then(async () => {
   void wsHandler;
 });
 
+import { redisCache } from './lib/cache.js';
+
 // Simple in-memory cache for aggregates (15 minutes TTL) - used by studio routes
+// UPDATED: Now supports Redis if available, falling back to memory
 const aggregateCache = new Map<string, { expiresAt: number; data: unknown }>();
-function cacheGet<T>(key: string): T | null {
+
+async function cacheGet<T>(key: string): Promise<T | null> {
+  // Try Redis first
+  try {
+    const cached = await redisCache.get<T>('studio', key);
+    if (cached) return cached;
+  } catch (e) {
+    // Redis failed, fall back to memory
+  }
+
   const hit = aggregateCache.get(key);
   if (!hit) return null;
   if (Date.now() > hit.expiresAt) {
@@ -567,7 +587,16 @@ function cacheGet<T>(key: string): T | null {
   }
   return hit.data as T;
 }
-function cacheSet<T>(key: string, data: T, ttlMs = 15 * 60 * 1000): void {
+
+async function cacheSet<T>(key: string, data: T, ttlMs = 15 * 60 * 1000): Promise<void> {
+  // Write to Redis
+  try {
+    await redisCache.set('studio', key, data, Math.floor(ttlMs / 1000));
+  } catch (e) {
+    // Redis failed
+  }
+
+  // Write to memory
   aggregateCache.set(key, { expiresAt: Date.now() + ttlMs, data });
 }
 

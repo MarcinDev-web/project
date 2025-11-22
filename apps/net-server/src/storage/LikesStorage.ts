@@ -4,7 +4,7 @@
 
 import { promises as fs } from 'fs';
 import path from 'path';
-import type { PrismaClient } from '../../node_modules/.prisma/net-client/index.js';
+import { PrismaClient } from '@engine/database';
 import type { MarketplaceStorage } from './MarketplaceStorage.js';
 
 export class LikesStorage {

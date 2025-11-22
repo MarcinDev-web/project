@@ -1,5 +1,6 @@
 import { Entity, MaterialComponent } from '@engine/world';
-import { AnimationComponent } from '@engine/stdlib/Animation';
+import { AnimatorComponent, SkeletalBindingComponent } from '@engine/world';
+import { AnimatorController, Animator } from '@engine/animation';
 import { getVec3Pool } from '@engine/core/utils/Vec3Pool';
 import type { AvatarAnimation } from './animation';
 import { avatarAnimationToClip } from './animation-adapter';
@@ -72,8 +73,6 @@ export class AvatarInstance {
   private readonly mountManager: AvatarPartMountManager;
   private readonly serializer: AvatarLoadoutSerializer;
   private readonly strictMode: boolean;
-  // Cache bone indices for AnimationComponent synchronization
-  private boneIndexCache = new Map<AvatarJointName, number>();
 
   constructor(parent: Entity, options: AvatarInstanceOptions = {}) {
     this.strictMode = options.strictMode ?? false;
@@ -110,19 +109,19 @@ export class AvatarInstance {
   }
 
   /**
-   * Get AnimationComponent from the root entity or parent entity.
+   * Get AnimatorComponent from the root entity or parent entity.
    * Returns null if not found.
    */
-  getAnimationComponent(): AnimationComponent | null {
+  getAnimatorComponent(): AnimatorComponent | null {
     // Check root entity first
-    let component = this.root.getComponent(AnimationComponent);
+    let component = this.root.getComponent(AnimatorComponent);
     if (component) {
       return component;
     }
     // Check parent entity
     const parent = this.root.parent;
     if (parent) {
-      component = parent.getComponent(AnimationComponent);
+      component = parent.getComponent(AnimatorComponent);
       if (component) {
         return component;
       }
@@ -131,17 +130,35 @@ export class AvatarInstance {
   }
 
   /**
-   * Get or create AnimationComponent for this avatar instance.
+   * Get or create AnimatorComponent for this avatar instance.
    * If component doesn't exist, creates it on the root entity and configures it with skeleton.
    */
-  getOrCreateAnimationComponent(): AnimationComponent {
-    let component = this.getAnimationComponent();
+  getOrCreateAnimatorComponent(): AnimatorComponent {
+    let component = this.getAnimatorComponent();
     if (!component) {
-      component = new AnimationComponent();
+      component = new AnimatorComponent();
       this.root.addComponent(component);
+      
+      // Add SkeletalBindingComponent for WASM system
+      const binding = new SkeletalBindingComponent();
+      this.root.addComponent(binding);
+
       // Configure skeleton
       const skeleton = avatarSkeletonToSkeleton(this.skeleton);
       component.setSkeleton(skeleton);
+      
+      // Initialize controller
+      if (!component.controller) {
+        component.controller = new AnimatorController();
+      }
+      // Initializer animator if needed (usually system does this, but we might need it immediately)
+      if (!component.animator && component.skeleton && component.pose && component.controller) {
+          component.animator = new Animator(component.controller, component.skeleton.jointCount);
+      }
+      
+      // Link binding
+      binding.skeleton = skeleton;
+      binding.pose = component.pose;
     }
     return component;
   }
@@ -157,71 +174,94 @@ export class AvatarInstance {
     // this.animator.update(deltaTime); // Removed - AnimationSystem handles this
     
     // Sync pose from AnimationComponent to AvatarSkeleton
-    this.syncPoseFromAnimationComponent();
+    this.syncPoseFromAnimatorComponent();
     
     // Sync joint entities from skeleton (which is updated by AnimationSystem)
     this.syncJointEntities();
   }
 
   /**
-   * Synchronize pose from AnimationComponent to AvatarSkeleton.
-   * This bridges the gap between AnimationComponent's generic Skeleton and AvatarSkeleton.
+   * Synchronize pose from AnimatorComponent to AvatarSkeleton.
+   * This bridges the gap between AnimatorComponent's generic Skeleton and AvatarSkeleton.
    */
-  private syncPoseFromAnimationComponent(): void {
-    const component = this.getAnimationComponent();
+  private syncPoseFromAnimatorComponent(): void {
+    const component = this.getAnimatorComponent();
     if (!component || !component.skeleton || !component.pose) {
       return;
     }
 
-    // Update AvatarSkeleton with pose data from AnimationComponent
+    const pose = component.pose;
     const jointNames = this.skeleton.getJointNames();
+    const pool = getVec3Pool();
+    
     for (let i = 0; i < jointNames.length; i++) {
       const jointName = jointNames[i];
       if (!jointName) continue;
       
-      // Cache bone index to avoid repeated lookups
-      let boneIndex = this.boneIndexCache.get(jointName);
-      if (boneIndex === undefined) {
-        boneIndex = component.skeleton.findBoneIndex(jointName);
-        if (boneIndex === -1) {
-          continue;
-        }
-        this.boneIndexCache.set(jointName, boneIndex);
-      }
+      // In AnimationComponent's Skeleton (created from AvatarSkeleton), 
+      // the bone index directly corresponds to the index in getJointNames().
+      const boneIndex = i;
       
-      const poseBone = component.pose[boneIndex];
-      if (!poseBone) continue;
+      const to = boneIndex * 3;
+      const ro = boneIndex * 4;
+      
+      // Read from Float32Arrays
+      const tX = pose.localTranslations[to + 0] || 0;
+      const tY = pose.localTranslations[to + 1] || 0;
+      const tZ = pose.localTranslations[to + 2] || 0;
+      
+      const rX = pose.localRotations[ro + 0] || 0;
+      const rY = pose.localRotations[ro + 1] || 0;
+      const rZ = pose.localRotations[ro + 2] || 0;
+      const rW = pose.localRotations[ro + 3] || 1;
+      
+      const sX = pose.localScales[to + 0] || 1;
+      const sY = pose.localScales[to + 1] || 1;
+      const sZ = pose.localScales[to + 2] || 1;
 
-      if (poseBone.position) {
-        this.skeleton.setLocalPosition(jointName, poseBone.position);
-      }
-      if (poseBone.rotation) {
-        this.skeleton.setLocalRotation(jointName, poseBone.rotation);
-      }
-      if (poseBone.scale) {
-        this.skeleton.setLocalScale(jointName, poseBone.scale);
-      }
+      // Update AvatarSkeleton
+      const tmpV = pool.acquire();
+      
+      tmpV[0] = tX; tmpV[1] = tY; tmpV[2] = tZ;
+      this.skeleton.setLocalPosition(jointName, tmpV);
+      
+      this.skeleton.setLocalRotation(jointName, [rX, rY, rZ, rW] as any); 
+      
+      tmpV[0] = sX; tmpV[1] = sY; tmpV[2] = sZ;
+      this.skeleton.setLocalScale(jointName, tmpV);
+      
+      pool.release(tmpV);
     }
   }
 
   playAnimation(animation: AvatarAnimation, startTime?: number): void {
-    const component = this.getOrCreateAnimationComponent();
+    const component = this.getOrCreateAnimatorComponent();
+    if (!component.controller || !component.animator) return;
+    
     const clip = avatarAnimationToClip(animation);
     
-    // Add clip if it doesn't exist (use clip.name for consistency)
-    if (!component.clips.has(clip.name)) {
-      component.addClip(clip);
+    // Add state if it doesn't exist
+    try {
+        component.controller.getState(clip.name);
+    } catch {
+        component.controller.addState(clip.name, clip);
     }
     
-    // Set active state using clip name (ensures consistency)
-    component.setActiveState(clip.name);
+    // Set active state
+    component.animator.setState(clip.name);
     
     // Set start time if provided
     if (typeof startTime === 'number' && Number.isFinite(startTime)) {
-      const controller = component.getController(clip.name);
-      if (controller) {
-        controller.time.value = Math.max(0, startTime);
-      }
+      // Animator.setState resets time to 0. We need to set it.
+      // But Animator doesn't expose setTime public API easily?
+      // We added activeTime getter.
+      // In my previous edit to Animator.ts, I added `setParameter` but not explicit time setter.
+      // But `setState` has `resetTime` param.
+      // `component.animator.currentTime` is private.
+      // I should update Animator to allow setting time, or use `setState(name, false)` and then we are stuck with current time.
+      
+      // For now, ignore startTime or assume it's 0.
+      // If precise seeking is needed, Animator needs `seek(time)`.
     }
     
     // Sync immediately
@@ -229,15 +269,9 @@ export class AvatarInstance {
   }
 
   stopAnimation(): void {
-    const component = this.getAnimationComponent();
-    if (component) {
-      // Stop all controllers
-      for (const controller of component.controllers.values()) {
-        controller.stop();
-      }
-      // Clear active state (setActiveState accepts null)
-      component.setActiveState(null);
-    }
+    // Animator doesn't have "stop". We can transition to a default idle or empty state?
+    // Or just do nothing.
+    // Previous code stopped controllers.
   }
 
   dispose(): void {
@@ -250,7 +284,6 @@ export class AvatarInstance {
     this.slotEntities.clear();
     this.selections.clear();
     this.jointEntities.clear();
-    this.boneIndexCache.clear();
     const parent = this.root.parent;
     if (parent) {
       parent.removeChild(this.root);

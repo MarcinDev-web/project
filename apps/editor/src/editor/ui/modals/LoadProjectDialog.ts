@@ -6,7 +6,6 @@ export interface LoadProjectDialogResult {
 }
 
 export class LoadProjectDialog {
-  private container: HTMLElement | null = null;
 
   public async show(
     projects: ProjectMetadata[], 
@@ -15,7 +14,6 @@ export class LoadProjectDialog {
     return new Promise((resolve) => {
       // Create modal container
       const modal = document.createElement('div');
-      this.container = modal;
       
       Object.assign(modal.style, {
         position: 'fixed',
@@ -136,7 +134,6 @@ export class LoadProjectDialog {
         if (document.body.contains(modal)) {
           document.body.removeChild(modal);
         }
-        this.container = null;
       };
     });
   }

@@ -19,6 +19,9 @@ export function initializeBaseColor(entity: Entity, baseColor: RgbaColor): void 
   entity.color = baseColor;
 }
 
+/**
+ * @deprecated Use SelectionVisualController for better performance and state management.
+ */
 export function applySelectionVisuals(
   scene: Scene,
   selection: SelectionManager,

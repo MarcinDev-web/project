@@ -5,4 +5,4 @@ export * from './PhysicsRaycast.js';
 export * from './Octree.js';
 export * from './BoundingVolume.js';
 export * from './Joint.js';
-export * from './RapierPhysicsSystem.js';
+// export * from './RapierPhysicsSystem.js';

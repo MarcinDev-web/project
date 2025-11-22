@@ -23,6 +23,7 @@ export interface PerformanceMetrics {
   triangles: number;
   entities: number;
   memoryUsage?: number;
+  resolutionScale?: number;
 }
 
 /**
@@ -30,6 +31,7 @@ export interface PerformanceMetrics {
  */
 export class PerformanceSystem {
   private scene: Scene | null = null;
+  private renderer: Renderer | null = null;
   private cameraPosition: Vec3 | null = null;
   private cameraForward: Vec3 | null = null;
   
@@ -50,13 +52,25 @@ export class PerformanceSystem {
     drawCalls: 0,
     triangles: 0,
     entities: 0,
+    resolutionScale: 1.0,
   };
+
+  // Dynamic Resolution Scaling
+  private enableDynamicResolution = true;
+  private currentResolutionScale = 1.0;
+  private minResolutionScale = 0.5;
+  private maxResolutionScale = 1.0;
+  private lowFpsThreshold = 30;
+  private highFpsThreshold = 55;
+  private resolutionUpdateTimer = 0;
+  private resolutionUpdateInterval = 2000; // Check every 2 seconds
 
   /**
    * Initialize performance system
    */
   initialize(scene: Scene, renderer: Renderer): void {
     this.scene = scene;
+    this.renderer = renderer;
     
     // Subscribe to render stats updates
     renderer.onRenderStats((stats) => {
@@ -84,7 +98,7 @@ export class PerformanceSystem {
       this.updateFrustumCulling();
     }
     
-    // Update performance metrics
+    // Update performance metrics & Dynamic Resolution
     this.updateMetrics(deltaTime);
   }
 
@@ -153,7 +167,7 @@ export class PerformanceSystem {
   }
 
   /**
-   * Update performance metrics
+   * Update performance metrics and handle dynamic resolution
    */
   private updateMetrics(deltaTime: number): void {
     const frameTime = deltaTime * 1000; // Convert to ms
@@ -164,7 +178,7 @@ export class PerformanceSystem {
       this.frameTimes.shift();
     }
     
-    // Calculate average frame time
+    // Calculate average frame time and FPS
     const avgFrameTime = this.frameTimes.reduce((a, b) => a + b, 0) / this.frameTimes.length;
     const fps = 1000 / avgFrameTime;
     
@@ -175,13 +189,47 @@ export class PerformanceSystem {
       drawCalls: this.currentDrawCalls,
       triangles: this.currentTriangles,
       entities: this.scene?.getAllEntities().length ?? 0,
+      resolutionScale: this.currentResolutionScale,
     };
     
-    // Log FPS every second
+    // Dynamic Resolution Scaling
+    if (this.enableDynamicResolution && this.renderer) {
+      this.resolutionUpdateTimer += deltaTime * 1000;
+      if (this.resolutionUpdateTimer > this.resolutionUpdateInterval) {
+        this.updateResolutionScale(fps);
+        this.resolutionUpdateTimer = 0;
+      }
+    }
+
+    // Log FPS every second (optional, can remove to reduce noise)
     const now = Date.now();
     if (now - this.lastFPSUpdate > 1000) {
-      Logger.debug(`[PerformanceSystem] FPS: ${this.currentMetrics.fps}, Frame time: ${this.currentMetrics.frameTime}ms`);
+      // Logger.debug(`[PerformanceSystem] FPS: ${this.currentMetrics.fps}, Res: ${this.currentResolutionScale.toFixed(2)}`);
       this.lastFPSUpdate = now;
+    }
+  }
+
+  private updateResolutionScale(fps: number): void {
+    let newScale = this.currentResolutionScale;
+
+    if (fps < this.lowFpsThreshold) {
+      // Decrease resolution
+      newScale = Math.max(this.minResolutionScale, this.currentResolutionScale - 0.1);
+    } else if (fps > this.highFpsThreshold) {
+      // Increase resolution
+      newScale = Math.min(this.maxResolutionScale, this.currentResolutionScale + 0.1);
+    }
+
+    if (newScale !== this.currentResolutionScale) {
+      this.currentResolutionScale = newScale;
+      Logger.info(`[PerformanceSystem] Adjusting resolution scale to ${newScale.toFixed(2)} (FPS: ${Math.round(fps)})`);
+      
+      // Apply to renderer
+      if (this.renderer) {
+        this.renderer.updateRenderSettings({
+          resolutionScale: newScale,
+        });
+      }
     }
   }
 
@@ -214,6 +262,18 @@ export class PerformanceSystem {
   }
 
   /**
+   * Enable/disable dynamic resolution
+   */
+  setDynamicResolutionEnabled(enabled: boolean): void {
+    this.enableDynamicResolution = enabled;
+    if (!enabled && this.renderer) {
+      // Reset to full resolution when disabled
+      this.currentResolutionScale = 1.0;
+      this.renderer.updateRenderSettings({ resolutionScale: 1.0 });
+    }
+  }
+
+  /**
    * Calculate distance between two points
    */
   private calculateDistance(a: Vec3, b: Vec3): number {
@@ -228,9 +288,9 @@ export class PerformanceSystem {
    */
   dispose(): void {
     this.scene = null;
+    this.renderer = null;
     this.cameraPosition = null;
     this.cameraForward = null;
     this.frameTimes = [];
   }
 }
-

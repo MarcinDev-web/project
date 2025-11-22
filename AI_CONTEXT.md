@@ -66,15 +66,19 @@ root/
 
 ### 3.2. Core Packages
 | Package | Description | Level |
-|Obiekt|Opis|Level|
 |---|---|---|
 | **@engine/core** | Foundation. Math library (`Vec3`, `Mat4`), `EventBus`, `Disposable`. | 0 |
 | **@engine/world** | The ECS definition. `Entity`, `Scene`, `System`, `Query`. | 1 |
-| **@engine/gfx-webgpu** | The Renderer. Manages Device, Pipeline, Shaders, Textures. | 2 |
 | **@engine/input** | Input handling (Keyboard, Mouse, Gamepad). | 1 |
-| **@engine/script** | Visual scripting system (LogicCubes). | 2 |
-| **@engine/stdlib** | Common gameplay elements: CharacterController, AnimationSystem. | 3 |
 | **@engine/editor-utils** | Reusable editor logic (History, Snapping) - decoupling apps from engine. | 1 |
+| **@engine/asset-pipeline** | Asset loading and processing (GLTF, Textures). | 1 |
+| **@engine/gfx-webgpu** | The Renderer. Manages Device, Pipeline, Shaders, Textures. | 2 |
+| **@engine/script** | Visual scripting system (LogicCubes). | 2 |
+| **@engine/physics** | Physics simulation (Rapier/PhysX integration). | 2 |
+| **@engine/voxel** | Voxel terrain engine and meshing. | 2 |
+| **@engine/stdlib** | Common gameplay elements: CharacterController, AnimationSystem. | 3 |
+| **@engine/net** | Multiplayer networking and replication. | 3 |
+| **@engine/economy** | Economy systems (Inventory, Trading). | 3 |
 
 ### 3.3. Dependency Rules
 - **Strict Unidirectional Flow**: Apps depend on Packages. Packages depend on lower-level Packages.
@@ -245,8 +249,8 @@ Before you consider a task done:
 
 ## 9. Reference Documentation
 - **Design Patterns**: [CODEBASE_PATTERNS.md](./CODEBASE_PATTERNS.md)
-- **Architecture**: [docs/ARCHITECTURE.md](./docs/ARCHITECTURE.md)
-- **Testing**: [docs/TESTING.md](./docs/TESTING.md)
+- **Architecture**: [docs/architecture/ARCHITECTURE.md](./docs/architecture/ARCHITECTURE.md)
+- **Testing**: [docs/testing/TESTING.md](./docs/testing/TESTING.md)
 - **Package Guidelines**: [docs/guidelines/PACKAGE_GUIDELINES.md](./docs/guidelines/PACKAGE_GUIDELINES.md)
 
 > **Note**: This file is the primary context for AI agents. If you find discrepancies between this file and the code, trust the code but update this file.

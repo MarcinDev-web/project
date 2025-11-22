@@ -288,9 +288,42 @@ export class ReplicationServer {
 
       message.userId = userId;
 
-      // Broadcast to other users in session
+      // Validate physics
       const sessionId = this.sessionManager.getUserSession(userId);
       if (sessionId) {
+        const physics = this.sessionManager.getPhysicsManager(sessionId);
+        if (physics) {
+          const valid = physics.validatePosition(
+            userId,
+            message.position[0],
+            message.position[1],
+            message.position[2]
+          );
+
+          if (!valid) {
+            // Log cheat attempt
+            securityLogger.logSuspiciousActivity(userId, 'Physics validation failed: Position deviation');
+
+            // Send correction to client
+            const serverPos = physics.getPlayerPosition(userId);
+            if (serverPos) {
+              const correction: PlayerUpdateMessage = {
+                type: 'player-update',
+                timestamp: Date.now(),
+                userId: userId,
+                playerId: userId, // Use correct field
+                position: [serverPos.x, serverPos.y, serverPos.z],
+                rotation: message.rotation, // Trust rotation for now
+                velocity: [0, 0, 0], // Reset velocity?
+              };
+              this.sendToWebSocket(ws, correction);
+
+              // Do NOT broadcast invalid update
+              return;
+            }
+          }
+        }
+
         this.sessionManager.broadcast(sessionId, message, userId);
       }
     } catch (error) {
@@ -315,9 +348,18 @@ export class ReplicationServer {
 
       message.userId = userId;
 
-      // Broadcast to other users in session
+      // Apply to physics
       const sessionId = this.sessionManager.getUserSession(userId);
       if (sessionId) {
+        const physics = this.sessionManager.getPhysicsManager(sessionId);
+        if (physics) {
+          physics.applyInput(userId, {
+            x: message.moveDirection?.[0] || 0,
+            z: message.moveDirection?.[1] || 0,
+            jump: message.inputType === 'jump',
+          });
+        }
+
         this.sessionManager.broadcast(sessionId, message, userId);
       }
     } catch (error) {

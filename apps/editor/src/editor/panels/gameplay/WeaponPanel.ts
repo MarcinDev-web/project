@@ -114,6 +114,134 @@ export class WeaponPanel {
   }
 
   /**
+   * Creates a generic panel section with title
+   */
+  private createSection(title: string): HTMLElement {
+    const section = document.createElement('div');
+    section.className = 'panel-section';
+
+    const titleEl = document.createElement('h3');
+    titleEl.className = 'panel-section-title';
+    titleEl.textContent = title;
+    section.appendChild(titleEl);
+
+    return section;
+  }
+
+  /**
+   * Creates a labeled number input
+   */
+  private createNumberInput(
+    label: string,
+    value: number,
+    config: {
+      min?: number;
+      max?: number;
+      step?: number;
+      onChange: (newValue: number) => void;
+    }
+  ): HTMLElement {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'panel-input-group';
+
+    const labelEl = document.createElement('label');
+    labelEl.className = 'panel-label-small';
+    labelEl.textContent = label;
+    wrapper.appendChild(labelEl);
+
+    const input = document.createElement('input');
+    input.type = 'number';
+    input.className = 'panel-input';
+    if (config.min !== undefined) input.min = String(config.min);
+    if (config.max !== undefined) input.max = String(config.max);
+    if (config.step !== undefined) input.step = String(config.step);
+    input.value = String(value);
+
+    input.addEventListener('change', () => {
+      let newValue = parseFloat(input.value);
+      if (isNaN(newValue)) {
+        input.value = String(value);
+        return;
+      }
+      if (config.min !== undefined) newValue = Math.max(config.min, newValue);
+      if (config.max !== undefined) newValue = Math.min(config.max, newValue);
+      
+      // Update UI if clamped
+      if (newValue !== parseFloat(input.value)) {
+        input.value = String(newValue);
+      }
+      
+      config.onChange(newValue);
+    });
+
+    wrapper.appendChild(input);
+    return wrapper;
+  }
+
+  /**
+   * Creates a slider with number input
+   */
+  private createSlider(
+    label: string,
+    value: number,
+    config: {
+      min: number;
+      max: number;
+      step: number;
+      onChange: (newValue: number) => void;
+    }
+  ): HTMLElement {
+    const wrapper = document.createElement('div');
+    wrapper.className = 'panel-input-group';
+
+    const header = document.createElement('div');
+    header.style.display = 'flex';
+    header.style.justifyContent = 'space-between';
+    header.style.marginBottom = '4px';
+
+    const labelEl = document.createElement('label');
+    labelEl.className = 'panel-label-small';
+    labelEl.textContent = label;
+    header.appendChild(labelEl);
+
+    const valueDisplay = document.createElement('span');
+    valueDisplay.className = 'panel-value-display';
+    valueDisplay.textContent = String(value);
+    header.appendChild(valueDisplay);
+
+    wrapper.appendChild(header);
+
+    const sliderContainer = document.createElement('div');
+    sliderContainer.style.display = 'flex';
+    sliderContainer.style.alignItems = 'center';
+    sliderContainer.style.gap = '8px';
+
+    const slider = document.createElement('input');
+    slider.type = 'range';
+    slider.className = 'panel-slider';
+    slider.style.flex = '1';
+    slider.min = String(config.min);
+    slider.max = String(config.max);
+    slider.step = String(config.step);
+    slider.value = String(value);
+
+    slider.addEventListener('input', () => {
+      const newValue = parseFloat(slider.value);
+      valueDisplay.textContent = String(newValue);
+    });
+
+    slider.addEventListener('change', () => {
+      const newValue = parseFloat(slider.value);
+      config.onChange(newValue);
+    });
+
+    sliderContainer.appendChild(slider);
+    wrapper.appendChild(sliderContainer);
+
+    return wrapper;
+  }
+
+  /**
    * Renders the weapon panel UI
    */
   private render(): void {
@@ -266,9 +394,9 @@ export class WeaponPanel {
     const presetSection = this.createPresetSelector(this.weaponComponent.weaponPreset ?? 'custom');
     section.appendChild(presetSection);
 
-    // Base stats (read-only display)
-    const statsSection = this.createStatsSection();
-    section.appendChild(statsSection);
+    // Base stats editor
+    const baseStatsSection = this.createBaseStatsSection();
+    section.appendChild(baseStatsSection);
 
     // Attachments
     const attachmentsSection = this.createAttachmentsSection();
@@ -278,6 +406,108 @@ export class WeaponPanel {
     const ammoSection = this.createAmmoSection();
     section.appendChild(ammoSection);
 
+    // Effective stats (read-only display)
+    const statsSection = this.createStatsSection();
+    section.appendChild(statsSection);
+
+    return section;
+  }
+
+  /**
+   * Creates base stats editor section
+   */
+  private createBaseStatsSection(): HTMLElement {
+    const section = this.createSection('Base Stats');
+
+    if (!this.weaponComponent || !this.selectedEntity) {
+      return section;
+    }
+
+    // Helper to update stat and handle undo/preset switch
+    const updateStat = (key: keyof WeaponComponent, value: number) => {
+      if (!this.weaponComponent || !this.selectedEntity) return;
+
+      const oldValue = this.weaponComponent[key] as number;
+      if (oldValue === value) return;
+
+      // Switch to custom preset if not already
+      const oldPreset = this.weaponComponent.weaponPreset;
+      if (oldPreset !== 'custom') {
+        this.weaponComponent.weaponPreset = 'custom';
+      }
+
+      (this.weaponComponent as any)[key] = value;
+      
+      // Force update of effective stats
+      this.weaponComponent.invalidateEffectiveStats();
+
+      // Register undo
+      if (this.config.registerUndo) {
+        const entity = this.selectedEntity;
+        const component = this.weaponComponent;
+        const prevPreset = oldPreset;
+        
+        this.config.registerUndo(() => {
+          if (component && entity) {
+            (component as any)[key] = oldValue;
+            if (prevPreset !== 'custom') {
+              component.weaponPreset = prevPreset;
+            }
+            component.invalidateEffectiveStats();
+            this.refresh();
+            this.config.onConfigChanged?.();
+            this.config.updateSceneBuffers?.();
+          }
+        });
+      }
+
+      this.refresh();
+      this.config.onConfigChanged?.();
+      this.config.updateSceneBuffers?.();
+    };
+
+    // Damage
+    section.appendChild(this.createSlider('Damage', this.weaponComponent.damage, {
+      min: 0, max: 200, step: 1,
+      onChange: (v) => updateStat('damage', v)
+    }));
+
+    // Fire Rate
+    section.appendChild(this.createSlider('Fire Rate', this.weaponComponent.fireRate, {
+      min: 0.1, max: 20, step: 0.1,
+      onChange: (v) => updateStat('fireRate', v)
+    }));
+
+    // Range
+    section.appendChild(this.createSlider('Range', this.weaponComponent.range, {
+      min: 1, max: 500, step: 1,
+      onChange: (v) => updateStat('range', v)
+    }));
+
+    // Spread
+    section.appendChild(this.createSlider('Spread', this.weaponComponent.spread, {
+      min: 0, max: 0.5, step: 0.001,
+      onChange: (v) => updateStat('spread', v)
+    }));
+
+    // Max Ammo
+    section.appendChild(this.createNumberInput('Max Ammo', this.weaponComponent.maxAmmo, {
+      min: 1, max: 1000, step: 1,
+      onChange: (v) => updateStat('maxAmmo', v)
+    }));
+
+    // Reload Duration
+    section.appendChild(this.createSlider('Reload Duration', this.weaponComponent.reloadDuration, {
+      min: 0.1, max: 10, step: 0.1,
+      onChange: (v) => updateStat('reloadDuration', v)
+    }));
+
+    // Projectile Speed
+    section.appendChild(this.createSlider('Projectile Speed', this.weaponComponent.projectileSpeed, {
+      min: 1, max: 200, step: 1,
+      onChange: (v) => updateStat('projectileSpeed', v)
+    }));
+
     return section;
   }
 
@@ -285,17 +515,50 @@ export class WeaponPanel {
    * Creates inventory configuration section
    */
   private createInventorySection(): HTMLElement {
-    const section = document.createElement('div');
-    section.className = 'panel-section';
+    const section = this.createSection('Weapon Inventory');
 
     if (!this.inventoryComponent || !this.selectedEntity) {
       return section;
     }
 
-    const title = document.createElement('h3');
-    title.className = 'panel-section-title';
-    title.textContent = 'Weapon Inventory';
-    section.appendChild(title);
+    // Helper to update inventory stats
+    const updateInventory = (key: keyof InventoryComponent, value: number) => {
+      if (!this.inventoryComponent) return;
+      
+      const oldValue = this.inventoryComponent[key] as number;
+      if (oldValue === value) return;
+
+      (this.inventoryComponent as any)[key] = value;
+
+      // Register undo
+      if (this.config.registerUndo) {
+        const component = this.inventoryComponent;
+        this.config.registerUndo(() => {
+          (component as any)[key] = oldValue;
+          this.refresh();
+          this.config.onConfigChanged?.();
+        });
+      }
+
+      this.refresh();
+      this.config.onConfigChanged?.();
+    };
+
+    // Inventory settings
+    const settingsGroup = document.createElement('div');
+    settingsGroup.style.marginBottom = '16px';
+    
+    settingsGroup.appendChild(this.createNumberInput('Max Capacity', this.inventoryComponent.maxWeapons, {
+      min: 1, max: 10, step: 1,
+      onChange: (v) => updateInventory('maxWeapons', v)
+    }));
+
+    settingsGroup.appendChild(this.createSlider('Switch Time (s)', this.inventoryComponent.switchDuration, {
+      min: 0.1, max: 5.0, step: 0.1,
+      onChange: (v) => updateInventory('switchDuration', v)
+    }));
+    
+    section.appendChild(settingsGroup);
 
     const info = document.createElement('div');
     info.className = 'panel-info';
@@ -326,8 +589,10 @@ export class WeaponPanel {
         switchBtn.className = 'panel-button-small';
         switchBtn.textContent = 'Switch';
         switchBtn.addEventListener('click', () => {
-          // Switch weapon (would need current time from system)
-          this.config.onConfigChanged?.();
+          if (this.inventoryComponent?.switchWeapon(i, performance.now() / 1000)) {
+             this.refresh();
+             this.config.onConfigChanged?.();
+          }
         });
         weaponActions.appendChild(switchBtn);
       }
@@ -443,17 +708,11 @@ export class WeaponPanel {
    * Creates stats display section
    */
   private createStatsSection(): HTMLElement {
-    const section = document.createElement('div');
-    section.className = 'panel-section';
+    const section = this.createSection('Analytics & Effective Stats');
 
     if (!this.weaponComponent || !this.selectedEntity) {
       return section;
     }
-
-    const title = document.createElement('h3');
-    title.className = 'panel-section-title';
-    title.textContent = 'Effective Stats';
-    section.appendChild(title);
 
     const stats = getEffectiveWeaponStats(this.selectedEntity);
     if (!stats) {
@@ -464,22 +723,53 @@ export class WeaponPanel {
       return section;
     }
 
+    // DPS Calculation
+    const rawDps = stats.damage * stats.fireRate;
+    
+    // Sustained DPS
+    // Time to empty mag = maxAmmo / fireRate
+    // Cycle time = time to empty + reloadDuration
+    const timeToEmpty = stats.maxAmmo / stats.fireRate;
+    const cycleTime = timeToEmpty + stats.reloadDuration;
+    const damagePerCycle = stats.maxAmmo * stats.damage;
+    const sustainedDps = damagePerCycle / cycleTime;
+
     const statsList = document.createElement('div');
     statsList.className = 'stats-list';
 
-    const statRow = (label: string, value: string | number) => {
+    const statRow = (label: string, value: string | number, highlight = false) => {
       const row = document.createElement('div');
       row.className = 'stat-row';
+      if (highlight) {
+        row.style.fontWeight = 'bold';
+        row.style.color = 'var(--color-accent, #4da6ff)';
+        row.style.marginTop = '4px';
+        row.style.marginBottom = '4px';
+      }
+      
       const labelEl = document.createElement('span');
       labelEl.className = 'stat-label';
       labelEl.textContent = label;
+      
       const valueEl = document.createElement('span');
       valueEl.className = 'stat-value';
       valueEl.textContent = String(value);
+      
       row.appendChild(labelEl);
       row.appendChild(valueEl);
       return row;
     };
+
+    // DPS Stats
+    statsList.appendChild(statRow('Raw DPS', rawDps.toFixed(1), true));
+    statsList.appendChild(statRow('Sustained DPS', sustainedDps.toFixed(1), true));
+    
+    // Separator
+    const separator = document.createElement('div');
+    separator.style.height = '1px';
+    separator.style.backgroundColor = 'var(--color-border, #333)';
+    separator.style.margin = '8px 0';
+    statsList.appendChild(separator);
 
     statsList.appendChild(statRow('Damage', stats.damage.toFixed(1)));
     statsList.appendChild(statRow('Fire Rate', stats.fireRate.toFixed(1)));
@@ -489,7 +779,116 @@ export class WeaponPanel {
     statsList.appendChild(statRow('Reload Time', stats.reloadDuration.toFixed(1) + 's'));
 
     section.appendChild(statsList);
+
+    // Spread Visualizer
+    const visualizer = this.createSpreadVisualizer(stats.range, stats.spread);
+    section.appendChild(visualizer);
+
     return section;
+  }
+
+  /**
+   * Creates spread visualization canvas
+   */
+  private createSpreadVisualizer(range: number, spread: number): HTMLElement {
+    const wrapper = document.createElement('div');
+    wrapper.style.marginTop = '12px';
+    wrapper.style.backgroundColor = '#111';
+    wrapper.style.border = '1px solid var(--color-border, #333)';
+    wrapper.style.borderRadius = '4px';
+    wrapper.style.padding = '8px';
+    
+    const label = document.createElement('div');
+    label.className = 'panel-label-small';
+    label.textContent = 'Spread Visualization (Top-Down)';
+    label.style.marginBottom = '4px';
+    wrapper.appendChild(label);
+
+    const canvas = document.createElement('canvas');
+    const width = 280;
+    const height = 140;
+    canvas.width = width;
+    canvas.height = height;
+    canvas.style.width = '100%';
+    canvas.style.height = 'auto';
+    canvas.style.display = 'block';
+    
+    const ctx = canvas.getContext('2d');
+    if (ctx) {
+      // Clear background
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, width, height);
+      
+      // Calculate drawing scales
+      // Max range to display = 100m or provided range if larger
+      const maxDisplayRange = Math.max(50, range * 1.1);
+      const scaleX = (width - 20) / maxDisplayRange;
+      const startX = 10;
+      const centerY = height / 2;
+
+      // Draw grid lines (every 10m)
+      ctx.strokeStyle = '#222';
+      ctx.lineWidth = 1;
+      for (let r = 10; r < maxDisplayRange; r += 10) {
+        const x = startX + r * scaleX;
+        ctx.beginPath();
+        ctx.moveTo(x, 0);
+        ctx.lineTo(x, height);
+        ctx.stroke();
+      }
+
+      // Draw effective range line
+      const rangeX = startX + range * scaleX;
+      ctx.strokeStyle = '#d44';
+      ctx.setLineDash([4, 4]);
+      ctx.beginPath();
+      ctx.moveTo(rangeX, 0);
+      ctx.lineTo(rangeX, height);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      
+      // Draw range label
+      ctx.fillStyle = '#d44';
+      ctx.font = '10px monospace';
+      ctx.fillText(`${range.toFixed(0)}m`, rangeX - 25, height - 5);
+
+      // Draw spread cone
+      ctx.fillStyle = 'rgba(77, 166, 255, 0.2)';
+      ctx.strokeStyle = 'rgba(77, 166, 255, 0.6)';
+      ctx.beginPath();
+      ctx.moveTo(startX, centerY);
+      
+      // Calculate spread points at range
+      // Spread is typically half-angle in game engines, but let's assume it's full spread or half depending on implementation.
+      // WeaponComponent says "Spread angle in radians". Usually this is the deviation from center.
+      // So total cone angle is 2 * spread.
+      
+      const coneLength = Math.min(range, maxDisplayRange);
+      const coneEndX = startX + coneLength * scaleX;
+      
+      // Width at distance d = d * tan(spread)
+      // We need to scale Y as well. Let's say height represents 20m width?
+      const metersPerPixelY = 20 / height;
+      
+      const spreadWidthMeters = coneLength * Math.tan(spread);
+      const spreadPixelsY = spreadWidthMeters / metersPerPixelY;
+      
+      ctx.lineTo(coneEndX, centerY - spreadPixelsY);
+      ctx.lineTo(coneEndX, centerY + spreadPixelsY);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+
+      // Draw center line
+      ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+      ctx.beginPath();
+      ctx.moveTo(startX, centerY);
+      ctx.lineTo(coneEndX, centerY);
+      ctx.stroke();
+    }
+
+    wrapper.appendChild(canvas);
+    return wrapper;
   }
 
   /**

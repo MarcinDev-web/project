@@ -148,7 +148,15 @@ export class NpcPresetManager {
         id: `npc-${presetId}`,
         name: preset.name,
         category,
+        material: 'plastic',
         textures: this.createUniformTextures(color),
+        properties: {
+          solid: true,
+          transparent: false,
+          emissive: 0,
+          roughness: 0.5,
+          metallic: 0,
+        },
       },
     };
   }

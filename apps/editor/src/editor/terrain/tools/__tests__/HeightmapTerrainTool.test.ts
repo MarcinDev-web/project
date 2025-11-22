@@ -3,6 +3,7 @@ import { HeightmapTerrainTool } from '../HeightmapTerrainTool';
 import { Scene, Entity } from '@engine/world';
 import { TerrainComponent } from '@engine/world/components/TerrainComponent';
 import { MeshComponent } from '@engine/world/components/MeshComponent';
+import { TerrainMeshGenerator } from '@engine/voxel/terrain';
 
 // Mock dependencies
 vi.mock('@engine/world', () => {
@@ -52,6 +53,10 @@ vi.mock('@engine/voxel/terrain', () => {
         }
       }
       
+      setHeightAtGrid(x: number, z: number, height: number) {
+        this.heights[z * this.config.resolution + x] = height;
+      }
+
       getHeights() { return this.heights; }
       
       exportData() { 
@@ -188,7 +193,6 @@ describe('HeightmapTerrainTool', () => {
     tool.applyNoise(entity, 5, 10);
 
     // Check if TerrainMeshGenerator.generate was called
-    const { TerrainMeshGenerator } = require('@engine/voxel/terrain');
     expect(TerrainMeshGenerator.generate).toHaveBeenCalled();
   });
 });

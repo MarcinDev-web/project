@@ -3,7 +3,7 @@
  * Supports both PostgreSQL (preferred) and JSON file storage (fallback)
  */
 
-import type { PrismaClient } from '../../node_modules/.prisma/net-client/index.js';
+import { PrismaClient } from '@engine/database';
 import { randomBytes } from 'node:crypto';
 import { promises as fs } from 'fs';
 import path from 'path';

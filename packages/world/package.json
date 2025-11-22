@@ -84,12 +84,14 @@
     "dependencies":  {
                          "@engine/core":  "workspace:*",
                          "@engine/animation":  "workspace:*",
+                         "@engine/wasm-animation": "workspace:*",
                          "@engine/blocks":  "workspace:*",
                          "@engine/economy":  "workspace:*",
                          "@engine/microblocks":  "workspace:*",
                          "@engine/script":  "workspace:*",
                          "@engine/wasm-collision": "workspace:*",
                          "@engine/wasm-physics": "workspace:*",
+                         "@engine/wasm-voxel": "workspace:*",
                          "gl-matrix":  "^3.4.4"
                      },
     "devDependencies":  {

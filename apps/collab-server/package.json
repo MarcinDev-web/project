@@ -5,12 +5,13 @@
   "type": "module",
   "main": "dist/index.js",
   "dependencies": {
+    "@engine/database": "workspace:*",
     "@engine/net-server": "workspace:*",
     "@fastify/cors": "^11.0.0",
     "@fastify/websocket": "^11.2.0",
-    "@prisma/client": "^5.22.0",
     "bcryptjs": "^2.4.3",
     "fastify": "^5.0.0",
+    "ioredis": "^5.4.1",
     "jsonwebtoken": "^9.0.2",
     "pg": "^8.11.5",
     "uuid": "^9.0.1",
@@ -22,19 +23,16 @@
     "@types/pg": "^8.11.6",
     "@types/ws": "^8.5.12",
     "@types/bcryptjs": "^2.4.6",
-    "prisma": "^5.22.0"
+    "@types/ioredis": "^5.0.0",
+    "tsup": "^8.1.0",
+    "tsx": "^4.7.0",
+    "typescript": "^5.9.3"
   },
   "scripts": {
     "dev": "tsx watch src/index.ts",
     "build": "tsup",
     "start": "node dist/index.js",
     "lint": "eslint src --max-warnings=0",
-    "prebuild": "pnpm run db:generate",
-    "db:generate": "prisma generate",
-    "db:migrate": "prisma migrate dev",
-    "db:push": "prisma db push",
     "db:studio": "prisma studio"
   }
 }
-
-

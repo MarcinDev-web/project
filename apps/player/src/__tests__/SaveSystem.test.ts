@@ -1,3 +1,6 @@
+/**
+ * @vitest-environment jsdom
+ */
 import { describe, it, expect, beforeEach } from 'vitest';
 import { SaveSystem } from '../systems/SaveSystem.js';
 
@@ -63,4 +66,3 @@ describe('SaveSystem', () => {
     expect(autoSave?.slotId).toBe('autosave');
   });
 });
-

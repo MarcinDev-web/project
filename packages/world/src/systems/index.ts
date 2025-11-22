@@ -18,3 +18,4 @@ export * from './NpcBehaviorSystem.js';
 export * from './StatusEffectSystem.js';
 export * from './InteractionSystem.js';
 export * from './CheckpointSystem.js';
+export * from './WasmAnimationSystem.js';

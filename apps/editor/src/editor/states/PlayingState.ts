@@ -9,7 +9,7 @@ import type { CameraDirector } from '@engine/camera';
  */
 export interface PlayingStateDeps {
   /** Update FPS camera */
-  updateFPSCamera: () => void;
+  updateFPSCamera: (deltaTime: number) => void;
   /** Camera director */
   cameraDirector: CameraDirector;
   /** Re-enable editor free-fly camera */
@@ -86,7 +86,7 @@ export class PlayingState implements IPlayModeState {
       }
       
       // Update FPS camera
-      this.deps.updateFPSCamera();
+      this.deps.updateFPSCamera(deltaTime);
       
       // Update character input with camera directions
       const forward = this.deps.getCameraForward();

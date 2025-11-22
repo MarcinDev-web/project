@@ -2,6 +2,7 @@ import type { WebSocket } from 'ws';
 import type { CollaborationSession, PublicUser } from '../types/websocket.js';
 import type { PublicUser as AuthPublicUser } from '../types/auth.js';
 import type { AuthManager } from '../auth/AuthManager.js';
+import { PhysicsManager, PHYSICS_CONSTANTS } from '../physics/PhysicsManager.js';
 
 /**
  * Manages active collaboration sessions and WebSocket connections.
@@ -12,9 +13,30 @@ export class SessionManager {
   private connections = new Map<string, WebSocket>(); // userId -> WebSocket
   private sessionUsers = new Map<string, Set<string>>(); // sessionId -> Set<userId>
   private userSessions = new Map<string, string>(); // userId -> sessionId
+  private physicsManagers = new Map<string, PhysicsManager>(); // sessionId -> PhysicsManager
+  private physicsLoop: NodeJS.Timeout | null = null;
 
   constructor(authManager?: AuthManager) {
     this.authManager = authManager ?? null;
+    
+    // Start physics loop
+    this.physicsLoop = setInterval(() => this.updatePhysics(), PHYSICS_CONSTANTS.STEP_DT * 1000);
+  }
+
+  /**
+   * Update physics for all sessions.
+   */
+  private updatePhysics() {
+    for (const manager of this.physicsManagers.values()) {
+      manager.step(PHYSICS_CONSTANTS.STEP_DT);
+    }
+  }
+
+  /**
+   * Get physics manager for a session.
+   */
+  getPhysicsManager(sessionId: string): PhysicsManager | null {
+    return this.physicsManagers.get(sessionId) ?? null;
   }
 
   /**
@@ -41,6 +63,11 @@ export class SessionManager {
 
     this.sessions.set(sessionId, session);
     this.sessionUsers.set(sessionId, new Set([ownerId]));
+    
+    // Initialize physics
+    const physics = new PhysicsManager();
+    physics.addPlayer(ownerId, 0, 10, 0); // Initial spawn
+    this.physicsManagers.set(sessionId, physics);
 
     return session;
   }
@@ -77,6 +104,12 @@ export class SessionManager {
     // Track connection
     this.connections.set(userId, ws);
     this.userSessions.set(userId, sessionId);
+    
+    // Add user to physics
+    const physics = this.physicsManagers.get(sessionId);
+    if (physics) {
+       physics.addPlayer(userId, 0, 10, 0);
+    }
 
     // Handle connection close
     ws.on('close', () => {
@@ -100,7 +133,20 @@ export class SessionManager {
         // Session is empty, remove it
         this.sessions.delete(sessionId);
         this.sessionUsers.delete(sessionId);
+        
+        // Cleanup physics
+        const physics = this.physicsManagers.get(sessionId);
+        if (physics) {
+            physics.dispose();
+            this.physicsManagers.delete(sessionId);
+        }
       }
+    }
+
+    // Remove user from physics (if session still exists)
+    const physics = this.physicsManagers.get(sessionId);
+    if (physics) {
+        physics.removePlayer(userId);
     }
 
     this.connections.delete(userId);
@@ -285,6 +331,20 @@ export class SessionManager {
    */
   setPresenceCallback(callback: (userId: string, isOnline: boolean) => void): void {
     this.presenceCallback = callback;
+  }
+
+  /**
+   * Cleanup resources
+   */
+  dispose() {
+    if (this.physicsLoop) {
+        clearInterval(this.physicsLoop);
+        this.physicsLoop = null;
+    }
+    for (const manager of this.physicsManagers.values()) {
+        manager.dispose();
+    }
+    this.physicsManagers.clear();
   }
 }
 

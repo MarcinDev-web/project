@@ -1,19 +1,5 @@
-/**
- * EditorPlacementController - Manages placement mode and raycasting.
- * 
- * Responsibilities:
- * - Track mouse movement during placement
- * - Raycast from mouse to world space
- * - Compute adjacent placement positions
- * - Update placement preview position
- * - Handle double-click to confirm placement
- * - Handle ESC to cancel placement
- * 
- * Extracted from EditorUI to reduce complexity and improve maintainability.
- */
-
 import type { OrbitControls, CameraDirector } from '@engine/camera';
-import type { Scene, Entity } from '@engine/world';
+import type { Scene, Entity, Ray } from '@engine/world';
 import { CameraComponent, TerrainComponent } from '@engine/world';
 import type { SelectionManager } from '@engine/world';
 import type { EditorState } from '../core/state';
@@ -21,9 +7,10 @@ import type { PlacementMode } from '../placement/PlacementMode';
 import { Raycaster } from '@engine/world';
 import type { Vec3, Mat4 } from '@engine/core/math';
 import { CollisionDetector } from '../placement/CollisionDetector';
-import { mat4Perspective, mat4LookAt, mat4Invert, normalizeVec3Out, dotVec3 } from '@engine/core/math';
-import { FOV_RADIANS, Z_FAR, Z_NEAR } from '@engine/gfx-webgpu/config';
+import { mat4Invert, normalizeVec3Out, dotVec3 } from '@engine/core/math';
 import { Logger } from '../../utils/logger';
+import type { GridRenderer } from '../grid/GridRenderer';
+import type { InteractionTool } from '../input/InteractionTypes';
 
 export interface EditorPlacementControllerConfig {
   canvas: HTMLCanvasElement;
@@ -37,324 +24,249 @@ export interface EditorPlacementControllerConfig {
   updateSceneBuffers: () => void;
   recordSnapshot: (description: string) => void;
   onStatusMessage?: (message: string, duration?: number) => void;
+  getGridRenderer?: () => GridRenderer | null;
 }
 
 /**
  * Manages placement mode interactions and raycasting.
  */
-export class EditorPlacementController {
+export class EditorPlacementController implements InteractionTool {
+  public readonly name = 'EditorPlacementController';
   private raycaster: Raycaster;
-  private abortController: AbortController | null = null;
-  /** Throttle mouse move updates using requestAnimationFrame */
-  private pendingMouseUpdate: { event: MouseEvent; rafId: number | null } | null = null;
+  
   /** Helper for OBB math (reuses CollisionDetector's OBB helpers) */
   private obbHelper: CollisionDetector;
+  
+  private rafId: number | null = null;
+  private pendingRay: Ray | null = null;
+  private abortController: AbortController | null = null;
 
   constructor(private readonly config: EditorPlacementControllerConfig) {
     this.raycaster = new Raycaster();
     this.obbHelper = new CollisionDetector(this.config.scene);
   }
 
-  /**
-   * Initializes placement controller and sets up event listeners.
-   */
-  initialize(): () => void {
-    this.abortController = new AbortController();
-    this.setupMouseTracking();
-    this.setupConfirmationHandlers();
-
-    // Return cleanup function
-    return () => {
-      this.dispose();
-    };
+  public checkHit(_ray: Ray): boolean {
+    // If placement mode is active, we want to handle interactions (unless gizmo claimed it)
+    // We also handle hover updates via onPointerMove even if we don't "claim" a drag yet,
+    // but the Manager prioritization handles that.
+    return this.config.placementMode.isActive();
   }
 
-  /**
-   * Sets up mouse movement tracking for placement preview with throttling.
-   */
-  private setupMouseTracking(): void {
-    if (!this.abortController) return;
+  public onPointerDown(_event: PointerEvent, ray: Ray): void {
+    if (!this.config.placementMode.isActive()) return;
+    
+    const action = this.config.placementMode.handleInput('down', ray);
+    if (action === 'confirm') {
+      void this.performPlacement(ray);
+    }
+  }
 
-    this.config.canvas.addEventListener(
-      'mousemove',
-      (event: MouseEvent) => {
-        if (!this.config.placementMode.isActive()) {
-          return;
-        }
+  public onPointerMove(_event: PointerEvent, ray: Ray): void {
+    if (!this.config.placementMode.isActive()) {
+        this.config.getGridRenderer?.()?.setHighlight(null);
+        return;
+    }
 
-        // Cancel any pending update
-        if (this.pendingMouseUpdate && this.pendingMouseUpdate.rafId !== null) {
-          cancelAnimationFrame(this.pendingMouseUpdate.rafId);
-        }
+    // Throttle updates using RAF
+    this.pendingRay = ray;
+    
+    if (this.rafId === null) {
+        this.rafId = requestAnimationFrame(() => {
+            this.updatePreview();
+            this.rafId = null;
+        });
+    }
+  }
 
-        // Schedule update on next animation frame (throttles to ~60fps)
-        const rafId = requestAnimationFrame(() => {
-          if (!this.config.placementMode.isActive()) {
-            return;
-          }
+  public onPointerUp(_event: PointerEvent, ray: Ray): void {
+    if (!this.config.placementMode.isActive()) return;
 
-          const ray = this.createRayFromMouseEvent(event);
-          if (!ray) return;
+    const action = this.config.placementMode.handleInput('up', ray);
+    if (action === 'confirm') {
+        void this.performPlacement(ray);
+    }
+  }
 
-          // Try adjacent placement first (snapping to existing entities)
-          const adjacent = this.getAdjacentPlacementFromRay(ray);
-          if (adjacent) {
-            const exclude = this.getLastRaycastEntity(ray);
-            if (exclude) {
-              void this.config.placementMode.updatePreviewPosition(adjacent, {
-                ignoreEntities: [exclude],
-                applySnap: false,
-              });
-            } else {
-              void this.config.placementMode.updatePreviewPosition(adjacent, {
-                applySnap: false,
-              });
-            }
-            return;
-          }
+  public cancel(): void {
+    if (this.config.placementMode.isActive()) {
+      try {
+        this.config.placementMode.cancelPlacement();
+        this.config.state.placementMode.value = false;
+        this.config.onStatusMessage?.('Placement cancelled', 500);
+      } catch {}
+    }
+    this.config.getGridRenderer?.()?.setHighlight(null);
+  }
 
-          // Fall back to ground plane intersection
+  private updatePreview(): void {
+      if (!this.pendingRay || !this.config.placementMode.isActive()) {
+           this.config.getGridRenderer?.()?.setHighlight(null);
+           return;
+      }
+      
+      const ray = this.pendingRay;
+
+      // Notify tool of move
+      this.config.placementMode.handleInput('move', ray);
+
+      // Check for Global Grid Snap mode
+      const isGridSnap = this.config.state.snapConfig.value.enabled;
+      const gridRenderer = this.config.getGridRenderer?.();
+
+      // Try adjacent placement first
+      const adjacent = !isGridSnap ? this.getAdjacentPlacementFromRay(ray) : null;
+
+      if (adjacent) {
+        gridRenderer?.setHighlight(null); 
+        const exclude = this.getLastRaycastEntity(ray);
+        const ignoreEntities = this.getIgnoreEntities(ray);
+
+        const options = {
+          ignoreEntities: ignoreEntities,
+          applySnap: false,
+          surfaceNormal: adjacent.normal,
+          targetEntity: exclude || undefined
+        };
+        
+        void this.config.placementMode.updatePreviewPosition(adjacent.position, options);
+        return;
+      }
+
+      // Fall back to ground plane
+      const groundIntersection = this.raycastToGroundPlane(ray);
+      if (groundIntersection) {
+         if (gridRenderer && this.config.state.showGrid.value) {
+           const cellSize = this.config.state.gridConfig.value.cellSize;
+           const snappedX = Math.floor(groundIntersection[0] / cellSize) * cellSize + cellSize / 2;
+           const snappedZ = Math.floor(groundIntersection[2] / cellSize) * cellSize + cellSize / 2;
+           const gridHeight = this.config.state.gridConfig.value.height;
+           gridRenderer.setHighlight([snappedX, gridHeight, snappedZ]);
+         }
+
+         let targetPos = groundIntersection;
+         let shouldSnap = true; 
+
+         if (isGridSnap) {
+           const cellSize = this.config.state.gridConfig.value.cellSize;
+           const snap = (val: number) => Math.round(val / cellSize) * cellSize;
+           targetPos = [
+             snap(groundIntersection[0]),
+             snap(groundIntersection[1]),
+             snap(groundIntersection[2])
+           ];
+           shouldSnap = false;
+         }
+         
+         const ignoreEntities = this.getIgnoreEntities(ray);
+
+        void this.config.placementMode.updatePreviewPosition(targetPos, {
+          applySnap: shouldSnap,
+          surfaceNormal: [0, 1, 0],
+          ignoreEntities: ignoreEntities
+        });
+        return;
+      }
+      
+      gridRenderer?.setHighlight(null);
+  }
+
+  private async performPlacement(ray: Ray): Promise<void> {
+        // Update position one last time before confirming
+        const isGridSnap = this.config.state.snapConfig.value.enabled;
+        const adjacent = !isGridSnap ? this.getAdjacentPlacementFromRay(ray) : null;
+        
+        if (adjacent) {
+          const exclude = this.getLastRaycastEntity(ray);
+          const ignoreEntities = this.getIgnoreEntities(ray);
+          
+          const options = {
+            ignoreEntities: ignoreEntities,
+            applySnap: false,
+            surfaceNormal: adjacent.normal,
+            targetEntity: exclude || undefined
+          };
+          
+          await this.config.placementMode.updatePreviewPosition(adjacent.position, options);
+        } else {
           const groundIntersection = this.raycastToGroundPlane(ray);
           if (groundIntersection) {
-            void this.config.placementMode.updatePreviewPosition(groundIntersection);
-            return;
-          }
+             let targetPos = groundIntersection;
+             let shouldSnap = true;
 
-          // No valid placement position found - keep ghost at last known position
-          // This prevents the ghost from "jumping back" to camera when moving away from blocks
-
-          // Clear pending update
-          if (this.pendingMouseUpdate?.rafId === rafId) {
-            this.pendingMouseUpdate = null;
-          }
-        });
-
-        this.pendingMouseUpdate = { event, rafId };
-      },
-      { signal: this.abortController.signal }
-    );
-  }
-
-  /**
-   * Sets up double-click to confirm and ESC to cancel.
-   */
-  private setupConfirmationHandlers(): void {
-    if (!this.abortController) return;
-
-    // Double-click to confirm placement
-    this.config.canvas.addEventListener(
-      'dblclick',
-      async (event: MouseEvent) => {
-        if (!this.config.placementMode.isActive()) {
-          return;
-        }
-
-        // Update position one last time before confirming
-        // IMPORTANT: Wait for update to complete to ensure position is correct
-        const ray = this.createRayFromMouseEvent(event);
-        if (ray) {
-          const adjacent = this.getAdjacentPlacementFromRay(ray);
-          if (adjacent) {
-            const exclude = this.getLastRaycastEntity(ray);
-            if (exclude) {
-              await this.config.placementMode.updatePreviewPosition(adjacent, {
-                ignoreEntities: [exclude],
-                applySnap: false,
-              });
-            } else {
-              await this.config.placementMode.updatePreviewPosition(adjacent, {
-                applySnap: false,
-              });
-            }
-          } else {
-            const groundIntersection = this.raycastToGroundPlane(ray);
-            if (groundIntersection) {
-              await this.config.placementMode.updatePreviewPosition(groundIntersection);
-            }
-            // No valid placement position found - keep ghost at last known position
+             if (isGridSnap) {
+               const cellSize = this.config.state.gridConfig.value.cellSize;
+               const snap = (val: number) => Math.round(val / cellSize) * cellSize;
+               targetPos = [
+                 snap(groundIntersection[0]),
+                 snap(groundIntersection[1]),
+                 snap(groundIntersection[2])
+               ];
+               shouldSnap = false;
+             }
+              
+            const ignoreEntities = this.getIgnoreEntities(ray);
+            await this.config.placementMode.updatePreviewPosition(targetPos, {
+               applySnap: shouldSnap,
+               surfaceNormal: [0, 1, 0],
+               ignoreEntities: ignoreEntities
+            });
           }
         }
 
-        // Confirm placement after position is updated
         const placed = this.config.placementMode.confirmPlacement();
+        
         if (placed) {
-          this.config.selection.select(placed);
+          const entities = Array.isArray(placed) ? placed : [placed];
+          
+          if (entities.length > 0) {
+              this.config.selection.selectMultiple(entities);
+          }
+          
           this.config.updateSceneBuffers();
-          // Don't disable placement mode if Easy Place is active (it handles auto-continuation)
-          // Also don't disable if placement mode is still active (auto-continuation may have restarted it)
-          // Use a small delay to allow auto-continuation callbacks to execute first
+          
           if (!this.config.state.easyPlaceMode.value) {
             setTimeout(() => {
-              // Only disable if placement mode is still inactive after callback execution
-              // This allows auto-continuation (e.g., from hotbar) to restart placement mode
               if (!this.config.placementMode.isActive()) {
                 this.config.state.placementMode.value = false;
               }
             }, 50);
           }
-          this.config.recordSnapshot('Place object');
+          
+          const count = entities.length > 0 ? entities.length : 1; 
+          this.config.recordSnapshot(count > 1 ? `Place ${count} objects` : 'Place object');
           try {
             this.config.state?.adaptiveUI?.trackPlacement?.();
           } catch {}
-          this.config.onStatusMessage?.('Object placed!', 1000);
-          Logger.debug(`Placed entity: ${placed.name}`);
+          this.config.onStatusMessage?.(count > 1 ? `${count} objects placed!` : 'Object placed!', 1000);
+          Logger.debug(`Placed ${count} entities`);
         } else {
-          this.config.onStatusMessage?.('Cannot place here (collision)', 1000);
-          Logger.debug('Placement failed: collision detected');
+          this.config.onStatusMessage?.('Cannot place here (collision/invalid)', 1000);
+          Logger.debug('Placement failed: collision detected or invalid state');
         }
-      },
-      { signal: this.abortController.signal }
-    );
-
-    // Fallback: global Esc cancels placement even if other handlers miss it
-    window.addEventListener(
-      'keydown',
-      (event: KeyboardEvent) => {
-        if (event.key === 'Escape' && this.config.placementMode.isActive()) {
-          try {
-            this.config.placementMode.cancelPlacement();
-            this.config.state.placementMode.value = false;
-            this.config.onStatusMessage?.('Placement cancelled', 500);
-          } catch {}
-        }
-      },
-      { signal: this.abortController.signal }
-    );
-
-    // Right-click to cancel (matches on-screen hint). Prevent default context menu.
-    this.config.canvas.addEventListener(
-      'contextmenu',
-      (event: MouseEvent) => {
-        event.preventDefault();
-        if (this.config.placementMode.isActive()) {
-          try {
-            this.config.placementMode.cancelPlacement();
-            this.config.state.placementMode.value = false;
-            this.config.onStatusMessage?.('Placement cancelled', 500);
-          } catch {}
-        }
-      },
-      { signal: this.abortController.signal }
-    );
   }
-
-  /**
-   * Creates a world-space ray from a mouse event.
-   * 
-   * Uses CameraDirector matrices if available (supports free-fly/FPS/third-person),
-   * falls back to OrbitControls-derived matrices if CameraDirector is unavailable
-   * or matrices are invalid.
-   * 
-   * @returns Ray with origin and direction, or null if ray creation fails
-   */
-  private createRayFromMouseEvent(event: MouseEvent): { origin: Vec3; direction: Vec3 } | null {
-    const rect = this.config.canvas.getBoundingClientRect();
-    // Calculate mouse position in canvas coordinates (accounting for canvas size vs display size)
-    const canvasDisplayWidth = rect.width;
-    const canvasDisplayHeight = rect.height;
-    const canvasInternalWidth = this.config.canvas.width;
-    const canvasInternalHeight = this.config.canvas.height;
-    
-    const mouseX = ((event.clientX - rect.left) / canvasDisplayWidth) * canvasInternalWidth;
-    const mouseY = ((event.clientY - rect.top) / canvasDisplayHeight) * canvasInternalHeight;
-
-    // Prefer CameraDirector matrices (supports free-fly/FPS/third-person)
-    const director = this.config.cameraDirector;
-    if (director) {
-      const viewMatrix = director.getViewMatrix();
-      const projectionMatrix = director.getProjectionMatrix();
+  
+  private getIgnoreEntities(ray: { origin: Vec3; direction: Vec3 }): Entity[] {
+      const previews = this.config.placementMode.getPreviewEntities();
+      const hitEntity = this.getLastRaycastEntity(ray);
       
-      // Validate matrices before using
-      if (!viewMatrix || !projectionMatrix) {
-        Logger.warn(
-          'EditorPlacementController: CameraDirector matrices are null/undefined',
-          { hasView: !!viewMatrix, hasProjection: !!projectionMatrix }
-        );
-        // Fall through to orbit controls fallback
-      } else {
-        // Additional validation: check if matrices are valid arrays with correct dimensions
-        if (viewMatrix.length === 16 && projectionMatrix.length === 16) {
-          // Verify matrices contain valid numbers (not NaN or Infinity)
-          let isValid = true;
-          for (let i = 0; i < 16; i++) {
-            if (!Number.isFinite(viewMatrix[i]!) || !Number.isFinite(projectionMatrix[i]!)) {
-              isValid = false;
-              break;
-            }
-          }
-          
-          if (isValid) {
-            return this.raycaster.createRayFromScreen(
-              mouseX,
-              mouseY,
-              canvasInternalWidth,
-              canvasInternalHeight,
-              viewMatrix,
-              projectionMatrix
-            );
-          } else {
-            Logger.warn(
-              'EditorPlacementController: CameraDirector matrices contain invalid values (NaN/Infinity)',
-              { viewMatrix, projectionMatrix }
-            );
-            // Fall through to orbit controls fallback
-          }
-        } else {
-          Logger.warn(
-            'EditorPlacementController: CameraDirector matrices have invalid dimensions',
-            { viewLength: viewMatrix.length, projectionLength: projectionMatrix.length }
-          );
-          // Fall through to orbit controls fallback
-        }
-      }
-    }
-
-    // Fallback to legacy orbit-controls derived matrices
-    // This is always available as controls is required in config
-    try {
-      const { yaw, pitch, distance } = this.config.controls.getState();
-      const aspect = canvasInternalWidth / canvasInternalHeight;
-
-      const projectionMatrix = new Float32Array(16) as Mat4;
-      const viewMatrix = new Float32Array(16) as Mat4;
-
-      mat4Perspective(projectionMatrix, FOV_RADIANS, aspect, Z_NEAR, Z_FAR);
-
-      const eyeX = Math.cos(pitch) * Math.sin(yaw) * distance;
-      const eyeY = Math.sin(pitch) * distance;
-      const eyeZ = Math.cos(pitch) * Math.cos(yaw) * distance;
-      mat4LookAt(viewMatrix, [eyeX, eyeY, eyeZ], [0, 0, 0], [0, 1, 0]);
-
-      return this.raycaster.createRayFromScreen(
-        mouseX,
-        mouseY,
-        canvasInternalWidth,
-        canvasInternalHeight,
-        viewMatrix,
-        projectionMatrix
-      );
-    } catch (error) {
-      Logger.error('EditorPlacementController: Failed to create ray from orbit controls', error);
-      return null;
-    }
+      const list = [...previews];
+      if (hitEntity) list.push(hitEntity);
+      
+      return list.length > 0 ? list : [];
   }
 
-  /**
-   * Attempts to compute an adjacent placement position from a ray hit on an entity.
-   */
-  private getAdjacentPlacementFromRay(ray: { origin: Vec3; direction: Vec3 }): Vec3 | null {
-    const preview = this.config.placementMode.getPreviewEntity();
-    if (!preview) return null;
+  private getAdjacentPlacementFromRay(ray: { origin: Vec3; direction: Vec3 }): { position: Vec3; normal: Vec3 } | null {
+    const previews = this.config.placementMode.getPreviewEntities();
 
-    // Exclude preview entity from raycast
+    // Exclude preview entities from raycast
     const entities = this.config.scene
       .getActiveEntities()
-      .filter((e) => e !== preview && !e.userData.isPreview && !e.getComponent(CameraComponent));
+      .filter((e) => !previews.includes(e) && !e.userData.isPreview && !e.getComponent(CameraComponent));
 
     if (entities.length === 0) return null;
 
     let hit = this.raycaster.raycastClosest(ray as any, entities) as { entity: Entity; point: Vec3 } | null;
-    // Fallback: if triangle raycast fails (e.g., missing mesh acceleration), use OBB raycast
     if (!hit) {
       hit = this.raycastClosestOBB(ray, entities);
       if (!hit) return null;
@@ -362,7 +274,12 @@ export class EditorPlacementController {
 
     const target = hit.entity;
     const targetWorld = target.transform.getWorldMatrix();
-    const previewWorld = preview.transform.getWorldMatrix();
+    const preview = previews[0];
+    const previewWorld = preview ? preview.transform.getWorldMatrix() : new Float32Array(16) as Mat4; 
+    if (!preview) {
+        previewWorld[0] = 1; previewWorld[5] = 1; previewWorld[10] = 1; previewWorld[15] = 1;
+    }
+
     const invTargetWorld = new Float32Array(16) as Mat4;
     try {
       mat4Invert(invTargetWorld, targetWorld);
@@ -370,7 +287,6 @@ export class EditorPlacementController {
       return null;
     }
 
-    // Transform hit point into target local space to determine the impacted face
     const hx = hit.point[0];
     const hy = hit.point[1];
     const hz = hit.point[2];
@@ -478,13 +394,9 @@ export class EditorPlacementController {
       centerWorld[2] + axisVector[2] * offset,
     ];
 
-    return pos;
+    return { position: pos, normal: axisVector };
   }
 
-  /**
-   * Fallback raycast against entity OBBs using a slab test in OBB space.
-   * Returns closest hit in front of the ray origin.
-   */
   private raycastClosestOBB(
     ray: { origin: Vec3; direction: Vec3 },
     entities: Entity[]
@@ -494,10 +406,8 @@ export class EditorPlacementController {
 
     const EPS = 1e-6;
     for (const ent of entities) {
-      // Skip virtual camera holders
       try { if (ent.getComponent(CameraComponent)) continue; } catch {}
       const obb = this.obbHelper.getOBB(ent);
-      // Transform ray into OBB local coordinates: project onto axes
       const px = ray.origin[0] - obb.center[0];
       const py = ray.origin[1] - obb.center[1];
       const pz = ray.origin[2] - obb.center[2];
@@ -516,7 +426,6 @@ export class EditorPlacementController {
       let tmax = Infinity;
       const half = obb.halfSizes;
 
-      // Slab test for each axis in OBB local space
       for (let i = 0; i < 3; i++) {
         const pi = p[i]!;
         const di = d[i]!;
@@ -524,9 +433,8 @@ export class EditorPlacementController {
         if (Math.abs(di) < EPS) {
           if (pi < -hi || pi > hi) {
             tmin = Infinity;
-            break; // No intersection with this box
+            break; 
           }
-          // Parallel and inside slab → no bounds update
           continue;
         }
         let t1 = (-hi - pi) / di;
@@ -539,7 +447,6 @@ export class EditorPlacementController {
         if (tmin > tmax) { tmin = Infinity; break; }
       }
 
-      // Choose the nearest valid intersection in front of origin
       if (tmin !== Infinity) {
         const tHit = tmin >= 0 ? tmin : tmax;
         if (tHit >= 0 && tHit < bestT) {
@@ -557,14 +464,11 @@ export class EditorPlacementController {
     return best;
   }
 
-  /**
-   * Helper to get the entity last hit by a ray (closest).
-   */
   private getLastRaycastEntity(ray: { origin: Vec3; direction: Vec3 }): Entity | null {
-    const preview = this.config.placementMode.getPreviewEntity();
+    const previews = this.config.placementMode.getPreviewEntities();
     const entities = this.config.scene
       .getActiveEntities()
-      .filter((e) => e !== preview && !e.userData.isPreview && !e.getComponent(CameraComponent));
+      .filter((e) => !previews.includes(e) && !e.userData.isPreview && !e.getComponent(CameraComponent));
     
     if (entities.length === 0) return null;
     
@@ -574,14 +478,6 @@ export class EditorPlacementController {
     return obbHit?.entity ?? null;
   }
 
-  /**
-   * Raycasts to find ground position. Prioritizes terrain entities, falls back to y=0 plane.
-   * 
-   * Strategy:
-   * 1. First, try raycasting to entities with TerrainComponent (prioritized)
-   * 2. Then, try raycasting to other scene entities (ground meshes, etc.)
-   * 3. Finally, fallback to y=0 plane only if no terrain entities exist
-   */
   private raycastToGroundPlane(ray: { origin: Vec3; direction: Vec3 }): Vec3 | null {
     const { origin, direction } = ray;
 
@@ -589,12 +485,11 @@ export class EditorPlacementController {
       return null;
     }
 
-    const preview = this.config.placementMode.getPreviewEntity();
+    const previews = this.config.placementMode.getPreviewEntities();
     const allEntities = this.config.scene
       .getActiveEntities()
-      .filter((e) => e !== preview && !e.userData.isPreview);
+      .filter((e) => !previews.includes(e) && !e.userData.isPreview);
 
-    // Separate terrain entities from other entities
     const terrainEntities: Entity[] = [];
     const otherEntities: Entity[] = [];
     
@@ -606,51 +501,43 @@ export class EditorPlacementController {
           otherEntities.push(entity);
         }
       } catch {
-        // If component check fails, treat as other entity
         otherEntities.push(entity);
       }
     }
 
-    // Priority 1: Raycast to terrain entities first
     if (terrainEntities.length > 0) {
       const terrainHit = this.raycaster.raycastClosest(ray as any, terrainEntities);
       if (terrainHit && terrainHit.point) {
-        // Use terrain hit point regardless of Y height (terrain can be at any elevation)
         const hitY = terrainHit.point[1];
-        const previewScale = preview?.transform.scale ?? [1, 1, 1];
+        const previewScale = previews[0]?.transform.scale ?? [1, 1, 1];
         const placementY = hitY + Math.max(0.001, Math.abs(previewScale[1]) / 2);
         return [terrainHit.point[0], placementY, terrainHit.point[2]];
       }
     }
 
-    // Priority 2: Raycast to other scene entities (ground meshes, etc.)
     if (otherEntities.length > 0) {
       const hit = this.raycaster.raycastClosest(ray as any, otherEntities);
       if (hit && hit.point) {
-        // Use hit point if it's below the ray origin (downward raycast)
-        // This ensures we're hitting a surface below, not above
         const hitY = hit.point[1];
         const originY = origin[1];
         
-        // Accept hit if it's below the origin or very close (within 0.1 units)
-        // This handles both downward rays and near-horizontal rays
         if (hitY <= originY + 0.1) {
-          const previewScale = preview?.transform.scale ?? [1, 1, 1];
+          const previewScale = previews[0]?.transform.scale ?? [1, 1, 1];
           const placementY = hitY + Math.max(0.001, Math.abs(previewScale[1]) / 2);
           return [hit.point[0], placementY, hit.point[2]];
         }
       }
     }
 
-    // Priority 3: Fallback to y=0 plane only if no terrain entities exist
-    // If terrain exists, we should have hit it above, so this is a last resort
     if (terrainEntities.length === 0) {
       const dy = direction[1];
       if (!Number.isFinite(dy) || Math.abs(dy) < 0.0001) {
         return null;
       }
+      
+      const gridHeight = this.config.state.gridConfig.value.height;
 
-      const t = -origin[1] / dy;
+      const t = -(origin[1] - gridHeight) / dy;
 
       if (!Number.isFinite(t) || t < 0) {
         return null;
@@ -663,39 +550,19 @@ export class EditorPlacementController {
         return null;
       }
 
-      // Place above ground plane based on preview scale
-      const previewScale = preview?.transform.scale ?? [1, 1, 1];
-      const placementY = Math.max(0.001, Math.abs(previewScale[1]) / 2);
+      const previewScale = previews[0]?.transform.scale ?? [1, 1, 1];
+      const placementY = gridHeight + Math.max(0.001, Math.abs(previewScale[1]) / 2);
 
       return [x, placementY, z];
     }
 
-    // If terrain exists but we didn't hit it, return null (don't use y=0 fallback)
     return null;
   }
 
-  /**
-   * Gets the raycaster instance (for external use if needed).
-   */
-  getRaycaster(): Raycaster {
-    return this.raycaster;
-  }
-
-  /**
-   * Checks if placement mode is currently active.
-   */
-  isPlacementActive(): boolean {
-    return this.config.placementMode.isActive();
-  }
-
-  /**
-   * Cleans up resources.
-   */
-  dispose(): void {
-    // Cancel any pending animation frame
-    if (this.pendingMouseUpdate && this.pendingMouseUpdate.rafId !== null) {
-      cancelAnimationFrame(this.pendingMouseUpdate.rafId);
-      this.pendingMouseUpdate = null;
+  public dispose(): void {
+    if (this.rafId !== null) {
+      cancelAnimationFrame(this.rafId);
+      this.rafId = null;
     }
 
     if (this.abortController) {

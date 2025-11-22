@@ -7,6 +7,7 @@ import { TonemapLutPass } from '../postprocess/TonemapLut';
 import { BloomPass } from '../postprocess/Bloom';
 import { FXAAPass } from '../postprocess/FXAAPass';
 import { SSAOPass } from '../postprocess/SSAO';
+import { SSGIPass } from '../postprocess/SSGIPass';
 import { OutlinePass } from '../postprocess/OutlinePass';
 import { NormalRenderPass } from './NormalRenderPass';
 import { TIMESTAMP_INDICES } from '../config';
@@ -15,6 +16,7 @@ export interface PostProcessFeatureFlags {
   enableHDR: boolean;
   enableBloom: boolean;
   enableSSAO: boolean;
+  enableSSGI?: boolean;
   enableFXAA: boolean;
   enableOutlines?: boolean;
 }
@@ -29,6 +31,7 @@ export interface PostProcessInputs {
     bloomView: GPUTextureView | null;
     normalView: GPUTextureView | null;
     ssaoView: GPUTextureView | null;
+    ssgiView?: GPUTextureView | null;
     resolvedDepthView: GPUTextureView | null;
     tonemapIntermediateView: GPUTextureView | null;
     needsDepthStore: boolean;
@@ -45,6 +48,7 @@ export class PostProcessPipeline {
   private bloomPass: BloomPass | null = null;
   private fxaaPass: FXAAPass | null = null;
   private ssaoPass: SSAOPass | null = null;
+  private ssgiPass: SSGIPass | null = null;
   private outlinePass: OutlinePass | null = null;
   private normalRenderPass: NormalRenderPass | null = null;
   private depthResolvePipeline: GPURenderPipeline | null = null;
@@ -71,6 +75,7 @@ export class PostProcessPipeline {
     const enableHDR = featureFlags.enableHDR;
     const enableBloom = featureFlags.enableBloom && enableHDR;
     const enableSSAO = featureFlags.enableSSAO;
+    const enableSSGI = featureFlags.enableSSGI;
     const enableFXAA = featureFlags.enableFXAA && enableHDR;
     const enableOutlines = featureFlags.enableOutlines === true;
 
@@ -78,6 +83,7 @@ export class PostProcessPipeline {
     const bloomView = targets.bloomView;
     const normalView = targets.normalView;
     const ssaoView = targets.ssaoView;
+    const ssgiView = targets.ssgiView;
     const resolvedDepthView = targets.resolvedDepthView;
     const tonemapIntermediateView = targets.tonemapIntermediateView;
     const depthView = frameResources.depthTextureView;
@@ -86,23 +92,42 @@ export class PostProcessPipeline {
       return;
     }
 
-    if (enableSSAO) {
+    if (enableSSGI) {
+      this.ensureSsgiPass(device);
+    } else if (enableSSAO) {
       this.ensureSsaoPass(device);
     }
 
-    if (enableSSAO && normalView) {
+    if ((enableSSAO || enableSSGI) && normalView) {
       this.ensureNormalPass(device, frameResources);
       this.renderNormalPass(encoder, frameResources, geometry, normalView);
     }
 
     const depthForSsao =
-      enableSSAO && sampleCount > 1 ? resolvedDepthView ?? null : depthView;
+      (enableSSAO || enableSSGI) && sampleCount > 1 ? resolvedDepthView ?? null : depthView;
 
-    if (enableSSAO && sampleCount > 1 && resolvedDepthView) {
+    if ((enableSSAO || enableSSGI) && sampleCount > 1 && resolvedDepthView) {
       this.resolveDepth(device, encoder, depthView, resolvedDepthView, ctx.canvas.width, ctx.canvas.height);
     }
 
+    // Run SSGI if enabled (replaces SSAO usually, or combines)
     if (
+      enableSSGI &&
+      this.ssgiPass &&
+      depthForSsao &&
+      ssgiView &&
+      normalView &&
+      frameResources.cameraUniformBuffer // Assuming camera UBO exists
+    ) {
+      this.ssgiPass.render(
+        encoder,
+        depthForSsao,
+        normalView,
+        hdrView ?? swapChainView,
+        ssgiView,
+        frameResources.uniformBuffer
+      );
+    } else if (
       enableSSAO &&
       this.ssaoPass &&
       depthForSsao &&
@@ -197,6 +222,9 @@ export class PostProcessPipeline {
     this.fxaaPass = null;
     this.ssaoPass?.dispose?.();
     this.ssaoPass = null;
+    this.ssgiPass?.dispose?.(); // Assuming SSGIPass has dispose (it doesn't have ? because I implemented it, but safe to check)
+    // Wait, my implementation has dispose.
+    this.ssgiPass = null;
     this.outlinePass?.dispose?.();
     this.outlinePass = null;
     this.normalRenderPass?.dispose();
@@ -240,6 +268,12 @@ export class PostProcessPipeline {
     if (!this.ssaoPass) {
       this.ssaoPass = new SSAOPass(device);
       this.ssaoPass.initialize('rgba16float');
+    }
+  }
+
+  private ensureSsgiPass(device: GPUDevice): void {
+    if (!this.ssgiPass) {
+      this.ssgiPass = new SSGIPass(device);
     }
   }
 

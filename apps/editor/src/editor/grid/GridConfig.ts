@@ -1,6 +1,6 @@
 /**
  * Configuration for 3D grid visualization in the editor.
- * Inspired by Minecraft's building grid system.
+ * Inspired by voxel building grid systems.
  */
 
 /**
@@ -37,6 +37,15 @@ export interface GridConfig {
   /** Interval for major lines (every N cells) */
   majorLineInterval: number;
 
+  /** Grid height (Y-offset) */
+  height: number;
+
+  /** Highlighted cell position (optional) */
+  highlightPosition?: [number, number, number] | undefined;
+
+  /** Highlight color (optional) */
+  highlightColor?: string;
+
   /** Infinite grid settings */
   infinite?: boolean;
   fadeDistance?: number;
@@ -71,6 +80,8 @@ export const DEFAULT_GRID_CONFIG: GridConfig = {
     origin: '#ff0000',
   },
   majorLineInterval: 5,
+  height: 0,
+  highlightColor: '#ffffff40',
   infinite: true,
   fadeDistance: 100,
   axisColors: {

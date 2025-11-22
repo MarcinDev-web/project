@@ -3,7 +3,7 @@
  * Supports both PostgreSQL (preferred) and JSON file storage (fallback)
  */
 
-import type { PrismaClient } from '../../node_modules/.prisma/net-client/index.js';
+import { PrismaClient } from '@engine/database';
 import { promises as fs } from 'fs';
 import path from 'path';
 import type { ProjectData } from '../types.js';
@@ -65,10 +65,10 @@ export class StudioProjectsStorageDB {
     const jsonData = JSON.stringify(data.projectData);
     const buffer = Buffer.from(jsonData, 'utf-8');
 
-    await this.prisma.userProject.create({
+    await this.prisma.project.create({
       data: {
         id,
-        userId,
+        ownerId: userId,
         name: data.name,
         description: data.description ?? null,
         projectData: buffer,
@@ -87,10 +87,10 @@ export class StudioProjectsStorageDB {
   }
 
   async getProject(userId: string, projectId: string): Promise<StudioProject | null> {
-    const project = await this.prisma.userProject.findUnique({
+    const project = await this.prisma.project.findUnique({
       where: {
         id: projectId,
-        userId,
+        ownerId: userId,
       },
     });
 
@@ -99,11 +99,11 @@ export class StudioProjectsStorageDB {
     }
 
     try {
-      const jsonData = project.projectData.toString('utf-8');
+      const jsonData = project.projectData ? project.projectData.toString('utf-8') : '{}';
       const projectData = JSON.parse(jsonData) as ProjectData;
       const result: StudioProject = {
         id: project.id,
-        userId: project.userId,
+        userId: project.ownerId,
         name: project.name,
         projectData,
         isPublished: project.isPublished,
@@ -133,8 +133,8 @@ export class StudioProjectsStorageDB {
     userId: string,
     options?: { limit?: number; offset?: number }
   ): Promise<StudioProject[]> {
-    const projects = await this.prisma.userProject.findMany({
-      where: { userId },
+    const projects = await this.prisma.project.findMany({
+      where: { ownerId: userId },
       orderBy: { updatedAt: 'desc' },
       ...(options?.limit && { take: options.limit }),
       ...(options?.offset && { skip: options.offset }),
@@ -143,22 +143,22 @@ export class StudioProjectsStorageDB {
     return projects.map(
       (project: {
         id: string;
-        userId: string;
+        ownerId: string;
         name: string;
         description: string | null;
         thumbnailUrl: string | null;
-        projectData: Buffer;
+        projectData: Buffer | null;
         isPublished: boolean;
         createdAt: Date;
         updatedAt: Date;
         version: number;
       }) => {
         try {
-          const jsonData = project.projectData.toString('utf-8');
+          const jsonData = project.projectData ? project.projectData.toString('utf-8') : '{}';
           const projectData = JSON.parse(jsonData) as ProjectData;
           const result: StudioProject = {
             id: project.id,
-            userId: project.userId,
+            userId: project.ownerId,
             name: project.name,
             projectData,
             isPublished: project.isPublished,
@@ -211,7 +211,7 @@ export class StudioProjectsStorageDB {
     const take = options?.limit;
     const skip = options?.offset ?? 0;
 
-    const projects = await this.prisma.userProject.findMany({
+    const projects = await this.prisma.project.findMany({
       where,
       orderBy: { updatedAt: 'desc' },
       ...(take !== undefined ? { take } : {}),
@@ -220,11 +220,11 @@ export class StudioProjectsStorageDB {
 
     return projects.map((project) => {
       try {
-        const jsonData = project.projectData.toString('utf-8');
+        const jsonData = project.projectData ? project.projectData.toString('utf-8') : '{}';
         const projectData = JSON.parse(jsonData) as ProjectData;
         const result: StudioProject = {
           id: project.id,
-          userId: project.userId,
+          userId: project.ownerId,
           name: project.name,
           projectData,
           isPublished: project.isPublished,
@@ -296,10 +296,10 @@ export class StudioProjectsStorageDB {
       return existing;
     }
 
-    await this.prisma.userProject.update({
+    await this.prisma.project.update({
       where: {
         id: projectId,
-        userId,
+        ownerId: userId,
       },
       data: updateData,
     });
@@ -313,10 +313,10 @@ export class StudioProjectsStorageDB {
 
   async deleteProject(userId: string, projectId: string): Promise<boolean> {
     try {
-      await this.prisma.userProject.delete({
+      await this.prisma.project.delete({
         where: {
           id: projectId,
-          userId,
+          ownerId: userId,
         },
       });
       return true;
@@ -327,12 +327,12 @@ export class StudioProjectsStorageDB {
 
   async countProjects(userId: string): Promise<{ total: number; published: number }> {
     const [total, published] = await Promise.all([
-      this.prisma.userProject.count({
-        where: { userId },
+      this.prisma.project.count({
+        where: { ownerId: userId },
       }),
-      this.prisma.userProject.count({
+      this.prisma.project.count({
         where: {
-          userId,
+          ownerId: userId,
           isPublished: true,
         },
       }),

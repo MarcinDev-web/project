@@ -7,6 +7,15 @@ import { afterEach, vi } from 'vitest';
 
 // Mock WASM collision package to avoid ESM integration errors in tests
 // This prevents Vite from trying to load WASM files during test execution
+
+// 1. Mock the package module itself (if aliased correctly or resolved via node)
+vi.mock('@engine/wasm-collision', () => ({
+  init: vi.fn().mockResolvedValue({}),
+  getTrsBuffers: () => ({ positions: new Float32Array(0), rotations: new Float32Array(0), scales: new Float32Array(0) }),
+  releaseTrsBuffers: vi.fn(),
+}));
+
+// 2. Mock the specific internal file that might be imported by the package
 vi.mock('@engine/wasm-collision/pkg/collision.js', () => ({
   default: {
     init: vi.fn().mockResolvedValue(undefined),
@@ -15,6 +24,9 @@ vi.mock('@engine/wasm-collision/pkg/collision.js', () => ({
   init: vi.fn().mockResolvedValue(undefined),
   init_panic_hook: vi.fn(),
 }));
+
+// 3. (Removed regex mock as it is not supported)
+
 
 // Check if we're in a browser-like environment (jsdom)
 const isBrowserEnv = typeof window !== 'undefined' && typeof document !== 'undefined';

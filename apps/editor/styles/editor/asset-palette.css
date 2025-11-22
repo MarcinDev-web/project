@@ -1,6 +1,6 @@
 /**
  * Asset Palette - Game-like Asset Browser
- * Inspired by Minecraft, Kogama, and The Sims
+ * Inspired by popular voxel games
  */
 
 /* ============================================
@@ -21,7 +21,7 @@
 }
 
 /* ============================================
-   HOTBAR - Minecraft Style Bottom Bar
+   HOTBAR - Voxel Style Bottom Bar
    ============================================ */
 
 .asset-hotbar {
@@ -50,7 +50,7 @@
 }
 
 /* ============================================
-   HOTBAR SLOTS - Minecraft Style
+   HOTBAR SLOTS - Voxel Style
    ============================================ */
 
 .hotbar-slot {
@@ -496,7 +496,7 @@
 }
 
 /* ============================================
-   CATEGORY TABS - Minecraft Creative Menu Style
+   CATEGORY TABS - Creative Menu Style
    ============================================ */
 
 .palette-category-tabs {
@@ -667,7 +667,7 @@
 }
 
 /* ============================================
-   ASSET GRID - Kogama/Sims Style
+   ASSET GRID - Grid Style
    ============================================ */
 
 .palette-asset-grid {

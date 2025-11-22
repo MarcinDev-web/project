@@ -1,7 +1,7 @@
 # Package Guidelines - Where Does Code Belong?
 
-**Version:** 1.0  
-**Last Updated:** 2025-10-26  
+**Version:** 1.1
+**Last Updated:** 2025-11-22
 **Mandatory for all code contributions**
 
 ## TL;DR
@@ -47,7 +47,8 @@
                     │ - ECS/World?          │
                     │   → @engine/world     │
                     │ - Assets?             │
-                    │   → @engine/assets    │
+                    │   → @engine/asset-    │
+                    │     pipeline          │
                     │ - Camera?             │
                     │   → @engine/camera    │
                     │ - Editor tool?        │
@@ -126,24 +127,24 @@
 
 ---
 
-### @engine/assets
-**Purpose:** Asset loading, management, registry
+### @engine/asset-pipeline
+**Purpose:** Asset loading, processing, and parsing
 
 **Belongs here:**
-- `AssetRegistry` (filtering, collections)
-- GLTF/GLB loading
-- Asset optimization
-- Asset types and metadata
+- GLTF/GLB parsing and loading
+- Texture loading
+- Asset optimization pipelines
+- Asset format definitions
 
 **Examples:**
-- ✅ `AssetRegistry` class
-- ✅ `AssetImporter`
-- ✅ `GltfOptimizer`
+- ✅ `AssetPipeline` class
+- ✅ `TextureLoader`
+- ✅ `parseGlb`
 
 **Doesn't belong:**
 - ❌ Asset browser UI
 - ❌ Asset placement logic
-- ❌ Editor-specific asset workflows
+- ❌ Game logic using assets
 
 ---
 
@@ -268,7 +269,7 @@
 
 **Doesn't belong:**
 - ❌ Reusable camera logic (→ @engine/camera)
-- ❌ Asset management logic (→ @engine/assets)
+- ❌ Asset management logic (→ @engine/asset-pipeline)
 - ❌ Generic utilities (→ @engine/core or @engine/editor-utils)
 
 ---
@@ -280,7 +281,7 @@
 ```typescript
 // ✅ CORRECT - Always use @engine/* imports
 import { FPSCamera, CameraDirector } from '@engine/camera';
-import { AssetRegistry, Asset } from '@engine/assets';
+import { AssetPipeline } from '@engine/asset-pipeline';
 import { HistoryManager, SnapSystem } from '@engine/editor-utils';
 import { DisposableGroup } from '@engine/core/utils';
 import { Entity, Scene } from '@engine/world';
@@ -328,21 +329,14 @@ const system = new MySystem({
 
 ```typescript
 // ✅ CORRECT - App can re-export package types for convenience
-// apps/editor/src/editor/assets/AssetRegistry.ts
-import { AssetRegistry } from '@engine/assets';
-import { Logger } from '../../utils/logger';
+// apps/editor/src/editor/assets/AssetService.ts
+import { AssetPipeline } from '@engine/asset-pipeline';
 
 // Re-export types
-export type { Asset, AssetFilter } from '@engine/assets';
+export type { ParsedGlb, RawTexture } from '@engine/asset-pipeline';
 
-// Create configured singleton
-export const assetRegistry = new AssetRegistry({
-  logger: {
-    debug: Logger.debug.bind(Logger),
-    warn: Logger.warn.bind(Logger),
-    error: Logger.error.bind(Logger),
-  }
-});
+// Create singleton
+export const assetPipeline = new AssetPipeline();
 ```
 
 ### Pattern 4: Utility in Core
@@ -543,7 +537,7 @@ class MyFeature {
 | Resource management | `DisposableGroup` | @engine/core/utils | Universal pattern |
 | ECS logic | `Component`, `System` | @engine/world | ECS domain |
 | Rendering | Shaders, materials | @engine/gfx-webgpu | Rendering domain |
-| Asset loading | GLTF loader | @engine/assets | Asset domain |
+| Asset loading | GLTF loader | @engine/asset-pipeline | Asset domain |
 | Asset UI | Asset browser | apps/editor | Editor UI |
 | Camera logic | FPS controls | @engine/camera | Reusable camera |
 | Camera UI | Camera settings panel | apps/editor | Editor UI |
@@ -799,7 +793,7 @@ Use this when reviewing PRs:
 **A:** `apps/editor` - UI component
 
 ### Q: Where does asset filtering logic go?
-**A:** `@engine/assets` - reusable asset logic
+**A:** `@engine/asset-pipeline` - reusable asset logic
 
 ### Q: I need undo/redo, where do I start?
 **A:** Use `HistoryManager` from `@engine/editor-utils`, don't create your own
@@ -832,7 +826,7 @@ Math utility          → @engine/core
 Universal pattern     → @engine/core/utils
 ECS component         → @engine/world
 Rendering logic       → @engine/gfx-webgpu
-Asset loading         → @engine/assets
+Asset loading         → @engine/asset-pipeline
 Camera system         → @engine/camera
 Input handling        → @engine/input
 Scripting             → @engine/script
@@ -867,16 +861,15 @@ Editor UI/workflow    → apps/editor
 
 ## 📚 Related Documents
 
-- [ARCHITECTURE.md](./ARCHITECTURE.md) - System architecture
+- [ARCHITECTURE.md](../architecture/ARCHITECTURE.md) - System architecture
 - [CODE_REVIEW_CHECKLIST.md](./CODE_REVIEW_CHECKLIST.md) - Review guide
-- [REFACTORING_COMPLETE.md](./REFACTORING_COMPLETE.md) - Recent refactoring summary
 - [TEAM_ONBOARDING.md](./TEAM_ONBOARDING.md) - New developer guide
 
 ---
 
 **Remember:** When in doubt, ask! Better to ask than create duplication.
 
-**Last Updated:** 2025-10-26  
-**Version:** 1.0  
+**Last Updated:** 2025-11-22  
+**Version:** 1.1  
 **Based on:** Refactoring Phases 1-3 learnings
 

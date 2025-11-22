@@ -118,6 +118,9 @@ export async function pickAdapter(): Promise<GPUAdapter | null> {
   
   for (const preference of preferences) {
     try {
+      // Note: On Windows Chrome, this may log "The powerPreference option is currently ignored".
+      // This is a browser-level warning we cannot suppress, but we still provide the hint
+      // for other platforms/browsers that respect it.
       const adapter = await navigator.gpu.requestAdapter({ powerPreference: preference });
       if (adapter) {
         Logger.debug(`Acquired adapter with powerPreference: ${preference}`);

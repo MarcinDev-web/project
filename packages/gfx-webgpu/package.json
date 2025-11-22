@@ -1,91 +1,98 @@
 {
-    "name":  "@engine/gfx-webgpu",
-    "version":  "0.1.0",
-    "type":  "module",
-    "main":  "./dist/index.js",
-    "types":  "./dist/index.d.ts",
-    "exports":  {
-                    ".":  {
-                        "import": "./dist/index.js",
-                        "development": "./src/index.ts",
-                        "test": "./src/index.ts",
-                        "default": "./dist/index.js"
-                    },
-                    "./core":  {
-                        "import": "./dist/core/index.js",
-                        "development": "./src/core/index.ts",
-                        "test": "./src/core/index.ts",
-                        "default": "./dist/core/index.js"
-                    },
-                    "./config":  {
-                        "import": "./dist/config.js",
-                        "development": "./src/config.ts",
-                        "test": "./src/config.ts",
-                        "default": "./dist/config.js"
-                    },
-                    "./materials":  {
-                        "import": "./dist/materials/index.js",
-                        "development": "./src/materials/index.ts",
-                        "test": "./src/materials/index.ts",
-                        "default": "./dist/materials/index.js"
-                    },
-                    "./textures":  {
-                        "import": "./dist/textures/index.js",
-                        "development": "./src/textures/index.ts",
-                        "test": "./src/textures/index.ts",
-                        "default": "./dist/textures/index.js"
-                    },
-                    "./textures/*":  {
-                        "import": "./dist/textures/*.js",
-                        "development": "./src/textures/*.ts",
-                        "test": "./src/textures/*.ts",
-                        "default": "./dist/textures/*.js"
-                    },
-                    "./blocks/BlockLibrary":  {
-                        "import": "./dist/blocks/BlockLibrary.js",
-                        "development": "./src/blocks/BlockLibrary.ts",
-                        "test": "./src/blocks/BlockLibrary.ts",
-                        "default": "./dist/blocks/BlockLibrary.js"
-                    },
-                    "./lighting/LightManager":  {
-                        "import": "./dist/lighting/LightManager.js",
-                        "development": "./src/lighting/LightManager.ts",
-                        "test": "./src/lighting/LightManager.ts",
-                        "default": "./dist/lighting/LightManager.js"
-                    },
-                    "./shadows":  {
-                        "import": "./dist/shadows/index.js",
-                        "development": "./src/shadows/index.ts",
-                        "test": "./src/shadows/index.ts",
-                        "default": "./dist/shadows/index.js"
-                    },
-                    "./postprocess":  {
-                        "import": "./dist/postprocess/index.js",
-                        "development": "./src/postprocess/index.ts",
-                        "test": "./src/postprocess/index.ts",
-                        "default": "./dist/postprocess/index.js"
-                    }
-                },
-    "scripts":  {
-                    "build":  "tsc",
-                    "dev":  "tsc --watch",
-                    "test":  "vitest run",
-                    "test:watch":  "vitest",
-                    "clean":  "rm -rf dist",
-                    "lint":  "eslint src --max-warnings=0"
-                },
-    "dependencies":  {
-                         "@engine/core":  "workspace:*",
-                         "@engine/world":  "workspace:*",
-                         "@engine/avatar":  "workspace:*",
-                         "@engine/blocks":  "workspace:*",
-    "@engine/editor-utils":  "workspace:*",
-    "@engine/asset-pipeline":  "workspace:*",
-    "gl-matrix":  "^3.4.4"
-                     },
-    "devDependencies":  {
-                            "@webgpu/types":  "^0.1.65",
-                            "typescript":  "^5.9.3",
-                            "vitest":  "^2.1.3"
-                        }
+    "name": "@engine/gfx-webgpu",
+    "version": "0.1.0",
+    "type": "module",
+    "main": "./dist/index.js",
+    "types": "./dist/index.d.ts",
+    "exports": {
+        ".": {
+            "import": "./dist/index.js",
+            "development": "./src/index.ts",
+            "test": "./src/index.ts",
+            "default": "./dist/index.js"
+        },
+        "./core": {
+            "import": "./dist/core/index.js",
+            "development": "./src/core/index.ts",
+            "test": "./src/core/index.ts",
+            "default": "./dist/core/index.js"
+        },
+        "./config": {
+            "import": "./dist/config.js",
+            "development": "./src/config.ts",
+            "test": "./src/config.ts",
+            "default": "./dist/config.js"
+        },
+        "./materials": {
+            "import": "./dist/materials/index.js",
+            "development": "./src/materials/index.ts",
+            "test": "./src/materials/index.ts",
+            "default": "./dist/materials/index.js"
+        },
+        "./textures": {
+            "import": "./dist/textures/index.js",
+            "development": "./src/textures/index.ts",
+            "test": "./src/textures/index.ts",
+            "default": "./dist/textures/index.js"
+        },
+        "./textures/*": {
+            "import": "./dist/textures/*.js",
+            "development": "./src/textures/*.ts",
+            "test": "./src/textures/*.ts",
+            "default": "./dist/textures/*.js"
+        },
+        "./blocks/BlockLibrary": {
+            "import": "./dist/blocks/BlockLibrary.js",
+            "development": "./src/blocks/BlockLibrary.ts",
+            "test": "./src/blocks/BlockLibrary.ts",
+            "default": "./dist/blocks/BlockLibrary.js"
+        },
+        "./lighting/LightManager": {
+            "import": "./dist/lighting/LightManager.js",
+            "development": "./src/lighting/LightManager.ts",
+            "test": "./src/lighting/LightManager.ts",
+            "default": "./dist/lighting/LightManager.js"
+        },
+        "./shadows": {
+            "import": "./dist/shadows/index.js",
+            "development": "./src/shadows/index.ts",
+            "test": "./src/shadows/index.ts",
+            "default": "./dist/shadows/index.js"
+        },
+        "./postprocess": {
+            "import": "./dist/postprocess/index.js",
+            "development": "./src/postprocess/index.ts",
+            "test": "./src/postprocess/index.ts",
+            "default": "./dist/postprocess/index.js"
+        },
+        "./utils/*": {
+            "import": "./dist/utils/*.js",
+            "development": "./src/utils/*.ts",
+            "test": "./src/utils/*.ts",
+            "default": "./dist/utils/*.js"
+        }
+    },
+    "scripts": {
+        "build": "tsc",
+        "dev": "tsc --watch",
+        "test": "vitest run",
+        "test:watch": "vitest",
+        "clean": "rm -rf dist",
+        "lint": "eslint src --max-warnings=0"
+    },
+    "dependencies": {
+        "@engine/asset-pipeline": "workspace:*",
+        "@engine/avatar": "workspace:*",
+        "@engine/blocks": "workspace:*",
+        "@engine/core": "workspace:*",
+        "@engine/editor-utils": "workspace:*",
+        "@engine/wasm-render-logic": "workspace:*",
+        "@engine/world": "workspace:*",
+        "gl-matrix": "^3.4.4"
+    },
+    "devDependencies": {
+        "@webgpu/types": "^0.1.65",
+        "typescript": "^5.9.3",
+        "vitest": "^2.1.3"
+    }
 }

@@ -6,7 +6,7 @@ import { UserStorageDB } from './UserStorageDB.js';
 import { TokenBlacklistService } from './TokenBlacklistService.js';
 import { securityLogger } from '../logging/SecurityLogger.js';
 import type { User, PublicUser, Session, JWTPayload, AuthResponse } from '../types/auth.js';
-import type { PrismaClient } from '../../node_modules/.prisma/net-client/index.js';
+import { PrismaClient } from '@engine/database';
 
 // Validate JWT_SECRET in production
 const isProduction = process.env.NODE_ENV === 'production';

@@ -1,0 +1,133 @@
+/**
+ * Inputs
+ * Text inputs, selects, and search boxes - Gaming style
+ */
+
+/* ============================================
+   INPUTS - Gaming Style
+   ============================================ */
+
+.input {
+  height: var(--input-height-md);
+  padding: 0 var(--spacing-3);
+  font-size: var(--text-base);
+  font-family: var(--font-sans);
+  color: var(--text-1);
+  background: var(--color-base-550);
+  border: 2px solid var(--color-border-strong);
+  border-radius: 6px;
+  outline: none;
+  transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+  box-shadow: inset 0 2px 4px var(--color-overlay-400);
+}
+
+.input::placeholder {
+  color: var(--color-text-placeholder);
+}
+
+.input:hover:not(:disabled) {
+  border-color: var(--color-border-highlight);
+}
+
+.input:focus {
+  border-color: var(--color-info);
+  box-shadow: inset 0 2px 4px var(--color-overlay-400), 0 0 0 3px var(--color-info-alpha-20);
+  background: var(--color-base-600);
+}
+
+.input:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Input variants */
+.input-sm {
+  height: var(--input-height-sm);
+  padding: 0 var(--spacing-2);
+  font-size: var(--text-sm);
+}
+
+/* ============================================
+   SELECT DROPDOWNS - Gaming Style
+   ============================================ */
+
+.select {
+  height: var(--input-height-md);
+  padding: 0 var(--spacing-8) 0 var(--spacing-3);
+  font-size: var(--text-base);
+  font-family: var(--font-sans);
+  color: var(--text-1);
+  background: var(--color-base-550);
+  border: 2px solid var(--color-border-strong);
+  border-radius: 6px;
+  outline: none;
+  cursor: pointer;
+  transition: border-color var(--transition-fast);
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' fill='none' viewBox='0 0 20 20'%3E%3Cpath stroke='%23A0AAB9' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='m6 8 4 4 4-4'/%3E%3C/svg%3E");
+  background-position: right var(--spacing-2) center;
+  background-repeat: no-repeat;
+  background-size: 1.5em 1.5em;
+  box-shadow: inset 0 2px 4px var(--color-overlay-400);
+}
+
+.select:hover:not(:disabled) {
+  border-color: var(--color-border-highlight);
+  background-color: var(--color-base-600);
+}
+
+.select:focus {
+  border-color: var(--color-info);
+  box-shadow: inset 0 2px 4px var(--color-overlay-400), 0 0 0 3px var(--color-info-alpha-20);
+}
+
+/* ============================================
+   SEARCH & FILTER - Gaming Style
+   ============================================ */
+
+.search-box {
+  position: relative;
+}
+
+.search-icon {
+  position: absolute;
+  left: var(--spacing-3);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1rem;
+  height: 1rem;
+  opacity: 0.5;
+  pointer-events: none;
+  filter: drop-shadow(0 1px 2px var(--color-overlay-500));
+}
+
+.search-input {
+  padding-left: var(--spacing-8);
+  width: 100%;
+}
+
+.search-clear {
+  position: absolute;
+  right: var(--spacing-2);
+  top: 50%;
+  transform: translateY(-50%);
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  background: var(--color-base-600);
+  border: 2px solid var(--color-border-strong);
+  color: var(--color-text-muted);
+  cursor: pointer;
+  border-radius: 4px;
+  transition: all var(--transition-fast);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.search-clear:hover {
+  background: var(--color-base-650);
+  color: var(--text-1);
+  border-color: var(--color-border-highlight);
+}
+

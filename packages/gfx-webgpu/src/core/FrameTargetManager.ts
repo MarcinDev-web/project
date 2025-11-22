@@ -8,6 +8,7 @@ export interface FrameTargetConfig {
   enableHDR: boolean;
   enableBloom: boolean;
   enableSSAO: boolean;
+  enableSSGI?: boolean;
   enableFXAA: boolean;
   enableOutlines?: boolean;
   sampleCount: number;
@@ -19,6 +20,7 @@ export interface FrameTargetState {
   bloomView: GPUTextureView | null;
   normalView: GPUTextureView | null;
   ssaoView: GPUTextureView | null;
+  ssgiView?: GPUTextureView | null;
   resolvedDepthView: GPUTextureView | null;
   tonemapIntermediateView: GPUTextureView | null;
   needsDepthStore: boolean;
@@ -43,6 +45,9 @@ export class FrameTargetManager {
   private ssaoTexture: GPUTexture | null = null;
   private ssaoTextureView: GPUTextureView | null = null;
   private ssaoSize: Size | null = null;
+  private ssgiTexture: GPUTexture | null = null;
+  private ssgiTextureView: GPUTextureView | null = null;
+  private ssgiSize: Size | null = null;
   private resolvedDepthTexture: GPUTexture | null = null;
   private resolvedDepthView: GPUTextureView | null = null;
   private resolvedDepthSize: Size | null = null;
@@ -50,6 +55,7 @@ export class FrameTargetManager {
   private tonemapView: GPUTextureView | null = null;
   private tonemapSize: Size | null = null;
   private pendingDestroy: GPUTexture[] = [];
+  private destroyedTextures: WeakSet<GPUTexture> = new WeakSet();
   // Track active encoders and textures they use to prevent premature destruction
   private activeEncoders: WeakMap<GPUCommandEncoder, Set<GPUTexture>> = new WeakMap();
   // Track all textures currently in use by any active encoder (for fast lookup)
@@ -87,9 +93,10 @@ export class FrameTargetManager {
     const enableHDR = config.enableHDR ?? ctx.featureFlags?.enableHDR !== false;
     const enableBloom = config.enableBloom ?? ctx.featureFlags?.enableBloom !== false;
     const enableSSAO = config.enableSSAO ?? ctx.featureFlags?.enableSSAO !== false;
+    const enableSSGI = config.enableSSGI ?? ctx.featureFlags?.enableSSGI === true;
     const enableFXAA = config.enableFXAA ?? ctx.featureFlags?.enableFXAA === true;
     const enableOutlines = config.enableOutlines ?? ctx.featureFlags?.enableOutlines === true;
-    const needsNormalTexture = enableSSAO || enableOutlines;
+    const needsNormalTexture = enableSSAO || enableSSGI || enableOutlines;
 
     const sizeChanged = this.size.width !== canvas.width || this.size.height !== canvas.height;
 
@@ -98,15 +105,19 @@ export class FrameTargetManager {
       // Don't destroy immediately as they might still be in use
       this.queueDestroy(frameResources.depthTexture);
       this.queueDestroy(frameResources.msaaColorTexture);
-      this.queueDestroy(this.hdrColorTexture);
+      // Handle HDR texture separately to avoid "active texture" safety warning
+      const oldHdrTexture = this.hdrColorTexture;
+      this.hdrColorTexture = null;
+      this.queueDestroy(oldHdrTexture);
+
       this.queueDestroy(this.bloomTexture);
       this.queueDestroy(this.normalTexture);
       this.queueDestroy(this.ssaoTexture);
+      this.queueDestroy(this.ssgiTexture);
       this.queueDestroy(this.resolvedDepthTexture);
       this.queueDestroy(this.tonemapTexture);
       
       // Clear references immediately so new textures are created
-      this.hdrColorTexture = null;
       this.hdrColorView = null;
       this.hdrSize = null;
       this.bloomTexture = null;
@@ -118,6 +129,9 @@ export class FrameTargetManager {
       this.ssaoTexture = null;
       this.ssaoTextureView = null;
       this.ssaoSize = null;
+      this.ssgiTexture = null;
+      this.ssgiTextureView = null;
+      this.ssgiSize = null;
       this.resolvedDepthTexture = null;
       this.resolvedDepthView = null;
       this.resolvedDepthSize = null;
@@ -146,7 +160,10 @@ export class FrameTargetManager {
     if (enableHDR) {
       if (!this.hdrColorTexture || !this.hdrColorView || !this.sameSize(this.hdrSize, this.size)) {
         if (this.hdrColorTexture && this.hdrColorTexture !== frameResources.msaaColorTexture) {
-          this.queueDestroy(this.hdrColorTexture);
+          // Clear reference before destroying to pass safety check
+          const oldHdr = this.hdrColorTexture;
+          this.hdrColorTexture = null;
+          this.queueDestroy(oldHdr);
         }
         this.hdrColorTexture = createHdrColorTarget(configuredDevice, canvas);
         this.hdrColorView = this.hdrColorTexture.createView({ label: 'frame-hdr-view' });
@@ -201,6 +218,24 @@ export class FrameTargetManager {
       }
     } else {
       this.releaseNormalResources();
+    }
+
+    if (enableSSGI) {
+      if (!this.ssgiTexture || !this.sameSize(this.ssgiSize, this.size)) {
+        this.queueDestroy(this.ssgiTexture);
+        this.ssgiTexture = configuredDevice.createTexture({
+          label: 'frame-ssgi-texture',
+          size: { width: canvas.width, height: canvas.height, depthOrArrayLayers: 1 },
+          format: 'rgba16float',
+          usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+        });
+        this.ssgiTextureView = this.ssgiTexture.createView();
+        this.ssgiSize = { ...this.size };
+      } else if (!this.ssgiTextureView) {
+        this.ssgiTextureView = this.ssgiTexture.createView();
+      }
+    } else {
+      this.releaseSsgiResources();
     }
 
     if (enableSSAO) {
@@ -269,7 +304,7 @@ export class FrameTargetManager {
       Logger.warn('Bloom requested without HDR; ignoring bloom target allocation.');
     }
 
-    const needsDepthStore = enableSSAO || enableOutlines || Boolean(ctx.waterRenderer);
+    const needsDepthStore = enableSSAO || enableSSGI || enableOutlines || Boolean(ctx.waterRenderer);
 
     return {
       msaaView: frameResources.msaaColorView,
@@ -277,6 +312,7 @@ export class FrameTargetManager {
       bloomView: this.bloomTextureView,
       normalView: this.normalTextureView,
       ssaoView: this.ssaoTextureView,
+      ssgiView: this.ssgiTextureView,
       resolvedDepthView: this.resolvedDepthView,
       tonemapIntermediateView: this.tonemapView,
       needsDepthStore,
@@ -309,6 +345,13 @@ export class FrameTargetManager {
    */
   getSsaoTexture(): GPUTexture | null {
     return this.ssaoTexture;
+  }
+
+  /**
+   * Gets the SSGI texture (for encoder registration).
+   */
+  getSsgiTexture(): GPUTexture | null {
+    return this.ssgiTexture;
   }
 
   /**
@@ -364,7 +407,13 @@ export class FrameTargetManager {
   }
 
   queueDestroy(texture: GPUTexture | null | undefined): void {
-    if (texture) {
+    if (texture && !this.destroyedTextures.has(texture)) {
+      // Safety: Never queue the currently active HDR texture if it happens to be passed here erroneously
+      if (texture === this.hdrColorTexture && this.hdrColorTexture !== null) {
+        Logger.warn('[FrameTargetManager] Attempted to queue active HDR texture for destruction. Skipping.');
+        return;
+      }
+
       // Don't queue textures that are currently in use by active encoders
       if (this.isTextureInUse(texture)) {
         // Texture is in use - will be queued after encoder finishes
@@ -405,9 +454,9 @@ export class FrameTargetManager {
       // Double-check textures aren't in use before destroying
       const safeToDestroy: GPUTexture[] = [];
       for (const texture of texturesToDestroy) {
-        if (!this.isTextureInUse(texture)) {
+        if (!this.isTextureInUse(texture) && !this.destroyedTextures.has(texture)) {
           safeToDestroy.push(texture);
-        } else {
+        } else if (this.isTextureInUse(texture)) {
           // Texture became in use again - re-queue for next flush
           this.pendingDestroy.push(texture);
         }
@@ -415,6 +464,7 @@ export class FrameTargetManager {
       
       for (const texture of safeToDestroy) {
         try {
+          this.destroyedTextures.add(texture);
           texture.destroy();
         } catch (err) {
           // Texture might already be destroyed or device lost
@@ -445,6 +495,7 @@ export class FrameTargetManager {
     this.releaseHdrResources();
     this.releaseNormalResources();
     this.releaseSsaoResources();
+    this.releaseSsgiResources();
     this.queueDestroy(this.tonemapTexture);
     this.flushImmediate();
     this.resolvedDepthTexture = null;
@@ -474,7 +525,10 @@ export class FrameTargetManager {
     // Destroy only safe textures
     for (const texture of texturesToDestroy) {
       try {
-        texture.destroy();
+        if (!this.destroyedTextures.has(texture)) {
+          this.destroyedTextures.add(texture);
+          texture.destroy();
+        }
       } catch {
         // ignore
       }
@@ -487,8 +541,9 @@ export class FrameTargetManager {
 
   private releaseHdrResources(): void {
     if (this.hdrColorTexture) {
-      this.queueDestroy(this.hdrColorTexture);
+      const oldHdr = this.hdrColorTexture;
       this.hdrColorTexture = null;
+      this.queueDestroy(oldHdr);
     }
     this.hdrColorView = null;
     this.hdrSize = null;
@@ -522,5 +577,14 @@ export class FrameTargetManager {
     }
     this.resolvedDepthView = null;
     this.resolvedDepthSize = null;
+  }
+
+  private releaseSsgiResources(): void {
+    if (this.ssgiTexture) {
+      this.queueDestroy(this.ssgiTexture);
+      this.ssgiTexture = null;
+      this.ssgiTextureView = null;
+      this.ssgiSize = null;
+    }
   }
 }

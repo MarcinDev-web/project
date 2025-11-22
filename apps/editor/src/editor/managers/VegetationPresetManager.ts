@@ -151,13 +151,22 @@ export class VegetationPresetManager {
         id: `vegetation-${presetId}`,
         name: preset.name,
         category,
+        material: 'stone',
         textures: {
           top: { color: preset.color },
           bottom: { color: preset.color },
+          sides: { color: preset.color },
           front: { color: preset.color },
           back: { color: preset.color },
           left: { color: preset.color },
           right: { color: preset.color },
+        },
+        properties: {
+          solid: false,
+          transparent: true,
+          emissive: 0,
+          roughness: 0.8,
+          metallic: 0,
         },
       },
     };

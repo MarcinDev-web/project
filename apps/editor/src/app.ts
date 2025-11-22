@@ -9,16 +9,18 @@ import { CameraComponent } from '@engine/world';
 import { PhysicsWorld } from '@engine/world';
 import { CharacterControllerSystem, GroundDetectionSystem } from '@engine/stdlib/CharacterController';
 import { BlockBehaviorSystem, UISystem, InteractionSystem } from '@engine/world/systems';
-import { AnimationSystem } from '@engine/stdlib/Animation';
+import { WasmAnimationSystem } from '@engine/world/systems';
 import { MeshComponent, InteractableComponent } from '@engine/world';
 import { registerTemplates, applyTo } from '@engine/world-templates';
 import { createFlatPlatformTemplate, createStarterBlockTemplate, createEmptyTemplate } from '@engine/world-templates';
 import { ShareClient } from '@engine/net';
 import { PredictionBridge } from './runtime/PredictionBridge';
+import { EOSClient } from './bootstrap/EOSClient';
 
 export interface EditorAppOptions {
   canvas: HTMLCanvasElement;
   statusEl: HTMLElement;
+  eosClient?: EOSClient;
 }
 
 export class EditorApp {
@@ -32,7 +34,7 @@ export class EditorApp {
   private blockBehaviorSystem: BlockBehaviorSystem | null = null;
   private uiSystem: UISystem | null = null;
   private interactionSystem: InteractionSystem | null = null;
-  private animationSystem: AnimationSystem | null = null;
+  private wasmAnimationSystem: WasmAnimationSystem | null = null;
   private currentAnimationScene: Scene | null = null;
   private readonly predictionBridge: PredictionBridge;
   private predictionTick = 0;
@@ -50,9 +52,12 @@ export class EditorApp {
   private readonly viewMatrix = new Float32Array(16);
   private readonly viewProjectionMatrix = new Float32Array(16);
 
+  public readonly eosClient: EOSClient | undefined;
+
   constructor(private readonly config: EditorAppOptions) {
-    this.controls = createOrbitControls(config.canvas, { initialDistance: 18 });
+    this.controls = createOrbitControls(config.canvas, { initialDistance: 45, initialPitch: 0.3, initialYaw: 0.6 });
     this.predictionBridge = new PredictionBridge({ scene: this.scene });
+    this.eosClient = config.eosClient;
   }
 
   public async start(): Promise<void> {
@@ -78,13 +83,24 @@ export class EditorApp {
         // Load default template (starter block) immediately before initializing renderer/UI
         this.config.statusEl.textContent = 'Loading default scene…';
         await applyTo(this.scene, 'template:starter-block', { clear: true });
-      } catch {}
+        
+      } catch (err) {
+        Logger.error('Failed to load default template', err as Error);
+      }
 
       this.renderer = await initRenderer({
         canvas: this.config.canvas,
         statusEl: this.config.statusEl,
         getOrbitState: () => this.controls.getState(),
         scene: this.scene,
+        enableOutlines: true,
+        outlineQuality: 'med',
+        enableShadows: true,
+        shadowQuality: 'med',
+        enableSSAO: true,
+        enableSSGI: true,
+        enableHDR: true,
+        enableBloom: true,
         shouldSimulate: () => this.editor?.isPlayMode() === true,
         onFrameUpdate: (deltaTime: number) => {
           this.predictionBridge.captureLocalState(this.predictionTick++);
@@ -103,13 +119,13 @@ export class EditorApp {
               if (modeManager) {
                 // Ensure AnimationSystem is using the correct scene (runtime vs authoring)
                 const activeScene = modeManager.getActiveScene();
-                if (this.animationSystem && this.currentAnimationScene !== activeScene) {
-                  this.animationSystem = new AnimationSystem(activeScene);
+                if (!this.wasmAnimationSystem || this.currentAnimationScene !== activeScene) {
+                  this.wasmAnimationSystem = new WasmAnimationSystem(activeScene);
                   this.currentAnimationScene = activeScene;
                 }
                 // Update animation system BEFORE avatar/character updates
                 // This ensures the skeleton is up-to-date for the current frame
-                this.animationSystem?.update(deltaTime);
+                this.wasmAnimationSystem.update(deltaTime);
                 
                 modeManager.updatePlayMode(deltaTime);
               }
@@ -163,7 +179,7 @@ export class EditorApp {
       this.characterSystem = new CharacterControllerSystem(this.scene, this.physicsWorld);
       this.blockBehaviorSystem = new BlockBehaviorSystem(this.scene, this.physicsWorld.getSystem());
       this.uiSystem = new UISystem(this.scene);
-      this.animationSystem = new AnimationSystem(this.scene);
+      this.wasmAnimationSystem = new WasmAnimationSystem(this.scene);
       this.currentAnimationScene = this.scene;
       this.interactionSystem = new InteractionSystem(this.scene, {
         canvas: this.config.canvas,
@@ -282,7 +298,6 @@ export class EditorApp {
       this.interactionSystem = null;
     }
 
-    this.animationSystem = null;
     this.currentAnimationScene = null;
 
     try {
@@ -475,6 +490,11 @@ export class EditorApp {
       if (this.editor?.isPlayMode()) {
         return;
       }
+
+      // Ignore click if placement mode is active (let placement controller handle it)
+      if ((this.editor as any)?.state?.placementMode?.value) {
+        return;
+      }
       
       // Ensure pointer lock is released in edit mode (failsafe)
       if (typeof document !== 'undefined' && document.pointerLockElement === this.config.canvas) {
@@ -565,4 +585,3 @@ export class EditorApp {
     };
   }
 }
-

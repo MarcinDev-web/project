@@ -10,6 +10,7 @@ export * from './LightComponent.js';
 // LogicCubeComponent → @engine/script (moved in Phase 4)
 export * from './MaterialComponent.js';
 export * from './MeshComponent.js';
+export * from './InstancedMeshComponent.js';
 export * from './PhysicsComponent.js';
 export * from './ProjectileComponent.js';
 export * from './RuntimePlayerTag.js';

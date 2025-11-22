@@ -1,19 +1,14 @@
+import type { ResaleListing } from '../storage/ResaleStorage.js';
+
 /**
  * Resale Storage - manages secondary resale listings for marketplace items
  */
 
-import type { PrismaClient } from '../../node_modules/.prisma/net-client/index.js';
+import { PrismaClient } from '@engine/database';
 import type { Decimal } from '@prisma/client/runtime/library';
 import type { CurrencyAmount } from '@engine/economy';
 
-export interface ResaleListing {
-  id: string;
-  marketplaceId: string;
-  sellerId: string;
-  price: CurrencyAmount;
-  createdAt: number;
-  expiresAt?: number;
-}
+export type { ResaleListing };
 
 export class ResaleStorage {
   constructor(private readonly prisma: PrismaClient) {}
@@ -182,4 +177,3 @@ export class ResaleStorage {
     return mapped;
   }
 }
-

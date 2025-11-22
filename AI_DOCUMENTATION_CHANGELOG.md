@@ -2,6 +2,17 @@
 
 > **Tracking improvements to AI assistant documentation**
 
+## 2025-11-22 - Documentation Refresh & Correction
+
+### 🔧 Fixes
+- **AI_CONTEXT.md**:
+  - Corrected package list and levels (added `@engine/asset-pipeline`, `@engine/net`, etc.)
+  - Fixed Polish/English mixed header in packages table
+- **PACKAGE_GUIDELINES.md**:
+  - Replaced obsolete `@engine/assets` references with `@engine/asset-pipeline`
+  - Updated code examples to use existing classes (`AssetPipeline` instead of `AssetRegistry`)
+  - Corrected anti-patterns and decision tree
+
 ## 2025-10-26 - Major AI Documentation Enhancement
 
 ### 🎯 Goal
@@ -231,10 +242,10 @@ Improve documentation for modern AI coding assistants (Claude 4.5 Sonnet, GPT-5)
 ### 📖 Related Documentation
 
 **Existing Docs (Still Relevant):**
-- docs/ARCHITECTURE.md - Detailed system architecture
+- docs/architecture/ARCHITECTURE.md - Detailed system architecture
 - docs/guidelines/PACKAGE_GUIDELINES.md - Package decision tree
 - docs/guidelines/CODE_REVIEW_CHECKLIST.md - Review checklist
-- docs/TESTING.md - Testing philosophy
+- docs/testing/TESTING.md - Testing philosophy
 - TEST_COMMANDS_CHEATSHEET.md - Testing commands
 
 **Relationship:**
@@ -282,5 +293,5 @@ These documentation files follow the same license as the project (ISC).
 
 **Note:** This is a living document. Update it whenever AI documentation changes.
 
-**Last Updated:** 2025-10-26
+**Last Updated:** 2025-11-22
 

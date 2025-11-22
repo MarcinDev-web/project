@@ -33,7 +33,7 @@ Projekt znajduje się w stanie hybrydowym z następującymi problemami:
 
 ### Cele Biznesowe
 
-Chcemy zbudować **platformę UGC 3D** (nextgen Roblox/Kogama) która:
+Chcemy zbudować **platformę UGC 3D** która:
 
 - ✅ **Skaluje się** do dużych projektów (tysiące entities, duże levele)
 - ✅ **Pozwala na wymianę** komponentów (renderer: WebGPU → WebGL, physics: własna → Rapier)
@@ -493,7 +493,7 @@ Jeśli migracja się nie uda (np. >50% testów failing):
 - **Unity ECS** - Entity-Component-System design
 - **Bevy (Rust)** - Modular game engine
 - **PlayCanvas** - WebGL engine architecture
-- **Roblox** - UGC platform sandbox
+- **UGC Platform** - sandbox
 - **Turborepo** - Monorepo build system
 
 ### Zewnętrzne Zasoby

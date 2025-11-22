@@ -10,6 +10,7 @@ import type { MarketplaceStorageDB } from '../storage/MarketplaceStorageDB.js';
 import type { BuildStorage } from '../storage/BuildStorage.js';
 import type { LikesStorage } from '../storage/LikesStorage.js';
 import type { ResaleStorage } from '../storage/ResaleStorage.js';
+import type { RedisResaleStorage } from '../storage/RedisResaleStorage.js';
 import type { FriendsStorage } from '../storage/FriendsStorage.js';
 import type { MessagesStorage } from '../storage/MessagesStorage.js';
 import type { BlockedUsersStorage } from '../storage/BlockedUsersStorage.js';
@@ -32,7 +33,7 @@ import type { PurchaseService } from '../services/PurchaseService.js';
 import type { LedgerService } from '../services/LedgerService.js';
 import type { FastifyRequest, FastifyReply } from 'fastify';
 import type { CurrencyAmount } from '@engine/economy';
-import type { PrismaClient } from '../../node_modules/.prisma/net-client/index.js';
+import { PrismaClient } from '@engine/database';
 
 /**
  * RouteDependencies - all dependencies needed by route handlers
@@ -54,7 +55,7 @@ export interface RouteDependencies {
   marketplaceStorage: MarketplaceStorage | MarketplaceStorageDB;
   buildStorage: BuildStorage | null;
   likesStorage: LikesStorage;
-  resaleStorage: ResaleStorage | null;
+  resaleStorage: ResaleStorage | RedisResaleStorage | null;
   friendsStorage: FriendsStorage;
   messagesStorage: MessagesStorage;
   blockedUsersStorage: BlockedUsersStorage;
@@ -94,8 +95,8 @@ export interface RouteDependencies {
   fs: typeof import('fs').promises;
 
   // Cache functions (for studio routes)
-  cacheGet: <T>(key: string) => T | null;
-  cacheSet: <T>(key: string, data: T, ttlMs?: number) => void;
+  cacheGet: <T>(key: string) => Promise<T | null> | T | null;
+  cacheSet: <T>(key: string, data: T, ttlMs?: number) => Promise<void> | void;
 
   // In-memory stores
   userCarts: Map<

@@ -1,8 +1,6 @@
-import { AnimationClip } from '@engine/stdlib/Animation';
-import type { AnimationTrack } from '@engine/stdlib/Animation';
-import type { Vec3, Quat } from '@engine/core/math';
+import { type AnimationClip, createClip, type Track } from '@engine/animation';
 import type { AvatarAnimation } from './animation';
-import type { AvatarJointName } from './skeleton';
+import { type AvatarJointName, DEFAULT_AVATAR_JOINTS } from './skeleton';
 
 /**
  * Converts AvatarAnimation format to AnimationClip format.
@@ -21,6 +19,12 @@ export function avatarAnimationToClip(animation: AvatarAnimation): AnimationClip
     throw new Error(`Animation "${animation.name}" must have at least one frame`);
   }
 
+  // Map joint names to indices
+  const jointIndices = new Map<string, number>();
+  for (let i = 0; i < DEFAULT_AVATAR_JOINTS.length; i++) {
+    jointIndices.set(DEFAULT_AVATAR_JOINTS[i]!.name, i);
+  }
+
   // Group keyframes by joint and property
   const tracksMap = new Map<string, Map<number, { position?: number[]; rotation?: number[]; scale?: number[] }>>();
 
@@ -29,6 +33,10 @@ export function avatarAnimationToClip(animation: AvatarAnimation): AnimationClip
     const time = Math.max(0, Math.min(frame.time, animation.length));
     for (const [jointName, keyframe] of Object.entries(frame.joints)) {
       if (!keyframe) continue;
+      
+      // Only process known joints
+      if (!jointIndices.has(jointName)) continue;
+      
       const joint = jointName as AvatarJointName;
       
       let jointTracks = tracksMap.get(joint);
@@ -52,68 +60,81 @@ export function avatarAnimationToClip(animation: AvatarAnimation): AnimationClip
   }
 
   // Second pass: create tracks
-  const tracks: AnimationTrack[] = [];
+  const tracks: Track[] = [];
 
   for (const [jointName, jointTracks] of tracksMap.entries()) {
+    const jointIndex = jointIndices.get(jointName)!;
+
     // Create position track
-    const positionKeyframes: Array<{ time: number; value: number[] }> = [];
-    for (const [time, data] of jointTracks.entries()) {
-      if (data.position) {
-        positionKeyframes.push({ time, value: data.position });
-      }
+    const posTimes: number[] = [];
+    const posValues: number[] = [];
+    
+    // Sort times
+    const sortedTimes = Array.from(jointTracks.keys()).sort((a, b) => a - b);
+    
+    for (const time of sortedTimes) {
+        const data = jointTracks.get(time);
+        if (data && data.position) {
+            posTimes.push(time);
+            posValues.push(...data.position);
+        }
     }
-    if (positionKeyframes.length > 0) {
-      positionKeyframes.sort((a, b) => a.time - b.time);
-      tracks.push({
-        id: `${jointName}_position`,
-        target: { type: 'bone', bone: jointName, property: 'position' },
-        interpolation: 'linear',
-        valueType: 'vec3',
-        keyframes: positionKeyframes.map((kf) => ({ time: kf.time, value: kf.value as Vec3 })),
-      });
+    
+    if (posTimes.length > 0) {
+        tracks.push({
+            kind: 'translation',
+            jointIndex,
+            times: new Float32Array(posTimes),
+            values: new Float32Array(posValues),
+            interpolation: 'linear'
+        });
     }
 
     // Create rotation track
-    const rotationKeyframes: Array<{ time: number; value: number[] }> = [];
-    for (const [time, data] of jointTracks.entries()) {
-      if (data.rotation) {
-        rotationKeyframes.push({ time, value: data.rotation });
-      }
+    const rotTimes: number[] = [];
+    const rotValues: number[] = [];
+    
+    for (const time of sortedTimes) {
+        const data = jointTracks.get(time);
+        if (data && data.rotation) {
+            rotTimes.push(time);
+            rotValues.push(...data.rotation);
+        }
     }
-    if (rotationKeyframes.length > 0) {
-      rotationKeyframes.sort((a, b) => a.time - b.time);
-      tracks.push({
-        id: `${jointName}_rotation`,
-        target: { type: 'bone', bone: jointName, property: 'rotation' },
-        interpolation: 'linear',
-        valueType: 'quat',
-        keyframes: rotationKeyframes.map((kf) => ({ time: kf.time, value: kf.value as Quat })),
-      });
+    
+    if (rotTimes.length > 0) {
+        tracks.push({
+            kind: 'rotation',
+            jointIndex,
+            times: new Float32Array(rotTimes),
+            values: new Float32Array(rotValues),
+            interpolation: 'linear'
+        });
     }
 
     // Create scale track
-    const scaleKeyframes: Array<{ time: number; value: number[] }> = [];
-    for (const [time, data] of jointTracks.entries()) {
-      if (data.scale) {
-        scaleKeyframes.push({ time, value: data.scale });
-      }
+    const sclTimes: number[] = [];
+    const sclValues: number[] = [];
+    
+    for (const time of sortedTimes) {
+        const data = jointTracks.get(time);
+        if (data && data.scale) {
+            sclTimes.push(time);
+            sclValues.push(...data.scale);
+        }
     }
-    if (scaleKeyframes.length > 0) {
-      scaleKeyframes.sort((a, b) => a.time - b.time);
-      tracks.push({
-        id: `${jointName}_scale`,
-        target: { type: 'bone', bone: jointName, property: 'scale' },
-        interpolation: 'linear',
-        valueType: 'vec3',
-        keyframes: scaleKeyframes.map((kf) => ({ time: kf.time, value: kf.value as Vec3 })),
-      });
+    
+    if (sclTimes.length > 0) {
+        tracks.push({
+            kind: 'scale',
+            jointIndex,
+            times: new Float32Array(sclTimes),
+            values: new Float32Array(sclValues),
+            interpolation: 'linear'
+        });
     }
   }
 
-  return new AnimationClip({
-    name: animation.name,
-    duration: animation.length,
-    tracks,
-  });
+  return createClip(animation.name, tracks);
 }
 

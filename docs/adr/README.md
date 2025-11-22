@@ -39,6 +39,12 @@ Co z tego wynika?
 - Clean separation of concerns
 - Gotowość do publikacji SDK
 
+### [002: Shader Tests](./002-shader-tests.md)
+Testowanie shaderów WGSL.
+
+### [003: WASM Collision](./003-wasm-collision.md)
+Implementacja kolizji w WebAssembly.
+
 ---
 
 ## Kiedy tworzyć ADR?

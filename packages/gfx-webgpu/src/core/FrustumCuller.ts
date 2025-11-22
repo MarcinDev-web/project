@@ -9,7 +9,7 @@
 
 import type { Mat4, Vec3 } from '@engine/core/math';
 import type { Entity, AABB } from '@engine/world';
-import { Octree } from '@engine/world';
+import { Octree, MeshComponent } from '@engine/world';
 
 export interface FrustumPlane {
   nx: number;
@@ -126,10 +126,19 @@ export class FrustumCuller {
     }
 
     // Broad-phase: Get potentially visible entities from octree
+    // Note: We currently bypass the octree and force a linear scan (candidates = entities)
+    // because the octree is not updated when entity transforms/bounds change (only on add/remove).
+    // This caused issues with dynamic objects (like growing terrain) disappearing when their
+    // bounds expanded outside the initial octree node.
+    // Linear scan is O(N) which is faster than rebuilding octree O(N log N) every frame,
+    // and sufficient for < 10k entities.
+    const candidates = entities;
+    /*
     const frustumBounds = this.getFrustumBounds(frustum);
     const candidates = this.octree
       ? this.octree.query(frustumBounds)
       : entities;
+    */
 
     // Fine-phase: Test each candidate against frustum planes
     for (const e of candidates) {
@@ -159,10 +168,19 @@ export class FrustumCuller {
     }
 
     // Broad-phase: Get potentially visible entities from octree
+    // Note: We currently bypass the octree and force a linear scan (candidates = entities)
+    // because the octree is not updated when entity transforms/bounds change (only on add/remove).
+    // This caused issues with dynamic objects (like growing terrain) disappearing when their
+    // bounds expanded outside the initial octree node.
+    // Linear scan is O(N) which is faster than rebuilding octree O(N log N) every frame,
+    // and sufficient for < 10k entities.
+    const candidates = entities;
+    /*
     const frustumBounds = this.getFrustumBounds(frustum);
     const candidates = this.octree
       ? this.octree.query(frustumBounds)
       : entities;
+    */
 
     // Fine-phase: Test each candidate against frustum planes
     for (const e of candidates) {
@@ -303,26 +321,63 @@ export class FrustumCuller {
    */
   private getEntityAABB(entity: Entity): AABB {
     const worldMatrix = entity.transform.getWorldMatrix();
-    const s = entity.transform.scale;
+    
+    let minX = -0.5;
+    let minY = -0.5;
+    let minZ = -0.5;
+    let maxX = 0.5;
+    let maxY = 0.5;
+    let maxZ = 0.5;
 
-    // 8 corners of unit cube scaled by entity scale
+    // Check for custom local AABB in MeshComponent
+    const mesh = entity.getComponent(MeshComponent);
+    if (mesh && mesh.localAABB) {
+      minX = mesh.localAABB.min[0];
+      minY = mesh.localAABB.min[1];
+      minZ = mesh.localAABB.min[2];
+      maxX = mesh.localAABB.max[0];
+      maxY = mesh.localAABB.max[1];
+      maxZ = mesh.localAABB.max[2];
+    } else if (mesh && mesh.meshType === 'box' && mesh.options) {
+      // Infer bounds from mesh options if localAABB is missing
+      // Box primitives are centered at (0,0,0) by default
+      const w = (mesh.options.width ?? 1) / 2;
+      const h = (mesh.options.height ?? 1) / 2;
+      const d = (mesh.options.depth ?? 1) / 2;
+      minX = -w; minY = -h; minZ = -d;
+      maxX = w; maxY = h; maxZ = d;
+    } else if (mesh && mesh.meshType === 'cube' && mesh.options?.size) {
+       // Cube primitives
+       const sx = (mesh.options.size[0] ?? 1) / 2;
+       const sy = (mesh.options.size[1] ?? 1) / 2;
+       const sz = (mesh.options.size[2] ?? 1) / 2;
+       minX = -sx; minY = -sy; minZ = -sz;
+       maxX = sx; maxY = sy; maxZ = sz;
+    } else if (mesh && mesh.meshType === 'cube') {
+       // Default cube (1x1x1)
+       minX = -0.5; minY = -0.5; minZ = -0.5;
+       maxX = 0.5; maxY = 0.5; maxZ = 0.5;
+    }
+
+    // 8 corners of the local bounding box
+    // Note: We do NOT multiply by scale here because getWorldMatrix() includes scale
     const localCorners: Vec3[] = [
-      [-s[0] * 0.5, -s[1] * 0.5, -s[2] * 0.5],
-      [s[0] * 0.5, -s[1] * 0.5, -s[2] * 0.5],
-      [-s[0] * 0.5, s[1] * 0.5, -s[2] * 0.5],
-      [s[0] * 0.5, s[1] * 0.5, -s[2] * 0.5],
-      [-s[0] * 0.5, -s[1] * 0.5, s[2] * 0.5],
-      [s[0] * 0.5, -s[1] * 0.5, s[2] * 0.5],
-      [-s[0] * 0.5, s[1] * 0.5, s[2] * 0.5],
-      [s[0] * 0.5, s[1] * 0.5, s[2] * 0.5],
+      [minX, minY, minZ],
+      [maxX, minY, minZ],
+      [minX, maxY, minZ],
+      [maxX, maxY, minZ],
+      [minX, minY, maxZ],
+      [maxX, minY, maxZ],
+      [minX, maxY, maxZ],
+      [maxX, maxY, maxZ],
     ];
 
-    let minX = Infinity,
-      minY = Infinity,
-      minZ = Infinity;
-    let maxX = -Infinity,
-      maxY = -Infinity,
-      maxZ = -Infinity;
+    let wMinX = Infinity,
+      wMinY = Infinity,
+      wMinZ = Infinity;
+    let wMaxX = -Infinity,
+      wMaxY = -Infinity,
+      wMaxZ = -Infinity;
 
     // Transform each corner to world space and expand AABB
     for (const corner of localCorners) {
@@ -342,17 +397,17 @@ export class FrustumCuller {
         (worldMatrix[10] ?? 0) * corner[2] +
         (worldMatrix[14] ?? 0);
 
-      minX = Math.min(minX, wx);
-      minY = Math.min(minY, wy);
-      minZ = Math.min(minZ, wz);
-      maxX = Math.max(maxX, wx);
-      maxY = Math.max(maxY, wy);
-      maxZ = Math.max(maxZ, wz);
+      wMinX = Math.min(wMinX, wx);
+      wMinY = Math.min(wMinY, wy);
+      wMinZ = Math.min(wMinZ, wz);
+      wMaxX = Math.max(wMaxX, wx);
+      wMaxY = Math.max(wMaxY, wy);
+      wMaxZ = Math.max(wMaxZ, wz);
     }
 
     return {
-      min: [minX, minY, minZ],
-      max: [maxX, maxY, maxZ],
+      min: [wMinX, wMinY, wMinZ],
+      max: [wMaxX, wMaxY, wMaxZ],
     };
   }
 

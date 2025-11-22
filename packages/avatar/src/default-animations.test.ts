@@ -34,14 +34,14 @@ describe('Default Animations', () => {
       avatar.playAnimation(IDLE_ANIMATION);
       
       // Simulate multiple loop cycles using AnimationSystem
-      const component = avatar.getOrCreateAnimationComponent();
+      const component = avatar.getOrCreateAnimatorComponent();
       for (let i = 0; i < 10; i++) {
-        component.stateMachine.update(0.3); // 0.3s per update, should loop every 3s
+        component.animator?.update(0.3); // 0.3s per update, should loop every 3s
         avatar.update(0.3);
       }
       
       // Looping animation should still be active
-      expect(component.getActiveState()).toBe('idle');
+      expect(component.animator?.currentState).toBe('idle');
     });
   });
 
@@ -172,15 +172,15 @@ describe('Default Animations', () => {
       avatar.playAnimation(JUMP_ANIMATION);
       
       // Play through entire animation using AnimationSystem
-      const animComponent = avatar.getOrCreateAnimationComponent();
+      const animComponent = avatar.getOrCreateAnimatorComponent();
       for (let i = 0; i < 10; i++) {
-        animComponent.stateMachine.update(0.1);
+        animComponent.animator?.update(0.1);
         avatar.update(0.1);
       }
       
       // Non-looping animation should still be active (AnimationComponent doesn't auto-stop)
       // But we can check that it played through
-      expect(animComponent.getActiveState()).toBe('jump');
+      expect(animComponent.animator?.currentState).toBe('jump');
     });
   });
 });

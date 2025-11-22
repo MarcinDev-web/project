@@ -20,6 +20,7 @@ const cpuCount = getSuggestedThreadCount();
 
 export default defineWorkspace([
   {
+    plugins: [wasm()],
     resolve: {
       alias: {
         ...engineAliases(__dirname),
@@ -33,7 +34,6 @@ export default defineWorkspace([
         './apps/editor/src/test/setup.ts',
         './packages/gfx-webgpu/__tests__/setup.ts',
       ],
-      plugins: [wasm()],
       optimizeDeps: {
         // Force Vite to use source files instead of dist files for @engine/* packages
         include: [
@@ -212,10 +212,10 @@ export default defineWorkspace([
     },
   },
   {
+    plugins: [wasm()],
     test: {
       name: 'integration',
       setupFiles: ['./apps/editor/src/test/setup.ts'],
-      plugins: [wasm()],
       optimizeDeps: {
         // Force Vite to use source files instead of dist files for @engine/* packages
         include: [

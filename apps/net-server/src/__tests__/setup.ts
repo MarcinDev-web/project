@@ -6,7 +6,7 @@ import { afterEach, beforeEach } from 'vitest';
 import type { FastifyInstance } from 'fastify';
 import { app } from '../server.js';
 import { createDbPool, ensureSchema } from '../lib/db.js';
-import type { PrismaClient } from '../../node_modules/.prisma/net-client/index.js';
+import { PrismaClient } from '@engine/database';
 import { promises as fs } from 'fs';
 import path from 'path';
 import os from 'os';

@@ -135,7 +135,7 @@
   align-items: center;
   gap: 6px;
   line-height: 1;
-  tr
+  transition: all 0.2s ease;
 }
 .forum-sort-button:hover {
   color: var(--text-1);

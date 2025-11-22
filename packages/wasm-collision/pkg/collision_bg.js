@@ -34,20 +34,6 @@ function getStringFromWasm0(ptr, len) {
     return decodeText(ptr, len);
 }
 
-let cachedUint32ArrayMemory0 = null;
-
-function getUint32ArrayMemory0() {
-    if (cachedUint32ArrayMemory0 === null || cachedUint32ArrayMemory0.byteLength === 0) {
-        cachedUint32ArrayMemory0 = new Uint32Array(wasm.memory.buffer);
-    }
-    return cachedUint32ArrayMemory0;
-}
-
-function getArrayU32FromWasm0(ptr, len) {
-    ptr = ptr >>> 0;
-    return getUint32ArrayMemory0().subarray(ptr / 4, ptr / 4 + len);
-}
-
 let cachedFloat32ArrayMemory0 = null;
 
 function getFloat32ArrayMemory0() {
@@ -65,27 +51,64 @@ function passArrayF32ToWasm0(arg, malloc) {
     WASM_VECTOR_LEN = arg.length;
     return ptr;
 }
+
+let cachedUint32ArrayMemory0 = null;
+
+function getUint32ArrayMemory0() {
+    if (cachedUint32ArrayMemory0 === null || cachedUint32ArrayMemory0.byteLength === 0) {
+        cachedUint32ArrayMemory0 = new Uint32Array(wasm.memory.buffer);
+    }
+    return cachedUint32ArrayMemory0;
+}
+
+function getArrayU32FromWasm0(ptr, len) {
+    ptr = ptr >>> 0;
+    return getUint32ArrayMemory0().subarray(ptr / 4, ptr / 4 + len);
+}
+
+function getArrayF32FromWasm0(ptr, len) {
+    ptr = ptr >>> 0;
+    return getFloat32ArrayMemory0().subarray(ptr / 4, ptr / 4 + len);
+}
+
+function passArray32ToWasm0(arg, malloc) {
+    const ptr = malloc(arg.length * 4, 4) >>> 0;
+    getUint32ArrayMemory0().set(arg, ptr / 4);
+    WASM_VECTOR_LEN = arg.length;
+    return ptr;
+}
 /**
  * @param {Float32Array} c_base
  * @param {Float32Array} c_tip
  * @param {number} c_radius
- * @param {Float32Array} b_center
- * @param {Float32Array} b_axes
- * @param {Float32Array} b_half
+ * @param {Float32Array} s_center
+ * @param {number} s_radius
  * @returns {boolean}
  */
-export function capsule_obb_intersect(c_base, c_tip, c_radius, b_center, b_axes, b_half) {
+export function capsule_sphere_intersect(c_base, c_tip, c_radius, s_center, s_radius) {
     const ptr0 = passArrayF32ToWasm0(c_base, wasm.__wbindgen_malloc);
     const len0 = WASM_VECTOR_LEN;
     const ptr1 = passArrayF32ToWasm0(c_tip, wasm.__wbindgen_malloc);
     const len1 = WASM_VECTOR_LEN;
-    const ptr2 = passArrayF32ToWasm0(b_center, wasm.__wbindgen_malloc);
+    const ptr2 = passArrayF32ToWasm0(s_center, wasm.__wbindgen_malloc);
     const len2 = WASM_VECTOR_LEN;
-    const ptr3 = passArrayF32ToWasm0(b_axes, wasm.__wbindgen_malloc);
-    const len3 = WASM_VECTOR_LEN;
-    const ptr4 = passArrayF32ToWasm0(b_half, wasm.__wbindgen_malloc);
-    const len4 = WASM_VECTOR_LEN;
-    const ret = wasm.capsule_obb_intersect(ptr0, len0, ptr1, len1, c_radius, ptr2, len2, ptr3, len3, ptr4, len4);
+    const ret = wasm.capsule_sphere_intersect(ptr0, len0, ptr1, len1, c_radius, ptr2, len2, s_radius);
+    return ret !== 0;
+}
+
+/**
+ * @param {Float32Array} a_center
+ * @param {number} a_radius
+ * @param {Float32Array} b_center
+ * @param {number} b_radius
+ * @returns {boolean}
+ */
+export function sphere_sphere_intersect(a_center, a_radius, b_center, b_radius) {
+    const ptr0 = passArrayF32ToWasm0(a_center, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArrayF32ToWasm0(b_center, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ret = wasm.sphere_sphere_intersect(ptr0, len0, a_radius, ptr1, len1, b_radius);
     return ret !== 0;
 }
 
@@ -105,104 +128,6 @@ export function ray_sphere_intersect(ray_origin, ray_dir, s_center, s_radius) {
     const len2 = WASM_VECTOR_LEN;
     const ret = wasm.ray_sphere_intersect(ptr0, len0, ptr1, len1, ptr2, len2, s_radius);
     return ret;
-}
-
-/**
- * Linear batch check using TRS inputs (SoA) - baseline without spatial index
- * @param {Float32Array} pre_pos
- * @param {Float32Array} pre_rot
- * @param {Float32Array} pre_scl
- * @param {Float32Array} others_pos
- * @param {Float32Array} others_rot
- * @param {Float32Array} others_scl
- * @returns {Uint32Array}
- */
-export function batch_check_trs_linear(pre_pos, pre_rot, pre_scl, others_pos, others_rot, others_scl) {
-    const ptr0 = passArrayF32ToWasm0(pre_pos, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArrayF32ToWasm0(pre_rot, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ptr2 = passArrayF32ToWasm0(pre_scl, wasm.__wbindgen_malloc);
-    const len2 = WASM_VECTOR_LEN;
-    const ptr3 = passArrayF32ToWasm0(others_pos, wasm.__wbindgen_malloc);
-    const len3 = WASM_VECTOR_LEN;
-    const ptr4 = passArrayF32ToWasm0(others_rot, wasm.__wbindgen_malloc);
-    const len4 = WASM_VECTOR_LEN;
-    const ptr5 = passArrayF32ToWasm0(others_scl, wasm.__wbindgen_malloc);
-    const len5 = WASM_VECTOR_LEN;
-    const ret = wasm.batch_check_trs_linear(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4, ptr5, len5);
-    var v7 = getArrayU32FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
-    return v7;
-}
-
-/**
- * @param {Float32Array} s_center
- * @param {number} s_radius
- * @param {Float32Array} b_center
- * @param {Float32Array} b_axes
- * @param {Float32Array} b_half
- * @returns {boolean}
- */
-export function sphere_obb_intersect(s_center, s_radius, b_center, b_axes, b_half) {
-    const ptr0 = passArrayF32ToWasm0(s_center, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArrayF32ToWasm0(b_center, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ptr2 = passArrayF32ToWasm0(b_axes, wasm.__wbindgen_malloc);
-    const len2 = WASM_VECTOR_LEN;
-    const ptr3 = passArrayF32ToWasm0(b_half, wasm.__wbindgen_malloc);
-    const len3 = WASM_VECTOR_LEN;
-    const ret = wasm.sphere_obb_intersect(ptr0, len0, s_radius, ptr1, len1, ptr2, len2, ptr3, len3);
-    return ret !== 0;
-}
-
-/**
- * @param {Float32Array} ray_origin
- * @param {Float32Array} ray_dir
- * @param {Float32Array} b_center
- * @param {Float32Array} b_axes
- * @param {Float32Array} b_half
- * @returns {number}
- */
-export function ray_obb_intersect(ray_origin, ray_dir, b_center, b_axes, b_half) {
-    const ptr0 = passArrayF32ToWasm0(ray_origin, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArrayF32ToWasm0(ray_dir, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ptr2 = passArrayF32ToWasm0(b_center, wasm.__wbindgen_malloc);
-    const len2 = WASM_VECTOR_LEN;
-    const ptr3 = passArrayF32ToWasm0(b_axes, wasm.__wbindgen_malloc);
-    const len3 = WASM_VECTOR_LEN;
-    const ptr4 = passArrayF32ToWasm0(b_half, wasm.__wbindgen_malloc);
-    const len4 = WASM_VECTOR_LEN;
-    const ret = wasm.ray_obb_intersect(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4);
-    return ret;
-}
-
-function getArrayF32FromWasm0(ptr, len) {
-    ptr = ptr >>> 0;
-    return getFloat32ArrayMemory0().subarray(ptr / 4, ptr / 4 + len);
-}
-/**
- * Computes global scene bounds (AABB) from world matrices and local half-extents.
- * Returns None if inputs are invalid or empty.
- * @param {Float32Array} world_mats
- * @param {Float32Array} half_extents
- * @returns {Float32Array | undefined}
- */
-export function compute_scene_bounds(world_mats, half_extents) {
-    const ptr0 = passArrayF32ToWasm0(world_mats, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArrayF32ToWasm0(half_extents, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ret = wasm.compute_scene_bounds(ptr0, len0, ptr1, len1);
-    let v3;
-    if (ret[0] !== 0) {
-        v3 = getArrayF32FromWasm0(ret[0], ret[1]).slice();
-        wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
-    }
-    return v3;
 }
 
 /**
@@ -232,18 +157,70 @@ export function obb_intersect(a_center, a_axes, a_half, b_center, b_axes, b_half
 }
 
 /**
- * @param {Float32Array} a_center
- * @param {number} a_radius
+ * @param {Float32Array} pre_pos
+ * @param {Float32Array} pre_rot
+ * @param {Float32Array} pre_scl
+ * @param {Float32Array} others_pos
+ * @param {Float32Array} others_rot
+ * @param {Float32Array} others_scl
+ * @returns {Uint32Array}
+ */
+export function batch_check_trs(pre_pos, pre_rot, pre_scl, others_pos, others_rot, others_scl) {
+    const ptr0 = passArrayF32ToWasm0(pre_pos, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArrayF32ToWasm0(pre_rot, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ptr2 = passArrayF32ToWasm0(pre_scl, wasm.__wbindgen_malloc);
+    const len2 = WASM_VECTOR_LEN;
+    const ptr3 = passArrayF32ToWasm0(others_pos, wasm.__wbindgen_malloc);
+    const len3 = WASM_VECTOR_LEN;
+    const ptr4 = passArrayF32ToWasm0(others_rot, wasm.__wbindgen_malloc);
+    const len4 = WASM_VECTOR_LEN;
+    const ptr5 = passArrayF32ToWasm0(others_scl, wasm.__wbindgen_malloc);
+    const len5 = WASM_VECTOR_LEN;
+    const ret = wasm.batch_check_trs(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4, ptr5, len5);
+    var v7 = getArrayU32FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+    return v7;
+}
+
+/**
+ * @param {Float32Array} world_mats
+ * @param {Float32Array} half_extents
+ * @returns {Float32Array | undefined}
+ */
+export function compute_scene_bounds(world_mats, half_extents) {
+    const ptr0 = passArrayF32ToWasm0(world_mats, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArrayF32ToWasm0(half_extents, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ret = wasm.compute_scene_bounds(ptr0, len0, ptr1, len1);
+    let v3;
+    if (ret[0] !== 0) {
+        v3 = getArrayF32FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+    }
+    return v3;
+}
+
+/**
+ * @param {Float32Array} s_center
+ * @param {number} s_radius
  * @param {Float32Array} b_center
- * @param {number} b_radius
+ * @param {Float32Array} b_axes
+ * @param {Float32Array} b_half
  * @returns {boolean}
  */
-export function sphere_sphere_intersect(a_center, a_radius, b_center, b_radius) {
-    const ptr0 = passArrayF32ToWasm0(a_center, wasm.__wbindgen_malloc);
+export function sphere_obb_intersect(s_center, s_radius, b_center, b_axes, b_half) {
+    const ptr0 = passArrayF32ToWasm0(s_center, wasm.__wbindgen_malloc);
     const len0 = WASM_VECTOR_LEN;
     const ptr1 = passArrayF32ToWasm0(b_center, wasm.__wbindgen_malloc);
     const len1 = WASM_VECTOR_LEN;
-    const ret = wasm.sphere_sphere_intersect(ptr0, len0, a_radius, ptr1, len1, b_radius);
+    const ptr2 = passArrayF32ToWasm0(b_axes, wasm.__wbindgen_malloc);
+    const len2 = WASM_VECTOR_LEN;
+    const ptr3 = passArrayF32ToWasm0(b_half, wasm.__wbindgen_malloc);
+    const len3 = WASM_VECTOR_LEN;
+    const ret = wasm.sphere_obb_intersect(ptr0, len0, s_radius, ptr1, len1, ptr2, len2, ptr3, len3);
     return ret !== 0;
 }
 
@@ -267,6 +244,34 @@ export function capsule_capsule_intersect(a_base, a_tip, a_radius, b_base, b_tip
     const len3 = WASM_VECTOR_LEN;
     const ret = wasm.capsule_capsule_intersect(ptr0, len0, ptr1, len1, a_radius, ptr2, len2, ptr3, len3, b_radius);
     return ret !== 0;
+}
+
+/**
+ * @param {Float32Array} pre_pos
+ * @param {Float32Array} pre_rot
+ * @param {Float32Array} pre_scl
+ * @param {Float32Array} others_pos
+ * @param {Float32Array} others_rot
+ * @param {Float32Array} others_scl
+ * @returns {Uint32Array}
+ */
+export function batch_check_trs_linear(pre_pos, pre_rot, pre_scl, others_pos, others_rot, others_scl) {
+    const ptr0 = passArrayF32ToWasm0(pre_pos, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArrayF32ToWasm0(pre_rot, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ptr2 = passArrayF32ToWasm0(pre_scl, wasm.__wbindgen_malloc);
+    const len2 = WASM_VECTOR_LEN;
+    const ptr3 = passArrayF32ToWasm0(others_pos, wasm.__wbindgen_malloc);
+    const len3 = WASM_VECTOR_LEN;
+    const ptr4 = passArrayF32ToWasm0(others_rot, wasm.__wbindgen_malloc);
+    const len4 = WASM_VECTOR_LEN;
+    const ptr5 = passArrayF32ToWasm0(others_scl, wasm.__wbindgen_malloc);
+    const len5 = WASM_VECTOR_LEN;
+    const ret = wasm.batch_check_trs_linear(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4, ptr5, len5);
+    var v7 = getArrayU32FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+    return v7;
 }
 
 /**
@@ -298,56 +303,29 @@ export function batch_check(pre_center, pre_axes, pre_half, others_centers, othe
 }
 
 /**
- * Batch check using TRS with uniform-grid broad-phase inside Rust
- * @param {Float32Array} pre_pos
- * @param {Float32Array} pre_rot
- * @param {Float32Array} pre_scl
- * @param {Float32Array} others_pos
- * @param {Float32Array} others_rot
- * @param {Float32Array} others_scl
- * @returns {Uint32Array}
+ * @param {Float32Array} ray_origin
+ * @param {Float32Array} ray_dir
+ * @param {Float32Array} b_center
+ * @param {Float32Array} b_axes
+ * @param {Float32Array} b_half
+ * @returns {number}
  */
-export function batch_check_trs(pre_pos, pre_rot, pre_scl, others_pos, others_rot, others_scl) {
-    const ptr0 = passArrayF32ToWasm0(pre_pos, wasm.__wbindgen_malloc);
+export function ray_obb_intersect(ray_origin, ray_dir, b_center, b_axes, b_half) {
+    const ptr0 = passArrayF32ToWasm0(ray_origin, wasm.__wbindgen_malloc);
     const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArrayF32ToWasm0(pre_rot, wasm.__wbindgen_malloc);
+    const ptr1 = passArrayF32ToWasm0(ray_dir, wasm.__wbindgen_malloc);
     const len1 = WASM_VECTOR_LEN;
-    const ptr2 = passArrayF32ToWasm0(pre_scl, wasm.__wbindgen_malloc);
+    const ptr2 = passArrayF32ToWasm0(b_center, wasm.__wbindgen_malloc);
     const len2 = WASM_VECTOR_LEN;
-    const ptr3 = passArrayF32ToWasm0(others_pos, wasm.__wbindgen_malloc);
+    const ptr3 = passArrayF32ToWasm0(b_axes, wasm.__wbindgen_malloc);
     const len3 = WASM_VECTOR_LEN;
-    const ptr4 = passArrayF32ToWasm0(others_rot, wasm.__wbindgen_malloc);
+    const ptr4 = passArrayF32ToWasm0(b_half, wasm.__wbindgen_malloc);
     const len4 = WASM_VECTOR_LEN;
-    const ptr5 = passArrayF32ToWasm0(others_scl, wasm.__wbindgen_malloc);
-    const len5 = WASM_VECTOR_LEN;
-    const ret = wasm.batch_check_trs(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4, ptr5, len5);
-    var v7 = getArrayU32FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
-    return v7;
+    const ret = wasm.ray_obb_intersect(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4);
+    return ret;
 }
 
 /**
- * @param {Float32Array} c_base
- * @param {Float32Array} c_tip
- * @param {number} c_radius
- * @param {Float32Array} s_center
- * @param {number} s_radius
- * @returns {boolean}
- */
-export function capsule_sphere_intersect(c_base, c_tip, c_radius, s_center, s_radius) {
-    const ptr0 = passArrayF32ToWasm0(c_base, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArrayF32ToWasm0(c_tip, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ptr2 = passArrayF32ToWasm0(s_center, wasm.__wbindgen_malloc);
-    const len2 = WASM_VECTOR_LEN;
-    const ret = wasm.capsule_sphere_intersect(ptr0, len0, ptr1, len1, c_radius, ptr2, len2, s_radius);
-    return ret !== 0;
-}
-
-/**
- * Batch check all vs all
- * Returns a list of pairs [a1, b1, a2, b2, ...]
  * @param {Float32Array} pos
  * @param {Float32Array} rot
  * @param {Float32Array} scl
@@ -364,6 +342,30 @@ export function batch_check_all(pos, rot, scl) {
     var v4 = getArrayU32FromWasm0(ret[0], ret[1]).slice();
     wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
     return v4;
+}
+
+/**
+ * @param {Float32Array} c_base
+ * @param {Float32Array} c_tip
+ * @param {number} c_radius
+ * @param {Float32Array} b_center
+ * @param {Float32Array} b_axes
+ * @param {Float32Array} b_half
+ * @returns {boolean}
+ */
+export function capsule_obb_intersect(c_base, c_tip, c_radius, b_center, b_axes, b_half) {
+    const ptr0 = passArrayF32ToWasm0(c_base, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArrayF32ToWasm0(c_tip, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ptr2 = passArrayF32ToWasm0(b_center, wasm.__wbindgen_malloc);
+    const len2 = WASM_VECTOR_LEN;
+    const ptr3 = passArrayF32ToWasm0(b_axes, wasm.__wbindgen_malloc);
+    const len3 = WASM_VECTOR_LEN;
+    const ptr4 = passArrayF32ToWasm0(b_half, wasm.__wbindgen_malloc);
+    const len4 = WASM_VECTOR_LEN;
+    const ret = wasm.capsule_obb_intersect(ptr0, len0, ptr1, len1, c_radius, ptr2, len2, ptr3, len3, ptr4, len4);
+    return ret !== 0;
 }
 
 const CollisionWorldFinalization = (typeof FinalizationRegistry === 'undefined')
@@ -384,7 +386,36 @@ export class CollisionWorld {
         wasm.__wbg_collisionworld_free(ptr, 0);
     }
     /**
-     * Get pointer to scales buffer (Float32Array view in JS).
+     * @param {Float32Array} view_proj
+     * @returns {Uint32Array}
+     */
+    query_frustum(view_proj) {
+        const ptr0 = passArrayF32ToWasm0(view_proj, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ret = wasm.collisionworld_query_frustum(this.__wbg_ptr, ptr0, len0);
+        var v2 = getArrayU32FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+        return v2;
+    }
+    /**
+     * @param {Float32Array} origin
+     * @param {Float32Array} dir
+     * @returns {Float32Array | undefined}
+     */
+    raycast_world(origin, dir) {
+        const ptr0 = passArrayF32ToWasm0(origin, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArrayF32ToWasm0(dir, wasm.__wbindgen_malloc);
+        const len1 = WASM_VECTOR_LEN;
+        const ret = wasm.collisionworld_raycast_world(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+        let v3;
+        if (ret[0] !== 0) {
+            v3 = getArrayF32FromWasm0(ret[0], ret[1]).slice();
+            wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+        }
+        return v3;
+    }
+    /**
      * @returns {number}
      */
     get_scales_ptr() {
@@ -392,8 +423,6 @@ export class CollisionWorld {
         return ret >>> 0;
     }
     /**
-     * Run batch collision check using internal buffers.
-     * Returns flat array of indices [idxA1, idxB1, idxA2, idxB2, ...]
      * @returns {Uint32Array}
      */
     check_collisions() {
@@ -403,7 +432,6 @@ export class CollisionWorld {
         return v1;
     }
     /**
-     * Get pointer to positions buffer (Float32Array view in JS).
      * @returns {number}
      */
     get_positions_ptr() {
@@ -411,12 +439,38 @@ export class CollisionWorld {
         return ret >>> 0;
     }
     /**
-     * Get pointer to rotations buffer (Float32Array view in JS).
      * @returns {number}
      */
     get_rotations_ptr() {
         const ret = wasm.collisionworld_get_rotations_ptr(this.__wbg_ptr);
         return ret >>> 0;
+    }
+    /**
+     * Rasterize a set of entities (indices) as occluders.
+     * These entities will be rendered into the depth buffer as solid boxes.
+     * @param {Uint32Array} indices
+     * @param {Float32Array} view_proj
+     */
+    rasterize_occluders(indices, view_proj) {
+        const ptr0 = passArray32ToWasm0(indices, wasm.__wbindgen_malloc);
+        const len0 = WASM_VECTOR_LEN;
+        const ptr1 = passArrayF32ToWasm0(view_proj, wasm.__wbindgen_malloc);
+        const len1 = WASM_VECTOR_LEN;
+        wasm.collisionworld_rasterize_occluders(this.__wbg_ptr, ptr0, len0, ptr1, len1);
+    }
+    /**
+     * Clear occlusion buffer.
+     */
+    clear_occlusion_buffer() {
+        wasm.collisionworld_clear_occlusion_buffer(this.__wbg_ptr);
+    }
+    /**
+     * Initialize occlusion buffer with given dimensions (e.g., 256x128).
+     * @param {number} width
+     * @param {number} height
+     */
+    init_occlusion_culling(width, height) {
+        wasm.collisionworld_init_occlusion_culling(this.__wbg_ptr, width, height);
     }
     constructor() {
         const ret = wasm.collisionworld_new();
@@ -425,8 +479,6 @@ export class CollisionWorld {
         return this;
     }
     /**
-     * Resize buffers to hold `count` entities.
-     * This preserves existing data up to new size, or initializes new slots with 0.
      * @param {number} count
      */
     resize(count) {

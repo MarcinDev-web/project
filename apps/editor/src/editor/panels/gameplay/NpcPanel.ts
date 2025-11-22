@@ -10,7 +10,14 @@
 
 import type { AssetPreset } from '../../types/BlockAssetTypes';
 import { createIcon } from '../../utils/icons';
-import { getAllNpcUnitTypes, getAllNpcBehaviors, getAllNpcFactions } from '@engine/editor-utils';
+import { 
+  getAllNpcUnitTypes, 
+  getAllNpcBehaviors, 
+  getAllNpcFactions,
+  getNpcUnitType
+} from '@engine/editor-utils';
+import type { Scene } from '@engine/world';
+import { CameraComponent } from '@engine/world/components/CameraComponent';
 
 type NpcConfig = NonNullable<AssetPreset['npcConfig']>;
 type NpcConfigUpdates = {
@@ -20,6 +27,8 @@ type NpcConfigUpdates = {
 export interface NpcPanelConfig {
   /** Current NPC asset preset (if any) */
   assetPreset: AssetPreset | null;
+  /** Scene instance for capturing positions */
+  scene?: Scene;
   /** Called when NPC configuration changes */
   onConfigChanged: (config: AssetPreset['npcConfig']) => void;
   /** Called when new NPC preset should be created */
@@ -71,59 +80,106 @@ export class NpcPanel {
   private render(): void {
     this.root.innerHTML = '';
 
-    const header = document.createElement('div');
-    header.className = 'panel-header';
-    
-    const iconWrapper = document.createElement('div');
-    iconWrapper.className = 'panel-header-icon';
-    iconWrapper.appendChild(createIcon('user', 20));
-    
-    const title = document.createElement('h2');
-    title.className = 'panel-title';
-    title.textContent = 'NPCs';
-
-    header.appendChild(iconWrapper);
-    header.appendChild(title);
-    this.root.appendChild(header);
+    this.renderHeader();
 
     const content = document.createElement('div');
     content.className = 'npc-panel-content custom-scrollbar';
 
     // Unit Type Selector
-    const unitTypeSection = this.createUnitTypeSection();
-    content.appendChild(unitTypeSection);
+    content.appendChild(this.createUnitTypeSection());
 
     // Faction Selector
-    const factionSection = this.createFactionSection();
-    content.appendChild(factionSection);
+    content.appendChild(this.createFactionSection());
+
+    // Equipment (Combat units)
+    if (['soldier', 'guard', 'custom'].includes(this.currentConfig?.unitType ?? 'soldier')) {
+      content.appendChild(this.createEquipmentSection());
+    }
+
+    // Attributes (Health, Speed)
+    content.appendChild(this.createAttributesSection());
 
     // Behavior Selector
-    const behaviorSection = this.createBehaviorSection();
-    content.appendChild(behaviorSection);
+    content.appendChild(this.createBehaviorSection());
 
     // Army ID
-    const armySection = this.createArmySection();
-    content.appendChild(armySection);
+    content.appendChild(this.createArmySection());
 
     // Behavior-specific settings
     if (this.currentConfig) {
-      if (this.currentConfig.behavior === 'patrol') {
-        const patrolSection = this.createPatrolSection();
-        content.appendChild(patrolSection);
-      } else if (this.currentConfig.behavior === 'guard-position') {
-        const guardSection = this.createGuardSection();
-        content.appendChild(guardSection);
-      } else if (this.currentConfig.behavior === 'shoot-player') {
-        const detectionSection = this.createDetectionSection();
-        content.appendChild(detectionSection);
-      }
+      this.renderBehaviorSpecifics(content);
     }
 
     // Action Buttons
-    const actionsSection = this.createActionsSection();
-    content.appendChild(actionsSection);
+    content.appendChild(this.createActionsSection());
 
     this.root.appendChild(content);
+  }
+
+  private renderHeader(): void {
+    const header = document.createElement('div');
+    header.className = 'panel-header';
+    
+    const unitType = getNpcUnitType((this.currentConfig?.unitType ?? 'soldier') as any);
+    const faction = getAllNpcFactions().find(f => f.id === (this.currentConfig?.faction ?? 'neutral'));
+    
+    // Apply faction color if available
+    if (faction?.color) {
+      const [r, g, b] = faction.color;
+      header.style.borderLeft = `4px solid rgb(${r * 255}, ${g * 255}, ${b * 255})`;
+    }
+    
+    const iconWrapper = document.createElement('div');
+    iconWrapper.className = 'panel-header-icon';
+    // Dynamic icon based on unit type if possible, otherwise generic user
+    const iconName = unitType?.id === 'guard' ? 'shield-check' : 'user';
+    iconWrapper.appendChild(createIcon(iconName, 20));
+    
+    const titleWrapper = document.createElement('div');
+    titleWrapper.style.display = 'flex';
+    titleWrapper.style.flexDirection = 'column';
+    titleWrapper.style.justifyContent = 'center';
+    
+    const title = document.createElement('h2');
+    title.className = 'panel-title';
+    title.textContent = unitType?.name ?? 'NPC';
+    titleWrapper.appendChild(title);
+
+    if (faction) {
+        const subtitle = document.createElement('div');
+        subtitle.style.fontSize = '11px';
+        subtitle.style.opacity = '0.7';
+        subtitle.textContent = faction.name;
+        titleWrapper.appendChild(subtitle);
+    }
+
+    header.appendChild(iconWrapper);
+    header.appendChild(titleWrapper);
+    this.root.appendChild(header);
+  }
+
+  private renderBehaviorSpecifics(content: HTMLElement): void {
+    if (!this.currentConfig) return;
+
+    if (this.currentConfig.behavior === 'patrol') {
+      content.appendChild(this.createPatrolSection());
+    } else if (this.currentConfig.behavior === 'guard-position') {
+      content.appendChild(this.createGuardSection());
+    } else if (this.currentConfig.behavior === 'shoot-player') {
+      content.appendChild(this.createDetectionSection());
+    }
+  }
+
+  /**
+   * Helper to create a tooltip icon
+   */
+  private createTooltip(text: string): HTMLElement {
+    const icon = createIcon('info', 14);
+    icon.style.marginLeft = '8px';
+    icon.style.opacity = '0.6';
+    icon.style.cursor = 'help';
+    icon.title = text;
+    return icon;
   }
 
   /**
@@ -133,10 +189,23 @@ export class NpcPanel {
     const section = document.createElement('div');
     section.className = 'panel-section';
 
+    const labelContainer = document.createElement('div');
+    labelContainer.style.display = 'flex';
+    labelContainer.style.alignItems = 'center';
+    labelContainer.style.marginBottom = '4px';
+
     const label = document.createElement('label');
     label.className = 'panel-label';
     label.textContent = 'Unit Type';
-    section.appendChild(label);
+    label.style.marginBottom = '0';
+    labelContainer.appendChild(label);
+
+    const currentUnit = getAllNpcUnitTypes().find(u => u.id === (this.currentConfig?.unitType ?? 'soldier'));
+    if (currentUnit) {
+        labelContainer.appendChild(this.createTooltip(currentUnit.description));
+    }
+
+    section.appendChild(labelContainer);
 
     const select = document.createElement('select');
     select.className = 'panel-select';
@@ -175,10 +244,23 @@ export class NpcPanel {
     const section = document.createElement('div');
     section.className = 'panel-section';
 
+    const labelContainer = document.createElement('div');
+    labelContainer.style.display = 'flex';
+    labelContainer.style.alignItems = 'center';
+    labelContainer.style.marginBottom = '4px';
+
     const label = document.createElement('label');
     label.className = 'panel-label';
     label.textContent = 'Faction';
-    section.appendChild(label);
+    label.style.marginBottom = '0';
+    labelContainer.appendChild(label);
+
+    const currentFaction = getAllNpcFactions().find(f => f.id === (this.currentConfig?.faction ?? 'neutral'));
+    if (currentFaction) {
+        labelContainer.appendChild(this.createTooltip(currentFaction.description));
+    }
+
+    section.appendChild(labelContainer);
 
     const select = document.createElement('select');
     select.className = 'panel-select';
@@ -189,17 +271,14 @@ export class NpcPanel {
       const option = document.createElement('option');
       option.value = faction.id;
       option.textContent = faction.name;
+      if (faction.color) {
+        // Note: option styling is limited in some browsers
+        option.style.color = `rgb(${faction.color.map(c => c*255).join(',')})`;
+      }
       select.appendChild(option);
     }
 
     select.addEventListener('change', () => {
-      const factions = getAllNpcFactions();
-      const isValid = factions.some(f => f.id === select.value);
-      if (!isValid) {
-        console.warn(`Invalid faction: ${select.value}`);
-        select.value = this.currentConfig?.faction ?? 'neutral';
-        return;
-      }
       const prevValue = this.currentConfig?.faction ?? 'neutral';
       this.updateConfig({ faction: select.value as any }, prevValue !== select.value ? () => {
         this.updateConfig({ faction: prevValue });
@@ -211,16 +290,157 @@ export class NpcPanel {
   }
 
   /**
+   * Creates equipment selector section
+   */
+  private createEquipmentSection(): HTMLElement {
+    const section = document.createElement('div');
+    section.className = 'panel-section';
+
+    const labelContainer = document.createElement('div');
+    labelContainer.style.display = 'flex';
+    labelContainer.style.alignItems = 'center';
+    labelContainer.style.marginBottom = '4px';
+
+    const label = document.createElement('label');
+    label.className = 'panel-label';
+    label.textContent = 'Equipment';
+    label.style.marginBottom = '0';
+    labelContainer.appendChild(label);
+    labelContainer.appendChild(this.createTooltip('Initial weapon equipped by the NPC'));
+
+    section.appendChild(labelContainer);
+
+    const select = document.createElement('select');
+    select.className = 'panel-select';
+    
+    const unitType = getNpcUnitType((this.currentConfig?.unitType ?? 'soldier') as any);
+    const currentEquipment = this.currentConfig?.equipment ?? unitType?.defaultWeapon ?? 'rifle';
+    select.value = currentEquipment;
+
+    const weapons = ['rifle', 'shotgun', 'sniper', 'pistol', 'smg', 'none'];
+    for (const weapon of weapons) {
+      const option = document.createElement('option');
+      option.value = weapon;
+      option.textContent = weapon.charAt(0).toUpperCase() + weapon.slice(1);
+      select.appendChild(option);
+    }
+
+    select.addEventListener('change', () => {
+      const prevValue = this.currentConfig?.equipment;
+      const newValue = select.value === 'none' ? undefined : select.value;
+      
+      this.updateConfig({ equipment: newValue }, prevValue !== newValue ? () => {
+        this.updateConfig({ equipment: prevValue });
+      } : undefined);
+    });
+
+    section.appendChild(select);
+    return section;
+  }
+
+  /**
+   * Creates attributes configuration section
+   */
+  private createAttributesSection(): HTMLElement {
+    const section = document.createElement('div');
+    section.className = 'panel-section';
+
+    const title = document.createElement('h3');
+    title.className = 'panel-section-title';
+    title.textContent = 'Attributes';
+    section.appendChild(title);
+
+    const unitType = getNpcUnitType((this.currentConfig?.unitType ?? 'soldier') as any);
+    
+    // Helper to create attribute row
+    const createAttributeRow = (
+      name: string, 
+      key: 'health' | 'speed', 
+      defaultValue: number,
+      min: number,
+      max: number
+    ) => {
+      const wrapper = document.createElement('div');
+      wrapper.className = 'panel-input-group';
+      wrapper.style.display = 'flex';
+      wrapper.style.alignItems = 'center';
+      wrapper.style.gap = '8px';
+
+      const checkbox = document.createElement('input');
+      checkbox.type = 'checkbox';
+      checkbox.checked = this.currentConfig?.[key] !== undefined;
+      
+      const label = document.createElement('label');
+      label.className = 'panel-label-small';
+      label.style.flex = '1';
+      label.textContent = name;
+      label.style.marginBottom = '0';
+
+      const input = document.createElement('input');
+      input.type = 'number';
+      input.className = 'panel-input';
+      input.style.width = '80px';
+      input.min = String(min);
+      input.max = String(max);
+      input.value = String(this.currentConfig?.[key] ?? defaultValue);
+      input.disabled = !checkbox.checked;
+
+      checkbox.addEventListener('change', () => {
+        input.disabled = !checkbox.checked;
+        if (checkbox.checked) {
+          const val = parseFloat(input.value);
+          this.updateConfig({ [key]: val });
+        } else {
+          this.updateConfig({ [key]: undefined });
+          input.value = String(defaultValue);
+        }
+      });
+
+      input.addEventListener('change', () => {
+        const val = parseFloat(input.value);
+        if (isNaN(val) || val < min) {
+          input.value = String(defaultValue);
+          return;
+        }
+        this.updateConfig({ [key]: val });
+      });
+
+      wrapper.appendChild(checkbox);
+      wrapper.appendChild(label);
+      wrapper.appendChild(input);
+      return wrapper;
+    };
+
+    section.appendChild(createAttributeRow('Health', 'health', unitType?.defaultHealth ?? 100, 1, 1000));
+    section.appendChild(createAttributeRow('Speed', 'speed', unitType?.defaultSpeed ?? 5, 1, 20));
+
+    return section;
+  }
+
+  /**
    * Creates behavior selector section
    */
   private createBehaviorSection(): HTMLElement {
     const section = document.createElement('div');
     section.className = 'panel-section';
 
+    const labelContainer = document.createElement('div');
+    labelContainer.style.display = 'flex';
+    labelContainer.style.alignItems = 'center';
+    labelContainer.style.marginBottom = '4px';
+
     const label = document.createElement('label');
     label.className = 'panel-label';
     label.textContent = 'Behavior';
-    section.appendChild(label);
+    label.style.marginBottom = '0';
+    labelContainer.appendChild(label);
+
+    const currentBehavior = getAllNpcBehaviors().find(b => b.id === (this.currentConfig?.behavior ?? 'idle'));
+    if (currentBehavior) {
+        labelContainer.appendChild(this.createTooltip(currentBehavior.description));
+    }
+
+    section.appendChild(labelContainer);
 
     const select = document.createElement('select');
     select.className = 'panel-select';
@@ -273,14 +493,28 @@ export class NpcPanel {
     input.placeholder = 'e.g., army-1, red-team';
     input.value = this.currentConfig?.armyId ?? '';
 
+    const errorMsg = document.createElement('div');
+    errorMsg.className = 'panel-error-message';
+    errorMsg.style.color = '#ff4444';
+    errorMsg.style.fontSize = '12px';
+    errorMsg.style.marginTop = '4px';
+    errorMsg.style.display = 'none';
+    errorMsg.textContent = 'Invalid format (alphanumeric, -, _ only)';
+
     input.addEventListener('input', () => {
       const trimmed = input.value.trim();
       // Validate army ID (alphanumeric, dashes, underscores)
       const isValid = trimmed === '' || /^[a-zA-Z0-9_-]+$/.test(trimmed);
+      
       if (!isValid) {
-        console.warn('Invalid army ID format (alphanumeric, dashes, underscores only)');
+        input.style.borderColor = '#ff4444';
+        errorMsg.style.display = 'block';
         return;
       }
+      
+      input.style.borderColor = '';
+      errorMsg.style.display = 'none';
+
       const prevValue = this.currentConfig?.armyId ?? undefined;
       this.updateConfig({ armyId: trimmed || undefined }, prevValue !== trimmed ? () => {
         this.updateConfig({ armyId: prevValue });
@@ -288,6 +522,7 @@ export class NpcPanel {
     });
 
     section.appendChild(input);
+    section.appendChild(errorMsg);
     return section;
   }
 
@@ -327,7 +562,7 @@ export class NpcPanel {
       this.updateConfig({ patrolSpeed: clamped }, prevValue !== clamped ? () => {
         this.updateConfig({ patrolSpeed: prevValue });
       } : undefined);
-      // Update input value if clamped
+      
       if (clamped !== value && !isNaN(value)) {
         speedInput.value = String(clamped);
       }
@@ -336,11 +571,117 @@ export class NpcPanel {
     speedWrapper.appendChild(speedInput);
     section.appendChild(speedWrapper);
 
-    // Waypoints info (read-only for now, could be extended with waypoint editor)
-    const waypointsInfo = document.createElement('div');
-    waypointsInfo.className = 'panel-info';
-    waypointsInfo.textContent = 'Waypoints can be configured in the Properties panel after placement.';
-    section.appendChild(waypointsInfo);
+    // Waypoints List
+    const waypointsTitle = document.createElement('label');
+    waypointsTitle.className = 'panel-label-small';
+    waypointsTitle.textContent = 'Waypoints';
+    waypointsTitle.style.marginTop = '8px';
+    waypointsTitle.style.marginBottom = '4px';
+    section.appendChild(waypointsTitle);
+
+    const waypointsList = document.createElement('div');
+    waypointsList.className = 'waypoints-list';
+    waypointsList.style.display = 'flex';
+    waypointsList.style.flexDirection = 'column';
+    waypointsList.style.gap = '4px';
+    waypointsList.style.marginBottom = '8px';
+
+    const waypoints = this.currentConfig?.patrolWaypoints ?? [];
+
+    const updateWaypoints = (newWaypoints: Array<[number, number, number]>) => {
+        this.updateConfig({ patrolWaypoints: newWaypoints });
+        this.render(); // Re-render to update list
+    };
+
+    waypoints.forEach((wp, index) => {
+        const row = document.createElement('div');
+        row.style.display = 'flex';
+        row.style.gap = '4px';
+        row.style.alignItems = 'center';
+
+        ['x', 'y', 'z'].forEach((axis, i) => {
+            const input = document.createElement('input');
+            input.type = 'number';
+            input.className = 'panel-input';
+            input.style.width = '0';
+            input.style.flex = '1';
+            input.step = '0.5';
+            input.placeholder = axis.toUpperCase();
+            input.value = String(wp[i]);
+            
+            input.addEventListener('change', () => {
+                const val = parseFloat(input.value);
+                if (isNaN(val)) return;
+                const newWp = [...wp] as [number, number, number];
+                newWp[i] = val;
+                const newWaypoints = [...waypoints];
+                newWaypoints[index] = newWp;
+                updateWaypoints(newWaypoints);
+            });
+            row.appendChild(input);
+        });
+
+        const removeBtn = document.createElement('button');
+        removeBtn.className = 'panel-button-small panel-button-danger';
+        removeBtn.textContent = '×';
+        removeBtn.title = 'Remove Waypoint';
+        removeBtn.style.width = '24px';
+        removeBtn.style.padding = '0';
+        removeBtn.addEventListener('click', () => {
+            const newWaypoints = waypoints.filter((_, i) => i !== index);
+            updateWaypoints(newWaypoints);
+        });
+        row.appendChild(removeBtn);
+
+        waypointsList.appendChild(row);
+    });
+
+    section.appendChild(waypointsList);
+
+    // Buttons
+    const buttonsRow = document.createElement('div');
+    buttonsRow.style.display = 'flex';
+    buttonsRow.style.gap = '8px';
+
+    const addBtn = document.createElement('button');
+    addBtn.className = 'panel-button';
+    addBtn.textContent = '+ Add';
+    addBtn.style.flex = '1';
+    addBtn.addEventListener('click', () => {
+        const lastWp = waypoints.length > 0 ? waypoints[waypoints.length - 1] : [0, 0, 0];
+        const newWp = [lastWp[0] + 2, lastWp[1], lastWp[2]] as [number, number, number];
+        updateWaypoints([...waypoints, newWp]);
+    });
+    buttonsRow.appendChild(addBtn);
+
+    if (this.config.scene) {
+        const captureBtn = document.createElement('button');
+        captureBtn.className = 'panel-button';
+        captureBtn.textContent = 'Capture Pos';
+        captureBtn.style.flex = '1';
+        captureBtn.title = 'Add current camera position as waypoint';
+        captureBtn.addEventListener('click', () => {
+            if (!this.config.scene) return;
+            
+            // Try to find camera
+            const cameras = this.config.scene.queryEntities(CameraComponent);
+            let pos: [number, number, number] = [0, 0, 0];
+            
+            if (cameras.length > 0) {
+                const camPos = cameras[0].transform.position;
+                pos = [
+                    Math.round(camPos[0] * 10) / 10,
+                    Math.round(camPos[1] * 10) / 10,
+                    Math.round(camPos[2] * 10) / 10
+                ];
+            }
+            
+            updateWaypoints([...waypoints, pos]);
+        });
+        buttonsRow.appendChild(captureBtn);
+    }
+
+    section.appendChild(buttonsRow);
 
     return section;
   }

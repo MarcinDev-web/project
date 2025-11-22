@@ -20,7 +20,7 @@ import { Entity } from '@engine/world';
 import type { Vec3, Mat4 } from '@engine/core/math';
 import { mat4Invert, mat4GetTranslationOut, mat4GetRotationOut, transformVec3ByQuatOut } from '@engine/core/math';
 import type { PhysicsWorld } from '@engine/world';
-import { CharacterController, CharacterState } from '@engine/world/components/CharacterController';
+import { CharacterController } from '@engine/world/components/CharacterController';
 import { PhysicsComponent, RigidbodyType } from '@engine/world/components/PhysicsComponent';
 import { HealthComponent } from '@engine/world/components/HealthComponent';
 import { CameraComponent } from '@engine/world/components/CameraComponent';
@@ -295,7 +295,7 @@ export class EditorModeManager {
     });
     
     this.playingState = new PlayingState({
-      updateFPSCamera: () => this.getFPSCamera()?.update(),
+      updateFPSCamera: (deltaTime) => this.getFPSCamera()?.update(deltaTime),
       cameraDirector: this.cameraDirector,
       enableEditorCamera: () => {
         this.cameraDirector.setMode('free-fly');

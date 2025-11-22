@@ -1,9 +1,11 @@
 import { Component } from './Component.js';
 import { registerComponent } from './registry.js';
+import type { AABB } from '../physics/BoundingVolume.js';
 
 export type MeshKind =
   | 'none'
   | 'cube'
+  | 'box'
   | 'sphere'
   | 'cylinder'
   | 'plane'
@@ -41,6 +43,7 @@ export interface SerializedMeshComponent {
   meshData?: SerializedCustomMeshData;
   options?: PrimitiveOptions;
   materialAssetId?: string;
+  localAABB?: { min: number[]; max: number[] };
 }
 
 export class MeshComponent extends Component {
@@ -50,6 +53,7 @@ export class MeshComponent extends Component {
   meshData?: CustomMeshData;
   options: PrimitiveOptions = {};
   materialAssetId?: string;
+  localAABB?: AABB;
 
   getType(): string {
     return MeshComponent.type;
@@ -78,6 +82,13 @@ export class MeshComponent extends Component {
       clone.materialAssetId = this.materialAssetId;
     }
     
+    if (this.localAABB) {
+      clone.localAABB = {
+        min: [...this.localAABB.min],
+        max: [...this.localAABB.max],
+      };
+    }
+
     return clone;
   }
 
@@ -89,6 +100,13 @@ export class MeshComponent extends Component {
 
     if (this.materialAssetId) {
       result.materialAssetId = this.materialAssetId;
+    }
+
+    if (this.localAABB) {
+      result.localAABB = {
+        min: [...this.localAABB.min],
+        max: [...this.localAABB.max],
+      };
     }
 
     if (this.meshData) {
@@ -107,6 +125,13 @@ export class MeshComponent extends Component {
     if (data.meshType) this.meshType = data.meshType;
     if (data.options) this.options = { ...data.options };
     if (data.materialAssetId) this.materialAssetId = data.materialAssetId;
+
+    if (data.localAABB) {
+      this.localAABB = {
+        min: [data.localAABB.min[0] ?? 0, data.localAABB.min[1] ?? 0, data.localAABB.min[2] ?? 0],
+        max: [data.localAABB.max[0] ?? 0, data.localAABB.max[1] ?? 0, data.localAABB.max[2] ?? 0],
+      };
+    }
 
     if (data.meshData) {
       this.meshData = {

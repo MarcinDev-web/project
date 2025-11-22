@@ -1,14 +1,3 @@
-/**
- * BlockDragController - KoGaMa-style block dragging system.
- * 
- * Allows users to drag existing blocks in 3D space:
- * - Click and hold on a block to start dragging
- * - Block follows cursor in 3D space
- * - Can snap to adjacent blocks
- * - Release to place in new position
- * - Collision detection prevents invalid placement
- */
-
 import type { OrbitControls, CameraDirector } from '@engine/camera';
 import type { Scene, Entity } from '@engine/world';
 import type { SelectionManager } from '@engine/world';
@@ -16,10 +5,16 @@ import type { EditorState } from '../core/state';
 import type { PlacementMode } from '../placement/PlacementMode';
 import { Raycaster } from '@engine/world';
 import type { Vec3, Mat4, Quat } from '@engine/core/math';
-import { mat4Perspective, mat4LookAt, mat4Invert, mat4GetRotation, mat4GetScale, dotVec3 } from '@engine/core/math';
-import { FOV_RADIANS, Z_FAR, Z_NEAR } from '@engine/gfx-webgpu/config';
+import { 
+  mat4GetRotation, 
+  mat4GetScale, 
+  mat4Invert,
+  dotVec3
+} from '@engine/core/math';
 import { Logger } from '../../utils/logger';
 import { CollisionDetector } from '../placement/CollisionDetector';
+import type { Ray } from '@engine/world';
+import type { InteractionTool } from '../input/InteractionTypes';
 
 export interface BlockDragControllerConfig {
   canvas: HTMLCanvasElement;
@@ -39,12 +34,15 @@ export interface BlockDragControllerConfig {
 interface DragState {
   /** Entity being dragged */
   entity: Entity;
-  /** Original position before drag started */
+  /** Original position before drag started (Local) */
   originalPosition: Vec3;
+  /** Original position before drag started (World) */
+  originalWorldPosition: Vec3;
   /** Original rotation before drag started */
   originalRotation: Quat;
   /** Original scale before drag started */
   originalScale: Vec3;
+
   /** Original color before drag started */
   originalColor: [number, number, number, number];
   /** Pointer ID for tracking */
@@ -55,119 +53,64 @@ interface DragState {
   isPreview: boolean;
   /** Whether current position is valid (no collision) */
   canPlace: boolean;
+  /** Whether the entity was created specifically for this drag (e.g. via Alt-clone) */
+  createdOnDrag: boolean;
 }
 
 /**
  * Manages block dragging interactions.
  */
-export class BlockDragController {
+export class BlockDragController implements InteractionTool {
+  public readonly name = 'BlockDragController';
   private raycaster: Raycaster;
   private dragState: DragState | null = null;
-  private abortController: AbortController | null = null;
   private isDragging = false;
   private dragThreshold = 5; // pixels before drag starts
+
+  // Keyboard modifiers state
+  private isShiftPressed = false;
+  private isAltPressed = false;
 
   constructor(private readonly config: BlockDragControllerConfig) {
     this.raycaster = new Raycaster();
   }
 
-  /**
-   * Initializes drag controller and sets up event listeners.
-   */
-  initialize(): () => void {
-    this.abortController = new AbortController();
-    this.setupDragHandlers();
+  public checkHit(ray: Ray): boolean {
+    // If already dragging, we claim it
+    if (this.dragState) return true;
 
-    // Return cleanup function
-    return () => {
-      this.dispose();
-    };
+    // If play mode, we don't interact
+    if (this.config.state.editorMode.value === 'play') return false;
+
+    // Perform raycast to see if we hit a draggable entity
+    const entities = this.config.scene
+      .getActiveEntities()
+      .filter((e) => !e.userData.isPreview);
+
+    if (entities.length === 0) return false;
+
+    const hit = this.raycaster.raycastClosest(ray, entities);
+    return !!hit;
   }
 
-  /**
-   * Sets up drag event handlers.
-   */
-  private setupDragHandlers(): void {
-    if (!this.abortController) return;
-
-    // Mousedown to start potential drag
-    this.config.canvas.addEventListener(
-      'pointerdown',
-      (event: PointerEvent) => this.handlePointerDown(event),
-      { signal: this.abortController.signal }
-    );
-
-    // Mousemove to update drag position
-    window.addEventListener(
-      'pointermove',
-      (event: PointerEvent) => this.handlePointerMove(event),
-      { signal: this.abortController.signal }
-    );
-
-    // Mouseup to complete drag
-    window.addEventListener(
-      'pointerup',
-      (event: PointerEvent) => this.handlePointerUp(event),
-      { signal: this.abortController.signal }
-    );
-
-    // Handle pointercancel (common on touch) to avoid stuck drag state
-    window.addEventListener(
-      'pointercancel',
-      (event: PointerEvent) => this.handlePointerCancel(event),
-      { signal: this.abortController.signal }
-    );
-
-    // If pointer capture is lost, cancel the drag safely
-    this.config.canvas.addEventListener(
-      'lostpointercapture',
-      (event: PointerEvent) => this.handlePointerCancel(event),
-      { signal: this.abortController.signal }
-    );
-
-    // If window loses focus, cancel any active drag
-    window.addEventListener(
-      'blur',
-      () => this.cancelDrag(),
-      { signal: this.abortController.signal }
-    );
-  }
-
-  /**
-   * Handles pointer down - checks if user clicked on a draggable block.
-   */
-  private handlePointerDown(event: PointerEvent): void {
-    // Only handle left mouse button
+  public onPointerDown(event: PointerEvent, ray: Ray): void {
     if (event.button !== 0) return;
-
-    // Don't interfere with placement mode
-    if (this.config.placementMode.isActive()) return;
-
-    // Don't drag in play mode
-    if (this.config.state.editorMode.value === 'play') return;
-
-    // Check if we're clicking on the canvas
-    if (event.target !== this.config.canvas) return;
-
-    // Raycast to find entity under cursor
-    const ray = this.createRayFromPointerEvent(event);
-    if (!ray) return;
 
     const entities = this.config.scene
       .getActiveEntities()
       .filter((e) => !e.userData.isPreview);
 
-    if (entities.length === 0) return;
-
-    const hit = this.raycaster.raycastClosest(ray as any, entities);
+    const hit = this.raycaster.raycastClosest(ray, entities);
     if (!hit) return;
 
     const entity = hit.entity;
+    const worldMatrix = entity.transform.getWorldMatrix();
+    const worldPos: Vec3 = [worldMatrix[12]!, worldMatrix[13]!, worldMatrix[14]!];
 
-    // Store initial drag state (but don't start dragging yet - wait for movement)
     this.dragState = {
       entity,
       originalPosition: [...entity.transform.position] as Vec3,
+      originalWorldPosition: worldPos,
       originalRotation: [...entity.transform.rotation] as Quat,
       originalScale: [...entity.transform.scale] as Vec3,
       originalColor: [...entity.color] as [number, number, number, number],
@@ -175,95 +118,174 @@ export class BlockDragController {
       startMousePos: [event.clientX, event.clientY],
       isPreview: false,
       canPlace: true,
+      createdOnDrag: false,
     };
 
-    // Capture pointer for smooth dragging
+    this.isAltPressed = event.altKey;
+    this.isShiftPressed = event.shiftKey;
+    
+    // Note: We don't capture pointer here, Manager handles global listeners.
+    // But we can request capture if we want exclusive events even outside window?
+    // Manager uses window listener for move/up, so we are good.
+    // But capture helps with UI consistency.
     try {
-      this.config.canvas.setPointerCapture(event.pointerId);
-    } catch (err) {
-      Logger.warn('Failed to capture pointer', err as Error);
-    }
-
-    event.preventDefault();
+       this.config.canvas.setPointerCapture(event.pointerId);
+    } catch {}
   }
 
-  /**
-   * Handles pointer move - updates block position during drag.
-   */
-  private handlePointerMove(event: PointerEvent): void {
+  public onPointerMove(event: PointerEvent, ray: Ray): void {
+    // Track modifiers
+    this.isAltPressed = event.altKey;
+    this.isShiftPressed = event.shiftKey;
+
     if (!this.dragState) return;
     if (this.dragState.pointerId !== event.pointerId) return;
 
-    // Check if we've moved enough to start dragging
+    // Check start threshold
     if (!this.isDragging) {
       const dx = event.clientX - this.dragState.startMousePos[0];
       const dy = event.clientY - this.dragState.startMousePos[1];
       const distance = Math.sqrt(dx * dx + dy * dy);
 
       if (distance < this.dragThreshold) {
-        return; // Not moved enough yet
+        return; 
       }
 
-      // Start dragging
-      this.startDragging();
+      this.startDragging(event.altKey || this.isAltPressed);
     }
 
-    // Update position based on raycast
-    const ray = this.createRayFromPointerEvent(event);
-    if (!ray) return;
-
-    // Try adjacent placement first (snapping to existing entities)
+    // Dragging logic
+    // Try adjacent placement first
     const adjacent = this.getAdjacentPlacementFromRay(ray);
     if (adjacent) {
       void this.updateDragPosition(adjacent);
       return;
     }
 
-    // Fall back to ground plane intersection
+    // Fall back to ground plane
     const groundIntersection = this.raycastToGroundPlane(ray);
     if (groundIntersection) {
       void this.updateDragPosition(groundIntersection);
     }
-
-    event.preventDefault();
   }
 
-  /**
-   * Starts the drag operation - converts entity to preview mode.
-   */
-  private startDragging(): void {
+  public onPointerUp(event: PointerEvent, _ray: Ray): void {
     if (!this.dragState) return;
+    if (this.dragState.pointerId !== event.pointerId) return;
+
+    try {
+       this.config.canvas.releasePointerCapture(event.pointerId);
+    } catch {}
+
+    if (this.isDragging) {
+      this.completeDrag();
+    } else {
+      // Click (Select)
+      this.cancelDrag(true);
+      // Select the entity
+      if (this.dragState?.entity) { // State was just cleared by cancelDrag? No, cancelDrag clears it.
+         // Wait, cancelDrag clears dragState.
+         // But we want to select.
+         // Logic:
+         // 1. cancelDrag reverts any changes (none if not dragging).
+         // 2. select entity.
+         // Actually `handlePointerUp` in original code called `cancelDrag(true)`.
+         // Original `cancelDrag` logic:
+         // "Was just a click, not a drag - let selection handler deal with it"
+         // Wait, does SelectionManager handle click separately?
+         // "handlePointerDown" in original:
+         // "Raycast to find entity... Store initial drag state... event.preventDefault()"
+         // It PREVENTED default. So standard selection might not fire?
+         // Ah, `EditorUI` might have other listeners?
+         // The plan says "BlockDragController takes control."
+         // So WE are responsible for selection if we claimed the down event.
+         
+         // Let's see original `cancelDrag`:
+         // It doesn't select.
+         // "Was just a click, not a drag - let selection handler deal with it"
+         // implies that the event might propagate?
+         // But `stopPropagation` was NOT called in `handlePointerDown` (only `preventDefault`).
+         // But we are in a manager now. `handlePointerDown` in manager calls `tool.onPointerDown`.
+         
+         // If BlockDrag is the Selection Tool, we should select here.
+         const entity = this.dragState.entity;
+         
+         // Toggle selection or set selection?
+         // Usually click = select exclusive. Ctrl+click = toggle.
+         if (event.ctrlKey || event.metaKey) {
+            this.config.selection.toggleSelection(entity);
+         } else {
+            this.config.selection.select(entity);
+         }
+      }
+    }
+  }
+
+  public cancel(): void {
+    this.cancelDrag();
+  }
+
+  // ... Private methods ...
+
+  private startDragging(shouldClone: boolean = false): void {
+    if (!this.dragState) return;
+
+    if (shouldClone) {
+      try {
+        const original = this.dragState.entity;
+        const clone = original.deepClone();
+        clone.name = `${original.name} (Copy)`;
+        
+        if (original.parent) {
+          original.parent.addChild(clone);
+        } else if (original.scene) {
+          original.scene.addEntity(clone);
+        }
+        
+        this.dragState.entity = clone;
+        this.dragState.createdOnDrag = true;
+        Logger.debug(`Cloned entity for drag: ${clone.name}`);
+      } catch (err) {
+        Logger.error('Failed to clone entity', err as Error);
+      }
+    }
 
     this.isDragging = true;
     this.dragState.isPreview = true;
-
-    // Select the entity
     this.config.selection.select(this.dragState.entity);
-
-    // Mark as preview
     this.dragState.entity.userData.isPreview = true;
-
-    // Disable orbit controls during drag
     this.config.controls.setEnabled(false);
-
     this.config.onStatusMessage?.('Dragging block (Esc to cancel)');
-    Logger.debug(`Started dragging entity: ${this.dragState.entity.name}`);
   }
 
-  /**
-   * Updates the position of the dragged block.
-   */
-  private async updateDragPosition(worldPosition: Vec3): Promise<void> {
+  private async updateDragPosition(targetPosition: Vec3): Promise<void> {
     if (!this.dragState || !this.isDragging) return;
 
     const entity = this.dragState.entity;
+    let finalPosition = targetPosition;
 
-    // Convert world position to local space of the parent and apply
-    const localPosition = this.worldToLocalPosition(worldPosition, entity.parent);
+    if (this.isShiftPressed) {
+      const startPos = this.dragState.originalWorldPosition;
+      const dx = finalPosition[0] - startPos[0];
+      const dy = finalPosition[1] - startPos[1];
+      const dz = finalPosition[2] - startPos[2];
+
+      const ax = Math.abs(dx);
+      const ay = Math.abs(dy);
+      const az = Math.abs(dz);
+
+      if (ax >= ay && ax >= az) {
+        finalPosition = [finalPosition[0], startPos[1], startPos[2]];
+      } else if (ay >= ax && ay >= az) {
+        finalPosition = [startPos[0], finalPosition[1], startPos[2]];
+      } else {
+        finalPosition = [startPos[0], startPos[1], finalPosition[2]];
+      }
+    }
+
+    const localPosition = this.worldToLocalPosition(finalPosition, entity.parent);
     entity.transform.position = localPosition;
 
-    // Check collision at this position
-    // Build world-space OBB: use world rotation and world scale at the updated position
     const worldMatrix = entity.transform.getWorldMatrix();
     const worldRotation = mat4GetRotation(worldMatrix);
     const worldScale = mat4GetScale(worldMatrix);
@@ -274,12 +296,11 @@ export class BlockDragController {
       Math.max(0.001, worldScale[2] - CONTACT_TOLERANCE),
     ];
 
-    // Exclude the entity being dragged from collision check
     const excludeSet = new Set<Entity>([entity]);
 
     const collisionResult = await this.config.collisionDetector.checkCollisionOBB(
       entity,
-      worldPosition,
+      finalPosition,
       worldRotation,
       testScale,
       excludeSet
@@ -290,60 +311,27 @@ export class BlockDragController {
       this.dragState.canPlace = canPlace;
     }
 
-    // Update visual feedback - green if valid, red if collision
     if (canPlace) {
-      entity.color = [0.2, 1.0, 0.2, 0.6]; // Green with alpha
+      entity.color = [0.2, 1.0, 0.2, 0.6]; 
     } else {
-      entity.color = [1.0, 0.2, 0.2, 0.6]; // Red with alpha
+      entity.color = [1.0, 0.2, 0.2, 0.6]; 
     }
 
-    // Update scene buffers for rendering
     this.config.updateSceneBuffers();
   }
 
-  /**
-   * Handles pointer up - completes or cancels drag.
-   */
-  private handlePointerUp(event: PointerEvent): void {
-    if (!this.dragState) return;
-    if (this.dragState.pointerId !== event.pointerId) return;
-
-    // Release pointer capture
-    try {
-      this.config.canvas.releasePointerCapture(event.pointerId);
-    } catch (err) {
-      // Ignore
-    }
-
-    if (this.isDragging) {
-      this.completeDrag();
-    } else {
-      // Was just a click, not a drag - let selection handler deal with it
-      this.cancelDrag(true);
-    }
-
-    event.preventDefault();
-  }
-
-  /**
-   * Completes the drag operation - places block in new position.
-   */
   private completeDrag(): void {
     if (!this.dragState) return;
-
     const entity = this.dragState.entity;
 
     if (this.dragState.canPlace) {
-      // Valid placement - restore original color and commit
       entity.color = this.dragState.originalColor;
       entity.userData.isPreview = false;
 
       this.config.updateSceneBuffers();
       this.config.recordSnapshot('Move block');
       this.config.onStatusMessage?.('Block moved', 1000);
-      Logger.debug(`Completed drag: ${entity.name}`);
     } else {
-      // Invalid placement - revert to original position
       entity.transform.position = this.dragState.originalPosition;
       entity.transform.rotation = this.dragState.originalRotation;
       entity.transform.scale = this.dragState.originalScale;
@@ -352,105 +340,51 @@ export class BlockDragController {
 
       this.config.updateSceneBuffers();
       this.config.onStatusMessage?.('Cannot place here (collision)', 1000);
-      Logger.debug(`Drag cancelled due to collision: ${entity.name}`);
     }
 
-    // Re-enable orbit controls
     this.config.controls.setEnabled(true);
-
-    // Clear drag state
     this.dragState = null;
     this.isDragging = false;
   }
 
-  /**
-   * Cancels the drag operation - reverts block to original position.
-   */
   public cancelDrag(silent = false): void {
     if (!this.dragState) return;
 
     if (this.isDragging) {
       const entity = this.dragState.entity;
 
-      // Revert to original position
-      entity.transform.position = this.dragState.originalPosition;
-      entity.transform.rotation = this.dragState.originalRotation;
-      entity.transform.scale = this.dragState.originalScale;
-      entity.color = this.dragState.originalColor;
-      entity.userData.isPreview = false;
+      if (this.dragState.createdOnDrag) {
+        if (entity.parent) {
+          entity.removeFromParent();
+        } else if (entity.scene) {
+          entity.scene.removeEntity(entity);
+        }
+        this.config.selection.removeFromSelection(entity);
+      } else {
+        entity.transform.position = this.dragState.originalPosition;
+        entity.transform.rotation = this.dragState.originalRotation;
+        entity.transform.scale = this.dragState.originalScale;
+        entity.color = this.dragState.originalColor;
+        entity.userData.isPreview = false;
+      }
 
       this.config.updateSceneBuffers();
 
       if (!silent) {
         this.config.onStatusMessage?.('Drag cancelled', 1000);
       }
-      Logger.debug(`Drag cancelled: ${entity.name}`);
-
-      // Re-enable orbit controls
       this.config.controls.setEnabled(true);
     }
 
-    // Clear drag state
     this.dragState = null;
     this.isDragging = false;
   }
 
-  /**
-   * Creates a world-space ray from a pointer event.
-   */
-  private createRayFromPointerEvent(event: PointerEvent): { origin: Vec3; direction: Vec3 } | null {
-    const rect = this.config.canvas.getBoundingClientRect();
-    const mouseX = (event.clientX - rect.left) * (this.config.canvas.width / rect.width);
-    const mouseY = (event.clientY - rect.top) * (this.config.canvas.height / rect.height);
-
-    // Prefer CameraDirector matrices if available
-    const director = this.config.cameraDirector;
-    if (director) {
-      const viewMatrix = director.getViewMatrix();
-      const projectionMatrix = director.getProjectionMatrix();
-      return this.raycaster.createRayFromScreen(
-        mouseX,
-        mouseY,
-        this.config.canvas.width,
-        this.config.canvas.height,
-        viewMatrix,
-        projectionMatrix
-      );
-    }
-
-    // Fallback to legacy orbit-controls derived matrices
-    const { yaw, pitch, distance } = this.config.controls.getState();
-    const aspect = this.config.canvas.width / this.config.canvas.height;
-    
-    const projectionMatrix = new Float32Array(16) as Mat4;
-    const viewMatrix = new Float32Array(16) as Mat4;
-
-    mat4Perspective(projectionMatrix, FOV_RADIANS, aspect, Z_NEAR, Z_FAR);
-
-    const eyeX = Math.cos(pitch) * Math.sin(yaw) * distance;
-    const eyeY = Math.sin(pitch) * distance;
-    const eyeZ = Math.cos(pitch) * Math.cos(yaw) * distance;
-    mat4LookAt(viewMatrix, [eyeX, eyeY, eyeZ], [0, 0, 0], [0, 1, 0]);
-
-    return this.raycaster.createRayFromScreen(
-      mouseX,
-      mouseY,
-      this.config.canvas.width,
-      this.config.canvas.height,
-      viewMatrix,
-      projectionMatrix
-    );
-  }
-
-  /**
-   * Attempts to compute an adjacent placement position from a ray hit on an entity.
-   */
   private getAdjacentPlacementFromRay(ray: { origin: Vec3; direction: Vec3 }): Vec3 | null {
     if (!this.dragState) return null;
 
     const draggedEntity = this.dragState.entity;
 
-    // Exclude dragged entity from raycast
     const entities = this.config.scene
       .getActiveEntities()
       .filter((e) => e !== draggedEntity && !e.userData.isPreview);
@@ -461,12 +395,9 @@ export class BlockDragController {
     if (!hit) return null;
 
     const target = hit.entity;
-
-    // Compute target world OBB axes, center and half sizes
     const { center, axes: targetAxes, halfSizes: targetHalf } = this.getWorldOBBParams(target);
     const toHit: Vec3 = [hit.point[0] - center[0], hit.point[1] - center[1], hit.point[2] - center[2]];
 
-    // Project vector to hit on each target axis to find closest face
     const proj0 = dotVec3(toHit, targetAxes[0]);
     const proj1 = dotVec3(toHit, targetAxes[1]);
     const proj2 = dotVec3(toHit, targetAxes[2]);
@@ -486,7 +417,6 @@ export class BlockDragController {
     if (distToFace2 < minDist) {
       axisIndex = 2;
       signedProj = proj2;
-      // minDist = distToFace2; // not used further
     }
 
     const sign = signedProj >= 0 ? 1 : -1;
@@ -496,15 +426,13 @@ export class BlockDragController {
       targetAxes[axisIndex][2] * sign,
     ];
 
-    // Compute dragged entity extent along the face normal
     const draggedParams = this.getWorldOBBParams(draggedEntity);
     const draggedExtentAlongNormal =
       Math.abs(dotVec3(draggedParams.axes[0], faceNormal)) * draggedParams.halfSizes[0] +
       Math.abs(dotVec3(draggedParams.axes[1], faceNormal)) * draggedParams.halfSizes[1] +
       Math.abs(dotVec3(draggedParams.axes[2], faceNormal)) * draggedParams.halfSizes[2];
 
-    // Compute new world position offset from target center along face normal
-    const EPSILON = 1e-4; // Slight epsilon to avoid touching collision due to numerical issues
+    const EPSILON = 1e-4; 
     const offset = targetHalf[axisIndex] + draggedExtentAlongNormal + EPSILON;
     const pos: Vec3 = [
       center[0] + faceNormal[0] * offset,
@@ -515,37 +443,24 @@ export class BlockDragController {
     return pos;
   }
 
-  /**
-   * Raycasts to the ground plane (y = 0).
-   */
   private raycastToGroundPlane(ray: { origin: Vec3; direction: Vec3 }): Vec3 | null {
     const { origin, direction } = ray;
 
-    if (!origin || !direction) {
-      return null;
-    }
+    if (!origin || !direction) return null;
 
     const dy = direction[1];
-    if (!Number.isFinite(dy) || Math.abs(dy) < 0.0001) {
-      return null;
-    }
+    if (!Number.isFinite(dy) || Math.abs(dy) < 0.0001) return null;
 
     const t = -origin[1] / dy;
 
-    if (!Number.isFinite(t) || t < 0) {
-      return null;
-    }
+    if (!Number.isFinite(t) || t < 0) return null;
 
     const x = origin[0] + t * direction[0];
     const z = origin[2] + t * direction[2];
     
-    if (!Number.isFinite(x) || !Number.isFinite(z)) {
-      return null;
-    }
+    if (!Number.isFinite(x) || !Number.isFinite(z)) return null;
 
-    // If dragging, maintain Y offset from ground
     if (this.dragState) {
-      // Use world scale to compute half height
       const worldScale = mat4GetScale(this.dragState.entity.transform.getWorldMatrix());
       const halfHeight = Math.abs(worldScale[1]) * 0.5;
       return [x, halfHeight, z];
@@ -554,40 +469,6 @@ export class BlockDragController {
     return [x, 0, z];
   }
 
-  /**
-   * Checks if currently dragging.
-   */
-  isDraggingBlock(): boolean {
-    return this.isDragging;
-  }
-
-  /**
-   * Gets the raycaster instance (for external use if needed).
-   */
-  getRaycaster(): Raycaster {
-    return this.raycaster;
-  }
-
-  /**
-   * Cleans up resources.
-   */
-  dispose(): void {
-    // Cancel any active drag
-    if (this.isDragging) {
-      this.cancelDrag(true);
-    }
-
-    if (this.abortController) {
-      this.abortController.abort();
-      this.abortController = null;
-    }
-
-    Logger.debug('BlockDragController disposed');
-  }
-
-  /**
-   * Safely converts a world position into the local space of the given parent entity.
-   */
   private worldToLocalPosition(worldPos: Vec3, parent: Entity | null): Vec3 {
     if (!parent) {
       return [worldPos[0], worldPos[1], worldPos[2]];
@@ -598,9 +479,6 @@ export class BlockDragController {
     return this.transformPointByMatrix(invParent, worldPos);
   }
 
-  /**
-   * Transforms a 3D point by a 4x4 matrix (assumes w=1).
-   */
   private transformPointByMatrix(m: Mat4, p: Vec3): Vec3 {
     const x = p[0];
     const y = p[1];
@@ -612,16 +490,13 @@ export class BlockDragController {
     ];
   }
 
-  /**
-   * Computes world-space OBB parameters (center, axes, half sizes) from an entity's world matrix.
-   */
   private getWorldOBBParams(entity: Entity): { center: Vec3; axes: [Vec3, Vec3, Vec3]; halfSizes: Vec3 } {
     const wm = entity.transform.getWorldMatrix();
     const scale = mat4GetScale(wm);
     const sx = scale[0] || 1;
     const sy = scale[1] || 1;
     const sz = scale[2] || 1;
-    // World axes are normalized columns of the world matrix
+    
     const axis0: Vec3 = [
       (wm[0] ?? 0) / sx,
       (wm[1] ?? 0) / sx,
@@ -641,22 +516,4 @@ export class BlockDragController {
     const halfSizes: Vec3 = [Math.abs(sx) * 0.5, Math.abs(sy) * 0.5, Math.abs(sz) * 0.5];
     return { center, axes: [axis0, axis1, axis2], halfSizes };
   }
-
-  /**
-   * Handles pointer cancellation and lost capture by safely cancelling the drag.
-   */
-  private handlePointerCancel(event: PointerEvent): void {
-    if (!this.dragState) return;
-    if (this.dragState.pointerId !== event.pointerId) return;
-
-    // Try to release pointer capture if held
-    try {
-      this.config.canvas.releasePointerCapture(event.pointerId);
-    } catch {
-      // Ignore
-    }
-    this.cancelDrag();
-    event.preventDefault();
-  }
 }
-

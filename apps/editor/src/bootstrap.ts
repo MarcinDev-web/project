@@ -6,7 +6,7 @@ import { LogicCubeLibrary } from '@engine/editor-utils';
 import { ensureWasmCollisionInit } from './wasm/collision';
 import { TerrainMeshGenerator } from '@engine/voxel/terrain';
 import { warmupCollisionWorker } from './wasm/collisionWorkerClient';
-import { login, createReplicationClient, createSession, saveSnapshot, loadLatestSnapshot } from './editor/net/collab';
+import { CollabClient } from './editor/net/collab';
 import { EOSClient } from './bootstrap/EOSClient';
 
 export async function bootstrap(): Promise<void> {
@@ -98,10 +98,10 @@ export async function bootstrap(): Promise<void> {
     Logger.error('Failed to initialize Logic Cube System:', error as Error);
   }
 
-  const app = new EditorApp({ canvas, statusEl });
   const eosClient = new EOSClient({
     sanctionsEndpoint: import.meta.env?.VITE_EOS_SANCTIONS_URL ?? '/trust/eos/events',
     reportsEndpoint: import.meta.env?.VITE_EOS_REPORT_URL ?? '/trust/reports',
+    telemetryEndpoint: import.meta.env?.VITE_EOS_TELEMETRY_URL ?? '/trust/telemetry/intent',
     enabled: import.meta.env?.VITE_ENABLE_EOS !== 'false',
   });
   try {
@@ -109,6 +109,12 @@ export async function bootstrap(): Promise<void> {
   } catch (error) {
     Logger.warn('EOS client init failed', error as Error);
   }
+
+  const app = new EditorApp({ 
+    canvas, 
+    statusEl,
+    eosClient 
+  });
 
   // Background warm-up: init WASM (in-thread) and Worker to avoid first-use jank
   try {
@@ -141,6 +147,7 @@ export async function bootstrap(): Promise<void> {
   // Minimal collab integration (opt-in via ?session=...)
   if (collabSession) {
     try {
+      const collabClient = new CollabClient();
       const stored = window.localStorage.getItem('COLLAB_SESSION');
       let token: string | null = null;
       if (stored) {
@@ -155,15 +162,15 @@ export async function bootstrap(): Promise<void> {
       if (!token) {
         const email = window.prompt('Email for collaboration login:') || '';
         const password = window.prompt('Password:') || '';
-        const auth = await login(email, password);
+        const auth = await collabClient.login(email, password);
         token = auth.session.token;
         window.localStorage.setItem('COLLAB_SESSION', JSON.stringify(auth.session));
       }
 
       if (!token) throw new Error('Missing token');
       // Ensure session exists (idempotent)
-      const sessionId = await createSession(token, projectId, collabSession);
-      const client = createReplicationClient(token);
+      const sessionId = await collabClient.createSession(token, projectId, collabSession);
+      const client = collabClient.createReplicationClient(token);
       await client.connect(sessionId);
 
       // Expose minimal selection broadcasting helper
@@ -189,7 +196,7 @@ export async function bootstrap(): Promise<void> {
             // Scene has toJSON
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const json = (payload as any).toJSON ? (payload as any).toJSON() : payload;
-            await saveSnapshot(token!, projectId, sessionId, { scene: json });
+            await collabClient.saveSnapshot(token!, projectId, sessionId, { scene: json });
             Logger.info('Snapshot saved');
           } catch (err) {
             Logger.warn('Snapshot save failed', err as Error);
@@ -213,7 +220,7 @@ export async function bootstrap(): Promise<void> {
 
       // Try to load latest snapshot on start
       try {
-        const latest = await loadLatestSnapshot(token, projectId);
+        const latest = await collabClient.loadLatestSnapshot(token, projectId);
         if (latest && typeof latest === 'object' && (latest as Record<string, unknown>)['scene']) {
           const sceneJson = (latest as Record<string, unknown>)['scene'];
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -234,4 +241,3 @@ export async function bootstrap(): Promise<void> {
     }
   }
 }
-

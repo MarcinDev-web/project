@@ -1,11 +1,13 @@
 import { defineConfig } from 'vitest/config';
 import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import wasm from 'vite-plugin-wasm';
 
 const __dirname = resolve(fileURLToPath(import.meta.url), '..');
 const rootDir = resolve(__dirname, '../..');
 
 export default defineConfig({
+  plugins: [wasm()],
   resolve: {
     alias: {
       '@engine/core': resolve(__dirname, '../core/src'),
@@ -19,6 +21,7 @@ export default defineConfig({
       '@engine/world/components/*': resolve(__dirname, 'src/components/*'),
       '@engine/world/physics': resolve(__dirname, 'src/physics'),
       '@engine/world/physics/*': resolve(__dirname, 'src/physics/*'),
+      '@engine/wasm-voxel': resolve(__dirname, '../wasm-voxel/src'),
     },
     conditions: ['development', 'test', 'import', 'module'],
   },

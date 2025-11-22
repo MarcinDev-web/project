@@ -1,7 +1,7 @@
 /**
  * Connected Textures System (CTM)
  *
- * Inspired by Minecraft's Connected Textures Mod
+ * Inspired by Connected Textures Mod
  * Allows blocks to have different textures based on neighboring blocks
  *
  * Features:
@@ -62,7 +62,7 @@ export declare class ConnectedTextureSystem {
     private static getVerticalIndex;
     /**
      * Cross connection (16 textures for all combinations)
-     * Uses Minecraft CTM format
+     * Uses CTM format
      */
     private static getCrossIndex;
     /**

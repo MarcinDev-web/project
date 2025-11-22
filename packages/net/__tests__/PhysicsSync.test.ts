@@ -30,6 +30,9 @@ describe('PhysicsSync', () => {
         onPhysicsStateCallback = callback;
         return () => {}; // Return unsubscribe function
       }),
+      onStateChange: vi.fn(() => {
+        return () => {}; // Return unsubscribe function
+      }),
       getState: vi.fn(() => 'connected' as any),
     } as unknown as ReplicationClient;
 

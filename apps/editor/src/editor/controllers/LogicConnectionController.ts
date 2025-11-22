@@ -76,7 +76,7 @@ export class LogicConnectionController {
     if (this.mode === 'selecting-source') {
       return await this.handleSourceSelection(entity, component);
     } else if (this.mode === 'selecting-target') {
-      return this.handleTargetSelection(entity, component);
+      return await this.handleTargetSelection(entity, component);
     }
 
     return false;
@@ -137,7 +137,7 @@ export class LogicConnectionController {
   /**
    * Handles target entity selection
    */
-  private handleTargetSelection(entity: Entity, component: LogicCubeComponent): boolean {
+  private async handleTargetSelection(entity: Entity, component: LogicCubeComponent): Promise<boolean> {
     if (!this.sourceEntity || !this.sourcePort) {
       this.cancel();
       return false;
@@ -158,20 +158,40 @@ export class LogicConnectionController {
       return false;
     }
 
-    // Find compatible input port
-    let targetPort: LogicPort | null = null;
+    // Find compatible input ports
+    const compatiblePorts: LogicPort[] = [];
     for (const port of inputPorts) {
-      // Check if port types are compatible
       if (this.arePortsCompatible(this.sourcePort, port)) {
-        targetPort = port;
-        break;
+        compatiblePorts.push(port);
       }
     }
 
-    if (!targetPort) {
+    if (compatiblePorts.length === 0) {
       Logger.warn('No compatible input port found');
       return false;
     }
+
+    // Select target port
+    let targetPort: LogicPort | null = null;
+
+    if (compatiblePorts.length === 1) {
+      targetPort = compatiblePorts[0] || null;
+    } else {
+      // Multiple compatible ports - show selection UI
+      targetPort = await showPortSelectionModal({
+        title: 'Select Input Port',
+        message: 'This cube has multiple compatible input ports. Select which one to use:',
+        ports: compatiblePorts,
+        entityName: entity.name,
+      });
+
+      if (!targetPort) {
+        Logger.info('Target port selection cancelled');
+        return false;
+      }
+    }
+
+    if (!targetPort) return false;
 
     // Validate and create connection
     const result = this.connectionManager.validateConnection(

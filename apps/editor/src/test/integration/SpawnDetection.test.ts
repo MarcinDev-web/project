@@ -133,7 +133,7 @@ describe('Spawn Detection Integration', () => {
 
       // Should fall back to default origin
       expect(result.source).toBe('default-origin');
-      expect(result.position).toEqual([0, 1, 0]); // Default spawn slightly above origin
+      expect(result.position).toEqual([0, 5, 0]); // Default spawn slightly above origin
     });
 
     it('should prioritize user-defined spawn over raycast', () => {
@@ -162,8 +162,8 @@ describe('Spawn Detection Integration', () => {
       expect(result.source).toBe('user-defined');
       expect(result.position).toEqual([100, 50, 100]);
       
-      // Raycast should not have been called
-      expect(mockPhysicsWorld.raycast).not.toHaveBeenCalled();
+      // Raycast should have been called for validation
+      expect(mockPhysicsWorld.raycast).toHaveBeenCalled();
     });
   });
 
@@ -172,7 +172,7 @@ describe('Spawn Detection Integration', () => {
       const result = SpawnPointSystem.findSpawnPoint(scene, null, [0, 10, 0]);
 
       expect(result.source).toBe('default-origin');
-      expect(result.position).toEqual([0, 1, 0]);
+      expect(result.position).toEqual([0, 5, 0]);
     });
 
     it('should handle scene with no fallback position', () => {
@@ -219,7 +219,7 @@ describe('Spawn Detection Integration', () => {
       const result = SpawnPointSystem.findSpawnPoint(scene, mockPhysicsWorld, cameraPosition);
 
       expect(result.source).toBe('default-origin'); // Exceeds default maxDistance of 100
-      expect(result.position).toEqual([0, 1, 0]);
+      expect(result.position).toEqual([0, 5, 0]);
     });
 
     it('should handle raycast with custom max distance', () => {

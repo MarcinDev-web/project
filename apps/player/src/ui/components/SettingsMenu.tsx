@@ -22,15 +22,57 @@ export function SettingsMenu(props: SettingsMenuProps): React.JSX.Element {
         <div style={styles.content}>
           <div style={styles.section}>
             <h3 style={styles.sectionTitle}>Graphics</h3>
-            <p style={styles.placeholder}>Graphics settings coming soon...</p>
+            <div style={styles.controlGroup}>
+              <label style={styles.label}>Shadow Quality</label>
+              <select style={styles.select} defaultValue="high">
+                <option value="low">Low</option>
+                <option value="medium">Medium</option>
+                <option value="high">High</option>
+              </select>
+            </div>
+            <div style={styles.controlGroup}>
+              <label style={styles.label}>Anti-Aliasing</label>
+              <select style={styles.select} defaultValue="on">
+                <option value="off">Off</option>
+                <option value="on">On (FXAA)</option>
+              </select>
+            </div>
           </div>
           <div style={styles.section}>
             <h3 style={styles.sectionTitle}>Audio</h3>
-            <p style={styles.placeholder}>Audio settings coming soon...</p>
+            <div style={styles.controlGroup}>
+              <label style={styles.label}>Master Volume</label>
+              <input type="range" min="0" max="100" defaultValue="80" style={styles.range} />
+            </div>
           </div>
           <div style={styles.section}>
             <h3 style={styles.sectionTitle}>Controls</h3>
-            <p style={styles.placeholder}>Control settings coming soon...</p>
+            <div style={styles.controlList}>
+              <div style={styles.controlRow}>
+                <span>Move Forward</span>
+                <span style={styles.key}>W</span>
+              </div>
+              <div style={styles.controlRow}>
+                <span>Move Backward</span>
+                <span style={styles.key}>S</span>
+              </div>
+              <div style={styles.controlRow}>
+                <span>Move Left</span>
+                <span style={styles.key}>A</span>
+              </div>
+              <div style={styles.controlRow}>
+                <span>Move Right</span>
+                <span style={styles.key}>D</span>
+              </div>
+              <div style={styles.controlRow}>
+                <span>Jump</span>
+                <span style={styles.key}>Space</span>
+              </div>
+              <div style={styles.controlRow}>
+                <span>Sprint</span>
+                <span style={styles.key}>Shift</span>
+              </div>
+            </div>
           </div>
         </div>
       </div>
@@ -101,6 +143,49 @@ const styles: Record<string, React.CSSProperties> = {
   placeholder: {
     color: 'rgba(255, 255, 255, 0.5)',
     fontSize: '0.875rem',
+  },
+  controlGroup: {
+    marginBottom: '1rem',
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
+  label: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: '0.9rem',
+  },
+  select: {
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    border: '1px solid rgba(255, 255, 255, 0.2)',
+    borderRadius: '4px',
+    color: '#fff',
+    padding: '0.25rem 0.5rem',
+    minWidth: '120px',
+  },
+  range: {
+    width: '150px',
+  },
+  controlList: {
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.5rem',
+  },
+  controlRow: {
+    display: 'flex',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: '0.5rem',
+    backgroundColor: 'rgba(255, 255, 255, 0.05)',
+    borderRadius: '4px',
+    fontSize: '0.9rem',
+  },
+  key: {
+    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+    border: '1px solid rgba(255, 255, 255, 0.2)',
+    borderRadius: '3px',
+    padding: '0.1rem 0.4rem',
+    fontFamily: 'monospace',
+    fontSize: '0.8rem',
   },
 };
 

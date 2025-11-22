@@ -9,5 +9,5 @@ export * from './obs/Metrics.js';
 export * from './telemetry/TelemetryEvents.js';
 export * from './telemetry/GameTelemetry.js';
 export * from './replication/TransformReplicator.js';
-
-
+export * from './replication/EcsReplicator.js';
+export * from './replication/types.js';

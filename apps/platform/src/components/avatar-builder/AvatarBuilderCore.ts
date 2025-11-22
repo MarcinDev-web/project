@@ -258,7 +258,15 @@ export class AvatarBuilderCore {
         },
         enableShadows: true,
         shadowQuality: 'med',
+        enableSSGI: true,
       });
+
+      // If disposed while initializing, clean up immediately
+      if (this.disposed) {
+        this.renderer.cleanup();
+        this.renderer = null;
+        return;
+      }
 
       if (this.statusEl) {
         this.statusEl.textContent = '';

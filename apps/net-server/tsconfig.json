@@ -15,6 +15,8 @@
       "@engine/economy/*": ["../../packages/economy/dist/src/*"],
       "@engine/script": ["../../packages/script/dist"],
       "@engine/script/*": ["../../packages/script/dist/*"],
+      "@engine/wasm-physics": ["../../packages/wasm-physics/src/index.ts"],
+      "@engine/wasm-physics/node": ["../../packages/wasm-physics/src/index.node.ts"],
       "@shared/*": ["../../shared/*"]
     }
   },

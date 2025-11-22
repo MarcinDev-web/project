@@ -1,13 +1,22 @@
 interface EOSClientConfig {
   sanctionsEndpoint: string;
   reportsEndpoint: string;
+  telemetryEndpoint?: string;
   enabled?: boolean;
 }
 
 export interface AntiCheatEvent {
   ticketId: string;
+  playerId: string;
   severity: 'info' | 'warn' | 'ban';
   reasons: string[];
+}
+
+export interface IntentTelemetry {
+  playerId: string;
+  inputsPerSecond: number;
+  aimVariance: number;
+  reportCount?: number;
 }
 
 export class EOSClient {
@@ -34,6 +43,7 @@ export class EOSClient {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         ticketId: event.ticketId,
+        playerId: event.playerId,
         severity: event.severity,
         reasons: event.reasons,
       }),
@@ -54,5 +64,15 @@ export class EOSClient {
       }),
     });
   }
-}
 
+  async sendTelemetry(data: IntentTelemetry): Promise<void> {
+    if (!this.initialized || this.config.enabled === false || !this.config.telemetryEndpoint) {
+      return;
+    }
+    await fetch(this.config.telemetryEndpoint, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(data),
+    });
+  }
+}

@@ -20,7 +20,7 @@
 |---|----|---|
 | **Explaining project to AI** | [AI_CONTEXT.md](AI_CONTEXT.md) | - |
 | **Writing prompts** | [AI_PROMPTS.md](AI_PROMPTS.md) | [QUICK_START_AI.md](QUICK_START_AI.md) |
-| **Understanding patterns** | [CODEBASE_PATTERNS.md](CODEBASE_PATTERNS.md) | [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) |
+| **Understanding patterns** | [CODEBASE_PATTERNS.md](CODEBASE_PATTERNS.md) | [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md) |
 | **Quick reference** | [QUICK_START_AI.md](QUICK_START_AI.md) | [TEST_COMMANDS_CHEATSHEET.md](TEST_COMMANDS_CHEATSHEET.md) |
 
 ---
@@ -188,7 +188,7 @@
 3. [CODEBASE_PATTERNS.md](CODEBASE_PATTERNS.md) - 10 min (patterns)
 4. [AI_PROMPTS.md](AI_PROMPTS.md) - 8 min (workflows)
 5. [docs/guidelines/PACKAGE_GUIDELINES.md](docs/guidelines/PACKAGE_GUIDELINES.md) - 10 min (decisions)
-6. [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - 5 min (architecture)
+6. [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md) - 5 min (architecture)
 
 **Result:** Complete mastery of the codebase context
 
@@ -271,8 +271,8 @@ QUICK_START_AI.md (Quick ref)
 
 All reference:
     ├── docs/guidelines/PACKAGE_GUIDELINES.md
-    ├── docs/ARCHITECTURE.md
-    ├── docs/TESTING.md
+    ├── docs/architecture/ARCHITECTURE.md
+    ├── docs/testing/TESTING.md
     └── TEST_COMMANDS_CHEATSHEET.md
 ```
 
@@ -341,7 +341,7 @@ All reference:
 **Other important docs:**
 - [README.md](README.md) - Project overview
 - [docs/README.md](docs/README.md) - Documentation index
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) - System architecture
+- [docs/architecture/ARCHITECTURE.md](docs/architecture/ARCHITECTURE.md) - System architecture
 - [docs/guidelines/](docs/guidelines/) - Development guidelines
 - [TEST_COMMANDS_CHEATSHEET.md](TEST_COMMANDS_CHEATSHEET.md) - Test commands
 

@@ -39,7 +39,7 @@ import { PausedState } from '../core/states/PausedState.js';
 import { DisconnectedState } from '../core/states/DisconnectedState.js';
 import { ReplicationClient, MultiplayerGameplayManager, ReplicationState } from '@engine/net';
 import { MultiplayerAPI } from '../utils/multiplayerApi.js';
-import { CheckpointSystem, RespawnManager } from '@engine/world';
+import { CheckpointSystem, RespawnManager, WasmAnimationSystem } from '@engine/world';
 
 // PlayManifest interface
 interface PlayManifest {
@@ -266,6 +266,7 @@ export class PlayerModeManager {
   private multiplayerGameplayManager: MultiplayerGameplayManager | null = null;
   
   private checkpointSystem: CheckpointSystem;
+  private wasmAnimationSystem: WasmAnimationSystem;
 
   constructor(config: PlayerModeManagerConfig) {
     this.canvas = config.canvas;
@@ -312,6 +313,8 @@ export class PlayerModeManager {
     
     this.checkpointSystem = new CheckpointSystem();
     this.checkpointSystem.initialize(this.scene);
+
+    this.wasmAnimationSystem = new WasmAnimationSystem(this.scene);
 
     // Initialize state machine
     this.stateMachine = new PlayerStateMachine();
@@ -688,6 +691,9 @@ export class PlayerModeManager {
       }
     }
     
+    // Update animation system
+    this.wasmAnimationSystem.update(deltaTime);
+
     // Update avatar visuals and animation
     this.updateAvatar(deltaTime);
     

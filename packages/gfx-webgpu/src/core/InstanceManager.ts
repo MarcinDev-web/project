@@ -8,11 +8,11 @@
  */
 
 import type { Entity, Scene } from '@engine/world';
-import { MaterialComponent, MeshComponent } from '@engine/world';
+import { MaterialComponent, MeshComponent, InstancedMeshComponent } from '@engine/world';
 import type { Frustum } from './FrustumCuller';
 import { Logger } from '@engine/core/utils';
 import { generateCapsuleY, generateHeroicTorsoMesh } from '@engine/avatar';
-import { generateSphereMesh, generateCylinderMesh, generatePlaneMesh, generateCapsuleMesh } from '../utils/geometry';
+import { generateSphereMesh, generateCylinderMesh, generatePlaneMesh, generateCapsuleMesh, generateBoxMesh } from '../utils/geometry';
 
 export interface InstanceData {
   instanceCount: number;
@@ -93,6 +93,10 @@ export class InstanceDataBuilder {
       if (!entity) continue;
       // Skip entities with meshType='none' (structural entities like joints, roots)
       if (entity.meshType === 'none') continue;
+      
+      // Skip explicit InstancedMeshComponent entities (handled in build)
+      if (entity.getComponent(InstancedMeshComponent)) continue;
+
       const meshComponent = entity.getComponent(MeshComponent);
       
       if (!meshComponent) {
@@ -122,6 +126,25 @@ export class InstanceDataBuilder {
         } catch (error) {
           Logger.warn(
             `[InstanceManager] Failed to generate fallback sphere geometry for entity "${entity.name || entity.id || 'unnamed'}":`,
+            error
+          );
+        }
+      } else if (meshComponent.meshType === 'box') {
+        try {
+          const opts = meshComponent.options || {};
+          // Use size array [width, height, depth] if available, or individual properties
+          let w = opts.width ?? 1;
+          let h = opts.height ?? 1;
+          let d = opts.depth ?? 1;
+          if (opts.size && opts.size.length >= 3) {
+            w = opts.size[0];
+            h = opts.size[1];
+            d = opts.size[2];
+          }
+          fallbackGeometry = generateBoxMesh(w, h, d, opts.segments ?? 1);
+        } catch (error) {
+          Logger.warn(
+            `[InstanceManager] Failed to generate fallback box geometry for entity "${entity.name || entity.id || 'unnamed'}":`,
             error
           );
         }
@@ -211,49 +234,72 @@ export class InstanceDataBuilder {
    * Skips entities with meshType='none' (structural entities).
    */
   build(entities: Entity[]): InstanceData {
-    // Filter out entities with custom geometry or meshType='none'
-    const entitiesWithoutCustom = entities.filter(e => {
-      if (!e) return false;
+    const singleEntities: Entity[] = [];
+    const instancedContainers: { entity: Entity; component: InstancedMeshComponent }[] = [];
+
+    // 1. Classify entities
+    for (const e of entities) {
+      if (!e) continue;
+      
+      const instanced = e.getComponent(InstancedMeshComponent);
+      if (instanced && instanced.count > 0) {
+        instancedContainers.push({ entity: e, component: instanced });
+        continue;
+      }
+
       // Skip entities with meshType='none' (structural entities like joints, roots)
-      if (e.meshType === 'none') return false;
+      if (e.meshType === 'none') continue;
+      
       const meshComponent = e.getComponent(MeshComponent);
-      return !meshComponent?.meshData?.vertices || !meshComponent.meshData.indices;
-    });
+      // Only process default geometry (entities with custom mesh data are handled by separateCustomGeometry and filtered out before reaching here in typical flow)
+      // But if they are passed here, we should filter them out to be safe.
+      if (meshComponent?.meshData?.vertices && meshComponent.meshData.indices) {
+         continue; 
+      }
+      
+      singleEntities.push(e);
+    }
 
-    const count = entitiesWithoutCustom.length;
-    if (count === 0) {
-      Logger.debug('[InstanceManager] build(): no renderable entities detected in scene');
+    const singleCount = singleEntities.length;
+    const instancedCount = instancedContainers.reduce((acc, item) => acc + item.component.count, 0);
+    const totalCount = singleCount + instancedCount;
+
+    if (totalCount === 0) {
+      // Logger.debug('[InstanceManager] build(): no renderable entities detected in scene');
     } else {
-      Logger.debug('[InstanceManager] build(): processing entities', { count });
+      // Logger.debug('[InstanceManager] build(): processing entities', { count: totalCount });
     }
 
-    // Grow if needed (only reallocates when exceeding capacity)
-    if (count > this.capacity) {
-      this.grow(Math.max(count, this.capacity * 2));
+    // 2. Grow if needed
+    if (totalCount > this.capacity) {
+      this.grow(Math.max(totalCount, this.capacity * 2));
     }
 
+    // 3. Count opaque for sorting
     let opaqueCount = 0;
-    for (let i = 0; i < count; i++) {
-      const entity = entitiesWithoutCustom[i];
-      if (!entity) continue;
+    
+    for (const entity of singleEntities) {
       const material = entity.getComponent(MaterialComponent);
       const alpha = material?.primaryColor?.[3] ?? material?.opacity ?? 1;
       const flags = material?.flags ?? 0;
-      const isTransparent =
-        (flags & MaterialComponent.FLAG_TRANSPARENT) !== 0 || alpha < 0.999;
-      if (!isTransparent) {
-        opaqueCount++;
-      }
+      const isTransparent = (flags & MaterialComponent.FLAG_TRANSPARENT) !== 0 || alpha < 0.999;
+      if (!isTransparent) opaqueCount++;
+    }
+    
+    for (const { entity, component } of instancedContainers) {
+      const material = entity.getComponent(MaterialComponent);
+      const alpha = material?.primaryColor?.[3] ?? material?.opacity ?? 1;
+      const flags = material?.flags ?? 0;
+      const isTransparent = (flags & MaterialComponent.FLAG_TRANSPARENT) !== 0 || alpha < 0.999;
+      if (!isTransparent) opaqueCount += component.count;
     }
 
+    // 4. Fill Buffers
     let opaqueCursor = 0;
     let transparentCursor = opaqueCount;
 
-    // Fill buffers with opaques first, transparent instances appended after
-    for (let i = 0; i < count; i++) {
-      const entity = entitiesWithoutCustom[i];
-      if (!entity) continue;
-
+    // 4a. Single Entities
+    for (const entity of singleEntities) {
       const pos = entity.transform.getWorldPosition();
       const rot = entity.transform.rotation;
       const scale = entity.transform.scale;
@@ -261,8 +307,8 @@ export class InstanceDataBuilder {
       const primary = material?.primaryColor ?? [1, 1, 1, 1];
       const alpha = primary[3] ?? (material?.opacity ?? 1);
       const flags = material?.flags ?? 0;
-      const isTransparent =
-        (flags & MaterialComponent.FLAG_TRANSPARENT) !== 0 || alpha < 0.999;
+      const isTransparent = (flags & MaterialComponent.FLAG_TRANSPARENT) !== 0 || alpha < 0.999;
+      
       const index = isTransparent ? transparentCursor++ : opaqueCursor++;
 
       // Position
@@ -277,7 +323,7 @@ export class InstanceDataBuilder {
       const maxScale = Math.max(scale[0], scale[1], scale[2]);
       this.colorScaleBuffer[index * 4 + 3] = maxScale;
 
-      // Use accentColor if available, otherwise fallback to secondaryColor, then primary
+      // Secondary
       const accent = material?.accentColor;
       const secondary = accent ?? material?.secondaryColor ?? primary;
       this.secondaryColorBuffer[index * 4 + 0] = secondary[0];
@@ -298,19 +344,13 @@ export class InstanceDataBuilder {
       this.materialParamsBuffer[index * 4 + 2] = roughness;
       this.materialParamsBuffer[index * 4 + 3] = flags;
 
-      // Rotation (quaternion)
+      // Rotation
       this.rotationBuffer[index * 4 + 0] = rot[0];
       this.rotationBuffer[index * 4 + 1] = rot[1];
       this.rotationBuffer[index * 4 + 2] = rot[2];
       this.rotationBuffer[index * 4 + 3] = rot[3];
 
-      // Material ID (for texture atlas)
-      // Check MeshComponent for material override first, then MaterialComponent
-      const meshComponent = entity.getComponent(MeshComponent);
-      // Note: MeshComponent.materialAssetId is a string ID, we need numeric ID for atlas
-      // Currently MaterialComponent.materialId is the numeric atlas index.
-      // If MeshComponent has materialAssetId, we might need to resolve it to a numeric ID.
-      // For now, stick to MaterialComponent.materialId as the source of truth for rendering.
+      // Material ID
       this.materialIdBuffer[index] = material?.materialId ?? 0;
 
       const maxExtent = Math.max(scale[0], scale[1], scale[2]);
@@ -321,18 +361,76 @@ export class InstanceDataBuilder {
       this.boundsBuffer[index * 4 + 3] = radius;
     }
 
-    // Return views (no allocations)
+    // 4b. Instanced Components
+    for (const { entity, component } of instancedContainers) {
+      const material = entity.getComponent(MaterialComponent);
+      const alpha = material?.primaryColor?.[3] ?? material?.opacity ?? 1;
+      const flags = material?.flags ?? 0;
+      const isTransparent = (flags & MaterialComponent.FLAG_TRANSPARENT) !== 0 || alpha < 0.999;
+      
+      let idx = isTransparent ? transparentCursor : opaqueCursor;
+      const count = component.count;
+      
+      for (let k = 0; k < count; k++) {
+        const i = idx + k;
+        
+        this.offsetBuffer[i * 3 + 0] = component.offsetData[k * 3 + 0] ?? 0;
+        this.offsetBuffer[i * 3 + 1] = component.offsetData[k * 3 + 1] ?? 0;
+        this.offsetBuffer[i * 3 + 2] = component.offsetData[k * 3 + 2] ?? 0;
+        
+        this.rotationBuffer[i * 4 + 0] = component.rotationData[k * 4 + 0] ?? 0;
+        this.rotationBuffer[i * 4 + 1] = component.rotationData[k * 4 + 1] ?? 0;
+        this.rotationBuffer[i * 4 + 2] = component.rotationData[k * 4 + 2] ?? 0;
+        this.rotationBuffer[i * 4 + 3] = component.rotationData[k * 4 + 3] ?? 0;
+        
+        this.colorScaleBuffer[i * 4 + 0] = component.colorData[k * 4 + 0] ?? 0;
+        this.colorScaleBuffer[i * 4 + 1] = component.colorData[k * 4 + 1] ?? 0;
+        this.colorScaleBuffer[i * 4 + 2] = component.colorData[k * 4 + 2] ?? 0;
+        
+        const sx = component.scaleData[k * 3 + 0] ?? 0;
+        const sy = component.scaleData[k * 3 + 1] ?? 0;
+        const sz = component.scaleData[k * 3 + 2] ?? 0;
+        this.colorScaleBuffer[i * 4 + 3] = Math.max(sx, sy, sz);
+        
+        this.secondaryColorBuffer[i * 4 + 0] = component.secondaryColorData[k * 4 + 0] ?? 0;
+        this.secondaryColorBuffer[i * 4 + 1] = component.secondaryColorData[k * 4 + 1] ?? 0;
+        this.secondaryColorBuffer[i * 4 + 2] = component.secondaryColorData[k * 4 + 2] ?? 0;
+        this.secondaryColorBuffer[i * 4 + 3] = component.secondaryColorData[k * 4 + 3] ?? 1;
+
+        this.emissiveColorBuffer[i * 4 + 0] = component.emissiveColorData[k * 4 + 0] ?? 0;
+        this.emissiveColorBuffer[i * 4 + 1] = component.emissiveColorData[k * 4 + 1] ?? 0;
+        this.emissiveColorBuffer[i * 4 + 2] = component.emissiveColorData[k * 4 + 2] ?? 0;
+        this.emissiveColorBuffer[i * 4 + 3] = component.emissiveColorData[k * 4 + 3] ?? 0;
+
+        this.materialParamsBuffer[i * 4 + 0] = component.materialParamsData[k * 4 + 0] ?? 0;
+        this.materialParamsBuffer[i * 4 + 1] = component.materialParamsData[k * 4 + 1] ?? 0;
+        this.materialParamsBuffer[i * 4 + 2] = component.materialParamsData[k * 4 + 2] ?? 0;
+        this.materialParamsBuffer[i * 4 + 3] = component.materialParamsData[k * 4 + 3] ?? 0;
+
+        this.materialIdBuffer[i] = component.materialIdData[k] ?? 0;
+        
+        const radius = Math.max(sx, sy, sz) * 0.5;
+        this.boundsBuffer[i * 4 + 0] = component.offsetData[k * 3 + 0] ?? 0;
+        this.boundsBuffer[i * 4 + 1] = component.offsetData[k * 3 + 1] ?? 0;
+        this.boundsBuffer[i * 4 + 2] = component.offsetData[k * 3 + 2] ?? 0;
+        this.boundsBuffer[i * 4 + 3] = radius;
+      }
+      
+      if (isTransparent) transparentCursor += count;
+      else opaqueCursor += count;
+    }
+
     return {
-      instanceCount: count,
+      instanceCount: totalCount,
       opaqueCount,
-      instanceOffsetData: this.offsetBuffer.subarray(0, count * 3),
-      instanceColorScaleData: this.colorScaleBuffer.subarray(0, count * 4),
-      instanceSecondaryColorData: this.secondaryColorBuffer.subarray(0, count * 4),
-      instanceEmissiveColorData: this.emissiveColorBuffer.subarray(0, count * 4),
-      instanceMaterialParamsData: this.materialParamsBuffer.subarray(0, count * 4),
-      instanceRotationData: this.rotationBuffer.subarray(0, count * 4),
-      instanceMaterialIdData: this.materialIdBuffer.subarray(0, count),
-      instanceBoundsData: this.boundsBuffer.subarray(0, count * 4),
+      instanceOffsetData: this.offsetBuffer.subarray(0, totalCount * 3),
+      instanceColorScaleData: this.colorScaleBuffer.subarray(0, totalCount * 4),
+      instanceSecondaryColorData: this.secondaryColorBuffer.subarray(0, totalCount * 4),
+      instanceEmissiveColorData: this.emissiveColorBuffer.subarray(0, totalCount * 4),
+      instanceMaterialParamsData: this.materialParamsBuffer.subarray(0, totalCount * 4),
+      instanceRotationData: this.rotationBuffer.subarray(0, totalCount * 4),
+      instanceMaterialIdData: this.materialIdBuffer.subarray(0, totalCount),
+      instanceBoundsData: this.boundsBuffer.subarray(0, totalCount * 4),
     };
   }
 

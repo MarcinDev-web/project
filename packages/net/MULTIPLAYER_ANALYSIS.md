@@ -61,29 +61,8 @@ PhysicsState → PhysicsSync → ReplicationClient → Server → Other Clients
 
 ### 1. **Brak implementacji getLocalUserId()**
 
-**Problem:** Wszystkie komponenty mają TODO dla `getLocalUserId()`:
-- `MultiplayerGameplayManager.getLocalUserId()` - zwraca `null`
-- `InputReplicator.getLocalUserId()` - zwraca `null`
-- `PhysicsSync.getLocalUserId()` - zwraca `null`
-- `PlayerSync` - używa `localUserId` ale może być `null`
-
-**Impact:** 
-- Nie można poprawnie filtrować własnych aktualizacji
-- Brak możliwości identyfikacji lokalnego gracza
-
-**Rozwiązanie:**
-```typescript
-// W ReplicationClient dodać:
-getLocalUserId(): string | null {
-  // Pobierz z auth payload po połączeniu
-  return this.currentUserId;
-}
-
-// W MultiplayerGameplayManager:
-private getLocalUserId(): string | null {
-  return this.replicationClient.getLocalUserId();
-}
-```
+**Status:** ✅ Rozwiązano
+Zaimplementowano w `ReplicationClient` i `MultiplayerGameplayManager`.
 
 ### 2. **PlayerSync.findOrCreateRemotePlayerEntity() zwraca null**
 
@@ -172,14 +151,8 @@ this.config.replicationClient.sendPlayerUpdate({
 
 ### 7. **Brak obsługi reconnection w MultiplayerGameplayManager**
 
-**Problem:**
-- Jeśli połączenie zostanie przerwane, `MultiplayerGameplayManager` nie próbuje ponownie dołączyć
-- `ReplicationClient` ma auto-reconnect, ale `MultiplayerGameplayManager` nie reaguje na reconnection
-
-**Impact:**
-- Gracz może zostać rozłączony bez możliwości automatycznego powrotu
-
-**Rozwiązanie:** Dodać listener na `onStateChange` w `ReplicationClient`.
+**Status:** ✅ Rozwiązano
+Zaimplementowano pełną obsługę reconnection w `MultiplayerGameplayManager` wraz z `handleReconnection()` i `resetSyncStates()`.
 
 ### 8. **PhysicsSync nie sprawdza czy entity jest local player**
 
@@ -210,13 +183,12 @@ private isLocalPlayerEntity(entityId: string): boolean {
 
 ### 10. **Brak testów jednostkowych**
 
-**Problem:**
-- Brak plików testowych (`*.test.ts`, `*.spec.ts`)
-- Brak pokrycia testowego
-
-**Impact:**
-- Ryzyko regresji
-- Trudność w refaktoringu
+**Status:** ✅ Rozwiązano
+Dodano testy dla wszystkich głównych komponentów:
+- `MultiplayerGameplayManager.test.ts`
+- `PlayerSync.test.ts`
+- `InputReplicator.test.ts`
+- `PhysicsSync.test.ts`
 
 ---
 
@@ -364,6 +336,6 @@ private isLocalPlayerEntity(entityId: string): boolean {
 
 ---
 
-**Data analizy:** 2025-01-XX  
-**Wersja kodu:** aktualna (po integracji z EditorModeManager)
+**Data analizy:** 2025-11-22
+**Wersja kodu:** aktualna (zaktualizowana po wdrożeniu poprawek)
 

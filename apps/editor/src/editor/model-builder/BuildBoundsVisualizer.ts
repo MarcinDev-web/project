@@ -2,7 +2,7 @@
  * BuildBoundsVisualizer - Visualizes build bounds with grid lines
  */
 
-import { Entity, TransformComponent, MeshComponent, MaterialComponent } from '@engine/world';
+import { Entity, Transform, MeshComponent, MaterialComponent } from '@engine/world';
 import type { Scene } from '@engine/world';
 import type { BuildBounds } from '@engine/blocks';
 import type { Vec3 } from '@engine/core/math';
@@ -17,6 +17,7 @@ export class BuildBoundsVisualizer {
   private readonly bounds: BuildBounds;
   private readonly disposables = new DisposableGroup();
   private gridEntities: Entity[] = [];
+  private time = 0;
 
   constructor(scene: Scene, bounds: BuildBounds) {
     this.scene = scene;
@@ -91,10 +92,11 @@ export class BuildBoundsVisualizer {
       Math.pow(end[2] - start[2], 2)
     );
 
-    entity.addComponent(new TransformComponent({
-      position: center,
-      scale: [length, 0.01, 0.01], // Thin line
-    }));
+    entity.addComponent(new Transform(
+      center,
+      undefined,
+      [length, 0.01, 0.01] // Thin line
+    ));
 
     const mesh = new MeshComponent();
     mesh.meshType = 'cube';
@@ -114,7 +116,16 @@ export class BuildBoundsVisualizer {
    * Updates visualization (for animations, etc.)
    */
   update(deltaTime: number): void {
-    // Could add pulsing animation here
+    this.time += deltaTime;
+    // Pulse between 0.3 and 0.7
+    const opacity = 0.5 + Math.sin(this.time * 3) * 0.2;
+
+    for (const entity of this.gridEntities) {
+      const material = entity.getComponent(MaterialComponent);
+      if (material) {
+        material.opacity = opacity;
+      }
+    }
   }
 
   /**
@@ -123,7 +134,6 @@ export class BuildBoundsVisualizer {
   dispose(): void {
     for (const entity of this.gridEntities) {
       this.scene.removeEntity(entity);
-      entity.dispose();
     }
     this.gridEntities = [];
     this.disposables.dispose();

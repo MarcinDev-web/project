@@ -1,0 +1,33 @@
+{
+  "name": "@apps/game-server",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/index.js",
+  "scripts": {
+    "dev": "tsx watch src/index.ts",
+    "build": "tsup",
+    "start": "node dist/index.js",
+    "lint": "eslint src --max-warnings=0"
+  },
+  "dependencies": {
+    "@engine/core": "workspace:*",
+    "@engine/world": "workspace:*",
+    "@engine/world-server": "workspace:*",
+    "@engine/net-protocol": "workspace:*",
+    "@fastify/cors": "^11.0.0",
+    "@fastify/websocket": "^11.2.0",
+    "fastify": "^5.0.0",
+    "ioredis": "^5.4.1",
+    "ws": "^8.18.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.5.0",
+    "@types/ws": "^8.5.12",
+    "@types/ioredis": "^5.0.0",
+    "tsup": "^8.1.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5.9.3"
+  }
+}
+

@@ -97,6 +97,29 @@ export class ModelBuilder {
   }
 
   /**
+   * Places multiple blocks in a batch operation
+   * @param updates Array of block updates (null block means remove)
+   * @returns true if all updates were successful (all within bounds)
+   */
+  placeBlocks(updates: { pos: LocalPos; block: MicroBlock | null }[]): boolean {
+    // First validate all bounds
+    for (const update of updates) {
+      if (!this.isWithinBounds(update.pos)) {
+        this.logger?.warn(`Cannot place block at ${update.pos}: out of bounds`);
+        return false;
+      }
+    }
+
+    // Then apply all updates
+    for (const update of updates) {
+      const worldPos = this.localToWorld(update.pos);
+      this.store.setBlock(worldPos, update.block);
+    }
+
+    return true;
+  }
+
+  /**
    * Places a block at local position
    * @returns true if placed successfully, false if out of bounds
    */

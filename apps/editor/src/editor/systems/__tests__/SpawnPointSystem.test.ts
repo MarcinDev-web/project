@@ -206,7 +206,7 @@ describe('SpawnPointSystem', () => {
       );
 
       expect(result.source).toBe('default-origin');
-      expect(result.position).toEqual([0, 1, 0]);
+      expect(result.position).toEqual([0, 5, 0]);
       expect(result.rotation).toBe(0);
     });
 
@@ -214,7 +214,7 @@ describe('SpawnPointSystem', () => {
       const result = SpawnPointSystem.findSpawnPoint(scene);
 
       expect(result.source).toBe('default-origin');
-      expect(result.position).toEqual([0, 1, 0]);
+      expect(result.position).toEqual([0, 5, 0]);
     });
 
     it('should work without fallback position', () => {

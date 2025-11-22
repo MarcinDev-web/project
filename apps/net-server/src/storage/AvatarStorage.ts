@@ -3,7 +3,7 @@
  * PostgreSQL-based storage
  */
 
-import type { PrismaClient } from '../../node_modules/.prisma/net-client/index.js';
+import { PrismaClient } from '@engine/database';
 
 export interface AvatarPreset {
   id: string;

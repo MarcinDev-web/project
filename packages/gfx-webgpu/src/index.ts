@@ -49,7 +49,7 @@ export {
 } from '@engine/blocks';
 
 // Shadow System
-export { computeCascades, type CascadeParams, type CascadeResult } from './shadows/ShadowCascades';
+export { computeCascades, ShadowCascadeCalculator, type CascadeParams, type CascadeResult } from './shadows/ShadowCascades';
 export { ShadowPass } from './shadows/ShadowPass';
 
 // Occlusion Culling

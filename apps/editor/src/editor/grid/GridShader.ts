@@ -16,17 +16,24 @@ export function createGridShaderCode(): string {
 struct GridUniforms {
   viewProjectionMatrix : mat4x4<f32>,
   eyePosition : vec3<f32>,
+  gridHeight : f32,
+  
   cellSize : f32,
   fadeDistance : f32,
   majorLineInterval : f32,
   minorLineWidth : f32,
+  
   majorLineWidth : f32,
+  hasHighlight : f32,
+  highlightX : f32,
+  highlightZ : f32,
   
   minorColor : vec4<f32>,
   majorColor : vec4<f32>,
   axisColorX : vec4<f32>,
   axisColorZ : vec4<f32>,
   originColor : vec4<f32>,
+  highlightColor : vec4<f32>,
 };
 
 @group(0) @binding(0) var<uniform> u : GridUniforms;
@@ -58,15 +65,15 @@ fn vs_grid(@builtin(vertex_index) vertexIndex : u32) -> VertexOutput {
   // Make the quad large enough to cover the fade distance
   let scale = u.fadeDistance * 2.0;
   
-  // Snap center to cell size to avoid jittering as camera moves
-  let snap = u.cellSize;
-  let center = floor(u.eyePosition.xz / snap) * snap;
-  
-  let worldPos = vec3<f32>(
-    center.x + pos.x * scale,
-    0.0,
-    center.y + pos.y * scale
-  );
+    // Snap center to cell size to avoid jittering as camera moves
+    let snap = u.cellSize;
+    let center = floor(u.eyePosition.xz / snap) * snap;
+    
+    let worldPos = vec3<f32>(
+      center.x + pos.x * scale,
+      u.gridHeight + 0.01, // Raised further to avoid z-fighting
+      center.y + pos.y * scale
+    );
 
   var output : VertexOutput;
   output.position = u.viewProjectionMatrix * vec4<f32>(worldPos, 1.0);
@@ -137,6 +144,21 @@ fn fs_grid(input : VertexOutput) -> @location(0) vec4<f32> {
   
   if (zAxis > 0.0) {
     color = mix(color, u.axisColorZ, zAxis);
+  }
+
+  // Highlight cell
+  if (u.hasHighlight > 0.5) {
+    let cellHalf = u.cellSize * 0.5;
+    // Use small epsilon to avoid flickering at edges
+    let dx = abs(worldPos.x - u.highlightX);
+    let dz = abs(worldPos.z - u.highlightZ);
+    
+    if (dx < cellHalf && dz < cellHalf) {
+       // Inside highlight cell
+       // Blend highlight color on top
+       // We assume highlightColor alpha is the opacity of the highlight
+       color = mix(color, vec4<f32>(u.highlightColor.rgb, 1.0), u.highlightColor.a);
+    }
   }
   
   // Apply distance fade

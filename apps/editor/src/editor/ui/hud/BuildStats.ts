@@ -2,8 +2,8 @@
  * BuildStats - Performance and scene statistics overlay
  * 
  * Inspired by:
- * - Minecraft F3 debug screen
- * - Roblox Studio stats
+ * - F3 debug screen
+ * - Studio stats
  * - Game engine debug overlays
  * 
  * Features:

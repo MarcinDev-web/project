@@ -3,7 +3,7 @@
  */
 
 import { randomBytes } from 'node:crypto';
-import type { PrismaClient as PrismaClientType } from '../../node_modules/.prisma/net-client/index.js';
+import { PrismaClient as PrismaClientType } from '@engine/database';
 import type { User } from '../types/auth.js';
 
 export class UserStorageDB {

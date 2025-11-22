@@ -79,6 +79,7 @@ import { CameraSystem } from './CameraSystem';
 import { UniformManager } from './UniformManager';
 import { FrameRenderer } from './FrameRenderer';
 import { createInstanceDataFromScene } from './InstanceManager';
+import { init as initWasmCollision, type WasmCollision, type CollisionWorld } from '@engine/wasm-collision';
 import {
   DEFAULT_STATUS_MESSAGE,
   MSAA_SAMPLE_COUNT,
@@ -191,6 +192,7 @@ export interface Renderer {
     enableBloom: boolean;
     enableFXAA: boolean;
     enableSSAO: boolean;
+    enableSSGI: boolean;
     enableShadows: boolean;
     enableForwardPlus: boolean;
     enableScreenLOD: boolean;
@@ -199,12 +201,14 @@ export interface Renderer {
     msaaSampleCount: 1 | 2 | 4;
     enableOutlines?: boolean;
     outlineQuality?: 'low' | 'med';
+    resolutionScale?: number;
   }>): void;
   getRenderSettings(): Readonly<{
     enableHDR: boolean;
     enableBloom: boolean;
     enableFXAA: boolean;
     enableSSAO: boolean;
+    enableSSGI: boolean;
     enableShadows: boolean;
     enableForwardPlus: boolean;
     enableScreenLOD: boolean;
@@ -213,11 +217,13 @@ export interface Renderer {
     msaaSampleCount: 1 | 2 | 4;
     enableOutlines: boolean;
     outlineQuality: 'low' | 'med';
+    resolutionScale: number;
   }>;
   /** Texture compression debug controls */
   getTextureCompressionManager(): TextureCompressionManager;
   setTextureCompressionFormat(format: CompressionFormat | null): void;
   setTextureCompressionEnabled(enabled: boolean): void;
+  getCollisionWorld(): CollisionWorld | null;
   [key: string]: unknown;
 }
 
@@ -252,6 +258,7 @@ interface RendererOptions {
   enableBloom?: boolean;
   enableShadows?: boolean;
   enableSSAO?: boolean; // Screen Space Ambient Occlusion
+  enableSSGI?: boolean; // Screen Space Global Illumination
   shadowQuality?: 'low' | 'med' | 'high' | 'ultra';
   enableOutlines?: boolean;
   outlineQuality?: 'low' | 'med';
@@ -273,6 +280,7 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
     enableBloom: options.enableBloom !== false,
     enableShadows: options.enableShadows !== false,
     enableSSAO: options.enableSSAO !== false,
+    enableSSGI: options.enableSSGI === true,
     enableFXAA: false,
     enableForwardPlus: false,
     enableScreenLOD: false,
@@ -281,6 +289,7 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
     msaaSampleCount: (options.msaaSampleCount ?? MSAA_SAMPLE_COUNT) as 1 | 2 | 4,
     enableOutlines: options.enableOutlines ?? false,
     outlineQuality: (options.outlineQuality ?? 'med') as 'low' | 'med',
+    resolutionScale: 1.0,
   };
 
   // Initialize light manager for the scene
@@ -818,6 +827,7 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
   let lastFrameTimeMs: number | null = null;
   let uniformManager: UniformManager;
   let cameraSystem: CameraSystem;
+  let collisionWorld: CollisionWorld | null = null;
 
   // Prepare geometry from scene or use default
   let geometry = options.geometry ?? DEFAULT_GEOMETRY;
@@ -828,7 +838,7 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
 
   try {
     resizeObserver = new ResizeObserver(() => {
-      updateCanvasSize(canvas);
+      updateCanvasSize(canvas, renderSettings.resolutionScale);
     });
     resizeObserver.observe(canvas);
 
@@ -900,6 +910,17 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
     uniformManager = new UniformManager(device, uniformResources.uniformBuffer);
     cameraSystem = new CameraSystem();
     frameRenderer = new FrameRenderer(geometry.instanceCount);
+    
+    // Initialize collision world
+    try {
+      const wasm = await initWasmCollision();
+      collisionWorld = new wasm.CollisionWorld();
+      // Initialize occlusion culling with low resolution buffer
+      collisionWorld.init_occlusion_culling(256, 128);
+      frameRenderer.setWasmCollision(wasm, collisionWorld);
+    } catch (e) {
+      Logger.warn('Failed to initialize CollisionWorld:', e);
+    }
     
     // Initialize static uniforms once
     uniformManager.initializeStaticUniforms(atlas.getConfig());
@@ -1028,7 +1049,7 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
         return;
       }
 
-      updateCanvasSize(canvas);
+      updateCanvasSize(canvas, renderSettings.resolutionScale);
       if (canvas.height === 0 || canvas.width === 0) {
         Logger.debug('Skipping frame: canvas has zero dimension', { w: canvas.width, h: canvas.height });
         scheduleNextFrame();
@@ -1172,6 +1193,7 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
           enableBloom: renderSettings.enableBloom,
           enableHDR: renderSettings.enableHDR,
           enableSSAO: renderSettings.enableSSAO,
+          enableSSGI: renderSettings.enableSSGI,
           enableFXAA: renderSettings.enableFXAA,
           enableOutlines: renderSettings.enableOutlines,
           enableForwardPlus: renderSettings.enableForwardPlus,
@@ -1322,6 +1344,10 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       scriptSystem = null;
       logicCubeSystem = null;
       lastFrameTimeMs = null;
+      if (collisionWorld) {
+        collisionWorld.free();
+        collisionWorld = null;
+      }
     } catch (e) {
       Logger.warn('Renderer systems cleanup failed', e);
     }
@@ -1417,6 +1443,7 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
     setTextureCompressionEnabled: (enabled: boolean) => {
       textureCompressionManager.setEnabled(enabled);
     },
+    getCollisionWorld: () => collisionWorld,
   };
 }
 

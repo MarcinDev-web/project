@@ -9,10 +9,12 @@ import {
   CORS_ALLOWED_METHODS,
 } from '@shared/config/cors';
 import { getPrismaClient, ensureSchema, disconnectPrisma } from './lib/db.js';
+import { disconnectRedis } from './lib/redis.js';
 import { registerAuthRoutes } from './routes/auth.js';
 import { registerSessionRoutes } from './routes/session.js';
 import { createWsServer } from './ws/server.js';
 import { createWebRTCServer, stopWebRTCServer } from './webrtc/server.js';
+import { initializeMessageRouter } from './shared/messageRouter.js';
 
 const PORT = process.env.PORT ? parseInt(process.env.PORT, 10) : 4000;
 const WEBRTC_SIGNALING_PORT = process.env.WEBRTC_SIGNALING_PORT
@@ -39,6 +41,8 @@ async function main(): Promise<void> {
 
   await app.register(websocket);
 
+  initializeMessageRouter();
+
   await ensureSchema();
   const prisma = await getPrismaClient();
 
@@ -55,6 +59,7 @@ async function main(): Promise<void> {
   app.addHook('onClose', async () => {
     await stopWebRTCServer();
     await disconnectPrisma();
+    await disconnectRedis();
   });
 
   await app.listen({ port: PORT, host: '0.0.0.0' });

@@ -61,7 +61,6 @@ A: Use CODE_REVIEW_CHECKLIST.md
 
 ## Related
 
-- [Architecture](../ARCHITECTURE.md) - System design
-- [Refactoring](../refactoring/) - Recent refactoring docs
-- [Testing](../TESTING.md) - Test philosophy
+- [Architecture](../architecture/ARCHITECTURE.md) - System design
+- [Testing](../testing/TESTING.md) - Test philosophy
 

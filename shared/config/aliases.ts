@@ -59,6 +59,8 @@ export const engineAliases = (rootDir: string): Record<string, string> => {
 		'@engine/voxel': p('voxel/src'),
 		'@engine/voxel/terrain': p('voxel/src/terrain'),
 		'@engine/wasm-collision': p('wasm-collision/src'),
+		'@engine/wasm-physics': p('wasm-physics/src'),
+		'@engine/wasm-voxel': p('wasm-voxel/src'),
 		'@shared': shared,
 		'@shared/types': path.resolve(shared, 'types'),
 	};

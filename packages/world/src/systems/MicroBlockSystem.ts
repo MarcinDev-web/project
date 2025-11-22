@@ -104,11 +104,12 @@ export class MicroBlockSystem {
 
     // Combine all chunk meshes into one
     const allChunks = component.store.getAllChunks();
-    const combinedMesh = this.combineChunkMeshes(allChunks);
+    const { mesh, bounds } = this.combineChunkMeshes(allChunks);
 
     // Update mesh component
     meshComponent.meshType = 'custom';
-    meshComponent.meshData = combinedMesh;
+    meshComponent.meshData = mesh;
+    meshComponent.localAABB = bounds;
   }
 
   /**
@@ -116,10 +117,17 @@ export class MicroBlockSystem {
    */
   private combineChunkMeshes(
     chunks: Array<import('@engine/microblocks').MicroBlockChunk>
-  ): import('../components/MeshComponent.js').CustomMeshData {
+  ): { mesh: import('../components/MeshComponent.js').CustomMeshData; bounds: { min: [number, number, number]; max: [number, number, number] } } {
     const allVertices: number[] = [];
     const allIndices: number[] = [];
     let vertexOffset = 0;
+
+    let minX = Infinity, minY = Infinity, minZ = Infinity;
+    let maxX = -Infinity, maxY = -Infinity, maxZ = -Infinity;
+
+    const chunkSize = DEFAULT_CHUNK_SIZE;
+    const blockSize = MICRO_BLOCK_SIZE;
+    const chunkWorldSize = chunkSize * blockSize;
 
     for (const chunk of chunks) {
       if (!chunk.mesh) continue;
@@ -133,6 +141,32 @@ export class MicroBlockSystem {
       const vertexArray = Array.from(vertices);
       const indexArray = Array.from(indices);
 
+      // Calculate chunk offset
+      const offsetX = chunk.coord[0] * chunkWorldSize;
+      const offsetY = chunk.coord[1] * chunkWorldSize;
+      const offsetZ = chunk.coord[2] * chunkWorldSize;
+
+      // Update bounds and apply offset to vertices
+      for (let i = 0; i < vertexArray.length; i += 6) {
+        // Apply chunk offset to position
+        vertexArray[i] = (vertexArray[i] ?? 0) + offsetX;
+        vertexArray[i + 1] = (vertexArray[i + 1] ?? 0) + offsetY;
+        vertexArray[i + 2] = (vertexArray[i + 2] ?? 0) + offsetZ;
+
+        const x = vertexArray[i];
+        const y = vertexArray[i + 1];
+        const z = vertexArray[i + 2];
+        
+        if (x === undefined || y === undefined || z === undefined) continue;
+        
+        if (x < minX) minX = x;
+        if (y < minY) minY = y;
+        if (z < minZ) minZ = z;
+        if (x > maxX) maxX = x;
+        if (y > maxY) maxY = y;
+        if (z > maxZ) maxZ = z;
+      }
+
       // Add vertices
       allVertices.push(...vertexArray);
 
@@ -145,9 +179,21 @@ export class MicroBlockSystem {
       vertexOffset += vertexArray.length / 6; // Each vertex has 6 components (x, y, z, nx, ny, nz)
     }
 
+    // Default bounds if mesh is empty
+    if (minX === Infinity) {
+      minX = -0.5; minY = -0.5; minZ = -0.5;
+      maxX = 0.5; maxY = 0.5; maxZ = 0.5;
+    }
+
     return {
-      vertices: new Float32Array(allVertices),
-      indices: new Uint16Array(allIndices),
+      mesh: {
+        vertices: new Float32Array(allVertices),
+        indices: new Uint16Array(allIndices),
+      },
+      bounds: {
+        min: [minX, minY, minZ],
+        max: [maxX, maxY, maxZ],
+      },
     };
   }
 

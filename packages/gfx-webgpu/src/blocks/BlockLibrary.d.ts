@@ -1,9 +1,9 @@
 /**
- * Block Library - Kogama/Roblox/Minecraft style blocks
+ * Block Library - Voxel style blocks
  *
  * Design principles:
- * - Simple, colorful aesthetic (Kogama/Roblox)
- * - Block-based voxel style (Minecraft)
+ * - Simple, colorful aesthetic
+ * - Block-based voxel style
  * - Support for both procedural and real textures
  * - Material-based rendering
  */
@@ -76,7 +76,7 @@ export interface BlockDefinition {
     };
 }
 /**
- * Built-in block library with Kogama/Roblox/Minecraft inspired blocks
+ * Built-in block library with voxel inspired blocks
  * Reduced to 10 essential blocks across 3 categories
  */
 export declare const BLOCK_LIBRARY: Record<string, BlockDefinition>;

@@ -1,24 +1,15 @@
-/**
- * EditorVisualManager - Manages visual editor elements:
- * - Grid rendering
- * - Gizmo overlay
- * - Selection visuals
- *
- * Extracted from EditorUI to reduce complexity.
- */
-
-import type { Scene } from '@engine/world';
+import type { Scene, Entity } from '@engine/world';
 import type { SelectionManager } from '@engine/world';
 import type { EditorState } from '../core/state';
 import type { Renderer } from '@engine/gfx-webgpu/index';
 import { GridRenderer } from '../grid/GridRenderer';
 import { GizmoController } from '../controllers/GizmoController';
 import type { SnapSystem } from '@engine/editor-utils';
-import { applySelectionVisuals } from './SelectionVisuals';
+import { SelectionVisualController } from './SelectionVisualController';
 import { DisposableGroup } from '@engine/core/utils';
 import { effect } from '@preact/signals-core';
 import { Logger } from '../../utils/logger';
-import type { Vec3 } from '@engine/core/math';
+import type { Vec3, Ray } from '@engine/core/math';
 
 export interface EditorVisualManagerConfig {
   scene: Scene;
@@ -28,6 +19,7 @@ export interface EditorVisualManagerConfig {
   snapSystem: SnapSystem | null;
   getRenderer: () => Renderer | null;
   projectWorldToScreen: (world: Vec3) => { x: number; y: number } | null;
+  getRayFromScreen: (x: number, y: number) => Ray;
   getCameraPosition?: () => Vec3;
   getCameraRotation?: () => import('@engine/core/math').Quat;
   updateSceneBuffers: () => void;
@@ -52,13 +44,21 @@ export class EditorVisualManager {
 
   private gridRenderer: GridRenderer | null = null;
   private gizmoController: GizmoController | null = null;
+  private selectionController: SelectionVisualController;
   private animationFrameHandle: number | null = null;
   
   // Remote camera markers overlay
   private remoteOverlayRoot: HTMLElement | null = null;
   private remoteMarkers = new Map<string, HTMLElement>();
 
-  constructor(private readonly config: EditorVisualManagerConfig) {}
+  constructor(private readonly config: EditorVisualManagerConfig) {
+    this.selectionController = new SelectionVisualController(
+      config.scene,
+      config.selection,
+      config.updateSceneBuffers
+    );
+    this.disposables.add(() => this.selectionController.dispose());
+  }
 
   /**
    * Initializes all visual components.
@@ -133,7 +133,9 @@ export class EditorVisualManager {
       state: this.config.state,
       selection: this.config.selection,
       canvas: this.config.canvas,
+      scene: this.config.scene,
       projectWorldToScreen: this.config.projectWorldToScreen,
+      // getRay removed - handled by InteractionManager
       getCameraPosition: this.config.getCameraPosition,
       getCameraRotation: this.config.getCameraRotation,
       snapSystem: this.config.snapSystem,
@@ -142,7 +144,8 @@ export class EditorVisualManager {
       onTransformChanged: this.config.onTransformChanged,
     });
 
-    this.gizmoController.mount();
+    // Note: GizmoController is now an InteractionTool and registered by EditorUI.
+    // We don't call mount() anymore.
 
     // Cleanup gizmo on dispose
     this.disposables.add(() => {
@@ -318,6 +321,11 @@ export class EditorVisualManager {
     const tick = () => {
       this.updateGizmoOverlay();
       this.updateRemoteCursorsOverlay();
+      
+      if (this.gizmoController) {
+        this.selectionController.setDragging(this.gizmoController.isDragging());
+      }
+
       this.animationFrameHandle = raf(tick);
     };
     this.animationFrameHandle = raf(tick);
@@ -342,9 +350,8 @@ export class EditorVisualManager {
    * Applies selection visual effects to entities.
    */
   applySelectionVisuals(): void {
-    const isDragging = this.gizmoController?.isDragging() ?? false;
-    applySelectionVisuals(this.config.scene, this.config.selection, undefined, isDragging);
-    this.config.updateSceneBuffers();
+    this.selectionController.refresh();
+    
     const raf = typeof requestAnimationFrame === 'function'
       ? requestAnimationFrame
       : (cb: FrameRequestCallback) => window.setTimeout(() => cb(performance.now()), 16);

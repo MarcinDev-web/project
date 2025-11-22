@@ -26,6 +26,15 @@ export class ScriptSystem {
       this.scriptSystem = new LogicCubeSystem(scene);
       Logger.debug('[ScriptSystem] Created new LogicCubeSystem');
     }
+
+    // Enable WASM Runtime
+    if (this.scriptSystem && typeof this.scriptSystem.enableWasm === 'function') {
+      this.scriptSystem.enableWasm().then(() => {
+        Logger.info('[ScriptSystem] WASM Runtime enabled');
+      }).catch((error) => {
+        Logger.error('[ScriptSystem] Failed to enable WASM runtime:', error);
+      });
+    }
   }
 
   /**

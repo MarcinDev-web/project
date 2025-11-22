@@ -20,7 +20,7 @@ export const Footer = memo(function Footer() {
           <span className="footer-divider">•</span>
           <Link to="/marketplace" className="footer-link">Marketplace</Link>
           <span className="footer-divider">•</span>
-          <Link to="/shop" className="footer-link">Shop</Link>
+          <Link to="/support" className="footer-link">Support</Link>
           <span className="footer-divider">•</span>
           <a href="#" className="footer-link">Docs</a>
         </div>

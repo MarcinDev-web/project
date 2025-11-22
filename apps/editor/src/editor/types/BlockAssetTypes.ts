@@ -68,6 +68,12 @@ export interface AssetPreset {
     guardRadius?: number;
     /** Detection range in world units (must be non-negative if provided) */
     detectionRange?: number;
+    /** Override default health (must be positive) */
+    health?: number;
+    /** Override default speed (must be positive) */
+    speed?: number;
+    /** Equipped weapon/item ID */
+    equipment?: string;
   };
 }
 
@@ -160,6 +166,12 @@ export function validateAssetPreset(preset: AssetPreset): AssetPreset {
     }
     if (npc.detectionRange !== undefined && (npc.detectionRange < 0 || !Number.isFinite(npc.detectionRange))) {
       throw new Error(`npcConfig.detectionRange must be a non-negative number, got: ${npc.detectionRange}`);
+    }
+    if (npc.health !== undefined && (npc.health <= 0 || !Number.isFinite(npc.health))) {
+      throw new Error(`npcConfig.health must be a positive number, got: ${npc.health}`);
+    }
+    if (npc.speed !== undefined && (npc.speed <= 0 || !Number.isFinite(npc.speed))) {
+      throw new Error(`npcConfig.speed must be a positive number, got: ${npc.speed}`);
     }
     // Validate patrolWaypoints structure
     if (npc.patrolWaypoints !== undefined) {

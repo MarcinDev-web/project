@@ -23,10 +23,10 @@ export function getTimestampPeriod(device: GPUDevice, adapter: GPUAdapter): numb
         timestampPeriod = value;
         determined = true;
       } else {
-        Logger.warn('Timestamp period: getTimestampPeriod returned invalid; trying next source');
+        Logger.debug('Timestamp period: getTimestampPeriod returned invalid; trying next source');
       }
     } catch (err) {
-      Logger.warn('Timestamp period: getTimestampPeriod threw; trying next source', err);
+      Logger.debug('Timestamp period: getTimestampPeriod threw; trying next source', err);
     }
   }
 
@@ -44,7 +44,7 @@ export function getTimestampPeriod(device: GPUDevice, adapter: GPUAdapter): numb
   }
 
   if (!determined) {
-    Logger.warn('Timestamp period: no source available; defaulting to 1');
+    Logger.debug('Timestamp period: no source available; defaulting to 1');
     timestampPeriod = 1;
   }
 
@@ -55,14 +55,15 @@ export function getTimestampPeriod(device: GPUDevice, adapter: GPUAdapter): numb
  * Updates the canvas resolution to match CSS pixels multiplied by device pixel ratio.
  *
  * @param canvas - Canvas element whose drawing buffer will be resized.
+ * @param scale - Optional resolution scale factor (default: 1.0).
  * @returns `true` when a resize occurred; otherwise `false`.
  */
-export function updateCanvasSize(canvas: HTMLCanvasElement): boolean {
+export function updateCanvasSize(canvas: HTMLCanvasElement, scale: number = 1.0): boolean {
   const dpr = window.devicePixelRatio ?? 1;
   const logicalWidthNow = canvas.clientWidth || canvas.width;
   const logicalHeightNow = canvas.clientHeight || canvas.height;
-  const nextWidth = Math.max(1, Math.round(logicalWidthNow * dpr));
-  const nextHeight = Math.max(1, Math.round(logicalHeightNow * dpr));
+  const nextWidth = Math.max(1, Math.round(logicalWidthNow * dpr * scale));
+  const nextHeight = Math.max(1, Math.round(logicalHeightNow * dpr * scale));
   if (canvas.width !== nextWidth || canvas.height !== nextHeight) {
     canvas.width = nextWidth;
     canvas.height = nextHeight;

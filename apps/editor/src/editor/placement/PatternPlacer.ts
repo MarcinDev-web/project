@@ -11,7 +11,6 @@
 import type { Vec3 } from '@engine/core/math';
 import type { Scene, Entity } from '@engine/world';
 import { Entity as EntityClass } from '@engine/world';
-import { initializeBaseColor } from '../visuals/SelectionVisuals';
 import type { CollisionDetector } from './CollisionDetector';
 
 export interface PatternPosition {

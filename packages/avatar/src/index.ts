@@ -4,7 +4,6 @@ export * from './animation';
 export * from './avatar-instance';
 export * from './animation-adapter';
 export * from './skeleton-adapter';
-export * from './animation-converter';
 
 export { generateHeroicTorsoMesh } from './geometry/torso-geometry';
 export { generateSphereMesh } from './geometry/sphere-geometry';

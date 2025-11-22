@@ -29,6 +29,10 @@ export interface CollisionWorld {
   get_rotations_ptr(): number;
   get_scales_ptr(): number;
   check_collisions(): Uint32Array;
+  query_frustum(view_proj: Float32Array): Uint32Array;
+  init_occlusion_culling(width: number, height: number): void;
+  clear_occlusion_buffer(): void;
+  rasterize_occluders(indices: Uint32Array, view_proj: Float32Array): void;
 }
 
 export interface WasmCollision {

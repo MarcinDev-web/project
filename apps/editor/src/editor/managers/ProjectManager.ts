@@ -499,7 +499,7 @@ export class ProjectManager {
 
   private normalizeProjectConfig(
     config: GameProjectConfig | undefined,
-    metadata: Pick<ProjectMetadata, 'name' | 'description'>
+    metadata: Pick<ProjectMetadata, 'name'> & { description?: string | undefined }
   ): GameProjectConfig {
     const base = config ?? createDefaultGameProjectConfig(metadata.name, metadata.description);
     const description = metadata.description ?? base.info.description;
@@ -633,7 +633,7 @@ export class ProjectManager {
   /**
    * Shows a dialog with the share link and copy button.
    */
-  private showShareDialog(url: string, token: string): void {
+  private showShareDialog(url: string, _token: string): void {
     const modal = document.createElement('div');
     Object.assign(modal.style, {
       position: 'fixed',

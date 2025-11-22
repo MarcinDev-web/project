@@ -4,7 +4,7 @@
 
 import { describe, it, expect, beforeEach } from 'vitest';
 import { randomUUID } from 'node:crypto';
-import type { PrismaClient as PrismaClientType } from '../../../node_modules/.prisma/net-client/index.js';
+import type { PrismaClient as PrismaClientType } from '@engine/database';
 import { SupportStorageDB } from '../SupportStorageDB.js';
 
 if (!process.env.DATABASE_URL) {

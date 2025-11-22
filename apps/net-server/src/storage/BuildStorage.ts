@@ -2,7 +2,7 @@
  * Build Storage - stores actual project/scene data for marketplace builds
  */
 
-import type { PrismaClient } from '../../node_modules/.prisma/net-client/index.js';
+import { PrismaClient } from '@engine/database';
 import type { ProjectData } from '../types.js';
 
 export class BuildStorage {

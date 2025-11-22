@@ -12,6 +12,7 @@ import { PlayerDetection } from './cubes/PlayerDetection.js';
 import { registerLogicCubeSystem } from './LogicCubeSystemRegistry.js';
 import type { LogicCube, LogicCubeConstructor } from './cubes/LogicCube.js';
 import type { LogicSignal, LogicExecutionContext } from './cubes/types.js';
+import { WasmLogicRuntime } from './WasmLogicRuntime.js';
 import type { EntityId } from '@engine/world';
 import { Logger } from '@engine/core/utils';
 
@@ -49,6 +50,8 @@ export class LogicCubeSystem {
   private readonly connectionManager: LogicConnectionManager;
   private readonly variableStorage: VariableStorage;
   private readonly playerDetection: PlayerDetection;
+  private wasmRuntime: WasmLogicRuntime;
+  private useWasm = false;
 
   /** Map of entity ID -> logic cube instance */
   private cubeInstances = new Map<EntityId, LogicCube>();
@@ -71,6 +74,7 @@ export class LogicCubeSystem {
     this.connectionManager = new LogicConnectionManager();
     this.variableStorage = new VariableStorage();
     this.playerDetection = new PlayerDetection(scene);
+    this.wasmRuntime = new WasmLogicRuntime(scene);
     registerLogicConnectionManager(scene, this.connectionManager);
     registerLogicCubeSystem(scene, this);
 
@@ -94,6 +98,16 @@ export class LogicCubeSystem {
         });
       }
     });
+  }
+
+  /**
+   * Enables WASM execution mode
+   */
+  async enableWasm(): Promise<void> {
+    await this.wasmRuntime.init();
+    this.wasmRuntime.compileAndLoad(this);
+    this.useWasm = true;
+    Logger.info('Switched to WASM Logic Runtime');
   }
 
   /**
@@ -124,6 +138,11 @@ export class LogicCubeSystem {
     if (!Number.isFinite(deltaTime) || deltaTime < 0) return;
 
     this.gameTime += deltaTime;
+
+    if (this.useWasm) {
+        this.wasmRuntime.update(deltaTime);
+        return;
+    }
 
     const context: LogicExecutionContext = {
       deltaTime,

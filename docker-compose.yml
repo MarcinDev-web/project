@@ -19,6 +19,19 @@ services:
       - "5432:5432"
     restart: unless-stopped
 
+  redis:
+    image: redis:alpine
+    networks:
+      - backend
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
   collab-server:
     build:
       context: .
@@ -28,6 +41,7 @@ services:
         condition: service_healthy
     environment:
       PORT: ${COLLAB_PORT:-4000}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       DATABASE_URL: ${COLLAB_DATABASE_URL:-postgres://${POSTGRES_USER:-forge}:${POSTGRES_PASSWORD:-forge}@db:5432/${POSTGRES_DB:-forge}?sslmode=disable}
       JWT_SECRET: ${JWT_SECRET:-a683e811f626f81c3488a543a49fe2181d9dfc28754a0b31221d199369b4b0e6}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-a683e811f626f81c3488a543a49fe2181d9dfc28754a0b31221d199369b4b0e6-refresh}

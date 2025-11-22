@@ -1,0 +1,33 @@
+{
+  "name": "@engine/wasm-render-logic",
+  "version": "0.1.0",
+  "type": "module",
+  "private": true,
+  "main": "./src/index.ts",
+  "module": "./src/index.ts",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./pkg/render_logic.js": "./pkg/render_logic.js"
+  },
+  "files": [
+    "dist",
+    "pkg",
+    "src"
+  ],
+  "scripts": {
+    "build:wasm": "wasm-pack build ../../crates/render-logic --target web --out-dir ../../packages/wasm-render-logic/pkg",
+    "build:wasm:skip": "node -e \"process.exit(require('fs').existsSync('pkg/render_logic.js') ? (console.log('Skipping WASM build'), 0) : (console.error('ERROR: WASM missing'), 1))\"",
+    "build:ts": "tsc -p tsconfig.json",
+    "build": "pnpm run build:wasm:skip && pnpm run build:ts",
+    "build:full": "pnpm run build:wasm && pnpm run build:ts",
+    "clean": "rimraf dist pkg",
+    "lint": "eslint src --max-warnings=0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "rimraf": "^5.0.0",
+    "typescript": "^5.0.0"
+  }
+}
+

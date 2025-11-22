@@ -1,4 +1,5 @@
 import type { Vec3 } from '@engine/core/math';
+import { normalizeVec3 } from '@engine/core/math';
 import { Entity, type Scene } from '@engine/world';
 import {
   AvatarInstance,
@@ -14,18 +15,37 @@ import { MeshComponent } from '@engine/world/components/MeshComponent';
 import { MaterialComponent } from '@engine/world/components/MaterialComponent';
 
 const DEFAULT_PREVIEW_PLAYER_ID = '__editor_preview_player';
-const CAMERA_PIVOT_HEIGHT = 1.6;
-const DEFAULT_SPAWN_POSITION: Vec3 = [0, CAMERA_PIVOT_HEIGHT, 0]; // Spawn at origin, camera will be positioned separately
+
+export interface PreviewAvatarConfig {
+  walkSpeed: number;
+  sprintMultiplier: number;
+  cameraPivotHeight: number;
+}
+
+export const DEFAULT_PREVIEW_AVATAR_CONFIG: PreviewAvatarConfig = {
+  walkSpeed: 3.5,
+  sprintMultiplier: 1.8,
+  cameraPivotHeight: 1.6,
+};
 
 interface PreviewAvatarOptions {
   id?: string;
   loadout?: AvatarLoadout;
   initialPosition?: Vec3; // Initial spawn position
+  config?: Partial<PreviewAvatarConfig>;
 }
 
 export interface AvatarPose {
   position: Vec3;
   yaw: number;
+}
+
+interface EditorPreviewEntityUserData extends Record<string, unknown> {
+  isEditorPreviewPlayer?: boolean;
+  isHidden?: boolean;
+  isEditorAvatarVisualRoot?: boolean;
+  isEditorAvatarPart?: boolean;
+  isAvatarInstanceRoot?: boolean;
 }
 
 /**
@@ -37,13 +57,18 @@ export class PreviewAvatar {
   private readonly root: Entity;
   private readonly visualRoot: Entity;
   private readonly avatar: AvatarInstance;
+  private readonly config: PreviewAvatarConfig;
   private yaw = 0;
   private currentAnimation: AvatarAnimation | null = null;
 
   constructor(scene: Scene, options: PreviewAvatarOptions = {}) {
     this.scene = scene;
+    this.config = { ...DEFAULT_PREVIEW_AVATAR_CONFIG, ...options.config };
+    
     const id = options.id ?? DEFAULT_PREVIEW_PLAYER_ID;
-    const initialPosition = options.initialPosition ?? DEFAULT_SPAWN_POSITION;
+    // Use config height for default spawn if not provided, but typically initialPosition handles it
+    const initialPosition = options.initialPosition ?? [0, this.config.cameraPivotHeight, 0];
+    
     this.root = this.ensureRootEntity(id, initialPosition);
     this.visualRoot = this.ensureVisualRoot();
     this.clearVisualChildren();
@@ -59,6 +84,10 @@ export class PreviewAvatar {
   dispose(): void {
     this.avatar.dispose();
     this.clearVisualChildren();
+  }
+
+  getConfig(): PreviewAvatarConfig {
+    return this.config;
   }
 
   getRoot(): Entity {
@@ -151,7 +180,7 @@ export class PreviewAvatar {
   }
 
   getCameraPivotHeight(): number {
-    return CAMERA_PIVOT_HEIGHT;
+    return this.config.cameraPivotHeight;
   }
 
   setPosition(position: Vec3): void {
@@ -165,12 +194,12 @@ export class PreviewAvatar {
 
   setVisible(visible: boolean): void {
     // Propagate visibility to entire avatar subtree to ensure renderer filters out parts
-    try {
+    if (this.root.traverse) {
       this.root.traverse((e) => {
         e.active = visible;
       });
-    } catch {
-      // Fallbacks if traverse is unavailable in certain test environments
+    } else {
+      // Fallback if traverse is unavailable (should not happen with proper Entity)
       this.root.active = visible;
       this.visualRoot.active = visible;
       this.avatar.getRootEntity().active = visible;
@@ -181,9 +210,9 @@ export class PreviewAvatar {
     const direction = [...forward] as Vec3;
     const length = Math.hypot(direction[0], direction[1], direction[2]);
     if (length > 1e-5) {
-      direction[0] /= length;
-      direction[2] /= length;
-      const yaw = Math.atan2(direction[0], -direction[2]);
+      // Normalize using utility
+      const normalized = normalizeVec3(direction);
+      const yaw = Math.atan2(normalized[0], -normalized[2]);
       this.setYaw(yaw);
     }
   }
@@ -194,8 +223,9 @@ export class PreviewAvatar {
       if (existing.parent) {
         existing.removeFromParent();
       }
-      existing.userData.isEditorPreviewPlayer = true;
-      existing.userData.isHidden = true;
+      const data = existing.userData as EditorPreviewEntityUserData;
+      data.isEditorPreviewPlayer = true;
+      data.isHidden = true;
       existing.transform.position = [...initialPosition] as Vec3;
       existing.transform.setEulerAngles(0, 0, 0);
       existing.transform.scale = [1, 1, 1];
@@ -205,8 +235,9 @@ export class PreviewAvatar {
     }
 
     const entity = new Entity('EditorPreviewAvatar', undefined, id);
-    entity.userData.isEditorPreviewPlayer = true;
-    entity.userData.isHidden = true;
+    const data = entity.userData as EditorPreviewEntityUserData;
+    data.isEditorPreviewPlayer = true;
+    data.isHidden = true;
     entity.transform.position = [...initialPosition] as Vec3;
     entity.transform.setEulerAngles(0, 0, 0);
     entity.transform.scale = [1, 1, 1];
@@ -216,19 +247,20 @@ export class PreviewAvatar {
 
   private ensureVisualRoot(): Entity {
     const existing = this.root.children.find(
-      (child) => child.userData?.isEditorAvatarVisualRoot === true,
+      (child) => (child.userData as EditorPreviewEntityUserData).isEditorAvatarVisualRoot === true,
     );
     if (existing) {
-      existing.transform.position = [0, -CAMERA_PIVOT_HEIGHT, 0];
+      existing.transform.position = [0, -this.config.cameraPivotHeight, 0];
       existing.transform.setEulerAngles(0, 0, 0);
-      existing.userData.isEditorAvatarVisualRoot = true;
+      (existing.userData as EditorPreviewEntityUserData).isEditorAvatarVisualRoot = true;
       return existing;
     }
 
     const visualRoot = new Entity('AvatarVisualRoot');
-    visualRoot.userData.isEditorAvatarVisualRoot = true;
-    visualRoot.userData.isHidden = true;
-    visualRoot.transform.position = [0, -CAMERA_PIVOT_HEIGHT, 0];
+    const data = visualRoot.userData as EditorPreviewEntityUserData;
+    data.isEditorAvatarVisualRoot = true;
+    data.isHidden = true;
+    visualRoot.transform.position = [0, -this.config.cameraPivotHeight, 0];
     visualRoot.transform.scale = [1, 1, 1];
     this.root.addChild(visualRoot);
     return visualRoot;
@@ -237,7 +269,7 @@ export class PreviewAvatar {
   private clearVisualChildren(): void {
     const children = [...this.visualRoot.children];
     for (const child of children) {
-      const data = child.userData ?? {};
+      const data = (child.userData ?? {}) as EditorPreviewEntityUserData;
       if (data.isEditorAvatarPart === true || data.isAvatarInstanceRoot === true) {
         this.visualRoot.removeChild(child);
       }

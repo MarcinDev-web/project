@@ -71,6 +71,7 @@ export class SettingsPanel {
         autoEnable: saved.easyPlaceSettings?.autoEnable ?? this.state.easyPlaceSettings.value.autoEnable,
         gridSpacing: saved.easyPlaceSettings?.gridSpacing ?? this.state.easyPlaceSettings.value.gridSpacing,
         lineSpacing: saved.easyPlaceSettings?.lineSpacing ?? this.state.easyPlaceSettings.value.lineSpacing,
+        wallHeight: saved.easyPlaceSettings?.wallHeight ?? this.state.easyPlaceSettings.value.wallHeight,
         circleRadius: saved.easyPlaceSettings?.circleRadius ?? this.state.easyPlaceSettings.value.circleRadius,
         circleCount: saved.easyPlaceSettings?.circleCount ?? this.state.easyPlaceSettings.value.circleCount,
       },
@@ -270,6 +271,15 @@ export class SettingsPanel {
           </label>
           <input type="number" class="settings-input" data-setting="easyPlaceSettings.lineSpacing" 
                  value="${this.settings.easyPlaceSettings.lineSpacing}" step="0.1" min="0.1" max="10">
+        </div>
+
+        <div class="settings-input-group">
+          <label class="settings-input-label">
+            <span>Wall Height</span>
+            <span class="settings-input-desc">Height of wall pattern</span>
+          </label>
+          <input type="number" class="settings-input" data-setting="easyPlaceSettings.wallHeight" 
+                 value="${this.settings.easyPlaceSettings.wallHeight}" step="1" min="1" max="20">
         </div>
 
         <div class="settings-input-group">

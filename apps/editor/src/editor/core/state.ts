@@ -9,6 +9,8 @@ import type { RendererCapabilities } from '@engine/gfx-webgpu/config';
 
 const DEFAULT_HISTORY_LIMIT = 100;
 
+import type { PlacementToolType } from '../placement/PlacementMode';
+
 export type EditorMode = 'edit' | 'play';
 export type BuildMode = 'free' | 'limited';
 export type EasyPlacePattern = 'single' | 'line' | 'grid' | 'circle' | 'wall';
@@ -94,6 +96,7 @@ export class EditorState {
   gridConfig: Signal<GridConfig>;
   showGrid: Signal<boolean>;
   placementMode: Signal<boolean>;
+  activePlacementTool: Signal<PlacementToolType>;
   editorMode: Signal<EditorMode>;
   buildMode: Signal<BuildMode>;
   
@@ -157,12 +160,13 @@ export class EditorState {
     // Initialize new snap-to-grid system
     this.snapConfig = signal<SnapConfig>({ ...DEFAULT_SNAP_CONFIG });
     this.gridConfig = signal<GridConfig>({ ...DEFAULT_GRID_CONFIG });
-    this.showGrid = signal<boolean>(false);
+    this.showGrid = signal<boolean>(true);
     this.placementMode = signal<boolean>(false);
+    this.activePlacementTool = signal<PlacementToolType>('single');
     this.editorMode = signal<EditorMode>('edit');
     this.buildMode = signal<BuildMode>('free');
     
-    // UI Preferences - simplified to Minecraft creative style
+    // UI Preferences - simplified creative style
     this.uiPreferences = signal<UIPreferences>({
       showHotbar: true,
       showInspector: true,

@@ -48,6 +48,7 @@ export async function bootstrap(): Promise<void> {
       getOrbitState: () => ({ yaw: 0, pitch: 0, distance: 10 }),
       scene,
       shouldSimulate: () => true, // Always simulate in player mode
+      enableSSGI: true,
       onFrameUpdate: () => {
         // Game loop will be handled by PlayerModeManager
       },

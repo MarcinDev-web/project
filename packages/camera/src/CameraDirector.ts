@@ -12,7 +12,7 @@ import { FPSRaycastCollision } from './collision/FPSRaycastCollision';
 // Default rendering config constants
 const FOV_RADIANS = (2 * Math.PI) / 5;
 const Z_NEAR = 0.1;
-const Z_FAR = 100;
+const Z_FAR = 10000;
 
 /**
  * Camera mode types

@@ -387,7 +387,7 @@ export class GpuInstancePipeline {
 
     const pass = params.encoder.beginComputePass({ label: 'gpu-instance-classify-pass' });
     pass.setPipeline(this.classifyPipeline);
-    pass.setBindGroup(1, bindGroup);
+    pass.setBindGroup(0, bindGroup);
     pass.dispatchWorkgroups(Math.ceil(instanceCount / WORKGROUP_SIZE));
     pass.end();
   }

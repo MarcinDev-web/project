@@ -1,6 +1,6 @@
 /**
  * Configuration for snap-to-grid system.
- * Inspired by Minecraft's block placement system.
+ * Inspired by block placement systems.
  */
 
 /**

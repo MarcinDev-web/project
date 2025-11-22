@@ -10,6 +10,10 @@ export interface ChatMessage {
   isSystem: boolean;
 }
 
+type ChatListener = (messages: ChatMessage[]) => void;
+
+const BAD_WORDS = ['badword', 'spam', 'offensive']; // Simplified list
+
 /**
  * ChatSystem manages chat messages and UI state
  */
@@ -18,6 +22,24 @@ export class ChatSystem {
   private messages: ChatMessage[] = [];
   private maxMessages = 100;
   private messageIdCounter = 0;
+  private listeners: Set<ChatListener> = new Set();
+
+  // Singleton instance
+  private static instance: ChatSystem;
+
+  public static getInstance(): ChatSystem {
+    if (!ChatSystem.instance) {
+      ChatSystem.instance = new ChatSystem();
+    }
+    return ChatSystem.instance;
+  }
+
+  constructor() {
+    if (ChatSystem.instance) {
+      return ChatSystem.instance;
+    }
+    ChatSystem.instance = this;
+  }
 
   /**
    * Initialize chat system
@@ -31,23 +53,25 @@ export class ChatSystem {
    * Send chat message
    */
   sendMessage(message: string): void {
-    if (!this.multiplayerSystem) {
-      Logger.warn('[ChatSystem] Cannot send message: multiplayer system not initialized');
-      return;
-    }
+    // Local simulation if no multiplayer system
+    // if (!this.multiplayerSystem) { ... }
 
-    if (!message.trim()) {
-      return; // Don't send empty messages
-    }
+    let text = message.trim();
+    if (!text) return;
 
-    this.multiplayerSystem.sendChatMessage(message);
+    // Profanity filter
+    text = this.filterProfanity(text);
+
+    if (this.multiplayerSystem) {
+      this.multiplayerSystem.sendChatMessage(text);
+    }
     
     // Add to local messages immediately (optimistic update)
     const chatMessage: ChatMessage = {
       id: `local_${this.messageIdCounter++}`,
       playerId: 'local',
       displayName: 'You',
-      message: message.trim(),
+      message: text,
       timestamp: Date.now(),
       isSystem: false,
     };
@@ -65,6 +89,8 @@ export class ChatSystem {
     if (this.messages.length > this.maxMessages) {
       this.messages.shift();
     }
+
+    this.notifyListeners();
   }
 
   /**
@@ -87,16 +113,40 @@ export class ChatSystem {
    * Handle incoming chat message from multiplayer
    */
   handleIncomingMessage(playerId: string, message: string, displayName?: string): void {
+    const filteredMessage = this.filterProfanity(message);
+
     const chatMessage: ChatMessage = {
       id: `remote_${this.messageIdCounter++}`,
       playerId,
       displayName: displayName ?? `Player ${playerId.substring(0, 8)}`,
-      message,
+      message: filteredMessage,
       timestamp: Date.now(),
       isSystem: false,
     };
     
     this.addMessage(chatMessage);
+  }
+
+  private filterProfanity(text: string): string {
+    let filtered = text;
+    for (const word of BAD_WORDS) {
+        const regex = new RegExp(`\\b${word}\\b`, 'gi');
+        filtered = filtered.replace(regex, '*'.repeat(word.length));
+    }
+    return filtered;
+  }
+
+  subscribe(listener: ChatListener): () => void {
+    this.listeners.add(listener);
+    // Initial call
+    listener(this.messages);
+    return () => {
+      this.listeners.delete(listener);
+    };
+  }
+
+  private notifyListeners(): void {
+    this.listeners.forEach(listener => listener([...this.messages]));
   }
 
   /**
@@ -118,6 +168,7 @@ export class ChatSystem {
    */
   clearMessages(): void {
     this.messages = [];
+    this.notifyListeners();
   }
 
   /**
@@ -126,6 +177,8 @@ export class ChatSystem {
   dispose(): void {
     this.multiplayerSystem = null;
     this.messages = [];
+    this.listeners.clear();
   }
 }
 
+export const chatSystem = ChatSystem.getInstance();

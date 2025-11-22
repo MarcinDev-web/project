@@ -1,123 +1,109 @@
 import type { Vec3, Quat } from '@engine/core/math';
-import { quatFromAxisAngle, quatMultiply } from '@engine/core/math';
-import type { SelectionManager, Entity } from '@engine/world';
+import { 
+  quatFromAxisAngle, quatMultiply, subVec3, addVec3, scaleVec3, 
+  normalizeVec3, dotVec3, crossVec3, lengthVec3 
+} from '@engine/core/math';
+import type { SelectionManager, Entity, Scene, Ray } from '@engine/world';
 import type { EditorState } from '../core/state';
 import type { SnapSystem } from '@engine/editor-utils';
-import { GizmoRenderer } from './GizmoRenderer';
+import { GizmoMeshRenderer } from './GizmoMeshRenderer';
 import type {
-  AxisKey,
-  PlaneKey,
   HandleKey,
   GizmoState,
-  GizmoMode,
   TransformSpace,
+  PlaneKey
 } from './GizmoTypes';
-import { DEFAULT_GIZMO_CONFIG } from './GizmoTypes';
 import {
-  calculateScreenSpaceScale,
-  calculateViewAngle,
-  calculateAxisOpacity,
   calculateCenterPoint,
-  transformDirectionByRotation,
+  calculateScreenSpaceScale,
+  transformDirectionByRotation
 } from './GizmoMath';
-
-// Temporary variables to avoid allocations in hot paths
-const TEMP_VEC3_A: Vec3 = [0, 0, 0];
-const TEMP_VEC3_B: Vec3 = [0, 0, 0];
-const TEMP_VEC3_C: Vec3 = [0, 0, 0];
+import { Raycaster } from '@engine/world';
+import type { InteractionTool } from '../input/InteractionTypes';
 
 export interface GizmoControllerOptions {
   state: EditorState;
   selection: SelectionManager;
   canvas: HTMLCanvasElement;
+  scene: Scene;
   projectWorldToScreen: (world: Vec3) => { x: number; y: number } | null;
   snapSystem: SnapSystem | null;
   updateSceneBuffers: () => void;
   setControlsEnabled: (enabled: boolean) => void;
   getCameraPosition?: () => Vec3;
   getCameraRotation?: () => Quat;
-  /** Called when transform changes (for replication) */
   onTransformChanged?: (entity: Entity) => void;
 }
 
-/**
- * Enhanced Gizmo Controller with multi-axis movement, adaptive sizing,
- * improved visuals, and better UX.
- */
-export class GizmoController {
-  private renderer: GizmoRenderer;
-  private eventListeners: Array<{ element: Element; type: string; handler: EventListener }> = [];
-  private activePointerCleanup: (() => void) | null = null;
-  private gizmoState: GizmoState | null = null;
+interface ExtendedGizmoState extends GizmoState {
+  dragPlaneNormal: Vec3;
+  dragStartPoint: Vec3; // World space intersection point at start
+  startAngle?: number; // For rotation
+}
+
+export class GizmoController implements InteractionTool {
+  public readonly name = 'GizmoTool';
+  private renderer: GizmoMeshRenderer;
+  private gizmoState: ExtendedGizmoState | null = null;
   
-  // Performance: dirty flags
-  private needsUpdate = true;
-  private lastSelectionId: string | null = null;
-  private lastCameraPos: Vec3 | null = null;
+  private raycaster = new Raycaster();
   
-  // Transform space
   private transformSpace: TransformSpace = 'world';
 
   constructor(private readonly options: GizmoControllerOptions) {
-    this.renderer = new GizmoRenderer(DEFAULT_GIZMO_CONFIG);
+    this.renderer = new GizmoMeshRenderer(options.scene);
   }
 
-  public mount(): void {
-    this.renderer.mount();
-    this.setupEventListeners();
+  // InteractionTool implementation
+  
+  public checkHit(ray: Ray): boolean {
+    // Used for hover and to determine if click should start drag
+    return this.raycast(ray) !== null;
   }
 
-  private setupEventListeners(): void {
-    // Axis handles
-    (['x', 'y', 'z'] as AxisKey[]).forEach((axis) => {
-      const visual = this.renderer.axisVisuals[axis];
-      const handler: EventListener = (event: Event) => {
-        const pe = event as PointerEvent;
-        if (pe.button !== 0) return;
-        this.startDrag(axis, pe);
-      };
-      visual.group.addEventListener('pointerdown', handler);
-      this.eventListeners.push({ element: visual.group, type: 'pointerdown', handler });
-    });
-
-    // Plane handles
-    (['xy', 'xz', 'yz'] as PlaneKey[]).forEach((plane) => {
-      const visual = this.renderer.planeVisuals[plane];
-      const handler: EventListener = (event: Event) => {
-        const pe = event as PointerEvent;
-        if (pe.button !== 0) return;
-        this.startDrag(plane, pe);
-      };
-      visual.group.addEventListener('pointerdown', handler);
-      this.eventListeners.push({ element: visual.group, type: 'pointerdown', handler });
-    });
-
-    // Center handle
-    const centerHandler: EventListener = (event: Event) => {
-      const pe = event as PointerEvent;
-      if (pe.button !== 0) return;
-      this.startDrag('center', pe);
-    };
-    this.renderer.centerVisual.element.addEventListener('pointerdown', centerHandler);
-    this.eventListeners.push({
-      element: this.renderer.centerVisual.element,
-      type: 'pointerdown',
-      handler: centerHandler,
-    });
-
-    // Hover detection
-    const container = document.getElementById('gizmo-container');
-    if (container) {
-      const hoverHandler: EventListener = (event: Event) => {
-        const me = event as MouseEvent;
-        if (this.gizmoState) return; // Don't update hover during drag
-        
-        const handle = this.renderer.getHandleAtPosition(me.clientX, me.clientY);
-        this.renderer.setHoveredHandle(handle);
-      };
-      container.addEventListener('pointermove', hoverHandler);
-      this.eventListeners.push({ element: container, type: 'pointermove', handler: hoverHandler });
+  public onPointerDown(event: PointerEvent, ray: Ray): void {
+    const hit = this.raycast(ray);
+    if (hit) {
+      this.startDrag(hit, event, ray);
     }
+  }
+
+  public onPointerMove(event: PointerEvent, ray: Ray): void {
+    if (this.gizmoState) {
+      this.handleDrag(event, ray);
+    } else {
+      // Hover logic
+      const hit = this.raycast(ray);
+      
+      if (hit !== this.hoveredHandle) {
+          this.hoveredHandle = hit;
+          this.renderer.setHighlight(hit);
+          this.options.canvas.style.cursor = hit ? 'pointer' : 'default';
+      }
+    }
+  }
+
+  public onPointerUp(_event: PointerEvent, _ray: Ray): void {
+    if (this.gizmoState) {
+      this.endDrag();
+    }
+  }
+
+  public cancel(): void {
+    this.endDrag();
+  }
+
+  private hoveredHandle: HandleKey | null = null;
+
+  private raycast(ray: Ray): HandleKey | null {
+    const pickables = this.renderer.getPickableEntities();
+    if (pickables.length === 0) return null;
+
+    const hit = this.raycaster.raycastClosest(ray, pickables);
+    if (hit) {
+        return this.renderer.getEntityHandle(hit.entity.id) ?? null;
+    }
+    return null;
   }
 
   public updateOverlay(): void {
@@ -127,169 +113,38 @@ export class GizmoController {
       this.renderer.setVisible(false);
       this.gizmoState = null;
       this.options.setControlsEnabled(true);
-      this.lastSelectionId = null;
       return;
     }
 
-    // Get world position (center for multi-selection)
     const worldPosition = this.getGizmoPosition(selected);
-    
-    // Check if we need to update (dirty flag optimization)
-    const selectionId = selected.map((e) => e.id).join(',');
     const cameraPos = this.options.getCameraPosition?.() ?? [0, 0, 0];
-    
-    const selectionChanged = selectionId !== this.lastSelectionId;
-    const cameraMoved = this.hasCameraMoved(cameraPos);
-    
-    if (!this.needsUpdate && !selectionChanged && !cameraMoved && !this.gizmoState) {
-      return; // Skip update
-    }
-
-    this.lastSelectionId = selectionId;
-    this.lastCameraPos = [...cameraPos];
-    this.needsUpdate = false;
-
-    // Project to screen
-    const base = this.options.projectWorldToScreen(worldPosition);
-    if (!base) {
-      this.renderer.setVisible(false);
-      return;
-    }
-
-    const rect = this.options.canvas.getBoundingClientRect();
-    const originX = rect.left + (base.x / this.options.canvas.width) * rect.width;
-    const originY = rect.top + (base.y / this.options.canvas.height) * rect.height;
-
-    this.renderer.setVisible(true);
-
-    // Calculate adaptive scale
     const scale = calculateScreenSpaceScale(worldPosition, cameraPos, 60);
-    const axisLength = DEFAULT_GIZMO_CONFIG.axisLength * (scale / 10); // Normalize scale
-
-    // Update axes
-    const primary = selected[0];
-    if (primary) {
-      this.updateAxes(worldPosition, originX, originY, rect, axisLength, primary);
-    }
-
-    // Update plane handles
-    this.updatePlanes(originX, originY, axisLength);
-
-    // Update center (for uniform scale)
-    const mode = this.options.state.gizmoMode.value ?? 'translate';
-    const showCenter = mode === 'scale' || mode === 'uniform';
-    this.renderer.updateCenterVisual(originX, originY, showCenter);
-  }
-
-  private updateAxes(
-    worldPosition: Vec3,
-    originX: number,
-    originY: number,
-    rect: DOMRect,
-    axisLength: number,
-    primaryEntity: Entity
-  ): void {
-    const cameraRot = this.options.getCameraRotation?.() ?? [0, 0, 0, 1];
     
-    // Camera forward for visibility calculation
-    // Optimized: reuse TEMP_VEC3_A instead of allocating new array
-    TEMP_VEC3_A[0] = -2 * (cameraRot[0] * cameraRot[2] + cameraRot[3] * cameraRot[1]);
-    TEMP_VEC3_A[1] = -2 * (cameraRot[1] * cameraRot[2] - cameraRot[3] * cameraRot[0]);
-    TEMP_VEC3_A[2] = -(1 - 2 * (cameraRot[0] * cameraRot[0] + cameraRot[1] * cameraRot[1]));
-    const cameraForward = TEMP_VEC3_A;
-
-    (['x', 'y', 'z'] as AxisKey[]).forEach((axis) => {
-      const visual = this.renderer.axisVisuals[axis];
-      
-      // Get world direction (transform by entity rotation if local space)
-      let worldDir = visual.worldDir;
-      if (this.transformSpace === 'local' && primaryEntity) {
-        worldDir = transformDirectionByRotation(
-          visual.worldDir,
-          primaryEntity.transform.rotation as Quat
-        );
-      }
-
-      // Optimized: reuse TEMP_VEC3_B for target position
-      TEMP_VEC3_B[0] = worldPosition[0] + worldDir[0] * axisLength;
-      TEMP_VEC3_B[1] = worldPosition[1] + worldDir[1] * axisLength;
-      TEMP_VEC3_B[2] = worldPosition[2] + worldDir[2] * axisLength;
-      const target = TEMP_VEC3_B;
-
-      const screen = this.options.projectWorldToScreen(target);
-      if (!screen) {
-        visual.group.style.display = 'none';
-        return;
-      }
-
-      const targetX = rect.left + (screen.x / this.options.canvas.width) * rect.width;
-      const targetY = rect.top + (screen.y / this.options.canvas.height) * rect.height;
-
-      // Calculate visibility/opacity based on angle to camera
-      const viewAngle = calculateViewAngle(worldDir, cameraForward);
-      const opacity = calculateAxisOpacity(viewAngle, DEFAULT_GIZMO_CONFIG.fadeAngleThreshold);
-
-      this.renderer.updateAxisVisual(axis, originX, originY, targetX, targetY, opacity);
-    });
-  }
-
-  private updatePlanes(originX: number, originY: number, axisLength: number): void {
-    const mode = this.options.state.gizmoMode.value ?? 'translate';
-    const showPlanes = mode === 'translate';
-
-    if (!showPlanes) {
-      (['xy', 'xz', 'yz'] as PlaneKey[]).forEach((plane) => {
-        this.renderer.updatePlaneVisual(plane, 0, 0, false);
-      });
-      return;
+    let rotation: Quat = [0, 0, 0, 1];
+    const firstEntity = selected[0];
+    if (this.transformSpace === 'local' && firstEntity) {
+        rotation = firstEntity.transform.rotation as Quat;
     }
 
-    (['xy', 'xz', 'yz'] as PlaneKey[]).forEach((plane) => {
-      const visual = this.renderer.planeVisuals[plane];
-      const [axis1, axis2] = visual.axes;
-      
-      const axis1Visual = this.renderer.axisVisuals[axis1];
-      const axis2Visual = this.renderer.axisVisuals[axis2];
-      
-      // Only show plane if both axes are visible
-      if (axis1Visual.screenLength < 10 || axis2Visual.screenLength < 10) {
-        this.renderer.updatePlaneVisual(plane, 0, 0, false);
-        return;
-      }
-
-      // Position plane at 1/3 distance along both axes
-      const offset1 = (axis1Visual.screenDir[0] * axisLength * 0.33);
-      const offset2 = (axis1Visual.screenDir[1] * axisLength * 0.33);
-      const offset3 = (axis2Visual.screenDir[0] * axisLength * 0.33);
-      const offset4 = (axis2Visual.screenDir[1] * axisLength * 0.33);
-      
-      const planeX = originX + offset1 + offset3;
-      const planeY = originY + offset2 + offset4;
-
-      this.renderer.updatePlaneVisual(plane, planeX, planeY, true);
-    });
+    this.renderer.setTransformSpace(this.transformSpace);
+    this.renderer.setMode(this.options.state.gizmoMode.value ?? 'translate');
+    this.renderer.update(worldPosition, rotation, scale);
+    this.renderer.setVisible(true);
   }
 
-  private startDrag(handle: HandleKey, event: PointerEvent): void {
+  private startDrag(handle: HandleKey, event: PointerEvent, ray: Ray): void {
     const selected = this.getSelectedEntities();
     if (selected.length === 0) return;
     const primary = selected[0];
     if (!primary) return;
 
-    // Cleanup any existing drag
-    if (this.activePointerCleanup) {
-      this.activePointerCleanup();
-      this.activePointerCleanup = null;
-    }
-
     this.options.setControlsEnabled(false);
-    this.renderer.setActiveHandle(handle);
+    this.renderer.setHighlight(handle);
 
     const originalPosition = this.getGizmoPosition(selected);
     const originalRotation = primary.transform.rotation as Quat;
     const originalScale = primary.transform.scale as Vec3;
 
-    // Store original transforms for multi-selection
     const originalPositions = new Map<string, Vec3>();
     const originalRotations = new Map<string, Quat>();
     const originalScales = new Map<string, Vec3>();
@@ -299,6 +154,48 @@ export class GizmoController {
       originalRotations.set(entity.id, [...(entity.transform.rotation as Quat)]);
       originalScales.set(entity.id, [...(entity.transform.scale as Vec3)]);
     });
+
+    // Calculate drag plane normal and start intersection
+    const cameraPos = this.options.getCameraPosition?.() ?? [0, 0, 0];
+    const toCamera = normalizeVec3(subVec3(cameraPos, originalPosition));
+    let dragPlaneNormal: Vec3 = [0, 1, 0];
+    
+    // For rotation, plane is the ring plane
+    if (this.options.state.gizmoMode.value === 'rotate') {
+        const axis = this.getHandleAxis(handle, originalRotation);
+        if (axis) dragPlaneNormal = axis;
+    } 
+    // For translation/scale axes, plane contains axis and faces camera
+    else if (['x', 'y', 'z'].includes(handle)) {
+         const axis = this.getHandleAxis(handle, originalRotation);
+         if (axis) {
+             const cross = crossVec3(axis, toCamera);
+             dragPlaneNormal = crossVec3(cross, axis);
+             normalizeVec3(dragPlaneNormal); // Re-normalize
+         }
+    }
+    // For planes (xy, xz, yz), use plane normal
+    else if (['xy', 'xz', 'yz'].includes(handle)) {
+         dragPlaneNormal = this.getPlaneNormal(handle as PlaneKey, originalRotation);
+    }
+    
+    // Calculate start point
+    const hit = this.intersectRayPlane(ray, originalPosition, dragPlaneNormal);
+    if (!hit) {
+        // Fallback if ray parallel to plane (should affect dragging behavior?)
+        // Just use projection on line closest point?
+        return; 
+    }
+
+    const startAngle = 0; // Placeholder
+    // if (this.options.state.gizmoMode.value === 'rotate') {
+    //     // Calculate angle relative to local axis
+    //     // const localHit = subVec3(hit, originalPosition);
+    //     // We need a reference vector on the plane. 
+    //     // Just store current angle? 
+    //     // Or project hit to local 2D plane basis?
+    //     // Simplified: we compute delta angle from start point.
+    // }
 
     this.gizmoState = {
       handle,
@@ -310,375 +207,230 @@ export class GizmoController {
       originalPositions,
       originalRotations,
       originalScales,
+      dragPlaneNormal,
+      dragStartPoint: hit,
+      startAngle,
       modifiers: {
         shift: event.shiftKey,
         ctrl: event.ctrlKey,
         alt: event.altKey,
       },
     };
-
-    const onPointerMove = (moveEvent: PointerEvent) => this.handleDrag(moveEvent);
-    const finalizePointerSequence = () => {
-      window.removeEventListener('pointermove', onPointerMove);
-      window.removeEventListener('pointerup', onPointerUp);
-      window.removeEventListener('pointercancel', onPointerCancel);
-      this.activePointerCleanup = null;
-    };
     
-    const onPointerUp = (upEvent: PointerEvent) => {
-      if (!this.gizmoState || upEvent.pointerId !== this.gizmoState.pointerId) return;
-      finalizePointerSequence();
-      this.endDrag();
-    };
-    
-    const onPointerCancel = (cancelEvent: PointerEvent) => {
-      if (!this.gizmoState || cancelEvent.pointerId !== this.gizmoState.pointerId) return;
-      finalizePointerSequence();
-      this.endDrag();
-    };
-
-    window.addEventListener('pointermove', onPointerMove, { passive: false });
-    window.addEventListener('pointerup', onPointerUp, { passive: false });
-    window.addEventListener('pointercancel', onPointerCancel, { passive: false });
-    
-    this.activePointerCleanup = finalizePointerSequence;
-
-    event.preventDefault();
-    event.stopPropagation();
+    this.options.canvas.setPointerCapture(event.pointerId);
   }
 
-  private handleDrag(event: PointerEvent): void {
+  private handleDrag(event: PointerEvent, ray: Ray): void {
     if (!this.gizmoState) return;
 
     const selected = this.getSelectedEntities();
     if (selected.length === 0) return;
 
-    // Update modifiers
     this.gizmoState.modifiers = {
       shift: event.shiftKey,
       ctrl: event.ctrlKey,
       alt: event.altKey,
     };
 
-    const deltaX = event.clientX - this.gizmoState.dragStartMouse[0];
-    const deltaY = event.clientY - this.gizmoState.dragStartMouse[1];
+    const hit = this.intersectRayPlane(ray, this.gizmoState.originalPosition, this.gizmoState.dragPlaneNormal);
+    if (!hit) return;
 
     const mode = this.options.state.gizmoMode.value ?? 'translate';
     const handle = this.gizmoState.handle;
 
-    // Apply transformation based on handle type
-    if (handle === 'x' || handle === 'y' || handle === 'z') {
-      this.handleAxisDrag(handle, deltaX, deltaY, mode, selected, event);
-    } else if (handle === 'xy' || handle === 'xz' || handle === 'yz') {
-      this.handlePlaneDrag(handle, deltaX, deltaY, selected, event);
-    } else if (handle === 'center') {
-      this.handleUniformScale(deltaX, deltaY, selected, event);
-    }
-
-    this.options.updateSceneBuffers();
-    this.needsUpdate = true;
-    requestAnimationFrame(() => this.updateOverlay());
-
-    event.preventDefault();
-  }
-
-  private handleAxisDrag(
-    axis: AxisKey,
-    deltaX: number,
-    deltaY: number,
-    mode: GizmoMode,
-    selected: Entity[],
-    pointerEvent: PointerEvent
-  ): void {
-    if (!this.gizmoState) return;
-    const primary = selected[0];
-    if (!primary) return;
-
-    const visual = this.renderer.axisVisuals[axis];
-    if (visual.screenLength <= 0) return;
-
-    const projected = deltaX * visual.screenDir[0] + deltaY * visual.screenDir[1];
-    let worldDelta = projected / visual.screenLength;
-
-    // Apply precision modifier (Shift = 10x finer)
-    if (this.gizmoState.modifiers.shift) {
-      worldDelta /= 10;
-    }
-
-    const axisIndex = axis === 'x' ? 0 : axis === 'y' ? 1 : 2;
-
     if (mode === 'translate') {
-      const next = [...this.gizmoState.originalPosition] as Vec3;
-      next[axisIndex] = this.gizmoState.originalPosition[axisIndex] + worldDelta;
+        const delta = subVec3(hit, this.gizmoState.dragStartPoint);
+        
+        // If axis constraint, project delta onto axis
+        if (['x', 'y', 'z'].includes(handle)) {
+            const axis = this.getHandleAxis(handle, this.gizmoState.originalRotation as Quat);
+            if (axis) {
+                const projection = dotVec3(delta, axis);
+                // Overwrite delta with projected vector
+                delta[0] = axis[0] * projection;
+                delta[1] = axis[1] * projection;
+                delta[2] = axis[2] * projection;
+            }
+        }
 
-      const snappingEnabled =
-        this.gizmoState.modifiers.ctrl
+        // Apply
+        const newPos = addVec3(this.gizmoState.originalPosition, delta);
+        
+        // Snapping
+        const snappingEnabled = this.gizmoState.modifiers.ctrl
           ? !this.options.state.snapConfig.value.enabled
           : this.options.state.snapConfig.value.enabled;
+        
+        const finalPos = snappingEnabled && this.options.snapSystem
+          ? this.options.snapSystem.snapPosition(newPos)
+          : newPos;
+        
+        const finalDelta = subVec3(finalPos, this.gizmoState.originalPosition);
 
-      const finalPos = snappingEnabled && this.options.snapSystem
-        ? this.options.snapSystem.snapPosition(next)
-        : next;
+        const firstEntity = selected[0];
+        if (selected.length === 1 && firstEntity) {
+            firstEntity.transform.position = finalPos;
+        } else {
+            selected.forEach(e => {
+                const orig = this.gizmoState!.originalPositions!.get(e.id)!;
+                e.transform.position = addVec3(orig, finalDelta);
+            });
+        }
+    } 
+    else if (mode === 'rotate') {
+        const center = this.gizmoState.originalPosition;
+        const startVec = subVec3(this.gizmoState.dragStartPoint, center);
+        const currVec = subVec3(hit, center);
+        
+        // Calculate angle between start and current
+        // Axis of rotation
+        const axis = this.gizmoState.dragPlaneNormal;
+        
+        // Project vectors onto plane (redundant if we hit the plane correctly, but good for safety)
+        // Cross product gives sine-like, Dot gives cosine-like
+        const cross = crossVec3(startVec, currVec);
+        const dot = dotVec3(startVec, currVec);
+        
+        // Angle direction depends on dot(cross, axis)
+        const dir = dotVec3(cross, axis) > 0 ? 1 : -1;
+        const angle = Math.atan2(lengthVec3(cross), dot) * dir;
+        
+        // Apply rotation
+        const deltaQuat = quatFromAxisAngle(axis, angle);
+        
+        // Snapping
+        // For rotation snapping, we need to accumulate total angle and snap that?
+        // Or snap the delta? 
+        // Snapping usually works on discrete steps from original rotation.
+        // Let's calculate target rotation and snap it.
+        
+        const newRotation = quatMultiply(this.gizmoState.originalRotation, deltaQuat);
+        // This is local rotation accumulation.
+        
+        // TODO: Implement proper rotation snapping (complicated with Quats)
+        // For now, snap angle if Shift? Or 45 deg steps?
+        
+        const firstEntity = selected[0];
+        if (selected.length === 1 && firstEntity) {
+            firstEntity.transform.rotation = newRotation;
+        } else {
+             // Multi-object rotation usually rotates each around its own center or group center?
+             // Here we just replicate local rotation.
+             selected.forEach(e => {
+                 const orig = this.gizmoState!.originalRotations!.get(e.id)!;
+                 e.transform.rotation = quatMultiply(orig, deltaQuat);
+             });
+        }
+    }
+    else if (mode === 'scale') {
+         // Similar to translate but modifying scale
+         // Project delta onto axis
+         const delta = subVec3(hit, this.gizmoState.dragStartPoint);
+         const axis = this.getHandleAxis(handle, this.gizmoState.originalRotation as Quat);
+         if (axis) {
+             const projection = dotVec3(delta, axis);
+             // Use projection to scale
+             // We need screen space scale factor? Or world units?
+             // Usually 1 unit drag = 1 unit scale change or proportional.
+             
+             const scaleDelta = projection; // 1 unit world drag = +1 scale
+             
+             const axisIndex = handle === 'x' ? 0 : handle === 'y' ? 1 : 2;
+             const origScale = this.gizmoState.originalScale;
+             
+             const newScaleVal = Math.max(0.01, origScale[axisIndex] + scaleDelta);
+             const newScale = [...origScale] as Vec3;
+             newScale[axisIndex] = newScaleVal;
+             
+             selected.forEach(e => {
+                 const orig = this.gizmoState!.originalScales!.get(e.id)!;
+                 const ns = [...orig] as Vec3;
+                 ns[axisIndex] = Math.max(0.01, orig[axisIndex] + scaleDelta);
+                 e.transform.scale = ns;
+             });
+         }
+    }
+    
+    this.options.updateSceneBuffers();
+  }
 
-      // Apply to all selected entities
-      if (selected.length === 1) {
-        primary.transform.position = finalPos;
-      } else {
-        const delta: Vec3 = [
-          finalPos[0] - this.gizmoState.originalPosition[0],
-          finalPos[1] - this.gizmoState.originalPosition[1],
-          finalPos[2] - this.gizmoState.originalPosition[2],
-        ];
-        selected.forEach((entity) => {
-          const orig = this.gizmoState!.originalPositions!.get(entity.id)!;
-          entity.transform.position = [orig[0] + delta[0], orig[1] + delta[1], orig[2] + delta[2]];
-        });
+  private intersectRayPlane(ray: Ray, planeOrigin: Vec3, planeNormal: Vec3): Vec3 | null {
+      const denom = dotVec3(planeNormal, ray.direction);
+      if (Math.abs(denom) < 1e-6) return null;
+      const diff = subVec3(planeOrigin, ray.origin);
+      const t = dotVec3(diff, planeNormal) / denom;
+      if (t < 0) return null;
+      return addVec3(ray.origin, scaleVec3(ray.direction, t));
+  }
+  
+  private getHandleAxis(handle: string, rotation: Quat): Vec3 | null {
+      let axis: Vec3 = [0, 0, 0];
+      if (handle === 'x') axis = [1, 0, 0];
+      else if (handle === 'y') axis = [0, 1, 0];
+      else if (handle === 'z') axis = [0, 0, 1];
+      else return null;
+      
+      if (this.transformSpace === 'local') {
+           return transformDirectionByRotation(axis, rotation);
       }
-
-      // Show value display
-      this.renderer.showValueDisplay(
-        `${axis.toUpperCase()}: ${finalPos[axisIndex].toFixed(2)}`,
-        pointerEvent.clientX,
-        pointerEvent.clientY
-      );
-    } else if (mode === 'scale') {
-      const nextScale = [...this.gizmoState.originalScale] as Vec3;
-      nextScale[axisIndex] = Math.max(0.001, this.gizmoState.originalScale[axisIndex] + worldDelta);
-
-      const snappingEnabled = this.gizmoState.modifiers.ctrl
-        ? !this.options.state.snapConfig.value.enabled
-        : this.options.state.snapConfig.value.enabled;
-
-      const finalScale = snappingEnabled && this.options.snapSystem
-        ? this.options.snapSystem.snapScale(nextScale)
-        : nextScale;
-
-      selected.forEach((entity) => {
-        entity.transform.scale = [...finalScale];
-      });
-
-      this.renderer.showValueDisplay(
-        `Scale ${axis.toUpperCase()}: ${finalScale[axisIndex].toFixed(2)}`,
-        pointerEvent.clientX,
-        pointerEvent.clientY
-      );
-    } else if (mode === 'rotate') {
-      const angle = worldDelta * Math.PI;
-      const axisVec: Vec3 = axis === 'x' ? [1, 0, 0] : axis === 'y' ? [0, 1, 0] : [0, 0, 1];
-      const deltaQuat = quatFromAxisAngle(axisVec, angle);
-      const newRotation = quatMultiply(this.gizmoState.originalRotation, deltaQuat);
-
-      const snappingEnabled = this.gizmoState.modifiers.ctrl
-        ? !this.options.state.snapConfig.value.enabled
-        : this.options.state.snapConfig.value.enabled;
-
-      const finalRot = snappingEnabled && this.options.snapSystem
-        ? this.options.snapSystem.snapRotation(newRotation)
-        : newRotation;
-
-      selected.forEach((entity) => {
-        entity.transform.rotation = [...finalRot];
-      });
-
-      const degrees = ((angle * 180) / Math.PI).toFixed(0);
-      this.renderer.showValueDisplay(
-        `Rotate ${axis.toUpperCase()}: ${degrees}°`,
-        pointerEvent.clientX,
-        pointerEvent.clientY
-      );
-    }
+      return axis;
   }
 
-  private handlePlaneDrag(
-    plane: PlaneKey,
-    deltaX: number,
-    deltaY: number,
-    selected: Entity[],
-    pointerEvent: PointerEvent
-  ): void {
-    if (!this.gizmoState) return;
-    const primary = selected[0];
-    if (!primary) return;
-
-    const [axis1, axis2] = this.renderer.planeVisuals[plane].axes;
-    const visual1 = this.renderer.axisVisuals[axis1];
-    const visual2 = this.renderer.axisVisuals[axis2];
-
-    if (visual1.screenLength <= 0 || visual2.screenLength <= 0) return;
-
-    // Project onto both axes
-    const projected1 = (deltaX * visual1.screenDir[0] + deltaY * visual1.screenDir[1]) / visual1.screenLength;
-    const projected2 = (deltaX * visual2.screenDir[0] + deltaY * visual2.screenDir[1]) / visual2.screenLength;
-
-    const axis1Index = axis1 === 'x' ? 0 : axis1 === 'y' ? 1 : 2;
-    const axis2Index = axis2 === 'x' ? 0 : axis2 === 'y' ? 1 : 2;
-
-    const next = [...this.gizmoState.originalPosition] as Vec3;
-    next[axis1Index] = this.gizmoState.originalPosition[axis1Index] + projected1;
-    next[axis2Index] = this.gizmoState.originalPosition[axis2Index] + projected2;
-
-    const snappingEnabled = this.gizmoState.modifiers.ctrl
-      ? !this.options.state.snapConfig.value.enabled
-      : this.options.state.snapConfig.value.enabled;
-
-    const finalPos = snappingEnabled && this.options.snapSystem
-      ? this.options.snapSystem.snapPosition(next)
-      : next;
-
-    // Apply to all selected
-    if (selected.length === 1) {
-      primary.transform.position = finalPos;
-    } else {
-      const delta: Vec3 = [
-        finalPos[0] - this.gizmoState.originalPosition[0],
-        finalPos[1] - this.gizmoState.originalPosition[1],
-        finalPos[2] - this.gizmoState.originalPosition[2],
-      ];
-      selected.forEach((entity) => {
-        const orig = this.gizmoState!.originalPositions!.get(entity.id)!;
-        entity.transform.position = [orig[0] + delta[0], orig[1] + delta[1], orig[2] + delta[2]];
-      });
-    }
-
-    this.renderer.showValueDisplay(
-      `${plane.toUpperCase()}: (${finalPos[axis1Index].toFixed(2)}, ${finalPos[axis2Index].toFixed(2)})`,
-      pointerEvent.clientX,
-      pointerEvent.clientY
-    );
-  }
-
-  private handleUniformScale(
-    deltaX: number,
-    deltaY: number,
-    selected: Entity[],
-    pointerEvent: PointerEvent
-  ): void {
-    if (!this.gizmoState) return;
-
-    const distance = Math.hypot(deltaX, deltaY);
-    const direction = Math.sign(deltaX + deltaY);
-    const scaleDelta = (distance / 100) * direction;
-
-    const baseScale = this.gizmoState.originalScale;
-    const newScale: Vec3 = [
-      Math.max(0.001, baseScale[0] + scaleDelta),
-      Math.max(0.001, baseScale[1] + scaleDelta),
-      Math.max(0.001, baseScale[2] + scaleDelta),
-    ];
-
-    selected.forEach((entity) => {
-      entity.transform.scale = [...newScale];
-    });
-
-    this.renderer.showValueDisplay(
-      `Uniform Scale: ${newScale[0].toFixed(2)}`,
-      pointerEvent.clientX,
-      pointerEvent.clientY
-    );
+  private getPlaneNormal(plane: PlaneKey, rotation: Quat): Vec3 {
+      let normal: Vec3;
+      if (plane === 'xy') normal = [0, 0, 1];
+      else if (plane === 'xz') normal = [0, 1, 0];
+      else if (plane === 'yz') normal = [1, 0, 0];
+      else normal = [0, 1, 0];
+      
+      if (this.transformSpace === 'local') {
+          return transformDirectionByRotation(normal, rotation);
+      }
+      return normal;
   }
 
   private endDrag(): void {
-    if (!this.gizmoState) {
-      this.options.setControlsEnabled(true);
-      return;
+    if (this.gizmoState) {
+        this.options.canvas.releasePointerCapture(this.gizmoState.pointerId);
+        this.gizmoState = null;
+        this.renderer.setHighlight(null);
+        this.hoveredHandle = null;
+        this.options.setControlsEnabled(true);
+        
+        const selected = this.getSelectedEntities();
+        if (this.options.onTransformChanged) {
+            selected.forEach((entity) => {
+                this.options.onTransformChanged?.(entity);
+            });
+        }
     }
-
-    // Replicate transform changes for all affected entities
-    const selected = this.getSelectedEntities();
-    if (this.options.onTransformChanged) {
-      selected.forEach((entity) => {
-        this.options.onTransformChanged?.(entity);
-      });
-    }
-
-    this.renderer.setActiveHandle(null);
-    this.renderer.hideValueDisplay(300);
-    
-    this.gizmoState = null;
-    this.options.setControlsEnabled(true);
-    this.needsUpdate = true;
-    
-    window.dispatchEvent(new CustomEvent('editor:gizmo:changed'));
   }
-
+  
   private getSelectedEntities(): Entity[] {
     const primary = this.options.selection.primarySelection;
     if (!primary) return [];
-    
     const all = Array.from(this.options.selection.selectedEntities);
     return all.length > 0 ? all : [primary];
   }
 
   private getGizmoPosition(entities: Entity[]): Vec3 {
     const [first] = entities;
-    if (!first) {
-      return [0, 0, 0];
-    }
-
-    if (entities.length === 1) {
-      return first.transform.getWorldPosition();
-    }
-    
+    if (!first) return [0, 0, 0];
+    if (entities.length === 1) return first.transform.getWorldPosition();
     const positions = entities.map((e) => e.transform.getWorldPosition());
     return calculateCenterPoint(positions);
   }
 
-  private hasCameraMoved(currentPos: Vec3): boolean {
-    if (!this.lastCameraPos) return true;
-    
-    const threshold = 0.01;
-    return (
-      Math.abs(currentPos[0] - this.lastCameraPos[0]) > threshold ||
-      Math.abs(currentPos[1] - this.lastCameraPos[1]) > threshold ||
-      Math.abs(currentPos[2] - this.lastCameraPos[2]) > threshold
-    );
-  }
-
-  /**
-   * Set transform space (world or local).
-   */
   public setTransformSpace(space: TransformSpace): void {
     this.transformSpace = space;
-    this.needsUpdate = true;
+    this.renderer.setTransformSpace(space);
   }
-
-  /**
-   * Force an update on next frame.
-   */
-  public invalidate(): void {
-    this.needsUpdate = true;
-  }
-
-  /**
-   * Check if gizmo is currently being dragged.
-   */
+  
   public isDragging(): boolean {
-    return this.gizmoState !== null;
+      return !!this.gizmoState;
   }
 
   public dispose(): void {
-    if (this.activePointerCleanup) {
-      this.activePointerCleanup();
-      this.activePointerCleanup = null;
-    }
-
-    // Remove registered DOM listeners
-    for (const { element, type, handler } of this.eventListeners) {
-      try {
-        element.removeEventListener(type, handler);
-      } catch {
-        // ignore
-      }
-    }
-    this.eventListeners = [];
-
-    // Dispose renderer
     this.renderer.dispose();
-
-    // Reset state and re-enable controls as a safety
-    this.gizmoState = null;
-    try {
-      this.options.setControlsEnabled(true);
-    } catch {}
   }
 }

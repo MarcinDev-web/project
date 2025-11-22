@@ -3,6 +3,8 @@ import { SpawnPointComponent } from '@engine/world';
 import type { Vec3 } from '@engine/core/math';
 import { Logger } from '../../utils/logger';
 
+const SPAWN_HEIGHT_OFFSET = 0.1;
+
 /**
  * Result of spawn point detection
  */
@@ -33,12 +35,14 @@ export class SpawnPointSystem {
    * @param scene - Scene to search
    * @param physicsWorld - Physics world for raycasting (optional)
    * @param fallbackPosition - Position to raycast from if no spawn point found (optional)
+   * @param fallbackRotation - Rotation (yaw) to use for fallback if no spawn point found (optional)
    * @returns Spawn point result
    */
   static findSpawnPoint(
     scene: Scene,
     physicsWorld?: PhysicsWorld | null,
-    fallbackPosition?: Vec3
+    fallbackPosition?: Vec3,
+    fallbackRotation?: number
   ): SpawnPointResult {
     // 1. Try to find user-defined spawn point
     const spawnEntity = this.findDefaultSpawnPoint(scene);
@@ -49,6 +53,11 @@ export class SpawnPointSystem {
       const rotation = spawnComponent?.rotation ?? 0;
       
       Logger.debug('[SpawnPointSystem] Using user-defined spawn point:', position);
+
+      // Check if spawn position is valid
+      if (physicsWorld && !this.isValidSpawnPosition(physicsWorld, position)) {
+        Logger.warn('[SpawnPointSystem] Spawn point is in invalid position (in air or obstructed):', position);
+      }
       
       return {
         position,
@@ -61,7 +70,9 @@ export class SpawnPointSystem {
     if (physicsWorld && fallbackPosition) {
       const raycastResult = this.findSpawnViaRaycast(
         physicsWorld,
-        fallbackPosition
+        fallbackPosition,
+        100,
+        fallbackRotation
       );
       
       if (raycastResult) {
@@ -73,7 +84,7 @@ export class SpawnPointSystem {
     // 3. Default origin as last resort
     Logger.warn('[SpawnPointSystem] No spawn point found, using default origin');
     return {
-      position: [0, 1, 0], // Slightly above ground
+      position: [0, 5, 0], // Higher above ground
       rotation: 0,
       source: 'default-origin',
     };
@@ -86,27 +97,24 @@ export class SpawnPointSystem {
    * @returns Spawn point entity or null
    */
   static findDefaultSpawnPoint(scene: Scene): Entity | null {
-    // Search for entities with SpawnPointComponent
-    const entities = scene.getAllEntities();
+    // Search for entities with SpawnPointComponent using efficient query
+    const entities = scene.queryEntities(SpawnPointComponent);
+    let firstFound: Entity | null = null;
     
     for (const entity of entities) {
       const spawnComponent = entity.getComponent(SpawnPointComponent);
-      
-      if (spawnComponent && spawnComponent.isDefault) {
+      if (!spawnComponent) continue;
+
+      if (spawnComponent.isDefault) {
         return entity;
+      }
+
+      if (!firstFound) {
+        firstFound = entity;
       }
     }
 
-    // If no default spawn point, return first spawn point found
-    for (const entity of entities) {
-      const spawnComponent = entity.getComponent(SpawnPointComponent);
-      
-      if (spawnComponent) {
-        return entity;
-      }
-    }
-
-    return null;
+    return firstFound;
   }
 
   /**
@@ -115,12 +123,14 @@ export class SpawnPointSystem {
    * @param physicsWorld - Physics world for raycasting
    * @param referencePosition - Position to cast from (typically camera position)
    * @param maxDistance - Maximum raycast distance (default: 100)
+   * @param rotation - Rotation to apply to spawn point (default: 0)
    * @returns Spawn point result or null if no hit
    */
   static findSpawnViaRaycast(
     physicsWorld: PhysicsWorld,
     referencePosition: Vec3,
-    maxDistance = 100
+    maxDistance = 100,
+    rotation = 0
   ): SpawnPointResult | null {
     // Cast ray downward from reference position
     const origin: Vec3 = [
@@ -142,16 +152,15 @@ export class SpawnPointSystem {
     }
 
     // Spawn slightly above the hit surface
-    const spawnHeight = 0.1; // Small offset above ground
     const position: Vec3 = [
       hit.point[0],
-      hit.point[1] + spawnHeight,
+      hit.point[1] + SPAWN_HEIGHT_OFFSET,
       hit.point[2],
     ];
 
     return {
       position,
-      rotation: 0, // Default rotation
+      rotation,
       source: 'raycast-fallback',
     };
   }

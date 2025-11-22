@@ -2,7 +2,7 @@
  * UnifiedBuildPanel - Combines hotbar for unified Build Mode experience
  * 
  * Features:
- * - Bottom hotbar (Minecraft-style, 1-9 keys)
+ * - Bottom hotbar (1-9 keys)
  * - Coordinated placement with hotbar
  * - Keyboard shortcuts (1-9 for hotbar slots)
  * 
