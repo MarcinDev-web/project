@@ -68,17 +68,22 @@ root/
 | Package | Description | Level |
 |---|---|---|
 | **@engine/core** | Foundation. Math library (`Vec3`, `Mat4`), `EventBus`, `Disposable`. | 0 |
+| **@engine/brand** | Branding assets, logos, and theme constants. | 0 |
 | **@engine/world** | The ECS definition. `Entity`, `Scene`, `System`, `Query`. | 1 |
 | **@engine/input** | Input handling (Keyboard, Mouse, Gamepad). | 1 |
 | **@engine/editor-utils** | Reusable editor logic (History, Snapping) - decoupling apps from engine. | 1 |
 | **@engine/asset-pipeline** | Asset loading and processing (GLTF, Textures). | 1 |
+| **@engine/microblocks** | Low-level voxel/block data structures and optimization. | 1 |
 | **@engine/gfx-webgpu** | The Renderer. Manages Device, Pipeline, Shaders, Textures. | 2 |
 | **@engine/script** | Visual scripting system (LogicCubes). | 2 |
 | **@engine/physics** | Physics simulation (Rapier/PhysX integration). | 2 |
 | **@engine/voxel** | Voxel terrain engine and meshing. | 2 |
+| **@engine/blocks** | High-level block definitions and logic. | 2 |
 | **@engine/stdlib** | Common gameplay elements: CharacterController, AnimationSystem. | 3 |
 | **@engine/net** | Multiplayer networking and replication. | 3 |
 | **@engine/economy** | Economy systems (Inventory, Trading). | 3 |
+| **@engine/gateway** | API Gateway, Rate Limiting, and backend services. | 3 |
+| **@engine/ui** | Shared React UI components and styles. | 3 |
 
 ### 3.3. Dependency Rules
 - **Strict Unidirectional Flow**: Apps depend on Packages. Packages depend on lower-level Packages.
@@ -252,5 +257,22 @@ Before you consider a task done:
 - **Architecture**: [docs/architecture/ARCHITECTURE.md](./docs/architecture/ARCHITECTURE.md)
 - **Testing**: [docs/testing/TESTING.md](./docs/testing/TESTING.md)
 - **Package Guidelines**: [docs/guidelines/PACKAGE_GUIDELINES.md](./docs/guidelines/PACKAGE_GUIDELINES.md)
+
+---
+
+## 10. Recent Changes & History (Oct-Nov 2025)
+
+### 10.1. Major Refactoring
+- **Created `@engine/editor-utils`**: Decoupled editor logic (History, Snapping) from `apps/editor`.
+- **Removed Duplication**: Eliminated 6 major code duplications (-1823 lines).
+- **Import Consistency**: Enforced 100% usage of `@engine/*` aliases.
+
+### 10.2. Removed Features
+- **Workflow System**: Removed legacy workflow engine in favor of new scripting.
+- **Asset Library (Legacy)**: Replaced by `@engine/asset-pipeline`.
+
+### 10.3. Documentation
+- **AI Context**: Added comprehensive AI documentation (this file, `CODEBASE_PATTERNS.md`).
+- **Package Guidelines**: Clarified decision tree for new code.
 
 > **Note**: This file is the primary context for AI agents. If you find discrepancies between this file and the code, trust the code but update this file.

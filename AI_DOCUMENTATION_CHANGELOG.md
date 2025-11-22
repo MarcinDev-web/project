@@ -7,6 +7,8 @@
 ### 🔧 Fixes
 - **AI_CONTEXT.md**:
   - Corrected package list and levels (added `@engine/asset-pipeline`, `@engine/net`, etc.)
+  - Added missing packages: `@engine/gateway`, `@engine/microblocks`, `@engine/blocks`, `@engine/ui`, `@engine/brand`.
+  - Added Section 10: "Recent Changes & History" to provide context on removed features and refactoring.
   - Fixed Polish/English mixed header in packages table
 - **PACKAGE_GUIDELINES.md**:
   - Replaced obsolete `@engine/assets` references with `@engine/asset-pipeline`
