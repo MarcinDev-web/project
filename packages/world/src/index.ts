@@ -114,6 +114,9 @@ export type { InteractionPromptUIStyle } from './systems/InteractionPromptUI.js'
 export { MicroBlockSystem, type MicroBlockSystemConfig } from './systems/MicroBlockSystem.js';
 export { MicroBlockMesher } from './utils/MicroBlockMesher.js';
 export { PowerUpSystem } from './systems/PowerUpSystem.js';
+export { MovingPlatformSystem } from './systems/MovingPlatformSystem.js';
+export { ParkourSystem } from './systems/ParkourSystem.js';
+export { NpcBehaviorSystem } from './systems/NpcBehaviorSystem.js';
 
 // Physics (selective to avoid duplicates with systems)
 export { PhysicsWorld } from './physics/PhysicsWorld.js';

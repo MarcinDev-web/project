@@ -21,7 +21,7 @@ describe('createOrbitControls', () => {
 
   beforeEach(() => {
     canvas = mockCanvas();
-    controlsReturn = createOrbitControls(canvas);
+    controlsReturn = createOrbitControls(canvas, { damping: 0 });
   });
 
   afterEach(() => {
@@ -34,14 +34,14 @@ describe('createOrbitControls', () => {
   });
 
   it('initializes with default state', () => {
-    expect(controlsReturn.getState()).toEqual({ yaw: 0, pitch: 0, distance: 3 });
+    expect(controlsReturn.getState()).toEqual({ yaw: 0, pitch: 0, distance: 40 });
   });
 
   it('updates yaw and pitch on drag', () => {
     const { getState } = controlsReturn;
-    canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 100, clientY: 100, button: 0 }));
-    window.dispatchEvent(new MouseEvent('mousemove', { clientX: 110, clientY: 120 }));
-    window.dispatchEvent(new MouseEvent('mouseup'));
+    canvas.dispatchEvent(new PointerEvent('pointerdown', { clientX: 100, clientY: 100, button: 0, isPrimary: true, pointerId: 1 }));
+    window.dispatchEvent(new PointerEvent('pointermove', { clientX: 110, clientY: 120, pointerId: 1 }));
+    window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1 }));
     const state = getState();
     expect(state.yaw).not.toBe(0);
     expect(state.pitch).not.toBe(0);
@@ -50,9 +50,9 @@ describe('createOrbitControls', () => {
   it('ignores non-left-button drags', () => {
     const { getState } = controlsReturn;
     const initial = getState();
-    canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 100, clientY: 100, button: 1 }));
-    window.dispatchEvent(new MouseEvent('mousemove', { clientX: 200, clientY: 200 }));
-    window.dispatchEvent(new MouseEvent('mouseup'));
+    canvas.dispatchEvent(new PointerEvent('pointerdown', { clientX: 100, clientY: 100, button: 1, isPrimary: true, pointerId: 1 }));
+    window.dispatchEvent(new PointerEvent('pointermove', { clientX: 200, clientY: 200, pointerId: 1 }));
+    window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1 }));
     const after = getState();
     expect(after.yaw).toBe(initial.yaw);
     expect(after.pitch).toBe(initial.pitch);
@@ -80,7 +80,7 @@ describe('createOrbitControls', () => {
     // Zoom out strongly; should not exceed MAX_DISTANCE
     canvas.dispatchEvent(new WheelEvent('wheel', { deltaY: 10_000 }));
     const afterStrongOut = getState().distance;
-    expect(afterStrongOut).toBeLessThanOrEqual(20);
+    expect(afterStrongOut).toBeLessThanOrEqual(500);
     expect(afterStrongOut).toBeGreaterThanOrEqual(0.75);
 
     // Tiny delta (0) should not change
@@ -91,20 +91,22 @@ describe('createOrbitControls', () => {
 
   it('clamps pitch within limits', () => {
     const { getState } = controlsReturn;
-    canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 0, clientY: 0 }));
-    window.dispatchEvent(new MouseEvent('mousemove', { clientX: 0, clientY: 10_000 }));
-    window.dispatchEvent(new MouseEvent('mouseup'));
+    canvas.dispatchEvent(new PointerEvent('pointerdown', { clientX: 0, clientY: 0, button: 0, isPrimary: true, pointerId: 1 }));
+    window.dispatchEvent(new PointerEvent('pointermove', { clientX: 0, clientY: 10_000, pointerId: 1 }));
+    window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1 }));
     const state = getState();
     expect(state.pitch).toBeLessThanOrEqual(Math.PI / 2 - 0.01);
   });
 
-  it('prevents default and stops propagation on mousedown', () => {
-    const mousedownEvent = new MouseEvent('mousedown', {
+  it('prevents default and stops propagation on pointerdown', () => {
+    const mousedownEvent = new PointerEvent('pointerdown', {
       clientX: 50,
       clientY: 50,
       button: 0,
       bubbles: true,
       cancelable: true,
+      isPrimary: true,
+      pointerId: 1
     });
     const preventSpy = vi.spyOn(mousedownEvent, 'preventDefault');
     const stopSpy = vi.spyOn(mousedownEvent, 'stopPropagation');
@@ -116,8 +118,8 @@ describe('createOrbitControls', () => {
   it('disabling during drag aborts listeners and stops rotation', () => {
     const { getState, setEnabled } = controlsReturn;
     // Start a drag
-    canvas.dispatchEvent(new MouseEvent('mousedown', { clientX: 100, clientY: 100, button: 0 }));
-    window.dispatchEvent(new MouseEvent('mousemove', { clientX: 120, clientY: 100 }));
+    canvas.dispatchEvent(new PointerEvent('pointerdown', { clientX: 100, clientY: 100, button: 0, isPrimary: true, pointerId: 1 }));
+    window.dispatchEvent(new PointerEvent('pointermove', { clientX: 120, clientY: 100, pointerId: 1 }));
     const midState = getState();
     expect(midState.yaw).not.toBe(0);
 
@@ -125,19 +127,19 @@ describe('createOrbitControls', () => {
     setEnabled(false);
 
     // Further mouse moves should not change yaw/pitch
-    window.dispatchEvent(new MouseEvent('mousemove', { clientX: 200, clientY: 200 }));
+    window.dispatchEvent(new PointerEvent('pointermove', { clientX: 200, clientY: 200, pointerId: 1 }));
     const afterDisable = getState();
     expect(afterDisable.yaw).toBe(midState.yaw);
     expect(afterDisable.pitch).toBe(midState.pitch);
 
-    // Re-enable and ensure drag doesn't resume without mousedown
+    // Re-enable and ensure drag doesn't resume without pointerdown
     setEnabled(true);
-    window.dispatchEvent(new MouseEvent('mousemove', { clientX: 300, clientY: 300 }));
+    window.dispatchEvent(new PointerEvent('pointermove', { clientX: 300, clientY: 300, pointerId: 1 }));
     const afterReenable = getState();
     expect(afterReenable.yaw).toBe(midState.yaw);
     expect(afterReenable.pitch).toBe(midState.pitch);
 
-    // Cleanup mouseup shouldn't throw
-    window.dispatchEvent(new MouseEvent('mouseup'));
+    // Cleanup pointerup shouldn't throw
+    window.dispatchEvent(new PointerEvent('pointerup', { pointerId: 1 }));
   });
 });

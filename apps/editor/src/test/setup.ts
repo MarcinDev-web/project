@@ -27,6 +27,29 @@ vi.mock('@engine/wasm-collision/pkg/collision.js', () => ({
 
 // 3. (Removed regex mock as it is not supported)
 
+// 4. Mock @engine/wasm-animation to avoid WASM loading issues
+vi.mock('@engine/wasm-animation', () => ({
+  AnimationWorld: class {
+    constructor() {}
+    free() {}
+    add_skeleton() {}
+    create_instance() { return true; }
+    remove_instance() {}
+    get_output_buffer() { return new Float32Array(0); }
+    set_instance_bone() {}
+    set_instance_state() {}
+    get_output_buffer_len() { return 0; }
+    get_output_buffer_ptr() { return 0; }
+    get_instance_joint_count() { return 0; }
+    get_instance_local_scales_ptr() { return 0; }
+    get_instance_local_rotations_ptr() { return 0; }
+    get_instance_local_translations_ptr() { return 0; }
+    step() {}
+    add_clip() {}
+  },
+  init: vi.fn().mockResolvedValue({}),
+}));
+
 
 // Check if we're in a browser-like environment (jsdom)
 const isBrowserEnv = typeof window !== 'undefined' && typeof document !== 'undefined';
@@ -62,6 +85,13 @@ export function initBrowserPolyfills() {
 
   // HTMLCanvasElement polyfills for jsdom
   if (typeof HTMLCanvasElement !== 'undefined') {
+    // Polyfill CanvasRenderingContext2D methods if missing (JSDOM)
+    if (typeof CanvasRenderingContext2D !== 'undefined') {
+      if (!CanvasRenderingContext2D.prototype.setLineDash) {
+        CanvasRenderingContext2D.prototype.setLineDash = function() {};
+      }
+    }
+
     // Override getContext to support any context type (including 'webgpu')
     const originalGetContext = HTMLCanvasElement.prototype.getContext;
     HTMLCanvasElement.prototype.getContext = function (contextType: string, ...args: any[]) {
@@ -141,10 +171,40 @@ export function initWebGPUPolyfills() {
     }
     (globalThis as any).navigator.gpu = {
       requestAdapter: async () => ({
+        limits: {
+          maxBindGroups: 4,
+          maxTextureDimension2D: 8192,
+        },
+        features: {
+          has: () => true,
+        },
         requestDevice: async () => ({
           queue: {
             submit: () => {},
           },
+          createCommandEncoder: () => ({
+            beginRenderPass: () => ({
+              setPipeline: () => {},
+              setBindGroup: () => {},
+              setVertexBuffer: () => {},
+              setIndexBuffer: () => {},
+              draw: () => {},
+              drawIndexed: () => {},
+              end: () => {},
+            }),
+            finish: () => {},
+          }),
+          createRenderPipeline: () => ({}),
+          createBindGroup: () => ({}),
+          createBuffer: () => ({
+            destroy: () => {},
+          }),
+          createTexture: () => ({
+            createView: () => ({}),
+            destroy: () => {},
+          }),
+          createSampler: () => ({}),
+          createShaderModule: () => ({}),
         }),
       }),
     };
@@ -215,6 +275,13 @@ if (typeof (globalThis as any).devicePixelRatio === 'undefined') {
 // Check dynamically since jsdom might initialize after module load
 if (typeof window !== 'undefined' && typeof document !== 'undefined') {
   initBrowserPolyfills();
+  
+  // Polyfill Pointer Events methods which are missing in JSDOM
+  if (typeof Element !== 'undefined' && !Element.prototype.setPointerCapture) {
+    Element.prototype.setPointerCapture = () => {};
+    Element.prototype.releasePointerCapture = () => {};
+    Element.prototype.hasPointerCapture = () => false;
+  }
 }
 
 // Global cleanup: Clear all timers after each test to prevent hanging processes

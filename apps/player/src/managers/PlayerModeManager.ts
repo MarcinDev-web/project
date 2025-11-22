@@ -16,6 +16,7 @@ import { InputContextManager, GameplayInputContext } from '@engine/input';
 import { CharacterController, CharacterState } from '@engine/world/components/CharacterController';
 import { PhysicsComponent, RigidbodyType } from '@engine/world/components/PhysicsComponent';
 import { HealthComponent } from '@engine/world/components/HealthComponent';
+import { WeaponComponent } from '@engine/world/components/WeaponComponent';
 import { DefaultControllerFactory, PlayerSession } from '@engine/stdlib/CharacterController';
 import { hydrateScene } from '@engine/editor-utils';
 import type { Vec3 } from '@engine/core/math';
@@ -39,7 +40,18 @@ import { PausedState } from '../core/states/PausedState.js';
 import { DisconnectedState } from '../core/states/DisconnectedState.js';
 import { ReplicationClient, MultiplayerGameplayManager, ReplicationState } from '@engine/net';
 import { MultiplayerAPI } from '../utils/multiplayerApi.js';
-import { CheckpointSystem, RespawnManager, WasmAnimationSystem } from '@engine/world';
+import { 
+  CheckpointSystem, 
+  RespawnManager, 
+  WasmAnimationSystem, 
+  MovingPlatformSystem, 
+  ParkourSystem,
+  WeaponSystem,
+  WeaponPickupSystem,
+  PowerUpSystem,
+  NpcBehaviorSystem,
+  SimpleCarNpcSystem,
+} from '@engine/world';
 
 // PlayManifest interface
 interface PlayManifest {
@@ -267,6 +279,13 @@ export class PlayerModeManager {
   
   private checkpointSystem: CheckpointSystem;
   private wasmAnimationSystem: WasmAnimationSystem;
+  private movingPlatformSystem: MovingPlatformSystem;
+  private parkourSystem: ParkourSystem;
+  private weaponSystem: WeaponSystem;
+  private weaponPickupSystem: WeaponPickupSystem;
+  private powerUpSystem: PowerUpSystem;
+  private npcBehaviorSystem: NpcBehaviorSystem;
+  private simpleCarNpcSystem: SimpleCarNpcSystem;
 
   constructor(config: PlayerModeManagerConfig) {
     this.canvas = config.canvas;
@@ -315,6 +334,13 @@ export class PlayerModeManager {
     this.checkpointSystem.initialize(this.scene);
 
     this.wasmAnimationSystem = new WasmAnimationSystem(this.scene);
+    this.movingPlatformSystem = new MovingPlatformSystem(this.scene);
+    this.parkourSystem = new ParkourSystem(this.scene);
+    this.weaponSystem = new WeaponSystem(this.scene);
+    this.weaponPickupSystem = new WeaponPickupSystem(this.scene);
+    this.powerUpSystem = new PowerUpSystem(this.scene);
+    this.npcBehaviorSystem = new NpcBehaviorSystem(this.scene, this.weaponSystem);
+    this.simpleCarNpcSystem = new SimpleCarNpcSystem(this.scene);
 
     // Initialize state machine
     this.stateMachine = new PlayerStateMachine();
@@ -507,6 +533,14 @@ export class PlayerModeManager {
       onAction: (action) => {
         if (action === 'pause') {
           this.requestPause();
+        } else if (action === 'fire') {
+          // Only fire if playing and we have a weapon
+          const currentState = this.stateMachine.getCurrentStateType();
+          if (currentState === PlayerStateType.PLAYING && this.playerEntity && this.weaponSystem) {
+            // Simple fire logic: fire from player entity (which may have weapon component)
+            // Direction is handled by weapon system using camera if available
+            this.weaponSystem.fire(this.playerEntity);
+          }
         }
       },
     });
@@ -694,6 +728,15 @@ export class PlayerModeManager {
     // Update animation system
     this.wasmAnimationSystem.update(deltaTime);
 
+    // Update gameplay systems
+    this.movingPlatformSystem.update(deltaTime);
+    this.parkourSystem.update(deltaTime);
+    this.weaponSystem.update(deltaTime);
+    this.weaponPickupSystem.update(deltaTime);
+    this.powerUpSystem.update(deltaTime);
+    this.npcBehaviorSystem.update(deltaTime);
+    this.simpleCarNpcSystem.update(deltaTime);
+
     // Update avatar visuals and animation
     this.updateAvatar(deltaTime);
     
@@ -851,6 +894,19 @@ export class PlayerModeManager {
     health.maxHealth = 100;
     health.currentHealth = 100;
     player.addComponent(health);
+
+    // Add weapon component (basic hitscan weapon)
+    // Only add if not already present (e.g. from loadout, though here we spawn fresh)
+    const weapon = new WeaponComponent();
+    weapon.type = 'hitscan';
+    weapon.damage = 20;
+    weapon.fireRate = 5; // shots per second
+    weapon.range = 200;
+    weapon.spread = 0.01;
+    // Infinite ammo for demo
+    weapon.maxAmmo = 999;
+    weapon.ammo = 999; 
+    player.addComponent(weapon);
     
     // Create player session and controller
     const factory = new DefaultControllerFactory();

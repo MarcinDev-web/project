@@ -29,6 +29,7 @@
     "dev:editor": "pnpm --filter @apps/editor dev",
     "dev:platform": "pnpm --filter @apps/platform dev",
     "dev:server": "pnpm --filter @apps/net-server dev",
+    "dev:game-server": "pnpm --filter @apps/game-server dev",
     "build:editor": "pnpm --filter @apps/editor build",
     "build:platform": "pnpm --filter @apps/platform build",
     "smoke:ws": "tsx scripts/smoke-ws.ts",

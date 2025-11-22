@@ -8,11 +8,21 @@ import { Logger } from './utils/logger';
 import { CameraComponent } from '@engine/world';
 import { PhysicsWorld } from '@engine/world';
 import { CharacterControllerSystem, GroundDetectionSystem } from '@engine/stdlib/CharacterController';
-import { BlockBehaviorSystem, UISystem, InteractionSystem } from '@engine/world/systems';
+import { 
+  BlockBehaviorSystem, 
+  UISystem, 
+  InteractionSystem, 
+  MovingPlatformSystem, 
+  ParkourSystem,
+  NpcBehaviorSystem,
+  WeaponSystem,
+  WeaponPickupSystem,
+  PowerUpSystem
+} from '@engine/world/systems';
 import { WasmAnimationSystem } from '@engine/world/systems';
 import { MeshComponent, InteractableComponent } from '@engine/world';
 import { registerTemplates, applyTo } from '@engine/world-templates';
-import { createFlatPlatformTemplate, createStarterBlockTemplate, createEmptyTemplate } from '@engine/world-templates';
+import { createFlatPlatformTemplate, createStarterBlockTemplate, createEmptyTemplate, createSkyIslandsTemplate } from '@engine/world-templates';
 import { ShareClient } from '@engine/net';
 import { PredictionBridge } from './runtime/PredictionBridge';
 import { EOSClient } from './bootstrap/EOSClient';
@@ -32,6 +42,12 @@ export class EditorApp {
   private groundDetectionSystem: GroundDetectionSystem | null = null;
   private characterSystem: CharacterControllerSystem | null = null;
   private blockBehaviorSystem: BlockBehaviorSystem | null = null;
+  private movingPlatformSystem: MovingPlatformSystem | null = null;
+  private parkourSystem: ParkourSystem | null = null;
+  private npcBehaviorSystem: NpcBehaviorSystem | null = null;
+  private weaponSystem: WeaponSystem | null = null;
+  private weaponPickupSystem: WeaponPickupSystem | null = null;
+  private powerUpSystem: PowerUpSystem | null = null;
   private uiSystem: UISystem | null = null;
   private interactionSystem: InteractionSystem | null = null;
   private wasmAnimationSystem: WasmAnimationSystem | null = null;
@@ -77,12 +93,13 @@ export class EditorApp {
       try {
         registerTemplates([
           createFlatPlatformTemplate(),
+          createSkyIslandsTemplate(),
           createStarterBlockTemplate(),
           createEmptyTemplate(),
         ]);
-        // Load default template (starter block) immediately before initializing renderer/UI
-        this.config.statusEl.textContent = 'Loading default scene…';
-        await applyTo(this.scene, 'template:starter-block', { clear: true });
+        // Load default template (Sky Islands) immediately before initializing renderer/UI
+        this.config.statusEl.textContent = 'Loading Sky Islands...';
+        await applyTo(this.scene, 'template:sky-islands', { clear: true });
         
       } catch (err) {
         Logger.error('Failed to load default template', err as Error);
@@ -138,6 +155,25 @@ export class EditorApp {
               if (this.interactionSystem) {
                 this.interactionSystem.update(deltaTime);
               }
+              // Update gameplay systems
+              if (this.movingPlatformSystem) {
+                this.movingPlatformSystem.update(deltaTime);
+              }
+              if (this.parkourSystem) {
+                this.parkourSystem.update(deltaTime);
+              }
+              if (this.weaponSystem) {
+                this.weaponSystem.update(deltaTime);
+              }
+              if (this.weaponPickupSystem) {
+                this.weaponPickupSystem.update(deltaTime);
+              }
+              if (this.powerUpSystem) {
+                this.powerUpSystem.update(deltaTime);
+              }
+              if (this.npcBehaviorSystem) {
+                this.npcBehaviorSystem.update(deltaTime);
+              }
             } catch (err) {
               Logger.warn('Play mode update failed:', err as Error);
             }
@@ -178,6 +214,12 @@ export class EditorApp {
       this.groundDetectionSystem = new GroundDetectionSystem(this.scene, this.physicsWorld);
       this.characterSystem = new CharacterControllerSystem(this.scene, this.physicsWorld);
       this.blockBehaviorSystem = new BlockBehaviorSystem(this.scene, this.physicsWorld.getSystem());
+      this.movingPlatformSystem = new MovingPlatformSystem(this.scene);
+      this.parkourSystem = new ParkourSystem(this.scene);
+      this.weaponSystem = new WeaponSystem(this.scene);
+      this.weaponPickupSystem = new WeaponPickupSystem(this.scene);
+      this.powerUpSystem = new PowerUpSystem(this.scene);
+      this.npcBehaviorSystem = new NpcBehaviorSystem(this.scene, this.weaponSystem);
       this.uiSystem = new UISystem(this.scene);
       this.wasmAnimationSystem = new WasmAnimationSystem(this.scene);
       this.currentAnimationScene = this.scene;
@@ -279,6 +321,12 @@ export class EditorApp {
     this.physicsWorld = null;
     this.groundDetectionSystem = null;
     this.characterSystem = null;
+    this.movingPlatformSystem = null;
+    this.parkourSystem = null;
+    this.npcBehaviorSystem = null;
+    this.weaponSystem = null;
+    this.weaponPickupSystem = null;
+    this.powerUpSystem = null;
 
     if (this.uiSystem) {
       try {

@@ -467,7 +467,7 @@ describe('AvatarSkeleton', () => {
       }
 
       // Change rotation
-      skeleton.setLocalRotation('Head', [0, 0, 0, 1]);
+      skeleton.setLocalRotation('Head', [0, 1, 0, 0]);
 
       expect(skeleton.isJointDirty('Head')).toBe(true);
     });

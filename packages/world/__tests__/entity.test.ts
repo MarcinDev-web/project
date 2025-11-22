@@ -52,7 +52,7 @@ describe('Entity', () => {
 
     it('has mesh type', () => {
       const entity = new Entity();
-      expect(entity.meshType).toBe('cube');
+      expect(entity.meshType).toBe('none');
     });
 
     it('has empty userData', () => {

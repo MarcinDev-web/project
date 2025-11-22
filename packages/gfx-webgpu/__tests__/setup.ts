@@ -3,6 +3,90 @@
  * Mocks WebGPU globals that are not available in Node.js/jsdom
  */
 
+import { vi } from 'vitest';
+
+// Mock @engine/wasm-animation to avoid WASM loading issues
+vi.mock('@engine/wasm-animation', () => ({
+  AnimationWorld: class {
+    constructor() {}
+    free() {}
+    add_skeleton() {}
+    create_instance() { return true; }
+    remove_instance() {}
+    get_output_buffer() { return new Float32Array(0); }
+    set_instance_bone() {}
+    set_instance_state() {}
+    get_output_buffer_len() { return 0; }
+    get_output_buffer_ptr() { return 0; }
+    get_instance_joint_count() { return 0; }
+    get_instance_local_scales_ptr() { return 0; }
+    get_instance_local_rotations_ptr() { return 0; }
+    get_instance_local_translations_ptr() { return 0; }
+    step() {}
+    add_clip() {}
+  },
+  init: vi.fn().mockResolvedValue({}),
+}));
+
+// Mock navigator.gpu for WebGPU tests
+if (typeof navigator !== 'undefined') {
+  const mockGpu = {
+    requestAdapter: async () => ({
+      limits: {
+        maxBindGroups: 4,
+        maxTextureDimension2D: 8192,
+      },
+      features: {
+        has: () => true,
+      },
+      requestDevice: async () => ({
+        queue: {
+          submit: () => {},
+        },
+        createCommandEncoder: () => ({
+          beginRenderPass: () => ({
+            setPipeline: () => {},
+            setBindGroup: () => {},
+            setVertexBuffer: () => {},
+            setIndexBuffer: () => {},
+            draw: () => {},
+            drawIndexed: () => {},
+            end: () => {},
+          }),
+          finish: () => {},
+        }),
+        createRenderPipeline: () => ({}),
+        createBindGroup: () => ({}),
+        createBuffer: () => ({
+          destroy: () => {},
+        }),
+        createTexture: () => ({
+          createView: () => ({}),
+          destroy: () => {},
+        }),
+        createSampler: () => ({}),
+        createShaderModule: () => ({}),
+      }),
+    }),
+  };
+
+  if (!(globalThis as any).navigator) {
+    (globalThis as any).navigator = {};
+  }
+  
+  // Force overwrite or define
+  try {
+    (globalThis as any).navigator.gpu = mockGpu;
+  } catch (e) {
+    // If read-only (jsdom), try Object.defineProperty
+    Object.defineProperty(globalThis.navigator, 'gpu', {
+      value: mockGpu,
+      writable: true,
+      configurable: true,
+    });
+  }
+}
+
 // Polyfill ImageData if not available (for Node.js/jsdom)
 if (typeof ImageData === 'undefined') {
   (globalThis as any).ImageData = class ImageData {
@@ -30,7 +114,7 @@ if (typeof HTMLCanvasElement !== 'undefined') {
   HTMLCanvasElement.prototype.getContext = function(
     contextId: string,
     options?: any
-  ): RenderingContext | null {
+  ): any {
     if (contextId === '2d') {
       // Create a minimal mock 2D context
       const canvas = this as HTMLCanvasElement;

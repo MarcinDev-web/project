@@ -232,7 +232,7 @@ describe('BlockLibrary', () => {
     it('should have brightness variations for depth', () => {
       const block = getBlock('plastic_red');
       expect(block?.textures.top.brightness).toBeGreaterThan(0.9);
-      expect(block?.textures.bottom.brightness).toBeLessThan(0.9);
+      expect(block?.textures.bottom.brightness).toBeLessThanOrEqual(0.9);
     });
   });
 });

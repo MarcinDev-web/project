@@ -152,6 +152,46 @@ export function HomePage() {
   return (
     <Layout>
       <div className="page-container" style={{ paddingTop: 'var(--spacing-6)' }}>
+        {/* Featured GTA Demo Banner */}
+        <Link to="/player/gta-demo" style={{ textDecoration: 'none' }}>
+          <div style={{
+            background: 'linear-gradient(135deg, #ff9a9e 0%, #fecfef 99%, #fecfef 100%)',
+            borderRadius: '16px',
+            padding: '2rem',
+            marginBottom: '2rem',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            color: '#2d3748',
+            cursor: 'pointer',
+            boxShadow: '0 4px 14px rgba(0,0,0,0.1)',
+            transition: 'transform 0.2s ease',
+            border: '2px solid rgba(255,255,255,0.5)'
+          }}
+          onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.01)'}
+          onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1.0)'}
+          >
+            <div>
+              <h2 style={{ fontSize: '2rem', marginBottom: '0.5rem', fontWeight: 800 }}>🏙️ GTA Style City Demo</h2>
+              <p style={{ fontSize: '1.1rem', opacity: 0.9, maxWidth: '500px' }}>
+                Experience high-speed movement, stunts, and procedural city generation in this tech demo.
+              </p>
+              <div style={{ 
+                marginTop: '1rem', 
+                display: 'inline-block', 
+                background: '#fff', 
+                color: '#000', 
+                padding: '0.5rem 1rem', 
+                borderRadius: '8px',
+                fontWeight: 'bold'
+              }}>
+                Play Now →
+              </div>
+            </div>
+            <div style={{ fontSize: '4rem' }}>🏎️💨</div>
+          </div>
+        </Link>
+
         <section className="discover-stack">
           {discoverLoading ? (
             <div className="discover-loading">Loading discovery feed...</div>

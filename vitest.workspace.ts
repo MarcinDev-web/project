@@ -26,6 +26,8 @@ export default defineWorkspace([
         ...engineAliases(__dirname),
         '@shared': sharedRoot,
         '@shared/types': resolve(sharedRoot, 'types'),
+        // Mock WASM package to avoid loading issues in tests
+        '@engine/wasm-animation': resolve(__dirname, 'packages/test-utils/src/mocks/wasm-animation.ts'),
       },
     },
     test: {
@@ -240,6 +242,8 @@ export default defineWorkspace([
           ...engineAliases(__dirname),
           '@shared': resolve(__dirname, 'shared'),
           '@shared/*': resolve(__dirname, 'shared/*'),
+          // Mock WASM package to avoid loading issues in tests
+          '@engine/wasm-animation': resolve(__dirname, 'packages/test-utils/src/mocks/wasm-animation.ts'),
         },
         conditions: ['development', 'test', 'import', 'module'],
         dedupe: ['@engine/core', '@engine/world', '@engine/animation', '@engine/avatar', '@engine/camera'],

@@ -98,6 +98,8 @@ describe('initRenderer', () => {
       setBindGroup: vi.fn(),
       draw: vi.fn(),
       drawIndexed: vi.fn(),
+      drawIndirect: vi.fn(),
+      drawIndexedIndirect: vi.fn(),
       writeTimestamp: vi.fn(),
       end: vi.fn(),
     };
@@ -197,6 +199,8 @@ describe('initRenderer', () => {
         onSubmittedWorkDone: vi.fn().mockResolvedValue(undefined),
       },
       destroy: vi.fn(),
+      addEventListener: vi.fn(),
+      removeEventListener: vi.fn(),
     } as unknown as GPUDevice;
 
     return { deviceMock, buffersByLabel, texturesByLabel, timestampQuerySet };
@@ -220,6 +224,10 @@ describe('initRenderer', () => {
     });
     const adapterMock = {
       features: new Set(useTimestamps ? ['timestamp-query'] : []),
+      limits: {
+        maxBindGroups: 4,
+        maxTextureDimension2D: 8192,
+      },
       requestDevice: vi.fn().mockResolvedValue(deviceMock),
       requestAdapterInfo: vi.fn().mockResolvedValue({ name: 'mock adapter' }),
     } as unknown as GPUAdapter;

@@ -20,7 +20,6 @@ interface ActiveLaunchPad {
  * System that handles parkour mechanics
  */
 export class ParkourSystem {
-  // @ts-expect-error - Reserved for future use
   private readonly scene: Scene;
   private readonly activeLaunchPads = new Map<Entity, ActiveLaunchPad>();
 
@@ -34,6 +33,21 @@ export class ParkourSystem {
   update(deltaTime: number): void {
     // Handle launch pads
     this.updateLaunchPads(deltaTime);
+
+    // Check for launch pad interactions
+    // This assumes we want to check all players against all launch pads
+    // O(Players * Pads) complexity, usually fine
+    const players = this.scene.queryEntities(CharacterController);
+    const pads = this.scene.queryEntities(LaunchPadComponent);
+    
+    for (const player of players) {
+      // Use world position
+      const playerPos = player.transform.position;
+      for (const pad of pads) {
+        this.handleLaunchPad(player, pad, playerPos);
+      }
+    }
+
     // Handle bounce pads (handled in collision callbacks)
     // Handle speed zones (handled in collision callbacks)
     // Handle moving platforms (handled by MovingPlatformSystem)

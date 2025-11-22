@@ -10,6 +10,7 @@ export { createProceduralTemplate } from './loaders/ProceduralTemplate';
 
 // Built-in templates (reduced set)
 export { createFlatPlatformTemplate } from './builtins/templates/FlatPlatform';
+export { createSkyIslandsTemplate } from './builtins/templates/SkyIslands';
 export { createStarterBlockTemplate } from './builtins/templates/StarterBlock';
 export { createEmptyTemplate } from './builtins/templates/Empty';
 

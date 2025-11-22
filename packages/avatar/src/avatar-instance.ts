@@ -1,6 +1,7 @@
 import { Entity, MaterialComponent } from '@engine/world';
 import { AnimatorComponent, SkeletalBindingComponent } from '@engine/world';
 import { AnimatorController, Animator } from '@engine/animation';
+import type { AnimationClip } from '@engine/animation';
 import { getVec3Pool } from '@engine/core/utils/Vec3Pool';
 import type { AvatarAnimation } from './animation';
 import { avatarAnimationToClip } from './animation-adapter';
@@ -150,6 +151,13 @@ export class AvatarInstance {
       // Initialize controller
       if (!component.controller) {
         component.controller = new AnimatorController();
+        // Add a default idle state so Animator doesn't crash on construction
+        const dummyClip: AnimationClip = {
+            name: 'default_idle',
+            duration: 1.0,
+            tracks: []
+        };
+        component.controller.addState('default_idle', dummyClip);
       }
       // Initializer animator if needed (usually system does this, but we might need it immediately)
       if (!component.animator && component.skeleton && component.pose && component.controller) {

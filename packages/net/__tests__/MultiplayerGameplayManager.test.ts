@@ -3,6 +3,7 @@ import { Entity, Scene, CharacterController } from '@engine/world';
 import type { PhysicsWorld } from '@engine/world';
 import { MultiplayerGameplayManager } from '../src/multiplayer/MultiplayerGameplayManager';
 import { ReplicationClient } from '../src/ReplicationClient';
+import { ReplicationState } from '../src/types/replication';
 import type { PublicUser } from '../src/ReplicationClient';
 
 /**
@@ -17,16 +18,24 @@ describe('MultiplayerGameplayManager', () => {
   let localPlayerEntity: Entity;
   let onUserJoinedCallbacks: Array<(user: PublicUser) => void>;
   let onUserLeftCallbacks: Array<(userId: string) => void>;
+  let onStateChangeCallback: (state: any) => void;
 
   beforeEach(() => {
     onUserJoinedCallbacks = [];
     onUserLeftCallbacks = [];
+    onStateChangeCallback = () => {};
 
     // Create mock ReplicationClient
     mockReplicationClient = {
       getLocalUserId: vi.fn(() => 'local-user-123'),
       getState: vi.fn(() => 'disconnected' as any),
-      connect: vi.fn(() => Promise.resolve()),
+      connect: vi.fn(() => {
+        // Simulate successful connection state change immediately
+        if (onStateChangeCallback) {
+          onStateChangeCallback(ReplicationState.Connected);
+        }
+        return Promise.resolve();
+      }),
       onUserJoined: vi.fn((callback) => {
         onUserJoinedCallbacks.push(callback);
         return () => {};
@@ -35,7 +44,10 @@ describe('MultiplayerGameplayManager', () => {
         onUserLeftCallbacks.push(callback);
         return () => {};
       }),
-      onStateChange: vi.fn(() => () => {}),
+      onStateChange: vi.fn((callback) => {
+        onStateChangeCallback = callback;
+        return () => {};
+      }),
       onError: vi.fn(() => () => {}),
       onPlayerUpdate: vi.fn((callback) => {
         // Store callback if needed for testing
@@ -48,6 +60,8 @@ describe('MultiplayerGameplayManager', () => {
       sendPlayerUpdate: vi.fn(),
       sendPhysicsState: vi.fn(),
       sendInput: vi.fn(),
+      onOperation: vi.fn(() => () => {}),
+      requestSnapshot: vi.fn(),
     } as unknown as ReplicationClient;
 
     // Create scene
@@ -84,7 +98,7 @@ describe('MultiplayerGameplayManager', () => {
   describe('session management', () => {
     it('should start session and connect to server', async () => {
       await manager.startSession('session-123', localPlayerEntity);
-
+      
       expect(mockReplicationClient.connect).toHaveBeenCalledWith('session-123');
       expect(manager.isSessionActive()).toBe(true);
       expect(manager.getSessionId()).toBe('session-123');

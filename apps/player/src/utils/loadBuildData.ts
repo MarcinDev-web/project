@@ -5,6 +5,7 @@
 import type { Vec3 } from '@engine/core/math';
 import type { GameProjectConfig } from '@shared/types/project';
 import { createDefaultGameProjectConfig } from '@shared/types/project';
+import { Scenarios } from '@engine/stdlib';
 
 // Simplified PlayManifest interface (matches structure from build data)
 interface PlayManifest {
@@ -35,6 +36,7 @@ interface PlayManifest {
         useGravity?: boolean;
       };
       collider?: {
+        shape?: 'capsule';
         radius?: number;
         height?: number;
         center?: Vec3;
@@ -75,6 +77,7 @@ interface PlayManifest {
         sprint?: string[];
         interact?: string[];
         crouch?: string[];
+        fire?: string[];
       };
     };
   };
@@ -100,6 +103,83 @@ interface ProjectData {
  * @throws Error if build not found or invalid data
  */
 export async function loadBuildData(buildId: string): Promise<BuildData> {
+  // Special Case: GTA Demo
+  if (buildId === 'gta-demo') {
+    const scene = Scenarios.createCityDemoScene();
+    const sceneJSON = JSON.stringify(scene.toJSON());
+    
+    return {
+      sceneJSON,
+      playerStart: { position: [0, 5, 0], rotation: 0 },
+      manifest: {
+        version: 1,
+        playerStart: {
+          position: [0, 5, 0],
+          rotation: 0
+        },
+        simulation: {
+          enableMultiplayer: false
+        },
+        pawn: {
+          cameraTarget: {
+            offset: [0, 1.8, 0],
+            collisionRadius: 0.3
+          },
+          physics: {
+            rigidbody: {
+              type: 'dynamic',
+              mass: 80,
+              useGravity: true
+            },
+            collider: {
+              shape: 'capsule',
+              radius: 0.4,
+              height: 1.8,
+              center: [0, 0.9, 0]
+            },
+            material: {
+              friction: 0.1, // Low friction for sliding/drifting
+              restitution: 0.0
+            }
+          },
+          kcc: {
+            moveSpeed: 20.0, // Very fast run speed
+            sprintMultiplier: 2.0, // Super fast sprint (40 m/s)
+            jumpForce: 15.0, // High jump
+            gravityMultiplier: 2.0, // Heavy gravity for snappy falls
+            airControlMultiplier: 0.1, // Low air control
+            rotationSpeed: 5.0,
+            autoRotate: true,
+            stepHeight: 0.6,
+            maxSlopeAngle: 50
+          }
+        },
+        controller: {
+          input: {
+            movement: {
+              forward: ['KeyW', 'ArrowUp'],
+              backward: ['KeyS', 'ArrowDown'],
+              left: ['KeyA', 'ArrowLeft'],
+              right: ['KeyD', 'ArrowRight']
+            },
+            actions: {
+              jump: ['Space'],
+              sprint: ['ShiftLeft', 'ShiftRight'],
+              interact: ['KeyE'],
+              crouch: ['KeyC', 'ControlLeft'],
+              fire: ['Mouse0'] // Add fire action bound to left mouse button
+            }
+          },
+          preferences: {
+            fov: 90,
+            invertY: false,
+            sensitivity: 0.0025
+          }
+        }
+      }
+    };
+  }
+
   const response = await fetch(`/api/marketplace/${buildId}/build`);
   
   if (!response.ok) {
