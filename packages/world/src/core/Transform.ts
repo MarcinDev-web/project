@@ -4,6 +4,10 @@ import {
   quatMultiply,
   quatNormalize,
   mat4Multiply,
+  mat4LookAt,
+  mat4Invert,
+  mat4GetRotation,
+  quatInverse,
   type Mat4,
   type Vec3,
 } from '@engine/core/math';
@@ -141,6 +145,52 @@ export class Transform extends Component {
     const deltaQuat = quatFromAxisAngle(axis, angle);
     this._rotation = quatMultiply(this._rotation, deltaQuat);
     this._rotation = quatNormalize(this._rotation);
+    this.markDirty();
+  }
+
+  /**
+   * Rotates the transform to look at a target position.
+   * @param target - Target position in world space
+   * @param up - Up vector (defaults to [0, 1, 0])
+   */
+  lookAt(target: Vec3, up: Vec3 = [0, 1, 0]): void {
+    // 1. Compute view matrix (inverse of world matrix)
+    const viewMat = new Float32Array(16) as unknown as Mat4;
+    const worldMat = new Float32Array(16) as unknown as Mat4;
+    
+    // Eye is current world position
+    const eye = this.getWorldPosition();
+    
+    // Compute view matrix
+    try {
+      mat4LookAt(viewMat, eye, target, up);
+    } catch (e) {
+      // If up vector is parallel to view direction or zero, ignore
+      return;
+    }
+    
+    // Invert to get world matrix (Camera -> World)
+    try {
+      mat4Invert(worldMat, viewMat);
+    } catch (e) {
+      // Not invertible (degenerate?)
+      return;
+    }
+    
+    // Extract world rotation
+    const worldRot = mat4GetRotation(worldMat);
+    
+    // If we have a parent, convert world rotation to local rotation
+    if (this._parent) {
+      const parentWorldMat = this._parent.getWorldMatrix();
+      const parentWorldRot = mat4GetRotation(parentWorldMat);
+      const parentWorldRotInv = quatInverse(parentWorldRot);
+      
+      this._rotation = quatMultiply(parentWorldRotInv, worldRot);
+    } else {
+      this._rotation = worldRot;
+    }
+    
     this.markDirty();
   }
 

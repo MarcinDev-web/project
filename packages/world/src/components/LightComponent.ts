@@ -37,6 +37,9 @@ export class LightComponent extends Component {
   /** Whether this light is enabled */
   enabled: boolean = true;
 
+  /** Whether this light casts shadows */
+  castShadows: boolean = false;
+
   getType(): string {
     return LightComponent.type;
   }
@@ -51,6 +54,7 @@ export class LightComponent extends Component {
     clone.innerConeAngle = this.innerConeAngle;
     clone.outerConeAngle = this.outerConeAngle;
     clone.enabled = this.enabled;
+    clone.castShadows = this.castShadows;
     return clone;
   }
 
@@ -64,6 +68,7 @@ export class LightComponent extends Component {
       innerConeAngle: this.innerConeAngle,
       outerConeAngle: this.outerConeAngle,
       enabled: this.enabled,
+      castShadows: this.castShadows,
     };
   }
 
@@ -82,6 +87,7 @@ export class LightComponent extends Component {
     if (typeof data.innerConeAngle === 'number') this.innerConeAngle = data.innerConeAngle;
     if (typeof data.outerConeAngle === 'number') this.outerConeAngle = data.outerConeAngle;
     if (typeof data.enabled === 'boolean') this.enabled = data.enabled;
+    if (typeof data.castShadows === 'boolean') this.castShadows = data.castShadows;
   }
 }
 

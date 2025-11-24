@@ -94,8 +94,8 @@ export class ShadowCascadeCalculator {
         const vyList = [-h, -h, h, h];
 
         for (let k = 0; k < 4; k++) {
-          const vx = vxList[k];
-          const vy = vyList[k];
+          const vx = vxList[k]!;
+          const vy = vyList[k]!;
           const vz = z;
 
           // Transform to world: invView * [vx,vy,vz,1]
@@ -112,9 +112,9 @@ export class ShadowCascadeCalculator {
       // Light view matrix (look from far away in light direction toward frustum center)
       let cx = 0, cy = 0, cz = 0;
       for (let i = 0; i < 8; i++) {
-        cx += this.corners[i * 3 + 0];
-        cy += this.corners[i * 3 + 1];
-        cz += this.corners[i * 3 + 2];
+        cx += this.corners[i * 3 + 0]!;
+        cy += this.corners[i * 3 + 1]!;
+        cz += this.corners[i * 3 + 2]!;
       }
       cx /= 8; cy /= 8; cz /= 8;
 
@@ -142,9 +142,9 @@ export class ShadowCascadeCalculator {
       let sumLX = 0, sumLY = 0;
 
       for (let i = 0; i < 8; i++) {
-        const px = this.corners[i * 3 + 0];
-        const py = this.corners[i * 3 + 1];
-        const pz = this.corners[i * 3 + 2];
+        const px = this.corners[i * 3 + 0]!;
+        const py = this.corners[i * 3 + 1]!;
+        const pz = this.corners[i * 3 + 2]!;
 
         const lx = px * this.lightView[0]! + py * this.lightView[4]! + pz * this.lightView[8]! + this.lightView[12]!;
         const ly = px * this.lightView[1]! + py * this.lightView[5]! + pz * this.lightView[9]! + this.lightView[13]!;
@@ -160,12 +160,12 @@ export class ShadowCascadeCalculator {
       let cxL = sumLX / 8; let cyL = sumLY / 8;
       let maxRadius = 0.0;
       for (let i = 0; i < 8; i++) {
-        const px = this.corners[i * 3 + 0];
-        const py = this.corners[i * 3 + 1];
-        const pz = this.corners[i * 3 + 2];
+        const px = this.corners[i * 3 + 0]!;
+        const py = this.corners[i * 3 + 1]!;
+        const pz = this.corners[i * 3 + 2]!;
 
-        const lx = px * this.lightView[0]! + py * this.lightView[4]! + pz * this.lightView[8]! + this.lightView[12]!;
-        const ly = px * this.lightView[1]! + py * this.lightView[5]! + pz * this.lightView[9]! + this.lightView[13]!;
+        const lx = px * (this.lightView[0] ?? 0) + py * (this.lightView[4] ?? 0) + pz * (this.lightView[8] ?? 0) + (this.lightView[12] ?? 0);
+        const ly = px * (this.lightView[1] ?? 0) + py * (this.lightView[5] ?? 0) + pz * (this.lightView[9] ?? 0) + (this.lightView[13] ?? 0);
         
         const dx = lx - cxL; const dy = ly - cyL;
         const r = Math.hypot(dx, dy);
@@ -188,7 +188,7 @@ export class ShadowCascadeCalculator {
       mat4Ortho(this.lightProj, minX, maxX, minY, maxY, minZ, maxZ);
       
       // Result LVP
-      mat4Multiply(this.result.lightViewProj[c], this.lightProj, this.lightView);
+      mat4Multiply(this.result.lightViewProj[c]!, this.lightProj, this.lightView);
     }
 
     // Fill remaining splits if cascadeCount < 4 (though typically 4)

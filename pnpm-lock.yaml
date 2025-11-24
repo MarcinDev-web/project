@@ -965,6 +965,12 @@ importers:
 
   packages/wasm-animation:
     devDependencies:
+      '@types/node':
+        specifier: ^24.7.2
+        version: 24.9.1
+      rimraf:
+        specifier: ^6.0.1
+        version: 6.0.1
       typescript:
         specifier: ^5.9.3
         version: 5.9.3

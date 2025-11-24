@@ -30,6 +30,11 @@ export interface InteractionTool {
   onPointerUp(event: PointerEvent, ray: Ray): void;
 
   /**
+   * Called on mouse wheel event.
+   */
+  onWheel?(event: WheelEvent): void;
+
+  /**
    * Called to cancel the current operation (e.g. Esc key).
    */
   cancel(): void;

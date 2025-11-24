@@ -262,6 +262,16 @@ export class LogicCubeSystem {
         targetPort: conn.targetPort,
         signal,
       });
+
+      // Emit debug event for visualization
+      this.scene.events.emit('logic:connection-active', {
+        payload: {
+          sourceEntityId,
+          sourcePort,
+          targetEntityId: conn.targetEntityId,
+          targetPort: conn.targetPort,
+        },
+      });
     }
   }
 

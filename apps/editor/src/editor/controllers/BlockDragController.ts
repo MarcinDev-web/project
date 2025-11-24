@@ -9,12 +9,15 @@ import {
   mat4GetRotation, 
   mat4GetScale, 
   mat4Invert,
-  dotVec3
+  dotVec3,
+  quatFromAxisAngle,
+  quatMultiply
 } from '@engine/core/math';
 import { Logger } from '../../utils/logger';
 import { CollisionDetector } from '../placement/CollisionDetector';
 import type { Ray } from '@engine/world';
 import type { InteractionTool } from '../input/InteractionTypes';
+import type { GuideLineVisualizer } from '../visuals/GuideLineVisualizer';
 
 export interface BlockDragControllerConfig {
   canvas: HTMLCanvasElement;
@@ -29,6 +32,8 @@ export interface BlockDragControllerConfig {
   updateSceneBuffers: () => void;
   recordSnapshot: (description: string) => void;
   onStatusMessage?: (message: string, duration?: number) => void;
+  /** Visualizer for debug/guide lines */
+  guideLineVisualizer?: GuideLineVisualizer;
 }
 
 interface DragState {
@@ -55,6 +60,16 @@ interface DragState {
   canPlace: boolean;
   /** Whether the entity was created specifically for this drag (e.g. via Alt-clone) */
   createdOnDrag: boolean;
+  /** Drag plane normal for free transform */
+  dragPlaneNormal?: Vec3;
+  /** Intersection point on plane when drag started */
+  dragStartPoint?: Vec3;
+  /** Whether we are in free transform mode */
+  isFreeTransform: boolean;
+  /** Height offset accumulated from scroll */
+  heightOffset: number;
+  /** Rotation accumulated from scroll */
+  rotationAngle: number;
 }
 
 /**
@@ -70,6 +85,10 @@ export class BlockDragController implements InteractionTool {
   // Keyboard modifiers state
   private isShiftPressed = false;
   private isAltPressed = false;
+  private isCtrlPressed = false;
+
+  // Helper for free transform
+  private freeTransformPlaneNormal: Vec3 = [0, 1, 0];
 
   constructor(private readonly config: BlockDragControllerConfig) {
     this.raycaster = new Raycaster();
@@ -107,6 +126,11 @@ export class BlockDragController implements InteractionTool {
     const worldMatrix = entity.transform.getWorldMatrix();
     const worldPos: Vec3 = [worldMatrix[12]!, worldMatrix[13]!, worldMatrix[14]!];
 
+    // Determine if we should start in free transform mode
+    // For now, toggle with a modifier key or check config/state
+    // Let's use CTRL as a toggle for "Free Transform" during drag
+    const isFreeTransform = event.ctrlKey;
+
     this.dragState = {
       entity,
       originalPosition: [...entity.transform.position] as Vec3,
@@ -119,10 +143,35 @@ export class BlockDragController implements InteractionTool {
       isPreview: false,
       canPlace: true,
       createdOnDrag: false,
+      isFreeTransform,
+      // Initialize plane drag data
+      dragPlaneNormal: [0, 1, 0], // Default to ground plane
+      dragStartPoint: hit.point,
+      heightOffset: 0,
+      rotationAngle: 0
     };
+
+    // Calculate initial drag plane based on camera view
+    if (isFreeTransform && this.config.cameraDirector) {
+       // For free transform, we want a plane perpendicular to camera look direction 
+       // or parallel to ground depending on angle?
+       // Standard behavior: drag on plane parallel to camera view plane passing through object center
+       // OR drag on horizontal plane (XZ) if looking from top/angle
+       // Let's default to horizontal XZ plane for "floor" feel, 
+       // unless Shift is pressed -> Vertical XY?
+       // For this prototype: Always XZ plane for simplicity unless we want to follow camera.
+       this.dragState.dragPlaneNormal = [0, 1, 0];
+       
+       // Recalculate start point on this plane to be precise
+       const planeHit = this.intersectRayPlane(ray, worldPos, [0, 1, 0]);
+       if (planeHit) {
+         this.dragState.dragStartPoint = planeHit;
+       }
+    }
 
     this.isAltPressed = event.altKey;
     this.isShiftPressed = event.shiftKey;
+    this.isCtrlPressed = event.ctrlKey;
     
     // Note: We don't capture pointer here, Manager handles global listeners.
     // But we can request capture if we want exclusive events even outside window?
@@ -137,9 +186,15 @@ export class BlockDragController implements InteractionTool {
     // Track modifiers
     this.isAltPressed = event.altKey;
     this.isShiftPressed = event.shiftKey;
+    this.isCtrlPressed = event.ctrlKey;
 
     if (!this.dragState) return;
     if (this.dragState.pointerId !== event.pointerId) return;
+
+    // Update free transform state if CTRL is pressed dynamically?
+    // Usually dragging mode is set on start, but toggling mid-drag is cool.
+    // Let's update the flag.
+    this.dragState.isFreeTransform = this.isCtrlPressed;
 
     // Check start threshold
     if (!this.isDragging) {
@@ -155,6 +210,39 @@ export class BlockDragController implements InteractionTool {
     }
 
     // Dragging logic
+    
+    if (this.dragState.isFreeTransform) {
+      // Free Transform Logic: Plane Dragging
+      const planeNormal = this.dragState.dragPlaneNormal || [0, 1, 0];
+      // Use original position as plane origin to keep it stable
+      const planeOrigin = this.dragState.originalWorldPosition;
+      
+      const hit = this.intersectRayPlane(ray, planeOrigin, planeNormal);
+      if (hit && this.dragState.dragStartPoint) {
+         // Calculate delta from start point
+         // Note: dragStartPoint is where ray hit the plane at START.
+         // hit is where ray hits plane NOW.
+         // The object should move by (hit - dragStartPoint).
+         
+         // Correction: We need to apply this delta to the ORIGINAL object position.
+         const delta = [
+           hit[0] - this.dragState.dragStartPoint[0],
+           hit[1] - this.dragState.dragStartPoint[1],
+           hit[2] - this.dragState.dragStartPoint[2]
+         ];
+         
+         const newPos: Vec3 = [
+           this.dragState.originalWorldPosition[0] + delta[0],
+           this.dragState.originalWorldPosition[1] + delta[1],
+           this.dragState.originalWorldPosition[2] + delta[2]
+         ];
+         
+         void this.updateDragPosition(newPos);
+         return;
+      }
+    }
+
+    // Standard Logic: Grid/Adjacency Snap
     // Try adjacent placement first
     const adjacent = this.getAdjacentPlacementFromRay(ray);
     if (adjacent) {
@@ -166,6 +254,46 @@ export class BlockDragController implements InteractionTool {
     const groundIntersection = this.raycastToGroundPlane(ray);
     if (groundIntersection) {
       void this.updateDragPosition(groundIntersection);
+    }
+  }
+
+  /**
+   * Renders visual guide lines during drag
+   */
+  private updateGuideLines(currentPos: Vec3): void {
+    const viz = this.config.guideLineVisualizer;
+    if (!viz) return;
+
+    viz.clear();
+
+    // Draw vertical line to ground (Anchor with Ruler)
+    const groundPos: Vec3 = [currentPos[0], 0, currentPos[2]]; // Assumes ground is at Y=0
+    // If we have a height offset, draw from original ground level to current height?
+    // currentPos is the center of block.
+    // If we lifted it, we want to see line to ground.
+    
+    // Use Ruler if height > 0
+    if (Math.abs(currentPos[1]) > 0.1) {
+        viz.drawRuler(groundPos, currentPos, [1, 1, 1, 0.5]);
+    } else {
+        viz.drawLine(currentPos, groundPos, [1, 1, 1, 0.5]);
+    }
+
+    // Draw Rotation Circle if Shift is pressed
+    if (this.isShiftPressed) {
+        // Draw circle at ground or at object center?
+        // At object center seems better for "Turntable" feel.
+        viz.drawCircle(currentPos, 1.5, 'y', [1, 1, 0, 0.5]); // Yellow circle
+    }
+
+    // Draw X/Z axis lines from start point if in free transform
+    if (this.dragState?.isFreeTransform && this.dragState.originalWorldPosition) {
+       const start = this.dragState.originalWorldPosition;
+       
+       // Line to X axis of start
+       viz.drawLine(currentPos, [start[0], currentPos[1], currentPos[2]], [1, 0, 0, 0.5]);
+       // Line to Z axis of start
+       viz.drawLine(currentPos, [currentPos[0], currentPos[1], start[2]], [0, 0, 1, 0.5]);
     }
   }
 
@@ -258,8 +386,38 @@ export class BlockDragController implements InteractionTool {
     this.config.onStatusMessage?.('Dragging block (Esc to cancel)');
   }
 
+
+  public onWheel(event: WheelEvent): void {
+    if (!this.dragState) return;
+
+    // Sensitivity
+    const scrollAmount = event.deltaY * -0.002; 
+
+    if (this.isShiftPressed) {
+        // Rotate
+        this.dragState.rotationAngle += scrollAmount * 100; // Degrees
+        
+        // Apply rotation immediately
+        const axis: Vec3 = [0, 1, 0];
+        const deltaQ = quatFromAxisAngle(axis, this.dragState.rotationAngle * (Math.PI / 180));
+        this.dragState.entity.transform.rotation = quatMultiply(this.dragState.originalRotation, deltaQ);
+    } else {
+        // Height
+        this.dragState.heightOffset += scrollAmount * 5; // Faster height
+    }
+    
+    // Force update if we have a last known position
+    if (this.lastTargetPosition) {
+        void this.updateDragPosition(this.lastTargetPosition);
+    }
+  }
+
+  private lastTargetPosition: Vec3 | null = null;
+
   private async updateDragPosition(targetPosition: Vec3): Promise<void> {
     if (!this.dragState || !this.isDragging) return;
+    
+    this.lastTargetPosition = targetPosition;
 
     const entity = this.dragState.entity;
     let finalPosition = targetPosition;
@@ -282,6 +440,13 @@ export class BlockDragController implements InteractionTool {
         finalPosition = [startPos[0], startPos[1], finalPosition[2]];
       }
     }
+
+    // Apply Height Offset (The Forklift)
+    finalPosition = [
+        finalPosition[0],
+        finalPosition[1] + this.dragState.heightOffset,
+        finalPosition[2]
+    ];
 
     const localPosition = this.worldToLocalPosition(finalPosition, entity.parent);
     entity.transform.position = localPosition;
@@ -318,6 +483,7 @@ export class BlockDragController implements InteractionTool {
     }
 
     this.config.updateSceneBuffers();
+    this.updateGuideLines(finalPosition);
   }
 
   private completeDrag(): void {
@@ -342,6 +508,7 @@ export class BlockDragController implements InteractionTool {
       this.config.onStatusMessage?.('Cannot place here (collision)', 1000);
     }
 
+    this.config.guideLineVisualizer?.clear();
     this.config.controls.setEnabled(true);
     this.dragState = null;
     this.isDragging = false;
@@ -369,6 +536,7 @@ export class BlockDragController implements InteractionTool {
       }
 
       this.config.updateSceneBuffers();
+      this.config.guideLineVisualizer?.clear();
 
       if (!silent) {
         this.config.onStatusMessage?.('Drag cancelled', 1000);
@@ -515,5 +683,23 @@ export class BlockDragController implements InteractionTool {
     const center: Vec3 = [wm[12] ?? 0, wm[13] ?? 0, wm[14] ?? 0];
     const halfSizes: Vec3 = [Math.abs(sx) * 0.5, Math.abs(sy) * 0.5, Math.abs(sz) * 0.5];
     return { center, axes: [axis0, axis1, axis2], halfSizes };
+  }
+
+  private intersectRayPlane(ray: Ray, planeOrigin: Vec3, planeNormal: Vec3): Vec3 | null {
+    const denom = dotVec3(planeNormal, ray.direction);
+    if (Math.abs(denom) < 1e-6) return null;
+    const diff = [
+      planeOrigin[0] - ray.origin[0],
+      planeOrigin[1] - ray.origin[1],
+      planeOrigin[2] - ray.origin[2]
+    ] as Vec3;
+    const t = dotVec3(diff, planeNormal) / denom;
+    if (t < 0) return null;
+    
+    return [
+      ray.origin[0] + ray.direction[0] * t,
+      ray.origin[1] + ray.direction[1] * t,
+      ray.origin[2] + ray.direction[2] * t
+    ];
   }
 }

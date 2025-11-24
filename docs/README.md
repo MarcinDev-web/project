@@ -71,6 +71,10 @@ Complete documentation for the UGC 3D Platform project.
   - [MULTIPLAYER_USAGE.md](./gameplay/MULTIPLAYER_USAGE.md) - Multiplayer usage
   - [MULTIPLAYER_READINESS_REPORT.md](./gameplay/MULTIPLAYER_READINESS_REPORT.md) - Multiplayer readiness
 
+### Scripting & Logic
+- **[scripting/](./scripting/)** - Visual scripting documentation
+  - [LOGIC_CUBES.md](./scripting/LOGIC_CUBES.md) - LogicCubes reference guide
+
 ### Automation & Release
 - **[automation/](./automation/)** - Release and CI/CD automation
   - [AUTOMATION_QUICK_START.md](./automation/AUTOMATION_QUICK_START.md) - Quick start for automation

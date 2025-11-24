@@ -14,17 +14,17 @@ export default defineConfig(({ command }) => {
   const alias: Record<string, string> = isBuild
     ? {} // No aliases needed - packages will be externalized
     : {
-        '@engine/core': resolvePath('../../packages/core/src'),
-        '@engine/world': resolvePath('../../packages/world/src'),
-        '@engine/world/components': resolvePath('../../packages/world/src/components'),
-        '@engine/gfx-webgpu': resolvePath('../../packages/gfx-webgpu/src'),
-        '@engine/input': resolvePath('../../packages/input/src'),
-        '@engine/camera': resolvePath('../../packages/camera/src'),
-        '@engine/stdlib': resolvePath('../../packages/stdlib/src'),
-        '@engine/script': resolvePath('../../packages/script/src'),
-        '@engine/editor-utils': resolvePath('../../packages/editor-utils/src'),
-        '@engine/wasm-collision': resolvePath('../../packages/wasm-collision/src'),
-        '@engine/avatar': resolvePath('../../packages/avatar/src'),
+        '@engine/core': '../../packages/core/src',
+        '@engine/world/components': '../../packages/world/src/components',
+        '@engine/world': '../../packages/world/src',
+        '@engine/gfx-webgpu': '../../packages/gfx-webgpu/src',
+        '@engine/input': '../../packages/input/src',
+        '@engine/camera': '../../packages/camera/src',
+        '@engine/stdlib': '../../packages/stdlib/src',
+        '@engine/script': '../../packages/script/src',
+        '@engine/editor-utils': '../../packages/editor-utils/src',
+        '@engine/wasm-collision': '../../packages/wasm-collision/src',
+        '@engine/avatar': '../../packages/avatar/src',
       };
 
   return {

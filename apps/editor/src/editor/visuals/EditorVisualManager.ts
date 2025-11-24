@@ -6,6 +6,7 @@ import { GridRenderer } from '../grid/GridRenderer';
 import { GizmoController } from '../controllers/GizmoController';
 import type { SnapSystem } from '@engine/editor-utils';
 import { SelectionVisualController } from './SelectionVisualController';
+import { GuideLineVisualizer } from './GuideLineVisualizer';
 import { DisposableGroup } from '@engine/core/utils';
 import { effect } from '@preact/signals-core';
 import { Logger } from '../../utils/logger';
@@ -45,6 +46,7 @@ export class EditorVisualManager {
   private gridRenderer: GridRenderer | null = null;
   private gizmoController: GizmoController | null = null;
   private selectionController: SelectionVisualController;
+  private guideLineVisualizer: GuideLineVisualizer;
   private animationFrameHandle: number | null = null;
   
   // Remote camera markers overlay
@@ -58,6 +60,9 @@ export class EditorVisualManager {
       config.updateSceneBuffers
     );
     this.disposables.add(() => this.selectionController.dispose());
+
+    this.guideLineVisualizer = new GuideLineVisualizer(config.scene);
+    this.disposables.add(() => this.guideLineVisualizer.dispose());
   }
 
   /**
@@ -370,6 +375,13 @@ export class EditorVisualManager {
    */
   getGizmoController(): GizmoController | null {
     return this.gizmoController;
+  }
+
+  /**
+   * Gets the guide line visualizer instance.
+   */
+  getGuideLineVisualizer(): GuideLineVisualizer {
+    return this.guideLineVisualizer;
   }
 
   /**

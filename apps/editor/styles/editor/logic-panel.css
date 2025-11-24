@@ -23,12 +23,24 @@
   font-weight: 600;
 }
 
-.logic-panel__enabled label {
+.logic-panel__controls {
+  display: flex;
+  gap: 1rem;
+}
+
+.logic-panel__control {
   display: flex;
   align-items: center;
   gap: 0.5rem;
   cursor: pointer;
-  font-size: 0.9rem;
+  font-size: 0.85rem;
+  color: rgba(255, 255, 255, 0.9);
+  user-select: none;
+}
+
+.logic-panel__control input[type="checkbox"] {
+  cursor: pointer;
+  accent-color: var(--color-primary-500, #3b82f6);
 }
 
 .logic-panel__empty {
@@ -110,6 +122,90 @@
   cursor: pointer;
 }
 
+/* Connections List */
+.logic-panel__connections-group {
+  margin-bottom: 1rem;
+  background: rgba(0, 0, 0, 0.1);
+  border-radius: 6px;
+  padding: 0.5rem;
+}
+
+.logic-panel__connections-group h5 {
+  margin: 0 0 0.5rem 0;
+  font-size: 0.8rem;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  color: rgba(255, 255, 255, 0.6);
+}
+
+.logic-panel__connections {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.logic-panel__connection {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.5rem;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 4px;
+  font-size: 0.85rem;
+  transition: background 0.2s, border-color 0.2s;
+  border: 1px solid transparent;
+}
+
+.logic-panel__connection:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+
+/* Debug Visualization */
+.logic-panel__connection.active-signal {
+  background: rgba(59, 130, 246, 0.2);
+  border-color: rgba(59, 130, 246, 0.5);
+  animation: signalPulse 0.3s ease-out;
+}
+
+@keyframes signalPulse {
+  0% { box-shadow: 0 0 0 0 rgba(59, 130, 246, 0.7); }
+  100% { box-shadow: 0 0 0 6px rgba(59, 130, 246, 0); }
+}
+
+.port-icon {
+  font-size: 1.1rem;
+  opacity: 0.8;
+}
+
+.connection-text {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+
+.entity-name {
+  font-weight: 600;
+  color: #a5f3fc; /* cyan-200 */
+}
+
+.port-label {
+  color: #e2e8f0; /* slate-200 */
+}
+
+.port-label-sm {
+  font-size: 0.75rem;
+  color: rgba(255, 255, 255, 0.5);
+}
+
+.arrow {
+  color: rgba(255, 255, 255, 0.4);
+  font-weight: bold;
+}
+
 /* Responsive adjustments */
 @media (max-width: 768px) {
   .logic-panel {
@@ -119,5 +215,8 @@
   .logic-panel__header h3 {
     font-size: 1rem;
   }
+  
+  .connection-text {
+    font-size: 0.8rem;
+  }
 }
-

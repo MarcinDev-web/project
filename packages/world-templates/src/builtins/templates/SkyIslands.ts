@@ -15,7 +15,7 @@ import {
   PowerUpPickupComponent,
   HealthComponent
 } from '@engine/world';
-import { Vec3 } from '@engine/core/math';
+import type { Vec3 } from '@engine/core/math';
 import type { TemplateProvider } from '../../types';
 import type { WeaponPresetType } from '@engine/world/types/weapon.js';
 
@@ -64,7 +64,7 @@ export function createSkyIslandsTemplate(): TemplateProvider {
       const crystalColor = [0.0, 1.0, 1.0, 0.8];
 
       // Helper to create a block
-      const createBlock = (name: string, pos: number[], size: number[], color: number[], isStatic = true) => {
+      const createBlock = (name: string, pos: number[], size: number[], color: number[], _isStatic = true) => {
         const entity = new Entity(name);
         const mesh = new MeshComponent();
         mesh.meshType = 'cube';
@@ -102,14 +102,14 @@ export function createSkyIslandsTemplate(): TemplateProvider {
           npc.behavior = 'patrol';
           // Patrol around spawn
           npc.patrolWaypoints = [
-            [pos[0], pos[1], pos[2]],
-            [pos[0] + 5, pos[1], pos[2] + 5],
-            [pos[0] - 5, pos[1], pos[2] + 5],
-            [pos[0], pos[1], pos[2] - 5]
+            [pos[0] ?? 0, pos[1] ?? 0, pos[2] ?? 0],
+            [(pos[0] ?? 0) + 5, pos[1] ?? 0, (pos[2] ?? 0) + 5],
+            [(pos[0] ?? 0) - 5, pos[1] ?? 0, (pos[2] ?? 0) + 5],
+            [pos[0] ?? 0, pos[1] ?? 0, (pos[2] ?? 0) - 5]
           ];
         } else {
           npc.behavior = 'guard-position';
-          npc.guardPosition = [pos[0], pos[1], pos[2]];
+          npc.guardPosition = [pos[0] ?? 0, pos[1] ?? 0, pos[2] ?? 0];
           npc.guardRadius = 8.0;
         }
         entity.addComponent(npc);
@@ -264,9 +264,9 @@ export function createSkyIslandsTemplate(): TemplateProvider {
         const angle = i * (Math.PI / 2);
         const radius = 8;
         const height = i * 3;
-        const x = towerBase[0] + Math.cos(angle) * radius;
-        const z = towerBase[2] + Math.sin(angle) * radius;
-        const y = towerBase[1] + height;
+        const x = (towerBase[0] ?? 0) + Math.cos(angle) * radius;
+        const z = (towerBase[2] ?? 0) + Math.sin(angle) * radius;
+        const y = (towerBase[1] ?? 0) + height;
         
         const step = createBlock(`TowerStep${i}`, [x, y, z], [3, 0.5, 3], metalColor);
         scene.addEntity(step);

@@ -12,7 +12,7 @@
  */
 
 import type { Scene, Entity } from '@engine/world';
-import { EnvironmentComponent, TransformComponent } from '@engine/world';
+import { EnvironmentComponent, Transform } from '@engine/world';
 import type { FrameResources, GeometryData } from '../resources/resources';
 import { FrustumCuller } from './FrustumCuller';
 import { InstanceDataBuilder, type CustomGeometryEntity } from './InstanceManager';
@@ -811,7 +811,7 @@ export class FrameRenderer {
              
              for (let i = 0; i < count; i++) {
                const entity = allEntities[i];
-               const transform = entity.getComponent(TransformComponent);
+               const transform = entity.getComponent(Transform);
                
                // Calculate indices
                const pBase = pStart + (i * 3);

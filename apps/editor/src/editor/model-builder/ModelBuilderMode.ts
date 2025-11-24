@@ -39,6 +39,8 @@ export interface ToolState {
   materialId: string;
   /** Current rotation */
   rotation: 0 | 1 | 2 | 3;
+  /** Enable Easy Place mode (continuous placement) */
+  easyPlace: boolean;
 }
 
 /**
@@ -378,6 +380,7 @@ export class ModelBuilderMode {
     shape: 'cube',
     materialId: 'plastic_red',
     rotation: 0,
+    easyPlace: false,
   };
   private isActive = false;
   private undoHandlerCleanup: (() => void) | null = null;
@@ -485,6 +488,14 @@ export class ModelBuilderMode {
   rotateBlock(): void {
     this.toolState.rotation = ((this.toolState.rotation + 1) % 4) as ToolState['rotation'];
     this.logger?.debug(`Rotation cycled to: ${this.toolState.rotation}`);
+  }
+
+  /**
+   * Toggles Easy Place mode
+   */
+  toggleEasyPlace(): void {
+    this.toolState.easyPlace = !this.toolState.easyPlace;
+    this.logger?.debug(`Easy Place toggled: ${this.toolState.easyPlace}`);
   }
 
   /**

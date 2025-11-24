@@ -43,7 +43,7 @@ export class WeaponComponent extends Component {
   weaponPreset?: WeaponPresetType;
 
   /** Weapon type */
-  type: WeaponType = 'hitscan';
+  weaponType: WeaponType = 'hitscan';
 
   /** Base damage per shot (before modifiers) */
   private _baseDamage: number = 25;
@@ -195,7 +195,7 @@ export class WeaponComponent extends Component {
   constructor(data?: WeaponComponentData) {
     super();
     if (data) {
-      this.type = data.type ?? this.type;
+      this.weaponType = data.type ?? this.weaponType;
       this._baseDamage = data.damage ?? this._baseDamage;
       this._baseFireRate = data.fireRate ?? this._baseFireRate;
       this._baseRange = data.range ?? this._baseRange;
@@ -466,7 +466,7 @@ export class WeaponComponent extends Component {
   clone(): WeaponComponent {
     const copy = new WeaponComponent();
     if (this.weaponPreset !== undefined) copy.weaponPreset = this.weaponPreset;
-    copy.type = this.type;
+    copy.weaponType = this.weaponType;
     copy._baseDamage = this._baseDamage;
     copy._baseFireRate = this._baseFireRate;
     copy._baseRange = this._baseRange;
@@ -504,7 +504,7 @@ export class WeaponComponent extends Component {
   } {
     return {
       ...(this.weaponPreset !== undefined && { weaponPreset: this.weaponPreset }),
-      type: this.type,
+      type: this.weaponType,
       damage: this._baseDamage,
       fireRate: this._baseFireRate,
       range: this._baseRange,
@@ -537,7 +537,7 @@ export class WeaponComponent extends Component {
     acceptedAmmoTypes?: AmmoType[];
   }): void {
     if (data.weaponPreset !== undefined) this.weaponPreset = data.weaponPreset;
-    if (data.type !== undefined) this.type = data.type;
+    if (data.type !== undefined) this.weaponType = data.type;
     if (typeof data.damage === 'number') this._baseDamage = data.damage;
     if (typeof data.fireRate === 'number') this._baseFireRate = data.fireRate;
     if (typeof data.range === 'number') this._baseRange = data.range;

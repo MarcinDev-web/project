@@ -25,6 +25,7 @@ export interface KeyBindingConfig {
   toolPaint: string[];
   toolSelect: string[];
   toolBox: string[];
+  toggleEasyPlace: string[];
 }
 
 const DEFAULT_KEY_BINDINGS: KeyBindingConfig = {
@@ -36,6 +37,7 @@ const DEFAULT_KEY_BINDINGS: KeyBindingConfig = {
   toolPaint: ['3'],
   toolSelect: ['4'],
   toolBox: ['5'],
+  toggleEasyPlace: ['e'],
 };
 
 /**
@@ -73,6 +75,7 @@ export class ModelBuilderController implements InteractionTool {
   private isDragging = false;
   private boxStartPos: LocalPos | null = null;
   private lastHitPos: LocalPos | null = null;
+  private lastPlacedPos: LocalPos | null = null;
 
   constructor(
     scene: Scene,
@@ -174,12 +177,41 @@ export class ModelBuilderController implements InteractionTool {
     }
 
     // Handle dragging
-    if (this.isDragging && hitPos) {
-      if (toolState.mode === 'box') {
-        // Just update lastHitPos for reference, actual preview is handled above
-        this.lastHitPos = hitPos;
-      } else {
-        this.handleDrag(ray);
+    if (this.isDragging) {
+      const toolState = this.mode.getToolState();
+
+      // Easy Place Logic
+      if (toolState.easyPlace && toolState.mode === 'place' && this.lastPlacedPos) {
+        const neighborPos = this.findNeighborHit(ray, this.lastPlacedPos);
+        if (neighborPos) {
+           // Only place if different from last placed (though findNeighborHit returns neighbors, so it's always different)
+           // But we might re-hit the same neighbor if we move mouse slightly.
+           // Actually findNeighborHit returns a neighbor of lastPlacedPos.
+           // If we successfully place, lastPlacedPos updates.
+           
+           // Check if neighborPos is occupied? placeBlock handles that (returns false if can't place?)
+           // placeBlock usually overwrites. But for easy place we might want to check emptiness?
+           // The user said "one on top of another", implies stacking.
+           
+           if (this.mode.placeBlock(neighborPos)) {
+             this.lastPlacedPos = neighborPos;
+             this.lastHitPos = neighborPos;
+             // Update preview to new position
+             this.updatePreview(neighborPos, true);
+           }
+        }
+        // In Easy Place mode, we skip the normal drag logic to prevent painting on surface
+        // This allows extruding into air.
+        return;
+      }
+
+      if (hitPos) {
+        if (toolState.mode === 'box') {
+          // Just update lastHitPos for reference, actual preview is handled above
+          this.lastHitPos = hitPos;
+        } else {
+          this.handleDrag(ray);
+        }
       }
     }
   }
@@ -246,7 +278,9 @@ export class ModelBuilderController implements InteractionTool {
 
     if (button === 'left') {
       if (toolState.mode === 'place') {
-        this.mode.placeBlock(hitPos);
+        if (this.mode.placeBlock(hitPos)) {
+          this.lastPlacedPos = hitPos;
+        }
       } else if (toolState.mode === 'remove') {
         this.mode.removeBlock(hitPos);
       } else if (toolState.mode === 'paint') {
@@ -315,6 +349,12 @@ export class ModelBuilderController implements InteractionTool {
     const ctrl = modifiers?.ctrl ?? false;
     const shift = modifiers?.shift ?? false;
 
+    // Toggle Easy Place
+    if (this.keyBindings.toggleEasyPlace.includes(key.toLowerCase())) {
+      this.mode.toggleEasyPlace();
+      return true;
+    }
+
     // Undo/Redo
     if (ctrl && this.keyBindings.undo.includes(key.toLowerCase()) && !shift) {
       return this.mode.undo();
@@ -372,9 +412,87 @@ export class ModelBuilderController implements InteractionTool {
     this.cachedEntityCount = -1;
     this.isDragging = false;
     this.lastHitPos = null;
+    this.lastPlacedPos = null;
     this.boxStartPos = null;
     this.preview.hidePreview();
     this.logger.debug('ModelBuilderController disposed');
+  }
+
+  private findNeighborHit(ray: Ray, centerPos: LocalPos): LocalPos | null {
+    // Neighbors: +X, -X, +Y, -Y, +Z, -Z
+    const dirs: LocalPos[] = [
+      [1, 0, 0], [-1, 0, 0],
+      [0, 1, 0], [0, -1, 0],
+      [0, 0, 1], [0, 0, -1]
+    ];
+
+    let closestDist = Infinity;
+    let bestPos: LocalPos | null = null;
+
+    for (const dir of dirs) {
+      const neighbor: LocalPos = [
+        centerPos[0] + dir[0],
+        centerPos[1] + dir[1],
+        centerPos[2] + dir[2]
+      ];
+
+      // Construct AABB for neighbor in world space
+      const min: [number, number, number] = [
+        neighbor[0] * MICRO_BLOCK_SIZE,
+        neighbor[1] * MICRO_BLOCK_SIZE,
+        neighbor[2] * MICRO_BLOCK_SIZE
+      ];
+      const max: [number, number, number] = [
+        min[0] + MICRO_BLOCK_SIZE,
+        min[1] + MICRO_BLOCK_SIZE,
+        min[2] + MICRO_BLOCK_SIZE
+      ];
+
+      const dist = this.intersectAABB(ray, min, max);
+      if (dist !== null && dist < closestDist) {
+        closestDist = dist;
+        bestPos = neighbor;
+      }
+    }
+
+    return bestPos;
+  }
+
+  private intersectAABB(ray: Ray, min: [number, number, number], max: [number, number, number]): number | null {
+    let tmin = (min[0] - ray.origin[0]) / ray.direction[0];
+    let tmax = (max[0] - ray.origin[0]) / ray.direction[0];
+
+    if (tmin > tmax) {
+      const temp = tmin; tmin = tmax; tmax = temp;
+    }
+
+    let tymin = (min[1] - ray.origin[1]) / ray.direction[1];
+    let tymax = (max[1] - ray.origin[1]) / ray.direction[1];
+
+    if (tymin > tymax) {
+      const temp = tymin; tymin = tymax; tymax = temp;
+    }
+
+    if ((tmin > tymax) || (tymin > tmax)) return null;
+
+    if (tymin > tmin) tmin = tymin;
+    if (tymax < tmax) tmax = tymax;
+
+    let tzmin = (min[2] - ray.origin[2]) / ray.direction[2];
+    let tzmax = (max[2] - ray.origin[2]) / ray.direction[2];
+
+    if (tzmin > tzmax) {
+      const temp = tzmin; tzmin = tzmax; tzmax = temp;
+    }
+
+    if ((tmin > tzmax) || (tzmin > tmax)) return null;
+
+    if (tzmin > tmin) tmin = tzmin;
+    if (tzmax < tmax) tmax = tzmax;
+
+    if (tmax < 0) return null;
+
+    return tmin >= 0 ? tmin : tmax;
   }
 
   private getMicroBlockEntities(): Entity[] {

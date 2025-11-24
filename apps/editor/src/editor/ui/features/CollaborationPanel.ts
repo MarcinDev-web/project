@@ -158,6 +158,35 @@ export class CollaborationPanel {
     });
     panel.appendChild(this.startButton);
 
+    // Invite button (hidden by default)
+    const inviteButton = document.createElement('button');
+    inviteButton.id = 'collab-invite-btn';
+    inviteButton.textContent = 'Copy Invite Link';
+    inviteButton.style.cssText = `
+      width: 100%;
+      padding: 10px;
+      background: #34d399;
+      color: white;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 500;
+      margin-bottom: 12px;
+      display: none;
+      transition: background 0.2s;
+    `;
+    inviteButton.addEventListener('mouseenter', () => {
+      inviteButton.style.background = '#10b981';
+    });
+    inviteButton.addEventListener('mouseleave', () => {
+      inviteButton.style.background = '#34d399';
+    });
+    inviteButton.addEventListener('click', () => {
+      this.handleCopyInviteLink(inviteButton);
+    });
+    panel.appendChild(inviteButton);
+
     // Stop button
     this.stopButton = document.createElement('button');
     this.stopButton.textContent = 'Stop Collaboration';
@@ -308,6 +337,11 @@ export class CollaborationPanel {
       if (this.startButton) {
         this.startButton.style.display = 'none';
       }
+      const inviteButton = this.root?.querySelector('#collab-invite-btn') as HTMLElement;
+      if (inviteButton) {
+        inviteButton.style.display = 'block';
+        inviteButton.dataset.sessionId = sessionId;
+      }
       if (this.stopButton) {
         this.stopButton.style.display = 'block';
       }
@@ -341,6 +375,10 @@ export class CollaborationPanel {
     if (this.startButton) {
       this.startButton.style.display = 'block';
     }
+    const inviteButton = this.root?.querySelector('#collab-invite-btn') as HTMLElement;
+    if (inviteButton) {
+      inviteButton.style.display = 'none';
+    }
     if (this.stopButton) {
       this.stopButton.style.display = 'none';
     }
@@ -355,6 +393,26 @@ export class CollaborationPanel {
     if (this.config.onStopSession) {
       this.config.onStopSession();
     }
+  }
+
+  private handleCopyInviteLink(button: HTMLButtonElement): void {
+    const sessionId = button.dataset.sessionId;
+    if (!sessionId) return;
+
+    const url = new URL(window.location.href);
+    url.searchParams.set('session', sessionId);
+    
+    navigator.clipboard.writeText(url.toString()).then(() => {
+      const originalText = button.textContent;
+      button.textContent = 'Copied!';
+      button.style.background = '#10b981';
+      setTimeout(() => {
+        button.textContent = originalText;
+        button.style.background = '#34d399';
+      }, 2000);
+    }).catch(err => {
+      console.error('Failed to copy invite link:', err);
+    });
   }
 
   /**

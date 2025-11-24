@@ -1,5 +1,5 @@
 import { Entity, Scene, SelectionManager } from '@engine/world';
-import { RgbaColor } from '../../utils/colors';
+import type { RgbaColor } from '../../utils/colors';
 
 const HIGHLIGHT_BOOST = 0.3;
 const SELECTION_TINT: RgbaColor = [1.0, 0.8, 0.2, 1.0]; // Gold/Orange tint

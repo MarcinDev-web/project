@@ -1,7 +1,7 @@
 import { Entity, MaterialComponent } from '@engine/world';
 import type { AssetPreset } from '../../types/BlockAssetTypes';
-import { PlacementTool, PlacementToolContext, ToolAction } from './PlacementTool';
-import { Vec3 } from '@engine/core/math';
+import { PlacementTool, type PlacementToolContext, type ToolAction } from './PlacementTool';
+import type { Vec3 } from '@engine/core/math';
 import { initializeBaseColor } from '../../visuals/SelectionVisuals';
 
 export class PaintPlacementTool extends PlacementTool {

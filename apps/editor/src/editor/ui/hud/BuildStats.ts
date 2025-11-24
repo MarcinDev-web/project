@@ -177,13 +177,13 @@ export class BuildStats {
         ${rendererStats.drawCalls !== null ? `
           <div class="build-stats-item">
             <span class="build-stats-key">Draw Calls</span>
-            <span class="build-stats-value">${rendererStats.drawCalls}</span>
+            <span class="build-stats-value ${this.getDrawCallClass(rendererStats.drawCalls)}">${rendererStats.drawCalls}</span>
           </div>
         ` : ''}
         ${rendererStats.triangles !== null ? `
           <div class="build-stats-item">
             <span class="build-stats-key">Triangles</span>
-            <span class="build-stats-value">${this.formatNumber(rendererStats.triangles)}</span>
+            <span class="build-stats-value ${this.getTriangleClass(rendererStats.triangles)}">${this.formatNumber(rendererStats.triangles)}</span>
           </div>
         ` : ''}
       </div>
@@ -323,6 +323,24 @@ export class BuildStats {
     if (this.fps >= 55) return 'fps-good';
     if (this.fps >= 30) return 'fps-ok';
     return 'fps-bad';
+  }
+
+  /**
+   * Gets CSS class for draw calls.
+   */
+  private getDrawCallClass(count: number): string {
+    if (count > 1000) return 'stat-bad';
+    if (count > 500) return 'stat-warn';
+    return '';
+  }
+
+  /**
+   * Gets CSS class for triangle count.
+   */
+  private getTriangleClass(count: number): string {
+    if (count > 1000000) return 'stat-bad';
+    if (count > 500000) return 'stat-warn';
+    return '';
   }
 
   /**

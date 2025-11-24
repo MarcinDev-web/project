@@ -103,6 +103,41 @@ interface ProjectData {
  * @throws Error if build not found or invalid data
  */
 export async function loadBuildData(buildId: string): Promise<BuildData> {
+  // Special Case: SDF Demo
+  if (buildId === 'sdf-demo') {
+    const scene = Scenarios.createSDFDemoScene();
+    const sceneJSON = JSON.stringify(scene.toJSON());
+    
+    return {
+      sceneJSON,
+      playerStart: { position: [0, 2, 5], rotation: 0 },
+      manifest: {
+        version: 1,
+        playerStart: { position: [0, 2, 5], rotation: 0 },
+        simulation: { enableMultiplayer: false },
+        pawn: {
+          cameraTarget: { offset: [0, 0, 0], collisionRadius: 0.1 },
+          physics: { rigidbody: { type: 'kinematic', mass: 1, useGravity: false } },
+          kcc: { moveSpeed: 10, sprintMultiplier: 2, jumpForce: 0, gravityMultiplier: 0 }
+        },
+        controller: {
+          input: {
+             movement: {
+              forward: ['KeyW', 'ArrowUp'],
+              backward: ['KeyS', 'ArrowDown'],
+              left: ['KeyA', 'ArrowLeft'],
+              right: ['KeyD', 'ArrowRight']
+            },
+            actions: {
+              sprint: ['ShiftLeft'],
+            }
+          },
+          preferences: { fov: 60, invertY: false, sensitivity: 0.0025 }
+        }
+      }
+    };
+  }
+
   // Special Case: GTA Demo
   if (buildId === 'gta-demo') {
     const scene = Scenarios.createCityDemoScene();

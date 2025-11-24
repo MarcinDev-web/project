@@ -92,6 +92,13 @@ export class SelectionManager {
     this.notifyChange();
   }
 
+  /**
+   * Gets the bound scene.
+   */
+  get scene(): Scene | null {
+    return this._scene;
+  }
+
   /** Binds the scene so selectAll/selectByType can operate. */
   setScene(scene: Scene): void {
     this._scene = scene;

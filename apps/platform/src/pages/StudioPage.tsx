@@ -10,6 +10,7 @@ import { AvatarsList } from '../components/studio/AvatarsList';
 import { StudioLeaderboard } from '../components/studio/StudioLeaderboard';
 import { TeamManagement } from '../components/studio/TeamManagement';
 import { PublishModal } from '../components/studio/PublishModal';
+import { StudioMonetization } from '../components/studio/StudioMonetization';
 import '../styles/studio.css';
 
 export function StudioPage() {
@@ -18,7 +19,7 @@ export function StudioPage() {
   const [avatars, setAvatars] = useState<AvatarPreset[]>([]);
   const [stats, setStats] = useState<StudioStatsType | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'projects' | 'avatars' | 'leaderboard' | 'team'>('projects');
+  const [activeTab, setActiveTab] = useState<'projects' | 'avatars' | 'leaderboard' | 'team' | 'monetization'>('projects');
   const [publishModalProject, setPublishModalProject] = useState<StudioProject | null>(null);
   const [publishModalAvatar, setPublishModalAvatar] = useState<AvatarPreset | null>(null);
 
@@ -190,6 +191,12 @@ export function StudioPage() {
           >
             Ekipa
           </button>
+          <button
+            className={`studio-tab ${activeTab === 'monetization' ? 'active' : ''}`}
+            onClick={() => setActiveTab('monetization')}
+          >
+            Monetyzacja
+          </button>
         </div>
 
         <div className="studio-content">
@@ -224,6 +231,12 @@ export function StudioPage() {
           {activeTab === 'team' && (
             <div className="studio-team-section">
               <TeamManagement />
+            </div>
+          )}
+
+          {activeTab === 'monetization' && (
+            <div className="studio-monetization-section">
+              <StudioMonetization projects={projects} />
             </div>
           )}
         </div>

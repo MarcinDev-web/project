@@ -29,6 +29,7 @@ import { TemplateGalleryPanel } from '../content/TemplateGalleryPanel';
 import { VegetationPanel } from '../gameplay/VegetationPanel';
 import { EconomyPanel } from '../gameplay/EconomyPanel';
 import { MarketplacePanel, type MarketplacePanelConfig } from '../content/MarketplacePanel';
+import { AssetUploadPanel } from '../content/AssetUploadPanel';
 import { UIPanel } from './UIPanel';
 import { NpcPanel } from '../gameplay/NpcPanel';
 import { WeaponPanel } from '../gameplay/WeaponPanel';
@@ -113,6 +114,7 @@ export class EditorPanelManager {
   private resizableSidebar: ResizableSidebar | null = null;
   private resizableInspector: ResizableSidebar | null = null;
   private marketplacePanel: MarketplacePanel | null = null;
+  private assetUploadPanel: AssetUploadPanel | null = null;
 
   constructor(private readonly config: EditorPanelManagerConfig) {}
 
@@ -311,6 +313,9 @@ export class EditorPanelManager {
       marketplacePanelConfig.onAssetPurchased = onMarketplaceAssetPurchased;
     }
     this.marketplacePanel = new MarketplacePanel(marketplacePanelConfig);
+
+    // Initialize Asset Upload Panel
+    this.assetUploadPanel = new AssetUploadPanel();
 
     // Initialize Weapon Panel
     this.weaponPanel = new WeaponPanel({
@@ -529,6 +534,13 @@ export class EditorPanelManager {
       label: 'Marketplace',
       icon: 'box',
       content: this.marketplacePanel.element,
+    });
+
+    this.sidebarTabs.addTab({
+      id: 'uploads',
+      label: 'Uploads',
+      icon: 'upload-cloud',
+      content: this.assetUploadPanel.element,
     });
 
     if (this.terrainPanel) {

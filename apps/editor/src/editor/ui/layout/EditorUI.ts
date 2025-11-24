@@ -63,6 +63,7 @@ import { LoginModal } from '../modals/LoginModal';
 import { RegisterModal } from '../modals/RegisterModal';
 import { WelcomeOverlay, type WelcomeOverlayConfig } from '../onboarding/WelcomeOverlay';
 import { InteractiveTutorial, createEditorTutorial } from '../onboarding/InteractiveTutorial';
+import { TutorialManager } from '../onboarding/TutorialManager';
 import { QuickStartGuide } from '../onboarding/QuickStartGuide';
 import { BuildStats } from '../hud/BuildStats';
 import { FloatingHints } from '../hud/FloatingHints';
@@ -176,6 +177,7 @@ export class EditorUI {
   private registerModal: RegisterModal | null = null;
   private welcomeOverlay: WelcomeOverlay | null = null;
   private interactiveTutorial: InteractiveTutorial | null = null;
+  private tutorialManager: TutorialManager | null = null;
   private quickStartGuide: QuickStartGuide | null = null;
   private buildStats: BuildStats | null = null;
   private floatingHints: FloatingHints | null = null;
@@ -1024,6 +1026,9 @@ export class EditorUI {
     this.featureIntro = new FeatureIntroduction();
     this.disposables.add(() => this.featureIntro?.dispose());
 
+    // Initialize Tutorial Manager
+    this.tutorialManager = new TutorialManager(this);
+
     // Initialize Collaboration Manager (optional - requires auth token)
     this.initializeCollaborationManager();
 
@@ -1709,6 +1714,9 @@ export class EditorUI {
         const persisted = byName.get(entity.name);
         if (!persisted) return;
         entity.transform.position = [...persisted.position];
+        if (persisted.rotation) {
+          entity.transform.rotation = [...persisted.rotation];
+        }
         entity.transform.scale = [...persisted.scale];
         if (persisted.baseColor) {
           initializeBaseColor(entity, [...persisted.baseColor]);
@@ -1778,6 +1786,7 @@ export class EditorUI {
         id: entity.id,
         name: entity.name,
         position: entity.transform.position,
+        rotation: entity.transform.rotation,
         scale: entity.transform.scale,
       };
       if (baseColor) {
@@ -2089,22 +2098,17 @@ export class EditorUI {
    * Starts the interactive tutorial for new users.
    */
   private startInteractiveTutorial(): void {
-    if (this.interactiveTutorial) {
-      // If tutorial already exists, restart it
-      this.interactiveTutorial.dispose();
+    if (this.tutorialManager) {
+      this.tutorialManager.startFirstGameTutorial();
+    } else {
+      // Fallback if manager not ready
+      if (this.interactiveTutorial) {
+        this.interactiveTutorial.dispose();
+      }
+      const tutorialConfig = createEditorTutorial();
+      this.interactiveTutorial = new InteractiveTutorial(tutorialConfig);
+      this.interactiveTutorial.start();
     }
-
-    const tutorialConfig = createEditorTutorial();
-    tutorialConfig.onComplete = () => {
-      this.setStatusMessage('Tutorial completed! You\'re ready to create.', 3000);
-      this.showQuickStartGuide();
-    };
-    tutorialConfig.onSkip = () => {
-      this.setStatusMessage('Tutorial skipped', 2000);
-    };
-
-    this.interactiveTutorial = new InteractiveTutorial(tutorialConfig);
-    this.interactiveTutorial.start();
   }
 
   /**
@@ -2414,6 +2418,7 @@ interface PersistedEntity {
   id: string;
   name: string;
   position: Vec3;
+  rotation: [number, number, number, number];
   scale: Vec3;
   baseColor?: RgbaColor;
   asset?: string;

@@ -39,6 +39,7 @@ export class EditorInteractionManager {
     canvas.addEventListener('pointerdown', this.handlePointerDown, { signal });
     window.addEventListener('pointermove', this.handlePointerMove, { signal });
     window.addEventListener('pointerup', this.handlePointerUp, { signal });
+    canvas.addEventListener('wheel', this.handleWheel, { signal, passive: false });
     window.addEventListener('keydown', this.handleKeyDown, { signal });
 
     // Prevent context menu on canvas
@@ -112,6 +113,32 @@ export class EditorInteractionManager {
       event.preventDefault();
       this.activeTool.onPointerUp(event, ray);
       this.activeTool = null; // Release lock
+    }
+  };
+
+  private handleWheel = (event: WheelEvent) => {
+    // Active tool gets priority
+    if (this.activeTool && this.activeTool.onWheel) {
+        event.preventDefault();
+        this.activeTool.onWheel(event);
+        return;
+    }
+
+    // Else check hover tools
+    const ray = this.createRay(event);
+    if (!ray) return; // Should we allow scroll even if ray fails? Usually yes for camera.
+
+    for (const tool of this.tools) {
+        if (tool.checkHit(ray) && tool.onWheel) {
+            // Should we consume? Usually yes if tool claims it.
+            // But if tool decides not to use it?
+            // We assume onWheel implementation decides whether to prevent default or not.
+            // But here we delegate.
+            // Let's assume if tool claims hit, it wants the wheel.
+            event.preventDefault();
+            tool.onWheel(event);
+            return;
+        }
     }
   };
 

@@ -8,6 +8,7 @@ import { LogicCubeComponent } from '@engine/script';
 import { LogicCubeLibrary } from '@engine/editor-utils';
 import type { LogicCubeCategory, LogicConnection } from '@engine/script';
 import { getLogicConnectionManager } from '@engine/script';
+import { DisposableGroup } from '@engine/core/utils';
 
 export interface LogicPanelConfig {
   selection: SelectionManager;
@@ -22,6 +23,8 @@ export class LogicPanel {
   private selection: SelectionManager;
   private onConfigChanged: () => void;
   private currentEntity: Entity | null = null;
+  private debugMode = false;
+  private disposables = new DisposableGroup();
 
   constructor(config: LogicPanelConfig) {
     this.selection = config.selection;
@@ -32,6 +35,21 @@ export class LogicPanel {
     this.selection.onSelectionChanged(() => {
       this.refresh();
     });
+
+    // Listen for logic signals
+    // We access scene via selection manager which has reference to it
+    // Note: logic:connection-active is a custom event we just added
+    const scene = this.selection.scene;
+    if (scene) {
+      this.disposables.add(
+        // @ts-ignore - dynamic event binding
+        scene.events.on('logic:connection-active', (event: any) => {
+          if (this.debugMode && event.payload) {
+            this.handleConnectionActive(event.payload);
+          }
+        })
+      );
+    }
   }
 
   private createContainer(): HTMLElement {
@@ -113,19 +131,30 @@ export class LogicPanel {
     header.className = 'logic-panel__header';
     header.innerHTML = `
       <h3>Logic Cube</h3>
-      <div class="logic-panel__enabled">
-        <label>
-          <input type="checkbox" ${component.isEnabled() ? 'checked' : ''} />
+      <div class="logic-panel__controls">
+        <label class="logic-panel__control" title="Visualize signal flow">
+          <input type="checkbox" class="debug-mode-toggle" ${this.debugMode ? 'checked' : ''} />
+          <span>Debug</span>
+        </label>
+        <label class="logic-panel__control">
+          <input type="checkbox" class="enabled-toggle" ${component.isEnabled() ? 'checked' : ''} />
           <span>Enabled</span>
         </label>
       </div>
     `;
 
-    const checkbox = header.querySelector('input[type="checkbox"]') as HTMLInputElement;
-    if (checkbox) {
-      checkbox.addEventListener('change', () => {
-        component.setEnabled(checkbox.checked);
+    const enabledCheckbox = header.querySelector('.enabled-toggle') as HTMLInputElement;
+    if (enabledCheckbox) {
+      enabledCheckbox.addEventListener('change', () => {
+        component.setEnabled(enabledCheckbox.checked);
         this.onConfigChanged();
+      });
+    }
+
+    const debugCheckbox = header.querySelector('.debug-mode-toggle') as HTMLInputElement;
+    if (debugCheckbox) {
+      debugCheckbox.addEventListener('change', () => {
+        this.debugMode = debugCheckbox.checked;
       });
     }
 
@@ -377,11 +406,33 @@ export class LogicPanel {
 
       const item = document.createElement('li');
       item.className = 'logic-panel__connection';
+      
+      // Add data attributes for debug visualization
+      item.dataset.sourceId = conn.sourceEntityId;
+      item.dataset.sourcePort = conn.sourcePort;
+      item.dataset.targetId = conn.targetEntityId;
+      item.dataset.targetPort = conn.targetPort;
 
       if (direction === 'outgoing') {
-        item.textContent = `${sourcePortLabel} → ${targetName} (${targetPortLabel})`;
+        item.innerHTML = `
+          <span class="port-icon output">📤</span>
+          <span class="connection-text">
+            <span class="port-label">${sourcePortLabel}</span>
+            <span class="arrow">→</span>
+            <span class="entity-name">${targetName}</span>
+            <span class="port-label-sm">(${targetPortLabel})</span>
+          </span>
+        `;
       } else {
-        item.textContent = `${sourceName} (${sourcePortLabel}) → ${targetPortLabel}`;
+        item.innerHTML = `
+          <span class="port-icon input">📥</span>
+          <span class="connection-text">
+            <span class="entity-name">${sourceName}</span>
+            <span class="port-label-sm">(${sourcePortLabel})</span>
+            <span class="arrow">→</span>
+            <span class="port-label">${targetPortLabel}</span>
+          </span>
+        `;
       }
 
       list.appendChild(item);
@@ -416,10 +467,35 @@ export class LogicPanel {
   }
 
   /**
+   * Handles visualization of active connections
+   */
+  private handleConnectionActive(data: {
+    sourceEntityId: string;
+    sourcePort: string;
+    targetEntityId: string;
+    targetPort: string;
+  }): void {
+    if (!this.container) return;
+
+    // Find matching connection elements
+    const selector = `li[data-source-id="${data.sourceEntityId}"][data-source-port="${data.sourcePort}"][data-target-id="${data.targetEntityId}"][data-target-port="${data.targetPort}"]`;
+    const elements = this.container.querySelectorAll(selector);
+
+    elements.forEach((el) => {
+      el.classList.add('active-signal');
+      
+      // Remove class after animation
+      setTimeout(() => {
+        el.classList.remove('active-signal');
+      }, 300);
+    });
+  }
+
+  /**
    * Disposes the panel
    */
   dispose(): void {
-    // Clean up event listeners if needed
+    this.disposables.dispose();
     this.container.remove();
   }
 }

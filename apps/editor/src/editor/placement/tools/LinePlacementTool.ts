@@ -1,8 +1,8 @@
 import { Entity } from '@engine/world';
 import type { AssetPreset } from '../../types/BlockAssetTypes';
-import { PlacementTool, PlacementToolContext, ToolAction } from './PlacementTool';
-import { PatternPlacer, PatternPosition } from '../PatternPlacer';
-import { Vec3 } from '@engine/core/math';
+import { PlacementTool, type PlacementToolContext, type ToolAction } from './PlacementTool';
+import { PatternPlacer, type PatternPosition } from '../PatternPlacer';
+import type { Vec3 } from '@engine/core/math';
 import { initializeBaseColor } from '../../visuals/SelectionVisuals';
 
 export class LinePlacementTool extends PlacementTool {

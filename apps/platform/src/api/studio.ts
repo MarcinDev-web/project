@@ -505,5 +505,84 @@ export const studioApi = {
   async publishAvatarPreset(id: string, data: { title: string; description?: string; tags?: string[] }): Promise<void> {
     return apiClient.post(`/studio/avatars/${id}/publish`, data);
   },
+
+  /**
+   * ========================================
+   * MONETIZATION API
+   * ========================================
+   */
+
+  /**
+   * Get game monetization settings
+   */
+  async getMonetizationSettings(gameId: string): Promise<{
+    gamePasses: GamePassConfig[];
+    shopItems: ShopItemConfig[];
+    revenue: RevenueStats;
+  }> {
+    return apiClient.get<{
+      gamePasses: GamePassConfig[];
+      shopItems: ShopItemConfig[];
+      revenue: RevenueStats;
+    }>(`/studio/games/${gameId}/monetization`);
+  },
+
+  /**
+   * Create or update a game pass
+   */
+  async upsertGamePass(gameId: string, data: UpsertGamePassRequest): Promise<GamePassConfig> {
+    return apiClient.post<GamePassConfig>(`/studio/games/${gameId}/monetization/passes`, data);
+  },
+
+  /**
+   * Create or update a shop item
+   */
+  async upsertShopItem(gameId: string, data: UpsertShopItemRequest): Promise<ShopItemConfig> {
+    return apiClient.post<ShopItemConfig>(`/studio/games/${gameId}/monetization/items`, data);
+  },
 };
+
+export interface GamePassConfig {
+  id: string;
+  name: string;
+  description?: string;
+  monthlyPrice: { currency: string; amount: number };
+  benefits: string[];
+  active: boolean;
+}
+
+export interface ShopItemConfig {
+  id: string;
+  name: string;
+  description?: string;
+  price: { currency: string; amount: number };
+  category: 'consumable' | 'cosmetic' | 'permanent';
+  available: boolean;
+  quantity?: number;
+}
+
+export interface UpsertGamePassRequest {
+  id?: string;
+  name: string;
+  description?: string;
+  monthlyPrice: { currency: string; amount: number };
+  benefits: string[];
+  active: boolean;
+}
+
+export interface UpsertShopItemRequest {
+  id?: string;
+  name: string;
+  description?: string;
+  price: { currency: string; amount: number };
+  category: 'consumable' | 'cosmetic' | 'permanent';
+  available: boolean;
+  quantity?: number;
+}
+
+export interface RevenueStats {
+  totalRevenue: { currency: string; amount: number };
+  lastMonthRevenue: { currency: string; amount: number };
+  creatorSplit: number; // percentage, e.g., 0.7 for 70%
+}
 

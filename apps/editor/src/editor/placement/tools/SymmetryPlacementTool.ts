@@ -1,8 +1,8 @@
 import { Entity } from '@engine/world';
 import type { AssetPreset } from '../../types/BlockAssetTypes';
-import { PlacementTool, PlacementToolContext, ToolAction } from './PlacementTool';
+import { PlacementTool, type PlacementToolContext, type ToolAction } from './PlacementTool';
 import { SinglePlacementTool } from './SinglePlacementTool';
-import { Vec3 } from '@engine/core/math';
+import type { Vec3 } from '@engine/core/math';
 import { initializeBaseColor } from '../../visuals/SelectionVisuals';
 
 export class SymmetryPlacementTool extends PlacementTool {

@@ -88,9 +88,9 @@ export class FloatingToolbar {
         const next = modes[(idx + 1) % modes.length];
         this.config.state.rotationSnapMode.value = next;
       },
-      () => {
+      (btn) => {
         const mode = this.config.state.rotationSnapMode.value;
-        rotSnapBtn.title = `Rotation Snap: ${mode}`;
+        btn.title = `Rotation Snap: ${mode}`;
       }
     );
     this.container.appendChild(rotSnapBtn);
@@ -110,7 +110,7 @@ export class FloatingToolbar {
     title: string, 
     getState: () => boolean, 
     onClick: () => void,
-    onUpdate?: () => void
+    onUpdate?: (btn: HTMLButtonElement) => void
   ): HTMLButtonElement {
     const btn = document.createElement('button');
     btn.className = 'floating-toolbar-btn';
@@ -124,7 +124,7 @@ export class FloatingToolbar {
     effect(() => {
       const active = getState();
       btn.classList.toggle('active', active);
-      onUpdate?.();
+      onUpdate?.(btn);
     });
 
     return btn;

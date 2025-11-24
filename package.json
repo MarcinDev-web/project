@@ -13,7 +13,7 @@
   "scripts": {
     "prebuild": "node ./scripts/verify-wasm-build.js",
     "postinstall": "node -e \"\"",
-    "build": "pnpm -w --filter @engine/core build && pnpm -w --filter @engine/microblocks build && pnpm -w --filter @engine/blocks build && pnpm -w --filter @engine/script build && pnpm -w --filter @engine/world build && pnpm -w --filter @engine/stdlib build && pnpm -w --filter @engine/camera build && pnpm -w --filter @engine/avatar build && pnpm -w --filter \"@apps/net-server...\" --filter \"!@engine/test-utils\" --filter \"!@engine/gateway\" --filter \"!@engine/editor-utils\" build",
+    "build": "pnpm --filter @engine/core run build && pnpm --filter @engine/microblocks run build && pnpm --filter @engine/blocks run build && pnpm --filter @engine/world run build && pnpm --filter @engine/script run build && pnpm --filter @engine/stdlib run build && pnpm --filter @engine/camera run build && pnpm --filter @engine/avatar run build && pnpm --filter \"@apps/net-server...\" --filter \"!@engine/test-utils\" --filter \"!@engine/gateway\" --filter \"!@engine/editor-utils\" --filter \"!@shared\" run build",
     "build:all": "pnpm -r build",
     "dev": "pnpm --filter @apps/editor dev",
     "test": "pnpm -r test",
