@@ -33,10 +33,10 @@
                     "lint":  "eslint src --max-warnings=100"
                 },
     "peerDependencies":  {
-                             "vitest":  "^2.1.3"
+                             "vitest":  "^4.0.13"
                          },
     "devDependencies":  {
                             "typescript":  "^5.9.3",
-                            "vitest":  "^2.1.3"
+                            "vitest":  "^4.0.13"
                         }
 }

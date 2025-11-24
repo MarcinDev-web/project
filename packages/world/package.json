@@ -97,6 +97,6 @@
     "devDependencies":  {
                             "@engine/test-utils":  "workspace:*",
                             "typescript":  "^5.9.3",
-                            "vitest":  "^2.1.3"
+                            "vitest":  "^4.0.13"
                         }
 }
