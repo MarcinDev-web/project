@@ -36,14 +36,7 @@ export type AnimationParameterValue = boolean | number | null;
 
 export type AnimationParameters = Record<string, AnimationParameterValue>;
 
-export type TransitionConditionOp =
-  | '=='
-  | '!='
-  | '>'
-  | '>='
-  | '<'
-  | '<='
-  | 'triggered';
+export type TransitionConditionOp = '==' | '!=' | '>' | '>=' | '<' | '<=' | 'triggered';
 
 export interface TransitionCondition {
   parameter: string;
@@ -129,4 +122,3 @@ export interface AnimationComponentJSON {
   parameterValues?: AnimationParameters;
   activeState?: string;
 }
-

@@ -20,4 +20,3 @@ export class AnimationLayer {
     this.mask = undefined;
   }
 }
-

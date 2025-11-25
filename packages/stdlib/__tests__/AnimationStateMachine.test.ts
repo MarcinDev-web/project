@@ -165,12 +165,17 @@ describe('AnimationStateMachine', () => {
       stateMachine.addState({ name: 'Run', controller: run });
       stateMachine.setState('Idle', { resetTime: true, autoPlay: true });
 
-      stateMachine.requestBlendTo('Run', 1.0, { resetTime: false, autoPlay: true, easing: 'ease-in-out' });
-      stateMachine.update(0.5); // Halfway through blend
+      stateMachine.requestBlendTo('Run', 1.0, {
+        resetTime: false,
+        autoPlay: true,
+        easing: 'ease-in-out',
+      });
+      stateMachine.update(0.25); // 25% through blend
 
       const samples = stateMachine.getSamples();
-      // Ease-in-out: weight should be less than 0.5 at midpoint (starts slow, ends slow)
-      expect(samples.blendWeight).toBeLessThan(0.5);
+      // Ease-in-out at 25%: weight should be less than 0.25 (curve starts slow)
+      // Formula: 2 * t * t = 2 * 0.25 * 0.25 = 0.125
+      expect(samples.blendWeight).toBeLessThan(0.25);
       expect(samples.blendWeight).toBeGreaterThan(0);
     });
 
@@ -184,7 +189,11 @@ describe('AnimationStateMachine', () => {
       stateMachine.addState({ name: 'Run', controller: run });
       stateMachine.setState('Idle', { resetTime: true, autoPlay: true });
 
-      stateMachine.requestBlendTo('Run', 1.0, { resetTime: false, autoPlay: true, easing: 'ease-in' });
+      stateMachine.requestBlendTo('Run', 1.0, {
+        resetTime: false,
+        autoPlay: true,
+        easing: 'ease-in',
+      });
       stateMachine.update(0.5); // Halfway through blend
 
       const samples = stateMachine.getSamples();
@@ -203,7 +212,11 @@ describe('AnimationStateMachine', () => {
       stateMachine.addState({ name: 'Run', controller: run });
       stateMachine.setState('Idle', { resetTime: true, autoPlay: true });
 
-      stateMachine.requestBlendTo('Run', 1.0, { resetTime: false, autoPlay: true, easing: 'ease-out' });
+      stateMachine.requestBlendTo('Run', 1.0, {
+        resetTime: false,
+        autoPlay: true,
+        easing: 'ease-out',
+      });
       stateMachine.update(0.5); // Halfway through blend
 
       const samples = stateMachine.getSamples();
@@ -252,8 +265,12 @@ describe('AnimationStateMachine', () => {
       stateMachine.addState({ name: 'Run', controller: run });
       stateMachine.setState('Idle', { resetTime: true, autoPlay: true });
 
-      stateMachine.requestBlendTo('Run', 1.0, { resetTime: false, autoPlay: true, easing: 'ease-in-out' });
-      
+      stateMachine.requestBlendTo('Run', 1.0, {
+        resetTime: false,
+        autoPlay: true,
+        easing: 'ease-in-out',
+      });
+
       // Update past blend duration
       stateMachine.update(1.5);
 

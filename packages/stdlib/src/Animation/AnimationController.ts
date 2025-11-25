@@ -25,8 +25,8 @@ export class AnimationController implements AnimationNode {
     this.clip = options.clip;
     this.time = signal(0);
     this.playing = signal(true);
-    this.speed = signal(Number.isFinite(options.speed ?? 1) ? options.speed ?? 1 : 1);
-    this.weight = signal(Number.isFinite(options.weight ?? 1) ? options.weight ?? 1 : 1);
+    this.speed = signal(Number.isFinite(options.speed ?? 1) ? (options.speed ?? 1) : 1);
+    this.weight = signal(Number.isFinite(options.weight ?? 1) ? (options.weight ?? 1) : 1);
     this.loop = signal(options.loop ?? true);
   }
 

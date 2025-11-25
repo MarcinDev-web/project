@@ -64,6 +64,7 @@ export class PerformanceSystem {
   private highFpsThreshold = 55;
   private resolutionUpdateTimer = 0;
   private resolutionUpdateInterval = 2000; // Check every 2 seconds
+  private cameraFovRadians = Math.PI / 3; // 60 degrees default
 
   /**
    * Initialize performance system
@@ -134,8 +135,18 @@ export class PerformanceSystem {
       
       // Store LOD level in entity userData
       entity.userData.lodLevel = lodLevel;
+      entity.active = lodLevel !== LODLevel.CULLED;
       
-      // TODO: Apply LOD to renderer (simplify geometry, reduce quality, etc.)
+      // Hint to renderer for downstream systems (e.g., custom renderers) via userData
+      if (lodLevel === LODLevel.HIGH) {
+        entity.userData.renderQuality = 'high';
+      } else if (lodLevel === LODLevel.MEDIUM) {
+        entity.userData.renderQuality = 'medium';
+      } else if (lodLevel === LODLevel.LOW) {
+        entity.userData.renderQuality = 'low';
+      } else {
+        entity.userData.renderQuality = 'culled';
+      }
     }
   }
 
@@ -147,10 +158,12 @@ export class PerformanceSystem {
       return;
     }
 
-    // TODO: Implement proper frustum culling using camera FOV and bounds
-    // For now, this is a placeholder
     const entities = this.scene.getAllEntities();
     
+    const forwardNorm = this.normalizeVec(this.cameraForward);
+    const cosHalfFov = Math.cos(this.cameraFovRadians * 0.5);
+    const cullDistance = 500; // Max render distance
+
     for (const entity of entities) {
       // Skip if entity doesn't support culling
       if (!entity.userData.supportsCulling) {
@@ -159,10 +172,17 @@ export class PerformanceSystem {
 
       const entityPosition = entity.transform.getWorldPosition();
       const distance = this.calculateDistance(this.cameraPosition, entityPosition);
+
+      const toEntity = this.normalizeVec([
+        entityPosition[0] - this.cameraPosition[0],
+        entityPosition[1] - this.cameraPosition[1],
+        entityPosition[2] - this.cameraPosition[2],
+      ]);
+      const facingScore = toEntity[0] * forwardNorm[0] + toEntity[1] * forwardNorm[1] + toEntity[2] * forwardNorm[2];
+      const inViewCone = facingScore >= cosHalfFov;
       
-      // Simple distance-based culling (can be enhanced with proper frustum)
-      const cullDistance = 500; // Max render distance
-      entity.userData.isCulled = distance > cullDistance;
+      entity.userData.isCulled = !(distance <= cullDistance && inViewCone);
+      entity.active = !entity.userData.isCulled;
     }
   }
 
@@ -274,6 +294,15 @@ export class PerformanceSystem {
   }
 
   /**
+   * Set camera field of view (radians) for frustum culling
+   */
+  setCameraFov(fovRadians: number): void {
+    if (Number.isFinite(fovRadians) && fovRadians > 0) {
+      this.cameraFovRadians = fovRadians;
+    }
+  }
+
+  /**
    * Calculate distance between two points
    */
   private calculateDistance(a: Vec3, b: Vec3): number {
@@ -281,6 +310,11 @@ export class PerformanceSystem {
     const dy = a[1] - b[1];
     const dz = a[2] - b[2];
     return Math.sqrt(dx * dx + dy * dy + dz * dz);
+  }
+
+  private normalizeVec(vec: Vec3): Vec3 {
+    const len = Math.sqrt(vec[0] * vec[0] + vec[1] * vec[1] + vec[2] * vec[2]) || 1;
+    return [vec[0] / len, vec[1] / len, vec[2] / len];
   }
 
   /**

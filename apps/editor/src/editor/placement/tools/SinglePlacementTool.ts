@@ -9,7 +9,8 @@ import { PlacementTool, type PlacementToolContext } from './PlacementTool';
 import type { PlacementPreview } from '../PlacementMode';
 import type { Vec3 } from '@engine/core/math';
 import { quatFromAxisAngle } from '@engine/core/math';
-import { getBlock } from '@engine/blocks';
+import { BLOCK_LIBRARY, getBlock } from '@engine/blocks';
+import { MaterialComponent } from '@engine/world/components/MaterialComponent';
 
 export class SinglePlacementTool extends PlacementTool {
   private preview: PlacementPreview;
@@ -162,6 +163,7 @@ export class SinglePlacementTool extends PlacementTool {
         const rotation = [...this.preview.previewEntity.transform.rotation];
         const scale = [...this.preview.asset.scale];
         const color = this.preview.asset.color || [1, 1, 1, 1];
+        const materialId = this.resolveMaterialId(this.preview.asset.blockId);
 
         this.context.staticBlockManager.addBlock({
             assetName: this.preview.asset.name,
@@ -171,7 +173,7 @@ export class SinglePlacementTool extends PlacementTool {
             color: color as [number, number, number, number],
             blockId: this.preview.asset.blockId,
             meshType: 'cube',
-            materialId: 0 // TODO: Resolve from asset/material system
+            materialId
         });
 
         // Notify config but don't return a new entity (instanced)
@@ -234,5 +236,17 @@ export class SinglePlacementTool extends PlacementTool {
   
   getPreviewState(): PlacementPreview {
       return this.preview;
+  }
+
+  private resolveMaterialId(blockId?: string): number {
+    if (!blockId) {
+      return 0;
+    }
+    const keys = Object.keys(BLOCK_LIBRARY);
+    const index = keys.indexOf(blockId);
+    if (index === -1) {
+      return 0;
+    }
+    return Math.min(index, MaterialComponent.MAX_MATERIAL_ID);
   }
 }

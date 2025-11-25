@@ -1,20 +1,15 @@
-import { SnapshotMessage } from '@engine/net-protocol';
-import { Scene } from '@engine/world';
-import { EcsReplicator, EcsReplicatorContext } from '@engine/world-server';
-import { ReplicationEntityRef } from '@engine/world-server/src/replication/types';
-import { SnapshotCodec } from '@engine/net-protocol';
+import type { SnapshotMessage } from '@engine/net-protocol';
+import type { Scene } from '@engine/world';
+import type { EcsReplicator, EcsReplicatorContext, ReplicationEntityRef } from '@engine/world-server';
 
 // Concrete implementation of ECS Replicator
 export class GameServerReplicator implements EcsReplicator {
-  private codec: SnapshotCodec;
-  
-  constructor(private scene: Scene) {
-    this.codec = new SnapshotCodec();
-  }
+  // Scene will be used in real implementation for entity lookups
+  constructor(_scene: Scene) {}
 
   buildSnapshot(
-    context: EcsReplicatorContext, 
-    entities: ReplicationEntityRef[], 
+    _context: EcsReplicatorContext, 
+    _entities: ReplicationEntityRef[], 
     seq: number, 
     ackInputSeq: number, 
     baselineSeq?: number
@@ -46,7 +41,7 @@ export class GameServerReplicator implements EcsReplicator {
       header: {
         seq,
         ackInputSeq,
-        baselineSeq,
+        ...(baselineSeq !== undefined && { baselineSeq }),
         byteLength: payload.byteLength
       },
       payload

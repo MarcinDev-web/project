@@ -19,4 +19,3 @@ export interface CharacterPawn {
   readonly cameraTarget: CameraTargetConfig;
   readonly entity: Entity;
 }
-

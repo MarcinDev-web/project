@@ -36,6 +36,6 @@ impl VMWrapper {
     }
     
     pub fn trigger(&mut self, entity_id: u32, signal: &str) {
-        // TODO: Implement external trigger
+        self.vm.trigger(entity_id, signal);
     }
 }

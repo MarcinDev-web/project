@@ -2,7 +2,7 @@ import type { MovementProfile } from './MovementProfile';
 
 /**
  * Profile Switcher - Manages switching between movement profiles
- * 
+ *
  * Provides convenient methods to cycle through profiles or switch to specific ones.
  * Useful for gameplay mechanics that allow players to change movement modes.
  */
@@ -12,14 +12,11 @@ export class ProfileSwitcher {
 
   /**
    * Create a ProfileSwitcher with a list of profiles
-   * 
+   *
    * @param profiles - Array of profiles to switch between
    * @param initialIndex - Initial profile index (default: 0)
    */
-  constructor(
-    profiles: readonly MovementProfile[],
-    initialIndex: number = 0
-  ) {
+  constructor(profiles: readonly MovementProfile[], initialIndex: number = 0) {
     if (profiles.length === 0) {
       throw new Error('ProfileSwitcher requires at least one profile');
     }
@@ -44,7 +41,8 @@ export class ProfileSwitcher {
    * Switch to the previous profile in the list (cycles back to last)
    */
   switchToPrevious(): MovementProfile {
-    this.currentProfileIndex = (this.currentProfileIndex - 1 + this.profiles.length) % this.profiles.length;
+    this.currentProfileIndex =
+      (this.currentProfileIndex - 1 + this.profiles.length) % this.profiles.length;
     const profile = this.profiles[this.currentProfileIndex];
     if (!profile) {
       throw new Error('Profile not found at index');
@@ -54,12 +52,12 @@ export class ProfileSwitcher {
 
   /**
    * Switch to a specific profile by ID
-   * 
+   *
    * @param profileId - ID of the profile to switch to
    * @returns The switched profile, or null if not found
    */
   switchTo(profileId: string): MovementProfile | null {
-    const index = this.profiles.findIndex(p => p.id === profileId);
+    const index = this.profiles.findIndex((p) => p.id === profileId);
     if (index === -1) {
       return null;
     }
@@ -105,7 +103,6 @@ export class ProfileSwitcher {
    * Check if a profile with the given ID exists
    */
   hasProfile(profileId: string): boolean {
-    return this.profiles.some(p => p.id === profileId);
+    return this.profiles.some((p) => p.id === profileId);
   }
 }
-

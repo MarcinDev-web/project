@@ -13,7 +13,8 @@ export interface ImportedModel {
 }
 
 export interface ModelEditorProps {
-  // TODO: Add props as needed
+  onModelSelect?: (model: ImportedModel | null) => void;
+  onModelsChange?: (models: ImportedModel[]) => void;
 }
 
 /**
@@ -61,6 +62,7 @@ export function ModelEditor(_props: ModelEditorProps) {
           const updated = [...importedModels, newModel];
           setImportedModels(updated);
           saveModels(updated);
+          _props.onModelsChange?.(updated);
         };
         reader.readAsArrayBuffer(file);
       }
@@ -77,7 +79,9 @@ export function ModelEditor(_props: ModelEditorProps) {
     saveModels(updated);
     if (selectedModel?.id === modelId) {
       setSelectedModel(null);
+      _props.onModelSelect?.(null);
     }
+    _props.onModelsChange?.(updated);
   };
 
   const formatFileSize = (bytes: number): string => {
@@ -121,7 +125,10 @@ export function ModelEditor(_props: ModelEditorProps) {
               <li 
                 key={model.id} 
                 className={`model-item ${selectedModel?.id === model.id ? 'selected' : ''}`}
-                onClick={() => setSelectedModel(model)}
+                onClick={() => {
+                  setSelectedModel(model);
+                  _props.onModelSelect?.(model);
+                }}
               >
                 <div style={{ flex: 1 }}>
                   <div style={{ fontWeight: '500' }}>{model.name}</div>
@@ -160,6 +167,8 @@ export function ModelEditor(_props: ModelEditorProps) {
                 setImportedModels(updated);
                 setSelectedModel({ ...selectedModel, name: e.target.value });
                 saveModels(updated);
+                _props.onModelsChange?.(updated);
+                _props.onModelSelect?.({ ...selectedModel, name: e.target.value });
               }}
             />
           </div>

@@ -1,10 +1,14 @@
 import { MovementProfile } from './MovementProfile';
 import { DEFAULT_CHARACTER_CONFIG } from '@engine/world';
-import { FlyingExtension, SpeedBoostExtension, VehicleExtension } from './MovementProfileExtensions';
+import {
+  FlyingExtension,
+  SpeedBoostExtension,
+  VehicleExtension,
+} from './MovementProfileExtensions';
 
 /**
  * Pre-defined movement profiles
- * 
+ *
  * These profiles provide common movement configurations
  * that can be used directly or as a base for custom profiles.
  */
@@ -144,4 +148,3 @@ export function getPresetProfile(id: keyof typeof PRESET_PROFILES): MovementProf
 export function getPresetProfileIds(): string[] {
   return Object.keys(PRESET_PROFILES);
 }
-

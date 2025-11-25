@@ -53,10 +53,6 @@ export class PlayerSession {
       console.warn('[PlayerSession] update() called but controller is null');
       return;
     }
-    // Debug: log occasionally
-    if (Math.random() < 0.01) {
-      console.log('[PlayerSession] update() called, controller:', this.controller.id);
-    }
     this.controller.update(deltaTime);
   }
 
@@ -72,4 +68,3 @@ export class PlayerSession {
     this.unbindController();
   }
 }
-

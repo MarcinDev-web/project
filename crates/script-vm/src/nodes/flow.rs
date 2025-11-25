@@ -72,21 +72,33 @@ impl NodeBehavior for TimerNode {
         }
 
         self.current_time += dt;
-        
-        // TODO: Emit elapsed time?
-        
+
+        let mut outputs: Vec<(u8, Signal)> = Vec::new();
+        outputs.push((
+            0,
+            Signal {
+                source_node: 0,
+                source_port: 0,
+                data: SignalData::Number(self.current_time as f64),
+            },
+        ));
+
         if self.current_time >= self.duration {
             self.running = false;
             self.current_time = 0.0; // Auto-reset? Or keep at max?
-            
-            return Some(vec![(1, Signal { // Output port 1: On Complete
+
+            outputs.push((1, Signal { // Output port 1: On Complete
                 source_node: 0,
                 source_port: 1,
                 data: SignalData::None,
-            })]);
+            }));
         }
-        
-        None
+
+        if outputs.is_empty() {
+            None
+        } else {
+            Some(outputs)
+        }
     }
 }
 

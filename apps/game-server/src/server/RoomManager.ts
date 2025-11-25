@@ -1,13 +1,25 @@
 import { Room } from '../simulation/Room';
-import { Disposable } from '@engine/core';
+import type { IDisposable } from '@engine/core';
 
-export class RoomManager implements Disposable {
+export class RoomManager implements IDisposable {
   private rooms = new Map<string, Room>();
 
   constructor() {}
 
   getRoom(roomId: string): Room | undefined {
     return this.rooms.get(roomId);
+  }
+
+  getRoomCount(): number {
+    return this.rooms.size;
+  }
+
+  getTotalPlayerCount(): number {
+    let count = 0;
+    for (const room of this.rooms.values()) {
+      count += room.getClientCount();
+    }
+    return count;
   }
 
   async createRoom(roomId: string): Promise<Room> {

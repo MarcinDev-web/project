@@ -105,6 +105,15 @@ impl ScriptVM {
         
         self.side_effects.clone()
     }
+
+    pub fn trigger(&mut self, target_node: u32, signal: &str) {
+        let signal = Signal {
+            source_node: 0,
+            source_port: 0,
+            data: SignalData::String(signal.to_string()),
+        };
+        self.signal_queue.push_back((target_node, 0, signal));
+    }
     
     fn emit_signal(&mut self, src_node: u32, src_port: u8, mut signal: Signal) {
         signal.source_node = src_node;

@@ -2,28 +2,32 @@ import { Entity, Scene } from '@engine/world';
 import { EnvironmentComponent, LightComponent, MeshComponent } from '@engine/world';
 import type { TemplateProvider } from '../../types';
 
-export function createEmptyTemplate(): TemplateProvider {
+/**
+ * Minimal template: scene with basic lighting and a 3x3 starter platform.
+ * Contains: Environment, Sun (directional), Ambient light, and a starter platform.
+ */
+export function createMinimalTemplate(): TemplateProvider {
   return {
     meta: {
-      id: 'template:empty',
+      id: 'template:minimal',
       kind: 'template',
-      name: 'Empty Scene',
-      description: 'Empty scene with grid floor, ambient and sun',
-      tags: ['starter', 'lighting'],
-      version: '1.0.0',
+      name: 'Minimal Scene',
+      description: 'Scene with basic lighting and a 3x3 starter platform',
+      tags: ['starter', 'minimal'],
+      version: '1.1.0',
     },
     build: () => {
-      const scene = new Scene('Empty');
+      const scene = new Scene('New Project');
 
-      // Environment (procedural sky + ambient)
+      // Environment (procedural sky)
       const env = new Entity('Environment');
       const envComp = new EnvironmentComponent();
       envComp.skyboxType = 'procedural-sky';
-      envComp.ambientIntensity = 0.6;
+      envComp.ambientIntensity = 0.5;
       env.addComponent(envComp);
       scene.addEntity(env);
 
-      // Sun (directional)
+      // Sun (directional light)
       const sun = new Entity('Sun');
       const sunLight = new LightComponent();
       sunLight.lightType = 'directional';
@@ -38,22 +42,21 @@ export function createEmptyTemplate(): TemplateProvider {
       const ambLight = new LightComponent();
       ambLight.lightType = 'ambient';
       ambLight.color = [1, 1, 1];
-      ambLight.intensity = 0.3;
+      ambLight.intensity = 0.35;
       ambient.addComponent(ambLight);
       scene.addEntity(ambient);
 
-      // Grid-like floor (simple large, thin cube)
-      const floor = new Entity('GridFloor');
-      const mesh = new MeshComponent();
-      mesh.meshType = 'cube';
-      floor.addComponent(mesh);
-      floor.transform.scale = [50, 0.05, 50];
-      floor.transform.position = [0, -0.025, 0];
-      scene.addEntity(floor);
+      // Starter platform (3x3)
+      const platform = new Entity('StarterPlatform');
+      platform.transform.position = [0, -0.25, 0]; // Slightly below origin so top is at y=0
+      const platformMesh = new MeshComponent();
+      platformMesh.meshType = 'box';
+      platformMesh.options = { size: [3, 0.5, 3] };
+      platform.addComponent(platformMesh);
+      scene.addEntity(platform);
 
       return scene;
     },
   };
 }
-
 

@@ -11,7 +11,7 @@ export interface GroundDetectionResult {
 
 /**
  * Spatial hash-based cache for ground detection results
- * 
+ *
  * Uses spatial hashing to cache ground detection results by position,
  * reducing raycast calls when multiple characters are in the same area.
  */
@@ -40,7 +40,7 @@ export class GroundDetectionCache {
 
   /**
    * Get cached ground detection result for a position
-   * 
+   *
    * @param position - Character position
    * @param currentTime - Current time in seconds (for age checking)
    * @returns Cached result or null if not found or expired
@@ -48,7 +48,7 @@ export class GroundDetectionCache {
   get(position: Vec3, currentTime: number): GroundDetectionResult | null {
     const key = this.getCellKey(position);
     const cached = this.spatialHash.get(key);
-    
+
     if (!cached) {
       return null;
     }
@@ -65,7 +65,7 @@ export class GroundDetectionCache {
 
   /**
    * Store ground detection result in cache
-   * 
+   *
    * @param position - Character position
    * @param result - Ground detection result
    * @param currentTime - Current time in seconds
@@ -87,7 +87,7 @@ export class GroundDetectionCache {
 
   /**
    * Remove expired cache entries
-   * 
+   *
    * @param currentTime - Current time in seconds
    */
   cleanup(currentTime: number): void {
@@ -106,4 +106,3 @@ export class GroundDetectionCache {
     return this.spatialHash.size;
   }
 }
-

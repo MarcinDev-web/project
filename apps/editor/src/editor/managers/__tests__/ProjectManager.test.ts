@@ -138,7 +138,7 @@ describe('ProjectManager - Templates', () => {
     expect(updateSceneBuffers).toHaveBeenCalled();
   });
 
-  it('falls back to empty project when template application fails', async () => {
+  it('falls back to minimal project when template application fails', async () => {
     // First call fails, second call (fallback) succeeds
     applyToMock
       .mockRejectedValueOnce(new Error('boom'))
@@ -146,13 +146,13 @@ describe('ProjectManager - Templates', () => {
 
     await manager.newProjectFromTemplate(templateMeta);
 
-    // Should have been called twice: once for requested template, once for empty fallback
+    // Should have been called twice: once for requested template, once for minimal fallback
     expect(applyToMock).toHaveBeenCalledTimes(2);
     expect(applyToMock).toHaveBeenNthCalledWith(1, scene, templateMeta.id, { clear: true });
-    expect(applyToMock).toHaveBeenNthCalledWith(2, scene, 'template:empty', { clear: true });
+    expect(applyToMock).toHaveBeenNthCalledWith(2, scene, 'template:minimal', { clear: true });
 
     expect(showStatusMessage).toHaveBeenLastCalledWith(
-      'Template failed, created empty project',
+      'Template failed, created minimal project',
       1500
     );
     if (typeof window !== 'undefined') {

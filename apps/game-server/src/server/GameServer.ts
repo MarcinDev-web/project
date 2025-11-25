@@ -43,7 +43,11 @@ export class GameServer {
 
   private setupRoutes() {
     this.app.get('/health', async () => {
-      return { status: 'ok', rooms: 0, players: 0 }; // TODO: Real metrics
+      return {
+        status: 'ok',
+        rooms: this.roomManager.getRoomCount(),
+        players: this.roomManager.getTotalPlayerCount()
+      };
     });
 
     this.app.register(async (fastify) => {

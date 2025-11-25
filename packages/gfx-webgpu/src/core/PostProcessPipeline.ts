@@ -117,7 +117,7 @@ export class PostProcessPipeline {
       depthForSsao &&
       ssgiView &&
       normalView &&
-      frameResources.cameraUniformBuffer // Assuming camera UBO exists
+      frameResources.uniformBuffer
     ) {
       this.ssgiPass.render(
         encoder,

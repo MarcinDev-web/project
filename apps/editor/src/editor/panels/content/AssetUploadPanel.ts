@@ -10,15 +10,21 @@
 
 import { Logger } from '../../../utils/logger';
 
+export interface AssetUploadPanelOptions {
+  onImport?: (file: File) => Promise<void> | void;
+}
+
 export class AssetUploadPanel {
   public readonly element: HTMLElement;
   private dropZone: HTMLElement;
   private fileInput: HTMLInputElement;
   private previewContainer: HTMLElement;
+  private readonly onImport?: (file: File) => Promise<void> | void;
 
-  constructor() {
+  constructor(options?: AssetUploadPanelOptions) {
     this.element = document.createElement('div');
     this.element.className = 'asset-upload-panel';
+    this.onImport = options?.onImport;
     
     this.createHeader();
     this.createDropZone();
@@ -145,9 +151,22 @@ export class AssetUploadPanel {
       const importBtn = document.createElement('button');
       importBtn.className = 'asset-action-btn';
       importBtn.textContent = 'Import to Scene';
-      importBtn.onclick = () => {
-        alert(`Importing ${file.name}... (Integration with Scene pending)`);
-        // TODO: Integrate with AssetLoader/Scene
+      importBtn.onclick = async () => {
+        if (this.onImport) {
+          status.textContent = 'Importing...';
+          try {
+            await this.onImport(file);
+            status.textContent = 'Imported';
+            status.classList.remove('status-error');
+            status.classList.add('status-success');
+          } catch (err) {
+            status.textContent = 'Error';
+            status.classList.add('status-error');
+            Logger.error(`Failed to import file ${file.name}:`, err as Error);
+          }
+        } else {
+          alert(`Importing ${file.name}...`);
+        }
       };
       item.appendChild(importBtn);
 

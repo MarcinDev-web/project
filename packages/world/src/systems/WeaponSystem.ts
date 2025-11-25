@@ -173,7 +173,7 @@ export class WeaponSystem {
     const effectiveSpread = weapon.getEffectiveSpread(attachmentModifiers);
 
     // Apply spread (only for hitscan, projectiles get spread during spawn)
-    if (weapon.type === 'hitscan') {
+    if (weapon.weaponType === 'hitscan') {
       this.applySpread(this.scratchVec2, effectiveSpread);
     }
 
@@ -187,7 +187,7 @@ export class WeaponSystem {
     if (!fireSuccess) return false;
 
     // Fire weapon based on type
-    if (weapon.type === 'hitscan') {
+    if (weapon.weaponType === 'hitscan') {
       this.fireHitscan(
         entity,
         weapon,
@@ -196,7 +196,7 @@ export class WeaponSystem {
         effectiveDamage,
         ammoTypeDef.effects
       );
-    } else if (weapon.type === 'projectile') {
+    } else if (weapon.weaponType === 'projectile') {
       const effectiveSpreadForProjectile = effectiveSpread;
       this.applySpread(this.scratchVec2, effectiveSpreadForProjectile);
       this.fireProjectile(
@@ -213,7 +213,7 @@ export class WeaponSystem {
     // Emit fire event
     const fireEvent: WeaponFireEvent = {
       entity,
-      weaponType: weapon.type,
+      weaponType: weapon.weaponType,
       direction: [...this.scratchVec2] as Vec3,
       origin: [...this.scratchVec1] as Vec3,
       spread: effectiveSpread,

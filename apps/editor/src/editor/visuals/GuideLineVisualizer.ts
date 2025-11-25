@@ -1,6 +1,7 @@
 import { Entity, Transform, MeshComponent, MaterialComponent } from '@engine/world';
 import type { Scene } from '@engine/world';
 import type { Vec3 } from '@engine/core/math';
+import { crossVec3, dotVec3, normalizeVec3, quatFromAxisAngle } from '@engine/core/math';
 import { DisposableGroup } from '@engine/core';
 
 /**
@@ -43,34 +44,16 @@ export class GuideLineVisualizer {
     const dz = end[2] - start[2];
     const length = Math.sqrt(dx*dx + dy*dy + dz*dz);
 
-    // Determine orientation
-    // By default cube is aligned with axes. We need to scale one axis to length.
-    // To handle arbitrary rotation, we'd need Quat.lookAt or similar.
-    // For axis-aligned guides (which is 90% of use cases), we can just scale the correct axis.
-    
-    // Check if aligned with X, Y, or Z
-    const epsilon = 0.001;
-    let scale: Vec3 = [thickness, thickness, thickness];
-    
-    if (Math.abs(dy) < epsilon && Math.abs(dz) < epsilon) {
-       // X-aligned
-       scale = [length, thickness, thickness];
-    } else if (Math.abs(dx) < epsilon && Math.abs(dz) < epsilon) {
-       // Y-aligned
-       scale = [thickness, length, thickness];
-    } else if (Math.abs(dx) < epsilon && Math.abs(dy) < epsilon) {
-       // Z-aligned
-       scale = [thickness, thickness, length];
-    } else {
-        // Arbitrary rotation needed - not supported by simple scaling
-        // TODO: Add rotation support
-    }
+    const scale: Vec3 = [length, thickness, thickness];
+    const rotation = this.computeRotationForDirection([dx, dy, dz]);
 
-    entity.addComponent(new Transform(
-      center,
-      undefined,
-      scale
-    ));
+    entity.addComponent(
+      new Transform(
+        center,
+        rotation,
+        scale
+      )
+    );
 
     const mesh = new MeshComponent();
     mesh.meshType = 'cube';
@@ -171,6 +154,27 @@ export class GuideLineVisualizer {
   dispose(): void {
     this.clear();
     this.disposables.dispose();
+  }
+
+  private computeRotationForDirection(direction: Vec3): [number, number, number, number] {
+    const base: Vec3 = [1, 0, 0];
+    const dir = normalizeVec3(direction);
+    const d = dotVec3(base, dir);
+
+    // If already aligned with +X
+    if (d > 0.9999) {
+      return [0, 0, 0, 1];
+    }
+
+    // Opposite to +X: rotate 180 degrees around any perpendicular axis (use Y)
+    if (d < -0.9999) {
+      return quatFromAxisAngle([0, 1, 0], Math.PI);
+    }
+
+    const axis = crossVec3(base, dir);
+    const axisNorm = normalizeVec3(axis);
+    const angle = Math.acos(Math.max(-1, Math.min(1, d)));
+    return quatFromAxisAngle(axisNorm, angle);
   }
 }
 

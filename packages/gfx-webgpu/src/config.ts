@@ -4,6 +4,24 @@ export const Z_FAR = 10000;
 export const MSAA_SAMPLE_COUNT = 4;
 export const CLEAR_COLOR = { r: 0.02, g: 0.02, b: 0.03, a: 1.0 };
 export const DEFAULT_STATUS_MESSAGE = 'Rendering simple cubes…';
+
+// ========== Frame Loop Constants ==========
+
+/** Maximum delta time in seconds to prevent physics explosions after tab switch */
+export const MAX_DELTA_TIME_SEC = 0.1;
+
+// ========== Occlusion Culling Constants ==========
+
+/** Width of the occlusion buffer in pixels */
+export const OCCLUSION_BUFFER_WIDTH = 256;
+
+/** Height of the occlusion buffer in pixels */
+export const OCCLUSION_BUFFER_HEIGHT = 128;
+
+// ========== Device Manager Constants ==========
+
+/** Maximum number of device recreation attempts before giving up */
+export const MAX_DEVICE_RECREATION_ATTEMPTS = 3;
 export const UI_STATUS_THROTTLE_MS = 250;
 // Lighting system adds: pointLightCount (16 bytes), directional (32 bytes), ambient (16 bytes), 4 point lights (4*64=256 bytes)
 // Base total before shadows/IBL: 128 (static) + 16 + 32 + 16 + 256 = 448 bytes

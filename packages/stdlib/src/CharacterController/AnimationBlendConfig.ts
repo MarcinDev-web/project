@@ -3,7 +3,7 @@ import type { AnimationEasing } from '../Animation/types';
 
 /**
  * Configuration for animation blend times and easing functions.
- * 
+ *
  * Provides intelligent defaults for different types of animation transitions:
  * - Fast transitions for similar states (idle ↔ walk)
  * - Medium transitions for common changes (walk ↔ run)
@@ -43,7 +43,7 @@ export class AnimationBlendConfig {
 
   /**
    * Get blend time for a transition between two animation states.
-   * 
+   *
    * @param from - Source animation state name
    * @param to - Target animation state name
    * @returns Blend time in seconds
@@ -58,12 +58,15 @@ export class AnimationBlendConfig {
 
   /**
    * Get blend easing function for a transition between two animation states.
-   * 
+   *
    * @param from - Source animation state name
    * @param to - Target animation state name
    * @returns Easing function name
    */
-  getBlendEasing(from: AnimationStateName | string | null, to: AnimationStateName | string): AnimationEasing {
+  getBlendEasing(
+    from: AnimationStateName | string | null,
+    to: AnimationStateName | string
+  ): AnimationEasing {
     if (!from) {
       return this.defaultEasing;
     }
@@ -73,29 +76,40 @@ export class AnimationBlendConfig {
 
   /**
    * Set custom blend time for a specific transition.
-   * 
+   *
    * @param from - Source animation state name
    * @param to - Target animation state name
    * @param time - Blend time in seconds
    */
-  setBlendTime(from: AnimationStateName | string, to: AnimationStateName | string, time: number): void {
+  setBlendTime(
+    from: AnimationStateName | string,
+    to: AnimationStateName | string,
+    time: number
+  ): void {
     const key = this.getTransitionKey(from, to);
     this.blendTimes.set(key, Math.max(0, time));
   }
 
   /**
    * Set custom blend easing for a specific transition.
-   * 
+   *
    * @param from - Source animation state name
    * @param to - Target animation state name
    * @param easing - Easing function name
    */
-  setBlendEasing(from: AnimationStateName | string, to: AnimationStateName | string, easing: AnimationEasing): void {
+  setBlendEasing(
+    from: AnimationStateName | string,
+    to: AnimationStateName | string,
+    easing: AnimationEasing
+  ): void {
     const key = this.getTransitionKey(from, to);
     this.blendEasings.set(key, easing);
   }
 
-  private getTransitionKey(from: AnimationStateName | string, to: AnimationStateName | string): string {
+  private getTransitionKey(
+    from: AnimationStateName | string,
+    to: AnimationStateName | string
+  ): string {
     return `${from}->${to}`;
   }
 
@@ -105,8 +119,8 @@ export class AnimationBlendConfig {
     this.blendTimes.set('walk->idle', 0.08);
 
     // Fast transitions for similar states (walk ↔ run)
-    this.blendTimes.set('walk->run', 0.10);
-    this.blendTimes.set('run->walk', 0.10);
+    this.blendTimes.set('walk->run', 0.1);
+    this.blendTimes.set('run->walk', 0.1);
 
     // Medium transitions for common changes (idle/run → jump)
     this.blendTimes.set('idle->jump', 0.15);
@@ -116,17 +130,16 @@ export class AnimationBlendConfig {
     this.blendTimes.set('jump->fall', 0.12);
 
     // Slower transitions for important state changes (fall → land)
-    this.blendTimes.set('fall->land', 0.20);
+    this.blendTimes.set('fall->land', 0.2);
 
     // Medium transitions (land → idle)
     this.blendTimes.set('land->idle', 0.15);
 
     // Additional transitions for completeness
-    this.blendTimes.set('idle->run', 0.10);
-    this.blendTimes.set('run->idle', 0.10);
+    this.blendTimes.set('idle->run', 0.1);
+    this.blendTimes.set('run->idle', 0.1);
     this.blendTimes.set('jump->land', 0.18);
     this.blendTimes.set('land->walk', 0.12);
     this.blendTimes.set('land->run', 0.12);
   }
 }
-

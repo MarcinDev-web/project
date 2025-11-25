@@ -13,7 +13,7 @@ export interface MovementProfileData {
 
 /**
  * Movement Profile
- * 
+ *
  * Defines a set of movement parameters and optional extensions
  * that can be applied to a CharacterController.
  */
@@ -24,7 +24,9 @@ export class MovementProfile {
   public readonly config: CharacterControllerConfig;
   public readonly extensions?: MovementProfileExtension[];
 
-  constructor(data: Omit<MovementProfileData, 'extensions'> & { extensions?: MovementProfileExtension[] }) {
+  constructor(
+    data: Omit<MovementProfileData, 'extensions'> & { extensions?: MovementProfileExtension[] }
+  ) {
     this.id = data.id;
     this.name = data.name;
     this.config = { ...data.config };
@@ -40,7 +42,11 @@ export class MovementProfile {
    * Create a new MovementProfile with optional partial data
    */
   static create(
-    custom: Partial<Omit<MovementProfileData, 'extensions'>> & { id: string; name: string; config: CharacterControllerConfig } & { extensions?: MovementProfileExtension[] }
+    custom: Partial<Omit<MovementProfileData, 'extensions'>> & {
+      id: string;
+      name: string;
+      config: CharacterControllerConfig;
+    } & { extensions?: MovementProfileExtension[] }
   ): MovementProfile {
     const baseData: Omit<MovementProfileData, 'extensions'> = {
       id: custom.id,
@@ -50,7 +56,9 @@ export class MovementProfile {
     if (custom.description !== undefined) {
       baseData.description = custom.description;
     }
-    const data: Omit<MovementProfileData, 'extensions'> & { extensions?: MovementProfileExtension[] } = {
+    const data: Omit<MovementProfileData, 'extensions'> & {
+      extensions?: MovementProfileExtension[];
+    } = {
       ...baseData,
     };
     if (custom.extensions !== undefined) {
@@ -72,30 +80,35 @@ export class MovementProfile {
       data.description = this.description;
     }
     if (this.extensions !== undefined && this.extensions.length > 0) {
-      data.extensions = this.extensions.map(ext => ext.id);
+      data.extensions = this.extensions.map((ext) => ext.id);
     }
     return data;
   }
 
   /**
    * Deserialize profile from JSON-compatible data
-   * 
+   *
    * Note: Extensions must be resolved separately using their IDs
    */
-  static deserialize(data: MovementProfileData, extensionResolver?: (id: string) => MovementProfileExtension | null): MovementProfile {
+  static deserialize(
+    data: MovementProfileData,
+    extensionResolver?: (id: string) => MovementProfileExtension | null
+  ): MovementProfile {
     const { extensions: extensionIds, ...restData } = data;
-    const profileData: Omit<MovementProfileData, 'extensions'> & { extensions?: MovementProfileExtension[] } = {
+    const profileData: Omit<MovementProfileData, 'extensions'> & {
+      extensions?: MovementProfileExtension[];
+    } = {
       ...restData,
     };
-    
+
     if (extensionIds !== undefined && extensionResolver !== undefined) {
       const extensions = extensionIds
-        .map(id => extensionResolver(id))
+        .map((id) => extensionResolver(id))
         .filter((ext): ext is MovementProfileExtension => ext !== null && ext !== undefined);
       // Always set extensions array, even if empty (when resolver returns null for all)
       profileData.extensions = extensions;
     }
-    
+
     return new MovementProfile(profileData);
   }
 
@@ -111,7 +124,9 @@ export class MovementProfile {
     if (this.description !== undefined) {
       baseData.description = this.description;
     }
-    const data: Omit<MovementProfileData, 'extensions'> & { extensions?: MovementProfileExtension[] } = {
+    const data: Omit<MovementProfileData, 'extensions'> & {
+      extensions?: MovementProfileExtension[];
+    } = {
       ...baseData,
     };
     if (this.extensions !== undefined) {
@@ -148,4 +163,3 @@ export interface MovementProfileExtension {
    */
   onRemove?(controller: import('@engine/world').CharacterController): void;
 }
-

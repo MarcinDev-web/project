@@ -6,7 +6,11 @@ export interface KeyframeVec3 {
   value: [number, number, number];
 }
 
-export function createTestClip(name: string, keyframes?: KeyframeVec3[], duration = 1): AnimationClip {
+export function createTestClip(
+  name: string,
+  keyframes?: KeyframeVec3[],
+  duration = 1
+): AnimationClip {
   const frames = keyframes ?? [
     { time: 0, value: [0, 0, 0] as [number, number, number] },
     { time: duration, value: [0, 0, 0] as [number, number, number] },

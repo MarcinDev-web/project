@@ -2,7 +2,11 @@ import { describe, it, expect, beforeEach } from 'vitest';
 import { CharacterController } from '@engine/world';
 import { Entity } from '@engine/world';
 import { Scene } from '@engine/world';
-import { MovementProfile, MovementProfileRegistry, PRESET_PROFILES } from '../../src/MovementProfiles';
+import {
+  MovementProfile,
+  MovementProfileRegistry,
+  PRESET_PROFILES,
+} from '../../src/MovementProfiles';
 import { DEFAULT_CHARACTER_CONFIG } from '@engine/world';
 
 describe('CharacterController - Movement Profiles Integration', () => {
@@ -37,7 +41,7 @@ describe('CharacterController - Movement Profiles Integration', () => {
         name: 'Test',
         config: DEFAULT_CHARACTER_CONFIG,
       } as any;
-      
+
       expect(() => {
         controller.applyProfile(invalidProfile);
       }).toThrow('MovementProfile missing id');
@@ -48,7 +52,7 @@ describe('CharacterController - Movement Profiles Integration', () => {
         id: 'test',
         name: 'Test',
       } as any;
-      
+
       expect(() => {
         controller.applyProfile(invalidProfile);
       }).toThrow('MovementProfile "test" missing config');
@@ -60,7 +64,7 @@ describe('CharacterController - Movement Profiles Integration', () => {
         name: 'Test',
         config: 'not-an-object',
       } as any;
-      
+
       expect(() => {
         controller.applyProfile(invalidProfile);
       }).toThrow('config must be an object');
@@ -72,7 +76,7 @@ describe('CharacterController - Movement Profiles Integration', () => {
         name: 'Test',
         config: [],
       } as any;
-      
+
       expect(() => {
         controller.applyProfile(invalidProfile);
       }).toThrow('config must be an object');
@@ -87,7 +91,7 @@ describe('CharacterController - Movement Profiles Integration', () => {
           moveSpeed: -1,
         },
       });
-      
+
       expect(() => {
         controller.applyProfile(invalidProfile);
       }).toThrow('moveSpeed must be positive');
@@ -102,7 +106,7 @@ describe('CharacterController - Movement Profiles Integration', () => {
           jumpForce: 0,
         },
       });
-      
+
       expect(() => {
         controller.applyProfile(invalidProfile);
       }).toThrow('jumpForce must be positive');
@@ -117,7 +121,7 @@ describe('CharacterController - Movement Profiles Integration', () => {
           gravityMultiplier: -1,
         },
       });
-      
+
       expect(() => {
         controller.applyProfile(invalidProfile);
       }).toThrow('gravityMultiplier cannot be negative');
@@ -132,7 +136,7 @@ describe('CharacterController - Movement Profiles Integration', () => {
           maxSlopeAngle: 100,
         },
       });
-      
+
       expect(() => {
         controller.applyProfile(invalidProfile);
       }).toThrow('maxSlopeAngle must be between 0 and 90 degrees');
@@ -147,7 +151,7 @@ describe('CharacterController - Movement Profiles Integration', () => {
           airControlMultiplier: 1.5,
         },
       });
-      
+
       expect(() => {
         controller.applyProfile(invalidProfile);
       }).toThrow('airControlMultiplier must be between 0 and 1');
@@ -159,11 +163,11 @@ describe('CharacterController - Movement Profiles Integration', () => {
         name: 'Test',
         config: DEFAULT_CHARACTER_CONFIG,
       });
-      
+
       expect(() => {
         controller.applyProfile(validProfile);
       }).not.toThrow();
-      
+
       expect(controller.getCurrentProfile()).toBe(validProfile);
     });
   });
@@ -171,7 +175,7 @@ describe('CharacterController - Movement Profiles Integration', () => {
   describe('applyProfile', () => {
     it('should apply profile config to controller', () => {
       const profile = PRESET_PROFILES.FAST_HUMAN;
-      
+
       controller.applyProfile(profile);
 
       expect(controller.config.moveSpeed).toBe(profile.config.moveSpeed);
@@ -181,7 +185,7 @@ describe('CharacterController - Movement Profiles Integration', () => {
 
     it('should get current profile after applying', () => {
       const profile = PRESET_PROFILES.HUMAN;
-      
+
       controller.applyProfile(profile);
 
       const currentProfile = controller.getCurrentProfile();
@@ -251,16 +255,16 @@ describe('CharacterController - Movement Profiles Integration', () => {
   describe('Serialization', () => {
     it('should serialize profile ID', () => {
       controller.applyProfile(PRESET_PROFILES.HUMAN);
-      
+
       const serialized = controller.serialize();
-      
+
       expect(serialized.profileId).toBe('human');
       expect(serialized.config).toBeDefined();
     });
 
     it('should not include profileId if no profile applied', () => {
       const serialized = controller.serialize();
-      
+
       expect(serialized.profileId).toBeUndefined();
     });
 
@@ -275,7 +279,7 @@ describe('CharacterController - Movement Profiles Integration', () => {
       };
 
       const deserialized = CharacterController.deserialize(data);
-      
+
       const currentProfile = deserialized.getCurrentProfile();
       expect(currentProfile).toBeDefined();
       expect(currentProfile?.id).toBe('human');
@@ -285,7 +289,7 @@ describe('CharacterController - Movement Profiles Integration', () => {
   describe('Profile Registry Integration', () => {
     it('should use profiles from registry', () => {
       const registry = MovementProfileRegistry.getInstance();
-      
+
       const customProfile = MovementProfile.create({
         id: 'custom-test',
         name: 'Custom Test',
@@ -304,7 +308,7 @@ describe('CharacterController - Movement Profiles Integration', () => {
     it('should work with preset profiles', () => {
       const profile = PRESET_PROFILES.FAST_HUMAN;
       controller.applyProfile(profile);
-      
+
       expect(controller.getCurrentProfile()?.id).toBe('fast-human');
       expect(controller.config.moveSpeed).toBe(7.0);
     });
@@ -313,12 +317,11 @@ describe('CharacterController - Movement Profiles Integration', () => {
   describe('Clone', () => {
     it('should clone controller with profile', () => {
       controller.applyProfile(PRESET_PROFILES.HUMAN);
-      
+
       const cloned = controller.clone();
-      
+
       expect(cloned.config.moveSpeed).toBe(controller.config.moveSpeed);
       expect(cloned.getCurrentProfile()?.id).toBe(controller.getCurrentProfile()?.id);
     });
   });
 });
-

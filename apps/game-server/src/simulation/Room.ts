@@ -1,7 +1,7 @@
-import { ZoneServer, ZoneServerOptions } from '@engine/world-server';
+import { ZoneServer } from '@engine/world-server';
 import { Scene } from '@engine/world';
-import { InputFrame, SnapshotMessage } from '@engine/net-protocol';
-import { Disposable } from '@engine/core';
+import type { InputFrame, SnapshotMessage } from '@engine/net-protocol';
+import type { IDisposable } from '@engine/core';
 import { GameServerReplicator } from './GameServerReplicator';
 // import { HeadlessPhysics } from '@engine/wasm-physics'; // Wasm physics integration
 
@@ -10,18 +10,22 @@ export interface RoomOptions {
   tickRate: number;
 }
 
-export class Room implements Disposable {
+export class Room implements IDisposable {
   public readonly id: string;
   private readonly zoneServer: ZoneServer;
   private readonly scene: Scene;
+  private readonly sceneUpdate: ((dt: number) => void) | null;
   private isRunning = false;
   private lastTickTime = 0;
+  private readonly clients = new Set<string>();
   
   constructor(options: RoomOptions) {
     this.id = options.id;
     
     // Initialize Scene
     this.scene = new Scene();
+    const updateFn = (this.scene as unknown as { update?: (dt: number) => void }).update;
+    this.sceneUpdate = typeof updateFn === 'function' ? updateFn.bind(this.scene) : null;
     
     // Initialize Physics (Placeholder for now as HeadlessPhysics is not exposed)
     // this.physics = new HeadlessPhysics();
@@ -63,8 +67,9 @@ export class Room implements Disposable {
 
     try {
       // 1. Update ECS (includes physics if added as system)
-      // The scene.update() would typically call all systems
-      // this.scene.update(dt); 
+      if (this.sceneUpdate) {
+        this.sceneUpdate(dt);
+      }
       
       // 2. ZoneServer handles AoI and Snapshots internally via its own timer
       // But we ensure it has the latest state
@@ -86,6 +91,7 @@ export class Room implements Disposable {
 
   addClient(clientId: string): void {
     this.zoneServer.addClient(clientId);
+    this.clients.add(clientId);
     // Spawn player entity in the world
     // const playerEntity = new Entity();
     // playerEntity.addComponent(new PlayerComponent(clientId));
@@ -95,6 +101,7 @@ export class Room implements Disposable {
 
   removeClient(clientId: string): void {
     this.zoneServer.removeClient(clientId);
+    this.clients.delete(clientId);
     // this.scene.removeEntity(playerEntityId);
     console.log(`[Room ${this.id}] Removed client ${clientId}`);
   }
@@ -106,6 +113,10 @@ export class Room implements Disposable {
 
   // Callback to be assigned by RoomManager
   public onSendSnapshot?: (clientId: string, snapshot: SnapshotMessage) => void;
+
+  getClientCount(): number {
+    return this.clients.size;
+  }
 
   dispose(): void {
     this.isRunning = false;

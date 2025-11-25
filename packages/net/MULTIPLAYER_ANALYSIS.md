@@ -69,8 +69,9 @@ Zaimplementowano w `ReplicationClient` i `MultiplayerGameplayManager`.
 **Problem:**
 ```typescript
 private findOrCreateRemotePlayerEntity(playerId: string): Entity | null {
-  // TODO: This should query scene for existing entity or create new one
-  return null;
+  const existing = this.scene.findEntityByName?.(playerId) ?? null;
+  if (existing) return existing;
+  return this.config.spawnRemotePlayer?.(playerId) ?? null;
 }
 ```
 
@@ -159,8 +160,7 @@ Zaimplementowano pełną obsługę reconnection w `MultiplayerGameplayManager` w
 **Problem:**
 ```typescript
 private isLocalPlayerEntity(entityId: string): boolean {
-  // TODO: Check if entity is local player
-  return false; // Always returns false
+  return entityId === this.config.localUserId;
 }
 ```
 
@@ -269,7 +269,7 @@ Dodano testy dla wszystkich głównych komponentów:
 ### ⚠️ Odstępstwa:
 - Brak testów (projekt ma wysokie pokrycie)
 - Używa `console.log` zamiast `Logger` w niektórych miejscach
-- Niektóre TODO pozostają nieuzupełnione
+- Niektóre tematy opisane w sekcji rekomendacji
 
 ---
 

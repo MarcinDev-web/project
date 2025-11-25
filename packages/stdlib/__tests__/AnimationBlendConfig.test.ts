@@ -31,13 +31,13 @@ describe('AnimationBlendConfig', () => {
     it('should return configured blend time for walk->run transition', () => {
       const config = new AnimationBlendConfig();
       const time = config.getBlendTime(AnimationStateName.Walk, AnimationStateName.Run);
-      expect(time).toBe(0.10);
+      expect(time).toBe(0.1);
     });
 
     it('should return configured blend time for fall->land transition', () => {
       const config = new AnimationBlendConfig();
       const time = config.getBlendTime(AnimationStateName.Fall, AnimationStateName.Land);
-      expect(time).toBe(0.20);
+      expect(time).toBe(0.2);
     });
 
     it('should return custom blend time when set', () => {
@@ -56,11 +56,11 @@ describe('AnimationBlendConfig', () => {
     it('should use custom blend times from constructor options', () => {
       const config = new AnimationBlendConfig({
         customBlendTimes: {
-          'idle->jump': 0.30,
+          'idle->jump': 0.3,
         },
       });
       const time = config.getBlendTime(AnimationStateName.Idle, AnimationStateName.Jump);
-      expect(time).toBe(0.30);
+      expect(time).toBe(0.3);
     });
   });
 
@@ -125,24 +125,25 @@ describe('AnimationBlendConfig', () => {
     it('should set blend easing for a transition', () => {
       const config = new AnimationBlendConfig();
       config.setBlendEasing(AnimationStateName.Idle, AnimationStateName.Run, 'ease-out');
-      expect(config.getBlendEasing(AnimationStateName.Idle, AnimationStateName.Run)).toBe('ease-out');
+      expect(config.getBlendEasing(AnimationStateName.Idle, AnimationStateName.Run)).toBe(
+        'ease-out'
+      );
     });
   });
 
   describe('default blend times', () => {
     it('should have correct default blend times for all common transitions', () => {
       const config = new AnimationBlendConfig();
-      
+
       expect(config.getBlendTime(AnimationStateName.Idle, AnimationStateName.Walk)).toBe(0.08);
       expect(config.getBlendTime(AnimationStateName.Walk, AnimationStateName.Idle)).toBe(0.08);
-      expect(config.getBlendTime(AnimationStateName.Walk, AnimationStateName.Run)).toBe(0.10);
-      expect(config.getBlendTime(AnimationStateName.Run, AnimationStateName.Walk)).toBe(0.10);
+      expect(config.getBlendTime(AnimationStateName.Walk, AnimationStateName.Run)).toBe(0.1);
+      expect(config.getBlendTime(AnimationStateName.Run, AnimationStateName.Walk)).toBe(0.1);
       expect(config.getBlendTime(AnimationStateName.Idle, AnimationStateName.Jump)).toBe(0.15);
       expect(config.getBlendTime(AnimationStateName.Run, AnimationStateName.Jump)).toBe(0.15);
       expect(config.getBlendTime(AnimationStateName.Jump, AnimationStateName.Fall)).toBe(0.12);
-      expect(config.getBlendTime(AnimationStateName.Fall, AnimationStateName.Land)).toBe(0.20);
+      expect(config.getBlendTime(AnimationStateName.Fall, AnimationStateName.Land)).toBe(0.2);
       expect(config.getBlendTime(AnimationStateName.Land, AnimationStateName.Idle)).toBe(0.15);
     });
   });
 });
-

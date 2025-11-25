@@ -94,7 +94,7 @@ describe('ProfileSwitcher', () => {
       const switcher = new ProfileSwitcher([profile1, profile2, profile3]);
 
       const result = switcher.switchTo('profile-3');
-      
+
       expect(result).toBe(profile3);
       expect(switcher.getCurrentProfile()).toBe(profile3);
       expect(switcher.getCurrentIndex()).toBe(2);
@@ -104,7 +104,7 @@ describe('ProfileSwitcher', () => {
       const switcher = new ProfileSwitcher([profile1, profile2, profile3]);
 
       const result = switcher.switchTo('non-existent');
-      
+
       expect(result).toBe(null);
       // Current profile should not change
       expect(switcher.getCurrentProfile()).toBe(profile1);
@@ -137,13 +137,12 @@ describe('ProfileSwitcher', () => {
       ]);
 
       expect(switcher.getCurrentProfile().id).toBe('human');
-      
+
       switcher.switchToNext();
       expect(switcher.getCurrentProfile().id).toBe('fast-human');
-      
+
       switcher.switchTo('flying-human');
       expect(switcher.getCurrentProfile().id).toBe('flying-human');
     });
   });
 });
-

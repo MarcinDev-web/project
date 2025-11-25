@@ -22,7 +22,7 @@ export class BlendTree1D implements AnimationNode {
   private stateMachine: AnimationStateMachine;
   private sync: boolean;
   private playing = signal(true);
-  
+
   // We track our own normalized time to sync children
   private normalizedTime = 0;
   private duration = 0;
@@ -31,14 +31,14 @@ export class BlendTree1D implements AnimationNode {
     this.parameter = options.parameter;
     this.stateMachine = options.stateMachine;
     this.sync = options.sync ?? true;
-    
+
     // Sort children by threshold
     this.children = [...options.children].sort((a, b) => a.threshold - b.threshold);
-    
+
     if (this.children.length === 0) {
       throw new Error('BlendTree1D must have at least one child');
     }
-    
+
     this.updateDuration();
   }
 
@@ -50,10 +50,10 @@ export class BlendTree1D implements AnimationNode {
 
     // Calculate weights and find active children
     const weights = this.calculateWeights(value);
-    
+
     // Calculate effective duration based on weights
     this.updateDuration();
-    
+
     // Advance time
     // We advance normalized time based on the effective duration
     if (this.duration > 0) {
@@ -67,7 +67,7 @@ export class BlendTree1D implements AnimationNode {
     for (let i = 0; i < this.children.length; i++) {
       const child = this.children[i]!;
       const weight = weights[i]!;
-      
+
       if (weight > 0 || !this.sync) {
         if (this.sync) {
           child.node.setNormalizedTime(this.normalizedTime);
@@ -102,9 +102,9 @@ export class BlendTree1D implements AnimationNode {
 
     // Blend samples
     const result: AnimationSample[] = [];
-    for (const [_, contributions] of samplesByTarget) {
+    for (const [, /* _targetKey */ contributions] of samplesByTarget) {
       if (contributions.length === 0) continue;
-      
+
       // If only one contribution, use it directly
       if (contributions.length === 1) {
         result.push(contributions[0]!.sample);
@@ -168,10 +168,10 @@ export class BlendTree1D implements AnimationNode {
     const paramValue = this.stateMachine.getParam(this.parameter);
     const value = typeof paramValue === 'number' ? paramValue : 0;
     const weights = this.calculateWeights(value);
-    
+
     let weightedDuration = 0;
     let totalWeight = 0;
-    
+
     for (let i = 0; i < this.children.length; i++) {
       const w = weights[i]!;
       if (w > 0) {
@@ -179,13 +179,13 @@ export class BlendTree1D implements AnimationNode {
         totalWeight += w;
       }
     }
-    
+
     this.duration = totalWeight > 0 ? weightedDuration / totalWeight : 1.0;
   }
 
   private calculateWeights(value: number): number[] {
-    const weights = new Array(this.children.length).fill(0);
-    
+    const weights: number[] = Array.from({ length: this.children.length }, () => 0);
+
     if (this.children.length === 0) return weights;
     if (this.children.length === 1) {
       weights[0] = 1;
@@ -196,7 +196,7 @@ export class BlendTree1D implements AnimationNode {
     for (let i = 0; i < this.children.length - 1; i++) {
       const a = this.children[i]!;
       const b = this.children[i + 1]!;
-      
+
       if (value >= a.threshold && value <= b.threshold) {
         const range = b.threshold - a.threshold;
         const t = range > 0 ? (value - a.threshold) / range : 0;
@@ -224,10 +224,12 @@ export class BlendTree1D implements AnimationNode {
     }
   }
 
-  private blendSamples(contributions: { sample: AnimationSample; weight: number }[]): AnimationSample | null {
+  private blendSamples(
+    contributions: { sample: AnimationSample; weight: number }[]
+  ): AnimationSample | null {
     const first = contributions[0]!.sample;
     const type = typeof first.value;
-    
+
     if (type === 'number') {
       let value = 0;
       let totalWeight = 0;
@@ -237,34 +239,36 @@ export class BlendTree1D implements AnimationNode {
       }
       return {
         target: first.target,
-        value: totalWeight > 0 ? value / totalWeight : value
+        value: totalWeight > 0 ? value / totalWeight : value,
       };
     } else {
       // Vec3 or Quat
       // Simple linear blend for now
       // For Quat we should use slerp but for multi-blend linear is approximation
       // Or we can do iterative interpolation
-      
+
       let result = contributions[0]!.sample.value;
       let currentWeight = contributions[0]!.weight;
-      
+
       for (let i = 1; i < contributions.length; i++) {
         const next = contributions[i]!;
         const t = next.weight / (currentWeight + next.weight);
-        
+
         if (first.target.property === 'rotation') {
-           // Quat interpolation
-           result = interpolate('quat', result as any, next.sample.value as any, t, 'linear');
+          // Quat interpolation - type assertion needed for generic AnimationValue
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
+          result = interpolate('quat', result as any, next.sample.value as any, t, 'linear');
         } else {
-           // Vec3 interpolation
-           result = interpolate('vec3', result as any, next.sample.value as any, t, 'linear');
+          // Vec3 interpolation - type assertion needed for generic AnimationValue
+          // eslint-disable-next-line @typescript-eslint/no-unsafe-argument, @typescript-eslint/no-explicit-any
+          result = interpolate('vec3', result as any, next.sample.value as any, t, 'linear');
         }
         currentWeight += next.weight;
       }
-      
+
       return {
         target: first.target,
-        value: result
+        value: result,
       };
     }
   }

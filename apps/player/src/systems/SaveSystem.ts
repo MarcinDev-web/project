@@ -55,7 +55,8 @@ export class SaveSystem {
     slotId: string,
     playerPosition: Vec3,
     playerRotation: number,
-    gameState?: Record<string, any>
+    gameState?: Record<string, any>,
+    checkpointPath?: number[]
   ): boolean {
     if (!this.buildId) {
       Logger.warn('[SaveSystem] Cannot save: buildId not set');
@@ -63,16 +64,14 @@ export class SaveSystem {
     }
 
     try {
-      // TODO: Calculate checkpoint path when checkpoint entity path calculation is implemented
-      const checkpointPath: number[] | undefined = undefined;
-
+      const checkpointPathToStore = checkpointPath ?? (gameState as any)?.checkpointPath;
       const saveData: GameSaveData = {
         slotId,
         buildId: this.buildId,
         timestamp: Date.now(),
         playerPosition: [...playerPosition] as Vec3,
         playerRotation,
-        ...(checkpointPath !== undefined && { checkpointPath }),
+        ...(checkpointPathToStore !== undefined && { checkpointPath: checkpointPathToStore }),
         ...(gameState !== undefined && { gameState }),
       };
 

@@ -35,6 +35,12 @@ import {
 
 const ESTIMATED_TRIANGLES_PER_UNKNOWN_ENTITY = 12;
 
+// WASM memory layout constants
+const WASM_FLOATS_PER_POSITION = 3;
+const WASM_FLOATS_PER_ROTATION = 4; // quaternion (x, y, z, w)
+const WASM_FLOATS_PER_SCALE = 3;
+const WASM_BYTES_TO_FLOAT32_SHIFT = 2; // divide by 4 (sizeof float32)
+
 import { ForwardPlus, type PointLight } from '../lighting/ForwardPlus';
 import { ScreenSpaceLOD } from './ScreenSpaceLOD';
 import { UniformManager } from './UniformManager';
@@ -70,6 +76,18 @@ interface SceneUpdateResult {
     instanceUpdateTime: number;
     totalCPUTime: number;
   };
+}
+
+interface BundleState {
+  bundle: GPURenderBundle;
+  instanceCount: number;
+  indexCount: number;
+  opaqueCount: number;
+  renderPipeline: GPURenderPipeline;
+  transparentPipeline: GPURenderPipeline | null;
+  overlayPipeline: GPURenderPipeline;
+  uniformBindGroup: GPUBindGroup;
+  textureBindGroup: GPUBindGroup;
 }
 
 export interface FrameRenderContext {
@@ -118,18 +136,8 @@ export interface FrameRenderContext {
  * Error metrics tracked by FrameRenderer for monitoring and debugging.
  */
 export interface ErrorMetrics {
-  sceneUpdateErrors: number;
-  screenLodErrors: number;
-  shadowPassErrors: number;
-  forwardPlusErrors: number;
-  computePrepassErrors: number;
-  environmentRenderErrors: number;
-  waterRenderErrors: number;
-  gridRenderErrors: number;
-  logicConnectionErrors: number;
-  postProcessErrors: number;
-  deviceValidationErrors: number;
-  lastErrorTime: number;
+  totalErrors: number;
+  lastError: { type: string; time: number } | null;
 }
 
 /**
@@ -155,39 +163,23 @@ export class FrameRenderer {
   private instancePipeline: GpuInstancePipeline | null = null;
   private instancePipelineDevice: GPUDevice | null = null;
   private pendingTimestampRead = false;
-  private staticBundle: GPURenderBundle | null = null;
-  private bundleDirty = true;
-  private bundleInstanceCount = 0;
-  private bundleIndexCount = 0;
-  private bundleOpaqueCount = 0;
-  private bundleRenderPipeline: GPURenderPipeline | null = null;
-  private bundleTransparentPipeline: GPURenderPipeline | null = null;
-  private bundleOverlayPipeline: GPURenderPipeline | null = null;
-  private bundleUniformBindGroup: GPUBindGroup | null = null;
-  private bundleTextureBindGroup: GPUBindGroup | null = null;
+  private bundleState: BundleState | null = null;
   private forwardPlus: ForwardPlus | null = null;
   private screenSpaceLOD: ScreenSpaceLOD | null = null;
   private shadowPass: ShadowPass | null = null;
   private instanceScaleScratch = new Float32Array(0);
   private ownedLodScaleBuffer: GPUBuffer | null = null;
   private errorMetrics: ErrorMetrics = {
-    sceneUpdateErrors: 0,
-    screenLodErrors: 0,
-    shadowPassErrors: 0,
-    forwardPlusErrors: 0,
-    computePrepassErrors: 0,
-    environmentRenderErrors: 0,
-    waterRenderErrors: 0,
-    gridRenderErrors: 0,
-    logicConnectionErrors: 0,
-    postProcessErrors: 0,
-    deviceValidationErrors: 0,
-    lastErrorTime: 0,
+    totalErrors: 0,
+    lastError: null,
   };
   private readonly MAX_VISIBLE_ENTITIES_CACHE_SIZE = 10000;
   private collisionWorld: CollisionWorld | null = null;
   private wasmCollision: WasmCollision | null = null;
   private lastFrameVisibleIndices: Uint32Array | null = null;
+  private lastFrameVisibleIndicesCount = 0;
+  private vpScratch = new Float32Array(16);
+  private disposed = false;
 
   constructor(initialCapacity = 1000) {
     this.frustumCuller = new FrustumCuller();
@@ -198,11 +190,38 @@ export class FrameRenderer {
     this.postProcess = new PostProcessPipeline();
   }
 
+  /**
+   * Sets the WASM collision world for accelerated frustum and occlusion culling.
+   * When set, the renderer will use WASM-based culling instead of the TypeScript implementation.
+   * @param wasm - WASM collision module instance providing memory access
+   * @param world - CollisionWorld instance from WASM for spatial queries
+   */
   setCollisionWorld(wasm: WasmCollision, world: CollisionWorld): void {
     this.wasmCollision = wasm;
     this.collisionWorld = world;
   }
 
+  /**
+   * Renders a single frame with the complete rendering pipeline.
+   * 
+   * Pipeline stages:
+   * 1. Device validation and swap chain setup
+   * 2. Scene update with frustum/occlusion culling
+   * 3. Screen-space LOD selection (optional)
+   * 4. Shadow pass (optional)
+   * 5. Forward+ light culling (optional)
+   * 6. Compute prepass for instance culling (optional)
+   * 7. Main render pass (environment, geometry, water, grid, connections)
+   * 8. Post-processing (HDR, bloom, SSAO, FXAA, etc.)
+   * 
+   * @param ctx - Frame render context containing device, resources, and scene
+   * @param viewProjectionMatrix - Combined view-projection matrix for culling and rendering
+   * @param eyePosition - Camera position in world space
+   * @param passDescriptor - Optional custom render pass descriptor for timestamp/occlusion queries
+   * @param viewMatrix - Optional separate view matrix for shadow/LOD calculations
+   * @param projectionMatrix - Optional separate projection matrix for shadow/LOD calculations
+   * @returns Updated geometry data with current instance counts
+   */
   renderFrame(
     ctx: FrameRenderContext,
     viewProjectionMatrix: Mat4,
@@ -219,8 +238,7 @@ export class FrameRenderer {
     const deviceValidation = DeviceValidator.validateSnapshot(deviceSnapshot);
     
     if (!deviceValidation.valid) {
-      this.errorMetrics.deviceValidationErrors++;
-      this.errorMetrics.lastErrorTime = performance.now();
+      this.recordError('deviceValidation');
       Logger.warn(`[FrameRenderer] ${deviceValidation.error} - skipping frame`);
       return geometry;
     }
@@ -257,8 +275,15 @@ export class FrameRenderer {
     
     this.frameTargets.registerEncoderTextures(encoder, texturesUsedByEncoder);
     
-    const swapChainView = this.setupSwapChain(ctx, configuredDevice, encoder, deviceSnapshot);
+    const swapChainView = this.setupSwapChain(ctx);
     if (!swapChainView) {
+      // Cleanup encoder on swap chain failure
+      try {
+        encoder.finish();
+      } catch {
+        // ignore
+      }
+      this.frameTargets.unregisterEncoderTextures(encoder);
       return geometry;
     }
 
@@ -337,8 +362,7 @@ export class FrameRenderer {
         })
       );
     } catch (err) {
-      this.errorMetrics.postProcessErrors++;
-      this.errorMetrics.lastErrorTime = performance.now();
+      this.recordError('postProcess');
       Logger.warn('[FrameRenderer] Post-process failed:', err);
       // Continue with frame submission even if post-process failed
     }
@@ -371,7 +395,7 @@ export class FrameRenderer {
     const commandBuffer = encoder.finish();
     // Unregister encoder textures after finish - textures are now safe to destroy after submit
     this.frameTargets.unregisterEncoderTextures(encoder);
-    this.submitAndCleanup(configuredDevice, commandBuffer, encoder);
+    this.submitAndCleanup(configuredDevice, commandBuffer);
     this.frameTargets.flush(configuredDevice.queue);
     this.postProcess.flush(configuredDevice.queue);
 
@@ -389,7 +413,18 @@ export class FrameRenderer {
     }
   }
 
+  /**
+   * Releases all GPU resources and internal state.
+   * 
+   * After disposal:
+   * - All GPU buffers and pipelines are destroyed
+   * - Pending async operations are safely cancelled
+   * - WASM references are cleared
+   * - The instance should not be reused
+   */
   dispose(): void {
+    this.disposed = true;
+    
     try {
       this.instancePipeline?.dispose();
     } catch {
@@ -413,6 +448,13 @@ export class FrameRenderer {
       // ignore
     }
     this.ownedLodScaleBuffer = null;
+    
+    // Cleanup WASM resources
+    this.collisionWorld = null;
+    this.wasmCollision = null;
+    this.lastFrameVisibleIndices = null;
+    this.lastFrameVisibleIndicesCount = 0;
+    
     // Cleanup caches
     this.visibleEntitiesCache = [];
     this.customGeometryEntitiesCache = [];
@@ -504,8 +546,7 @@ export class FrameRenderer {
     operationName: string
   ): boolean {
     if (!DeviceValidator.validateBeforeOperation(ctx, deviceSnapshot, operationName)) {
-      this.errorMetrics.deviceValidationErrors++;
-      this.errorMetrics.lastErrorTime = performance.now();
+      this.recordError('deviceValidation');
       try {
         encoder.finish();
         // Unregister encoder textures after finish
@@ -520,127 +561,30 @@ export class FrameRenderer {
   }
 
   /**
-   * Sets up swap chain texture and view with device validation.
-   * @param ctx Frame render context
-   * @param configuredDevice Configured GPU device
-   * @param encoder Command encoder
-   * @param deviceSnapshot Device snapshot from start of frame
-   * @returns GPUTextureView if successful, null otherwise
+   * Sets up swap chain texture and view.
+   * Device validation is done once at frame start in renderFrame().
    */
-  private setupSwapChain(
-    ctx: FrameRenderContext,
-    configuredDevice: GPUDevice,
-    encoder: GPUCommandEncoder,
-    deviceSnapshot: DeviceSnapshot
-  ): GPUTextureView | null {
-    // Validate device before acquiring swap chain texture
-    if (!this.validateDeviceAndCleanupEncoder(ctx, deviceSnapshot, encoder, 'swap chain texture acquisition')) {
-      return null;
-    }
-    
-    const swapChainTexture = this.acquireSwapChainTexture(ctx, configuredDevice, encoder, deviceSnapshot);
+  private setupSwapChain(ctx: FrameRenderContext): GPUTextureView | null {
+    const swapChainTexture = this.acquireSwapChainTexture(ctx);
     if (!swapChainTexture) {
       return null;
     }
     
-      // Validate device before creating swap chain view
-      // Critical: texture view must be created with the same device as the encoder
-      if (!this.validateDeviceAndCleanupEncoder(ctx, deviceSnapshot, encoder, 'swap chain view creation')) {
-        return null;
-      }
-      
-      // Double-check device consistency - texture must be from the same device as configuredDevice
-      // If device changed, getCurrentTexture() may return a texture from the old device
-      if (!DeviceValidator.validateBeforeOperation(ctx, deviceSnapshot, 'texture view creation')) {
-        try {
-          encoder.finish();
-          this.frameTargets.unregisterEncoderTextures(encoder);
-        } catch {
-          // ignore - but still unregister to prevent leaks
-          this.frameTargets.unregisterEncoderTextures(encoder);
-        }
-        return null;
-      }
-    
-    let swapChainView: GPUTextureView;
     try {
-      // Create view immediately after validation to minimize chance of device change
-      swapChainView = swapChainTexture.createView({ label: 'frame-color-resolve-view' });
-      
-      // Validate device one more time after creating view to ensure consistency
-      if (!DeviceValidator.validateBeforeOperation(ctx, deviceSnapshot, 'texture view creation completion')) {
-        try {
-          encoder.finish();
-          this.frameTargets.unregisterEncoderTextures(encoder);
-        } catch {
-          // ignore - but still unregister to prevent leaks
-          this.frameTargets.unregisterEncoderTextures(encoder);
-        }
-        return null;
-      }
+      return swapChainTexture.createView({ label: 'frame-color-resolve-view' });
     } catch (err) {
-      this.errorMetrics.deviceValidationErrors++;
-      this.errorMetrics.lastErrorTime = performance.now();
-      Logger.warn('[FrameRenderer] Failed to create swap chain view - device may have changed:', err);
-      try {
-        encoder.finish();
-        this.frameTargets.unregisterEncoderTextures(encoder);
-      } catch {
-        // ignore - but still unregister to prevent leaks
-        this.frameTargets.unregisterEncoderTextures(encoder);
-      }
+      this.recordError('swapChain');
+      Logger.warn('[FrameRenderer] Failed to create swap chain view:', err);
       return null;
     }
-    
-    return swapChainView;
   }
 
-  private acquireSwapChainTexture(
-    ctx: FrameRenderContext,
-    configuredDevice: GPUDevice,
-    encoder: GPUCommandEncoder,
-    deviceSnapshot: DeviceSnapshot
-  ): GPUTexture | null {
+  private acquireSwapChainTexture(ctx: FrameRenderContext): GPUTexture | null {
     try {
-      // Validate device consistency before getting texture
-      if (!DeviceValidator.validateBeforeOperation(ctx, deviceSnapshot, 'getCurrentTexture')) {
-        try {
-          encoder.finish();
-          this.frameTargets.unregisterEncoderTextures(encoder);
-        } catch {
-          // ignore - but still unregister to prevent leaks
-          this.frameTargets.unregisterEncoderTextures(encoder);
-        }
-        return null;
-      }
-      
-      // Get the swap chain texture - it's associated with the device that configured the context
-      const texture = ctx.context.getCurrentTexture();
-      
-      // Validate device consistency after getting texture
-      if (!DeviceValidator.validateBeforeOperation(ctx, deviceSnapshot, 'texture acquisition completion')) {
-        try {
-          encoder.finish();
-          this.frameTargets.unregisterEncoderTextures(encoder);
-        } catch {
-          // ignore - but still unregister to prevent leaks
-          this.frameTargets.unregisterEncoderTextures(encoder);
-        }
-        return null;
-      }
-      
-      return texture;
+      return ctx.context.getCurrentTexture();
     } catch (err) {
-      this.errorMetrics.deviceValidationErrors++;
-      this.errorMetrics.lastErrorTime = performance.now();
-      Logger.warn('[FrameRenderer] Failed to get current swap chain texture - device may have changed:', err);
-      try {
-        encoder.finish();
-        this.frameTargets.unregisterEncoderTextures(encoder);
-      } catch {
-        // ignore - but still unregister to prevent leaks
-        this.frameTargets.unregisterEncoderTextures(encoder);
-      }
+      this.recordError('swapChain');
+      Logger.warn('[FrameRenderer] Failed to get current swap chain texture:', err);
       return null;
     }
   }
@@ -688,30 +632,35 @@ export class FrameRenderer {
   }
   
   /**
-   * Gets current error metrics for monitoring/debugging.
+   * Gets current error metrics for monitoring and debugging.
+   * 
+   * Error metrics track:
+   * - Total number of errors since last reset
+   * - Type and timestamp of the last error
+   * 
+   * @returns Readonly copy of current error metrics
    */
   getErrorMetrics(): Readonly<ErrorMetrics> {
     return { ...this.errorMetrics };
   }
   
   /**
-   * Resets error metrics (useful for testing or periodic resets).
+   * Resets all error metrics to initial state.
+   * Useful for testing, periodic metric collection, or after recovering from errors.
    */
   resetErrorMetrics(): void {
     this.errorMetrics = {
-      sceneUpdateErrors: 0,
-      screenLodErrors: 0,
-      shadowPassErrors: 0,
-      forwardPlusErrors: 0,
-      computePrepassErrors: 0,
-      environmentRenderErrors: 0,
-      waterRenderErrors: 0,
-      gridRenderErrors: 0,
-      logicConnectionErrors: 0,
-      postProcessErrors: 0,
-      deviceValidationErrors: 0,
-      lastErrorTime: 0,
+      totalErrors: 0,
+      lastError: null,
     };
+  }
+
+  /**
+   * Records an error occurrence.
+   */
+  private recordError(type: string): void {
+    this.errorMetrics.totalErrors++;
+    this.errorMetrics.lastError = { type, time: performance.now() };
   }
 
   private writeFrameBeginTimestamp(frameResources: FrameResources, encoder: GPUCommandEncoder): void {
@@ -766,7 +715,7 @@ export class FrameRenderer {
     );
   }
 
-  private submitAndCleanup(device: GPUDevice, commandBuffer: GPUCommandBuffer, encoder: GPUCommandEncoder): void {
+  private submitAndCleanup(device: GPUDevice, commandBuffer: GPUCommandBuffer): void {
     device.queue.submit([commandBuffer]);
   }
 
@@ -799,72 +748,78 @@ export class FrameRenderer {
           const rotPtr = this.collisionWorld.get_rotations_ptr();
           const sclPtr = this.collisionWorld.get_scales_ptr();
 
-          const memory = this.wasmCollision.memory;
-          if (memory) {
-             const f32 = new Float32Array(memory.buffer);
-             
-             // 3. Copy transform data to WASM memory
-             // Use integer division (>> 2) for byte->float offset conversion
-             const pStart = posPtr >> 2;
-             const rStart = rotPtr >> 2;
-             const sStart = sclPtr >> 2;
-             
-             for (let i = 0; i < count; i++) {
-               const entity = allEntities[i];
-               const transform = entity.getComponent(Transform);
+            const memory = this.wasmCollision.memory;
+            if (memory) {
+               const f32 = new Float32Array(memory.buffer);
                
-               // Calculate indices
-               const pBase = pStart + (i * 3);
-               const rBase = rStart + (i * 4);
-               const sBase = sStart + (i * 3);
+               // 3. Copy transform data to WASM memory
+               // Convert byte pointers to float32 indices using bit shift (>> 2 = / 4)
+               const pStart = posPtr >> WASM_BYTES_TO_FLOAT32_SHIFT;
+               const rStart = rotPtr >> WASM_BYTES_TO_FLOAT32_SHIFT;
+               const sStart = sclPtr >> WASM_BYTES_TO_FLOAT32_SHIFT;
                
-               if (transform) {
-                 f32[pBase] = transform.position[0];
-                 f32[pBase + 1] = transform.position[1];
-                 f32[pBase + 2] = transform.position[2];
+              for (let i = 0; i < count; i++) {
+                const entity = allEntities[i];
+                if (!entity) continue;
+                const transform = entity.getComponent(Transform);
+                 
+                 // Calculate indices using WASM memory layout constants
+                 const pBase = pStart + (i * WASM_FLOATS_PER_POSITION);
+                 const rBase = rStart + (i * WASM_FLOATS_PER_ROTATION);
+                 const sBase = sStart + (i * WASM_FLOATS_PER_SCALE);
+                 
+                 if (transform) {
+                   f32[pBase] = transform.position[0];
+                   f32[pBase + 1] = transform.position[1];
+                   f32[pBase + 2] = transform.position[2];
 
-                 f32[rBase] = transform.rotation[0];
-                 f32[rBase + 1] = transform.rotation[1];
-                 f32[rBase + 2] = transform.rotation[2];
-                 f32[rBase + 3] = transform.rotation[3];
+                   f32[rBase] = transform.rotation[0];
+                   f32[rBase + 1] = transform.rotation[1];
+                   f32[rBase + 2] = transform.rotation[2];
+                   f32[rBase + 3] = transform.rotation[3];
 
-                 f32[sBase] = transform.scale[0];
-                 f32[sBase + 1] = transform.scale[1];
-                 f32[sBase + 2] = transform.scale[2];
-               } else {
-                 // Default transform (identity)
-                 f32[pBase] = 0; f32[pBase+1] = 0; f32[pBase+2] = 0;
-                 f32[rBase] = 0; f32[rBase+1] = 0; f32[rBase+2] = 0; f32[rBase+3] = 1;
-                 f32[sBase] = 1; f32[sBase+1] = 1; f32[sBase+2] = 1;
+                   f32[sBase] = transform.scale[0];
+                   f32[sBase + 1] = transform.scale[1];
+                   f32[sBase + 2] = transform.scale[2];
+                 } else {
+                   // Default transform (identity)
+                   f32[pBase] = 0; f32[pBase+1] = 0; f32[pBase+2] = 0;
+                   f32[rBase] = 0; f32[rBase+1] = 0; f32[rBase+2] = 0; f32[rBase+3] = 1;
+                   f32[sBase] = 1; f32[sBase+1] = 1; f32[sBase+2] = 1;
+                 }
                }
-             }
              
              // 4. Occlusion Culling & Frustum Query
-             const vp = viewProjectionMatrix instanceof Float32Array 
-               ? viewProjectionMatrix 
-               : new Float32Array(viewProjectionMatrix);
+             // Use scratch buffer to avoid allocation in hot path
+             let vp: Float32Array;
+             if (viewProjectionMatrix instanceof Float32Array) {
+               vp = viewProjectionMatrix;
+             } else {
+               this.vpScratch.set(viewProjectionMatrix);
+               vp = this.vpScratch;
+             }
 
              this.collisionWorld.clear_occlusion_buffer();
              
              // Use last frame's visible entities as potential occluders for this frame
              // This exploits temporal coherence: what was visible is likely still visible and occluding
              // We filter indices to ensure they are still valid (within range)
-             if (this.lastFrameVisibleIndices && this.lastFrameVisibleIndices.length > 0) {
+             if (this.lastFrameVisibleIndices && this.lastFrameVisibleIndicesCount > 0) {
                // Note: Indices are valid only if entity count hasn't decreased or order changed significantly.
                // Since we rebuild the world every frame in sequential order of activeEntities,
                // indices from last frame are only valid if activeEntities array is somewhat stable.
                // A more robust way would be to track Entity IDs, but for now we rely on stability.
                // We clamp indices to be safe.
                
-               // Filter valid indices
-               const validIndices = new Uint32Array(this.lastFrameVisibleIndices.length);
+               // Filter valid indices - reuse scratch array
+               const validIndices = new Uint32Array(this.lastFrameVisibleIndicesCount);
                let validCount = 0;
-               for (let i = 0; i < this.lastFrameVisibleIndices.length; i++) {
-                 const idx = this.lastFrameVisibleIndices[i];
-                 if (idx < count) {
-                   validIndices[validCount++] = idx;
-                 }
-               }
+              for (let i = 0; i < this.lastFrameVisibleIndicesCount; i++) {
+                const idx = this.lastFrameVisibleIndices[i];
+                if (idx !== undefined && idx < count) {
+                  validIndices[validCount++] = idx;
+                }
+              }
                
                // Rasterize
                const occluders = validIndices.subarray(0, validCount);
@@ -879,18 +834,24 @@ export class FrameRenderer {
              // 5. Query Frustum (with Occlusion check)
              const visibleIndices = this.collisionWorld.query_frustum(vp);
              
-             // Cache for next frame
-             this.lastFrameVisibleIndices = new Uint32Array(visibleIndices);
+             // Cache for next frame - reuse array to avoid allocations
+             const visibleCount = visibleIndices.length;
+             if (!this.lastFrameVisibleIndices || this.lastFrameVisibleIndices.length < visibleCount) {
+               // Allocate with 2x buffer to reduce reallocations
+               this.lastFrameVisibleIndices = new Uint32Array(Math.max(visibleCount * 2, 256));
+             }
+             this.lastFrameVisibleIndices.set(visibleIndices);
+             this.lastFrameVisibleIndicesCount = visibleCount;
 
              // 6. Update visible entities cache
              this.visibleEntitiesCache.length = 0;
-             for (let i = 0; i < visibleIndices.length; i++) {
-               const idx = visibleIndices[i];
-               if (idx < count) {
-                 const entity = allEntities[idx];
-                 if (entity) this.visibleEntitiesCache.push(entity);
-               }
-             }
+            for (let i = 0; i < visibleIndices.length; i++) {
+              const idx = visibleIndices[i];
+              if (idx !== undefined && idx < count) {
+                const entity = allEntities[idx];
+                if (entity) this.visibleEntitiesCache.push(entity);
+              }
+            }
           } else {
              // Fallback if memory access fails
              const frustum = this.frustumCuller.extractFrustumFromVP(viewProjectionMatrix);
@@ -949,8 +910,7 @@ export class FrameRenderer {
         timings: { cullingTime, instanceUpdateTime, totalCPUTime },
       };
     } catch (err) {
-      this.errorMetrics.sceneUpdateErrors++;
-      this.errorMetrics.lastErrorTime = performance.now();
+      this.recordError('sceneUpdate');
       Logger.warn('Frustum culling/update failed:', err);
       return { geometry };
     }
@@ -993,8 +953,7 @@ export class FrameRenderer {
         geometry.instanceCount
       );
     } catch (err) {
-      this.errorMetrics.screenLodErrors++;
-      this.errorMetrics.lastErrorTime = performance.now();
+      this.recordError('screenLod');
       Logger.warn('Screen-space LOD selection failed:', err);
     }
   }
@@ -1043,8 +1002,7 @@ export class FrameRenderer {
         }
       }
     } catch (err) {
-      this.errorMetrics.shadowPassErrors++;
-      this.errorMetrics.lastErrorTime = performance.now();
+      this.recordError('shadowPass');
       Logger.warn('Shadow pass failed:', err);
     }
   }
@@ -1091,8 +1049,7 @@ export class FrameRenderer {
         );
       }
     } catch (err) {
-      this.errorMetrics.forwardPlusErrors++;
-      this.errorMetrics.lastErrorTime = performance.now();
+      this.recordError('forwardPlus');
       Logger.warn('Forward+ light culling failed:', err);
     }
   }
@@ -1142,8 +1099,7 @@ export class FrameRenderer {
       }
       return success;
     } catch (err) {
-      this.errorMetrics.computePrepassErrors++;
-      this.errorMetrics.lastErrorTime = performance.now();
+      this.recordError('computePrepass');
       Logger.warn('Compute prepass failed:', err);
       return false;
     }
@@ -1261,8 +1217,7 @@ export class FrameRenderer {
       environmentRenderer.updateParams(envComponent);
       environmentRenderer.render(passEncoder, envComponent);
     } catch (err) {
-      this.errorMetrics.environmentRenderErrors++;
-      this.errorMetrics.lastErrorTime = performance.now();
+      this.recordError('environmentRender');
       Logger.warn('Environment render failed:', err);
     }
   }
@@ -1275,42 +1230,41 @@ export class FrameRenderer {
     sampleCount: number
   ): void {
     const { device } = ctx;
-    const geometryChanged =
-      this.bundleInstanceCount !== geometry.instanceCount ||
-      this.bundleIndexCount !== geometry.indices.length ||
-      this.bundleOpaqueCount !== (geometry.opaqueCount ?? geometry.instanceCount);
-    const pipelineChanged =
-      this.bundleRenderPipeline !== frameResources.renderPipeline ||
-      this.bundleTransparentPipeline !== frameResources.transparentPipeline ||
-      this.bundleOverlayPipeline !== frameResources.overlayPipeline ||
-      this.bundleUniformBindGroup !== frameResources.uniformBindGroup ||
-      this.bundleTextureBindGroup !== frameResources.textureBindGroup;
+    const state = this.bundleState;
+    
+    const needsRebuild = !state ||
+      state.instanceCount !== geometry.instanceCount ||
+      state.indexCount !== geometry.indices.length ||
+      state.opaqueCount !== (geometry.opaqueCount ?? geometry.instanceCount) ||
+      state.renderPipeline !== frameResources.renderPipeline ||
+      state.transparentPipeline !== frameResources.transparentPipeline ||
+      state.overlayPipeline !== frameResources.overlayPipeline ||
+      state.uniformBindGroup !== frameResources.uniformBindGroup ||
+      state.textureBindGroup !== frameResources.textureBindGroup;
 
-    if (geometryChanged || pipelineChanged) {
-      this.invalidateBundle();
-    }
-
-    if (this.bundleDirty || !this.staticBundle) {
+    if (needsRebuild) {
       try {
-        this.staticBundle = this.recordStaticBundle(device, frameResources, geometry, sampleCount);
-        this.bundleDirty = false;
-        this.bundleInstanceCount = geometry.instanceCount;
-        this.bundleIndexCount = geometry.indices.length;
-        this.bundleOpaqueCount = geometry.opaqueCount ?? geometry.instanceCount;
-        this.bundleRenderPipeline = frameResources.renderPipeline;
-        this.bundleTransparentPipeline = frameResources.transparentPipeline;
-        this.bundleOverlayPipeline = frameResources.overlayPipeline;
-        this.bundleUniformBindGroup = frameResources.uniformBindGroup;
-        this.bundleTextureBindGroup = frameResources.textureBindGroup;
+        const bundle = this.recordStaticBundle(device, frameResources, geometry, sampleCount);
+        this.bundleState = {
+          bundle,
+          instanceCount: geometry.instanceCount,
+          indexCount: geometry.indices.length,
+          opaqueCount: geometry.opaqueCount ?? geometry.instanceCount,
+          renderPipeline: frameResources.renderPipeline,
+          transparentPipeline: frameResources.transparentPipeline,
+          overlayPipeline: frameResources.overlayPipeline,
+          uniformBindGroup: frameResources.uniformBindGroup,
+          textureBindGroup: frameResources.textureBindGroup,
+        };
       } catch (err) {
         Logger.warn('Render bundle creation failed', err);
-        this.invalidateBundle();
+        this.bundleState = null;
       }
     }
 
-    if (this.staticBundle) {
+    if (this.bundleState) {
       try {
-        passEncoder.executeBundles([this.staticBundle]);
+        passEncoder.executeBundles([this.bundleState.bundle]);
         return;
       } catch {
         // fallthrough to direct draw
@@ -1344,8 +1298,7 @@ export class FrameRenderer {
         frameResources.msaaColorTexture
       );
     } catch (err) {
-      this.errorMetrics.waterRenderErrors++;
-      this.errorMetrics.lastErrorTime = performance.now();
+      this.recordError('waterRender');
       Logger.warn('Water render failed:', err);
     }
   }
@@ -1363,8 +1316,7 @@ export class FrameRenderer {
     try {
       gridRenderer.render(passEncoder, viewProjectionMatrix, eyePosition);
     } catch (err) {
-      this.errorMetrics.gridRenderErrors++;
-      this.errorMetrics.lastErrorTime = performance.now();
+      this.recordError('gridRender');
       Logger.warn('Grid render failed:', err);
     }
   }
@@ -1382,8 +1334,7 @@ export class FrameRenderer {
     try {
       logicConnectionRenderer.render(passEncoder, viewProjectionMatrix, eyePosition);
     } catch (err) {
-      this.errorMetrics.logicConnectionErrors++;
-      this.errorMetrics.lastErrorTime = performance.now();
+      this.recordError('logicConnection');
       Logger.warn('Logic connection render failed:', err);
     }
   }
@@ -1562,8 +1513,22 @@ export class FrameRenderer {
     const readBuffer = frameResources.timestampReadBuffer;
     device.queue
       .onSubmittedWorkDone()
-      .then(() => readBuffer.mapAsync(GPUMapMode.READ))
       .then(() => {
+        // Check if disposed before async operation
+        if (this.disposed) return;
+        return readBuffer.mapAsync(GPUMapMode.READ);
+      })
+      .then(() => {
+        // Check if disposed after mapping
+        if (this.disposed) {
+          try {
+            readBuffer.unmap();
+          } catch {
+            // ignore - buffer may already be destroyed
+          }
+          return;
+        }
+        
         let snapshot: ArrayBuffer;
         try {
           const mapped = readBuffer.getMappedRange();
@@ -1575,6 +1540,9 @@ export class FrameRenderer {
             // ignore
           }
         }
+
+        // Final check before callback
+        if (this.disposed) return;
 
         const values = new BigUint64Array(snapshot);
         const timings: { label: string; timeMs: number }[] = [];
@@ -1597,7 +1565,10 @@ export class FrameRenderer {
         callback(timings);
       })
       .catch((err) => {
-        Logger.warn('GPU timestamp read failed', err);
+        // Don't log errors if disposed - expected behavior
+        if (!this.disposed) {
+          Logger.warn('GPU timestamp read failed', err);
+        }
         try {
           readBuffer.unmap();
         } catch {
@@ -1610,16 +1581,7 @@ export class FrameRenderer {
   }
 
   private invalidateBundle(): void {
-    this.staticBundle = null;
-    this.bundleDirty = true;
-    this.bundleInstanceCount = 0;
-    this.bundleIndexCount = 0;
-    this.bundleOpaqueCount = 0;
-    this.bundleRenderPipeline = null;
-    this.bundleTransparentPipeline = null;
-    this.bundleOverlayPipeline = null;
-    this.bundleUniformBindGroup = null;
-    this.bundleTextureBindGroup = null;
+    this.bundleState = null;
   }
 
   private handleTimestampRead(

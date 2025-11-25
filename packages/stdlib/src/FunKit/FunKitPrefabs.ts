@@ -97,11 +97,7 @@ export function createLaunchPad(
 /**
  * Create a bounce pad
  */
-export function createBouncePad(
-  scene: Scene,
-  position: Vec3,
-  bounceForce?: number
-): Entity {
+export function createBouncePad(scene: Scene, position: Vec3, bounceForce?: number): Entity {
   const entity = new Entity('BouncePad', new Transform());
   entity.transform.position = [...position] as Vec3;
 
@@ -191,4 +187,3 @@ export function createSpeedZone(
   scene.addEntity(entity);
   return entity;
 }
-

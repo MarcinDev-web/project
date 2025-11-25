@@ -211,16 +211,20 @@ export async function init(): Promise<WasmCollision> {
         ) => Float32Array | undefined)
       : null;
 
-  // Capture memory buffer
+  // Capture memory buffer - after init, initSync() returns the cached wasm instance
+  // which includes the memory export
+  let wasmMemory: WebAssembly.Memory | undefined;
   // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-  const wasmMemory = mod.initSync 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    ? mod.wasm.memory // Bundler might expose `wasm` on the module
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    : (await (window as any).wasm_bindgen).memory; // Fallback for some targets
+  if (typeof mod.initSync === 'function') {
+    // initSync() returns the wasm exports when already initialized (no-op if already init'd)
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-call, @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+    const wasmInstance = mod.initSync();
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
+    wasmMemory = wasmInstance?.memory;
+  }
 
-  // Ideally, use the memory exported by the module
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+  // Use the memory from wasm instance
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment
   const memory = mod.memory || wasmMemory;
 
   const api: WasmCollision = {

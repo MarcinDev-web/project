@@ -1,5 +1,5 @@
 import Redis from 'ioredis';
-import { Disposable } from '@engine/core';
+import type { IDisposable } from '@engine/core';
 
 export interface DiscoveryOptions {
   redisUrl: string;
@@ -9,7 +9,7 @@ export interface DiscoveryOptions {
   maxCapacity: number;
 }
 
-export class DiscoveryService implements Disposable {
+export class DiscoveryService implements IDisposable {
   private readonly redis: Redis;
   private readonly serverId: string;
   private readonly options: DiscoveryOptions;

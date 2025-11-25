@@ -634,7 +634,6 @@ export class CameraDirector {
 
   /**
    * Smooth interpolation function (ease-in-out)
-   * TODO: Move to @engine/core/math if used elsewhere
    */
   private smoothstep(t: number): number {
     return t * t * (3 - 2 * t);

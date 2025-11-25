@@ -1,6 +1,6 @@
 /**
  * Common movement profile extensions
- * 
+ *
  * These extensions add custom mechanics to movement profiles.
  * Extensions can modify config, add update logic, or handle lifecycle events.
  */
@@ -36,14 +36,12 @@ export class BaseMovementExtension implements MovementProfileExtension {
 
 /**
  * Example extension: Reduced gravity (for flying-like mechanics)
- * 
+ *
  * This is a template - actual extensions would be implemented
  * as needed for specific gameplay mechanics.
  */
 export class ReducedGravityExtension extends BaseMovementExtension {
-  constructor(
-    public readonly gravityReduction: number = 0.5
-  ) {
+  constructor(public readonly gravityReduction: number = 0.5) {
     super('reduced-gravity', 'Reduced Gravity');
   }
 
@@ -64,7 +62,7 @@ export interface MovementExtensionInputProvider {
 
 /**
  * Flying Extension - Enables flight mechanics
- * 
+ *
  * Features:
  * - Significantly reduced gravity (nearly zero)
  * - Space key to fly up
@@ -76,10 +74,7 @@ export class FlyingExtension extends BaseMovementExtension {
   private readonly flyDownForce: number = 10.0;
   private inputProvider: MovementExtensionInputProvider | null = null;
 
-  constructor(
-    flyUpForce: number = 15.0,
-    flyDownForce: number = 10.0
-  ) {
+  constructor(flyUpForce: number = 15.0, flyDownForce: number = 10.0) {
     super('flying', 'Flying');
     this.flyUpForce = flyUpForce;
     this.flyDownForce = flyDownForce;
@@ -101,6 +96,8 @@ export class FlyingExtension extends BaseMovementExtension {
 
     if (!this.inputProvider) return;
 
+    // Access internal physics property (not exposed in public interface)
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
     const physics = (controller as any).physics;
     if (!physics) return;
 
@@ -110,9 +107,11 @@ export class FlyingExtension extends BaseMovementExtension {
     }
 
     // Fly down with Ctrl
-    if (this.inputProvider.isKeyPressed('ControlLeft') || 
-        this.inputProvider.isKeyPressed('ControlRight') ||
-        this.inputProvider.isKeyPressed('KeyC')) {
+    if (
+      this.inputProvider.isKeyPressed('ControlLeft') ||
+      this.inputProvider.isKeyPressed('ControlRight') ||
+      this.inputProvider.isKeyPressed('KeyC')
+    ) {
       controller.addVelocity([0, -this.flyDownForce * deltaTime, 0]);
     }
   }
@@ -137,15 +136,15 @@ export class FlyingExtension extends BaseMovementExtension {
       // Use singleton pattern to avoid multiple event listeners
       if (!FlyingExtension.globalInputProvider) {
         const keys = new Set<string>();
-        
+
         const handleKeyDown = (e: KeyboardEvent) => {
           keys.add(e.code);
         };
-        
+
         const handleKeyUp = (e: KeyboardEvent) => {
           keys.delete(e.code);
         };
-        
+
         window.addEventListener('keydown', handleKeyDown);
         window.addEventListener('keyup', handleKeyUp);
 
@@ -163,7 +162,7 @@ export class FlyingExtension extends BaseMovementExtension {
 
 /**
  * Speed Boost Extension - Temporarily increases movement speed
- * 
+ *
  * Features:
  * - Doubles movement speed
  * - Increases sprint multiplier
@@ -250,7 +249,7 @@ export class SpeedBoostExtension extends BaseMovementExtension {
 
 /**
  * Vehicle Extension - Vehicle-like movement mechanics
- * 
+ *
  * Features:
  * - Very high movement speed
  * - Minimal air control
@@ -277,19 +276,24 @@ export class VehicleExtension extends BaseMovementExtension {
 
   onApply(controller: import('@engine/world').CharacterController): void {
     // Modify physics component for vehicle-like behavior
+    // Access internal physics property (not exposed in public interface)
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
     const physics = (controller as any).physics;
     if (physics) {
       // Increase linear drag for vehicle momentum feel
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-argument
       physics.linearDrag = Math.max(physics.linearDrag || 5, 8);
     }
   }
 
   onRemove(controller: import('@engine/world').CharacterController): void {
     // Restore original physics settings
+    // Access internal physics property (not exposed in public interface)
+    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access, @typescript-eslint/no-unsafe-assignment, @typescript-eslint/no-explicit-any
     const physics = (controller as any).physics;
     if (physics) {
+      // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
       physics.linearDrag = 5; // Default drag
     }
   }
 }
-

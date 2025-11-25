@@ -98,7 +98,7 @@ describe('MovementProfileRegistry', () => {
 
     it('should get all registered profiles', () => {
       registry.clear(); // Clear defaults first - but clear() re-registers defaults
-      
+
       const profile1 = MovementProfile.create({
         id: 'all-1',
         name: 'All 1',
@@ -134,7 +134,7 @@ describe('MovementProfileRegistry', () => {
     it('should include preset profiles after clear', () => {
       registry.clear();
       const defaultProfiles = MovementProfileRegistry.getDefaultProfiles();
-      
+
       // Re-register defaults
       for (const profile of defaultProfiles) {
         registry.register(profile);
@@ -163,4 +163,3 @@ describe('MovementProfileRegistry', () => {
     });
   });
 });
-

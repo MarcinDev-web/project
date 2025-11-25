@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { LocalPlayerController, type KeyInputProvider } from '../../src/CharacterController/LocalPlayerController';
+import {
+  LocalPlayerController,
+  type KeyInputProvider,
+} from '../../src/CharacterController/LocalPlayerController';
 import { CharacterController } from '@engine/world';
 import { Entity } from '@engine/world';
 import { Scene } from '@engine/world';
@@ -111,10 +114,10 @@ describe('LocalPlayerController - Profile Switching Integration', () => {
       });
 
       controllerWithMock.possess(entity);
-      
+
       // First update - F1 pressed
       controllerWithMock.update(0.016);
-      
+
       expect(controller.getCurrentProfile()?.id).toBe('human');
 
       // Release F1
@@ -124,7 +127,7 @@ describe('LocalPlayerController - Profile Switching Integration', () => {
       // Press F1 again - should switch again
       pressedKeys.add('F1');
       controllerWithMock.update(0.016);
-      
+
       // Should still be human (applied again)
       expect(controller.getCurrentProfile()?.id).toBe('human');
     });
@@ -147,14 +150,14 @@ describe('LocalPlayerController - Profile Switching Integration', () => {
 
       controllerWithMock.possess(entity);
       controllerWithMock.update(0.016);
-      
+
       expect(controller.getCurrentProfile()?.id).toBe('flying-human');
     });
 
     it('should cycle profiles when Tab is pressed', () => {
       const pressedKeys = new Set<string>();
       let tabPressed = false;
-      
+
       const mockKeyProvider: KeyInputProvider = {
         isKeyPressed: (key: string) => {
           if (key === 'Tab') return tabPressed;
@@ -173,7 +176,7 @@ describe('LocalPlayerController - Profile Switching Integration', () => {
       });
 
       controllerWithMock.possess(entity);
-      
+
       // Press Tab - should switch to next (FAST_HUMAN)
       tabPressed = true;
       controllerWithMock.update(0.016);
@@ -210,7 +213,7 @@ describe('LocalPlayerController - Profile Switching Integration', () => {
       });
 
       controllerWithMock.possess(entity);
-      
+
       const originalSpeed = controller.config.moveSpeed;
       controllerWithMock.update(0.016);
 
@@ -245,4 +248,3 @@ describe('LocalPlayerController - Profile Switching Integration', () => {
     });
   });
 });
-

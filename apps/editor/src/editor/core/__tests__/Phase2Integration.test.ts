@@ -45,7 +45,7 @@ describe.skip('Phase 2 Integration', () => {
     manager.dispose();
   });
 
-  // TODO: Re-enable when WorkflowSelector component is implemented
+  // Skipped until WorkflowSelector component is implemented
   it.skip('renders workflow selector and toggles dropdown', () => {
     // const selector = new WorkflowSelector({ state });
     // const element = selector.render();
@@ -64,7 +64,7 @@ describe.skip('Phase 2 Integration', () => {
     // selector.dispose();
   });
 
-  // TODO: Re-enable when WorkflowSelector component is implemented
+  // Skipped until WorkflowSelector component is implemented
   it.skip('updates state when workflow is selected', () => {
     // const selector = new WorkflowSelector({ state });
     // const element = selector.render();
@@ -86,7 +86,7 @@ describe.skip('Phase 2 Integration', () => {
     // selector.dispose();
   });
 
-  // TODO: Re-enable when workflow selector integration is implemented
+  // Skipped until workflow selector integration is implemented
   it.skip('integrates workflow selector into QuickMenu', () => {
     // const menu = new QuickMenu({
     //   state,
@@ -108,7 +108,7 @@ describe.skip('Phase 2 Integration', () => {
     // menu.dispose();
   });
 
-  // TODO: Re-enable when WorkflowPresets module is implemented
+  // Skipped until WorkflowPresets module is implemented
   it.skip('detects preset changes via helper', () => {
     // const current = state.uiPreferences.value;
     // const updated = applyWorkflowPreset(current, 'developer');

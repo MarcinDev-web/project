@@ -96,8 +96,8 @@ export class ProjectManager {
           this.options.scene.name = config.name;
         } catch (error) {
           Logger.error('Failed to apply template:', error);
-          // Fallback to empty template
-          await applyTo(this.options.scene, 'template:empty', { clear: true });
+          // Fallback to minimal template
+          await applyTo(this.options.scene, 'template:minimal', { clear: true });
           this.options.scene.name = config.name;
           this.finalizeNewProject(`Template failed, created project "${config.name}"`);
           if (typeof window !== 'undefined' && typeof window.alert === 'function') {
@@ -105,8 +105,8 @@ export class ProjectManager {
           }
         }
       } else {
-        // Create empty project (use Empty template which has lights/floor)
-        await applyTo(this.options.scene, 'template:empty', { clear: true });
+        // Create project with minimal template (basic lighting only)
+        await applyTo(this.options.scene, 'template:minimal', { clear: true });
         this.options.scene.name = config.name;
       }
 
@@ -126,9 +126,9 @@ export class ProjectManager {
     // Fallback for non-browser environments (tests)
     this.setInitialProjectConfig('New Project');
     this.resetScene();
-    // Best effort to apply empty template in tests, ignore errors if registry not ready
+    // Best effort to apply minimal template in tests, ignore errors if registry not ready
     try {
-      await applyTo(this.options.scene, 'template:empty', { clear: true });
+      await applyTo(this.options.scene, 'template:minimal', { clear: true });
     } catch {
       // Ignore in tests
     }
@@ -146,8 +146,8 @@ export class ProjectManager {
       this.finalizeNewProject(`Created from "${template.name}"`);
     } catch (error) {
       Logger.error('Failed to apply template:', error);
-      await applyTo(this.options.scene, 'template:empty', { clear: true });
-      this.finalizeNewProject('Template failed, created empty project');
+      await applyTo(this.options.scene, 'template:minimal', { clear: true });
+      this.finalizeNewProject('Template failed, created minimal project');
       if (typeof window !== 'undefined' && typeof window.alert === 'function') {
         window.alert('Failed to load selected template. Created an empty project instead.');
       }

@@ -231,7 +231,7 @@ export class HeightmapTerrain {
    * @param seed - Optional seed for deterministic generation. Defaults to random.
    */
   generateNoise(scale: number = 1, amplitude: number = 10, seed?: number): void {
-    const { resolution, size } = this.config;
+    const { resolution } = this.config;
     const { minHeight = 0, maxHeight = 100 } = this.config;
     
     // Use provided seed or random if not provided (for editor tools)

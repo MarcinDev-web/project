@@ -276,7 +276,7 @@ export class GizmoController implements InteractionTool {
                 e.transform.position = addVec3(orig, finalDelta);
             });
         }
-    } 
+    }
     else if (mode === 'rotate') {
         const center = this.gizmoState.originalPosition;
         const startVec = subVec3(this.gizmoState.dragStartPoint, center);
@@ -306,19 +306,23 @@ export class GizmoController implements InteractionTool {
         
         const newRotation = quatMultiply(this.gizmoState.originalRotation, deltaQuat);
         // This is local rotation accumulation.
-        
-        // TODO: Implement proper rotation snapping (complicated with Quats)
-        // For now, snap angle if Shift? Or 45 deg steps?
-        
+
+        const baseSnapEnabled = this.options.snapSystem?.isEnabled?.() ?? false;
+        const rotationSnapEnabled = this.gizmoState.modifiers.ctrl ? !baseSnapEnabled : baseSnapEnabled;
+        const snapRotation = (rot: Quat): Quat =>
+          rotationSnapEnabled && this.options.snapSystem
+            ? this.options.snapSystem.snapRotation(rot)
+            : rot;
+
         const firstEntity = selected[0];
         if (selected.length === 1 && firstEntity) {
-            firstEntity.transform.rotation = newRotation;
+            firstEntity.transform.rotation = snapRotation(newRotation);
         } else {
              // Multi-object rotation usually rotates each around its own center or group center?
              // Here we just replicate local rotation.
              selected.forEach(e => {
                  const orig = this.gizmoState!.originalRotations!.get(e.id)!;
-                 e.transform.rotation = quatMultiply(orig, deltaQuat);
+                 e.transform.rotation = snapRotation(quatMultiply(orig, deltaQuat));
              });
         }
     }

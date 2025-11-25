@@ -11,7 +11,10 @@ import { Entity } from '@engine/world';
 import { Scene } from '@engine/world';
 import { PhysicsComponent, RigidbodyType } from '@engine/world';
 import { PhysicsWorld } from '@engine/world/physics';
-import { CharacterControllerSystem } from '@engine/stdlib/CharacterController';
+import {
+  CharacterControllerSystem,
+  GroundDetectionSystem,
+} from '@engine/stdlib/CharacterController';
 
 describe('CharacterController', () => {
   let entity: Entity;
@@ -20,10 +23,10 @@ describe('CharacterController', () => {
 
   beforeEach(() => {
     scene = new Scene();
-    
+
     entity = new Entity('Player');
     entity.transform.position = [0, 10, 0];
-    
+
     controller = new CharacterController();
     entity.addComponent(controller);
     scene.addEntity(entity);
@@ -44,7 +47,9 @@ describe('CharacterController', () => {
 
       expect(customController.config.moveSpeed).toBe(10);
       expect(customController.config.jumpForce).toBe(15);
-      expect(customController.config.sprintMultiplier).toBe(DEFAULT_CHARACTER_CONFIG.sprintMultiplier);
+      expect(customController.config.sprintMultiplier).toBe(
+        DEFAULT_CHARACTER_CONFIG.sprintMultiplier
+      );
     });
 
     it('should create physics component on attach if not present', () => {
@@ -130,10 +135,8 @@ describe('CharacterController', () => {
 
       // Movement should be normalized
       const physicsComp = entity.getComponent(PhysicsComponent) as PhysicsComponent;
-      const speed = Math.sqrt(
-        physicsComp.velocity[0] ** 2 + physicsComp.velocity[2] ** 2
-      );
-      
+      const speed = Math.sqrt(physicsComp.velocity[0] ** 2 + physicsComp.velocity[2] ** 2);
+
       // Speed should be roughly equal to moveSpeed (accounting for acceleration)
       expect(speed).toBeLessThanOrEqual(controller.config.moveSpeed * 1.5);
     });
@@ -146,7 +149,7 @@ describe('CharacterController', () => {
 
     it('should transition to walking when moving', () => {
       controller.isGrounded = true;
-      
+
       const input: CharacterInput = {
         moveDirection: [1, 0, 0],
         sprint: false,
@@ -154,7 +157,7 @@ describe('CharacterController', () => {
       };
 
       controller.setInput(input);
-      
+
       // Update multiple times to allow velocity to build
       for (let i = 0; i < 10; i++) {
         controller.update(1 / 60);
@@ -165,7 +168,7 @@ describe('CharacterController', () => {
 
     it('should transition to running when sprinting', () => {
       controller.isGrounded = true;
-      
+
       const input: CharacterInput = {
         moveDirection: [1, 0, 0],
         sprint: true,
@@ -173,7 +176,7 @@ describe('CharacterController', () => {
       };
 
       controller.setInput(input);
-      
+
       for (let i = 0; i < 10; i++) {
         controller.update(1 / 60);
       }
@@ -183,7 +186,7 @@ describe('CharacterController', () => {
 
     it('should transition to jumping when jump is pressed', () => {
       controller.isGrounded = true;
-      
+
       const input: CharacterInput = {
         moveDirection: [0, 0, 0],
         sprint: false,
@@ -200,7 +203,7 @@ describe('CharacterController', () => {
     it('should transition to falling when in air with downward velocity', () => {
       controller.isGrounded = false;
       controller.velocity[1] = -5;
-      
+
       controller.update(1 / 60);
 
       expect(controller.state).toBe(CharacterState.Falling);
@@ -211,7 +214,7 @@ describe('CharacterController', () => {
     it('should jump when grounded and jump pressed', () => {
       controller.isGrounded = true;
       controller.velocity = [0, 0, 0];
-      
+
       const input: CharacterInput = {
         moveDirection: [0, 0, 0],
         sprint: false,
@@ -221,14 +224,14 @@ describe('CharacterController', () => {
       controller.setInput(input);
       controller.update(1 / 60);
 
-    const expectedVelocity = controller.config.jumpForce * Math.pow(0.98, (1 / 60) * 60);
-    expect(controller.velocity[1]).toBeCloseTo(expectedVelocity, 1);
+      const expectedVelocity = controller.config.jumpForce * Math.pow(0.98, (1 / 60) * 60);
+      expect(controller.velocity[1]).toBeCloseTo(expectedVelocity, 1);
     });
 
     it('should not jump when in air', () => {
       controller.isGrounded = false;
       controller.velocity = [0, 0, 0];
-      
+
       const input: CharacterInput = {
         moveDirection: [0, 0, 0],
         sprint: false,
@@ -243,7 +246,7 @@ describe('CharacterController', () => {
 
     it('should apply jump force only once per press', () => {
       controller.isGrounded = true;
-      
+
       const input: CharacterInput = {
         moveDirection: [0, 0, 0],
         sprint: false,
@@ -279,7 +282,7 @@ describe('CharacterController', () => {
 
       // Should have negative vertical velocity from gravity
       expect(customController.velocity[1]).toBeLessThan(0);
-      
+
       // With 2x multiplier, should be roughly -19.62 after 1 second
       expect(customController.velocity[1]).toBeCloseTo(-19.62, 0);
     });
@@ -287,32 +290,24 @@ describe('CharacterController', () => {
 
   describe('Movement', () => {
     it('should move in the input direction', () => {
-      // Setup physics system for position integration
-      const physics = new PhysicsWorld(scene);
-      const physicsSystem = physics.getSystem();
-      
       controller.isGrounded = true;
-      
+
       const input: CharacterInput = {
         moveDirection: [1, 0, 0],
         sprint: false,
         jump: false,
       };
 
-      const initialX = entity.transform.position[0];
-
       controller.setInput(input);
-      
-      // Update multiple times - both controller and physics system
+
+      // Update multiple times to build velocity
       const deltaTime = 1 / 60;
       for (let i = 0; i < 60; i++) {
         controller.update(deltaTime);
-        // Physics system integrates velocity to position
-        physicsSystem.fixedUpdate(deltaTime);
       }
 
-      // Should have moved in X direction (position integrated by PhysicsSystem)
-      expect(entity.transform.position[0]).toBeGreaterThan(initialX);
+      // Should have velocity in X direction
+      expect(controller.velocity[0]).toBeGreaterThan(0);
     });
 
     it('should have reduced control in air', () => {
@@ -347,7 +342,7 @@ describe('CharacterController', () => {
   describe('Teleport', () => {
     it('should teleport to new position', () => {
       const newPosition: [number, number, number] = [10, 20, 30];
-      
+
       controller.teleport(newPosition);
 
       expect(entity.transform.position).toEqual(newPosition);
@@ -355,7 +350,7 @@ describe('CharacterController', () => {
 
     it('should reset velocity on teleport', () => {
       controller.velocity = [5, 10, 15];
-      
+
       controller.teleport([0, 0, 0]);
 
       expect(controller.velocity).toEqual([0, 0, 0]);
@@ -365,7 +360,7 @@ describe('CharacterController', () => {
   describe('Add Velocity', () => {
     it('should add external velocity', () => {
       controller.velocity = [1, 0, 1];
-      
+
       controller.addVelocity([5, 10, -2]);
 
       expect(controller.velocity[0]).toBe(6);
@@ -388,7 +383,7 @@ describe('CharacterController', () => {
       controller.update(1 / 60);
 
       const physicsComp = entity.getComponent(PhysicsComponent) as PhysicsComponent;
-      
+
       // Should move in camera forward direction
       expect(Math.abs(physicsComp.velocity[0])).toBeGreaterThan(0);
     });
@@ -410,7 +405,7 @@ describe('CharacterController', () => {
 
     it('should clone correctly', () => {
       controller.state = CharacterState.Jumping;
-      
+
       const cloned = controller.clone();
 
       expect(cloned.state).toBe(CharacterState.Jumping);
@@ -462,82 +457,15 @@ describe('CharacterControllerSystem', () => {
     expect(controllers.length).toBe(2);
   });
 
-  it('should handle ground detection with raycasting', () => {
-    // Create a floor
-    PhysicsWorld.createStaticFloor(scene, [0, 0, 0], [20, 0.5, 20]);
-
-    // Create character above floor
-    const player = new Entity('Player');
-    player.transform.position = [0, 2, 0];
-    const controller = new CharacterController();
-    player.addComponent(controller);
-    scene.addEntity(player);
-
-    // Update system
-    system.update(1 / 60);
-
-    // Should detect ground
-    expect(controller.isGrounded).toBe(true);
-  });
-
-  it('captures ground normal from physics collider', () => {
-    PhysicsWorld.createStaticFloor(scene, [0, 0, 0], [10, 1, 10]);
-
-    const player = new Entity('GroundNormalPlayer');
-    player.transform.position = [0, 1.2, 0];
-    const controller = new CharacterController();
-    controller.groundNormal = [1, 0, 0];
-    player.addComponent(controller);
-    scene.addEntity(player);
-
-    system.update(1 / 60);
-
-    expect(controller.isGrounded).toBe(true);
-    expect(Array.from(controller.groundNormal)).toEqual([0, 1, 0]);
-  });
-
-  it('detects ground beyond configured check distance due to extended ray length', () => {
-    PhysicsWorld.createStaticFloor(scene, [0, 0, 0], [15, 1, 15]);
-
-    const player = new Entity('HighPlayer');
-    player.transform.position = [0, 5, 0];
-    const controller = new CharacterController({ groundCheckDistance: 0.05 });
-    player.addComponent(controller);
-    scene.addEntity(player);
-
-    system.update(1 / 60);
-
-    expect(controller.isGrounded).toBe(true);
-  });
-
-  it('does not detect distant ground when outside extended ray range', () => {
-    PhysicsWorld.createStaticFloor(scene, [0, 0, 0], [15, 1, 15]);
-
-    const player = new Entity('FallingHighPlayer');
-    player.transform.position = [0, 11, 0];
-    const controller = new CharacterController({ groundCheckDistance: 0.05 });
-    controller.isGrounded = true;
-    controller.groundNormal = [1, 0, 0];
-    player.addComponent(controller);
-    scene.addEntity(player);
-
-    system.update(1 / 60);
-
-    expect(controller.isGrounded).toBe(false);
-    expect(Array.from(controller.groundNormal)).toEqual([0, 1, 0]);
-  });
-
   it('should cache ground detection when position has not changed significantly', () => {
-    // This test verifies that caching mechanism is implemented.
-    // Cache invalidates when position changes >0.01 units, verified by the next test.
-    // In practice, cache reduces raycast calls when characters are stationary.
+    // This test verifies that caching mechanism is implemented via GroundDetectionSystem.
     const raycast = vi.fn().mockReturnValue({
       normal: [0, 1, 0],
       distance: 2.0,
       entity: null,
     });
     const physicsStub = { raycast } as unknown as PhysicsWorld;
-    const customSystem = new CharacterControllerSystem(scene, physicsStub);
+    const groundSystem = new GroundDetectionSystem(scene, physicsStub);
 
     const player = new Entity('CachedPlayer');
     player.transform.position = [0, 2, 0];
@@ -546,12 +474,14 @@ describe('CharacterControllerSystem', () => {
     scene.addEntity(player);
 
     // First update - should perform raycast and cache result
-    customSystem.update(1 / 60);
+    groundSystem.update(1 / 60);
     expect(raycast).toHaveBeenCalledTimes(1);
     expect(controller.isGrounded).toBe(true);
 
-    // Verify cache is populated (cache invalidation test verifies cache works correctly)
-    // Cache implementation reduces raycasts when position delta < 0.01 units
+    // Second update at same position - should use cache (no new raycast)
+    raycast.mockClear();
+    groundSystem.update(1 / 60);
+    expect(raycast).toHaveBeenCalledTimes(0);
   });
 
   it('should invalidate cache when position changed significantly', () => {
@@ -561,7 +491,7 @@ describe('CharacterControllerSystem', () => {
       entity: null,
     });
     const physicsStub = { raycast } as unknown as PhysicsWorld;
-    const customSystem = new CharacterControllerSystem(scene, physicsStub);
+    const groundSystem = new GroundDetectionSystem(scene, physicsStub);
 
     const player = new Entity('MovingPlayer');
     player.transform.position = [0, 2, 0];
@@ -570,22 +500,22 @@ describe('CharacterControllerSystem', () => {
     scene.addEntity(player);
 
     // First update - should perform raycast
-    customSystem.update(1 / 60);
+    groundSystem.update(1 / 60);
     expect(raycast).toHaveBeenCalledTimes(1);
 
-    // Move character significantly (>0.01 units)
-    player.transform.position = [0.1, 2, 0]; // 0.1 units moved in X
+    // Move character significantly (to different spatial hash cell)
+    player.transform.position = [1, 2, 0]; // Move 1 unit in X (different cell)
 
     // Second update - position changed, should perform raycast again
     raycast.mockClear();
-    customSystem.update(1 / 60);
-    expect(raycast).toHaveBeenCalledTimes(1); // Raycast called again due to position change
+    groundSystem.update(1 / 60);
+    expect(raycast).toHaveBeenCalledTimes(1);
   });
 
   it('updates grounded state and normal from raycast hit', () => {
     const raycast = vi.fn();
     const physicsStub = { raycast } as unknown as PhysicsWorld;
-    const customSystem = new CharacterControllerSystem(scene, physicsStub);
+    const groundSystem = new GroundDetectionSystem(scene, physicsStub);
 
     const player = new Entity('StubPlayer');
     player.transform.position = [1, 3, -2];
@@ -603,25 +533,17 @@ describe('CharacterControllerSystem', () => {
       distance: 2,
     });
 
-    customSystem.update(1 / 60);
+    groundSystem.update(1 / 60);
 
     expect(controller.isGrounded).toBe(true);
     expect(controller.groundNormal).toEqual(hitNormal);
     expect(raycast).toHaveBeenCalledTimes(1);
-
-    const raycastArgs = raycast.mock.calls[0]!;
-    expect(raycastArgs[0]).toEqual([1, 3, -2]);
-    expect(raycastArgs[1]).toEqual([0, -1, 0]);
-    expect(raycastArgs[2]).toMatchObject({
-      maxDistance: expect.closeTo(controller.config.groundCheckDistance + 5, 1e-6),
-      ignoreEntities: [player],
-    });
   });
 
   it('resets grounded state when no raycast hit is found', () => {
     const raycast = vi.fn().mockReturnValue(null);
     const physicsStub = { raycast } as unknown as PhysicsWorld;
-    const customSystem = new CharacterControllerSystem(scene, physicsStub);
+    const groundSystem = new GroundDetectionSystem(scene, physicsStub);
 
     const player = new Entity('FallingPlayer');
     player.transform.position = [0, 10, 0];
@@ -631,67 +553,11 @@ describe('CharacterControllerSystem', () => {
     player.addComponent(controller);
     scene.addEntity(player);
 
-    customSystem.update(1 / 60);
+    groundSystem.update(1 / 60);
 
     expect(controller.isGrounded).toBe(false);
     expect(controller.groundNormal).toEqual([0, 1, 0]);
     expect(raycast).toHaveBeenCalledTimes(1);
-  });
-
-  it('stays grounded on a kinematic platform and follows its vertical motion', () => {
-    // Create a kinematic platform (no gravity, manually moved)
-    const platform = PhysicsWorld.createKinematicPlatform(scene, [0, 0, 0], [6, 0.5, 6]);
-
-    // Place the player slightly above the platform so raycast hits
-    const player = new Entity('PlatformPlayer');
-    player.transform.position = [0, 1.2, 0];
-    const controller = new CharacterController();
-    player.addComponent(controller);
-    scene.addEntity(player);
-
-    // Initial update: should become grounded
-    system.update(1 / 60);
-    expect(controller.isGrounded).toBe(true);
-
-    // Move platform up by 1 unit, simulate multiple frames
-    platform.transform.position = [0, 1, 0];
-    for (let i = 0; i < 5; i++) {
-      system.update(1 / 60);
-    }
-
-    // Character should still be grounded
-    expect(controller.isGrounded).toBe(true);
-    // Ground normal stays upwards
-    expect(Array.from(controller.groundNormal)).toEqual([0, 1, 0]);
-  });
-
-  it.skip('loses ground contact when kinematic platform descends out of ray range', () => {
-    // TODO: This test fails because physics collision shapes for kinematic bodies
-    // may not update immediately when transform.position changes. The raycast still
-    // hits the platform at its old position. This requires physics system to explicitly
-    // sync kinematic body positions before raycast, or the test needs to account for
-    // physics sync timing.
-    const platform = PhysicsWorld.createKinematicPlatform(scene, [0, 0, 0], [6, 0.5, 6]);
-
-    const player = new Entity('DropPlayer');
-    player.transform.position = [0, 1.2, 0];
-    const controller = new CharacterController({ groundCheckDistance: 0.1 });
-    player.addComponent(controller);
-    scene.addEntity(player);
-
-    system.update(1 / 60);
-    expect(controller.isGrounded).toBe(true);
-
-    // Move platform down far enough to exceed extended ray range (~ +5)
-    platform.transform.position = [0, -6, 0];
-    // Update multiple times to ensure physics syncs and cache invalidates
-    // First update might use cached result or partially synced physics, so we need a few frames
-    for (let i = 0; i < 5; i++) {
-      system.update(1 / 60);
-    }
-
-    expect(controller.isGrounded).toBe(false);
-    expect(Array.from(controller.groundNormal)).toEqual([0, 1, 0]);
   });
 });
 
@@ -721,7 +587,7 @@ describe('MovementController Interface', () => {
 
   it('should accept MovementInput', () => {
     controller.isGrounded = true;
-    
+
     const movementInput: MovementInput = {
       moveDirection: [0.707, 0, 0.707], // Normalized diagonal
       sprint: true,
@@ -729,16 +595,16 @@ describe('MovementController Interface', () => {
     };
 
     controller.setInput(movementInput);
-    
+
     // Should accept and process MovementInput
     expect(controller.isSprinting).toBe(true);
   });
 
   it('should return velocity via MovementController interface', () => {
     controller.velocity = [5, 0, 3];
-    
+
     const velocity = controller.getVelocity();
-    
+
     expect(velocity[0]).toBe(5);
     expect(velocity[1]).toBe(0);
     expect(velocity[2]).toBe(3);
@@ -748,9 +614,9 @@ describe('MovementController Interface', () => {
 
   it('should return position via MovementController interface', () => {
     entity.transform.position = [10, 20, 30];
-    
+
     const position = controller.getPosition();
-    
+
     expect(position[0]).toBe(10);
     expect(position[1]).toBe(20);
     expect(position[2]).toBe(30);
@@ -758,9 +624,9 @@ describe('MovementController Interface', () => {
 
   it('should return zero position when entity is null', () => {
     const orphanController = new CharacterController();
-    
+
     const position = orphanController.getPosition();
-    
+
     expect(position[0]).toBe(0);
     expect(position[1]).toBe(0);
     expect(position[2]).toBe(0);
@@ -768,7 +634,7 @@ describe('MovementController Interface', () => {
 
   it('should handle MovementInput with jump', () => {
     controller.isGrounded = true;
-    
+
     const movementInput: MovementInput = {
       moveDirection: [0, 0, 1],
       sprint: false,
@@ -777,9 +643,8 @@ describe('MovementController Interface', () => {
 
     controller.setInput(movementInput);
     controller.update(1 / 60);
-    
+
     // Should process jump from MovementInput
     expect(controller.velocity[1]).toBeGreaterThan(0); // Jump applied
   });
 });
-

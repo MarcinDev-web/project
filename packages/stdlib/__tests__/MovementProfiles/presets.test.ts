@@ -13,29 +13,45 @@ describe('Preset Profiles', () => {
     it('should have FAST_HUMAN profile with increased speed', () => {
       expect(PRESET_PROFILES.FAST_HUMAN).toBeDefined();
       expect(PRESET_PROFILES.FAST_HUMAN.id).toBe('fast-human');
-      expect(PRESET_PROFILES.FAST_HUMAN.config.moveSpeed).toBeGreaterThan(DEFAULT_CHARACTER_CONFIG.moveSpeed);
-      expect(PRESET_PROFILES.FAST_HUMAN.config.sprintMultiplier).toBeGreaterThan(DEFAULT_CHARACTER_CONFIG.sprintMultiplier);
+      expect(PRESET_PROFILES.FAST_HUMAN.config.moveSpeed).toBeGreaterThan(
+        DEFAULT_CHARACTER_CONFIG.moveSpeed
+      );
+      expect(PRESET_PROFILES.FAST_HUMAN.config.sprintMultiplier).toBeGreaterThan(
+        DEFAULT_CHARACTER_CONFIG.sprintMultiplier
+      );
     });
 
     it('should have SLOW_HUMAN profile with reduced speed', () => {
       expect(PRESET_PROFILES.SLOW_HUMAN).toBeDefined();
       expect(PRESET_PROFILES.SLOW_HUMAN.id).toBe('slow-human');
-      expect(PRESET_PROFILES.SLOW_HUMAN.config.moveSpeed).toBeLessThan(DEFAULT_CHARACTER_CONFIG.moveSpeed);
-      expect(PRESET_PROFILES.SLOW_HUMAN.config.sprintMultiplier).toBeLessThan(DEFAULT_CHARACTER_CONFIG.sprintMultiplier);
+      expect(PRESET_PROFILES.SLOW_HUMAN.config.moveSpeed).toBeLessThan(
+        DEFAULT_CHARACTER_CONFIG.moveSpeed
+      );
+      expect(PRESET_PROFILES.SLOW_HUMAN.config.sprintMultiplier).toBeLessThan(
+        DEFAULT_CHARACTER_CONFIG.sprintMultiplier
+      );
     });
 
     it('should have HEAVY_HUMAN profile', () => {
       expect(PRESET_PROFILES.HEAVY_HUMAN).toBeDefined();
       expect(PRESET_PROFILES.HEAVY_HUMAN.id).toBe('heavy-human');
-      expect(PRESET_PROFILES.HEAVY_HUMAN.config.gravityMultiplier).toBeGreaterThan(DEFAULT_CHARACTER_CONFIG.gravityMultiplier);
-      expect(PRESET_PROFILES.HEAVY_HUMAN.config.airControlMultiplier).toBeLessThan(DEFAULT_CHARACTER_CONFIG.airControlMultiplier);
+      expect(PRESET_PROFILES.HEAVY_HUMAN.config.gravityMultiplier).toBeGreaterThan(
+        DEFAULT_CHARACTER_CONFIG.gravityMultiplier
+      );
+      expect(PRESET_PROFILES.HEAVY_HUMAN.config.airControlMultiplier).toBeLessThan(
+        DEFAULT_CHARACTER_CONFIG.airControlMultiplier
+      );
     });
 
     it('should have AGILE_HUMAN profile', () => {
       expect(PRESET_PROFILES.AGILE_HUMAN).toBeDefined();
       expect(PRESET_PROFILES.AGILE_HUMAN.id).toBe('agile-human');
-      expect(PRESET_PROFILES.AGILE_HUMAN.config.airControlMultiplier).toBeGreaterThan(DEFAULT_CHARACTER_CONFIG.airControlMultiplier);
-      expect(PRESET_PROFILES.AGILE_HUMAN.config.rotationSpeed).toBeGreaterThan(DEFAULT_CHARACTER_CONFIG.rotationSpeed);
+      expect(PRESET_PROFILES.AGILE_HUMAN.config.airControlMultiplier).toBeGreaterThan(
+        DEFAULT_CHARACTER_CONFIG.airControlMultiplier
+      );
+      expect(PRESET_PROFILES.AGILE_HUMAN.config.rotationSpeed).toBeGreaterThan(
+        DEFAULT_CHARACTER_CONFIG.rotationSpeed
+      );
     });
 
     it('should have FLYING_HUMAN profile with flying extension', () => {
@@ -101,7 +117,7 @@ describe('Preset Profiles', () => {
     it('should include all preset profile keys', () => {
       const ids = getPresetProfileIds();
       const expectedKeys = Object.keys(PRESET_PROFILES);
-      
+
       expect(ids.length).toBe(expectedKeys.length);
       for (const key of expectedKeys) {
         expect(ids).toContain(key);
@@ -109,4 +125,3 @@ describe('Preset Profiles', () => {
     });
   });
 });
-

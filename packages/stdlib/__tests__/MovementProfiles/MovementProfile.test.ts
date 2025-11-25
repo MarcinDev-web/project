@@ -1,5 +1,9 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { MovementProfile, type MovementProfileData, type MovementProfileExtension } from '../../src/MovementProfiles';
+import {
+  MovementProfile,
+  type MovementProfileData,
+  type MovementProfileExtension,
+} from '../../src/MovementProfiles';
 import { DEFAULT_CHARACTER_CONFIG } from '@engine/world';
 import type { CharacterController } from '@engine/world';
 
@@ -180,4 +184,3 @@ describe('MovementProfile', () => {
     });
   });
 });
-

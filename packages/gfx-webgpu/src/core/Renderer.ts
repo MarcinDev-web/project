@@ -1,4 +1,24 @@
+/**
+ * Renderer
+ *
+ * Main WebGPU renderer orchestrator. Manages the complete rendering lifecycle:
+ * - Device acquisition and configuration
+ * - Frame loop management
+ * - Resource creation and disposal
+ * - Scene rendering
+ *
+ * @module gfx-webgpu/core/Renderer
+ */
+
+// ========== External Dependencies ==========
 import type { OrbitControlsState } from '@engine/camera';
+import type { Scene, Entity } from '@engine/world';
+import { EnvironmentComponent, type VisualPreset } from '@engine/world';
+import { Logger } from '@engine/core/utils';
+import { ScriptSystem, LogicCubeSystem } from '@engine/script';
+import { init as initWasmCollision, type CollisionWorld } from '@engine/wasm-collision';
+
+// ========== Internal Dependencies ==========
 import { updateCanvasSize, getTimestampPeriod } from './helpers';
 import {
   pickAdapter,
@@ -12,28 +32,62 @@ import {
   createGeometryBuffers,
   createTimestampResources,
   createUniformResources,
-  createTextureAtlas, // NEW: Texture atlas system
+  createTextureAtlas,
   createPipelines,
   createDepthTexture,
   createMsaaColorTarget,
 } from '../resources/resources';
 import type { FrameResources, GeometryData } from '../resources/resources';
 import { GPUBufferPool } from './bufferPool';
-import type { Scene, Entity } from '@engine/world';
-import { EnvironmentComponent, type VisualPreset } from '@engine/world';
+import { LightManager } from '../lighting/LightManager';
+import { LogicConnectionRenderer } from '../LogicConnectionRenderer';
+import { EnvironmentRenderer } from '../renderers/EnvironmentRenderer';
+import { WaterRenderer } from '../renderers/WaterRenderer';
+import { CameraSystem } from './CameraSystem';
+import { UniformManager } from './UniformManager';
+import { FrameRenderer } from './FrameRenderer';
+import { createInstanceDataFromScene } from './InstanceManager';
+import { SDFTestHarness } from './SDFTestHarness';
+import { TextureCompressionManager } from '../textures/TextureCompressionManager';
+import type { CompressionFormat } from '../textures/TextureCompressionManager';
+
+// ========== Config ==========
+import {
+  DEFAULT_STATUS_MESSAGE,
+  MSAA_SAMPLE_COUNT,
+  TIMESTAMP_QUERY_COUNT,
+  UNIFORM_BUFFER_SIZE,
+  UNIFORM_DATA_LENGTH,
+  TIMESTAMP_BUFFER_SIZE,
+  MAX_DELTA_TIME_SEC,
+  MAX_DEVICE_RECREATION_ATTEMPTS,
+  OCCLUSION_BUFFER_WIDTH,
+  OCCLUSION_BUFFER_HEIGHT,
+  TIMESTAMP_INDICES,
+} from '../config';
+import type { RendererCapabilities } from '../config';
+
+// ========== Types (re-exported from RendererTypes) ==========
+import type {
+  Renderer,
+  GridRenderer,
+  RendererOptions,
+  RenderSettings,
+  GpuTimingsHandler,
+  CpuTimingsHandler,
+  ShadowMetricsHandler,
+  RenderStatsHandler,
+} from './RendererTypes';
+
+// Re-export types for backwards compatibility
+export type { Renderer, GridRenderer, RendererOptions } from './RendererTypes';
+
+// ========== Helper Functions ==========
 
 /**
- * Maps visual preset to render settings
+ * Maps visual preset to render settings.
  */
-function applyVisualPreset(preset: VisualPreset | undefined): Partial<{
-  enableHDR: boolean;
-  enableBloom: boolean;
-  enableSSAO: boolean;
-  enableFXAA: boolean;
-  enableOutlines: boolean;
-  outlineQuality: 'low' | 'med';
-  shadowQuality: 'low' | 'med' | 'high' | 'ultra';
-}> {
+function applyVisualPreset(preset: VisualPreset | undefined): Partial<RenderSettings> {
   switch (preset) {
     case 'stylized-balanced':
       return {
@@ -68,30 +122,6 @@ function applyVisualPreset(preset: VisualPreset | undefined): Partial<{
       return {};
   }
 }
-import { LightManager } from '../lighting/LightManager';
-import { ScriptSystem } from '@engine/script';
-import { LogicCubeSystem } from '@engine/script';
-import { LogicConnectionRenderer } from '../LogicConnectionRenderer';
-import { EnvironmentRenderer } from '../renderers/EnvironmentRenderer';
-import { WaterRenderer } from '../renderers/WaterRenderer';
-import { Logger } from '@engine/core/utils';
-import { CameraSystem } from './CameraSystem';
-import { UniformManager } from './UniformManager';
-import { FrameRenderer } from './FrameRenderer';
-import { createInstanceDataFromScene } from './InstanceManager';
-import { init as initWasmCollision, type WasmCollision, type CollisionWorld } from '@engine/wasm-collision';
-import {
-  DEFAULT_STATUS_MESSAGE,
-  MSAA_SAMPLE_COUNT,
-  TIMESTAMP_QUERY_COUNT,
-  UNIFORM_BUFFER_SIZE,
-  UNIFORM_DATA_LENGTH,
-  TIMESTAMP_BUFFER_SIZE,
-} from '../config';
-import { TIMESTAMP_INDICES } from '../config';
-import type { RendererCapabilities } from '../config';
-import { TextureCompressionManager } from '../textures/TextureCompressionManager';
-import type { CompressionFormat } from '../textures/TextureCompressionManager';
 
 function hasPreferredCanvasFormat(
   gpu: unknown
@@ -157,119 +187,14 @@ function createVertexBufferLayouts(): GPUVertexBufferLayout[] {
   ];
 }
 
-import { SDFTestHarness } from './SDFTestHarness';
+// ========== Main Renderer Function ==========
 
-export interface Renderer {
-  cleanup(): void;
-  abort(): void;
-  /** Updates instance data from the scene */
-  updateScene(): void;
-  /** Gets the current scene */
-  getScene(): Scene | null;
-  /** Sets the grid renderer (optional) */
-  setGridRenderer(gridRenderer: GridRenderer | null): void;
-  /** Initializes a grid renderer with device info */
-  initializeGridRenderer(gridRenderer: GridRenderer): Promise<void>;
-  /** Returns the underlying GPUDevice */
-  getDevice(): GPUDevice;
-  /** Returns the current presentation format */
-  getPresentationFormat(): GPUTextureFormat;
-  /** Returns renderer capabilities determined at init time */
-  getCapabilities(): RendererCapabilities;
-  /** Feature helpers */
-  supportsTimestampQueries(): boolean;
-  supportsOcclusionQueries(): boolean;
-  supportsTextureCompression(): boolean;
-  getFrameRenderer(): FrameRenderer;
-  onGpuTimings(handler: (timings: { label: string; timeMs: number }[]) => void): void;
-  onCpuTimings(handler: (timings: {
-    cullingTime: number;
-    instanceUpdateTime: number;
-    totalCPUTime: number;
-  }) => void): void;
-  onShadowMetrics(handler: (metrics: readonly [number, number, number, number]) => void): void;
-  onRenderStats(handler: (stats: { drawCalls: number; triangles: number }) => void): void;
-  updateRenderSettings(settings: Partial<{
-    enableHDR: boolean;
-    enableBloom: boolean;
-    enableFXAA: boolean;
-    enableSSAO: boolean;
-    enableSSGI: boolean;
-    enableShadows: boolean;
-    enableForwardPlus: boolean;
-    enableScreenLOD: boolean;
-    shadowQuality: 'low' | 'med' | 'high' | 'ultra';
-    enableComputePrepass: boolean;
-    msaaSampleCount: 1 | 2 | 4;
-    enableOutlines?: boolean;
-    outlineQuality?: 'low' | 'med';
-    resolutionScale?: number;
-  }>): void;
-  getRenderSettings(): Readonly<{
-    enableHDR: boolean;
-    enableBloom: boolean;
-    enableFXAA: boolean;
-    enableSSAO: boolean;
-    enableSSGI: boolean;
-    enableShadows: boolean;
-    enableForwardPlus: boolean;
-    enableScreenLOD: boolean;
-    shadowQuality: 'low' | 'med' | 'high' | 'ultra';
-    enableComputePrepass: boolean;
-    msaaSampleCount: 1 | 2 | 4;
-    enableOutlines: boolean;
-    outlineQuality: 'low' | 'med';
-    resolutionScale: number;
-  }>;
-  /** Texture compression debug controls */
-  getTextureCompressionManager(): TextureCompressionManager;
-  setTextureCompressionFormat(format: CompressionFormat | null): void;
-  setTextureCompressionEnabled(enabled: boolean): void;
-  getCollisionWorld(): CollisionWorld | null;
-  // SDF Demo
-  toggleSDFDemo(): void;
-  [key: string]: unknown;
-}
-
-// Lightweight grid renderer interface used by the core renderer
-export interface GridRenderer {
-  initialize(device: GPUDevice, format: GPUTextureFormat, depthFormat: GPUTextureFormat): Promise<void>;
-  render(passEncoder: GPURenderPassEncoder, viewProjectionMatrix: Float32Array, eyePosition?: Float32Array | number[]): void;
-  dispose(): void;
-  /** Optional method to control grid visibility */
-  setVisible?(visible: boolean): void;
-}
-
-interface RendererOptions {
-  canvas: HTMLCanvasElement;
-  statusEl: HTMLElement;
-  getOrbitState: () => OrbitControlsState;
-  geometry?: GeometryData;
-  scene?: Scene;
-  cameraEntity?: Entity | null;
-  /**
-   * Optional predicate indicating whether runtime simulation should run this frame.
-   * If not provided, simulation (e.g., ScriptSystem) always runs when available.
-   */
-  shouldSimulate?: () => boolean;
-  /**
-   * Optional callback for per-frame updates (called before rendering).
-   * Use this for play mode updates, physics, character controllers, etc.
-   */
-  onFrameUpdate?: (deltaTime: number) => void;
-  // Performance/quality flags
-  enableHDR?: boolean;
-  enableBloom?: boolean;
-  enableShadows?: boolean;
-  enableSSAO?: boolean; // Screen Space Ambient Occlusion
-  enableSSGI?: boolean; // Screen Space Global Illumination
-  shadowQuality?: 'low' | 'med' | 'high' | 'ultra';
-  enableOutlines?: boolean;
-  outlineQuality?: 'low' | 'med';
-  enableComputePrepass?: boolean;
-  msaaSampleCount?: 1 | 2 | 4;
-}
-
+/**
+ * Initializes the WebGPU renderer.
+ *
+ * @param options - Renderer configuration options
+ * @returns Promise resolving to the Renderer interface
+ */
 export async function initRenderer(options: RendererOptions): Promise<Renderer> {
   const { canvas, statusEl, getOrbitState } = options;
   const shouldSimulateFn = typeof options.shouldSimulate === 'function' ? options.shouldSimulate : () => true;
@@ -370,14 +295,10 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
 
   const renderAbortController = new AbortController();
   const renderAbortSignal = renderAbortController.signal;
-  const gpuTimingListeners: Array<(timings: { label: string; timeMs: number }[]) => void> = [];
-  const cpuTimingListeners: Array<(timings: {
-    cullingTime: number;
-    instanceUpdateTime: number;
-    totalCPUTime: number;
-  }) => void> = [];
-  const shadowMetricsListeners: Array<(metrics: readonly [number, number, number, number]) => void> = [];
-  const renderStatsListeners: Array<(stats: { drawCalls: number; triangles: number }) => void> = [];
+  const gpuTimingListeners: GpuTimingsHandler[] = [];
+  const cpuTimingListeners: CpuTimingsHandler[] = [];
+  const shadowMetricsListeners: ShadowMetricsHandler[] = [];
+  const renderStatsListeners: RenderStatsHandler[] = [];
 
   let cleanedUp = false;
   
@@ -921,8 +842,8 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       const wasm = await initWasmCollision();
       collisionWorld = new wasm.CollisionWorld();
       // Initialize occlusion culling with low resolution buffer
-      collisionWorld.init_occlusion_culling(256, 128);
-      frameRenderer.setWasmCollision(wasm, collisionWorld);
+      collisionWorld.init_occlusion_culling(OCCLUSION_BUFFER_WIDTH, OCCLUSION_BUFFER_HEIGHT);
+      frameRenderer.setCollisionWorld(wasm, collisionWorld);
     } catch (e) {
       Logger.warn('Failed to initialize CollisionWorld:', e);
     }
@@ -1025,8 +946,9 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
         ],
       });
       (frameResources as any).textureBindGroup = newBg;
-    } catch {
-      // ignore if IBL generation fails in minimal environments
+    } catch (e) {
+      // IBL generation may fail in minimal/test environments - non-critical
+      Logger.debug('IBL generation failed in minimal environment', e);
     }
 
     // Initialize logic connection renderer
@@ -1078,11 +1000,12 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
             : Date.now();
         if (lastFrameTimeMs !== null) {
           dtSec = Math.max(0, (nowMs - lastFrameTimeMs) / 1000);
-          // Clamp dt to avoid huge spikes
-          if (!Number.isFinite(dtSec) || dtSec > 0.1) dtSec = 0.1;
+          // Clamp dt to avoid huge spikes (e.g., after tab switch)
+          if (!Number.isFinite(dtSec) || dtSec > MAX_DELTA_TIME_SEC) dtSec = MAX_DELTA_TIME_SEC;
         }
         lastFrameTimeMs = nowMs;
-      } catch {
+      } catch (e) {
+        Logger.debug('Delta time calculation failed', e);
         dtSec = 0;
       }
       const aspect = canvas.width / canvas.height;
@@ -1487,21 +1410,33 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       capabilities.features.textureCompression.etc2 ||
       capabilities.features.textureCompression.astc,
     getFrameRenderer: () => frameRenderer,
-    onGpuTimings: (handler: (timings: { label: string; timeMs: number }[]) => void) => {
+    onGpuTimings: (handler: GpuTimingsHandler) => {
       gpuTimingListeners.push(handler);
     },
-    onCpuTimings: (handler: (timings: {
-      cullingTime: number;
-      instanceUpdateTime: number;
-      totalCPUTime: number;
-    }) => void) => {
+    offGpuTimings: (handler: GpuTimingsHandler) => {
+      const idx = gpuTimingListeners.indexOf(handler);
+      if (idx !== -1) gpuTimingListeners.splice(idx, 1);
+    },
+    onCpuTimings: (handler: CpuTimingsHandler) => {
       cpuTimingListeners.push(handler);
     },
-    onShadowMetrics: (handler: (metrics: readonly [number, number, number, number]) => void) => {
+    offCpuTimings: (handler: CpuTimingsHandler) => {
+      const idx = cpuTimingListeners.indexOf(handler);
+      if (idx !== -1) cpuTimingListeners.splice(idx, 1);
+    },
+    onShadowMetrics: (handler: ShadowMetricsHandler) => {
       shadowMetricsListeners.push(handler);
     },
-    onRenderStats: (handler: (stats: { drawCalls: number; triangles: number }) => void) => {
+    offShadowMetrics: (handler: ShadowMetricsHandler) => {
+      const idx = shadowMetricsListeners.indexOf(handler);
+      if (idx !== -1) shadowMetricsListeners.splice(idx, 1);
+    },
+    onRenderStats: (handler: RenderStatsHandler) => {
       renderStatsListeners.push(handler);
+    },
+    offRenderStats: (handler: RenderStatsHandler) => {
+      const idx = renderStatsListeners.indexOf(handler);
+      if (idx !== -1) renderStatsListeners.splice(idx, 1);
     },
     updateRenderSettings: (settings: Partial<typeof renderSettings>) => {
       renderSettings = { ...renderSettings, ...settings };

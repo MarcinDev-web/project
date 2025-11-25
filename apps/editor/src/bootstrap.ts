@@ -22,10 +22,10 @@ export async function bootstrap(): Promise<void> {
   const tokenFromUrl = urlParams.get('token');
   const refreshTokenFromUrl = urlParams.get('refreshToken');
   
-  Logger.info(`Editor: URL params - token: ${tokenFromUrl ? 'present' : 'missing'}, refreshToken: ${refreshTokenFromUrl ? 'present' : 'missing'}`);
   Logger.info(`Editor: Current URL: ${window.location.href}`);
   
   if (tokenFromUrl) {
+    Logger.info('Editor: Token found in URL params (redirected from platform)');
     try {
       const { setTokens, getTokens: getStoredTokens } = await import('./utils/auth');
       const stored = getStoredTokens();
@@ -58,11 +58,15 @@ export async function bootstrap(): Promise<void> {
       Logger.warn('Editor: Failed to store token from URL:', error as Error);
     }
   } else {
-    Logger.info('Editor: No token in URL - checking localStorage for existing token');
+    Logger.info('Editor: No token in URL (direct access) - checking localStorage...');
     try {
       const { getTokens: getStoredTokens } = await import('./utils/auth');
       const stored = getStoredTokens();
-      Logger.info(`Editor: localStorage token: ${stored.token ? 'present' : 'missing'}`);
+      if (stored.token) {
+        Logger.info('Editor: Found existing token in localStorage');
+      } else {
+        Logger.info('Editor: No token in localStorage - user not logged in');
+      }
       
       // If no token in URL and no token in localStorage, check if we came from platform
       // by checking if URL has authenticated=true parameter

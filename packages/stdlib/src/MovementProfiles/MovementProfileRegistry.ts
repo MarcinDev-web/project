@@ -3,7 +3,7 @@ import { PRESET_PROFILES } from './presets';
 
 /**
  * Registry for movement profiles
- * 
+ *
  * Singleton that manages all registered movement profiles,
  * including pre-defined presets and custom profiles.
  */
@@ -70,7 +70,9 @@ export class MovementProfileRegistry {
    */
   registerExtension(extension: MovementProfileExtension): void {
     if (this.extensionRegistry.has(extension.id)) {
-      console.warn(`MovementProfileExtension with id "${extension.id}" already exists. Overwriting.`);
+      console.warn(
+        `MovementProfileExtension with id "${extension.id}" already exists. Overwriting.`
+      );
     }
     this.extensionRegistry.set(extension.id, extension);
   }
@@ -108,4 +110,3 @@ export class MovementProfileRegistry {
     this.registerDefaults();
   }
 }
-

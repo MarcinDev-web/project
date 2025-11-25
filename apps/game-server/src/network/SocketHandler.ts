@@ -1,19 +1,17 @@
 import { WebSocket } from 'ws';
-import { 
+import { protocolVersion } from '@engine/net-protocol';
+import type { 
   HandshakeHello, 
   HandshakeAccept, 
   HandshakeReject, 
-  InputFrame, 
-  protocolVersion,
-  ClientCapabilities,
-  TransportKind
+  InputFrame
 } from '@engine/net-protocol';
 import { RoomManager } from '../server/RoomManager';
 
 export class SocketHandler {
   constructor(private roomManager: RoomManager) {}
 
-  handleConnection(socket: WebSocket, req: any) {
+  handleConnection(socket: WebSocket, _req: unknown) {
     let clientId: string | null = null;
     let roomId: string | null = null;
     let isAuthenticated = false;
@@ -47,7 +45,7 @@ export class SocketHandler {
             const room = await this.roomManager.joinRoom(roomId, clientId);
             
             // Wire up snapshot sending
-            room.onSendSnapshot = (targetClientId, snapshot) => {
+            room.onSendSnapshot = (targetClientId, _snapshot) => {
               if (targetClientId === clientId && socket.readyState === WebSocket.OPEN) {
                 // Send binary snapshot
                 // In real impl: use SnapshotCodec.encode(snapshot)

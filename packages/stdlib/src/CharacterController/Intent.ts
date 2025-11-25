@@ -52,4 +52,3 @@ export function resetIntent(intent: GameplayIntent): void {
   intent.interact = false;
   intent.ability = null;
 }
-

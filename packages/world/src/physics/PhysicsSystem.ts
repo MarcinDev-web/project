@@ -112,6 +112,7 @@ export class PhysicsSystem {
   private nextBodyId = 1;
   private nextJointId = 1;
   private joints = new Map<number, Joint>();
+  private jointIdToWasmId = new Map<number, number>();
 
   constructor(scene: Scene, config: Partial<PhysicsConfig> = {}) {
     this.scene = scene;
@@ -393,7 +394,17 @@ export class PhysicsSystem {
    */
   setGravity(gravity: Vec3): void {
     this.config.gravity = [...gravity] as Vec3;
-    // TODO: Sync with WASM if supported in runtime (or recreate world)
+    // Recreate the physics world so existing bodies pick up the new gravity.
+    if (this.world && this.initialized) {
+      try {
+        this.world = new PhysicsWorld(gravity[0], gravity[1], gravity[2]);
+        this.entityToBodyId.clear();
+        this.bodyIdToEntity.clear();
+        this.nextBodyId = 1;
+      } catch (err) {
+        console.warn('Failed to recreate physics world with new gravity', err);
+      }
+    }
   }
 
   /**
@@ -445,7 +456,6 @@ export class PhysicsSystem {
         ...config
     } as any; // Casting as id type might mismatch string vs number in types. Using simplified Joint type here.
 
-    // TODO: Map to WASM add_joint
     this.joints.set(id, joint);
     
     if (this.world && this.initialized) {
@@ -477,7 +487,7 @@ export class PhysicsSystem {
                 type = 5;
             }
 
-            this.world.add_joint(
+            const wasmJointId = this.world.add_joint(
                 type,
                 bodyA, bodyB,
                 anchorA[0], anchorA[1], anchorA[2],
@@ -487,6 +497,7 @@ export class PhysicsSystem {
                 axisA[0], axisA[1], axisA[2],
                 axisB[0], axisB[1], axisB[2]
             );
+            this.jointIdToWasmId.set(id, wasmJointId);
         }
     }
     
@@ -494,7 +505,28 @@ export class PhysicsSystem {
   }
 
   removeJoint(_joint: Joint): void {
-      // TODO: Implement removal in WASM
+      let jointKey: number | undefined;
+      for (const [id, stored] of this.joints.entries()) {
+          if (stored === _joint || stored.id === _joint.id) {
+              jointKey = id;
+              break;
+          }
+      }
+
+      if (jointKey === undefined) {
+          return;
+      }
+
+      const wasmId = this.jointIdToWasmId.get(jointKey);
+      if (wasmId !== undefined && this.world) {
+          try {
+              this.world.remove_joint(wasmId);
+          } catch (err) {
+              console.warn('Failed to remove joint from WASM world', err);
+          }
+      }
+      this.joints.delete(jointKey);
+      this.jointIdToWasmId.delete(jointKey);
   }
 
   getAllJoints(): Joint[] {

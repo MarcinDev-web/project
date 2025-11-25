@@ -19,6 +19,7 @@ export class MicroBlockMesher {
   private readonly chunkSize: number;
   private readonly disposables = new DisposableGroup();
   private initialized = false;
+  private voxelBuffer: Uint16Array | null = null;
 
   constructor(blockSize: number = MICRO_BLOCK_SIZE, chunkSize: number = DEFAULT_CHUNK_SIZE) {
     this.blockSize = blockSize;
@@ -47,9 +48,9 @@ export class MicroBlockMesher {
 
     // Try WASM mesher first
     if (this.initialized) {
-      // Convert microblock map to flat Uint16Array
-      // TODO: Optimize this conversion or update Rust to accept sparse map
-      const voxels = new Uint16Array(this.chunkSize * this.chunkSize * this.chunkSize);
+      // Convert microblock map to flat Uint16Array (reused buffer to avoid allocations)
+      const voxels = this.getOrCreateVoxelBuffer();
+      voxels.fill(0);
       for (const [index, _] of chunk.blocks) {
         // Simple mapping: 1 for block, 0 for air. 
         // Ideally we'd map material IDs to integers if the mesher supported textures.
@@ -88,5 +89,13 @@ export class MicroBlockMesher {
    */
   dispose(): void {
     this.disposables.dispose();
+  }
+
+  private getOrCreateVoxelBuffer(): Uint16Array {
+    const requiredSize = this.chunkSize * this.chunkSize * this.chunkSize;
+    if (!this.voxelBuffer || this.voxelBuffer.length !== requiredSize) {
+      this.voxelBuffer = new Uint16Array(requiredSize);
+    }
+    return this.voxelBuffer;
   }
 }

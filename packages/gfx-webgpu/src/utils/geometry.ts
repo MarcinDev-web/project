@@ -220,8 +220,32 @@ export function generateCylinderMesh(
   const indexArray: number[][] = [];
   const halfHeight = height / 2;
 
-  // Generate torso
-  for (let y = 0; y <= heightSegments; y++) {
+  // Check if we're generating a cone (one radius is 0)
+  const isTopCone = radiusTop === 0;
+  const isBottomCone = radiusBottom === 0;
+
+  // Apex indices for cone geometry
+  let topApexIndex = -1;
+  let bottomApexIndex = -1;
+
+  // Generate top apex vertex for cone (single point at tip)
+  if (isTopCone) {
+    const slope = radiusBottom / height;
+    // Normal points along the slant of the cone
+    const normalLen = Math.sqrt(1 + slope * slope);
+    
+    vertices.push(0, halfHeight, 0);
+    // Average normal pointing up and outward
+    normals.push(0, 1 / normalLen, slope / normalLen);
+    uvs.push(0.5, 0);
+    topApexIndex = index++;
+  }
+
+  // Generate torso rings (skip first ring if top is cone, skip last if bottom is cone)
+  const startY = isTopCone ? 1 : 0;
+  const endY = isBottomCone ? heightSegments - 1 : heightSegments;
+
+  for (let y = startY; y <= endY; y++) {
     const indexRow: number[] = [];
     const v = y / heightSegments;
     const radius = v * (radiusBottom - radiusTop) + radiusTop;
@@ -247,15 +271,47 @@ export function generateCylinderMesh(
     indexArray.push(indexRow);
   }
 
-  for (let x = 0; x < radialSegments; x++) {
-    for (let y = 0; y < heightSegments; y++) {
-      const a = indexArray[y][x];
-      const b = indexArray[y + 1][x];
-      const c = indexArray[y + 1][x + 1];
-      const d = indexArray[y][x + 1];
+  // Generate bottom apex vertex for cone
+  if (isBottomCone) {
+    const slope = radiusTop / height;
+    const normalLen = Math.sqrt(1 + slope * slope);
+    
+    vertices.push(0, -halfHeight, 0);
+    // Average normal pointing down and outward
+    normals.push(0, -1 / normalLen, slope / normalLen);
+    uvs.push(0.5, 1);
+    bottomApexIndex = index++;
+  }
+
+  // Generate torso triangles for regular cylinder sections
+  const numRings = indexArray.length;
+  for (let ringIdx = 0; ringIdx < numRings - 1; ringIdx++) {
+    for (let x = 0; x < radialSegments; x++) {
+      const a = indexArray[ringIdx][x];
+      const b = indexArray[ringIdx + 1][x];
+      const c = indexArray[ringIdx + 1][x + 1];
+      const d = indexArray[ringIdx][x + 1];
 
       indices.push(a, b, d);
       indices.push(b, c, d);
+    }
+  }
+
+  // Generate cone tip triangles (fan from apex to first ring)
+  if (isTopCone && indexArray.length > 0) {
+    const firstRing = indexArray[0];
+    for (let x = 0; x < radialSegments; x++) {
+      // Triangle from apex to edge of first ring
+      indices.push(topApexIndex, firstRing[x], firstRing[x + 1]);
+    }
+  }
+
+  // Generate bottom cone tip triangles (fan from last ring to apex)
+  if (isBottomCone && indexArray.length > 0) {
+    const lastRing = indexArray[indexArray.length - 1];
+    for (let x = 0; x < radialSegments; x++) {
+      // Triangle from edge of last ring to apex
+      indices.push(lastRing[x], bottomApexIndex, lastRing[x + 1]);
     }
   }
 

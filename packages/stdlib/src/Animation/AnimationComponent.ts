@@ -25,9 +25,9 @@ export class AnimationComponent extends Component {
   pose: PoseBone[] | null = null;
   clips = new Map<string, AnimationClip>();
   controllers = new Map<string, AnimationController>();
-  
+
   layers: AnimationLayer[] = [];
-  
+
   private activeStateName: string | null = null;
 
   constructor() {
@@ -153,7 +153,7 @@ export class AnimationComponent extends Component {
       // Ignore unknown states to avoid crashing the component
     }
   }
-  
+
   addLayer(name: string, weight: number = 1.0, additive: boolean = false): AnimationLayer {
     const layer = new AnimationLayer(name);
     layer.weight = weight;
@@ -161,14 +161,15 @@ export class AnimationComponent extends Component {
     this.layers.push(layer);
     return layer;
   }
-  
+
   getLayer(name: string): AnimationLayer | undefined {
-    return this.layers.find(l => l.name === name);
+    return this.layers.find((l) => l.name === name);
   }
-  
+
   removeLayer(name: string): void {
-    const index = this.layers.findIndex(l => l.name === name);
-    if (index > 0) { // Cannot remove base layer
+    const index = this.layers.findIndex((l) => l.name === name);
+    if (index > 0) {
+      // Cannot remove base layer
       this.layers.splice(index, 1);
     }
   }
@@ -188,7 +189,8 @@ export class AnimationComponent extends Component {
     const states = this.stateMachine.getStateConfigs().map((state) => this.serializeState(state));
     const parameters = this.getParameterDefinitions();
     const parameterValues = this.stateMachine.getParameters();
-    const activeState = this.stateMachine.getCurrentStateName() ?? this.activeStateName ?? undefined;
+    const activeState =
+      this.stateMachine.getCurrentStateName() ?? this.activeStateName ?? undefined;
 
     return {
       clips,
@@ -216,7 +218,9 @@ export class AnimationComponent extends Component {
 
     if (data.controllers && typeof data.controllers === 'object') {
       for (const [name, controllerData] of Object.entries(data.controllers)) {
-        const clip = controllerData.clip ? this.clips.get(controllerData.clip) : this.clips.get(name);
+        const clip = controllerData.clip
+          ? this.clips.get(controllerData.clip)
+          : this.clips.get(name);
         if (!clip) continue;
         const controller = this.createControllerFromJSON(clip, controllerData);
         this.controllers.set(name, controller);
@@ -299,16 +303,17 @@ export class AnimationComponent extends Component {
       // For now, we only support cloning simple Controllers in this basic clone()
       // BlendTrees would need more complex cloning logic
       if (state.controller instanceof AnimationController) {
-        const cloneController = controllerMap.get(state.controller)
-          ?? clone.controllers.get(state.controller.clip.name)
-          ?? clone.controllers.get(state.name);
-          
+        const cloneController =
+          controllerMap.get(state.controller) ??
+          clone.controllers.get(state.controller.clip.name) ??
+          clone.controllers.get(state.name);
+
         if (!cloneController) {
           const base = {
             name: state.name,
-            controller: clone.controllers.values().next().value ?? clone.addClip(
-              AnimationClip.fromJSON(state.controller.clip.toJSON())
-            ),
+            controller:
+              clone.controllers.values().next().value ??
+              clone.addClip(AnimationClip.fromJSON(state.controller.clip.toJSON())),
           } as const;
           const transitions = this.cloneTransitions(state.transitions);
           return transitions ? { ...base, transitions } : base;
@@ -338,13 +343,13 @@ export class AnimationComponent extends Component {
     const transitions = state.transitions
       ?.map((transition) => this.serializeTransition(transition))
       .filter((transition): transition is AnimationTransitionJSON => Boolean(transition));
-    
+
     // Only serialize if controller is AnimationController
     let clipName = '';
     if (state.controller instanceof AnimationController) {
       clipName = state.controller.clip.name;
     }
-    
+
     return {
       name: state.name,
       clip: clipName,
@@ -352,7 +357,9 @@ export class AnimationComponent extends Component {
     };
   }
 
-  private serializeTransition(transition: AnimationTransitionConfig): AnimationTransitionJSON | undefined {
+  private serializeTransition(
+    transition: AnimationTransitionConfig
+  ): AnimationTransitionJSON | undefined {
     if (typeof transition.condition === 'function') {
       return undefined;
     }
@@ -363,7 +370,9 @@ export class AnimationComponent extends Component {
     }));
     return {
       to: transition.to,
-      ...(transition.blendDuration !== undefined ? { blendDuration: transition.blendDuration } : {}),
+      ...(transition.blendDuration !== undefined
+        ? { blendDuration: transition.blendDuration }
+        : {}),
       ...(transition.blendEasing !== undefined ? { blendEasing: transition.blendEasing } : {}),
       ...(conditions && conditions.length > 0 ? { conditions } : {}),
     };
@@ -373,7 +382,9 @@ export class AnimationComponent extends Component {
     const result: AnimationStateConfig[] = [];
     for (const state of states) {
       if (!state || typeof state !== 'object') continue;
-      const controller = state.clip ? this.controllers.get(state.clip) : this.controllers.get(state.name);
+      const controller = state.clip
+        ? this.controllers.get(state.clip)
+        : this.controllers.get(state.name);
       if (!controller) continue;
       const transitions = this.deserializeTransitions(state.transitions);
       const base = { name: state.name, controller } as const;
@@ -382,7 +393,9 @@ export class AnimationComponent extends Component {
     return result;
   }
 
-  private deserializeTransitions(transitions: AnimationTransitionJSON[] | undefined): AnimationTransitionConfig[] | undefined {
+  private deserializeTransitions(
+    transitions: AnimationTransitionJSON[] | undefined
+  ): AnimationTransitionConfig[] | undefined {
     if (!Array.isArray(transitions) || transitions.length === 0) {
       return undefined;
     }
@@ -391,7 +404,9 @@ export class AnimationComponent extends Component {
       if (!transition) continue;
       const mapped: AnimationTransitionConfig = {
         to: transition.to,
-        ...(transition.blendDuration !== undefined ? { blendDuration: transition.blendDuration } : {}),
+        ...(transition.blendDuration !== undefined
+          ? { blendDuration: transition.blendDuration }
+          : {}),
         ...(transition.blendEasing !== undefined ? { blendEasing: transition.blendEasing } : {}),
         ...(transition.conditions
           ? {
@@ -408,11 +423,15 @@ export class AnimationComponent extends Component {
     return result.length > 0 ? result : undefined;
   }
 
-  private cloneTransitions(transitions: AnimationTransitionConfig[] | undefined): AnimationTransitionConfig[] | undefined {
+  private cloneTransitions(
+    transitions: AnimationTransitionConfig[] | undefined
+  ): AnimationTransitionConfig[] | undefined {
     if (!Array.isArray(transitions) || transitions.length === 0) return undefined;
     return transitions.map((transition) => ({
       to: transition.to,
-      ...(transition.blendDuration !== undefined ? { blendDuration: transition.blendDuration } : {}),
+      ...(transition.blendDuration !== undefined
+        ? { blendDuration: transition.blendDuration }
+        : {}),
       ...(transition.blendEasing !== undefined ? { blendEasing: transition.blendEasing } : {}),
       ...(typeof transition.condition === 'function' ? { condition: transition.condition } : {}),
       ...(transition.conditions
@@ -427,9 +446,13 @@ export class AnimationComponent extends Component {
     }));
   }
 
-  private createControllerFromJSON(clip: AnimationClip, data: AnimationControllerJSON): AnimationController {
+  private createControllerFromJSON(
+    clip: AnimationClip,
+    data: AnimationControllerJSON
+  ): AnimationController {
     const speed = typeof data.speed === 'number' && Number.isFinite(data.speed) ? data.speed : 1;
-    const weight = typeof data.weight === 'number' && Number.isFinite(data.weight) ? data.weight : 1;
+    const weight =
+      typeof data.weight === 'number' && Number.isFinite(data.weight) ? data.weight : 1;
     const loop = data.loop ?? true;
     return new AnimationController({ clip, speed, weight, loop });
   }

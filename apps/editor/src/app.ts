@@ -22,7 +22,7 @@ import {
 import { WasmAnimationSystem } from '@engine/world/systems';
 import { MeshComponent, InteractableComponent } from '@engine/world';
 import { registerTemplates, applyTo } from '@engine/world-templates';
-import { createFlatPlatformTemplate, createStarterBlockTemplate, createEmptyTemplate, createSkyIslandsTemplate } from '@engine/world-templates';
+import { createMinimalTemplate } from '@engine/world-templates';
 import { ShareClient } from '@engine/net';
 import { PredictionBridge } from './runtime/PredictionBridge';
 import { EOSClient } from './bootstrap/EOSClient';
@@ -89,18 +89,15 @@ export class EditorApp {
         this.config.statusEl.textContent = 'Loading renderer…';
       }, 150);
 
-      // Register built-in templates once at boot
+      // Register built-in template once at boot
       try {
         registerTemplates([
-          createFlatPlatformTemplate(),
-          createSkyIslandsTemplate(),
-          createStarterBlockTemplate(),
-          createEmptyTemplate(),
+          createMinimalTemplate(),
         ]);
-        // Load default template (Sky Islands) immediately before initializing renderer/UI
-        this.config.statusEl.textContent = 'Loading Sky Islands...';
-        await applyTo(this.scene, 'template:sky-islands', { clear: true });
-        
+        // Load default template immediately before initializing renderer/UI
+        this.config.statusEl.textContent = 'Loading scene...';
+        await applyTo(this.scene, 'template:minimal', { clear: true });
+        Logger.info('Template "minimal" loaded successfully');
       } catch (err) {
         Logger.error('Failed to load default template', err as Error);
       }

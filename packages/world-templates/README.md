@@ -1,9 +1,6 @@
 # @engine/world-templates
 
-Reusable world templates and example seeds for @engine/world scenes.
-
-- Templates: starting skeletons (Empty, Basic Lighting)
-- Seeds: curated example worlds (Cornell Box)
+Reusable world templates for @engine/world scenes.
 
 ## Usage
 
@@ -13,18 +10,16 @@ import {
   listTemplates,
   instantiate,
   applyTo,
-  createEmptyTemplate,
-  createBasicLightingTemplate,
+  createMinimalTemplate,
 } from '@engine/world-templates';
 
 registerTemplates([
-  createEmptyTemplate(),
-  createBasicLightingTemplate(),
+  createMinimalTemplate(),
 ]);
 
 const cards = listTemplates({ kind: 'template' });
-const scene = await instantiate('template:empty');
-await applyTo(existingScene, 'template:basic-lighting', { clear: true });
+const scene = await instantiate('template:minimal');
+await applyTo(existingScene, 'template:minimal', { clear: true });
 ```
 
 See `src/types.ts` and `src/registry/TemplateRegistry.ts` for API.

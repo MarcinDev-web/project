@@ -753,6 +753,9 @@ importers:
       '@engine/editor-utils':
         specifier: workspace:*
         version: link:../editor-utils
+      '@engine/wasm-collision':
+        specifier: workspace:*
+        version: link:../wasm-collision
       '@engine/wasm-render-logic':
         specifier: workspace:*
         version: link:../wasm-render-logic

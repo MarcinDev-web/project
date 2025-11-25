@@ -6,18 +6,18 @@ export interface AnimationNode {
   play(): void;
   pause(): void;
   stop(): void;
-  
+
   /**
    * Get the duration of the animation source in seconds.
    * For blend trees, this might be a weighted average or the duration of the dominant child.
    */
   getDuration(): number;
-  
+
   /**
    * Get current normalized time (0-1).
    */
   getNormalizedTime(): number;
-  
+
   /**
    * Set current normalized time (0-1).
    * Used for synchronizing animations in a blend tree.

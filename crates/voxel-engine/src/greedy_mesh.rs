@@ -1,6 +1,11 @@
 use wasm_bindgen::prelude::*;
 use glam::{Vec3};
 
+// Transparent voxel identifiers (treated specially during meshing).
+// In a full engine this would come from a material registry, but for the WASM
+// helper we keep a small built-in list.
+const TRANSPARENT_IDS: [u16; 3] = [2, 3, 4];
+
 #[wasm_bindgen]
 pub struct MeshResult {
     vertices: Vec<f32>,
@@ -61,11 +66,9 @@ pub fn mesh_chunk(
         get_voxel(x, y, z) != 0
     };
 
-    // TODO: Pass this as config or use a consistent registry
     let is_transparent = |id: u16| -> bool {
         // Assuming 2=Water, 3=Glass, 4=Leaves, etc.
-        // For now, let's just assume a range or specific IDs
-        id == 2 || id == 3 || id == 4
+        TRANSPARENT_IDS.contains(&id)
     };
 
     let calc_ao_vertex = |s1: bool, s2: bool, c: bool| -> u32 {

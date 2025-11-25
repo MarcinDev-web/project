@@ -3,20 +3,20 @@
   "version": "0.1.0",
   "description": "Currency and economy system for game players and marketplace transactions",
   "type": "module",
-  "main": "./dist/src/index.js",
-  "types": "./dist/src/index.d.ts",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
   "exports": {
     ".": {
-      "import": "./dist/src/index.js",
+      "import": "./dist/index.js",
       "development": "./src/index.ts",
       "test": "./src/index.ts",
-      "default": "./dist/src/index.js"
+      "default": "./dist/index.js"
     },
     "./examples": {
-      "import": "./dist/src/examples/CurrencySystemExample.js",
+      "import": "./dist/examples/CurrencySystemExample.js",
       "development": "./src/examples/CurrencySystemExample.ts",
       "test": "./src/examples/CurrencySystemExample.ts",
-      "default": "./dist/src/examples/CurrencySystemExample.js"
+      "default": "./dist/examples/CurrencySystemExample.js"
     }
   },
   "scripts": {

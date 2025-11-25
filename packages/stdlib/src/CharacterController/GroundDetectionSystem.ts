@@ -6,11 +6,11 @@ import { GroundDetectionCache } from './GroundDetectionCache';
 
 /**
  * Independent system for handling ground detection for character controllers
- * 
+ *
  * Uses physics raycasting with spatial hash caching to efficiently detect
  * ground for multiple characters. This system operates independently and
  * queries CharacterController components from the scene automatically.
- * 
+ *
  * Must be updated before CharacterControllerSystem.update() in the game loop.
  */
 export class GroundDetectionSystem {
@@ -35,7 +35,7 @@ export class GroundDetectionSystem {
 
   /**
    * Update ground detection for all character controllers in the scene
-   * 
+   *
    * @param deltaTime - Time since last frame in seconds
    */
   update(deltaTime: number): void {
@@ -58,7 +58,7 @@ export class GroundDetectionSystem {
 
   /**
    * Update ground detection for a single controller
-   * 
+   *
    * @param controller - Character controller to update
    */
   private updateGroundDetection(controller: CharacterController): void {
@@ -96,10 +96,14 @@ export class GroundDetectionSystem {
     controller.groundNormal = [...groundNormal] as Vec3;
 
     // Store result in cache
-    this.cache.set(originCopy, {
-      isGrounded,
-      groundNormal: [...groundNormal] as Vec3,
-    }, this.currentTime);
+    this.cache.set(
+      originCopy,
+      {
+        isGrounded,
+        groundNormal: [...groundNormal] as Vec3,
+      },
+      this.currentTime
+    );
   }
 
   /**
@@ -109,4 +113,3 @@ export class GroundDetectionSystem {
     this.cache.clear();
   }
 }
-

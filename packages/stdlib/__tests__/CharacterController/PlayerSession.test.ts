@@ -1,6 +1,10 @@
 import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { PlayerSession, type PlayerProfile } from '@engine/stdlib/CharacterController';
-import type { PlayerController, ControllerPreferences, ControllerContext } from '@engine/stdlib/CharacterController';
+import type {
+  PlayerController,
+  ControllerPreferences,
+  ControllerContext,
+} from '@engine/stdlib/CharacterController';
 import type { Entity } from '@engine/world';
 import { EMPTY_INTENT, cloneIntent as cloneIntentUtil } from '@engine/stdlib/CharacterController';
 
@@ -93,36 +97,30 @@ describe('PlayerSession', () => {
   describe('bindController', () => {
     it('should bind controller to session', () => {
       const controller = createMockController('controller1');
-      
+
       session.bindController(controller);
-      
+
       expect(session.getController()).toBe(controller);
     });
 
     it('should log warning when overwriting existing controller', () => {
       const consoleSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
-      
+
       const controller1 = createMockController('controller1');
       const controller2 = createMockController('controller2');
-      
+
       session.bindController(controller1);
       session.bindController(controller2);
-      
+
       expect(consoleSpy).toHaveBeenCalledWith(
         expect.stringContaining('[PlayerSession] Overwriting existing controller')
       );
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('player1')
-      );
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('controller1')
-      );
-      expect(consoleSpy).toHaveBeenCalledWith(
-        expect.stringContaining('controller2')
-      );
-      
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('player1'));
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('controller1'));
+      expect(consoleSpy).toHaveBeenCalledWith(expect.stringContaining('controller2'));
+
       expect(session.getController()).toBe(controller2);
-      
+
       consoleSpy.mockRestore();
     });
 
@@ -130,11 +128,11 @@ describe('PlayerSession', () => {
       const controller1 = createMockController('controller1');
       const controller2 = createMockController('controller2');
       const controller3 = createMockController('controller3');
-      
+
       session.bindController(controller1);
       session.bindController(controller2);
       session.bindController(controller3);
-      
+
       expect(session.getController()).toBe(controller3);
     });
   });
@@ -143,10 +141,10 @@ describe('PlayerSession', () => {
     it('should unbind controller and call unpossess', () => {
       const controller = createMockController('controller1');
       const unpossessSpy = vi.spyOn(controller, 'unpossess');
-      
+
       session.bindController(controller);
       session.unbindController();
-      
+
       expect(unpossessSpy).toHaveBeenCalledTimes(1);
       expect(session.getController()).toBeNull();
     });
@@ -161,10 +159,10 @@ describe('PlayerSession', () => {
     it('should delegate update to controller', () => {
       const controller = createMockController('controller1');
       const updateSpy = vi.spyOn(controller, 'update');
-      
+
       session.bindController(controller);
       session.update(0.016);
-      
+
       expect(updateSpy).toHaveBeenCalledTimes(1);
       expect(updateSpy).toHaveBeenCalledWith(0.016);
     });
@@ -176,12 +174,12 @@ describe('PlayerSession', () => {
     it('should handle multiple updates', () => {
       const controller = createMockController('controller1');
       const updateSpy = vi.spyOn(controller, 'update');
-      
+
       session.bindController(controller);
       session.update(0.016);
       session.update(0.016);
       session.update(0.016);
-      
+
       expect(updateSpy).toHaveBeenCalledTimes(3);
     });
   });
@@ -190,10 +188,10 @@ describe('PlayerSession', () => {
     it('should unbind controller when disposed', () => {
       const controller = createMockController('controller1');
       const unpossessSpy = vi.spyOn(controller, 'unpossess');
-      
+
       session.bindController(controller);
       session.dispose();
-      
+
       expect(unpossessSpy).toHaveBeenCalledTimes(1);
       expect(session.getController()).toBeNull();
     });
@@ -201,12 +199,12 @@ describe('PlayerSession', () => {
     it('should be idempotent - safe to call multiple times', () => {
       const controller = createMockController('controller1');
       const unpossessSpy = vi.spyOn(controller, 'unpossess');
-      
+
       session.bindController(controller);
       session.dispose();
       session.dispose();
       session.dispose();
-      
+
       expect(unpossessSpy).toHaveBeenCalledTimes(1);
       expect(session.getController()).toBeNull();
     });
@@ -223,21 +221,21 @@ describe('PlayerSession', () => {
       const possessSpy = vi.spyOn(controller, 'possess');
       const updateSpy = vi.spyOn(controller, 'update');
       const unpossessSpy = vi.spyOn(controller, 'unpossess');
-      
+
       // Bind controller
       session.bindController(controller);
       expect(session.getController()).toBe(controller);
-      
+
       // Update multiple times
       session.update(0.016);
       session.update(0.016);
       expect(updateSpy).toHaveBeenCalledTimes(2);
-      
+
       // Unbind
       session.unbindController();
       expect(unpossessSpy).toHaveBeenCalledTimes(1);
       expect(session.getController()).toBeNull();
-      
+
       // Dispose (should be safe but no-op)
       session.dispose();
       expect(session.getController()).toBeNull();
@@ -246,13 +244,12 @@ describe('PlayerSession', () => {
     it('should handle bind -> dispose lifecycle', () => {
       const controller = createMockController('controller1');
       const unpossessSpy = vi.spyOn(controller, 'unpossess');
-      
+
       session.bindController(controller);
       session.dispose();
-      
+
       expect(unpossessSpy).toHaveBeenCalledTimes(1);
       expect(session.getController()).toBeNull();
     });
   });
 });
-

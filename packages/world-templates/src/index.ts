@@ -8,10 +8,7 @@ export { registerTemplates, listTemplates, getTemplate, instantiate, applyTo } f
 export { createJsonTemplate } from './loaders/JsonTemplate';
 export { createProceduralTemplate } from './loaders/ProceduralTemplate';
 
-// Built-in templates (reduced set)
-export { createFlatPlatformTemplate } from './builtins/templates/FlatPlatform';
-export { createSkyIslandsTemplate } from './builtins/templates/SkyIslands';
-export { createStarterBlockTemplate } from './builtins/templates/StarterBlock';
-export { createEmptyTemplate } from './builtins/templates/Empty';
+// Built-in template
+export { createMinimalTemplate } from './builtins/templates/Minimal';
 
 

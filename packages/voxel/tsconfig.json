@@ -2,6 +2,7 @@
   "extends": "../../tsconfig.json",
   "compilerOptions": {
     "outDir": "./dist",
+    "rootDir": "./src",
     "composite": true,
     "declaration": true,
     "declarationMap": true,
@@ -17,7 +18,7 @@
     }
   },
   "include": ["src/**/*"],
-  "exclude": ["__tests__", "dist", "node_modules", "../core/src", "../world/src"],
+  "exclude": ["__tests__", "src/**/__tests__/**", "src/**/*.test.ts", "dist", "node_modules", "../core/src", "../world/src"],
   "references": [
     { "path": "../core/tsconfig.build.json" },
     { "path": "../world" }

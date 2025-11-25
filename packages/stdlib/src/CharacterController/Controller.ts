@@ -26,4 +26,3 @@ export interface PlayerController {
   update(deltaTime: number): void;
   getContext(): ControllerContext;
 }
-

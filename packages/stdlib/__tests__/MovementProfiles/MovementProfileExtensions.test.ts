@@ -2,11 +2,11 @@ import { describe, it, expect, beforeEach, vi } from 'vitest';
 import { CharacterController } from '@engine/world';
 import { Entity } from '@engine/world';
 import { Scene } from '@engine/world';
-import { 
-  FlyingExtension, 
-  SpeedBoostExtension, 
+import {
+  FlyingExtension,
+  SpeedBoostExtension,
   VehicleExtension,
-  type MovementExtensionInputProvider 
+  type MovementExtensionInputProvider,
 } from '../../src/MovementProfiles/MovementProfileExtensions';
 import { DEFAULT_CHARACTER_CONFIG } from '@engine/world';
 
@@ -84,7 +84,7 @@ describe('Movement Profile Extensions', () => {
 
     it('should track active time when duration is set', () => {
       const extension = new SpeedBoostExtension(2.0, 1.5, 5.0, 0);
-      
+
       extension.modifyConfig?.(DEFAULT_CHARACTER_CONFIG);
       expect(extension.getIsActive()).toBe(true);
 
@@ -99,7 +99,7 @@ describe('Movement Profile Extensions', () => {
 
     it('should have infinite duration when duration is 0', () => {
       const extension = new SpeedBoostExtension(2.0, 1.5, 0, 0);
-      
+
       extension.modifyConfig?.(DEFAULT_CHARACTER_CONFIG);
       expect(extension.getIsActive()).toBe(true);
 
@@ -112,7 +112,7 @@ describe('Movement Profile Extensions', () => {
 
     it('should deactivate on remove', () => {
       const extension = new SpeedBoostExtension(2.0, 1.5, 0, 0);
-      
+
       extension.modifyConfig?.(DEFAULT_CHARACTER_CONFIG);
       expect(extension.getIsActive()).toBe(true);
 
@@ -134,36 +134,35 @@ describe('Movement Profile Extensions', () => {
 
     it('should increase linear drag on apply', () => {
       const extension = new VehicleExtension(3.0);
-      
+
       // Ensure physics component exists
       controller.update(0.016); // Trigger physics creation
-      
+
       const physics = (controller as any).physics;
       if (physics) {
         const originalDrag = physics.linearDrag || 5;
-        
+
         extension.onApply?.(controller);
-        
+
         expect(physics.linearDrag).toBeGreaterThanOrEqual(8);
       }
     });
 
     it('should restore linear drag on remove', () => {
       const extension = new VehicleExtension(3.0);
-      
+
       // Ensure physics component exists
       controller.update(0.016);
-      
+
       const physics = (controller as any).physics;
       if (physics) {
         const originalDrag = physics.linearDrag || 5;
-        
+
         extension.onApply?.(controller);
         extension.onRemove?.(controller);
-        
+
         expect(physics.linearDrag).toBe(5); // Default drag restored
       }
     });
   });
 });
-

@@ -26,6 +26,7 @@ export interface AssetPaletteConfig {
   vegetationPresetManager?: VegetationPresetManager | null;
   npcPresetManager?: NpcPresetManager | null;
   marketplaceAssetManager?: MarketplaceAssetManager | null;
+  onMarketplaceAssetSelect?: (asset: { id: string; title: string; thumbnailUrl?: string; fileUrl: string }) => void;
 }
 
 export class AssetPalette {
@@ -432,10 +433,13 @@ export class AssetPalette {
     name.textContent = asset.title;
     item.appendChild(name);
 
-    // Click handler - for now just log, can be extended later
+    // Click handler - hand off to consumer for placement/integration
     item.addEventListener('click', () => {
-      console.log('Marketplace asset clicked:', asset.title);
-      // TODO: Implement placement logic for marketplace assets
+      if (this.config.onMarketplaceAssetSelect) {
+        this.config.onMarketplaceAssetSelect(asset);
+      } else {
+        console.log('Marketplace asset clicked:', asset.title);
+      }
       this.toggleBuildMenu(); // Close menu after selection
     });
 

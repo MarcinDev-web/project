@@ -77,23 +77,27 @@ function applyPosition(node: AudioListener | PannerNode, position: Vec3): void {
   const [x, y, z] = position;
   if ('positionX' in node && node.positionX) {
     toParamValue(node.positionX, x ?? 0);
-    toParamValue(node.positionY!, y ?? 0);
-    toParamValue(node.positionZ!, z ?? 0);
+    toParamValue(node.positionY, y ?? 0);
+    toParamValue(node.positionZ, z ?? 0);
   } else if ('setPosition' in node && typeof node.setPosition === 'function') {
     node.setPosition(x ?? 0, y ?? 0, z ?? 0);
   }
 }
 
-function applyOrientation(node: AudioListener | PannerNode, forward: Vec3, up: Vec3 | null = null): void {
+function applyOrientation(
+  node: AudioListener | PannerNode,
+  forward: Vec3,
+  up: Vec3 | null = null
+): void {
   const [fx, fy, fz] = forward;
   if ('forwardX' in node && node.forwardX) {
     toParamValue(node.forwardX, fx ?? 0);
-    toParamValue(node.forwardY!, fy ?? 0);
-    toParamValue(node.forwardZ!, fz ?? 0);
+    toParamValue(node.forwardY, fy ?? 0);
+    toParamValue(node.forwardZ, fz ?? 0);
     const upVec = up ?? DEFAULT_UP;
-    toParamValue(node.upX!, upVec[0] ?? 0);
-    toParamValue(node.upY!, upVec[1] ?? 0);
-    toParamValue(node.upZ!, upVec[2] ?? 0);
+    toParamValue(node.upX, upVec[0] ?? 0);
+    toParamValue(node.upY, upVec[1] ?? 0);
+    toParamValue(node.upZ, upVec[2] ?? 0);
   } else if ('setOrientation' in node && typeof node.setOrientation === 'function') {
     const upVec = up ?? DEFAULT_UP;
     node.setOrientation(fx ?? 0, fy ?? 0, fz ?? 0, upVec[0] ?? 0, upVec[1] ?? 0, upVec[2] ?? 0);
@@ -171,7 +175,10 @@ export interface AudioPlaybackHandle {
 class OneShotHandle implements AudioPlaybackHandle {
   private stopped = false;
 
-  constructor(private readonly source: AudioBufferSourceNode, private readonly cleanup: () => void) {}
+  constructor(
+    private readonly source: AudioBufferSourceNode,
+    private readonly cleanup: () => void
+  ) {}
 
   stop(): void {
     if (this.stopped) return;
@@ -232,7 +239,13 @@ export class SpatialAudioSource implements AudioPlaybackHandle {
     private readonly gain: GainNode,
     private readonly output: GainNode,
     private readonly onDispose: () => void,
-    options: { loop?: boolean; volume?: number; playbackRate?: number; position?: Vec3; orientation?: Vec3; }
+    options: {
+      loop?: boolean;
+      volume?: number;
+      playbackRate?: number;
+      position?: Vec3;
+      orientation?: Vec3;
+    }
   ) {
     this.loop = options.loop ?? false;
     this.playbackRate = options.playbackRate ?? 1;
@@ -248,7 +261,7 @@ export class SpatialAudioSource implements AudioPlaybackHandle {
     }
   }
 
-  async play(): Promise<void> {
+  play(): void {
     if (this.disposed) {
       throw new Error('SpatialAudioSource has been disposed');
     }
@@ -375,7 +388,8 @@ export class SfxManager {
     if (!graph) {
       return null;
     }
-    const buffer = options.buffer ?? (options.url ? await this.system.loadBuffer(options.url) : null);
+    const buffer =
+      options.buffer ?? (options.url ? await this.system.loadBuffer(options.url) : null);
     if (!buffer) {
       return null;
     }
@@ -420,26 +434,25 @@ export class SfxManager {
     return this.trackOneShot(source, gain, options.onEnded);
   }
 
-  async createSpatialSource(
-    options: {
-      buffer?: AudioBuffer;
-      url?: string;
-      loop?: boolean;
-      volume?: number;
-      playbackRate?: number;
-      position?: Vec3;
-      orientation?: Vec3;
-      refDistance?: number;
-      maxDistance?: number;
-      rolloffFactor?: number;
-      distanceModel?: DistanceModelType;
-    }
-  ): Promise<SpatialAudioSource | null> {
+  async createSpatialSource(options: {
+    buffer?: AudioBuffer;
+    url?: string;
+    loop?: boolean;
+    volume?: number;
+    playbackRate?: number;
+    position?: Vec3;
+    orientation?: Vec3;
+    refDistance?: number;
+    maxDistance?: number;
+    rolloffFactor?: number;
+    distanceModel?: DistanceModelType;
+  }): Promise<SpatialAudioSource | null> {
     const graph = await this.system.ensureGraph();
     if (!graph) {
       return null;
     }
-    const buffer = options.buffer ?? (options.url ? await this.system.loadBuffer(options.url) : null);
+    const buffer =
+      options.buffer ?? (options.url ? await this.system.loadBuffer(options.url) : null);
     if (!buffer) {
       return null;
     }
@@ -484,7 +497,11 @@ export class SfxManager {
     this.active.clear();
   }
 
-  private trackOneShot(source: AudioBufferSourceNode, gain: GainNode, onEnded?: () => void): AudioPlaybackHandle {
+  private trackOneShot(
+    source: AudioBufferSourceNode,
+    gain: GainNode,
+    onEnded?: () => void
+  ): AudioPlaybackHandle {
     const handle = new OneShotHandle(source, () => {
       source.onended = null;
       try {
@@ -527,7 +544,10 @@ export class MusicManager {
     return this.tracks.has(key);
   }
 
-  async play(keyOrOptions: string | PlayMusicOptions, overrides: PlayMusicOptions = {}): Promise<AudioPlaybackHandle | null> {
+  async play(
+    keyOrOptions: string | PlayMusicOptions,
+    overrides: PlayMusicOptions = {}
+  ): Promise<AudioPlaybackHandle | null> {
     let options: PlayMusicOptions & { key?: string };
     if (typeof keyOrOptions === 'string') {
       const track = this.tracks.get(keyOrOptions);
@@ -550,7 +570,8 @@ export class MusicManager {
       return null;
     }
 
-    const buffer = options.buffer ?? (options.url ? await this.system.loadBuffer(options.url) : null);
+    const buffer =
+      options.buffer ?? (options.url ? await this.system.loadBuffer(options.url) : null);
     if (!buffer) {
       return null;
     }
@@ -815,7 +836,11 @@ export class AudioSystem {
     return this.muted;
   }
 
-  async updateListener(position: Vec3, forward: Vec3 = this.listenerForward, up: Vec3 = this.listenerUp): Promise<void> {
+  async updateListener(
+    position: Vec3,
+    forward: Vec3 = this.listenerForward,
+    up: Vec3 = this.listenerUp
+  ): Promise<void> {
     this.listenerPosition = [...position];
     this.listenerForward = [...forward];
     this.listenerUp = [...up];
@@ -872,18 +897,17 @@ export class AudioSystem {
       return this.context;
     }
     if (!this.contextPromise) {
-      this.contextPromise = (async () => {
+      this.contextPromise = Promise.resolve().then(() => {
         if (!this.isSupported()) {
           return null;
         }
         const context = this.contextFactory();
         this.context = context;
         return context;
-      })();
+      });
     }
     return await this.contextPromise;
   }
 }
 
 export const audioSystem = new AudioSystem();
-

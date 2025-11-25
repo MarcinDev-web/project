@@ -1,5 +1,11 @@
 import type { PlayerController } from './Controller';
-import { LocalPlayerController, type CharacterInputHandler, type CameraDirector, type FPSCamera, type CharacterControllerSystem } from './LocalPlayerController';
+import {
+  LocalPlayerController,
+  type CharacterInputHandler,
+  type CameraDirector,
+  type FPSCamera,
+  type CharacterControllerSystem,
+} from './LocalPlayerController';
 import type { ControllerBindings } from './ManifestBindings';
 
 export interface LocalControllerOptions {
@@ -23,4 +29,3 @@ export class DefaultControllerFactory {
     });
   }
 }
-

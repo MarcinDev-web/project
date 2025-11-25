@@ -96,7 +96,12 @@ export class AnimationStateMachine {
       if (!target) {
         continue;
       }
-      this.startTransition(target, transition.blendDuration, transition.consumeTriggers, transition.blendEasing);
+      this.startTransition(
+        target,
+        transition.blendDuration,
+        transition.consumeTriggers,
+        transition.blendEasing
+      );
       break;
     }
     if (this.blendState) {
@@ -114,7 +119,11 @@ export class AnimationStateMachine {
     const { duration, elapsed, target, easing } = this.blendState;
     const rawWeight = duration > 0 ? Math.min(1, elapsed / duration) : 1;
     const weight = this.applyBlendEasing(rawWeight, easing);
-    return { primary: this.currentState.controller, secondary: target.controller, blendWeight: weight };
+    return {
+      primary: this.currentState.controller,
+      secondary: target.controller,
+      blendWeight: weight,
+    };
   }
 
   hasState(name: string): boolean {
@@ -196,9 +205,10 @@ export class AnimationStateMachine {
         }
         case 'number': {
           const prevNumber = typeof prev === 'number' && Number.isFinite(prev) ? prev : undefined;
-          const defaultNumber = typeof param.defaultValue === 'number' && Number.isFinite(param.defaultValue)
-            ? param.defaultValue
-            : undefined;
+          const defaultNumber =
+            typeof param.defaultValue === 'number' && Number.isFinite(param.defaultValue)
+              ? param.defaultValue
+              : undefined;
           value = prevNumber ?? defaultNumber ?? 0;
           break;
         }
@@ -237,9 +247,10 @@ export class AnimationStateMachine {
             name,
             Number.isFinite(numeric)
               ? numeric
-              : (typeof definition.defaultValue === 'number' && Number.isFinite(definition.defaultValue)
-                  ? definition.defaultValue
-                  : 0)
+              : typeof definition.defaultValue === 'number' &&
+                  Number.isFinite(definition.defaultValue)
+                ? definition.defaultValue
+                : 0
           );
           break;
         }
@@ -316,9 +327,8 @@ export class AnimationStateMachine {
       )
     );
 
-    const evaluate = conditions.length === 0
-      ? () => true
-      : () => this.evaluateTransitionConditions(conditions);
+    const evaluate =
+      conditions.length === 0 ? () => true : () => this.evaluateTransitionConditions(conditions);
 
     return {
       to: transition.to,
@@ -334,12 +344,9 @@ export class AnimationStateMachine {
     for (const condition of conditions) {
       const definition = this.parameterDefs.get(condition.parameter);
       const value = this.resolveParameterValue(condition.parameter);
-      const type: AnimationParameterType = definition?.type
-        ?? (typeof value === 'number'
-          ? 'number'
-          : typeof value === 'boolean'
-            ? 'bool'
-            : 'trigger');
+      const type: AnimationParameterType =
+        definition?.type ??
+        (typeof value === 'number' ? 'number' : typeof value === 'boolean' ? 'bool' : 'trigger');
 
       switch (condition.operator) {
         case 'triggered': {
@@ -350,9 +357,8 @@ export class AnimationStateMachine {
         case '==':
         case '!=': {
           if (type === 'number') {
-            const compareValue = typeof condition.value === 'number'
-              ? condition.value
-              : Number(condition.value);
+            const compareValue =
+              typeof condition.value === 'number' ? condition.value : Number(condition.value);
             if (!Number.isFinite(compareValue)) return false;
             const numericValue = typeof value === 'number' ? value : Number(value);
             if (!Number.isFinite(numericValue)) return false;
@@ -362,9 +368,8 @@ export class AnimationStateMachine {
               return false;
             }
           } else if (type === 'bool') {
-            const expected = typeof condition.value === 'boolean'
-              ? condition.value
-              : Boolean(condition.value);
+            const expected =
+              typeof condition.value === 'boolean' ? condition.value : Boolean(condition.value);
             const boolValue = Boolean(value);
             if (condition.operator === '==') {
               if (boolValue !== expected) return false;
@@ -381,9 +386,8 @@ export class AnimationStateMachine {
         case '<':
         case '<=': {
           if (type !== 'number') return false;
-          const compareValue = typeof condition.value === 'number'
-            ? condition.value
-            : Number(condition.value);
+          const compareValue =
+            typeof condition.value === 'number' ? condition.value : Number(condition.value);
           const numericValue = typeof value === 'number' ? value : Number(value);
           if (!Number.isFinite(compareValue) || !Number.isFinite(numericValue)) return false;
           switch (condition.operator) {
@@ -424,9 +428,10 @@ export class AnimationStateMachine {
         value = typeof definition.defaultValue === 'boolean' ? definition.defaultValue : false;
         break;
       case 'number':
-        value = typeof definition.defaultValue === 'number' && Number.isFinite(definition.defaultValue)
-          ? definition.defaultValue
-          : 0;
+        value =
+          typeof definition.defaultValue === 'number' && Number.isFinite(definition.defaultValue)
+            ? definition.defaultValue
+            : 0;
         break;
       case 'trigger':
         value = null;
@@ -507,7 +512,12 @@ export class AnimationStateMachine {
       return;
     }
 
-    this.blendState = { target, duration: blendDuration, elapsed: 0, ...(blendEasing !== undefined ? { easing: blendEasing } : {}) };
+    this.blendState = {
+      target,
+      duration: blendDuration,
+      elapsed: 0,
+      ...(blendEasing !== undefined ? { easing: blendEasing } : {}),
+    };
   }
 
   private finishTransition(): void {
@@ -535,7 +545,11 @@ export class AnimationStateMachine {
    * Request an immediate transition to the target state with a given blend duration.
    * If there is no current state, behaves like setState().
    */
-  requestBlendTo(name: string, blendDuration: number, options?: { resetTime?: boolean; autoPlay?: boolean; easing?: AnimationEasing }): void {
+  requestBlendTo(
+    name: string,
+    blendDuration: number,
+    options?: { resetTime?: boolean; autoPlay?: boolean; easing?: AnimationEasing }
+  ): void {
     const target = this.states.get(name);
     if (!target) {
       throw new Error(`AnimationStateMachine: unknown state "${name}"`);
@@ -557,9 +571,15 @@ export class AnimationStateMachine {
       target.controller.play();
     }
     // Start blend
-    const blendState = duration > 0 
-      ? { target, duration, elapsed: 0, ...(options?.easing !== undefined ? { easing: options.easing } : {}) }
-      : null;
+    const blendState =
+      duration > 0
+        ? {
+            target,
+            duration,
+            elapsed: 0,
+            ...(options?.easing !== undefined ? { easing: options.easing } : {}),
+          }
+        : null;
     this.blendState = blendState;
     if (!this.blendState) {
       // Immediate switch
@@ -585,12 +605,8 @@ export class AnimationStateMachine {
         ...(transition.blendDuration !== undefined
           ? { blendDuration: transition.blendDuration }
           : {}),
-        ...(transition.blendEasing !== undefined
-          ? { blendEasing: transition.blendEasing }
-          : {}),
-        ...(typeof transition.condition === 'function'
-          ? { condition: transition.condition }
-          : {}),
+        ...(transition.blendEasing !== undefined ? { blendEasing: transition.blendEasing } : {}),
+        ...(typeof transition.condition === 'function' ? { condition: transition.condition } : {}),
         ...(transition.conditions
           ? {
               conditions: transition.conditions.map((condition) => ({

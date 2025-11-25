@@ -19,7 +19,7 @@
     }
   },
   "scripts": {
-    "build": "echo 'Skipping voxel build in production' || tsc -b",
+    "build": "tsc -b",
     "dev": "tsc -b --watch",
     "test": "vitest run",
     "test:watch": "vitest",

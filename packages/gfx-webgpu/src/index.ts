@@ -1,5 +1,27 @@
-export { initRenderer, type Renderer } from './core/Renderer';
-export type { GridRenderer } from './core/Renderer';
+export { initRenderer } from './core/Renderer';
+
+// Renderer Types (from RendererTypes module)
+export type {
+  Renderer,
+  GridRenderer,
+  RendererOptions,
+  RenderSettings,
+  GpuTimingsHandler,
+  CpuTimingsHandler,
+  ShadowMetricsHandler,
+  RenderStatsHandler,
+  ExtendedFrameResources,
+} from './core/RendererTypes';
+
+// Frame Loop (new module)
+export { FrameLoop, type FrameState } from './core/FrameLoop';
+
+// Device Manager (new module)
+export { DeviceManager, type DeviceCreationResult, type DeviceEventDetail } from './core/DeviceManager';
+
+// Frame Resource Factory (new module)
+export { FrameResourceFactory, createVertexBufferLayouts } from './core/FrameResourceFactory';
+
 export type { GeometryData } from './resources/resources';
 
 // Adapter probing and capabilities

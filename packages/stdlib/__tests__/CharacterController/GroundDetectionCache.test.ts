@@ -18,7 +18,7 @@ describe('GroundDetectionCache', () => {
       const pos3: Vec3 = [0.6, 0, 0.6]; // Different cell
 
       cache.set(pos1, { isGrounded: true, groundNormal: [0, 1, 0] }, currentTime);
-      
+
       const result1 = cache.get(pos1, currentTime);
       const result2 = cache.get(pos2, currentTime);
       const result3 = cache.get(pos3, currentTime);
@@ -117,4 +117,3 @@ describe('GroundDetectionCache', () => {
     });
   });
 });
-

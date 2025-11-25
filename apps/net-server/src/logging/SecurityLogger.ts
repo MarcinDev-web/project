@@ -33,6 +33,7 @@ export interface SecurityEvent {
 export class SecurityLogger {
   private events: SecurityEvent[] = [];
   private readonly maxEvents = 1000; // Keep last 1000 events in memory
+  private externalSink: ((event: SecurityEvent) => Promise<void> | void) | null = null;
 
   /**
    * Log a security event.
@@ -66,8 +67,12 @@ export class SecurityLogger {
         break;
     }
 
-    // TODO: Integrate with external logging service (CloudWatch, Datadog, etc.)
-    // this.sendToExternalService(fullEvent);
+    // Forward to external service if configured
+    if (this.externalSink) {
+      Promise.resolve(this.externalSink(fullEvent)).catch((err) => {
+        console.warn('[SECURITY WARN] External sink failed:', err);
+      });
+    }
   }
 
   /**
@@ -253,8 +258,14 @@ export class SecurityLogger {
 
     return parts.filter(Boolean).join(' ');
   }
+
+  /**
+   * Configure an external sink (e.g., CloudWatch, Datadog, SIEM).
+   */
+  setExternalSink(sink: (event: SecurityEvent) => Promise<void> | void): void {
+    this.externalSink = sink;
+  }
 }
 
 // Singleton instance
 export const securityLogger = new SecurityLogger();
-

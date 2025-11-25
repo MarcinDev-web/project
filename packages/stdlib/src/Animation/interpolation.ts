@@ -1,7 +1,12 @@
 import { quat } from 'gl-matrix';
 import { lerpVec3Out, quatSlerpOut, quatNormalizeOut } from '@engine/core/math';
 import type { Vec3, Quat } from '@engine/core/math';
-import type { AnimationEasing, AnimationInterpolation, AnimationTrackType, AnimationValue } from './types';
+import type {
+  AnimationEasing,
+  AnimationInterpolation,
+  AnimationTrackType,
+  AnimationValue,
+} from './types';
 
 function applyEasing(t: number, easing: AnimationEasing | undefined): number {
   if (!Number.isFinite(t)) return 0;
@@ -39,7 +44,9 @@ function slerpQuat(a: Quat, b: Quat, t: number): Quat {
 function cubicHermiteNumber(p0: number, p1: number, m0: number, m1: number, t: number): number {
   const t2 = t * t;
   const t3 = t2 * t;
-  return (2 * t3 - 3 * t2 + 1) * p0 + (t3 - 2 * t2 + t) * m0 + (-2 * t3 + 3 * t2) * p1 + (t3 - t2) * m1;
+  return (
+    (2 * t3 - 3 * t2 + 1) * p0 + (t3 - 2 * t2 + t) * m0 + (-2 * t3 + 3 * t2) * p1 + (t3 - t2) * m1
+  );
 }
 
 function cubicHermiteVec3(p0: Vec3, p1: Vec3, m0: Vec3, m1: Vec3, t: number): Vec3 {
@@ -52,14 +59,22 @@ function cubicHermiteVec3(p0: Vec3, p1: Vec3, m0: Vec3, m1: Vec3, t: number): Ve
 
 // For quaternions we fallback to slerp even for cubic to avoid instability.
 
-function getTangent(previous: AnimationValue, next: AnimationValue, valueType: AnimationTrackType): AnimationValue {
+function getTangent(
+  previous: AnimationValue,
+  next: AnimationValue,
+  valueType: AnimationTrackType
+): AnimationValue {
   if (valueType === 'number') {
     return ((next as number) - (previous as number)) as AnimationValue;
   }
   if (valueType === 'vec3') {
     const a = previous as Vec3;
     const b = next as Vec3;
-    return [(b[0] ?? 0) - (a[0] ?? 0), (b[1] ?? 0) - (a[1] ?? 0), (b[2] ?? 0) - (a[2] ?? 0)] as AnimationValue;
+    return [
+      (b[0] ?? 0) - (a[0] ?? 0),
+      (b[1] ?? 0) - (a[1] ?? 0),
+      (b[2] ?? 0) - (a[2] ?? 0),
+    ] as AnimationValue;
   }
   const qa = previous as Quat;
   const qb = next as Quat;
@@ -127,4 +142,3 @@ export function interpolate(
 
   return a;
 }
-
