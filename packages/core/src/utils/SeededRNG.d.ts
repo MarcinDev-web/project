@@ -4,8 +4,12 @@
  * Provides deterministic random number generation for gameplay systems.
  * Uses Mulberry32 algorithm - fast and suitable for games.
  *
- * IMPORTANT: Use this instead of Math.random() for all gameplay logic
+ * IMPORTANT: Use this for gameplay logic (items, critical hits, events)
  * to ensure deterministic simulation results.
+ *
+ * NOT RECOMMENDED for heavy procedural generation (terrain, large worlds).
+ * For world generation, use Rust/WASM RNG (rand/pcg) for better performance
+ * and quality.
  */
 /**
  * Seeded RNG using Mulberry32 algorithm

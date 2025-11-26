@@ -239,6 +239,8 @@ export class GizmoMeshRenderer {
         const mat = this.materials.get(baseMatName);
         if (mat) {
             for (const entity of entities) {
+                // Remove existing material before adding new one
+                entity.removeComponent(MaterialComponent);
                 entity.addComponent(mat.clone());
             }
         }
@@ -255,6 +257,8 @@ export class GizmoMeshRenderer {
                 // Check if visible
                 const mesh = entity.getComponent(MeshComponent);
                 if (mesh && mesh.meshType !== 'none') {
+                    // Remove existing material before adding new one
+                    entity.removeComponent(MaterialComponent);
                     entity.addComponent(mat.clone());
                 }
             }

@@ -180,6 +180,12 @@ export class FrameRenderer {
   private lastFrameVisibleIndicesCount = 0;
   private vpScratch = new Float32Array(16);
   private disposed = false;
+  
+  // Depth resolve resources for volumetric clouds
+  private depthResolvePipeline: GPURenderPipeline | null = null;
+  private depthResolveLayout: GPUBindGroupLayout | null = null;
+  private depthResolveUniformBuffer: GPUBuffer | null = null;
+  private depthResolveDevice: GPUDevice | null = null;
 
   constructor(initialCapacity = 1000) {
     this.frustumCuller = new FrustumCuller();
@@ -343,6 +349,33 @@ export class FrameRenderer {
 
     renderPass.end();
 
+    // Render volumetric clouds in a separate pass (after main pass ends)
+    // This is required because clouds sample the depth texture, which cannot be
+    // sampled while it's attached as a render target (WebGPU validation requirement)
+    if (sampleCount > 1 && targetState.resolvedDepthView && frameResources.depthTextureView) {
+      // Resolve MSAA depth to single-sampled texture for cloud occlusion sampling
+      this.resolveDepthForClouds(
+        configuredDevice,
+        encoder,
+        frameResources.depthTextureView,
+        targetState.resolvedDepthView,
+        ctx.canvas.width,
+        ctx.canvas.height
+      );
+    }
+    
+    // Render volumetric clouds with the resolved depth
+    this.renderVolumetricCloudsPass(
+      ctx,
+      encoder,
+      targetState,
+      swapChainView,
+      viewProjectionMatrix,
+      eyePosition,
+      featureFlags,
+      sampleCount
+    );
+
     // Validate device consistency before post-processing
     // Post-process may use swapChainView, so we need to ensure device hasn't changed
     if (!this.validateDeviceAndCleanupEncoder(ctx, deviceSnapshot, encoder, 'post-processing')) {
@@ -448,6 +481,17 @@ export class FrameRenderer {
       // ignore
     }
     this.ownedLodScaleBuffer = null;
+    
+    // Cleanup depth resolve resources for volumetric clouds
+    try {
+      this.depthResolveUniformBuffer?.destroy();
+    } catch {
+      // ignore
+    }
+    this.depthResolveUniformBuffer = null;
+    this.depthResolvePipeline = null;
+    this.depthResolveLayout = null;
+    this.depthResolveDevice = null;
     
     // Cleanup WASM resources
     this.collisionWorld = null;
@@ -1216,10 +1260,256 @@ export class FrameRenderer {
       environmentRenderer.updateUniforms(inverseVP, eyePosition);
       environmentRenderer.updateParams(envComponent);
       environmentRenderer.render(passEncoder, envComponent);
+      
+      // Note: Volumetric clouds are rendered in a separate pass after the main pass ends
+      // to avoid sampling the depth texture while it's attached as a render target.
+      // See renderVolumetricCloudsPass() which is called after the main render pass.
     } catch (err) {
       this.recordError('environmentRender');
       Logger.warn('Environment render failed:', err);
     }
+  }
+
+  /**
+   * Renders volumetric clouds in a separate pass after the main render pass.
+   * This is necessary because clouds sample the depth texture, which cannot be
+   * sampled while it's attached as a render target (WebGPU validation requirement).
+   */
+  private renderVolumetricCloudsPass(
+    ctx: FrameRenderContext,
+    encoder: GPUCommandEncoder,
+    targetState: ReturnType<FrameTargetManager['ensureTargets']>,
+    swapChainView: GPUTextureView,
+    viewProjectionMatrix: Mat4,
+    eyePosition: Vec3,
+    featureFlags: { enableHDR: boolean },
+    sampleCount: number
+  ): void {
+    const { environmentRenderer, scene, frameResources, canvas } = ctx;
+    if (!environmentRenderer || !scene) {
+      return;
+    }
+    const environmentEntities = scene.queryEntities(EnvironmentComponent);
+    const environmentEntity = environmentEntities.find((entity: Entity) => entity.active);
+    if (!environmentEntity) {
+      return;
+    }
+    const envComponent = environmentEntity.getComponent(EnvironmentComponent);
+    if (!envComponent || !envComponent.enabled || !envComponent.cloudsEnabled) {
+      return;
+    }
+
+    try {
+      // For volumetric clouds, we need a single-sampled depth texture that is not 
+      // currently attached as a render target.
+      // - For MSAA (sampleCount > 1): use the resolved depth texture
+      // - For non-MSAA (sampleCount === 1): use the original depth texture (safe since main pass ended)
+      let depthViewForClouds: GPUTextureView | null = null;
+      
+      if (sampleCount > 1) {
+        // MSAA: use resolved depth (already resolved before this method is called)
+        depthViewForClouds = targetState.resolvedDepthView;
+      } else {
+        // Non-MSAA: original depth texture is single-sampled and safe to use
+        depthViewForClouds = frameResources.depthTextureView;
+      }
+      
+      if (!depthViewForClouds) {
+        // No depth available - skip cloud rendering
+        return;
+      }
+
+      // Update the cloud pass with the depth texture for occlusion sampling
+      environmentRenderer.updateDepthTexture(depthViewForClouds);
+
+      // Determine resolve target based on HDR mode
+      let resolveTarget: GPUTextureView | undefined;
+      if (sampleCount > 1) {
+        resolveTarget = featureFlags.enableHDR ? targetState.hdrView ?? swapChainView : swapChainView;
+      }
+
+      // Create a separate render pass for clouds
+      const cloudPass = encoder.beginRenderPass({
+        label: 'volumetric-clouds-pass',
+        colorAttachments: [{
+          view: frameResources.msaaColorView,
+          ...(resolveTarget && { resolveTarget }),
+          loadOp: 'load', // Preserve existing content (skybox, geometry)
+          storeOp: 'store',
+        }],
+        // No depth attachment - clouds don't write depth and we're sampling it
+      });
+
+      // Render volumetric clouds
+      const vpMatrix = viewProjectionMatrix instanceof Float32Array 
+        ? viewProjectionMatrix 
+        : new Float32Array(viewProjectionMatrix);
+      environmentRenderer.renderVolumetricClouds(
+        cloudPass, 
+        envComponent, 
+        vpMatrix,
+        canvas?.width ?? 1920,
+        canvas?.height ?? 1080
+      );
+
+      cloudPass.end();
+    } catch (err) {
+      this.recordError('volumetricClouds');
+      Logger.warn('Volumetric clouds render failed:', err);
+    }
+  }
+
+  /**
+   * Resolves MSAA depth to a single-sampled texture for use in volumetric clouds.
+   * This must be called before renderVolumetricCloudsPass when MSAA is enabled.
+   */
+  private resolveDepthForClouds(
+    device: GPUDevice,
+    encoder: GPUCommandEncoder,
+    multisampledDepthView: GPUTextureView,
+    resolvedDepthView: GPUTextureView,
+    width: number,
+    height: number
+  ): void {
+    this.initializeDepthResolve(device);
+    if (!this.depthResolvePipeline || !this.depthResolveLayout || !this.depthResolveUniformBuffer) {
+      Logger.warn('Depth resolve pipeline not initialized for clouds');
+      return;
+    }
+    
+    const uniformData = new Float32Array([width, height]);
+    device.queue.writeBuffer(this.depthResolveUniformBuffer, 0, uniformData);
+    
+    const bindGroup = device.createBindGroup({
+      label: 'cloud-depth-resolve-bg',
+      layout: this.depthResolveLayout,
+      entries: [
+        { binding: 0, resource: multisampledDepthView },
+        { binding: 1, resource: { buffer: this.depthResolveUniformBuffer } },
+      ],
+    });
+    
+    const pass = encoder.beginRenderPass({
+      label: 'cloud-depth-resolve-pass',
+      colorAttachments: [],
+      depthStencilAttachment: {
+        view: resolvedDepthView,
+        depthLoadOp: 'clear',
+        depthStoreOp: 'store',
+        depthClearValue: 1.0,
+      },
+    });
+    pass.setPipeline(this.depthResolvePipeline);
+    pass.setBindGroup(0, bindGroup);
+    pass.draw(3, 1, 0, 0);
+    pass.end();
+  }
+
+  /**
+   * Initializes the depth resolve pipeline for volumetric cloud depth sampling.
+   */
+  private initializeDepthResolve(device: GPUDevice): void {
+    if (this.depthResolvePipeline && this.depthResolveDevice === device) {
+      return;
+    }
+    
+    // Cleanup old resources if device changed
+    if (this.depthResolveDevice !== device) {
+      try {
+        this.depthResolveUniformBuffer?.destroy();
+      } catch {
+        // ignore
+      }
+      this.depthResolvePipeline = null;
+      this.depthResolveLayout = null;
+      this.depthResolveUniformBuffer = null;
+    }
+    this.depthResolveDevice = device;
+    
+    this.depthResolveLayout = device.createBindGroupLayout({
+      label: 'cloud-depth-resolve-bgl',
+      entries: [
+        {
+          binding: 0,
+          visibility: GPUShaderStage.FRAGMENT,
+          texture: { sampleType: 'depth', multisampled: true },
+        },
+        { binding: 1, visibility: GPUShaderStage.FRAGMENT, buffer: { type: 'uniform' } },
+      ],
+    });
+    
+    this.depthResolveUniformBuffer = device.createBuffer({
+      label: 'cloud-depth-resolve-uniforms',
+      size: 8,
+      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+    });
+    
+    const vs = device.createShaderModule({
+      label: 'cloud-depth-resolve-vs',
+      code: `
+struct VSOut {
+  @builtin(position) pos: vec4<f32>,
+  @location(0) uv: vec2<f32>,
+}
+@vertex
+fn vs_fullscreen(@builtin(vertex_index) vid: u32) -> VSOut {
+  var o: VSOut;
+  let x = f32((vid << 1u) & 2u);
+  let y = f32(vid & 2u);
+  o.pos = vec4<f32>(x * 2.0 - 1.0, y * -2.0 + 1.0, 0.0, 1.0);
+  o.uv = vec2<f32>(x, y);
+  return o;
+}
+`,
+    });
+    
+    const fs = device.createShaderModule({
+      label: 'cloud-depth-resolve-fs',
+      code: `
+@group(0) @binding(0) var depthTex : texture_depth_multisampled_2d;
+
+struct Uniforms {
+  width: f32,
+  height: f32,
+}
+
+@group(0) @binding(1) var<uniform> uniforms : Uniforms;
+
+@fragment
+fn fs_main(@location(0) v_uv: vec2<f32>) -> @builtin(frag_depth) f32 {
+  let texCoord = vec2<i32>(v_uv * vec2<f32>(uniforms.width, uniforms.height));
+  let depth = textureLoad(depthTex, texCoord, 0);
+  return depth;
+}
+`,
+    });
+    
+    this.depthResolvePipeline = device.createRenderPipeline({
+      label: 'cloud-depth-resolve-pipeline',
+      layout: device.createPipelineLayout({
+        bindGroupLayouts: [this.depthResolveLayout],
+      }),
+      vertex: {
+        module: vs,
+        entryPoint: 'vs_fullscreen',
+      },
+      fragment: {
+        module: fs,
+        entryPoint: 'fs_main',
+        targets: [],
+      },
+      primitive: {
+        topology: 'triangle-list',
+      },
+      depthStencil: {
+        format: 'depth24plus',
+        depthWriteEnabled: true,
+        depthCompare: 'always',
+      },
+      multisample: {
+        count: 1,
+      },
+    });
   }
 
   private renderStaticGeometry(

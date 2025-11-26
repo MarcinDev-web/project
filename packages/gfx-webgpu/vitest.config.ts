@@ -24,7 +24,12 @@ export default defineConfig({
     environment: 'jsdom',
     include: ['__tests__/**/*.test.ts', 'src/**/*.test.ts'],
     setupFiles: ['./__tests__/setup.ts'],
-    exclude: ['__tests__/resources/HdrLoader.test.ts'],
+    exclude: [
+      '__tests__/resources/HdrLoader.test.ts',
+      // Exclude Playwright tests (they use @playwright/test, not vitest)
+      'tests/**/*.spec.ts',
+      '**/tests/**/*.spec.ts',
+    ],
     onConsoleLog(log, type) {
       const ignore = [
         /Timestamp period: no source available/,

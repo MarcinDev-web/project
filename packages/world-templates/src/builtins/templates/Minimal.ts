@@ -1,5 +1,5 @@
 import { Entity, Scene } from '@engine/world';
-import { EnvironmentComponent, LightComponent, MeshComponent } from '@engine/world';
+import { EnvironmentComponent, LightComponent, MeshComponent, MaterialComponent } from '@engine/world';
 import type { TemplateProvider } from '../../types';
 
 /**
@@ -19,11 +19,14 @@ export function createMinimalTemplate(): TemplateProvider {
     build: () => {
       const scene = new Scene('New Project');
 
-      // Environment (procedural sky)
+      // Environment (procedural sky with volumetric clouds)
+      // Note: IBL is now generated without clouds to prevent lighting artifacts
       const env = new Entity('Environment');
       const envComp = new EnvironmentComponent();
       envComp.skyboxType = 'procedural-sky';
-      envComp.ambientIntensity = 0.5;
+      envComp.ambientIntensity = 0.4;
+      envComp.cloudsEnabled = true; // Volumetric clouds in the sky
+      envComp.cloudDensity = 0.5;
       env.addComponent(envComp);
       scene.addEntity(env);
 
@@ -46,13 +49,22 @@ export function createMinimalTemplate(): TemplateProvider {
       ambient.addComponent(ambLight);
       scene.addEntity(ambient);
 
-      // Starter platform (3x3)
+      // Starter platform (3x3x0.5)
       const platform = new Entity('StarterPlatform');
       platform.transform.position = [0, -0.25, 0]; // Slightly below origin so top is at y=0
+      
       const platformMesh = new MeshComponent();
       platformMesh.meshType = 'box';
       platformMesh.options = { size: [3, 0.5, 3] };
       platform.addComponent(platformMesh);
+      
+      // Add material with a neutral gray color and no reflections
+      const platformMaterial = new MaterialComponent();
+      platformMaterial.color = [0.6, 0.6, 0.65, 1]; // Light gray-blue
+      platformMaterial.roughness = 1.0; // Fully rough (no specular reflections)
+      platformMaterial.metallic = 0; // Non-metallic
+      platform.addComponent(platformMaterial);
+      
       scene.addEntity(platform);
 
       return scene;

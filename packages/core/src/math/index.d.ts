@@ -374,4 +374,5 @@ export declare function extractFrustumPlanes(out: FrustumPlane[], vp: Mat4): Fru
  * @returns Positive distance if AABB is in front of plane, negative if behind
  */
 export declare function frustumPlaneTestAABB(aabbMin: Vec3, aabbMax: Vec3, plane: FrustumPlane): number;
+export { cullAABBBatch } from './culling.js';
 //# sourceMappingURL=index.d.ts.map

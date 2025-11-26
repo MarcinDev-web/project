@@ -111,6 +111,7 @@ export { BloomPass } from './postprocess/BloomPass';
 export { FXAAPass } from './postprocess/FXAAPass';
 export { OutlinePass } from './postprocess/OutlinePass';
 export { EnvironmentRenderer } from './renderers/EnvironmentRenderer';
+export { VolumetricCloudPass, type VolumetricCloudParams } from './renderers/VolumetricCloudPass';
 
 // Lighting
 export { ForwardPlus } from './lighting/ForwardPlus';

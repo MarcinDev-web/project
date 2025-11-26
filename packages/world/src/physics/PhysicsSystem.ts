@@ -507,7 +507,7 @@ export class PhysicsSystem {
   removeJoint(_joint: Joint): void {
       let jointKey: number | undefined;
       for (const [id, stored] of this.joints.entries()) {
-          if (stored === _joint || stored.id === _joint.id) {
+          if (stored === _joint || stored.getId() === _joint.getId()) {
               jointKey = id;
               break;
           }

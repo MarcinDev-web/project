@@ -1,5 +1,6 @@
 import { Component } from './Component.js';
-export type MeshKind = 'none' | 'cube' | 'sphere' | 'cylinder' | 'plane' | 'capsule' | 'capsule_y' | 'custom' | 'avatar_torso' | 'terrain';
+import type { AABB } from '../physics/BoundingVolume.js';
+export type MeshKind = 'none' | 'cube' | 'box' | 'sphere' | 'cylinder' | 'plane' | 'capsule' | 'capsule_y' | 'custom' | 'avatar_torso' | 'terrain';
 export interface CustomMeshData {
     vertices: Float32Array;
     indices?: Uint16Array | Uint32Array;
@@ -25,6 +26,10 @@ export interface SerializedMeshComponent {
     meshData?: SerializedCustomMeshData;
     options?: PrimitiveOptions;
     materialAssetId?: string;
+    localAABB?: {
+        min: number[];
+        max: number[];
+    };
 }
 export declare class MeshComponent extends Component {
     static readonly type = "Mesh";
@@ -32,6 +37,7 @@ export declare class MeshComponent extends Component {
     meshData?: CustomMeshData;
     options: PrimitiveOptions;
     materialAssetId?: string;
+    localAABB?: AABB;
     getType(): string;
     clone(): MeshComponent;
     toJSON(): SerializedMeshComponent;

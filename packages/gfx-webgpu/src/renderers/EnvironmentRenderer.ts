@@ -3,6 +3,7 @@ import type { EnvironmentComponent } from '@engine/world';
 import { BrdfLutPass } from '../postprocess/BrdfLut';
 import { loadHdrFile, parseHdrFile } from '../resources/HdrLoader';
 import { createProceduralCloudyHdr } from '../textures/ProceduralSkyCubemap';
+import { VolumetricCloudPass, type VolumetricCloudParams } from './VolumetricCloudPass';
 
 /**
  * Skybox vertex shader - renders a full-screen quad at far plane
@@ -215,7 +216,8 @@ fn generateClouds(viewDir: vec3<f32>, cloudDensity: f32, cloudSpeed: f32, time: 
 `;
 
 /**
- * Procedural sky fragment shader with atmospheric scattering approximation and clouds
+ * Procedural sky fragment shader with atmospheric scattering approximation.
+ * Note: 2D clouds removed - volumetric clouds are rendered as a separate pass via VolumetricCloudPass.
  */
 const SKYBOX_PROCEDURAL_FRAGMENT_SHADER = /* wgsl */ `
 struct FragmentInput {
@@ -231,6 +233,8 @@ struct SkyboxParams {
   _pad2: f32,
   sunColor: vec3f,
   sunIntensity: f32,
+  // Cloud params kept for buffer compatibility but not used in main shader
+  // Volumetric clouds rendered separately via VolumetricCloudPass
   cloudsEnabled: f32,
   cloudDensity: f32,
   cloudSpeed: f32,
@@ -240,25 +244,164 @@ struct SkyboxParams {
 @group(1) @binding(0) var<uniform> params: SkyboxParams;
 
 ${ATMOSPHERIC_SCATTERING_FUNCTION}
-${CLOUD_NOISE_FUNCTION}
 
 @fragment
 fn fragmentMain(input: FragmentInput) -> @location(0) vec4f {
   let viewDir = normalize(input.viewDirection);
   let sunDir = normalize(params.sunDirection);
   
-  var color = atmosphericScattering(viewDir, sunDir, params.skyColor, params.horizonColor, params.sunColor, params.sunIntensity);
-  
-  // Add clouds if enabled
-  if (params.cloudsEnabled > 0.5) {
-    let cloudCoverage = generateClouds(viewDir, params.cloudDensity, params.cloudSpeed, params.cloudTime);
-    // Cloud color (slightly brighter than sky, with sun influence)
-    let cloudColor = mix(color * 1.1, params.sunColor * params.sunIntensity * 0.4 + color * 1.3, 0.55);
-    // Blend clouds with sky
-    color = mix(color, cloudColor, cloudCoverage * 0.85);
-  }
+  // Pure atmospheric scattering - volumetric clouds rendered in separate pass
+  let color = atmosphericScattering(viewDir, sunDir, params.skyColor, params.horizonColor, params.sunColor, params.sunIntensity);
   
   return vec4f(color, 1.0);
+}
+`;
+
+/**
+ * Physical Sky fragment shader with Rayleigh and Mie scattering
+ * Based on Preetham/Hosek-Wilkie sky model for realistic atmospheric rendering
+ */
+const SKYBOX_PHYSICAL_SKY_FRAGMENT_SHADER = /* wgsl */ `
+struct FragmentInput {
+  @location(0) viewDirection: vec3f,
+}
+
+struct PhysicalSkyParams {
+  sunDirection: vec3f,
+  rayleigh: f32,
+  sunColor: vec3f,
+  turbidity: f32,
+  mieCoefficient: f32,
+  mieDirectionalG: f32,
+  exposure: f32,
+  _pad0: f32,
+}
+
+@group(1) @binding(0) var<uniform> params: PhysicalSkyParams;
+
+// Physical constants
+const PI: f32 = 3.141592653589793;
+const E: f32 = 2.718281828459045;
+
+// Refractive index of air
+const n: f32 = 1.0003;
+// Number of molecules per unit volume at sea level
+const N: f32 = 2.545e25;
+// Depolarization factor for standard air
+const pn: f32 = 0.035;
+
+// Primary wavelengths in meters (RGB)
+const WAVELENGTH: vec3f = vec3f(680e-9, 550e-9, 450e-9);
+
+// Mie K factor
+const MIE_K: vec3f = vec3f(0.686, 0.678, 0.666);
+
+// Rayleigh zenith optical depth constants
+const RAYLEIGH_ZENITH: vec3f = vec3f(8.4e3, 1.25e4, 2.1e4);
+
+// Calculate Rayleigh scattering coefficient
+fn totalRayleigh(lambda: vec3f) -> vec3f {
+  let n2 = n * n - 1.0;
+  let num = 8.0 * pow(PI, 3.0) * n2 * n2 * (6.0 + 3.0 * pn);
+  let lambda4 = pow(lambda, vec3f(4.0));
+  let denom = 3.0 * N * lambda4 * (6.0 - 7.0 * pn);
+  return num / denom;
+}
+
+// Rayleigh phase function
+fn rayleighPhase(cosTheta: f32) -> f32 {
+  return (3.0 / (16.0 * PI)) * (1.0 + cosTheta * cosTheta);
+}
+
+// Calculate Mie scattering coefficient
+fn totalMie(lambda: vec3f, K: vec3f, T: f32) -> vec3f {
+  let c = 0.2 * T * 10e-18;
+  let lambda2 = pow((2.0 * PI) / lambda, vec3f(2.0));
+  return 0.434 * c * PI * lambda2 * K;
+}
+
+// Henyey-Greenstein phase function for Mie scattering
+fn hgPhase(cosTheta: f32, g: f32) -> f32 {
+  let g2 = g * g;
+  let num = 1.0 - g2;
+  let denom = pow(1.0 + g2 - 2.0 * g * cosTheta, 1.5);
+  return num / (4.0 * PI * denom);
+}
+
+// Optical depth for Rayleigh scattering
+fn rayleighOpticalDepth(zenithAngle: f32) -> vec3f {
+  // Approximate optical depth based on zenith angle
+  let secZ = 1.0 / max(cos(zenithAngle), 0.001);
+  return RAYLEIGH_ZENITH * secZ;
+}
+
+@fragment
+fn fragmentMain(input: FragmentInput) -> @location(0) vec4f {
+  let viewDir = normalize(input.viewDirection);
+  let sunDir = normalize(params.sunDirection);
+  
+  // Cosine of angle between view and sun
+  let cosTheta = dot(viewDir, sunDir);
+  
+  // Zenith angle (angle from vertical)
+  let zenithAngle = acos(max(viewDir.y, 0.0));
+  
+  // Sun zenith angle
+  let sunZenithAngle = acos(max(sunDir.y, 0.0));
+  
+  // Calculate scattering coefficients
+  let betaR = totalRayleigh(WAVELENGTH) * params.rayleigh;
+  let betaM = totalMie(WAVELENGTH, MIE_K, params.turbidity) * params.mieCoefficient;
+  
+  // Optical depth along view direction
+  let zenithFactor = 1.0 / max(viewDir.y + 0.15, 0.001);
+  let sunZenithFactor = 1.0 / max(sunDir.y + 0.15, 0.001);
+  
+  // Rayleigh extinction
+  let rayleighDepth = betaR * zenithFactor;
+  let mieDepth = betaM * zenithFactor;
+  
+  // Phase functions
+  let phaseR = rayleighPhase(cosTheta);
+  let phaseM = hgPhase(cosTheta, params.mieDirectionalG);
+  
+  // Atmospheric optical depth
+  let extinction = exp(-(rayleighDepth + mieDepth));
+  
+  // In-scattering (simplified)
+  let rayleighScatter = betaR * phaseR;
+  let mieScatter = betaM * phaseM;
+  
+  // Sun disk and halo
+  let sunDisk = smoothstep(0.9998, 0.99985, cosTheta) * 5.0;
+  let sunHalo = pow(max(cosTheta, 0.0), 256.0) * 2.0;
+  
+  // Calculate sky color
+  let inscatter = (rayleighScatter + mieScatter);
+  let fex = extinction;
+  
+  // Sky radiance
+  var skyColor = inscatter * (1.0 - fex);
+  
+  // Add sunlight contribution
+  let sunContrib = params.sunColor * (sunDisk + sunHalo) * extinction;
+  skyColor = skyColor + sunContrib;
+  
+  // Ground color (simple gradient below horizon)
+  if (viewDir.y < 0.0) {
+    let groundFactor = pow(-viewDir.y, 0.5);
+    let groundColor = vec3f(0.1, 0.1, 0.12);
+    let horizonColor = skyColor;
+    skyColor = mix(horizonColor, groundColor, groundFactor);
+  }
+  
+  // Tone mapping with exposure
+  let exposed = vec3f(1.0) - exp(-skyColor * params.exposure);
+  
+  // Gamma correction (sRGB)
+  let gammaOut = pow(exposed, vec3f(1.0 / 2.2));
+  
+  return vec4f(gammaOut, 1.0);
 }
 `;
 
@@ -304,6 +447,15 @@ export class EnvironmentRenderer {
   private pipelineDescriptorsCache: Map<string, GPURenderPipelineDescriptor> = new Map();
   // Cloud animation time
   private cloudTimeStart: number = 0;
+  
+  // Volumetric cloud pass
+  private volumetricCloudPass: VolumetricCloudPass | null = null;
+  private lastInverseViewProj: Mat4 | null = null;
+  private lastCameraPosition: Vec3 | null = null;
+  private presentationFormat: GPUTextureFormat = 'bgra8unorm';
+  
+  // Depth texture for cloud occlusion
+  private currentDepthTextureView: GPUTextureView | null = null;
 
   constructor() {
     this.device = null!; // Will be set in initialize
@@ -407,7 +559,13 @@ export class EnvironmentRenderer {
     await this.createPipeline('solid', SKYBOX_SOLID_FRAGMENT_SHADER, config.presentationFormat, sampleCount);
     await this.createPipeline('gradient', SKYBOX_GRADIENT_FRAGMENT_SHADER, config.presentationFormat, sampleCount);
     await this.createPipeline('procedural-sky', SKYBOX_PROCEDURAL_FRAGMENT_SHADER, config.presentationFormat, sampleCount);
+    await this.createPipeline('physical-sky', SKYBOX_PHYSICAL_SKY_FRAGMENT_SHADER, config.presentationFormat, sampleCount);
     await this.createCubemapPipeline(config.presentationFormat, sampleCount);
+
+    // Initialize volumetric cloud pass
+    this.presentationFormat = config.presentationFormat;
+    this.volumetricCloudPass = new VolumetricCloudPass();
+    await this.volumetricCloudPass.initialize(this.device, config.presentationFormat, sampleCount);
 
     this.initialized = true;
     try {
@@ -576,6 +734,10 @@ export class EnvironmentRenderer {
   updateUniforms(inverseViewProjection: Mat4, cameraPosition: Vec3): void {
     if (!this.initialized) return;
 
+    // Store for volumetric cloud pass
+    this.lastInverseViewProj = inverseViewProjection;
+    this.lastCameraPosition = cameraPosition;
+
     // Only update if dirty or first time
     if (!this.uniformsDirty) {
       this.uniformsDirty = true; // Mark for potential update
@@ -715,6 +877,37 @@ export class EnvironmentRenderer {
         break;
       }
 
+      case 'physical-sky': {
+        // PhysicalSkyParams struct layout:
+        // sunDirection: vec3f + rayleigh: f32 (16 bytes)
+        // sunColor: vec3f + turbidity: f32 (16 bytes)
+        // mieCoefficient: f32 + mieDirectionalG: f32 + exposure: f32 + _pad0: f32 (16 bytes)
+        const sunDirection = this.validateSunDirection(environment.sunDirection);
+        data[offset++] = sunDirection[0];
+        data[offset++] = sunDirection[1];
+        data[offset++] = sunDirection[2];
+        // Type assertion needed until @engine/world is rebuilt with new properties
+        const envWithPhysical = environment as typeof environment & {
+          rayleigh?: number;
+          turbidity?: number;
+          mieCoefficient?: number;
+          mieDirectionalG?: number;
+        };
+        data[offset++] = envWithPhysical.rayleigh ?? 2.0;
+        // sunColor + turbidity
+        const sunColor = this.validateColor(environment.sunColor, [1.0, 0.95, 0.8]);
+        data[offset++] = sunColor[0];
+        data[offset++] = sunColor[1];
+        data[offset++] = sunColor[2];
+        data[offset++] = envWithPhysical.turbidity ?? 4.0;
+        // mieCoefficient, mieDirectionalG, exposure, _pad0
+        data[offset++] = envWithPhysical.mieCoefficient ?? 0.005;
+        data[offset++] = envWithPhysical.mieDirectionalG ?? 0.8;
+        data[offset++] = environment.exposure ?? 1.0;
+        data[offset++] = 0; // padding
+        break;
+      }
+
       case 'cubemap': {
         if (!environment.cubemapTexture) {
           const fallback = this.getDefaultCubemap();
@@ -811,6 +1004,82 @@ export class EnvironmentRenderer {
     }
 
     passEncoder.draw(3, 1, 0, 0); // Full-screen triangle
+  }
+
+  /**
+   * Updates the depth texture used for cloud occlusion.
+   * Must be called before renderVolumetricClouds() when depth texture changes.
+   * 
+   * IMPORTANT: This must be a single-sampled (non-MSAA) depth texture view.
+   * For MSAA rendering, use a resolved depth texture. The depth texture must
+   * NOT be currently attached as a render target when sampling.
+   * 
+   * @param depthTextureView Single-sampled depth texture view for occlusion sampling
+   */
+  updateDepthTexture(depthTextureView: GPUTextureView): void {
+    if (!this.initialized) return;
+    this.currentDepthTextureView = depthTextureView;
+    
+    // Forward to volumetric cloud pass
+    if (this.volumetricCloudPass) {
+      this.volumetricCloudPass.updateDepthTexture(depthTextureView);
+    }
+  }
+
+  /**
+   * Renders volumetric clouds using raymarching.
+   * 
+   * IMPORTANT: This must be called in a SEPARATE render pass from the main scene pass.
+   * The depth texture (set via updateDepthTexture) cannot be sampled while it's attached
+   * as a render target. Ensure the main pass has ended before calling this method.
+   * 
+   * Note: updateDepthTexture() must be called before this with a resolved/single-sampled
+   * depth texture for proper occlusion.
+   * 
+   * @param passEncoder The render pass encoder (for a separate cloud pass, NOT the main pass)
+   * @param environment The environment component with cloud settings
+   * @param viewProjectionMatrix The VP matrix (NOT inverted - will be inverted internally)
+   * @param screenWidth Screen width in pixels (for depth sampling)
+   * @param screenHeight Screen height in pixels (for depth sampling)
+   */
+  renderVolumetricClouds(
+    passEncoder: GPURenderPassEncoder,
+    environment: EnvironmentComponent,
+    viewProjectionMatrix: Float32Array | Mat4,
+    screenWidth?: number,
+    screenHeight?: number
+  ): void {
+    if (!this.initialized || !this.volumetricCloudPass) return;
+    if (!environment.enabled || !environment.cloudsEnabled) return;
+    // Volumetric clouds work with procedural-sky and physical-sky
+    if (environment.skyboxType !== 'procedural-sky' && environment.skyboxType !== 'physical-sky') return;
+    if (!this.lastCameraPosition) return;
+
+    const cloudTime = (performance.now() / 1000.0) - this.cloudTimeStart;
+
+    // Note: cloudAltitude/cloudThickness are new properties added to EnvironmentComponent
+    // Type assertion needed until @engine/world is rebuilt
+    const env = environment as EnvironmentComponent & { cloudAltitude?: number; cloudThickness?: number };
+    
+    const params: VolumetricCloudParams = {
+      cloudAltitude: env.cloudAltitude ?? 800,
+      cloudThickness: env.cloudThickness ?? 400,
+      cloudDensity: environment.cloudDensity,
+      cloudSpeed: environment.cloudSpeed,
+      sunDirection: environment.sunDirection,
+      sunColor: environment.sunColor,
+      skyColor: environment.skyColor,
+      time: cloudTime,
+    };
+
+    this.volumetricCloudPass.render(
+      passEncoder,
+      viewProjectionMatrix,
+      this.lastCameraPosition,
+      params,
+      screenWidth ?? 1920,
+      screenHeight ?? 1080
+    );
   }
 
   /**
@@ -1329,13 +1598,15 @@ ${CLOUD_NOISE_FUNCTION}
     const faceBuffer = this.device.createBuffer({ label: 'ibl-face-ubo', size: 32, usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST });
     const faceLayout = (pipeline.getBindGroupLayout(1));
 
-    // Write cloud params with time=0 for static IBL capture
+    // Write cloud params for IBL capture
+    // IMPORTANT: Always disable clouds for IBL cubemap to prevent "clouds on ground" artifacts
+    // Volumetric clouds are rendered separately as a visual effect, not baked into lighting
     if (environment.skyboxType === 'procedural-sky') {
       const cloudParamsData = new Float32Array(4);
-      cloudParamsData[0] = environment.cloudsEnabled ? 1.0 : 0.0;
-      cloudParamsData[1] = Math.max(0, Math.min(1, environment.cloudDensity));
-      cloudParamsData[2] = Math.max(0, Math.min(1, environment.cloudSpeed));
-      cloudParamsData[3] = 0.0; // Static time for IBL
+      cloudParamsData[0] = 0.0; // ALWAYS disable clouds for IBL - they cause lighting artifacts
+      cloudParamsData[1] = 0.0;
+      cloudParamsData[2] = 0.0;
+      cloudParamsData[3] = 0.0;
       // Write to params buffer at offset 24 (after sunColor + sunIntensity)
       this.device.queue.writeBuffer(this.paramsBuffer, 24 * 4, cloudParamsData.buffer, cloudParamsData.byteOffset, cloudParamsData.byteLength);
     }
@@ -1387,5 +1658,45 @@ ${CLOUD_NOISE_FUNCTION}
    */
   getEnvCubeTexture(): GPUTexture | null {
     return this.envCube;
+  }
+
+  /**
+   * Cleanup GPU resources.
+   */
+  dispose(): void {
+    if (this.volumetricCloudPass) {
+      this.volumetricCloudPass.dispose();
+      this.volumetricCloudPass = null;
+    }
+    
+    if (this.uniformBuffer) {
+      this.uniformBuffer.destroy();
+    }
+    if (this.paramsBuffer) {
+      this.paramsBuffer.destroy();
+    }
+    if (this.brdfLut) {
+      this.brdfLut.destroy();
+      this.brdfLut = null;
+    }
+    if (this.envCube) {
+      this.envCube.destroy();
+      this.envCube = null;
+    }
+    
+    // Cleanup cached cubemaps
+    for (const texture of this.cubemapCache.values()) {
+      texture.destroy();
+    }
+    this.cubemapCache.clear();
+    
+    // Cleanup cached IBL
+    for (const entry of this.iblCache.values()) {
+      entry.brdfLut.destroy();
+      entry.envCube.destroy();
+    }
+    this.iblCache.clear();
+    
+    this.initialized = false;
   }
 }

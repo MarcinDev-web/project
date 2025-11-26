@@ -5,6 +5,7 @@ export type UserRole = 'user' | 'moderator' | 'admin' | 'root';
 export interface PublicUser {
     id: string;
     email: string;
+    username?: string;
     createdAt: number;
     role?: UserRole;
 }
@@ -20,6 +21,7 @@ export interface LoginRequest {
 }
 export interface RegisterRequest {
     email: string;
+    username: string;
     password: string;
 }
 //# sourceMappingURL=auth.d.ts.map

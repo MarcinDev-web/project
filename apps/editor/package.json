@@ -12,6 +12,7 @@
   "dependencies": {
     "@engine/brand": "workspace:*",
     "@engine/core": "workspace:*",
+    "@shared": "workspace:*",
     "@engine/world": "workspace:*",
     "@engine/gfx-webgpu": "workspace:*",
     "@engine/script": "workspace:*",

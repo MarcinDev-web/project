@@ -30,6 +30,14 @@ const NEW_DEFAULT_SUN_INTENSITY = 1.1;
 const NEW_DEFAULT_AMBIENT_INTENSITY = 0.35;
 const DEFAULT_CLOUD_DENSITY = 0.55;
 const DEFAULT_CLOUD_SPEED = 0.04;
+const DEFAULT_CLOUD_ALTITUDE = 800;
+const DEFAULT_CLOUD_THICKNESS = 400;
+
+// Physical sky (Rayleigh/Mie scattering) defaults
+const DEFAULT_RAYLEIGH = 2.0;
+const DEFAULT_TURBIDITY = 4.0;
+const DEFAULT_MIE_COEFFICIENT = 0.005;
+const DEFAULT_MIE_DIRECTIONAL_G = 0.8;
 
 // WebGPU types (available in browser/WebGPU environment)
 declare global {
@@ -39,8 +47,13 @@ declare global {
 
 /**
  * Types of skybox rendering supported
+ * - 'solid': Single color fill
+ * - 'gradient': Gradient from sky to horizon to ground
+ * - 'procedural-sky': Simple procedural sky with sun
+ * - 'physical-sky': Physically-based sky with Rayleigh/Mie scattering
+ * - 'cubemap': HDR/LDR cubemap texture
  */
-export type SkyboxType = 'solid' | 'gradient' | 'procedural-sky' | 'cubemap';
+export type SkyboxType = 'solid' | 'gradient' | 'procedural-sky' | 'physical-sky' | 'cubemap';
 
 /**
  * Fog modes for distance-based atmosphere
@@ -71,7 +84,14 @@ export interface EnvironmentComponentJSON {
   cloudsEnabled?: boolean;
   cloudDensity?: number;
   cloudSpeed?: number;
+  cloudAltitude?: number;
+  cloudThickness?: number;
   visualPreset?: VisualPreset;
+  // Physical sky (Rayleigh/Mie) parameters
+  rayleigh?: number;
+  turbidity?: number;
+  mieCoefficient?: number;
+  mieDirectionalG?: number;
 }
 
 /**
@@ -134,6 +154,26 @@ export class EnvironmentComponent extends Component {
 
   /** Cloud animation speed */
   cloudSpeed: number = DEFAULT_CLOUD_SPEED;
+
+  /** Cloud layer altitude in world units */
+  cloudAltitude: number = DEFAULT_CLOUD_ALTITUDE;
+
+  /** Cloud layer thickness in world units */
+  cloudThickness: number = DEFAULT_CLOUD_THICKNESS;
+
+  // ===== Physical sky (Rayleigh/Mie scattering) parameters =====
+
+  /** Rayleigh scattering coefficient (affects blue color intensity) */
+  rayleigh: number = DEFAULT_RAYLEIGH;
+
+  /** Atmospheric turbidity (haze/particles, affects Mie scattering) */
+  turbidity: number = DEFAULT_TURBIDITY;
+
+  /** Mie scattering coefficient (affects sun halo size) */
+  mieCoefficient: number = DEFAULT_MIE_COEFFICIENT;
+
+  /** Mie directional G parameter (affects sun halo shape, -1 to 1) */
+  mieDirectionalG: number = DEFAULT_MIE_DIRECTIONAL_G;
 
   /** Visual preset for rendering quality/features */
   private _visualPreset: VisualPreset | undefined;
@@ -383,6 +423,12 @@ export class EnvironmentComponent extends Component {
     clone.cloudsEnabled = this.cloudsEnabled;
     clone.cloudDensity = this.cloudDensity;
     clone.cloudSpeed = this.cloudSpeed;
+    clone.cloudAltitude = this.cloudAltitude;
+    clone.cloudThickness = this.cloudThickness;
+    clone.rayleigh = this.rayleigh;
+    clone.turbidity = this.turbidity;
+    clone.mieCoefficient = this.mieCoefficient;
+    clone.mieDirectionalG = this.mieDirectionalG;
     clone._visualPreset = this._visualPreset;
     return clone;
   }
@@ -407,6 +453,12 @@ export class EnvironmentComponent extends Component {
       cloudsEnabled: this.cloudsEnabled,
       cloudDensity: this.cloudDensity,
       cloudSpeed: this.cloudSpeed,
+      cloudAltitude: this.cloudAltitude,
+      cloudThickness: this.cloudThickness,
+      rayleigh: this.rayleigh,
+      turbidity: this.turbidity,
+      mieCoefficient: this.mieCoefficient,
+      mieDirectionalG: this.mieDirectionalG,
     };
 
     if (this._visualPreset !== undefined) {
@@ -451,6 +503,19 @@ export class EnvironmentComponent extends Component {
       this.cloudDensity = Math.max(0, Math.min(1, data.cloudDensity));
     if (typeof data.cloudSpeed === 'number')
       this.cloudSpeed = Math.max(0, Math.min(1, data.cloudSpeed));
+    if (typeof data.cloudAltitude === 'number')
+      this.cloudAltitude = Math.max(0, data.cloudAltitude);
+    if (typeof data.cloudThickness === 'number')
+      this.cloudThickness = Math.max(1, data.cloudThickness);
+    // Physical sky parameters
+    if (typeof data.rayleigh === 'number')
+      this.rayleigh = Math.max(0, Math.min(10, data.rayleigh));
+    if (typeof data.turbidity === 'number')
+      this.turbidity = Math.max(0, Math.min(20, data.turbidity));
+    if (typeof data.mieCoefficient === 'number')
+      this.mieCoefficient = Math.max(0, Math.min(0.1, data.mieCoefficient));
+    if (typeof data.mieDirectionalG === 'number')
+      this.mieDirectionalG = Math.max(-1, Math.min(1, data.mieDirectionalG));
     if (
       data.visualPreset === 'stylized-balanced' ||
       data.visualPreset === 'cinematic' ||

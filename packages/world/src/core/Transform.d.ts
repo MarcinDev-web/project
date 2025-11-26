@@ -73,6 +73,12 @@ export declare class Transform extends Component {
      */
     rotate(axis: Vec3, angle: number): void;
     /**
+     * Rotates the transform to look at a target position.
+     * @param target - Target position in world space
+     * @param up - Up vector (defaults to [0, 1, 0])
+     */
+    lookAt(target: Vec3, up?: Vec3): void;
+    /**
      * Sets rotation from Euler angles (radians) in XYZ order.
      */
     setEulerAngles(x: number, y: number, z: number): void;

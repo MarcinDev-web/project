@@ -1,0 +1,14 @@
+{
+  "extends": "../tsconfig.json",
+  "compilerOptions": {
+    "outDir": ".",
+    "rootDir": ".",
+    "composite": false,
+    "declaration": true,
+    "emitDeclarationOnly": false,
+    "noEmit": false,
+    "paths": {}
+  },
+  "include": ["types/**/*.ts", "config/**/*.ts", "validation/**/*.ts"],
+  "exclude": ["node_modules", "**/*.d.ts", "**/*.js"]
+}

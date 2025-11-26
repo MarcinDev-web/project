@@ -1,6 +1,5 @@
 import path from 'path';
 import fs from 'fs';
-import { fileURLToPath } from 'url';
 
 const pickPackagesRoot = (rootDir: string): string => {
 	const candidates = [

@@ -11,9 +11,15 @@ export default defineConfig(({ command }) => {
   
   // During build: externalize all @engine/* packages (use as external dependencies)
   // During dev: use source files for HMR
+  // @shared is always bundled (not externalized)
+  const sharedAlias = {
+    '@shared': resolvePath('../../shared'),
+  };
+  
   const alias: Record<string, string> = isBuild
-    ? {} // No aliases needed - packages will be externalized
+    ? sharedAlias // Only @shared alias needed - @engine packages will be externalized
     : {
+        ...sharedAlias,
         '@engine/core': '../../packages/core/src',
         '@engine/world/components': '../../packages/world/src/components',
         '@engine/world': '../../packages/world/src',

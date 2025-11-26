@@ -31,6 +31,13 @@ interface Size {
   height: number;
 }
 
+/**
+ * Number of frames to wait before destroying textures.
+ * This ensures all in-flight command buffers have completed.
+ * 3 frames provides safety margin for triple-buffered rendering.
+ */
+const DESTRUCTION_DELAY_FRAMES = 3;
+
 export class FrameTargetManager {
   private size: Size = { width: 0, height: 0 };
   private hdrColorTexture: GPUTexture | null = null;
@@ -60,6 +67,10 @@ export class FrameTargetManager {
   private activeEncoders: WeakMap<GPUCommandEncoder, Set<GPUTexture>> = new WeakMap();
   // Track all textures currently in use by any active encoder (for fast lookup)
   private texturesInUse: Set<GPUTexture> = new Set();
+  // Frame-based destruction queue: each entry is textures to destroy after N more frames
+  private frameDestructionQueue: GPUTexture[][] = [];
+  // Current frame counter for tracking
+  private frameCounter = 0;
 
   ensureTargets(
     ctx: FrameRenderContext,
@@ -75,6 +86,11 @@ export class FrameTargetManager {
       // Clear active encoders - they're from old device and invalid
       this.activeEncoders = new WeakMap();
       this.texturesInUse.clear();
+      // Move all queued textures to pendingDestroy for immediate cleanup
+      for (const batch of this.frameDestructionQueue) {
+        this.pendingDestroy.push(...batch);
+      }
+      this.frameDestructionQueue = [];
       // Destroy textures safely (only those not in use)
       this.flushImmediate();
       this.releaseHdrResources();
@@ -427,67 +443,93 @@ export class FrameTargetManager {
   }
 
   flush(queue: GPUQueue): void {
+    // Increment frame counter
+    this.frameCounter++;
+    
+    // Process frame destruction queue - destroy textures that have waited long enough
+    this.processFrameDestructionQueue(queue);
+    
     if (this.pendingDestroy.length === 0) {
       return;
     }
     
     // Filter out textures that are still in use by active encoders
-    const texturesToDestroy: GPUTexture[] = [];
+    const texturesToQueue: GPUTexture[] = [];
     const texturesStillInUse: GPUTexture[] = [];
     
     for (const texture of this.pendingDestroy) {
       if (this.isTextureInUse(texture)) {
         texturesStillInUse.push(texture);
       } else {
-        texturesToDestroy.push(texture);
+        texturesToQueue.push(texture);
       }
     }
     
     // Keep textures still in use for next flush
     this.pendingDestroy = texturesStillInUse;
     
+    if (texturesToQueue.length === 0) {
+      return;
+    }
+    
+    // Add textures to the frame-based destruction queue
+    // They will be destroyed after DESTRUCTION_DELAY_FRAMES more frames
+    this.frameDestructionQueue.push(texturesToQueue);
+  }
+  
+  /**
+   * Processes the frame destruction queue, destroying textures that have waited
+   * long enough (DESTRUCTION_DELAY_FRAMES frames).
+   */
+  private processFrameDestructionQueue(queue: GPUQueue): void {
+    // Only process if we have entries that are old enough
+    if (this.frameDestructionQueue.length <= DESTRUCTION_DELAY_FRAMES) {
+      return;
+    }
+    
+    // Take all entries that are ready for destruction (older than DESTRUCTION_DELAY_FRAMES)
+    const readyCount = this.frameDestructionQueue.length - DESTRUCTION_DELAY_FRAMES;
+    const textureBatches = this.frameDestructionQueue.splice(0, readyCount);
+    
+    // Flatten all texture batches into one array
+    const texturesToDestroy = textureBatches.flat();
+    
     if (texturesToDestroy.length === 0) {
       return;
     }
     
-    const destroyTextures = () => {
-      // Double-check textures aren't in use before destroying
-      const safeToDestroy: GPUTexture[] = [];
-      for (const texture of texturesToDestroy) {
-        if (!this.isTextureInUse(texture) && !this.destroyedTextures.has(texture)) {
-          safeToDestroy.push(texture);
-        } else if (this.isTextureInUse(texture)) {
-          // Texture became in use again - re-queue for next flush
-          this.pendingDestroy.push(texture);
-        }
-      }
-      
-      for (const texture of safeToDestroy) {
-        try {
-          this.destroyedTextures.add(texture);
-          texture.destroy();
-        } catch (err) {
-          // Texture might already be destroyed or device lost
-          // This is expected in some cases, so we just log and continue
-          Logger.warn('[FrameTargetManager] Failed to destroy texture during cleanup (may be already destroyed):', err);
-        }
-      }
-    };
-    
-    // Wait for GPU work to complete before destroying textures
-    // This ensures textures aren't destroyed while still referenced in command buffers
+    // Wait for GPU work to complete before destroying
     queue
       .onSubmittedWorkDone()
       .then(() => {
-        // Add delay to ensure all GPU work is truly complete
-        // This gives WebGPU time to finish processing command buffers
-        // Use longer delay (2 frames) to be safe with variable frame rates
-        setTimeout(destroyTextures, 32);
+        for (const texture of texturesToDestroy) {
+          // Final safety checks before destruction
+          if (this.isTextureInUse(texture)) {
+            // Texture is in use again - re-queue it
+            this.pendingDestroy.push(texture);
+            continue;
+          }
+          if (this.destroyedTextures.has(texture)) {
+            // Already destroyed
+            continue;
+          }
+          try {
+            this.destroyedTextures.add(texture);
+            texture.destroy();
+          } catch (err) {
+            // Texture might already be destroyed or device lost
+            Logger.warn('[FrameTargetManager] Failed to destroy texture during cleanup (may be already destroyed):', err);
+          }
+        }
       })
       .catch((err) => {
         Logger.warn('[FrameTargetManager] Failed to wait for GPU work completion during cleanup:', err);
-        // Use longer fallback delay to be safe
-        setTimeout(destroyTextures, 200);
+        // On error, re-queue textures for next attempt
+        for (const texture of texturesToDestroy) {
+          if (!this.destroyedTextures.has(texture) && !this.isTextureInUse(texture)) {
+            this.pendingDestroy.push(texture);
+          }
+        }
       });
   }
 
@@ -497,6 +539,13 @@ export class FrameTargetManager {
     this.releaseSsaoResources();
     this.releaseSsgiResources();
     this.queueDestroy(this.tonemapTexture);
+    
+    // Move all queued textures to pendingDestroy for immediate cleanup
+    for (const batch of this.frameDestructionQueue) {
+      this.pendingDestroy.push(...batch);
+    }
+    this.frameDestructionQueue = [];
+    
     this.flushImmediate();
     this.resolvedDepthTexture = null;
     this.resolvedDepthView = null;

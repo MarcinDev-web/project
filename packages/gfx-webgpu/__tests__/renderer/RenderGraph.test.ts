@@ -1,5 +1,16 @@
-import { describe, it, expect, vi, beforeEach } from 'vitest';
+import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest';
 import { RenderGraph, type RenderPassNode } from '../../src/renderer/RenderGraph';
+
+// Mock WebGPU constants that aren't available in test environment
+beforeAll(() => {
+  (globalThis as any).GPUTextureUsage = {
+    COPY_SRC: 0x01,
+    COPY_DST: 0x02,
+    TEXTURE_BINDING: 0x04,
+    STORAGE_BINDING: 0x08,
+    RENDER_ATTACHMENT: 0x10,
+  };
+});
 
 // Minimal GPU mocks to satisfy types during unit tests
 const createMockDevice = (): GPUDevice => {

@@ -58,6 +58,54 @@ describe('EnvironmentComponent', () => {
       component.skyboxType = 'cubemap';
       expect(component.skyboxType).toBe('cubemap');
     });
+
+    it('should support physical-sky type', () => {
+      component.skyboxType = 'physical-sky';
+      expect(component.skyboxType).toBe('physical-sky');
+    });
+  });
+
+  describe('Physical Sky Parameters (Rayleigh/Mie)', () => {
+    it('should initialize with default atmospheric values', () => {
+      expect(component.rayleigh).toBe(2.0);
+      expect(component.turbidity).toBe(4.0);
+      expect(component.mieCoefficient).toBe(0.005);
+      expect(component.mieDirectionalG).toBe(0.8);
+    });
+
+    it('should allow setting rayleigh coefficient', () => {
+      component.rayleigh = 3.5;
+      expect(component.rayleigh).toBe(3.5);
+    });
+
+    it('should allow setting turbidity', () => {
+      component.turbidity = 8.0;
+      expect(component.turbidity).toBe(8.0);
+    });
+
+    it('should allow setting mie coefficient', () => {
+      component.mieCoefficient = 0.01;
+      expect(component.mieCoefficient).toBe(0.01);
+    });
+
+    it('should allow setting mie directional G', () => {
+      component.mieDirectionalG = 0.5;
+      expect(component.mieDirectionalG).toBe(0.5);
+    });
+
+    it('should handle extreme rayleigh values', () => {
+      component.rayleigh = 0;
+      expect(component.rayleigh).toBe(0);
+      component.rayleigh = 10;
+      expect(component.rayleigh).toBe(10);
+    });
+
+    it('should handle mieDirectionalG range', () => {
+      component.mieDirectionalG = -1;
+      expect(component.mieDirectionalG).toBe(-1);
+      component.mieDirectionalG = 1;
+      expect(component.mieDirectionalG).toBe(1);
+    });
   });
 
   describe('Sun Direction Normalization', () => {
@@ -247,6 +295,22 @@ describe('EnvironmentComponent', () => {
       expect(json.fogFar).toBe(200.0);
       expect(json.fogDensity).toBe(0.04);
     });
+
+    it('should serialize physical sky parameters', () => {
+      component.skyboxType = 'physical-sky';
+      component.rayleigh = 3.0;
+      component.turbidity = 6.0;
+      component.mieCoefficient = 0.008;
+      component.mieDirectionalG = 0.6;
+
+      const json = component.toJSON();
+
+      expect(json.skyboxType).toBe('physical-sky');
+      expect(json.rayleigh).toBe(3.0);
+      expect(json.turbidity).toBe(6.0);
+      expect(json.mieCoefficient).toBe(0.008);
+      expect(json.mieDirectionalG).toBe(0.6);
+    });
   });
 
   describe('Deserialization', () => {
@@ -294,6 +358,40 @@ describe('EnvironmentComponent', () => {
 
       expect(component.skyColor).toEqual(originalColor); // Should remain unchanged
     });
+
+    it('should deserialize physical sky parameters', () => {
+      const data = {
+        skyboxType: 'physical-sky' as const,
+        rayleigh: 2.5,
+        turbidity: 5.0,
+        mieCoefficient: 0.006,
+        mieDirectionalG: 0.7,
+      };
+
+      component.fromJSON(data);
+
+      expect(component.skyboxType).toBe('physical-sky');
+      expect(component.rayleigh).toBe(2.5);
+      expect(component.turbidity).toBe(5.0);
+      expect(component.mieCoefficient).toBe(0.006);
+      expect(component.mieDirectionalG).toBe(0.7);
+    });
+
+    it('should clamp physical sky parameters from JSON', () => {
+      const data = {
+        rayleigh: 15.0, // Should clamp to 10
+        turbidity: 25.0, // Should clamp to 20
+        mieCoefficient: 0.2, // Should clamp to 0.1
+        mieDirectionalG: 2.0, // Should clamp to 1
+      };
+
+      component.fromJSON(data);
+
+      expect(component.rayleigh).toBe(10);
+      expect(component.turbidity).toBe(20);
+      expect(component.mieCoefficient).toBe(0.1);
+      expect(component.mieDirectionalG).toBe(1);
+    });
   });
 
   describe('Clone', () => {
@@ -332,6 +430,22 @@ describe('EnvironmentComponent', () => {
       expect(clone.sunDirection[0]).not.toBe(999);
       expect(clone.sunColor[1]).not.toBe(999);
       expect(clone.fogColor[2]).not.toBe(999);
+    });
+
+    it('should clone physical sky parameters', () => {
+      component.skyboxType = 'physical-sky';
+      component.rayleigh = 3.5;
+      component.turbidity = 7.0;
+      component.mieCoefficient = 0.009;
+      component.mieDirectionalG = 0.65;
+
+      const clone = component.clone();
+
+      expect(clone.skyboxType).toBe('physical-sky');
+      expect(clone.rayleigh).toBe(3.5);
+      expect(clone.turbidity).toBe(7.0);
+      expect(clone.mieCoefficient).toBe(0.009);
+      expect(clone.mieDirectionalG).toBe(0.65);
     });
   });
 

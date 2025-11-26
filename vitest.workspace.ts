@@ -1,11 +1,13 @@
 import { defineWorkspace } from 'vitest/config';
-import { resolve } from 'node:path';
+import { resolve, normalize } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import os from 'node:os';
 import wasm from 'vite-plugin-wasm';
 import { engineAliases } from './shared/config/aliases';
 
-const __dirname = resolve(fileURLToPath(import.meta.url), '..');
+// Normalize the root directory path to prevent Windows path aliasing issues
+// (e.g., "My Documents" vs "Documents" causing duplicate test discovery)
+const __dirname = normalize(resolve(fileURLToPath(import.meta.url), '..'));
 const sharedRoot = resolve(__dirname, 'shared');
 
 function getSuggestedThreadCount() {
@@ -21,6 +23,8 @@ const cpuCount = getSuggestedThreadCount();
 export default defineWorkspace([
   {
     plugins: [wasm()],
+    // Set root to normalized path to prevent Windows path aliasing issues
+    root: __dirname,
     resolve: {
       alias: {
         ...engineAliases(__dirname),
@@ -32,6 +36,8 @@ export default defineWorkspace([
     },
     test: {
       name: 'unit',
+      // Use normalized root to prevent duplicate test discovery on Windows
+      dir: __dirname,
       setupFiles: [
         './apps/editor/src/test/setup.ts',
         './packages/gfx-webgpu/__tests__/setup.ts',
@@ -70,7 +76,8 @@ export default defineWorkspace([
       },
       include: [
         'packages/**/*.test.ts',
-        'packages/**/*.spec.ts',
+        'packages/**/src/**/*.spec.ts',
+        'packages/**/__tests__/**/*.spec.ts',
         'apps/**/*.test.ts',
         'apps/**/*.spec.ts',
       ],
@@ -101,7 +108,6 @@ export default defineWorkspace([
         'apps/net-server/src/__tests__/**/*.test.ts',
         'packages/net/src/multiplayer/*.test.ts',
         'packages/stdlib/__tests__/**/*.test.ts',
-        'packages/gfx-webgpu/src/renderers/WaterRenderer.test.ts',
         'apps/editor/src/**/*Phase2*.test.ts',
         'apps/editor/src/**/*PlayMode*.test.ts',
         'apps/editor/src/**/*Unified*.test.ts',
@@ -112,7 +118,9 @@ export default defineWorkspace([
         'apps/editor/src/**/*Wasm*.test.ts',
         'apps/platform/src/**/*AvatarBuilder*.test.ts',
         'apps/player/src/**/*PlayerMode*.test.ts',
+        // Playwright E2E tests - these use @playwright/test and must NOT be run by vitest
         'packages/gfx-webgpu/tests/**/*.spec.ts',
+        '**/gfx-webgpu/tests/**',
         'apps/editor/src/editor/ui/__tests__/editor-gizmo.test.ts',
         'apps/**/?(*.){integration,interaction,ui}.spec.ts',
         'apps/**/__tests__/e2e/**',
@@ -215,8 +223,12 @@ export default defineWorkspace([
   },
   {
     plugins: [wasm()],
+    // Set root to normalized path to prevent Windows path aliasing issues
+    root: __dirname,
     test: {
       name: 'integration',
+      // Use normalized root to prevent duplicate test discovery on Windows
+      dir: __dirname,
       setupFiles: ['./apps/editor/src/test/setup.ts'],
       optimizeDeps: {
         // Force Vite to use source files instead of dist files for @engine/* packages
@@ -294,6 +306,8 @@ export default defineWorkspace([
         '**/.git/**',
         '**/coverage/**',
         '**/.bun/**',
+        // Playwright E2E tests - these use @playwright/test and must NOT be run by vitest
+        '**/gfx-webgpu/tests/**',
       ],
       environment: 'jsdom',
       // Integration tests need isolation

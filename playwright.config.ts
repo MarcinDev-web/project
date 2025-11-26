@@ -2,7 +2,11 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './',
-  testMatch: ['**/e2e/**/*.spec.ts'],
+  testMatch: [
+    '**/e2e/**/*.spec.ts',
+    // WebGPU Playwright E2E tests (compute, render, visual tests)
+    'packages/gfx-webgpu/tests/**/*.spec.ts',
+  ],
   timeout: 30_000,
   expect: {
     timeout: 5_000,

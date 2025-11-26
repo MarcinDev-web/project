@@ -1,7 +1,46 @@
-import { describe, it, expect, beforeEach, vi } from 'vitest';
-import { EnvironmentRenderer } from '@engine/gfx-webgpu';
+import { describe, it, expect, beforeEach, vi, beforeAll } from 'vitest';
+import { EnvironmentRenderer } from '../src/renderers/EnvironmentRenderer';
 import { EnvironmentComponent } from '@engine/world';
 import type { Mat4, Vec3 } from '@engine/core/math';
+
+// Mock WebGPU constants that aren't available in test environment
+beforeAll(() => {
+  (globalThis as any).GPUTextureUsage = {
+    COPY_SRC: 0x01,
+    COPY_DST: 0x02,
+    TEXTURE_BINDING: 0x04,
+    STORAGE_BINDING: 0x08,
+    RENDER_ATTACHMENT: 0x10,
+  };
+  (globalThis as any).GPUBufferUsage = {
+    MAP_READ: 0x0001,
+    MAP_WRITE: 0x0002,
+    COPY_SRC: 0x0004,
+    COPY_DST: 0x0008,
+    INDEX: 0x0010,
+    VERTEX: 0x0020,
+    UNIFORM: 0x0040,
+    STORAGE: 0x0080,
+    INDIRECT: 0x0100,
+    QUERY_RESOLVE: 0x0200,
+  };
+  (globalThis as any).GPUShaderStage = {
+    VERTEX: 0x1,
+    FRAGMENT: 0x2,
+    COMPUTE: 0x4,
+  };
+  (globalThis as any).GPUColorWrite = {
+    RED: 0x1,
+    GREEN: 0x2,
+    BLUE: 0x4,
+    ALPHA: 0x8,
+    ALL: 0xF,
+  };
+  (globalThis as any).GPUMapMode = {
+    READ: 0x0001,
+    WRITE: 0x0002,
+  };
+});
 
 // Helper to create device mock for IBL tests
 function createBasicDeviceMock() {
@@ -176,6 +215,28 @@ describe('EnvironmentRenderer', () => {
       }).not.toThrow();
     });
 
+    it('should accept physical-sky type', () => {
+      const environment = new EnvironmentComponent();
+      environment.skyboxType = 'physical-sky';
+
+      expect(() => {
+        renderer.updateParams(environment);
+      }).not.toThrow();
+    });
+
+    it('should handle physical-sky atmospheric parameters', () => {
+      const environment = new EnvironmentComponent();
+      environment.skyboxType = 'physical-sky';
+      environment.rayleigh = 3.0;
+      environment.turbidity = 6.0;
+      environment.mieCoefficient = 0.01;
+      environment.mieDirectionalG = 0.7;
+
+      expect(() => {
+        renderer.updateParams(environment);
+      }).not.toThrow();
+    });
+
     it('should handle disabled environment component', () => {
       const environment = new EnvironmentComponent();
       environment.enabled = false;
@@ -267,12 +328,14 @@ describe('EnvironmentRenderer', () => {
 
     it('should handle switching between skybox types', () => {
       const environment = new EnvironmentComponent();
-      const types: Array<'solid' | 'gradient' | 'procedural-sky'> = [
+      const types: Array<'solid' | 'gradient' | 'procedural-sky' | 'physical-sky'> = [
         'solid',
         'gradient',
         'procedural-sky',
+        'physical-sky',
         'gradient',
         'solid',
+        'physical-sky',
         'procedural-sky',
       ];
 
@@ -281,6 +344,48 @@ describe('EnvironmentRenderer', () => {
           environment.skyboxType = type;
           renderer.updateParams(environment);
         }
+      }).not.toThrow();
+    });
+  });
+
+  describe('Physical Sky Edge Cases', () => {
+    it('should handle zero rayleigh coefficient', () => {
+      const environment = new EnvironmentComponent();
+      environment.skyboxType = 'physical-sky';
+      environment.rayleigh = 0;
+
+      expect(() => {
+        renderer.updateParams(environment);
+      }).not.toThrow();
+    });
+
+    it('should handle high turbidity', () => {
+      const environment = new EnvironmentComponent();
+      environment.skyboxType = 'physical-sky';
+      environment.turbidity = 20.0;
+
+      expect(() => {
+        renderer.updateParams(environment);
+      }).not.toThrow();
+    });
+
+    it('should handle negative mieDirectionalG', () => {
+      const environment = new EnvironmentComponent();
+      environment.skyboxType = 'physical-sky';
+      environment.mieDirectionalG = -0.5;
+
+      expect(() => {
+        renderer.updateParams(environment);
+      }).not.toThrow();
+    });
+
+    it('should handle extreme mie coefficient', () => {
+      const environment = new EnvironmentComponent();
+      environment.skyboxType = 'physical-sky';
+      environment.mieCoefficient = 0.1;
+
+      expect(() => {
+        renderer.updateParams(environment);
       }).not.toThrow();
     });
   });

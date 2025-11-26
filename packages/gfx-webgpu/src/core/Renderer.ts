@@ -46,7 +46,7 @@ import { WaterRenderer } from '../renderers/WaterRenderer';
 import { CameraSystem } from './CameraSystem';
 import { UniformManager } from './UniformManager';
 import { FrameRenderer } from './FrameRenderer';
-import { createInstanceDataFromScene } from './InstanceManager';
+import { InstanceManager } from './InstanceManager';
 import { SDFTestHarness } from './SDFTestHarness';
 import { TextureCompressionManager } from '../textures/TextureCompressionManager';
 import type { CompressionFormat } from '../textures/TextureCompressionManager';
@@ -312,7 +312,6 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
   const MAX_DEVICE_RECREATION_ATTEMPTS = 3;
   let isRecreatingDevice = false;
   let currentTier = capabilities.tier;
-  let needsResourceRecreation = false;
 
   /**
    * Safely disposes GPU resources from frameResources.
@@ -654,14 +653,10 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       // Recreate all frame resources with the new device
       try {
         await recreateFrameResources(newDevice, newAdapter);
-        needsResourceRecreation = false; // Resources are now recreated
         Logger.info(`Device recreated successfully at Tier ${targetTier}`);
         statusEl.textContent = DEFAULT_STATUS_MESSAGE;
       } catch (resourceErr) {
         Logger.error('Failed to recreate frame resources after device recreation', resourceErr instanceof Error ? resourceErr : new Error(String(resourceErr)));
-        // If resource recreation fails, we still have a valid device but no resources
-        // The frame loop will skip rendering until resources are recreated
-        needsResourceRecreation = true;
         throw resourceErr;
       }
       
@@ -770,7 +765,8 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
 
     // Update geometry if scene is provided
     if (currentScene) {
-      const sceneData = createInstanceDataFromScene(currentScene);
+      const instanceManager = new InstanceManager();
+      const sceneData = instanceManager.buildFromScene(currentScene);
       geometry = {
         ...DEFAULT_GEOMETRY,
         ...sceneData,

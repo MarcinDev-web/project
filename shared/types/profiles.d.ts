@@ -24,4 +24,60 @@ export interface UpdateProfileRequest {
     displayName?: string;
     avatarLoadout?: AvatarLoadoutData;
 }
+/**
+ * Social statistics for a user profile
+ */
+export interface ProfileSocialStats {
+    friendsCount: number;
+    forumThreadsCount: number;
+    forumPostsCount: number;
+    marketplaceBuildsCount: number;
+    marketplaceLikesCount: number;
+    marketplaceDownloadsCount: number;
+    isFriend?: boolean;
+    friendshipStatus?: 'none' | 'pending' | 'accepted';
+    pendingRequestId?: string;
+    isPendingFromCurrentUser?: boolean;
+    blocksStats?: {
+        saved: number;
+        published: number;
+        totalUses: number;
+    };
+    avatarsStats?: {
+        savedPresets: number;
+        published: number;
+        totalDownloads: number;
+        totalLikes: number;
+    };
+    marketplaceStats?: {
+        buildsCount: number;
+        avatarsCount: number;
+        buildsLikes: number;
+        buildsDownloads: number;
+        avatarsLikes: number;
+        avatarsDownloads: number;
+    };
+}
+/**
+ * User forum activity data
+ */
+export interface UserForumActivity {
+    recentThreads: Array<{
+        id: string;
+        title: string;
+        categoryId: string;
+        categoryName?: string;
+        postCount: number;
+        createdAt: number;
+        lastPostAt: number;
+    }>;
+    recentPosts: Array<{
+        id: string;
+        threadId: string;
+        threadTitle: string;
+        content: string;
+        createdAt: number;
+        score?: number;
+    }>;
+}
 //# sourceMappingURL=profiles.d.ts.map

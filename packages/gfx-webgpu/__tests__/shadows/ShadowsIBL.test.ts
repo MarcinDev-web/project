@@ -1,10 +1,10 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { computeCascades } from '@engine/gfx-webgpu';
+import { computeCascades } from '../../src/shadows/ShadowCascades';
 import { mat4Identity, mat4Perspective, type Mat4, type Vec3 } from '@engine/core/math';
-import { ShadowPass } from '@engine/gfx-webgpu';
-import type { GeometryData } from '@engine/gfx-webgpu';
-import { BrdfLutPass } from '@engine/gfx-webgpu';
-import { EnvironmentRenderer } from '@engine/gfx-webgpu';
+import { ShadowPass } from '../../src/shadows/ShadowPass';
+import type { GeometryData } from '../../src/resources/resources';
+import { BrdfLutPass } from '../../src/postprocess/BrdfLut';
+import { EnvironmentRenderer } from '../../src/renderers/EnvironmentRenderer';
 import { EnvironmentComponent } from '@engine/world';
 
 // Initialize WebGPU polyfills for tests
@@ -18,11 +18,43 @@ if (typeof (globalThis as any).GPUTextureUsage === 'undefined') {
   } as const;
 }
 
+if (typeof (globalThis as any).GPUBufferUsage === 'undefined') {
+  (globalThis as any).GPUBufferUsage = {
+    MAP_READ: 0x0001,
+    MAP_WRITE: 0x0002,
+    COPY_SRC: 0x0004,
+    COPY_DST: 0x0008,
+    INDEX: 0x0010,
+    VERTEX: 0x0020,
+    UNIFORM: 0x0040,
+    STORAGE: 0x0080,
+    INDIRECT: 0x0100,
+    QUERY_RESOLVE: 0x0200,
+  } as const;
+}
+
 if (typeof (globalThis as any).GPUShaderStage === 'undefined') {
   (globalThis as any).GPUShaderStage = {
     VERTEX: 0x1,
     FRAGMENT: 0x2,
     COMPUTE: 0x4,
+  } as const;
+}
+
+if (typeof (globalThis as any).GPUColorWrite === 'undefined') {
+  (globalThis as any).GPUColorWrite = {
+    RED: 0x1,
+    GREEN: 0x2,
+    BLUE: 0x4,
+    ALPHA: 0x8,
+    ALL: 0xF,
+  } as const;
+}
+
+if (typeof (globalThis as any).GPUMapMode === 'undefined') {
+  (globalThis as any).GPUMapMode = {
+    READ: 0x0001,
+    WRITE: 0x0002,
   } as const;
 }
 

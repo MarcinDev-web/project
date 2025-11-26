@@ -25,7 +25,7 @@ export interface NormalizedIntentBatch {
   frames: IntentFrame[];
   droppedFrames: number;
   appliedProfile: string;
-  ipAddress?: string;
+  ipAddress?: string | undefined;
 }
 
 export interface IntentForwarder {
@@ -53,7 +53,7 @@ export interface EdgeInputGatewayConfig {
  */
 export class EdgeInputGateway {
   private readonly forwarder: IntentForwarder;
-  private readonly authenticator?: IntentAuthenticator;
+  private readonly authenticator?: IntentAuthenticator | undefined;
   private readonly deviceProfiles = new Map<string, ResolvedProfile>();
   private readonly defaultProfile: ResolvedProfile;
   private readonly maxBatchSize: number;

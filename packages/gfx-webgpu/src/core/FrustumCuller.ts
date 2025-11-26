@@ -338,25 +338,46 @@ export class FrustumCuller {
       maxX = mesh.localAABB.max[0];
       maxY = mesh.localAABB.max[1];
       maxZ = mesh.localAABB.max[2];
-    } else if (mesh && mesh.meshType === 'box' && mesh.options) {
-      // Infer bounds from mesh options if localAABB is missing
-      // Box primitives are centered at (0,0,0) by default
-      const w = (mesh.options.width ?? 1) / 2;
-      const h = (mesh.options.height ?? 1) / 2;
-      const d = (mesh.options.depth ?? 1) / 2;
-      minX = -w; minY = -h; minZ = -d;
-      maxX = w; maxY = h; maxZ = d;
-    } else if (mesh && mesh.meshType === 'cube' && mesh.options?.size) {
-       // Cube primitives
-       const sx = (mesh.options.size[0] ?? 1) / 2;
-       const sy = (mesh.options.size[1] ?? 1) / 2;
-       const sz = (mesh.options.size[2] ?? 1) / 2;
-       minX = -sx; minY = -sy; minZ = -sz;
-       maxX = sx; maxY = sy; maxZ = sz;
-    } else if (mesh && mesh.meshType === 'cube') {
-       // Default cube (1x1x1)
-       minX = -0.5; minY = -0.5; minZ = -0.5;
-       maxX = 0.5; maxY = 0.5; maxZ = 0.5;
+    } else if (mesh && (mesh.meshType === 'box' || mesh.meshType === 'cube') && mesh.options) {
+      // Handle both 'box' and 'cube' mesh types
+      // Support both size array format [w, h, d] and individual width/height/depth properties
+      let w = 1, h = 1, d = 1;
+      
+      if (mesh.options.size && Array.isArray(mesh.options.size)) {
+        // Size array format: [width, height, depth]
+        w = mesh.options.size[0] ?? 1;
+        h = mesh.options.size[1] ?? 1;
+        d = mesh.options.size[2] ?? 1;
+      } else {
+        // Individual property format (legacy/plane-style)
+        w = mesh.options.width ?? 1;
+        h = mesh.options.height ?? 1;
+        d = mesh.options.depth ?? 1;
+      }
+      
+      // Box/cube primitives are centered at (0,0,0)
+      const halfW = w / 2;
+      const halfH = h / 2;
+      const halfD = d / 2;
+      minX = -halfW; minY = -halfH; minZ = -halfD;
+      maxX = halfW; maxY = halfH; maxZ = halfD;
+    } else if (mesh && mesh.meshType === 'sphere' && mesh.options?.radius) {
+      // Sphere primitives
+      const r = mesh.options.radius;
+      minX = -r; minY = -r; minZ = -r;
+      maxX = r; maxY = r; maxZ = r;
+    } else if (mesh && mesh.meshType === 'cylinder' && mesh.options) {
+      // Cylinder primitives
+      const r = mesh.options.radius ?? 0.5;
+      const halfH = (mesh.options.height ?? 1) / 2;
+      minX = -r; minY = -halfH; minZ = -r;
+      maxX = r; maxY = halfH; maxZ = r;
+    } else if (mesh && mesh.meshType === 'plane' && mesh.options) {
+      // Plane primitives (flat, thin in Y)
+      const halfW = (mesh.options.width ?? 1) / 2;
+      const halfD = (mesh.options.depth ?? 1) / 2;
+      minX = -halfW; minY = -0.001; minZ = -halfD;
+      maxX = halfW; maxY = 0.001; maxZ = halfD;
     }
 
     // 8 corners of the local bounding box
