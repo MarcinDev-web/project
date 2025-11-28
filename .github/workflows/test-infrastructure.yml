@@ -69,7 +69,7 @@ jobs:
         run: pnpm vitest run --project unit --reporter=verbose --coverage
 
       - name: Upload coverage
-        uses: codecov/codecov-action@v4
+        uses: codecov/codecov-action@v5
         with:
           files: ./coverage/unit/lcov.info
           flags: unit-tests
