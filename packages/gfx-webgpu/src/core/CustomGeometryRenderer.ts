@@ -12,6 +12,15 @@ interface CustomGeometryParams {
   entities: CustomGeometryEntity[];
 }
 
+/**
+ * Per-entity instance buffer for custom geometry rendering.
+ * Each entity needs its own buffer to avoid data races during GPU command execution.
+ */
+interface EntityInstanceBuffer {
+  buffer: GPUBuffer;
+  lastUsedFrame: number;
+}
+
 export class CustomGeometryRenderer {
   /**
    * Interleaved scratch buffer (24 floats per instance):
@@ -24,6 +33,14 @@ export class CustomGeometryRenderer {
    * - materialId: f32 (1 float) at offset 23
    */
   private readonly interleavedScratch = new Float32Array(INSTANCE_STRIDE);
+  
+  /**
+   * Per-entity instance buffers to avoid data races.
+   * Key is entity ID, value is the GPU buffer for that entity's instance data.
+   */
+  private readonly entityInstanceBuffers = new Map<string, EntityInstanceBuffer>();
+  private frameCounter = 0;
+  private readonly maxUnusedFrames = 60; // Cleanup buffers unused for 60 frames
 
   constructor(private readonly geometryCache: GeometryCache) {}
 
@@ -32,6 +49,8 @@ export class CustomGeometryRenderer {
     if (!entities.length) {
       return;
     }
+    
+    this.frameCounter++;
 
     for (const { entity, meshComponent } of entities) {
       if (!entity.active) {
@@ -48,10 +67,13 @@ export class CustomGeometryRenderer {
         continue;
       }
 
+      // Get or create per-entity instance buffer
+      const instanceBuffer = this.getOrCreateEntityInstanceBuffer(device, entity.id);
+      
       const material = this.prepareMaterial(entity);
-      this.writeInstanceBuffers(device, geometryBuffers, entity, material);
+      this.writeInstanceData(device, instanceBuffer, entity, material);
 
-      this.bindGeometry(encoder, geometryBuffers);
+      this.bindGeometryWithEntityBuffer(encoder, geometryBuffers, instanceBuffer);
       encoder.setBindGroup(0, frameResources.uniformBindGroup);
       encoder.setBindGroup(1, frameResources.textureBindGroup);
 
@@ -67,6 +89,64 @@ export class CustomGeometryRenderer {
       encoder.setPipeline(frameResources.overlayPipeline);
       encoder.drawIndexed(geometryBuffers.indexCount, 1, 0, 0, 0);
     }
+    
+    // Periodic cleanup of unused buffers
+    if (this.frameCounter % 120 === 0) {
+      this.cleanupUnusedBuffers();
+    }
+  }
+  
+  /**
+   * Get or create a per-entity instance buffer.
+   */
+  private getOrCreateEntityInstanceBuffer(device: GPUDevice, entityId: string): GPUBuffer {
+    let entry = this.entityInstanceBuffers.get(entityId);
+    
+    if (!entry) {
+      // Create new buffer for this entity
+      const buffer = device.createBuffer({
+        size: INSTANCE_STRIDE * 4, // 24 floats * 4 bytes
+        usage: GPUBufferUsage.VERTEX | GPUBufferUsage.COPY_DST,
+        label: `CustomGeometry-Instance-${entityId}`,
+      });
+      entry = { buffer, lastUsedFrame: this.frameCounter };
+      this.entityInstanceBuffers.set(entityId, entry);
+    } else {
+      entry.lastUsedFrame = this.frameCounter;
+    }
+    
+    return entry.buffer;
+  }
+  
+  /**
+   * Clean up buffers that haven't been used for a while.
+   */
+  private cleanupUnusedBuffers(): void {
+    const cutoff = this.frameCounter - this.maxUnusedFrames;
+    for (const [entityId, entry] of this.entityInstanceBuffers.entries()) {
+      if (entry.lastUsedFrame < cutoff) {
+        try {
+          entry.buffer.destroy();
+        } catch {
+          // Ignore cleanup errors
+        }
+        this.entityInstanceBuffers.delete(entityId);
+      }
+    }
+  }
+  
+  /**
+   * Dispose all entity instance buffers.
+   */
+  dispose(): void {
+    for (const entry of this.entityInstanceBuffers.values()) {
+      try {
+        entry.buffer.destroy();
+      } catch {
+        // Ignore cleanup errors
+      }
+    }
+    this.entityInstanceBuffers.clear();
   }
 
   private prepareMaterial(entity: Entity): MaterialComponent | null {
@@ -88,15 +168,15 @@ export class CustomGeometryRenderer {
     return material;
   }
 
-  private writeInstanceBuffers(
+  /**
+   * Write instance data to the per-entity buffer.
+   */
+  private writeInstanceData(
     device: GPUDevice,
-    geometryBuffers: ReturnType<GeometryCache['getGeometryBuffers']>,
+    instanceBuffer: GPUBuffer,
     entity: Entity,
     material: MaterialComponent | null
   ): void {
-    if (!geometryBuffers) {
-      return;
-    }
     const position = entity.transform.getWorldPosition();
     const rotation = entity.transform.rotation;
     const scale = entity.transform.scale;
@@ -152,19 +232,23 @@ export class CustomGeometryRenderer {
     // materialId (1 float at offset 23)
     buf[23] = material?.materialId ?? 0;
 
-    // Write entire interleaved buffer in one call
-    device.queue.writeBuffer(geometryBuffers.instanceInterleavedBuffer, 0, buf);
+    // Write to per-entity instance buffer (not shared!)
+    device.queue.writeBuffer(instanceBuffer, 0, buf);
   }
 
-  private bindGeometry(
+  /**
+   * Bind geometry buffers with per-entity instance buffer.
+   */
+  private bindGeometryWithEntityBuffer(
     encoder: GPURenderPassEncoder,
-    geometryBuffers: ReturnType<GeometryCache['getGeometryBuffers']>
+    geometryBuffers: ReturnType<GeometryCache['getGeometryBuffers']>,
+    instanceBuffer: GPUBuffer
   ): void {
     if (!geometryBuffers) {
       return;
     }
     encoder.setVertexBuffer(0, geometryBuffers.vertexBuffer);
-    encoder.setVertexBuffer(1, geometryBuffers.instanceInterleavedBuffer);
+    encoder.setVertexBuffer(1, instanceBuffer); // Use per-entity buffer!
     encoder.setIndexBuffer(geometryBuffers.indexBuffer, 'uint16');
   }
 

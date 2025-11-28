@@ -777,6 +777,26 @@ export class FrameRenderer {
     try {
       return ctx.context.getCurrentTexture();
     } catch (err) {
+      // Check if the error is due to unconfigured context
+      const errorMessage = err instanceof Error ? err.message : String(err);
+      if (errorMessage.includes('not configured')) {
+        // Try to reconfigure the context and retry once
+        try {
+          Logger.info('[FrameRenderer] Context unconfigured, attempting reconfiguration...');
+          ctx.context.configure({
+            device: ctx.device,
+            format: ctx.presentationFormat,
+            alphaMode: 'opaque',
+          });
+          // Retry getting the texture
+          return ctx.context.getCurrentTexture();
+        } catch (reconfigureErr) {
+          this.recordError('swapChain');
+          Logger.warn('[FrameRenderer] Failed to reconfigure context:', reconfigureErr);
+          return null;
+        }
+      }
+      
       this.recordError('swapChain');
       Logger.warn('[FrameRenderer] Failed to get current swap chain texture:', err);
       return null;

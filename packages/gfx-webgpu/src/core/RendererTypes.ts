@@ -154,6 +154,11 @@ export interface RendererOptions {
   statusEl: HTMLElement;
   /** Function to get current orbit controls state */
   getOrbitState: () => OrbitControlsState;
+  /** 
+   * Target point for orbit camera to look at. Defaults to [0, 0, 0].
+   * For avatar preview, use [0, 1, 0] to center on the character.
+   */
+  orbitTarget?: [number, number, number];
   /** Initial geometry data (optional, defaults to simple cubes) */
   geometry?: GeometryData;
   /** Scene to render */

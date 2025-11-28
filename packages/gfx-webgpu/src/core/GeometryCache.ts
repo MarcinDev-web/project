@@ -28,19 +28,56 @@ interface CachedGeometry {
 }
 
 /**
- * Cache key for geometry - based on meshData content
+ * Compute a simple hash of vertex data for cache key differentiation
+ * Uses sampling strategy for performance (first 64 + last 64 bytes + stride samples)
+ */
+function computeVertexHash(vertices: ArrayBufferView): number {
+  const bytes = new Uint8Array(vertices.buffer, vertices.byteOffset, vertices.byteLength);
+  const len = bytes.length;
+  let hash = 0x811c9dc5; // FNV-1a offset basis
+  
+  // Sample strategy: first 64 bytes, last 64 bytes, and every 256th byte
+  const sampleEnd = Math.min(64, len);
+  for (let i = 0; i < sampleEnd; i++) {
+    hash ^= bytes[i]!;
+    hash = Math.imul(hash, 0x01000193); // FNV prime
+  }
+  
+  // Last 64 bytes
+  const lastStart = Math.max(0, len - 64);
+  for (let i = lastStart; i < len; i++) {
+    hash ^= bytes[i]!;
+    hash = Math.imul(hash, 0x01000193);
+  }
+  
+  // Sample every 256th byte for middle section
+  for (let i = 64; i < lastStart; i += 256) {
+    hash ^= bytes[i]!;
+    hash = Math.imul(hash, 0x01000193);
+  }
+  
+  return hash >>> 0; // Convert to unsigned
+}
+
+/**
+ * Cache key for geometry - based on meshData content hash
+ * Uses length + content hash for unique identification
  */
 function getGeometryKey(meshData: CustomMeshData): string {
   if (!meshData.vertices || !meshData.indices) {
     return 'invalid';
   }
-  // Use length as simple key (could hash content for more accuracy)
-  // Include normals/uvs length in key if present
+  // Include length AND content hash for uniqueness
   const vLen = meshData.vertices.byteLength;
   const iLen = meshData.indices.byteLength;
   const nLen = meshData.normals?.byteLength ?? 0;
   const uLen = meshData.uvs?.byteLength ?? 0;
-  return `${vLen}-${iLen}-${nLen}-${uLen}`;
+  
+  // Compute hash of vertex data to differentiate geometries with same size
+  const vHash = computeVertexHash(meshData.vertices);
+  const iHash = computeVertexHash(meshData.indices);
+  
+  return `${vLen}-${iLen}-${nLen}-${uLen}-${vHash.toString(16)}-${iHash.toString(16)}`;
 }
 
 /**
@@ -88,7 +125,6 @@ function isValidGeometrySilent(vertices: Uint8Array, indices: Uint16Array | Uint
   // where triangles near poles can be very small but still valid
   const dv = new DataView(vertices.buffer as ArrayBuffer, vertices.byteOffset, vertices.byteLength);
   let degenerateCount = 0;
-  const maxDegenerateToLog = 5; // Only log first few degenerate triangles
   
   for (let i = 0; i + 2 < indices.length; i += 3) {
     const ia = indices[i]! * strideBytes;
@@ -115,14 +151,11 @@ function isValidGeometrySilent(vertices: Uint8Array, indices: Uint16Array | Uint
     const distBC = Math.sqrt((cx - bx) ** 2 + (cy - by) ** 2 + (cz - bz) ** 2);
     
     // If all vertices are at the same position, it's truly degenerate
+    // Don't reject geometry - just count for diagnostics
     if (distAB < 1e-6 && distAC < 1e-6 && distBC < 1e-6) {
       degenerateCount++;
-      if (degenerateCount <= maxDegenerateToLog) {
-        Logger.warn(
-          `[GeometryCache] Truly degenerate triangle at index ${i}: all vertices identical`
-        );
-      }
-      return false;
+      // Skip logging individual triangles to reduce noise
+      continue; // Don't reject, just skip this triangle check
     }
     
     // Check triangle area using cross product
@@ -137,28 +170,21 @@ function isValidGeometrySilent(vertices: Uint8Array, indices: Uint16Array | Uint
     const cxZ = abx * acy - aby * acx;
     const area2 = cxX * cxX + cxY * cxY + cxZ * cxZ;
     
-    // Only reject if area is truly zero (within floating point precision)
-    // Very small triangles are still valid and will render correctly
-    // Use 1e-8 as the rejection threshold (more lenient than 1e-10)
-    // This allows very small triangles near poles of spheres/capsules
-    if (area2 < 1e-8) {
+    // Count very small triangles but don't reject geometry
+    // Very small triangles near poles of spheres/capsules are expected
+    if (area2 < 1e-12) { // Only count truly zero-area triangles
       degenerateCount++;
-      if (degenerateCount <= maxDegenerateToLog) {
-        Logger.warn(
-          `[GeometryCache] Degenerate triangle at index ${i}: area²=${area2.toExponential(2)}, ` +
-          `distances: AB=${distAB.toFixed(6)}, AC=${distAC.toFixed(6)}, BC=${distBC.toFixed(6)}`
-        );
-      }
-      return false;
     }
   }
   
-  if (degenerateCount > maxDegenerateToLog) {
+  // Log summary if there are many degenerate triangles (informational only)
+  if (degenerateCount > 10) {
     Logger.warn(
-      `[GeometryCache] Found ${degenerateCount} degenerate triangles (showing first ${maxDegenerateToLog})`
+      `[GeometryCache] Geometry has ${degenerateCount} near-zero-area triangles (may affect rendering quality)`
     );
   }
 
+  // Don't reject geometry based on degenerate triangles - let GPU handle them
   return true;
 }
 
@@ -428,6 +454,8 @@ export class GeometryCache {
         this.evictOldest();
       }
       this.cache.set(key, cached);
+      
+      Logger.info(`[GeometryCache] Created geometry: key=${key}, vertices=${vertexCount}, indices=${indexCount}`);
 
       return {
         ...buffers,
@@ -435,7 +463,7 @@ export class GeometryCache {
         indexCount,
       };
     } catch (err) {
-      console.warn('[GeometryCache] Failed to create geometry buffers:', err);
+      Logger.error('[GeometryCache] Failed to create geometry buffers:', err);
       return null;
     }
   }

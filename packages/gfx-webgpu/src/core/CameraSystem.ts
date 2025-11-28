@@ -44,12 +44,19 @@ export class CameraSystem {
   /**
    * Updates camera matrices from entity camera or orbit controls.
    * Internal state is updated; use getters to retrieve matrices.
+   * 
+   * @param cameraEntity - Optional camera entity to use
+   * @param scene - Scene containing primary camera fallback
+   * @param getOrbitState - Function returning orbit controls state
+   * @param aspect - Viewport aspect ratio
+   * @param orbitTarget - Target point for orbit camera (defaults to [0, 0, 0])
    */
   updateCamera(
     cameraEntity: Entity | null,
     scene: Scene | null,
     getOrbitState: () => OrbitControlsState,
-    aspect: number
+    aspect: number,
+    orbitTarget: [number, number, number] = [0, 0, 0]
   ): void {
     const camera = cameraEntity ?? scene?.primaryCamera ?? null;
     const cameraComponent = camera?.getComponent(CameraComponent) ?? null;
@@ -72,11 +79,12 @@ export class CameraSystem {
       const actualYaw = yaw;
       const actualPitch = pitch;
       
-      this.eyePosition[0] = Math.cos(actualPitch) * Math.sin(actualYaw) * distance;
-      this.eyePosition[1] = Math.sin(actualPitch) * distance;
-      this.eyePosition[2] = Math.cos(actualPitch) * Math.cos(actualYaw) * distance;
+      // Calculate eye position relative to target (not origin)
+      this.eyePosition[0] = orbitTarget[0] + Math.cos(actualPitch) * Math.sin(actualYaw) * distance;
+      this.eyePosition[1] = orbitTarget[1] + Math.sin(actualPitch) * distance;
+      this.eyePosition[2] = orbitTarget[2] + Math.cos(actualPitch) * Math.cos(actualYaw) * distance;
 
-      mat4LookAt(this.viewMatrix, this.eyePosition as unknown as Vec3, [0, 0, 0], [0, 1, 0]);
+      mat4LookAt(this.viewMatrix, this.eyePosition as unknown as Vec3, orbitTarget, [0, 1, 0]);
       mat4Multiply(this.viewProjectionMatrix, this.projectionMatrix, this.viewMatrix);
     }
   }

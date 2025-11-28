@@ -255,6 +255,9 @@ export class TerrainMeshGenerator {
   /**
    * Updates mesh data (for incremental updates during sculpting)
    * Only updates vertices and normals in specified region
+   * 
+   * Performance optimization: Uses incremental normal calculation that only
+   * processes the affected region + 1-ring neighborhood instead of entire mesh.
    */
   static updateRegion(
     meshData: TerrainMeshData,
@@ -297,14 +300,211 @@ export class TerrainMeshGenerator {
       }
     }
 
-    // Recalculate normals for affected region (simplified - recalc all)
+    // Recalculate normals for affected region only (incremental update)
     if (options.generateNormals !== false && meshData.normals.length > 0) {
-      TerrainMeshGenerator.calculateNormals(
+      TerrainMeshGenerator.calculateNormalsRegion(
         meshData.vertices,
         meshData.indices,
         meshData.normals,
-        meshData.vertexCount
+        effectiveResolution,
+        Math.floor(gridMinX / step),
+        Math.ceil(gridMaxX / step),
+        Math.floor(gridMinZ / step),
+        Math.ceil(gridMaxZ / step)
       );
+    }
+  }
+
+  /**
+   * Calculates normals for a specific region of a terrain grid (incremental update)
+   * 
+   * Optimized for terrain sculpting - only processes triangles touching the
+   * affected region and vertices in the region + 1-ring neighborhood.
+   * 
+   * @param vertices - All vertex positions
+   * @param indices - All triangle indices
+   * @param normals - Normals buffer (modified in-place)
+   * @param resolution - Grid resolution (vertices per side)
+   * @param minX - Minimum grid X coordinate of affected region
+   * @param maxX - Maximum grid X coordinate of affected region
+   * @param minZ - Minimum grid Z coordinate of affected region
+   * @param maxZ - Maximum grid Z coordinate of affected region
+   */
+  private static calculateNormalsRegion(
+    vertices: Float32Array,
+    indices: Uint16Array,
+    normals: Float32Array,
+    resolution: number,
+    minX: number,
+    maxX: number,
+    minZ: number,
+    maxZ: number
+  ): void {
+    // Clamp coordinates to valid range
+    const clampedMinX = Math.max(0, minX);
+    const clampedMaxX = Math.min(resolution - 1, maxX);
+    const clampedMinZ = Math.max(0, minZ);
+    const clampedMaxZ = Math.min(resolution - 1, maxZ);
+
+    // Try WASM first for incremental update
+    if (TerrainMeshGenerator.wasmProcessor) {
+      try {
+        TerrainMeshGenerator.wasmProcessor.computeNormalsRegionU16(
+          vertices,
+          indices,
+          normals,
+          resolution,
+          clampedMinX,
+          clampedMaxX,
+          clampedMinZ,
+          clampedMaxZ
+        );
+        return;
+      } catch (e) {
+        console.warn('WASM incremental normal calculation failed, falling back to JS', e);
+      }
+    }
+
+    // JavaScript fallback implementation
+    TerrainMeshGenerator.calculateNormalsRegionJS(
+      vertices,
+      normals,
+      resolution,
+      clampedMinX,
+      clampedMaxX,
+      clampedMinZ,
+      clampedMaxZ
+    );
+  }
+
+  /**
+   * JavaScript fallback for incremental normal calculation
+   */
+  private static calculateNormalsRegionJS(
+    vertices: Float32Array,
+    normals: Float32Array,
+    resolution: number,
+    minX: number,
+    maxX: number,
+    minZ: number,
+    maxZ: number
+  ): void {
+    // Expand region by 1 for neighbor influence
+    const expandedMinX = Math.max(0, minX - 1);
+    const expandedMaxX = Math.min(resolution - 1, maxX + 1);
+    const expandedMinZ = Math.max(0, minZ - 1);
+    const expandedMaxZ = Math.min(resolution - 1, maxZ + 1);
+
+    // Local accumulator for affected vertices
+    const regionWidth = expandedMaxX - expandedMinX + 1;
+    const regionHeight = expandedMaxZ - expandedMinZ + 1;
+    const localNormals = new Float32Array(regionWidth * regionHeight * 3);
+
+    // Helper to convert grid coords to vertex index
+    const gridToVertex = (x: number, z: number) => z * resolution + x;
+
+    // Helper to check if vertex is in expanded region
+    const inExpandedRegion = (x: number, z: number) =>
+      x >= expandedMinX && x <= expandedMaxX && z >= expandedMinZ && z <= expandedMaxZ;
+
+    // Helper to convert to local index
+    const toLocalIndex = (x: number, z: number) =>
+      ((z - expandedMinZ) * regionWidth + (x - expandedMinX)) * 3;
+
+    // Process quads that touch the affected region
+    const quadMinX = Math.max(0, expandedMinX - 1);
+    const quadMaxX = Math.min(resolution - 2, expandedMaxX);
+    const quadMinZ = Math.max(0, expandedMinZ - 1);
+    const quadMaxZ = Math.min(resolution - 2, expandedMaxZ);
+
+    for (let qz = quadMinZ; qz <= quadMaxZ; qz++) {
+      for (let qx = quadMinX; qx <= quadMaxX; qx++) {
+        // Quad vertices
+        const tl = gridToVertex(qx, qz);
+        const tr = gridToVertex(qx + 1, qz);
+        const bl = gridToVertex(qx, qz + 1);
+        const br = gridToVertex(qx + 1, qz + 1);
+
+        // Get positions
+        const pTl: Vec3 = [vertices[tl * 3]!, vertices[tl * 3 + 1]!, vertices[tl * 3 + 2]!];
+        const pTr: Vec3 = [vertices[tr * 3]!, vertices[tr * 3 + 1]!, vertices[tr * 3 + 2]!];
+        const pBl: Vec3 = [vertices[bl * 3]!, vertices[bl * 3 + 1]!, vertices[bl * 3 + 2]!];
+        const pBr: Vec3 = [vertices[br * 3]!, vertices[br * 3 + 1]!, vertices[br * 3 + 2]!];
+
+        // Triangle 1: tl, tr, bl
+        const edge1T1 = subVec3(pTr, pTl);
+        const edge2T1 = subVec3(pBl, pTl);
+        const normalT1 = crossVec3(edge1T1, edge2T1);
+
+        // Triangle 2: tr, br, bl
+        const edge1T2 = subVec3(pBr, pTr);
+        const edge2T2 = subVec3(pBl, pTr);
+        const normalT2 = crossVec3(edge1T2, edge2T2);
+
+        // Accumulate normals for Triangle 1
+        if (inExpandedRegion(qx, qz)) {
+          const idx = toLocalIndex(qx, qz);
+          localNormals[idx]! += normalT1[0];
+          localNormals[idx + 1]! += normalT1[1];
+          localNormals[idx + 2]! += normalT1[2];
+        }
+        if (inExpandedRegion(qx + 1, qz)) {
+          const idx = toLocalIndex(qx + 1, qz);
+          localNormals[idx]! += normalT1[0];
+          localNormals[idx + 1]! += normalT1[1];
+          localNormals[idx + 2]! += normalT1[2];
+        }
+        if (inExpandedRegion(qx, qz + 1)) {
+          const idx = toLocalIndex(qx, qz + 1);
+          localNormals[idx]! += normalT1[0];
+          localNormals[idx + 1]! += normalT1[1];
+          localNormals[idx + 2]! += normalT1[2];
+        }
+
+        // Accumulate normals for Triangle 2
+        if (inExpandedRegion(qx + 1, qz)) {
+          const idx = toLocalIndex(qx + 1, qz);
+          localNormals[idx]! += normalT2[0];
+          localNormals[idx + 1]! += normalT2[1];
+          localNormals[idx + 2]! += normalT2[2];
+        }
+        if (inExpandedRegion(qx + 1, qz + 1)) {
+          const idx = toLocalIndex(qx + 1, qz + 1);
+          localNormals[idx]! += normalT2[0];
+          localNormals[idx + 1]! += normalT2[1];
+          localNormals[idx + 2]! += normalT2[2];
+        }
+        if (inExpandedRegion(qx, qz + 1)) {
+          const idx = toLocalIndex(qx, qz + 1);
+          localNormals[idx]! += normalT2[0];
+          localNormals[idx + 1]! += normalT2[1];
+          localNormals[idx + 2]! += normalT2[2];
+        }
+      }
+    }
+
+    // Normalize and write back to the normals buffer
+    for (let z = expandedMinZ; z <= expandedMaxZ; z++) {
+      for (let x = expandedMinX; x <= expandedMaxX; x++) {
+        const localIdx = toLocalIndex(x, z);
+        const vertexIdx = gridToVertex(x, z);
+
+        const nx = localNormals[localIdx]!;
+        const ny = localNormals[localIdx + 1]!;
+        const nz = localNormals[localIdx + 2]!;
+
+        const length = Math.sqrt(nx * nx + ny * ny + nz * nz);
+        if (length > 0.0001) {
+          normals[vertexIdx * 3] = nx / length;
+          normals[vertexIdx * 3 + 1] = ny / length;
+          normals[vertexIdx * 3 + 2] = nz / length;
+        } else {
+          // Fallback to up vector
+          normals[vertexIdx * 3] = 0;
+          normals[vertexIdx * 3 + 1] = 1;
+          normals[vertexIdx * 3 + 2] = 0;
+        }
+      }
     }
   }
 }

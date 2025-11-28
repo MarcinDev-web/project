@@ -9,7 +9,8 @@
   },
   "include": ["src/**/*"],
   "references": [
-    { "path": "../core/tsconfig.build.json" }
+    { "path": "../core/tsconfig.build.json" },
+    { "path": "../asset-pipeline/tsconfig.json" }
   ]
 }
 

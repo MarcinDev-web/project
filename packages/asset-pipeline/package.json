@@ -19,6 +19,9 @@
     "test": "vitest run",
     "lint": "eslint src --max-warnings=0"
   },
+  "dependencies": {
+    "@engine/core": "workspace:*"
+  },
   "devDependencies": {
     "typescript": "^5.9.3",
     "vitest": "^2.1.3"

@@ -37,12 +37,13 @@ import { NotFoundPage } from './pages/NotFoundPage';
 import { ProtectedRoute, AdminRoute, ModeratorRoute } from './components/auth/ProtectedRoute';
 import { RouteErrorElement } from './components/shared/RouteErrorElement';
 
-export const router: ReturnType<typeof createBrowserRouter> = createBrowserRouter([
-  {
-    path: '/',
-    element: <HomePage />,
-    errorElement: <RouteErrorElement />,
-  },
+export const router: ReturnType<typeof createBrowserRouter> = createBrowserRouter(
+  [
+    {
+      path: '/',
+      element: <HomePage />,
+      errorElement: <RouteErrorElement />,
+    },
   {
     path: '/games',
     element: (
@@ -288,6 +289,13 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
     path: '*',
     element: <NotFoundPage />,
   },
-]);
+  ],
+  {
+    future: {
+      v7_startTransition: true,
+      v7_relativeSplatPath: true,
+    },
+  }
+);
 
 

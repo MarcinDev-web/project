@@ -39,6 +39,9 @@ export const AvatarViewport = memo(function AvatarViewport({
   const lastLoadoutRef = useRef<AvatarLoadout | undefined>(loadout);
 
   // Initialize WebGPU
+  // Use a ref to track the initializing core for proper cleanup in StrictMode
+  const initializingCoreRef = useRef<AvatarBuilderCore | null>(null);
+  
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -50,10 +53,14 @@ export const AvatarViewport = memo(function AvatarViewport({
         setIsInitializing(true);
         setError(null);
 
-        // Cleanup previous core
+        // Cleanup previous cores if they exist
         if (coreRef.current) {
           coreRef.current.dispose();
           coreRef.current = null;
+        }
+        if (initializingCoreRef.current) {
+          initializingCoreRef.current.dispose();
+          initializingCoreRef.current = null;
         }
 
         const core = new AvatarBuilderCore({
@@ -62,18 +69,32 @@ export const AvatarViewport = memo(function AvatarViewport({
           onLoadoutChange,
         });
 
-        coreRef.current = core;
+        // Track in ref for cleanup during async initialization
+        initializingCoreRef.current = core;
         await core.initialize();
 
+        // Only set the ref and update state if still mounted
+        // This prevents race conditions in React StrictMode
         if (mounted) {
+          coreRef.current = core;
+          initializingCoreRef.current = null; // Clear initializing ref
           setIsInitializing(false);
           onCoreReady?.(core);
+        } else {
+          // Component was unmounted during init - dispose the core
+          core.dispose();
+          initializingCoreRef.current = null;
         }
       } catch (err) {
         console.error('Failed to initialize Avatar Viewport:', err);
         if (mounted) {
           setError(err instanceof Error ? err.message : 'Failed to initialize');
           setIsInitializing(false);
+        }
+        // Cleanup on error
+        if (initializingCoreRef.current) {
+          initializingCoreRef.current.dispose();
+          initializingCoreRef.current = null;
         }
       }
     };
@@ -82,6 +103,12 @@ export const AvatarViewport = memo(function AvatarViewport({
 
     return () => {
       mounted = false;
+      // Dispose the initializing core if init was in progress
+      if (initializingCoreRef.current) {
+        initializingCoreRef.current.dispose();
+        initializingCoreRef.current = null;
+      }
+      // Dispose the ref core if initialization completed
       if (coreRef.current) {
         coreRef.current.dispose();
         coreRef.current = null;

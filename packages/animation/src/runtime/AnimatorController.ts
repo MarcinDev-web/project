@@ -53,6 +53,10 @@ export class AnimatorController {
     return s;
   }
 
+  getStateNames(): string[] {
+    return Array.from(this.states.keys());
+  }
+
   getTransitionsFrom(name: string): AnimatorTransition[] {
     return this.transitions.filter((t) => t.from === name);
   }

@@ -20,14 +20,14 @@ vi.mock('@engine/world', async () => {
     ...actual,
     Raycaster: class MockRaycaster {
       private lastEntities: Entity[] = [];
-      raycastClosest(ray: any, entities: Entity[]): { entity: Entity; position: [number, number, number]; normal: [number, number, number]; distance: number } | null {
+      raycastClosest(ray: any, entities: Entity[]): { entity: Entity; point: [number, number, number]; normal: [number, number, number]; distance: number } | null {
         this.lastEntities = entities;
         // Return first entity if any exists (simulates clicking on entity)
         if (entities.length > 0) {
           const entity = entities[0]!;
           return {
             entity,
-            position: [...entity.transform.position] as [number, number, number],
+            point: [...entity.transform.position] as [number, number, number],
             normal: [0, 1, 0],
             distance: 5,
           };
@@ -503,6 +503,7 @@ describe('BlockDragController', () => {
     (controller as any).dragState = {
       entity: child,
       originalPosition: [...child.transform.position],
+      originalWorldPosition: [...child.transform.position],
       originalRotation: [...child.transform.rotation],
       originalScale: [...child.transform.scale],
       originalColor: [...child.color],
@@ -510,6 +511,12 @@ describe('BlockDragController', () => {
       startMousePos: [0, 0],
       isPreview: true,
       canPlace: true,
+      createdOnDrag: false,
+      isFreeTransform: true,
+      dragPlaneNormal: [0, 1, 0],
+      dragStartPoint: [0, 0, 0],
+      heightOffset: 0,
+      rotationAngle: 0,
     };
     (controller as any).isDragging = true;
     child.userData.isPreview = true;

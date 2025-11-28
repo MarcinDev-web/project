@@ -1,6 +1,21 @@
-import init, { AnimationWorld } from '../pkg/animation.js';
+import init, { 
+  AnimationWorld,
+  batch_mat4_to_dual_quat,
+  batch_mat4_to_dual_quat_inplace,
+  DualQuaternionConverter,
+  batch_sample_pose,
+  blend_poses,
+} from '../pkg/animation.js';
 
-export { init, AnimationWorld };
+export { 
+  init, 
+  AnimationWorld,
+  batch_mat4_to_dual_quat,
+  batch_mat4_to_dual_quat_inplace,
+  DualQuaternionConverter,
+  batch_sample_pose,
+  blend_poses,
+};
 
 // Re-export types that might be needed
 export type { InitOutput } from '../pkg/animation.js';
@@ -80,4 +95,78 @@ export function getInstanceLocalTransforms(world: AnimationWorld, instanceId: nu
     rotations: rPtr ? new Float32Array(memory.buffer, rPtr, jointCount * 4) : null,
     scales: sPtr ? new Float32Array(memory.buffer, sPtr, jointCount * 3) : null,
   };
+}
+
+// ============================================================================
+// Dual Quaternion Conversion Helpers
+// ============================================================================
+
+/**
+ * Returns a view into the DualQuaternionConverter's output buffer.
+ * WARNING: This view is valid only until the WASM memory grows or the converter is used again.
+ * 
+ * @param converter - The DualQuaternionConverter instance
+ * @param jointCount - Number of joints to view (determines length)
+ * @returns Float32Array view into WASM memory
+ */
+export function getDualQuatConverterView(
+  converter: DualQuaternionConverter,
+  jointCount: number
+): Float32Array {
+  const memory = getWasmMemory();
+  const ptr = converter.get_output_ptr();
+  const len = jointCount * 8; // 8 floats per dual quaternion
+  return new Float32Array(memory.buffer, ptr, len);
+}
+
+/**
+ * Converts joint matrices to dual quaternions and uploads directly to GPU.
+ * This is the most efficient path: WASM conversion + zero-copy GPU upload.
+ * 
+ * @param converter - Persistent DualQuaternionConverter (reused across frames)
+ * @param queue - WebGPU queue
+ * @param targetBuffer - GPU buffer to write dual quaternions to
+ * @param matrices - Joint matrices as Float32Array (N×16 floats)
+ * @param jointCount - Number of joints
+ * @param dstOffset - Byte offset in target buffer (default 0)
+ */
+export function convertAndUploadDualQuatsToGPU(
+  converter: DualQuaternionConverter,
+  queue: GPUQueue,
+  targetBuffer: GPUBuffer,
+  matrices: Float32Array,
+  jointCount: number,
+  dstOffset = 0
+): void {
+  // Convert in WASM
+  converter.convert(matrices, jointCount);
+  
+  // Zero-copy upload from WASM linear memory
+  const memory = getWasmMemory();
+  const ptr = converter.get_output_ptr();
+  const byteLength = jointCount * 8 * 4; // 8 floats * 4 bytes
+  
+  queue.writeBuffer(
+    targetBuffer,
+    dstOffset,
+    memory.buffer,
+    ptr,
+    byteLength
+  );
+}
+
+/**
+ * Simple batch conversion without persistent state.
+ * Creates a new output array each call - use DualQuaternionConverter for hot paths.
+ * 
+ * @param matrices - Joint matrices as Float32Array (N×16 floats)
+ * @param jointCount - Number of joints
+ * @returns Float32Array of dual quaternions (N×8 floats)
+ */
+export function convertMatricesToDualQuats(
+  matrices: Float32Array,
+  jointCount: number
+): Float32Array {
+  // This allocates a new Vec in Rust and copies to JS
+  return batch_mat4_to_dual_quat(matrices, jointCount);
 }

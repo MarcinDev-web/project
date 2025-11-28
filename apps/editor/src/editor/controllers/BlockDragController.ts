@@ -210,6 +210,12 @@ export class BlockDragController implements InteractionTool {
 
   public onPointerDown(event: PointerEvent, ray: Ray): void {
     if (event.button !== 0) return;
+    
+    // Don't start drag in play mode
+    if (this.config.state.editorMode.value === 'play') return;
+    
+    // Don't start drag during placement mode
+    if (this.config.placementMode.isActive()) return;
 
     const entities = this.config.scene
       .getActiveEntities()

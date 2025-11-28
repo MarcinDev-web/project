@@ -1,0 +1,30 @@
+[package]
+name = "avatar-builder"
+version = "0.1.0"
+edition = "2021"
+description = "High-performance avatar mesh generation and skeleton system in Rust/WASM"
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+console_error_panic_hook = { version = "0.1", optional = true }
+# glam for fast math (SIMD-ready)
+glam = { version = "0.24", features = ["std"] }
+
+[features]
+default = []
+panic-hook = ["console_error_panic_hook"]
+# Enable when targeting SIMD-capable browsers
+simd = ["glam/core-simd"]
+
+[profile.release]
+opt-level = 3  # Max optimization for performance
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[profile.release.package."*"]
+opt-level = 3
+

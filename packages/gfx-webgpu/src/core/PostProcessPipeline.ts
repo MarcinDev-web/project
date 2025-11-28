@@ -289,51 +289,35 @@ export class PostProcessPipeline {
     }
     if (this.normalRenderPass && !this.normalRenderPass.isInitialized()) {
       if (!this.normalVertexLayouts) {
+        // Use the same interleaved vertex buffer layout as the main renderer
+        // This matches what NormalRenderPass.render() binds (2 buffers: vertex + interleaved instance)
+        const VERTEX_STRIDE = 24;
+        const INSTANCE_INTERLEAVED_STRIDE = 96;
         this.normalVertexLayouts = [
+          // Vertex buffer (position, normal, uv, AO) - Slot 0
           {
-            arrayStride: 24,
+            arrayStride: VERTEX_STRIDE,
             stepMode: 'vertex',
             attributes: [
-              { shaderLocation: 0, offset: 0, format: 'float32x3' },
-              { shaderLocation: 1, offset: 12, format: 'snorm8x4' },
-              { shaderLocation: 2, offset: 16, format: 'float16x2' },
-              { shaderLocation: 3, offset: 20, format: 'unorm8x4' },
+              { shaderLocation: 0, offset: 0, format: 'float32x3' },  // position
+              { shaderLocation: 1, offset: 12, format: 'snorm8x4' },  // normal
+              { shaderLocation: 2, offset: 16, format: 'float16x2' }, // uv
+              { shaderLocation: 3, offset: 20, format: 'unorm8x4' },  // AO
             ],
           },
+          // Single interleaved instance buffer (96 bytes per instance) - Slot 1
           {
-            arrayStride: 12,
+            arrayStride: INSTANCE_INTERLEAVED_STRIDE,
             stepMode: 'instance',
-            attributes: [{ shaderLocation: 4, offset: 0, format: 'float32x3' }],
-          },
-          {
-            arrayStride: 16,
-            stepMode: 'instance',
-            attributes: [{ shaderLocation: 5, offset: 0, format: 'float32x4' }],
-          },
-          {
-            arrayStride: 16,
-            stepMode: 'instance',
-            attributes: [{ shaderLocation: 6, offset: 0, format: 'float32x4' }],
-          },
-          {
-            arrayStride: 16,
-            stepMode: 'instance',
-            attributes: [{ shaderLocation: 7, offset: 0, format: 'float32x4' }],
-          },
-          {
-            arrayStride: 16,
-            stepMode: 'instance',
-            attributes: [{ shaderLocation: 8, offset: 0, format: 'float32x4' }],
-          },
-          {
-            arrayStride: 16,
-            stepMode: 'instance',
-            attributes: [{ shaderLocation: 9, offset: 0, format: 'float32x4' }],
-          },
-          {
-            arrayStride: 4,
-            stepMode: 'instance',
-            attributes: [{ shaderLocation: 10, offset: 0, format: 'float32' }],
+            attributes: [
+              { shaderLocation: 4, offset: 0, format: 'float32x3' },   // offset (12 bytes)
+              { shaderLocation: 5, offset: 12, format: 'float32x4' },  // colorScale (16 bytes)
+              { shaderLocation: 6, offset: 28, format: 'float32x4' },  // secondaryColor (16 bytes)
+              { shaderLocation: 7, offset: 44, format: 'float32x4' },  // emissiveColor (16 bytes)
+              { shaderLocation: 8, offset: 60, format: 'float32x4' },  // materialParams (16 bytes)
+              { shaderLocation: 9, offset: 76, format: 'float32x4' },  // rotation (16 bytes)
+              { shaderLocation: 10, offset: 92, format: 'float32' },   // materialId (4 bytes)
+            ],
           },
         ];
       }

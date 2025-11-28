@@ -65,6 +65,8 @@
       "@engine/test-utils/*": ["./packages/test-utils/src/*"],
       "@engine/wasm-collision": ["./packages/wasm-collision/src"],
       "@engine/wasm-collision/*": ["./packages/wasm-collision/src/*"],
+      "@engine/wasm-spatial": ["./packages/wasm-spatial/src"],
+      "@engine/wasm-spatial/*": ["./packages/wasm-spatial/src/*"],
       "@engine/microblocks": ["./packages/microblocks/src"],
       "@engine/microblocks/*": ["./packages/microblocks/src/*"],
       "@engine/voxel": ["./packages/voxel/src"],

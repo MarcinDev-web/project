@@ -135,6 +135,8 @@ export {
 // Physics (selective to avoid duplicates with systems)
 export { PhysicsWorld } from './physics/PhysicsWorld.js';
 export { Octree } from './physics/Octree.js';
+export { LooseOctree, type LooseOctreeConfig, type LooseOctreeEntry } from './physics/LooseOctree.js';
+export { DynamicBVH, type DynamicBVHConfig } from './physics/DynamicBVH.js';
 export type { AABB } from './physics/BoundingVolume.js';
 export * from './physics/PhysicsWorld.js';
 export * from './physics/PhysicsSystem.js';

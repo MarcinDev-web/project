@@ -249,6 +249,8 @@ export class AvatarBuilderCore {
             distance: state.distance,
           };
         },
+        // Target the center of the avatar (hips at Y=0.9, head at Y=1.8, center ≈ 1.0)
+        orbitTarget: [0, 1.0, 0],
         scene: this.scene,
         shouldSimulate: () => false, // No physics simulation needed
         onFrameUpdate: (deltaTime: number) => {
@@ -296,18 +298,32 @@ export class AvatarBuilderCore {
         
         let meshCount = 0;
         let meshWithDataCount = 0;
+        let defaultGeometryCount = 0;
+        // Mesh types that use default cube geometry (no meshData needed)
+        const DEFAULT_GEOMETRY_TYPES = ['cube', 'box', 'none', undefined];
+        
         root.traverse((entity) => {
           const meshComp = entity.getComponent?.(MeshComponent);
           if (meshComp) {
             meshCount++;
-            if (meshComp.meshData?.vertices && meshComp.meshData?.indices) {
+            const worldPos = entity.transform.getWorldPosition();
+            const hasData = meshComp.meshData?.vertices && meshComp.meshData?.indices;
+            
+            // Log each mesh entity with its position and data status
+            console.log(`[AvatarBuilderCore] Mesh: "${entity.name}" type=${meshComp.meshType} hasData=${hasData} pos=[${worldPos[0].toFixed(2)}, ${worldPos[1].toFixed(2)}, ${worldPos[2].toFixed(2)}] active=${entity.active}`);
+            
+            if (hasData) {
               meshWithDataCount++;
+              // Log mesh data sizes
+              console.log(`  -> vertices=${meshComp.meshData!.vertices.length} indices=${meshComp.meshData!.indices.length}`);
+            } else if (DEFAULT_GEOMETRY_TYPES.includes(meshComp.meshType)) {
+              defaultGeometryCount++;
             } else {
-              console.warn('[AvatarBuilderCore] Entity without meshData:', entity.name, 'meshType:', meshComp.meshType);
+              console.warn('[AvatarBuilderCore] Entity missing procedural meshData:', entity.name, 'meshType:', meshComp.meshType);
             }
           }
         });
-        console.log(`[AvatarBuilderCore] Mesh entities: ${meshCount}, with valid meshData: ${meshWithDataCount}`);
+        console.log(`[AvatarBuilderCore] Summary: ${meshCount} mesh entities, ${meshWithDataCount} procedural, ${defaultGeometryCount} default geometry`);
       }
     } catch (error) {
       // Provide more specific error messages with better formatting

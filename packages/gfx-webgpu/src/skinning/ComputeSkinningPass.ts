@@ -11,7 +11,7 @@
  * - Decouples animation from rendering pipeline
  */
 
-import { jointMatricesToDualQuats } from './DualQuaternion';
+import { DualQuaternionAccelerator } from './DualQuaternion';
 
 // Import shader code
 import skinningComputeShader from '../shaders/compute/skinning_compute.wgsl?raw';
@@ -63,9 +63,13 @@ export class ComputeSkinningPass {
   private jointDualQuatBuffer: GPUBuffer | null = null;
   private maxJointBufferSize = 0;
   
+  // Dual quaternion accelerator for zero-allocation conversion (hot path)
+  private dqAccelerator: DualQuaternionAccelerator;
+  
   constructor(device: GPUDevice, config: ComputeSkinningPassConfig) {
     this.device = device;
     this.config = config;
+    this.dqAccelerator = new DualQuaternionAccelerator(config.maxJoints);
     this.initialize();
   }
   
@@ -280,14 +284,13 @@ export class ComputeSkinningPass {
     );
     
     // Convert and upload dual quaternions if in DQS mode
+    // Uses WASM-accelerated zero-copy path when available
     if (this.config.mode === SkinningMode.DQS) {
-      const dualQuats = jointMatricesToDualQuats(jointMatrices, jointCount);
-      this.device.queue.writeBuffer(
+      this.dqAccelerator.uploadToGPU(
+        this.device.queue,
         this.jointDualQuatBuffer!,
-        0,
-        dualQuats.buffer,
-        dualQuats.byteOffset,
-        jointCount * 8 * 4
+        jointMatrices,
+        jointCount
       );
     }
     
@@ -362,12 +365,20 @@ export class ComputeSkinningPass {
     this.uniformBuffer?.destroy();
     this.jointMatrixBuffer?.destroy();
     this.jointDualQuatBuffer?.destroy();
+    this.dqAccelerator.dispose();
     
     this.uniformBuffer = null;
     this.jointMatrixBuffer = null;
     this.jointDualQuatBuffer = null;
     this.pipeline = null;
     this.bindGroupLayout = null;
+  }
+  
+  /**
+   * Returns whether WASM acceleration is active for dual quaternion conversion.
+   */
+  get isWasmAccelerated(): boolean {
+    return this.dqAccelerator.isWasmAccelerated;
   }
 }
 

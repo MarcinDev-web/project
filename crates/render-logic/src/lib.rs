@@ -116,6 +116,10 @@ pub fn get_ssgi_uniforms(config: &SSGIConfig) -> SSGIUniforms {
     SSGIUniforms { data }
 }
 
+/// Test world-space AABBs against frustum planes.
+/// planes: 24 floats (6 planes × 4 components: nx, ny, nz, d)
+/// aabbs: N×6 floats (minX, minY, minZ, maxX, maxY, maxZ)
+/// Returns: N bytes (1 = visible, 0 = culled)
 #[wasm_bindgen]
 pub fn cull_aabb_batch(planes: &[f32], aabbs: &[f32]) -> Vec<u8> {
     if planes.len() < 24 {
@@ -162,4 +166,319 @@ pub fn cull_aabb_batch(planes: &[f32], aabbs: &[f32]) -> Vec<u8> {
         results[i] = visible;
     }
     results
+}
+
+/// Transform local AABBs to world space using world matrices.
+/// Uses Arvo's method - O(18) ops per AABB instead of O(8×12) for corner transform.
+/// 
+/// world_matrices: N×16 floats (column-major 4x4 matrices)
+/// local_aabbs: N×6 floats (minX, minY, minZ, maxX, maxY, maxZ)
+/// Returns: N×6 floats (world-space AABBs)
+#[wasm_bindgen]
+pub fn batch_transform_aabbs(world_matrices: &[f32], local_aabbs: &[f32]) -> Vec<f32> {
+    let count = local_aabbs.len() / 6;
+    if world_matrices.len() < count * 16 {
+        return Vec::new();
+    }
+    
+    let mut out = vec![0.0f32; count * 6];
+    
+    for i in 0..count {
+        let m_base = i * 16;
+        let a_base = i * 6;
+        let o_base = i * 6;
+        
+        let min_x = local_aabbs[a_base];
+        let min_y = local_aabbs[a_base + 1];
+        let min_z = local_aabbs[a_base + 2];
+        let max_x = local_aabbs[a_base + 3];
+        let max_y = local_aabbs[a_base + 4];
+        let max_z = local_aabbs[a_base + 5];
+        
+        // Matrix elements (column-major)
+        let m00 = world_matrices[m_base];
+        let m01 = world_matrices[m_base + 1];
+        let m02 = world_matrices[m_base + 2];
+        let m10 = world_matrices[m_base + 4];
+        let m11 = world_matrices[m_base + 5];
+        let m12 = world_matrices[m_base + 6];
+        let m20 = world_matrices[m_base + 8];
+        let m21 = world_matrices[m_base + 9];
+        let m22 = world_matrices[m_base + 10];
+        let m30 = world_matrices[m_base + 12];
+        let m31 = world_matrices[m_base + 13];
+        let m32 = world_matrices[m_base + 14];
+        
+        // Arvo's method: compute world AABB without transforming 8 corners
+        // Start with translation
+        let mut w_min_x = m30;
+        let mut w_min_y = m31;
+        let mut w_min_z = m32;
+        let mut w_max_x = m30;
+        let mut w_max_y = m31;
+        let mut w_max_z = m32;
+        
+        // X axis contribution
+        let a = m00 * min_x;
+        let b = m00 * max_x;
+        w_min_x += a.min(b);
+        w_max_x += a.max(b);
+        
+        let a = m01 * min_x;
+        let b = m01 * max_x;
+        w_min_y += a.min(b);
+        w_max_y += a.max(b);
+        
+        let a = m02 * min_x;
+        let b = m02 * max_x;
+        w_min_z += a.min(b);
+        w_max_z += a.max(b);
+        
+        // Y axis contribution
+        let a = m10 * min_y;
+        let b = m10 * max_y;
+        w_min_x += a.min(b);
+        w_max_x += a.max(b);
+        
+        let a = m11 * min_y;
+        let b = m11 * max_y;
+        w_min_y += a.min(b);
+        w_max_y += a.max(b);
+        
+        let a = m12 * min_y;
+        let b = m12 * max_y;
+        w_min_z += a.min(b);
+        w_max_z += a.max(b);
+        
+        // Z axis contribution
+        let a = m20 * min_z;
+        let b = m20 * max_z;
+        w_min_x += a.min(b);
+        w_max_x += a.max(b);
+        
+        let a = m21 * min_z;
+        let b = m21 * max_z;
+        w_min_y += a.min(b);
+        w_max_y += a.max(b);
+        
+        let a = m22 * min_z;
+        let b = m22 * max_z;
+        w_min_z += a.min(b);
+        w_max_z += a.max(b);
+        
+        out[o_base] = w_min_x;
+        out[o_base + 1] = w_min_y;
+        out[o_base + 2] = w_min_z;
+        out[o_base + 3] = w_max_x;
+        out[o_base + 4] = w_max_y;
+        out[o_base + 5] = w_max_z;
+    }
+    
+    out
+}
+
+/// Combined transform + cull in one pass (most efficient).
+/// Transforms local AABBs to world space AND tests against frustum.
+/// 
+/// planes: 24 floats (6 planes × 4 components: nx, ny, nz, d)
+/// world_matrices: N×16 floats (column-major 4x4 matrices)
+/// local_aabbs: N×6 floats (minX, minY, minZ, maxX, maxY, maxZ)
+/// Returns: N bytes (1 = visible, 0 = culled)
+#[wasm_bindgen]
+pub fn batch_transform_and_cull_aabbs(
+    planes: &[f32],
+    world_matrices: &[f32],
+    local_aabbs: &[f32],
+) -> Vec<u8> {
+    if planes.len() < 24 {
+        return Vec::new();
+    }
+    
+    let count = local_aabbs.len() / 6;
+    if world_matrices.len() < count * 16 {
+        return Vec::new();
+    }
+    
+    let mut results = vec![0u8; count];
+    
+    for i in 0..count {
+        let m_base = i * 16;
+        let a_base = i * 6;
+        
+        let min_x = local_aabbs[a_base];
+        let min_y = local_aabbs[a_base + 1];
+        let min_z = local_aabbs[a_base + 2];
+        let max_x = local_aabbs[a_base + 3];
+        let max_y = local_aabbs[a_base + 4];
+        let max_z = local_aabbs[a_base + 5];
+        
+        // Matrix elements (column-major)
+        let m00 = world_matrices[m_base];
+        let m01 = world_matrices[m_base + 1];
+        let m02 = world_matrices[m_base + 2];
+        let m10 = world_matrices[m_base + 4];
+        let m11 = world_matrices[m_base + 5];
+        let m12 = world_matrices[m_base + 6];
+        let m20 = world_matrices[m_base + 8];
+        let m21 = world_matrices[m_base + 9];
+        let m22 = world_matrices[m_base + 10];
+        let m30 = world_matrices[m_base + 12];
+        let m31 = world_matrices[m_base + 13];
+        let m32 = world_matrices[m_base + 14];
+        
+        // Arvo's method for AABB transform
+        let mut w_min_x = m30;
+        let mut w_min_y = m31;
+        let mut w_min_z = m32;
+        let mut w_max_x = m30;
+        let mut w_max_y = m31;
+        let mut w_max_z = m32;
+        
+        // X axis
+        let a = m00 * min_x; let b = m00 * max_x;
+        w_min_x += a.min(b); w_max_x += a.max(b);
+        let a = m01 * min_x; let b = m01 * max_x;
+        w_min_y += a.min(b); w_max_y += a.max(b);
+        let a = m02 * min_x; let b = m02 * max_x;
+        w_min_z += a.min(b); w_max_z += a.max(b);
+        
+        // Y axis
+        let a = m10 * min_y; let b = m10 * max_y;
+        w_min_x += a.min(b); w_max_x += a.max(b);
+        let a = m11 * min_y; let b = m11 * max_y;
+        w_min_y += a.min(b); w_max_y += a.max(b);
+        let a = m12 * min_y; let b = m12 * max_y;
+        w_min_z += a.min(b); w_max_z += a.max(b);
+        
+        // Z axis
+        let a = m20 * min_z; let b = m20 * max_z;
+        w_min_x += a.min(b); w_max_x += a.max(b);
+        let a = m21 * min_z; let b = m21 * max_z;
+        w_min_y += a.min(b); w_max_y += a.max(b);
+        let a = m22 * min_z; let b = m22 * max_z;
+        w_min_z += a.min(b); w_max_z += a.max(b);
+        
+        // Frustum test
+        let mut visible = 1u8;
+        for p in 0..6 {
+            let p_base = p * 4;
+            let nx = planes[p_base];
+            let ny = planes[p_base + 1];
+            let nz = planes[p_base + 2];
+            let d = planes[p_base + 3];
+            
+            let px = if nx >= 0.0 { w_max_x } else { w_min_x };
+            let py = if ny >= 0.0 { w_max_y } else { w_min_y };
+            let pz = if nz >= 0.0 { w_max_z } else { w_min_z };
+            
+            if nx * px + ny * py + nz * pz + d < 0.0 {
+                visible = 0;
+                break;
+            }
+        }
+        results[i] = visible;
+    }
+    
+    results
+}
+
+/// Returns indices of visible entities after transform + cull.
+/// More efficient when expecting many culled entities (sparse result).
+/// 
+/// planes: 24 floats (6 planes × 4 components)
+/// world_matrices: N×16 floats
+/// local_aabbs: N×6 floats
+/// Returns: array of visible entity indices (u32)
+#[wasm_bindgen]
+pub fn batch_transform_cull_get_visible_indices(
+    planes: &[f32],
+    world_matrices: &[f32],
+    local_aabbs: &[f32],
+) -> Vec<u32> {
+    if planes.len() < 24 {
+        return Vec::new();
+    }
+    
+    let count = local_aabbs.len() / 6;
+    if world_matrices.len() < count * 16 {
+        return Vec::new();
+    }
+    
+    let mut visible_indices = Vec::with_capacity(count);
+    
+    for i in 0..count {
+        let m_base = i * 16;
+        let a_base = i * 6;
+        
+        let min_x = local_aabbs[a_base];
+        let min_y = local_aabbs[a_base + 1];
+        let min_z = local_aabbs[a_base + 2];
+        let max_x = local_aabbs[a_base + 3];
+        let max_y = local_aabbs[a_base + 4];
+        let max_z = local_aabbs[a_base + 5];
+        
+        let m00 = world_matrices[m_base];
+        let m01 = world_matrices[m_base + 1];
+        let m02 = world_matrices[m_base + 2];
+        let m10 = world_matrices[m_base + 4];
+        let m11 = world_matrices[m_base + 5];
+        let m12 = world_matrices[m_base + 6];
+        let m20 = world_matrices[m_base + 8];
+        let m21 = world_matrices[m_base + 9];
+        let m22 = world_matrices[m_base + 10];
+        let m30 = world_matrices[m_base + 12];
+        let m31 = world_matrices[m_base + 13];
+        let m32 = world_matrices[m_base + 14];
+        
+        // Arvo's AABB transform
+        let mut w_min_x = m30; let mut w_max_x = m30;
+        let mut w_min_y = m31; let mut w_max_y = m31;
+        let mut w_min_z = m32; let mut w_max_z = m32;
+        
+        let a = m00 * min_x; let b = m00 * max_x;
+        w_min_x += a.min(b); w_max_x += a.max(b);
+        let a = m01 * min_x; let b = m01 * max_x;
+        w_min_y += a.min(b); w_max_y += a.max(b);
+        let a = m02 * min_x; let b = m02 * max_x;
+        w_min_z += a.min(b); w_max_z += a.max(b);
+        
+        let a = m10 * min_y; let b = m10 * max_y;
+        w_min_x += a.min(b); w_max_x += a.max(b);
+        let a = m11 * min_y; let b = m11 * max_y;
+        w_min_y += a.min(b); w_max_y += a.max(b);
+        let a = m12 * min_y; let b = m12 * max_y;
+        w_min_z += a.min(b); w_max_z += a.max(b);
+        
+        let a = m20 * min_z; let b = m20 * max_z;
+        w_min_x += a.min(b); w_max_x += a.max(b);
+        let a = m21 * min_z; let b = m21 * max_z;
+        w_min_y += a.min(b); w_max_y += a.max(b);
+        let a = m22 * min_z; let b = m22 * max_z;
+        w_min_z += a.min(b); w_max_z += a.max(b);
+        
+        // Frustum test
+        let mut visible = true;
+        for p in 0..6 {
+            let p_base = p * 4;
+            let nx = planes[p_base];
+            let ny = planes[p_base + 1];
+            let nz = planes[p_base + 2];
+            let d = planes[p_base + 3];
+            
+            let px = if nx >= 0.0 { w_max_x } else { w_min_x };
+            let py = if ny >= 0.0 { w_max_y } else { w_min_y };
+            let pz = if nz >= 0.0 { w_max_z } else { w_min_z };
+            
+            if nx * px + ny * py + nz * pz + d < 0.0 {
+                visible = false;
+                break;
+            }
+        }
+        
+        if visible {
+            visible_indices.push(i as u32);
+        }
+    }
+    
+    visible_indices
 }

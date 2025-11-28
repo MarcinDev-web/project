@@ -518,11 +518,12 @@ describe('FPSRaycastCollision', () => {
       const forward: Vec3 = [0, 0, -1];
       collision.resolveEye(eye, eye, forward);
 
-      expect(physics.raycast).toHaveBeenCalledWith(
-        expect.any(Array),
-        expect.any(Array),
-        expect.objectContaining({ ignoreEntities: undefined })
-      );
+      // Verify raycast was called with options that don't include ignoreEntities
+      expect(physics.raycast).toHaveBeenCalled();
+      const lastCall = vi.mocked(physics.raycast).mock.calls[0];
+      const options = lastCall?.[2];
+      // When ignoreEntities is empty, it should not be passed at all
+      expect(options).not.toHaveProperty('ignoreEntities');
 
       collision.dispose();
     });

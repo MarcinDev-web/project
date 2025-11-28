@@ -156,6 +156,10 @@ export {
   jointMatricesToDualQuats,
   normalizeDualQuat,
   blendDualQuats,
+  initDualQuatWasm,
+  isDualQuatWasmReady,
+  clearDualQuatWasm,
+  DualQuaternionAccelerator,
   type DualQuaternion,
 } from './skinning/DualQuaternion';
 

@@ -7,8 +7,6 @@ import {
   type GamesSortOption,
   type GamesDiscoverResponse,
   type DiscoverCategorySection,
-  type DiscoverCuratedPick,
-  type FairnessSlot,
 } from '../api/games';
 
 type SortOption = GamesSortOption;
@@ -159,87 +157,6 @@ export function HomePage() {
             <div className="discover-error">{discoverError}</div>
           ) : discover ? (
             <>
-              {discover.featured.length > 0 && (
-                <section className="discover-hero">
-                  <div className="discover-hero__intro">
-                    <p>Discover new player-made worlds</p>
-                    <span>{discover.totalGames} published experiences</span>
-                  </div>
-                  <div className="discover-hero__cards">
-                    {discover.featured.slice(0, 3).map((game) => (
-                      <Link key={game.id} to={`/marketplace/${game.id}`} className="discover-hero-card">
-                        <div
-                          className="discover-hero-card__thumb"
-                          style={{ background: getGameGradient(game.id) }}
-                        >
-                          {game.thumbnailUrl ? (
-                            <img
-                              src={
-                                game.thumbnailUrl.startsWith('http') || game.thumbnailUrl.startsWith('/api')
-                                  ? game.thumbnailUrl
-                                  : `/api${game.thumbnailUrl}`
-                              }
-                              alt={game.title}
-                            />
-                          ) : (
-                            <span>{getGameEmoji(game.tags)}</span>
-                          )}
-                        </div>
-                        <div className="discover-hero-card__meta">
-                          <h3>{game.title}</h3>
-                          <p>{game.authorName || 'Unknown creator'}</p>
-                          <div className="discover-hero-card__stats">
-                            <span>❤️ {game.likes}</span>
-                            <span>👁 {game.downloads}</span>
-                          </div>
-                        </div>
-                      </Link>
-                    ))}
-                  </div>
-                </section>
-              )}
-
-              {discover.categories.length > 0 && (
-                <section className="discover-section">
-                  <div className="discover-section__header">
-                    <h2>Browse by category</h2>
-                    <span>Tap a card to filter the catalog</span>
-                  </div>
-                  <div className="discover-category-grid">
-                    {discover.categories.map((category) => (
-                      <article key={category.id} className="discover-category-card">
-                        <div className="discover-category-card__header">
-                          <span className="discover-category-card__icon">{category.icon}</span>
-                          <div>
-                            <h3>{category.title}</h3>
-                            <p>{category.tagline}</p>
-                          </div>
-                        </div>
-                        <div className="discover-category-card__games">
-                          {category.games.slice(0, 3).map((game) => (
-                            <button
-                              key={game.id}
-                              type="button"
-                              className="discover-chip"
-                              onClick={() => handleCategorySelect(category)}
-                            >
-                              {game.title}
-                            </button>
-                          ))}
-                        </div>
-                        <button
-                          type="button"
-                          className="discover-category-card__action"
-                          onClick={() => handleCategorySelect(category)}
-                        >
-                          Explore {category.title}
-                        </button>
-                      </article>
-                    ))}
-                  </div>
-                </section>
-              )}
-
               {discover.fresh.games.length > 0 && (
                 <section className="discover-section">
                   <div className="discover-section__header">
@@ -266,26 +183,6 @@ export function HomePage() {
               )}
 
 
-              {discover.fairness.slots.length > 0 && (
-                <section className="discover-section">
-                  <div className="discover-section__header">
-                    <h2>Long-tail spotlight</h2>
-                    <span>{discover.fairness.strategy}</span>
-                  </div>
-                  <div className="discover-longtail-grid">
-                    {discover.fairness.slots.slice(0, 5).map((slot: FairnessSlot) => (
-                      <Link key={slot.game.id} to={`/marketplace/${slot.game.id}`} className="discover-longtail-card">
-                        <div className="discover-longtail-card__rank">#{slot.slot}</div>
-                        <div className="discover-longtail-card__body">
-                          <strong>{slot.game.title}</strong>
-                          <span>{slot.reason}</span>
-                        </div>
-                        <div className="discover-longtail-card__boost">{slot.boostMultiplier.toFixed(2)}x</div>
-                      </Link>
-                    ))}
-                  </div>
-                </section>
-              )}
             </>
           ) : null}
         </section>

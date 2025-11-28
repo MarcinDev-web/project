@@ -23,7 +23,8 @@
   },
   "dependencies": {
     "@engine/core": "workspace:*",
-    "@engine/world": "workspace:*"
+    "@engine/world": "workspace:*",
+    "@engine/wasm-avatar-builder": "workspace:*"
   },
   "devDependencies": {
     "@vitest/coverage-v8": "2.1.9",

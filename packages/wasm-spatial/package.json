@@ -1,0 +1,35 @@
+{
+  "name": "@engine/wasm-spatial",
+  "version": "0.1.0",
+  "description": "High-performance spatial indexing (BVH, Loose Octree) in Rust/WASM",
+  "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "pkg"
+  ],
+  "scripts": {
+    "build:wasm": "wasm-pack build --target web --out-dir pkg",
+    "build:ts": "tsc",
+    "build": "npm run build:wasm && npm run build:ts",
+    "clean": "rimraf dist pkg target"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "typescript": "^5.0.0",
+    "rimraf": "^5.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "directory": "packages/wasm-spatial"
+  },
+  "license": "MIT"
+}
+

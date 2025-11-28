@@ -184,7 +184,7 @@ function createVertexBufferLayouts(): GPUVertexBufferLayout[] {
  * @returns Promise resolving to the Renderer interface
  */
 export async function initRenderer(options: RendererOptions): Promise<Renderer> {
-  const { canvas, statusEl, getOrbitState } = options;
+  const { canvas, statusEl, getOrbitState, orbitTarget = [0, 0, 0] } = options;
   const shouldSimulateFn = typeof options.shouldSimulate === 'function' ? options.shouldSimulate : () => true;
   const onFrameUpdateFn = options.onFrameUpdate;
   const currentScene = options.scene ?? null;
@@ -994,7 +994,8 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
         currentCameraEntity,
         currentScene,
         getOrbitState,
-        aspect
+        aspect,
+        orbitTarget
       );
       const viewProjectionMatrix = cameraSystem.getViewProjectionMatrix();
       const eyePos = cameraSystem.getEyePosition();
@@ -1091,6 +1092,12 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
     // Render frame (handles all rendering operations)
     // Calculate time for animations
     // currentTime already calculated above
+
+    // Final cleanup check - prevent rendering if cleanup started mid-frame
+    // This can happen in React StrictMode when components unmount during render
+    if (cleanedUp || renderAbortSignal.aborted) {
+      return;
+    }
 
     geometry = frameRenderer.renderFrame(
       {
@@ -1270,6 +1277,15 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       resourceManager.dispose();
     } catch (e) {
       Logger.warn('Renderer systems cleanup failed', e);
+    }
+
+    // Unconfigure the WebGPU canvas context LAST - this is critical for React StrictMode
+    // Without this, the canvas remains bound to the old context and re-initialization fails
+    // Must be called after all GPU resources are destroyed to avoid race conditions
+    try {
+      webgpuContext.unconfigure();
+    } catch (e) {
+      Logger.warn('WebGPU context unconfigure failed', e);
     }
   }
 

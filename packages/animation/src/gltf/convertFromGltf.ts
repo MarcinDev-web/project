@@ -28,7 +28,7 @@ export function convertFromGltf(
   const skin = gltf.skins[options?.skinIndex ?? 0]!;
   const jointNodeIndices = skin.joints;
   const jointCount = jointNodeIndices.length;
-  const joints: Joint[] = jointNodeIndices.map((ni) => ({
+  const joints: Joint[] = jointNodeIndices.map((ni: number) => ({
     name: gltf.nodes[ni]?.name ?? `joint_${ni}`,
   }));
 
@@ -40,7 +40,7 @@ export function convertFromGltf(
   }
   // Map node index -> joint index
   const nodeToJoint = new Map<number, number>();
-  jointNodeIndices.forEach((ni, idx) => nodeToJoint.set(ni, idx));
+  jointNodeIndices.forEach((ni: number, idx: number) => nodeToJoint.set(ni, idx));
   const parents = new Int16Array(jointCount).fill(-1);
   for (let j = 0; j < jointCount; j++) {
     const nodeIndex = jointNodeIndices[j]!;

@@ -1,7 +1,8 @@
 [package]
 name = "animation"
-version = "0.1.0"
+version = "0.2.0"
 edition = "2021"
+description = "High-performance animation sampling with WASM support"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
@@ -9,15 +10,21 @@ crate-type = ["cdylib", "rlib"]
 [dependencies]
 wasm-bindgen = "0.2"
 console_error_panic_hook = { version = "0.1", optional = true }
-glam = { version = "0.24", features = ["scalar-math"] }
+# Enable SIMD via std feature (auto-vectorization)
+glam = { version = "0.24", features = ["std"] }
 
 [features]
 default = []
 panic-hook = ["console_error_panic_hook"]
+# Enable when targeting SIMD-capable browsers
+simd = ["glam/core-simd"]
 
 [profile.release]
-opt-level = "z"
+opt-level = 3  # Max optimization for performance (was "z" for size)
 lto = true
 codegen-units = 1
 panic = "abort"
+
+[profile.release.package."*"]
+opt-level = 3
 

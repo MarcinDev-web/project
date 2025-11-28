@@ -127,9 +127,10 @@ describe('FrameResourceFactory', () => {
   });
 
   describe('createVertexBufferLayouts', () => {
-    it('returns correct number of buffer layouts', () => {
+    it('returns correct number of buffer layouts (vertex + interleaved instance)', () => {
       const layouts = createVertexBufferLayouts();
-      expect(layouts).toHaveLength(8);
+      // New interleaved layout: 1 vertex buffer + 1 interleaved instance buffer
+      expect(layouts).toHaveLength(2);
     });
 
     it('configures vertex buffer with correct stride', () => {
@@ -138,25 +139,37 @@ describe('FrameResourceFactory', () => {
       expect(layouts[0].stepMode).toBe('vertex');
     });
 
-    it('configures instance offset buffer correctly', () => {
+    it('configures vertex buffer attributes correctly', () => {
       const layouts = createVertexBufferLayouts();
-      expect(layouts[1].arrayStride).toBe(12); // INSTANCE_OFFSET_STRIDE
+      const vertexLayout = layouts[0];
+      expect(vertexLayout.attributes).toHaveLength(4);
+      // position, normal, uv, AO
+      expect(vertexLayout.attributes[0].shaderLocation).toBe(0);
+      expect(vertexLayout.attributes[1].shaderLocation).toBe(1);
+      expect(vertexLayout.attributes[2].shaderLocation).toBe(2);
+      expect(vertexLayout.attributes[3].shaderLocation).toBe(3);
+    });
+
+    it('configures interleaved instance buffer with 96-byte stride', () => {
+      const layouts = createVertexBufferLayouts();
+      // Interleaved instance buffer: 96 bytes per instance
+      expect(layouts[1].arrayStride).toBe(96);
       expect(layouts[1].stepMode).toBe('instance');
     });
 
-    it('configures all instance buffers with 16-byte stride', () => {
+    it('configures all instance attributes in interleaved buffer', () => {
       const layouts = createVertexBufferLayouts();
-      // Buffers 2-6 should be 16-byte stride (color, secondary, emissive, material, rotation)
-      for (let i = 2; i <= 6; i++) {
-        expect(layouts[i].arrayStride).toBe(16);
-        expect(layouts[i].stepMode).toBe('instance');
-      }
-    });
-
-    it('configures material ID buffer with 4-byte stride', () => {
-      const layouts = createVertexBufferLayouts();
-      expect(layouts[7].arrayStride).toBe(4);
-      expect(layouts[7].stepMode).toBe('instance');
+      const instanceLayout = layouts[1];
+      // Should have 7 attributes: offset, colorScale, secondaryColor, emissiveColor, materialParams, rotation, materialId
+      expect(instanceLayout.attributes).toHaveLength(7);
+      // Check shader locations 4-10
+      expect(instanceLayout.attributes[0].shaderLocation).toBe(4);  // offset
+      expect(instanceLayout.attributes[1].shaderLocation).toBe(5);  // colorScale
+      expect(instanceLayout.attributes[2].shaderLocation).toBe(6);  // secondaryColor
+      expect(instanceLayout.attributes[3].shaderLocation).toBe(7);  // emissiveColor
+      expect(instanceLayout.attributes[4].shaderLocation).toBe(8);  // materialParams
+      expect(instanceLayout.attributes[5].shaderLocation).toBe(9);  // rotation
+      expect(instanceLayout.attributes[6].shaderLocation).toBe(10); // materialId
     });
   });
 

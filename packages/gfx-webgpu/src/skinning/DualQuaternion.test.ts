@@ -1,9 +1,12 @@
-import { describe, it, expect } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import {
   mat4ToDualQuat,
   jointMatricesToDualQuats,
   normalizeDualQuat,
   blendDualQuats,
+  isDualQuatWasmReady,
+  clearDualQuatWasm,
+  DualQuaternionAccelerator,
   type DualQuaternion,
 } from './DualQuaternion';
 
@@ -179,6 +182,171 @@ describe('DualQuaternion', () => {
         result.real[3]! ** 2
       );
       expect(Math.abs(mag - 1)).toBeLessThan(0.001);
+    });
+  });
+
+  describe('WASM acceleration', () => {
+    beforeEach(() => {
+      // Ensure clean state before each test
+      clearDualQuatWasm();
+    });
+
+    afterEach(() => {
+      // Clean up after tests
+      clearDualQuatWasm();
+    });
+
+    it('reports WASM not ready when not initialized', () => {
+      expect(isDualQuatWasmReady()).toBe(false);
+    });
+
+    it('jointMatricesToDualQuats works without WASM (fallback)', () => {
+      const matrices = new Float32Array(32);
+      
+      // Identity for joint 0
+      matrices.set([
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1,
+      ], 0);
+      
+      // Translation for joint 1
+      matrices.set([
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        10, 0, 0, 1,
+      ], 16);
+      
+      const dqs = jointMatricesToDualQuats(matrices, 2);
+      
+      expect(dqs.length).toBe(16);
+      expect(Math.abs(dqs[3]! - 1)).toBeLessThan(0.001);
+      expect(Math.abs(dqs[12]! - 5)).toBeLessThan(0.001);
+    });
+  });
+
+  describe('DualQuaternionAccelerator', () => {
+    let accelerator: DualQuaternionAccelerator;
+
+    beforeEach(() => {
+      clearDualQuatWasm();
+      accelerator = new DualQuaternionAccelerator(64);
+    });
+
+    afterEach(() => {
+      accelerator.dispose();
+    });
+
+    it('creates accelerator without WASM', () => {
+      expect(accelerator.isWasmAccelerated).toBe(false);
+    });
+
+    it('converts identity matrix correctly', () => {
+      const matrices = new Float32Array([
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1,
+      ]);
+      
+      const result = accelerator.convert(matrices, 1);
+      
+      expect(result.length).toBe(8);
+      // Identity rotation: (0, 0, 0, 1)
+      expect(Math.abs(result[0]!)).toBeLessThan(0.001);
+      expect(Math.abs(result[1]!)).toBeLessThan(0.001);
+      expect(Math.abs(result[2]!)).toBeLessThan(0.001);
+      expect(Math.abs(result[3]! - 1)).toBeLessThan(0.001);
+      // No translation: dual = (0, 0, 0, 0)
+      expect(Math.abs(result[4]!)).toBeLessThan(0.001);
+      expect(Math.abs(result[5]!)).toBeLessThan(0.001);
+      expect(Math.abs(result[6]!)).toBeLessThan(0.001);
+      expect(Math.abs(result[7]!)).toBeLessThan(0.001);
+    });
+
+    it('converts translation matrix correctly', () => {
+      const matrices = new Float32Array([
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        10, 4, 2, 1, // translation (10, 4, 2)
+      ]);
+      
+      const result = accelerator.convert(matrices, 1);
+      
+      expect(result.length).toBe(8);
+      // dual.x = 0.5 * 10 = 5
+      expect(Math.abs(result[4]! - 5)).toBeLessThan(0.001);
+      // dual.y = 0.5 * 4 = 2
+      expect(Math.abs(result[5]! - 2)).toBeLessThan(0.001);
+      // dual.z = 0.5 * 2 = 1
+      expect(Math.abs(result[6]! - 1)).toBeLessThan(0.001);
+    });
+
+    it('handles multiple joints', () => {
+      const matrices = new Float32Array(48); // 3 joints
+      
+      // Joint 0: identity
+      matrices.set([
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 0, 0, 1,
+      ], 0);
+      
+      // Joint 1: translate by (6, 0, 0)
+      matrices.set([
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        6, 0, 0, 1,
+      ], 16);
+      
+      // Joint 2: translate by (0, 8, 0)
+      matrices.set([
+        1, 0, 0, 0,
+        0, 1, 0, 0,
+        0, 0, 1, 0,
+        0, 8, 0, 1,
+      ], 32);
+      
+      const result = accelerator.convert(matrices, 3);
+      
+      expect(result.length).toBe(24); // 3 joints * 8 floats
+      
+      // Joint 0: no translation
+      expect(Math.abs(result[4]!)).toBeLessThan(0.001);
+      
+      // Joint 1: dual.x = 3 (0.5 * 6)
+      expect(Math.abs(result[12]! - 3)).toBeLessThan(0.001);
+      
+      // Joint 2: dual.y = 4 (0.5 * 8)
+      expect(Math.abs(result[21]! - 4)).toBeLessThan(0.001);
+    });
+
+    it('auto-resizes for larger joint counts', () => {
+      // Start with small accelerator
+      const smallAccel = new DualQuaternionAccelerator(2);
+      
+      // Create matrices for 4 joints (more than initial capacity)
+      const matrices = new Float32Array(64);
+      for (let i = 0; i < 4; i++) {
+        matrices.set([
+          1, 0, 0, 0,
+          0, 1, 0, 0,
+          0, 0, 1, 0,
+          i * 2, 0, 0, 1,
+        ], i * 16);
+      }
+      
+      // Should auto-resize
+      const result = smallAccel.convert(matrices, 4);
+      
+      expect(result.length).toBe(32); // 4 joints * 8 floats
+      
+      smallAccel.dispose();
     });
   });
 });

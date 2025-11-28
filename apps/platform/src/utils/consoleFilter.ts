@@ -16,6 +16,33 @@ interface ConsoleFilterOptions {
     pattern: RegExp | string;
     description?: string;
   }>;
+  /** Deduplicate repeated messages within this time window (ms). 0 = disabled */
+  dedupeWindowMs?: number;
+}
+
+/**
+ * Track recent messages for deduplication (React StrictMode causes double logging)
+ */
+const recentMessages = new Map<string, number>();
+const DEDUPE_WINDOW_MS = 100; // 100ms window for deduplication
+
+function isDuplicateMessage(message: string): boolean {
+  const now = Date.now();
+  const lastTime = recentMessages.get(message);
+  
+  // Clean up old entries
+  for (const [msg, time] of recentMessages.entries()) {
+    if (now - time > DEDUPE_WINDOW_MS) {
+      recentMessages.delete(msg);
+    }
+  }
+  
+  if (lastTime && now - lastTime < DEDUPE_WINDOW_MS) {
+    return true;
+  }
+  
+  recentMessages.set(message, now);
+  return false;
 }
 
 /**
@@ -39,6 +66,18 @@ const DEFAULT_FILTERS: ConsoleFilterOptions['filters'] = [
     method: ['error'],
     pattern: /GET.*404.*Not Found/i,
     description: 'Network 404 errors',
+  },
+  // Filter React Router future flag warnings (already opted in)
+  {
+    method: ['warn'],
+    pattern: /React Router Future Flag Warning/i,
+    description: 'React Router v7 migration warnings (already handled)',
+  },
+  // Filter WebGPU powerPreference warnings (Chrome bug on Windows)
+  {
+    method: ['warn'],
+    pattern: /powerPreference option is currently ignored/i,
+    description: 'WebGPU Chrome bug on Windows (crbug.com/369219127)',
   },
 ];
 
@@ -100,6 +139,12 @@ function createFilteredConsole(
       // Check if this message should be filtered
       if (shouldFilter(message, method, options.filters)) {
         // Filtered - don't log
+        return;
+      }
+
+      // Check for duplicate messages (React StrictMode double-logging)
+      if (isDuplicateMessage(message)) {
+        // Skip duplicate log
         return;
       }
 
