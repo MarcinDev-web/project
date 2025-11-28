@@ -49,6 +49,7 @@ export interface EditorToolbarConfig {
   isCollaborating?: () => boolean;
   onEntityCreated?: (entity: Entity) => void;
   onEntityDeleted?: (entityId: string) => void;
+  onToggleModelForge?: () => void;
 }
 
 interface DropdownMenuItem {
@@ -595,6 +596,29 @@ export class EditorToolbar {
       this.config.state.buildMode.value = current === 'free' ? 'limited' : 'free';
     });
 
+    // Model Forge button
+    const modelForgeBtn = document.createElement('button');
+    modelForgeBtn.type = 'button';
+    modelForgeBtn.className = 'toolbar-v2-model-forge-btn';
+    modelForgeBtn.title = 'Model Forge - Build microblock models';
+    
+    const forgeIcon = createIcon('cube', 16);
+    const forgeText = document.createElement('span');
+    forgeText.textContent = 'Model Forge';
+    modelForgeBtn.appendChild(forgeIcon);
+    modelForgeBtn.appendChild(forgeText);
+
+    effect(() => {
+      const isActive = this.config.state.modelForgeActive.value;
+      modelForgeBtn.classList.toggle('active', isActive);
+      forgeText.textContent = isActive ? 'Exit Forge' : 'Model Forge';
+    });
+
+    modelForgeBtn.addEventListener('click', () => {
+      if (this.config.state.isSharedView.value) return;
+      this.config.onToggleModelForge?.();
+    });
+
     const cameraMenu = this.createCameraMenu();
 
     // Collaboration button
@@ -623,6 +647,7 @@ export class EditorToolbar {
 
     section.appendChild(modeBtn);
     section.appendChild(buildBtn);
+    section.appendChild(modelForgeBtn);
     section.appendChild(cameraMenu);
     section.appendChild(collaborationBtn);
     section.appendChild(settingsBtn);

@@ -17,6 +17,7 @@ import { EnvironmentComponent, type VisualPreset } from '@engine/world';
 import { Logger } from '@engine/core/utils';
 import { ScriptSystem, LogicCubeSystem } from '@engine/script';
 import { init as initWasmCollision, type CollisionWorld } from '@engine/wasm-collision';
+import { initializeWasmTextureProcessor } from '../resources/GPUAtlasMaterialBuilder';
 
 // ========== Internal Dependencies ==========
 import { updateCanvasSize, getTimestampPeriod } from './helpers';
@@ -47,9 +48,10 @@ import { CameraSystem } from './CameraSystem';
 import { UniformManager } from './UniformManager';
 import { FrameRenderer } from './FrameRenderer';
 import { InstanceManager } from './InstanceManager';
-import { SDFTestHarness } from './SDFTestHarness';
 import { TextureCompressionManager } from '../textures/TextureCompressionManager';
 import type { CompressionFormat } from '../textures/TextureCompressionManager';
+import { ResourceManager } from '../resources/ResourceManager';
+import { initializeMaterialLibrary } from '../materials/MaterialLibrary';
 
 // ========== Config ==========
 import {
@@ -135,54 +137,40 @@ function hasPreferredCanvasFormat(
 
 // Vertex buffer layout constants
 const VERTEX_STRIDE = 24;
-const INSTANCE_OFFSET_STRIDE = 12;
+const INSTANCE_INTERLEAVED_STRIDE = 96;
 
+/**
+ * Creates vertex buffer layouts for the render pipeline.
+ * Uses interleaved instance buffer for optimal GPU compaction.
+ * Layout matches FrameResourceFactory and FrameRenderer binding.
+ */
 function createVertexBufferLayouts(): GPUVertexBufferLayout[] {
   return [
+    // Vertex buffer (position, normal, uv, AO)
     {
       arrayStride: VERTEX_STRIDE,
       stepMode: 'vertex',
       attributes: [
-        { shaderLocation: 0, offset: 0, format: 'float32x3' }, // position
-        { shaderLocation: 1, offset: 12, format: 'snorm8x4' }, // normal
+        { shaderLocation: 0, offset: 0, format: 'float32x3' },  // position
+        { shaderLocation: 1, offset: 12, format: 'snorm8x4' },  // normal
         { shaderLocation: 2, offset: 16, format: 'float16x2' }, // uv
-        { shaderLocation: 3, offset: 20, format: 'unorm8x4' }, // AO (x), rest unused
+        { shaderLocation: 3, offset: 20, format: 'unorm8x4' },  // AO (x), rest unused
       ],
     },
+    // Single interleaved instance buffer (96 bytes per instance)
+    // Combines all instance attributes for single-pass GPU compaction
     {
-      arrayStride: INSTANCE_OFFSET_STRIDE,
+      arrayStride: INSTANCE_INTERLEAVED_STRIDE,
       stepMode: 'instance',
-      attributes: [{ shaderLocation: 4, offset: 0, format: 'float32x3' }],
-    },
-    {
-      arrayStride: 16,
-      stepMode: 'instance',
-      attributes: [{ shaderLocation: 5, offset: 0, format: 'float32x4' }],
-    },
-    {
-      arrayStride: 16,
-      stepMode: 'instance',
-      attributes: [{ shaderLocation: 6, offset: 0, format: 'float32x4' }],
-    },
-    {
-      arrayStride: 16,
-      stepMode: 'instance',
-      attributes: [{ shaderLocation: 7, offset: 0, format: 'float32x4' }],
-    },
-    {
-      arrayStride: 16,
-      stepMode: 'instance',
-      attributes: [{ shaderLocation: 8, offset: 0, format: 'float32x4' }],
-    },
-    {
-      arrayStride: 16,
-      stepMode: 'instance',
-      attributes: [{ shaderLocation: 9, offset: 0, format: 'float32x4' }],
-    },
-    {
-      arrayStride: 4,
-      stepMode: 'instance',
-      attributes: [{ shaderLocation: 10, offset: 0, format: 'float32' }],
+      attributes: [
+        { shaderLocation: 4, offset: 0, format: 'float32x3' },   // offset (12 bytes)
+        { shaderLocation: 5, offset: 12, format: 'float32x4' },  // colorScale (16 bytes)
+        { shaderLocation: 6, offset: 28, format: 'float32x4' },  // secondaryColor (16 bytes)
+        { shaderLocation: 7, offset: 44, format: 'float32x4' },  // emissiveColor (16 bytes)
+        { shaderLocation: 8, offset: 60, format: 'float32x4' },  // materialParams (16 bytes)
+        { shaderLocation: 9, offset: 76, format: 'float32x4' },  // rotation (16 bytes)
+        { shaderLocation: 10, offset: 92, format: 'float32' },   // materialId (4 bytes)
+      ],
     },
   ];
 }
@@ -215,6 +203,7 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
     enableScreenLOD: false,
     shadowQuality: (options.shadowQuality ?? 'med') as 'low' | 'med' | 'high' | 'ultra',
     enableComputePrepass: options.enableComputePrepass !== false,
+    enableAsyncCompute: options.enableAsyncCompute ?? false,
     msaaSampleCount: (options.msaaSampleCount ?? MSAA_SAMPLE_COUNT) as 1 | 2 | 4,
     enableOutlines: options.enableOutlines ?? false,
     outlineQuality: (options.outlineQuality ?? 'med') as 'low' | 'med',
@@ -256,6 +245,12 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
 
   // Initialize texture compression manager
   const textureCompressionManager = new TextureCompressionManager(capabilities);
+
+  // Initialize ResourceManager for centralized texture/material management
+  const resourceManager = options.resourceManager ?? new ResourceManager();
+  initializeMaterialLibrary(resourceManager.materials);
+  resourceManager.initialize(device);
+  Logger.info('[Renderer] ResourceManager initialized with', resourceManager.materials.count, 'materials');
 
   const {
     querySet: timestampQuerySet,
@@ -335,20 +330,8 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       safeDestroy(frameResources.uniformBuffer);
       safeDestroy(frameResources.vertexBuffer);
       safeDestroy(frameResources.indexBuffer);
-      safeDestroy(frameResources.instanceOffsetBuffer);
-      safeDestroy(frameResources.instanceOffsetStagingBuffer);
-      safeDestroy(frameResources.instanceColorScaleBuffer);
-      safeDestroy(frameResources.instanceColorScaleStagingBuffer);
-      safeDestroy(frameResources.instanceSecondaryColorBuffer);
-      safeDestroy(frameResources.instanceSecondaryColorStagingBuffer);
-      safeDestroy(frameResources.instanceEmissiveColorBuffer);
-      safeDestroy(frameResources.instanceEmissiveColorStagingBuffer);
-      safeDestroy(frameResources.instanceMaterialParamsBuffer);
-      safeDestroy(frameResources.instanceMaterialParamsStagingBuffer);
-      safeDestroy(frameResources.instanceRotationBuffer);
-      safeDestroy(frameResources.instanceRotationStagingBuffer);
-      safeDestroy(frameResources.instanceMaterialIdBuffer);
-      safeDestroy(frameResources.instanceMaterialIdStagingBuffer);
+      safeDestroy(frameResources.instanceInterleavedBuffer);
+      safeDestroy(frameResources.instanceInterleavedStagingBuffer);
       safeDestroy(frameResources.instanceBoundsBuffer);
       safeDestroy(frameResources.instanceIndirectArgsBuffer);
       safeDestroy(frameResources.sideTexture);
@@ -392,7 +375,7 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       // Recreate texture atlas
       const vertexBuffers = createVertexBufferLayouts();
       const { textureBindGroupLayout, textureBindGroup, atlasTexture, normalAtlasTexture, sampler, atlas, atlasMetaBuffer } =
-        createTextureAtlas(newDevice, undefined, 2048, 128);
+        createTextureAtlas(newDevice, undefined, 2048, 128, { useGPU: true });
 
       // Recreate pipelines
       const { renderPipeline, transparentPipeline, overlayPipeline } = await createPipelines(
@@ -755,7 +738,6 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
   let gridRenderer: GridRenderer | null = null;
   let environmentRenderer: EnvironmentRenderer | null = null;
   let waterRenderer: WaterRenderer | null = null;
-  let sdfHarness: SDFTestHarness | null = null;
 
   try {
     resizeObserver = new ResizeObserver(() => {
@@ -786,13 +768,23 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
     }
     const geometryBuffers = createGeometryBuffers(device, geometry);
 
+    // Initialize WASM texture processor for faster texture generation
+    try {
+      const wasmAvailable = await initializeWasmTextureProcessor();
+      if (wasmAvailable) {
+        Logger.info('[Renderer] WASM texture processor initialized - 25x faster texture generation');
+      }
+    } catch (e) {
+      Logger.warn('[Renderer] WASM texture processor not available, using GPU/CPU fallback');
+    }
+
     const uniformResources = createUniformResources(device, {
       bufferSize: UNIFORM_BUFFER_SIZE,
       dataLength: UNIFORM_DATA_LENGTH,
     });
     const vertexBuffers = createVertexBufferLayouts();
     const { textureBindGroupLayout, textureBindGroup, atlasTexture, normalAtlasTexture, sampler, atlas, atlasMetaBuffer } =
-      createTextureAtlas(device, undefined, 2048, 128);
+      createTextureAtlas(device, undefined, 2048, 128, { useGPU: true });
 
     const { renderPipeline, transparentPipeline, overlayPipeline } = await createPipelines(
       device,
@@ -958,15 +950,6 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       }
     }
 
-    // Initialize SDF Test Harness (lazy loaded on toggle, but harness instance created here)
-    sdfHarness = new SDFTestHarness(device, canvas, webgpuContext, presentationFormat);
-    
-    // Auto-enable SDF Demo if scene name matches
-    if (currentScene && currentScene.name === 'SDF Matter Simulator') {
-      Logger.info('Auto-enabling SDF Matter Simulator');
-      sdfHarness.toggle();
-    }
-
     frame = () => {
       if (animationFrameHandle !== null) {
         try {
@@ -1024,11 +1007,6 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
     const currentTime = typeof performance !== 'undefined' && typeof performance.now === 'function'
       ? performance.now() / 1000.0 // Convert to seconds
       : Date.now() / 1000.0;
-
-    // SDF Update
-    if (sdfHarness && sdfHarness.isActive()) {
-      sdfHarness.update(currentTime);
-    }
 
       // Call frame update callback (for play mode, physics, etc.)
       if (onFrameUpdateFn && dtSec > 0) {
@@ -1131,6 +1109,7 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
         lightingData,
         featureFlags: {
           enableComputePrepass: renderSettings.enableComputePrepass,
+          enableAsyncCompute: renderSettings.enableAsyncCompute,
           enableShadows: renderSettings.enableShadows,
           enableBloom: renderSettings.enableBloom,
           enableHDR: renderSettings.enableHDR,
@@ -1207,54 +1186,6 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       cameraSystem.getProjectionMatrix()
     );
 
-    // If SDF demo is active, render it on top (or instead of?)
-    // Currently rendering on top as a full-screen pass that clears its own background in shader (or blends?)
-    // The SDF shader outputs alpha=1.0, so it will overwrite if z-test allows or if drawn last without depth check.
-    // We pass the main passEncoder if we want to combine, but FrameRenderer finishes the pass.
-    // So we need to start a new pass or inject into FrameRenderer.
-    // Since FrameRenderer encapsulates the main pass, we'll do a separate pass here for the prototype.
-    if (sdfHarness && sdfHarness.isActive()) {
-        const encoder = device.createCommandEncoder({ label: 'sdf-encoder' });
-        const view = context.getCurrentTexture().createView();
-        const pass = encoder.beginRenderPass({
-            label: 'sdf-pass',
-            colorAttachments: [{
-                view: view,
-                loadOp: 'load', // Draw on top of existing scene
-                storeOp: 'store',
-            }],
-        });
-        // Need inverse ViewProjection for raymarching
-        const invViewProj = new Float32Array(16);
-        // We need to invert viewProjectionMatrix. 
-        // Note: viewProjectionMatrix from CameraSystem is already computed.
-        // But we need to invert it. Let's import mat4Invert if available or use a helper.
-        // Ideally CameraSystem should provide this or we compute it.
-        // For prototype, let's assume we can invert it here.
-        // ACTUALLY: SDFRenderer expects ViewProjectionInverse.
-        
-        // We can use the cameraSystem's matrices to construct it if needed, 
-        // but let's just assume we can invert the one we have.
-        // Or use cameraSystem.getInverseViewProjectionMatrix() if it exists? (It doesn't seem to).
-        
-        // Quick invert for prototype (using gl-matrix style or similar if available in @engine/core/math)
-        // We'll skip the detailed math import here and let SDFHarness handle it if we pass the matrix?
-        // No, SDFHarness expects the inverse.
-        
-        // Let's compute inverse here using a simple utility or just pass normal VP and invert in shader?
-        // Shader expects inverse.
-        
-        // Workaround: We will pass the ViewProjection matrix to harness, and let harness invert it 
-        // OR we modify Harness to accept VP and invert it there. 
-        // Let's modify this call to assume we have a helper or do it in harness.
-        // For now, let's pass the VP matrix and let Harness handle inversion (we will update Harness signature).
-        
-        sdfHarness.render(pass, viewProjectionMatrix, [eyeX, eyeY, eyeZ]);
-        
-        pass.end();
-        device.queue.submit([encoder.finish()]);
-    }
-
       // For tests, ensure timestamp resolves happen (resolve/copy handled below)
       scheduleNextFrame();
     };
@@ -1309,13 +1240,10 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
     safeDestroy(frameResources.uniformBuffer);
     safeDestroy(frameResources.vertexBuffer);
     safeDestroy(frameResources.indexBuffer);
-    safeDestroy(frameResources.instanceOffsetBuffer);
-    safeDestroy(frameResources.instanceColorScaleBuffer);
-    safeDestroy(frameResources.instanceSecondaryColorBuffer);
-    safeDestroy(frameResources.instanceEmissiveColorBuffer);
-    safeDestroy(frameResources.instanceMaterialParamsBuffer);
-    safeDestroy(frameResources.instanceRotationBuffer);
-    safeDestroy(frameResources.instanceMaterialIdBuffer);
+    safeDestroy(frameResources.instanceInterleavedBuffer);
+    safeDestroy(frameResources.instanceInterleavedStagingBuffer);
+    safeDestroy(frameResources.instanceBoundsBuffer);
+    safeDestroy(frameResources.instanceIndirectArgsBuffer);
     safeDestroy(frameResources.sideTexture);
     safeDestroy(frameResources.topTexture);
     safeDestroy(frameResources.msaaColorTexture);
@@ -1338,6 +1266,8 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
         collisionWorld.free();
         collisionWorld = null;
       }
+      // Dispose ResourceManager
+      resourceManager.dispose();
     } catch (e) {
       Logger.warn('Renderer systems cleanup failed', e);
     }
@@ -1446,11 +1376,7 @@ export async function initRenderer(options: RendererOptions): Promise<Renderer> 
       textureCompressionManager.setEnabled(enabled);
     },
     getCollisionWorld: () => collisionWorld,
-    toggleSDFDemo: () => {
-      if (sdfHarness) {
-        sdfHarness.toggle();
-      }
-    },
+    getResourceManager: () => resourceManager,
   };
 }
 

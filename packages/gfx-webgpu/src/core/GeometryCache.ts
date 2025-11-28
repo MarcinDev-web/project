@@ -10,17 +10,14 @@ import type { CustomMeshData } from '@engine/world';
 import { createGeometryBuffers, packVerticesFloat32ToPacked24 } from '../resources/resources';
 import { Logger } from '@engine/core/utils';
 
-// Type for geometry buffers returned by createGeometryBuffers
+// Type for geometry buffers returned by createGeometryBuffers (interleaved layout)
 type GeometryBuffers = {
   vertexBuffer: GPUBuffer;
   indexBuffer: GPUBuffer;
-  instanceOffsetBuffer: GPUBuffer;
-  instanceColorScaleBuffer: GPUBuffer;
-  instanceSecondaryColorBuffer: GPUBuffer;
-  instanceEmissiveColorBuffer: GPUBuffer;
-  instanceMaterialParamsBuffer: GPUBuffer;
-  instanceRotationBuffer: GPUBuffer;
-  instanceMaterialIdBuffer: GPUBuffer;
+  instanceInterleavedBuffer: GPUBuffer;
+  instanceInterleavedStagingBuffer: GPUBuffer;
+  instanceBoundsBuffer: GPUBuffer;
+  instanceIndirectArgsBuffer: GPUBuffer;
 };
 
 interface CachedGeometry {
@@ -365,20 +362,50 @@ export class GeometryCache {
         return null;
       }
 
-      // Create minimal GeometryData for single entity
+      // Create minimal GeometryData for single entity using interleaved layout
       const instanceBoundsData = computeInstanceBounds(packedVertices);
+      
+      // Create interleaved instance data (24 floats per instance):
+      // [offset(3), colorScale(4), secondaryColor(4), emissiveColor(4), materialParams(4), rotation(4), materialId(1)]
+      const instanceInterleavedData = new Float32Array(24);
+      // offset [0-2]: 0, 0, 0
+      instanceInterleavedData[0] = 0;
+      instanceInterleavedData[1] = 0;
+      instanceInterleavedData[2] = 0;
+      // colorScale [3-6]: 1, 1, 1, 1
+      instanceInterleavedData[3] = 1;
+      instanceInterleavedData[4] = 1;
+      instanceInterleavedData[5] = 1;
+      instanceInterleavedData[6] = 1;
+      // secondaryColor [7-10]: 1, 1, 1, 1
+      instanceInterleavedData[7] = 1;
+      instanceInterleavedData[8] = 1;
+      instanceInterleavedData[9] = 1;
+      instanceInterleavedData[10] = 1;
+      // emissiveColor [11-14]: 0, 0, 0, 0
+      instanceInterleavedData[11] = 0;
+      instanceInterleavedData[12] = 0;
+      instanceInterleavedData[13] = 0;
+      instanceInterleavedData[14] = 0;
+      // materialParams [15-18]: alpha=1, metallic=0, roughness=1, flags=0
+      instanceInterleavedData[15] = 1;
+      instanceInterleavedData[16] = 0;
+      instanceInterleavedData[17] = 1;
+      instanceInterleavedData[18] = 0;
+      // rotation [19-22]: identity quaternion (0, 0, 0, 1)
+      instanceInterleavedData[19] = 0;
+      instanceInterleavedData[20] = 0;
+      instanceInterleavedData[21] = 0;
+      instanceInterleavedData[22] = 1;
+      // materialId [23]: 0
+      instanceInterleavedData[23] = 0;
+      
       const geometryData = {
         vertices: packedVertices,
         indices: indices,
         instanceCount: 1,
         opaqueCount: 1,
-        instanceOffsetData: new Float32Array(3), // [0, 0, 0]
-        instanceColorScaleData: new Float32Array(4), // [1, 1, 1, 1]
-        instanceSecondaryColorData: new Float32Array(4), // [1, 1, 1, 1]
-        instanceEmissiveColorData: new Float32Array(4), // [0, 0, 0, 0]
-        instanceMaterialParamsData: new Float32Array(4), // [1, 0, 1, 0]
-        instanceRotationData: new Float32Array(4), // [0, 0, 0, 1] (identity quaternion)
-        instanceMaterialIdData: new Float32Array(1), // [0]
+        instanceInterleavedData,
         instanceBoundsData,
       };
 
@@ -434,13 +461,10 @@ export class GeometryCache {
         try {
           cached.buffers.vertexBuffer.destroy();
           cached.buffers.indexBuffer.destroy();
-          cached.buffers.instanceOffsetBuffer.destroy();
-          cached.buffers.instanceColorScaleBuffer.destroy();
-          cached.buffers.instanceSecondaryColorBuffer.destroy();
-          cached.buffers.instanceEmissiveColorBuffer.destroy();
-          cached.buffers.instanceMaterialParamsBuffer.destroy();
-          cached.buffers.instanceRotationBuffer.destroy();
-          cached.buffers.instanceMaterialIdBuffer.destroy();
+          cached.buffers.instanceInterleavedBuffer.destroy();
+          cached.buffers.instanceInterleavedStagingBuffer.destroy();
+          cached.buffers.instanceBoundsBuffer.destroy();
+          cached.buffers.instanceIndirectArgsBuffer.destroy();
         } catch (err) {
           // Ignore errors during cleanup
         }
@@ -464,13 +488,10 @@ export class GeometryCache {
       try {
         cached.buffers.vertexBuffer.destroy();
         cached.buffers.indexBuffer.destroy();
-        cached.buffers.instanceOffsetBuffer.destroy();
-        cached.buffers.instanceColorScaleBuffer.destroy();
-        cached.buffers.instanceSecondaryColorBuffer.destroy();
-        cached.buffers.instanceEmissiveColorBuffer.destroy();
-        cached.buffers.instanceMaterialParamsBuffer.destroy();
-        cached.buffers.instanceRotationBuffer.destroy();
-        cached.buffers.instanceMaterialIdBuffer.destroy();
+        cached.buffers.instanceInterleavedBuffer.destroy();
+        cached.buffers.instanceInterleavedStagingBuffer.destroy();
+        cached.buffers.instanceBoundsBuffer.destroy();
+        cached.buffers.instanceIndirectArgsBuffer.destroy();
       } catch (err) {
         // Ignore errors during cleanup
       }

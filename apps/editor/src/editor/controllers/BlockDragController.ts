@@ -90,8 +90,104 @@ export class BlockDragController implements InteractionTool {
   // Helper for free transform
   private freeTransformPlaneNormal: Vec3 = [0, 1, 0];
 
+  private abortController: AbortController | null = null;
+
   constructor(private readonly config: BlockDragControllerConfig) {
     this.raycaster = new Raycaster();
+  }
+
+  /**
+   * Initializes the controller and sets up event listeners.
+   * @returns A cleanup function that disposes the controller
+   */
+  public initialize(): () => void {
+    this.abortController = new AbortController();
+    const signal = this.abortController.signal;
+
+    // Listen for keyboard modifiers
+    window.addEventListener('keydown', (e) => {
+      this.isShiftPressed = e.shiftKey;
+      this.isAltPressed = e.altKey;
+      this.isCtrlPressed = e.ctrlKey;
+    }, { signal });
+
+    window.addEventListener('keyup', (e) => {
+      this.isShiftPressed = e.shiftKey;
+      this.isAltPressed = e.altKey;
+      this.isCtrlPressed = e.ctrlKey;
+    }, { signal });
+
+    // Listen for pointer events on canvas
+    this.config.canvas.addEventListener('pointerdown', (e) => {
+      const ray = this.createRayFromEvent(e);
+      this.onPointerDown(e, ray);
+    }, { signal });
+
+    window.addEventListener('pointermove', (e) => {
+      const ray = this.createRayFromEvent(e);
+      this.onPointerMove(e, ray);
+    }, { signal });
+
+    window.addEventListener('pointerup', (e) => {
+      const ray = this.createRayFromEvent(e);
+      this.onPointerUp(e, ray);
+    }, { signal });
+
+    // Listen for pointer cancel to abort drag
+    window.addEventListener('pointercancel', (e) => {
+      if (this.dragState && this.dragState.pointerId === e.pointerId) {
+        this.config.canvas.releasePointerCapture(e.pointerId);
+        this.cancelDrag();
+      }
+    }, { signal });
+
+    return () => {
+      this.dispose();
+    };
+  }
+
+  /**
+   * Creates a ray from a pointer event using the camera.
+   */
+  private createRayFromEvent(event: PointerEvent): Ray {
+    const rect = this.config.canvas.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / rect.width) * 2 - 1;
+    const y = -((event.clientY - rect.top) / rect.height) * 2 + 1;
+
+    // Get camera matrices
+    const cameraDirector = this.config.cameraDirector;
+    if (cameraDirector) {
+      const viewMatrix = cameraDirector.getViewMatrix();
+      const projectionMatrix = cameraDirector.getProjectionMatrix();
+      return this.raycaster.createRayFromScreenCoords(x, y, viewMatrix, projectionMatrix);
+    }
+
+    // Fallback to scene's primary camera
+    const camera = this.config.scene.primaryCamera;
+    if (camera) {
+      const viewMatrix = camera.getViewMatrix?.() ?? camera.transform.getWorldMatrix();
+      const projectionMatrix = camera.getProjectionMatrix?.() ?? new Float32Array(16) as Mat4;
+      return this.raycaster.createRayFromScreenCoords(x, y, viewMatrix, projectionMatrix);
+    }
+
+    // Default ray pointing forward
+    return { origin: [0, 0, 0], direction: [0, 0, -1] };
+  }
+
+  /**
+   * Disposes the controller and cleans up resources.
+   */
+  public dispose(): void {
+    this.abortController?.abort();
+    this.abortController = null;
+    this.cancelDrag(true);
+  }
+
+  /**
+   * Returns whether a block is currently being dragged.
+   */
+  public isDraggingBlock(): boolean {
+    return this.isDragging && this.dragState !== null;
   }
 
   public checkHit(ray: Ray): boolean {

@@ -180,6 +180,58 @@ describe('adapterProbing', () => {
       expect(result.adapterName).toBeUndefined();
       expect(mockDebug).toHaveBeenCalled();
     });
+
+    it('detects subgroup operations when subgroups feature is available', async () => {
+      const adapter = {
+        features: new Set<string>(['subgroups']),
+        limits: {
+          maxBindGroups: 4,
+          maxTextureDimension2D: 4096,
+          maxBufferSize: 256 * 1024 * 1024,
+          maxStorageBufferBindingSize: 64 * 1024 * 1024,
+          maxUniformBufferBindingSize: 16384,
+          maxComputeWorkgroupSizeX: 256,
+          maxComputeWorkgroupSizeY: 256,
+          maxComputeWorkgroupSizeZ: 64,
+          minSubgroupSize: 32,
+          maxSubgroupSize: 32,
+        } as unknown as GPUSupportedLimits,
+        requestAdapterInfo: undefined,
+      } as unknown as GPUAdapter;
+
+      const result = await probeAdapterCapabilities(adapter);
+
+      expect(result.subgroup.supported).toBe(true);
+      expect(result.subgroup.minSubgroupSize).toBe(32);
+      expect(result.subgroup.maxSubgroupSize).toBe(32);
+      expect(result.subgroup.arithmetic).toBe(true);
+      expect(result.subgroup.ballot).toBe(true);
+      expect(result.subgroup.shuffle).toBe(true);
+    });
+
+    it('reports subgroup not supported when feature is missing', async () => {
+      const adapter = {
+        features: new Set<string>([]),
+        limits: {
+          maxBindGroups: 4,
+          maxTextureDimension2D: 4096,
+          maxBufferSize: 256 * 1024 * 1024,
+          maxStorageBufferBindingSize: 64 * 1024 * 1024,
+          maxUniformBufferBindingSize: 16384,
+          maxComputeWorkgroupSizeX: 256,
+          maxComputeWorkgroupSizeY: 256,
+          maxComputeWorkgroupSizeZ: 64,
+        } as GPUSupportedLimits,
+        requestAdapterInfo: undefined,
+      } as unknown as GPUAdapter;
+
+      const result = await probeAdapterCapabilities(adapter);
+
+      expect(result.subgroup.supported).toBe(false);
+      expect(result.subgroup.arithmetic).toBe(false);
+      expect(result.subgroup.ballot).toBe(false);
+      expect(result.subgroup.shuffle).toBe(false);
+    });
   });
 
   describe('validateMinimumLimits', () => {
@@ -257,6 +309,9 @@ describe('adapterProbing', () => {
         textureCompression: 'bc',
         timestampQuery: true,
         shaderF16: true,
+        subgroup: {
+          supported: false,
+        },
         adapterInfo: {
           vendor: 'Test Vendor',
           architecture: 'Test Arch',
@@ -280,6 +335,51 @@ describe('adapterProbing', () => {
       expect(capabilities.features.textureCompression.astc).toBe(false);
       expect(capabilities.textureCompression).toBe('bc');
       expect(capabilities.limits.maxBindGroups).toBe(4);
+      expect(capabilities.features.subgroup?.supported).toBe(false);
+    });
+
+    it('includes subgroup capabilities when subgroups feature is available', () => {
+      const probe: AdapterProbeResult = {
+        adapter: {} as GPUAdapter,
+        tier: 2,
+        features: new Set<string>(['timestamp-query', 'subgroups']),
+        limits: {
+          maxBindGroups: 4,
+          maxTextureDimension2D: 4096,
+          maxBufferSize: 256 * 1024 * 1024,
+          maxStorageBufferBindingSize: 64 * 1024 * 1024,
+          maxUniformBufferBindingSize: 16384,
+          maxComputeWorkgroupSizeX: 256,
+          maxComputeWorkgroupSizeY: 256,
+          maxComputeWorkgroupSizeZ: 64,
+          minSubgroupSize: 32,
+          maxSubgroupSize: 32,
+        } as unknown as GPUSupportedLimits,
+        textureCompression: 'none',
+        timestampQuery: true,
+        shaderF16: false,
+        subgroup: {
+          supported: true,
+          minSubgroupSize: 32,
+          maxSubgroupSize: 32,
+          arithmetic: true,
+          ballot: true,
+          shuffle: true,
+        },
+        adapterInfo: undefined,
+        adapterName: undefined,
+      };
+
+      const capabilities = probeResultToCapabilities(probe);
+
+      expect(capabilities.features.subgroup?.supported).toBe(true);
+      expect(capabilities.features.subgroup?.minSubgroupSize).toBe(32);
+      expect(capabilities.features.subgroup?.maxSubgroupSize).toBe(32);
+      expect(capabilities.features.subgroup?.arithmetic).toBe(true);
+      expect(capabilities.features.subgroup?.ballot).toBe(true);
+      expect(capabilities.features.subgroup?.shuffle).toBe(true);
+      expect(capabilities.limits.minSubgroupSize).toBe(32);
+      expect(capabilities.limits.maxSubgroupSize).toBe(32);
     });
   });
 

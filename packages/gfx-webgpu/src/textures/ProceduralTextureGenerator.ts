@@ -194,9 +194,9 @@ fn patternCobble(x: f32, y: f32) -> vec4<f32> {
   var variation = 0.9 + normalizeNoise(perlinNoise) * 0.1;
   variation = quantize(variation, params.quantizeLevels);
   let edgeMask = select(0.6, 1.0, edge >= 0.2);
-  var final = stone * variation * edgeMask;
-  final = quantize(final, params.quantizeLevels);
-  return params.color * final;
+  var finalValue = stone * variation * edgeMask;
+  finalValue = quantize(finalValue, params.quantizeLevels);
+  return params.color * finalValue;
 }
 
 fn patternBricks(x: f32, y: f32) -> vec4<f32> {
@@ -296,17 +296,17 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
   
   // Sample surrounding heights for Sobel operator
   let tl = getHeight(x - 1, y - 1);
-  let t = getHeight(x, y - 1);
+  let top = getHeight(x, y - 1);
   let tr = getHeight(x + 1, y - 1);
-  let l = getHeight(x - 1, y);
-  let r = getHeight(x + 1, y);
+  let left = getHeight(x - 1, y);
+  let right = getHeight(x + 1, y);
   let bl = getHeight(x - 1, y + 1);
-  let b = getHeight(x, y + 1);
+  let bottom = getHeight(x, y + 1);
   let br = getHeight(x + 1, y + 1);
   
   // Sobel operator
-  let dX = (tr + 2.0 * r + br) - (tl + 2.0 * l + bl);
-  let dY = (bl + 2.0 * b + br) - (tl + 2.0 * t + tr);
+  let dX = (tr + 2.0 * right + br) - (tl + 2.0 * left + bl);
+  let dY = (bl + 2.0 * bottom + br) - (tl + 2.0 * top + tr);
   
   // Calculate normal vector
   let nX = -dX * params.strength;
@@ -530,6 +530,144 @@ fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
 }
 `;
 
+// Emission map generation shader
+const EMISSION_MAP_SHADER_CODE = `
+struct EmissionMapParams {
+  emissionColor: vec3<f32>,
+  intensity: f32,
+  pattern: u32,
+  size: u32,
+  seed: f32,
+  _padding: f32,
+}
+
+@group(0) @binding(0) var<uniform> params: EmissionMapParams;
+@group(0) @binding(1) var<storage, read_write> output: array<u32>;
+
+fn hash2(p: vec2<f32>) -> u32 {
+  let h = u32(params.seed) + u32(p.x * 374761393.0) + u32(p.y * 668265263.0);
+  let h1 = h ^ (h >> 13u);
+  let h2 = h1 * 1274126177u;
+  return h2 ^ (h2 >> 16u);
+}
+
+fn permHash(x: u32, y: u32) -> u32 {
+  let h = u32(params.seed) + x * 374761393u + y * 668265263u;
+  let h1 = h ^ (h >> 13u);
+  let h2 = h1 * 1274126177u;
+  return (h2 ^ (h2 >> 16u)) & 255u;
+}
+
+fn fade(t: f32) -> f32 {
+  return t * t * t * (t * (t * 6.0 - 15.0) + 10.0);
+}
+
+fn lerp(t: f32, a: f32, b: f32) -> f32 {
+  return a + t * (b - a);
+}
+
+fn grad2D(hash: u32, x: f32, y: f32) -> f32 {
+  let h = hash & 3u;
+  let u = select(y, x, h < 2u);
+  let v = select(x, y, h < 2u);
+  let signU = select(-1.0, 1.0, (h & 1u) == 0u);
+  let signV = select(-1.0, 1.0, (h & 2u) == 0u);
+  return signU * u + signV * v;
+}
+
+fn perlinNoise2D(x: f32, y: f32) -> f32 {
+  let X = u32(floor(x)) & 255u;
+  let Y = u32(floor(y)) & 255u;
+  let xf = x - floor(x);
+  let yf = y - floor(y);
+  let u = fade(xf);
+  let v = fade(yf);
+  let A = permHash(X, Y);
+  let AA = permHash(A & 255u, 0u);
+  let AB = permHash(A & 255u, 1u);
+  let B = permHash((X + 1u) & 255u, Y);
+  let BA = permHash(B & 255u, 0u);
+  let BB = permHash(B & 255u, 1u);
+  return lerp(
+    v,
+    lerp(u, grad2D(AA, xf, yf), grad2D(BA, xf - 1.0, yf)),
+    lerp(u, grad2D(AB, xf, yf - 1.0), grad2D(BB, xf - 1.0, yf - 1.0))
+  );
+}
+
+fn getFeaturePoint(cellX: i32, cellY: i32) -> vec2<f32> {
+  let hash = hash2(vec2<f32>(f32(cellX), f32(cellY)));
+  let fx = f32(cellX) + f32(hash & 0xFFFFu) / 65535.0;
+  let fy = f32(cellY) + f32((hash >> 16u) & 0xFFFFu) / 65535.0;
+  return vec2<f32>(fx, fy);
+}
+
+fn distanceEuclidean(p1: vec2<f32>, p2: vec2<f32>) -> f32 {
+  let dx = p2.x - p1.x;
+  let dy = p2.y - p1.y;
+  return sqrt(dx * dx + dy * dy);
+}
+
+fn worleyNoise(x: f32, y: f32) -> f32 {
+  let cellX = i32(floor(x));
+  let cellY = i32(floor(y));
+  var minDist: f32 = 999999.0;
+  let pos = vec2<f32>(x, y);
+  
+  for (var dy = -1; dy <= 1; dy++) {
+    for (var dx = -1; dx <= 1; dx++) {
+      let featurePoint = getFeaturePoint(cellX + dx, cellY + dy);
+      let dist = distanceEuclidean(pos, featurePoint);
+      minDist = min(minDist, dist);
+    }
+  }
+  
+  return minDist;
+}
+
+@compute @workgroup_size(8, 8)
+fn main(@builtin(global_invocation_id) gid: vec3<u32>) {
+  let x = f32(gid.x);
+  let y = f32(gid.y);
+  if (u32(x) >= params.size || u32(y) >= params.size) {
+    return;
+  }
+  
+  var emissionMask: f32 = 0.0;
+  
+  // Pattern-based emission variation
+  if (params.pattern == 2u) { // noise pattern (glowstone-like)
+    let noise = perlinNoise2D(x * 0.08, y * 0.08);
+    let normalized = (noise + 1.0) * 0.5;
+    // Pulsating glow effect with noise variation
+    emissionMask = 0.7 + normalized * 0.3;
+  } else if (params.pattern == 3u) { // cobble pattern (lava-like)
+    let worley = worleyNoise(x * 0.05, y * 0.05);
+    // Bright cracks between cells (lava veins)
+    emissionMask = clamp(1.0 - worley * 2.0, 0.0, 1.0);
+    // Add perlin for variation
+    let noise = perlinNoise2D(x * 0.1, y * 0.1);
+    emissionMask *= 0.8 + (noise + 1.0) * 0.1;
+  } else {
+    // Default: uniform emission
+    emissionMask = 1.0;
+  }
+  
+  // Apply intensity
+  emissionMask *= params.intensity;
+  emissionMask = clamp(emissionMask, 0.0, 1.0);
+  
+  // Calculate final emission color
+  let r = u32(params.emissionColor.r * emissionMask * 255.0);
+  let g = u32(params.emissionColor.g * emissionMask * 255.0);
+  let b = u32(params.emissionColor.b * emissionMask * 255.0);
+  let a = 255u;
+  
+  let idx = u32(y) * params.size + u32(x);
+  output[idx] = r | (g << 8u) | (b << 16u) | (a << 24u);
+}
+`;
+
 export interface PBRTextureData {
   /** Base color/albedo texture */
   albedo: ImageData;
@@ -541,6 +679,8 @@ export interface PBRTextureData {
   metallic?: ImageData;
   /** Ambient occlusion map */
   ao?: ImageData;
+  /** Emission map (RGB emission color * intensity) */
+  emission?: ImageData;
 }
 
 export class ProceduralTextureGenerator {
@@ -579,6 +719,11 @@ export class ProceduralTextureGenerator {
   private aoMapBindGroupLayout: GPUBindGroupLayout | null = null;
   private aoMapPipelineLayout: GPUPipelineLayout | null = null;
   private aoMapUniformBuffer: GPUBuffer | null = null;
+
+  private emissionMapPipeline: GPUComputePipeline | null = null;
+  private emissionMapBindGroupLayout: GPUBindGroupLayout | null = null;
+  private emissionMapPipelineLayout: GPUPipelineLayout | null = null;
+  private emissionMapUniformBuffer: GPUBuffer | null = null;
 
   constructor(private readonly textureSize: number = 64, seed?: number) {
     this.canvas = document.createElement('canvas');
@@ -679,6 +824,9 @@ export class ProceduralTextureGenerator {
       
       // Initialize AO map pipeline
       this.initializeAOMapPipeline(device);
+      
+      // Initialize Emission map pipeline
+      this.initializeEmissionMapPipeline(device);
 
       this.isGPUInitialized = true;
       console.info('[ProceduralTextureGenerator] GPU compute shaders initialized successfully');
@@ -707,7 +855,7 @@ export class ProceduralTextureGenerator {
         label: 'normal-map-bgl',
         entries: [
           { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
-          { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+          { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
           { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
         ],
       });
@@ -875,6 +1023,53 @@ export class ProceduralTextureGenerator {
     } catch (error) {
       console.warn('[ProceduralTextureGenerator] AO map pipeline initialization failed', error);
       this.aoMapPipeline = null;
+    }
+  }
+
+  /**
+   * Initialize emission map compute pipeline
+   */
+  private initializeEmissionMapPipeline(device: GPUDevice): void {
+    try {
+      const shaderModule = device.createShaderModule({
+        label: 'emission-map-compute-shader',
+        code: EMISSION_MAP_SHADER_CODE,
+      });
+
+      this.emissionMapBindGroupLayout = device.createBindGroupLayout({
+        label: 'emission-map-bgl',
+        entries: [
+          { binding: 0, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
+          { binding: 1, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
+        ],
+      });
+
+      this.emissionMapPipelineLayout = device.createPipelineLayout({
+        label: 'emission-map-pipeline-layout',
+        bindGroupLayouts: [this.emissionMapBindGroupLayout],
+      });
+
+      const pipelineDescriptor: GPUComputePipelineDescriptor = {
+        label: 'emission-map-compute-pipeline',
+        layout: this.emissionMapPipelineLayout,
+        compute: { module: shaderModule, entryPoint: 'main' },
+      };
+
+      if (this.pipelineCache) {
+        this.emissionMapPipeline = this.pipelineCache.getComputePipeline(pipelineDescriptor);
+      } else {
+        this.emissionMapPipeline = device.createComputePipeline(pipelineDescriptor);
+      }
+
+      // EmissionMapParams: vec3(12) + f32(4) + u32(4) + u32(4) + f32(4) + f32(4) = 32 bytes
+      this.emissionMapUniformBuffer = device.createBuffer({
+        label: 'emission-map-uniforms',
+        size: 32,
+        usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
+      });
+    } catch (error) {
+      console.warn('[ProceduralTextureGenerator] Emission map pipeline initialization failed', error);
+      this.emissionMapPipeline = null;
     }
   }
 
@@ -1455,6 +1650,165 @@ export class ProceduralTextureGenerator {
   }
 
   /**
+   * Generate emission map using GPU compute shader (if available)
+   * @param emissionColor RGB emission color (0-1 range)
+   * @param intensity Emission intensity multiplier
+   * @param pattern Pattern type for variation
+   * @returns ImageData or null if GPU unavailable
+   */
+  public async generateEmissionMapGPU(
+    emissionColor: [number, number, number],
+    intensity: number,
+    pattern: string = 'solid'
+  ): Promise<ImageData | null> {
+    if (!this.device || !this.emissionMapPipeline || !this.emissionMapUniformBuffer || !this.emissionMapBindGroupLayout) {
+      return null; // Fall back to CPU
+    }
+
+    const patternMap: Record<string, number> = {
+      'solid': 0,
+      'smooth': 1,
+      'noise': 2,
+      'cobble': 3,
+      'bricks': 4,
+      'planks': 5,
+      'grid': 6,
+    };
+    const patternId = patternMap[pattern] ?? 0;
+    const seed = Math.random() * 1000;
+
+    const outputSize = this.textureSize * this.textureSize * 4;
+    const outputBuffer = this.device.createBuffer({
+      label: 'emission-map-output',
+      size: outputSize,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC,
+    });
+
+    const stagingBuffer = this.device.createBuffer({
+      label: 'emission-map-staging',
+      size: outputSize,
+      usage: GPUBufferUsage.COPY_DST | GPUBufferUsage.MAP_READ,
+    });
+
+    // Update uniform buffer
+    // EmissionMapParams: vec3(12 aligned to 16) + f32(4) + u32(4) + u32(4) + f32(4) + f32(4) = 32 bytes
+    const uniformBuffer = new ArrayBuffer(32);
+    const uniformView = new DataView(uniformBuffer);
+    // vec3 emissionColor (offset 0)
+    uniformView.setFloat32(0, emissionColor[0], true);
+    uniformView.setFloat32(4, emissionColor[1], true);
+    uniformView.setFloat32(8, emissionColor[2], true);
+    // f32 intensity (offset 12)
+    uniformView.setFloat32(12, intensity, true);
+    // u32 pattern (offset 16)
+    uniformView.setUint32(16, patternId, true);
+    // u32 size (offset 20)
+    uniformView.setUint32(20, this.textureSize, true);
+    // f32 seed (offset 24)
+    uniformView.setFloat32(24, seed, true);
+    // f32 padding (offset 28)
+    uniformView.setFloat32(28, 0.0, true);
+
+    this.device.queue.writeBuffer(this.emissionMapUniformBuffer, 0, uniformBuffer);
+
+    const bindGroup = this.device.createBindGroup({
+      label: 'emission-map-bg',
+      layout: this.emissionMapBindGroupLayout,
+      entries: [
+        { binding: 0, resource: { buffer: this.emissionMapUniformBuffer } },
+        { binding: 1, resource: { buffer: outputBuffer } },
+      ],
+    });
+
+    const encoder = this.device.createCommandEncoder({ label: 'emission-map-encoder' });
+    const pass = encoder.beginComputePass({ label: 'emission-map-pass' });
+    pass.setPipeline(this.emissionMapPipeline);
+    pass.setBindGroup(0, bindGroup);
+    const workgroupSize = 8;
+    const workgroupsX = Math.ceil(this.textureSize / workgroupSize);
+    const workgroupsY = Math.ceil(this.textureSize / workgroupSize);
+    pass.dispatchWorkgroups(workgroupsX, workgroupsY);
+    pass.end();
+
+    encoder.copyBufferToBuffer(outputBuffer, 0, stagingBuffer, 0, outputSize);
+    this.device.queue.submit([encoder.finish()]);
+
+    try {
+      await stagingBuffer.mapAsync(GPUMapMode.READ);
+    } catch (error) {
+      console.warn('[ProceduralTextureGenerator] Failed to map emission map staging buffer', error);
+      outputBuffer.destroy();
+      stagingBuffer.destroy();
+      return null;
+    }
+
+    const mappedRange = stagingBuffer.getMappedRange();
+    const data = new Uint32Array(mappedRange);
+    const imageData = new ImageData(this.textureSize, this.textureSize);
+    for (let i = 0; i < data.length; i++) {
+      const packed = data[i]!;
+      const pixelIdx = i * 4;
+      imageData.data[pixelIdx] = (packed & 0xFF);
+      imageData.data[pixelIdx + 1] = ((packed >> 8) & 0xFF);
+      imageData.data[pixelIdx + 2] = ((packed >> 16) & 0xFF);
+      imageData.data[pixelIdx + 3] = ((packed >> 24) & 0xFF);
+    }
+
+    stagingBuffer.unmap();
+    outputBuffer.destroy();
+    stagingBuffer.destroy();
+
+    return imageData;
+  }
+
+  /**
+   * Generate emission map (CPU fallback)
+   * @param emissionColor RGB emission color (0-1 range)
+   * @param intensity Emission intensity multiplier
+   * @param pattern Pattern type for variation
+   * @returns ImageData
+   */
+  public generateEmissionMap(
+    emissionColor: [number, number, number],
+    intensity: number,
+    pattern: string = 'solid'
+  ): ImageData {
+    const imageData = new ImageData(this.textureSize, this.textureSize);
+    const data = imageData.data;
+
+    for (let y = 0; y < this.textureSize; y++) {
+      for (let x = 0; x < this.textureSize; x++) {
+        const idx = (y * this.textureSize + x) * 4;
+
+        let emissionMask = 1.0;
+
+        if (pattern === 'noise') {
+          // Glowstone-like pulsating glow
+          const noise = this.perlin.noise(x * 0.08, y * 0.08);
+          const normalized = NoiseUtils.normalize(noise);
+          emissionMask = 0.7 + normalized * 0.3;
+        } else if (pattern === 'cobble') {
+          // Lava-like bright cracks
+          const worley = this.worley.noise(x * 0.05, y * 0.05);
+          emissionMask = NoiseUtils.clamp01(1.0 - worley * 2.0);
+          const noise = this.perlin.noise(x * 0.1, y * 0.1);
+          emissionMask *= 0.8 + NoiseUtils.normalize(noise) * 0.1;
+        }
+
+        emissionMask *= intensity;
+        emissionMask = NoiseUtils.clamp01(emissionMask);
+
+        data[idx + 0] = Math.round(emissionColor[0] * emissionMask * 255);
+        data[idx + 1] = Math.round(emissionColor[1] * emissionMask * 255);
+        data[idx + 2] = Math.round(emissionColor[2] * emissionMask * 255);
+        data[idx + 3] = 255;
+      }
+    }
+
+    return imageData;
+  }
+
+  /**
    * Generate deterministic seed from face properties
    * Ensures same face always generates same texture (prevents flickering)
    */
@@ -1956,12 +2310,37 @@ export class ProceduralTextureGenerator {
       ao = this.generateAOMap(face);
     }
     
+    // Generate emission map if emission properties are defined
+    let emission: ImageData | undefined;
+    if (face.emissionColor && face.emissionIntensity && face.emissionIntensity > 0) {
+      const pattern = face.pattern || 'solid';
+      if (this.isGPUInitialized) {
+        const gpuEmission = await this.generateEmissionMapGPU(
+          face.emissionColor,
+          face.emissionIntensity,
+          pattern
+        );
+        emission = gpuEmission || this.generateEmissionMap(
+          face.emissionColor,
+          face.emissionIntensity,
+          pattern
+        );
+      } else {
+        emission = this.generateEmissionMap(
+          face.emissionColor,
+          face.emissionIntensity,
+          pattern
+        );
+      }
+    }
+    
     return {
       albedo,
       normal,
       roughness,
       metallic,
-      ao
+      ao,
+      emission
     };
   }
 

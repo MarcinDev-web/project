@@ -1,0 +1,28 @@
+[package]
+name = "texture-processor"
+version = "0.1.0"
+edition = "2021"
+description = "High-performance procedural texture generation with SIMD support"
+authors = ["Forge Engine Team"]
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+wasm-bindgen = "0.2"
+console_error_panic_hook = { version = "0.1", optional = true }
+
+[dev-dependencies]
+approx = "0.5"
+
+[features]
+default = []
+simd = []
+panic-hook = ["console_error_panic_hook"]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+

@@ -226,6 +226,15 @@ export declare function quatFromEulerOut(out: Quat, euler: Vec3): Quat;
  */
 export declare function quatToMatrix3(q: Quat): number[];
 /**
+ * Converts a quaternion to a 3x3 rotation matrix (column-major order), writing to output buffer.
+ * This is an allocation-free version for performance-critical code paths.
+ * @param out - Output Float32Array (must have length >= 9) to receive the rotation matrix.
+ * @param q - Quaternion to convert.
+ * @returns The same `out` array populated with the rotation matrix values.
+ * @throws {TypeError} If `q` is not a valid `Quat` or `out` is too small.
+ */
+export declare function quatToMatrix3Out(out: Float32Array, q: Quat): Float32Array;
+/**
  * Transforms a vector by a quaternion (rotation)
  * @param vec The vector to transform
  * @param quat The quaternion representing the rotation

@@ -20,7 +20,13 @@ export class MaterialComponent extends Component {
    */
   static MAX_MATERIAL_ID = 15;
 
+  /**
+   * Default material reference when none is specified.
+   */
+  static readonly DEFAULT_MATERIAL_REF = 'default';
+
   private _materialId = 0;
+  private _materialRef: string = MaterialComponent.DEFAULT_MATERIAL_REF;
   private _primaryColor: RgbaColor = [1, 1, 1, 1];
   private _secondaryColor: RgbaColor = [1, 1, 1, 1];
   private _accentColor: RgbaColor = [1, 1, 1, 1];
@@ -37,6 +43,9 @@ export class MaterialComponent extends Component {
    * Used to determine UV offset when sampling from atlas.
    * Default 0 = first material in atlas.
    * Automatically clamped to [0, MAX_MATERIAL_ID] to prevent black blocks.
+   * 
+   * @deprecated Prefer using `materialRef` for string-based material references.
+   * This numeric ID is maintained for backward compatibility with the atlas system.
    */
   get materialId(): number {
     return this._materialId;
@@ -54,6 +63,40 @@ export class MaterialComponent extends Component {
     } else {
       this._materialId = Math.floor(value);
     }
+  }
+
+  /**
+   * Material reference - string identifier for the material (e.g., "stone", "oak_planks").
+   * This provides a human-readable way to reference materials and works with the
+   * MaterialRegistry system for validation and resolution.
+   * 
+   * Use this in combination with ResourceManager to:
+   * - Validate that the material exists
+   * - Resolve to the correct atlasIndex
+   * - Get detailed information about the material
+   * 
+   * @example
+   * ```typescript
+   * const material = entity.getComponent(MaterialComponent);
+   * material.materialRef = 'stone';
+   * 
+   * // Later, resolve to atlas index via ResourceManager
+   * const atlasIndex = resourceManager.resolveAtlasIndex(material.materialRef);
+   * ```
+   */
+  get materialRef(): string {
+    return this._materialRef;
+  }
+
+  set materialRef(value: string) {
+    this._materialRef = value || MaterialComponent.DEFAULT_MATERIAL_REF;
+  }
+
+  /**
+   * Check if this material has a custom reference (not the default).
+   */
+  hasCustomMaterialRef(): boolean {
+    return this._materialRef !== MaterialComponent.DEFAULT_MATERIAL_REF;
   }
 
   get primaryColor(): RgbaColor {
@@ -169,6 +212,7 @@ export class MaterialComponent extends Component {
     copy._alphaMode = this._alphaMode;
     copy.flags = this.flags;
     copy._materialId = this._materialId;
+    copy._materialRef = this._materialRef;
     
     return copy;
   }
@@ -184,6 +228,7 @@ export class MaterialComponent extends Component {
     metallic: number;
     roughness: number;
     materialId: number;
+    materialRef: string;
     flags: number;
   } {
     return {
@@ -197,6 +242,7 @@ export class MaterialComponent extends Component {
       metallic: this.metallic,
       roughness: this.roughness,
       materialId: this._materialId,
+      materialRef: this._materialRef,
       flags: this.flags,
     };
   }
@@ -212,6 +258,7 @@ export class MaterialComponent extends Component {
     metallic?: number;
     roughness?: number;
     materialId?: number;
+    materialRef?: string;
     flags?: number;
     color?: RgbaColor; // legacy fallback
   }): void {
@@ -219,6 +266,7 @@ export class MaterialComponent extends Component {
     if (typeof data.metallic === 'number') this.metallic = data.metallic;
     if (typeof data.roughness === 'number') this.roughness = data.roughness;
     if (typeof data.materialId === 'number') this.materialId = data.materialId;
+    if (typeof data.materialRef === 'string') this._materialRef = data.materialRef;
     if (typeof data.emissiveIntensity === 'number') this._emissiveIntensity = data.emissiveIntensity;
     
     // Colors

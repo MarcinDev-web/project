@@ -13,6 +13,34 @@ import { EditorState } from '../../core/state';
 import type { OrbitControls } from '@engine/camera';
 import { mat4Invert, mat4GetRotation, mat4GetScale } from '@engine/core/math';
 
+// Mock Raycaster to return predictable hits for testing
+vi.mock('@engine/world', async () => {
+  const actual = await vi.importActual('@engine/world');
+  return {
+    ...actual,
+    Raycaster: class MockRaycaster {
+      private lastEntities: Entity[] = [];
+      raycastClosest(ray: any, entities: Entity[]): { entity: Entity; position: [number, number, number]; normal: [number, number, number]; distance: number } | null {
+        this.lastEntities = entities;
+        // Return first entity if any exists (simulates clicking on entity)
+        if (entities.length > 0) {
+          const entity = entities[0]!;
+          return {
+            entity,
+            position: [...entity.transform.position] as [number, number, number],
+            normal: [0, 1, 0],
+            distance: 5,
+          };
+        }
+        return null;
+      }
+      createRayFromScreenCoords(): any {
+        return { origin: [0, 5, 0], direction: [0, -1, 0] };
+      }
+    },
+  };
+});
+
 function createMockControls(): OrbitControls {
   const setEnabledSpy = vi.fn();
   return {
@@ -22,6 +50,26 @@ function createMockControls(): OrbitControls {
     setState: vi.fn(),
     setPreset: vi.fn(),
   } as OrbitControls & { setEnabled: ReturnType<typeof vi.fn> };
+}
+
+function createMockCameraDirector() {
+  // Standard perspective projection looking down -Z
+  const viewMatrix = new Float32Array([
+    1, 0, 0, 0,
+    0, 1, 0, 0,
+    0, 0, 1, 0,
+    0, 0, -5, 1, // Camera at z=5 looking at origin
+  ]);
+  const projectionMatrix = new Float32Array([
+    1.5, 0, 0, 0,
+    0, 2, 0, 0,
+    0, 0, -1.02, -1,
+    0, 0, -0.202, 0,
+  ]);
+  return {
+    getViewMatrix: () => viewMatrix,
+    getProjectionMatrix: () => projectionMatrix,
+  };
 }
 
 function createMockCanvas(): HTMLCanvasElement {
@@ -92,10 +140,12 @@ describe('BlockDragController', () => {
     recordSnapshot = vi.fn();
     onStatusMessage = vi.fn();
 
-    // Create controller
+    // Create controller with mock camera director for raycasting
+    const cameraDirector = createMockCameraDirector();
     controller = new BlockDragController({
       canvas,
       controls,
+      cameraDirector: cameraDirector as any,
       scene,
       selection,
       state,

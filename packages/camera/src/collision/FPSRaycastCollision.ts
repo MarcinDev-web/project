@@ -1,5 +1,5 @@
 import type { Vec3 } from '@engine/core/math';
-import type { PhysicsWorld } from '@engine/world';
+import type { Entity, PhysicsWorld } from '@engine/world';
 import type { IFPSCameraCollisionProvider } from '../types';
 
 /**
@@ -18,6 +18,8 @@ export interface FPSRaycastCollisionOptions {
   sampleCount?: number;
   /** Optional physics mask/layer filter */
   mask?: number;
+  /** Entities to ignore during raycast (e.g. player's own collider) */
+  ignoreEntities?: Entity[];
 }
 
 /**
@@ -31,6 +33,7 @@ export class FPSRaycastCollision implements IFPSCameraCollisionProvider {
   private readonly maxIters: number;
   private readonly sampleCount: number;
   private readonly maxDistance: number;
+  private ignoreEntities: Entity[];
 
   // Preallocated vectors for performance
   private readonly tempDirection: Vec3 = [0, 0, 0];
@@ -44,6 +47,7 @@ export class FPSRaycastCollision implements IFPSCameraCollisionProvider {
     this.maxIters = options.maxIters ?? 2;
     this.sampleCount = options.sampleCount ?? 6;
     this.maxDistance = this.radius + this.backoff;
+    this.ignoreEntities = options.ignoreEntities ?? [];
 
     // Initialize sample directions
     if (this.sampleCount === 6) {
@@ -105,9 +109,11 @@ export class FPSRaycastCollision implements IFPSCameraCollisionProvider {
         this.tempDirection[1] = dir[1];
         this.tempDirection[2] = dir[2];
 
-        const hit = this.physics.raycast(out, this.tempDirection, {
-          maxDistance: this.maxDistance,
-        });
+        const hit = this.physics.raycast(out, this.tempDirection, 
+          this.ignoreEntities.length > 0 
+            ? { maxDistance: this.maxDistance, ignoreEntities: this.ignoreEntities }
+            : { maxDistance: this.maxDistance }
+        );
 
         if (hit && hit.distance < this.maxDistance) {
           // Calculate penetration
@@ -157,8 +163,50 @@ export class FPSRaycastCollision implements IFPSCameraCollisionProvider {
     return out;
   }
 
+  /**
+   * Set entities to ignore during collision detection
+   * @param entities Array of entities to ignore (e.g. player's own collider)
+   */
+  setIgnoreEntities(entities: Entity[]): void {
+    this.ignoreEntities = entities;
+  }
+
+  /**
+   * Get the current list of ignored entities
+   */
+  getIgnoreEntities(): Entity[] {
+    return this.ignoreEntities;
+  }
+
+  /**
+   * Add an entity to ignore list
+   */
+  addIgnoreEntity(entity: Entity): void {
+    if (!this.ignoreEntities.includes(entity)) {
+      this.ignoreEntities.push(entity);
+    }
+  }
+
+  /**
+   * Remove an entity from ignore list
+   */
+  removeIgnoreEntity(entity: Entity): void {
+    const index = this.ignoreEntities.indexOf(entity);
+    if (index !== -1) {
+      this.ignoreEntities.splice(index, 1);
+    }
+  }
+
+  /**
+   * Clear all ignored entities
+   */
+  clearIgnoreEntities(): void {
+    this.ignoreEntities = [];
+  }
+
   dispose(): void {
-    // No cleanup needed for this implementation
+    // Clear ignore list
+    this.ignoreEntities = [];
   }
 }
 

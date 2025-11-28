@@ -161,7 +161,7 @@ describe('LogicPanel', () => {
       host.appendChild(panel.element);
       panel.refresh();
 
-      const checkbox = host.querySelector('input[type="checkbox"]') as HTMLInputElement;
+      const checkbox = host.querySelector('.enabled-toggle') as HTMLInputElement;
       expect(checkbox).toBeTruthy();
       expect(checkbox.checked).toBe(true);
     });
@@ -172,7 +172,7 @@ describe('LogicPanel', () => {
       host.appendChild(panel.element);
       panel.refresh();
 
-      const checkbox = host.querySelector('input[type="checkbox"]') as HTMLInputElement;
+      const checkbox = host.querySelector('.enabled-toggle') as HTMLInputElement;
       checkbox.checked = false;
       checkbox.dispatchEvent(new Event('change'));
 

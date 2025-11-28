@@ -6,7 +6,7 @@ import { ToastProvider } from './contexts/ToastContext';
 import { router } from './router';
 import { initConsoleFilter } from './utils/consoleFilter';
 import './styles/main.css';
-import './styles/avatar-builder.css';
+// Avatar Builder CSS removed - will be rebuilt with new design system
 
 // Initialize console filtering to reduce noise from expected errors/warnings
 // Filters out: 404s for avatar-loadout, WebGPU timestamp warnings, etc.

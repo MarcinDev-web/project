@@ -26,6 +26,7 @@ export interface QuickMenuConfig {
   onOpenUIEditor?: () => void;
   onToggleCollaboration?: () => void;
   isCollaborating?: () => boolean;
+  onToggleModelForge?: () => void;
   onGizmoModeChange: (mode: 'translate' | 'rotate' | 'scale') => void;
   onRotationSnapChange: (mode: 'free' | '15deg' | '45deg' | '90deg') => void;
   onCameraChange?: (type: CameraType) => void;
@@ -154,8 +155,29 @@ export class QuickMenu {
     this.updateModeButton();
     section.appendChild(modeBtn);
 
-    // Removed: Transform Tools Group (Move/Rotate/Scale)
-    // Removed: Grid/Snap Tools Group (Snap/Grid)
+    // Model Forge Button
+    const forgeBtn = document.createElement('button');
+    forgeBtn.className = 'top-bar-forge-button';
+    forgeBtn.title = 'Model Forge - Build microblock models';
+    
+    const forgeIcon = createIcon('cube', 14);
+    const forgeText = document.createElement('span');
+    forgeText.textContent = 'Model Forge';
+    forgeBtn.appendChild(forgeIcon);
+    forgeBtn.appendChild(forgeText);
+
+    forgeBtn.addEventListener('click', () => {
+      this.config.onToggleModelForge?.();
+    });
+
+    // React to model forge state
+    effect(() => {
+      const isActive = this.config.state.modelForgeActive.value;
+      forgeBtn.classList.toggle('active', isActive);
+      forgeText.textContent = isActive ? 'Exit Forge' : 'Model Forge';
+    });
+
+    section.appendChild(forgeBtn);
 
     return section;
   }

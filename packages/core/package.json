@@ -67,6 +67,13 @@
       "development": "./src/script/index.ts",
       "test": "./src/script/index.ts",
       "default": "./dist/script/index.js"
+    },
+    "./plugin": {
+      "types": "./dist/plugin/index.d.ts",
+      "import": "./dist/plugin/index.js",
+      "development": "./src/plugin/index.ts",
+      "test": "./src/plugin/index.ts",
+      "default": "./dist/plugin/index.js"
     }
   },
   "scripts": {

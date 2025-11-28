@@ -1,14 +1,35 @@
 /* tslint:disable */
 /* eslint-disable */
 export const memory: WebAssembly.Memory;
+export const __wbg_collisioncontact_free: (a: number, b: number) => void;
 export const __wbg_collisionworld_free: (a: number, b: number) => void;
+export const __wbg_get_collisioncontact_depth: (a: number) => number;
+export const __wbg_get_collisioncontact_has_collision: (a: number) => number;
+export const __wbg_get_collisioncontact_normal_x: (a: number) => number;
+export const __wbg_get_collisioncontact_normal_y: (a: number) => number;
+export const __wbg_get_collisioncontact_normal_z: (a: number) => number;
+export const __wbg_get_collisioncontact_point_x: (a: number) => number;
+export const __wbg_get_collisioncontact_point_y: (a: number) => number;
+export const __wbg_get_collisioncontact_point_z: (a: number) => number;
+export const __wbg_set_collisioncontact_depth: (a: number, b: number) => void;
+export const __wbg_set_collisioncontact_has_collision: (a: number, b: number) => void;
+export const __wbg_set_collisioncontact_normal_x: (a: number, b: number) => void;
+export const __wbg_set_collisioncontact_normal_y: (a: number, b: number) => void;
+export const __wbg_set_collisioncontact_normal_z: (a: number, b: number) => void;
+export const __wbg_set_collisioncontact_point_x: (a: number, b: number) => void;
+export const __wbg_set_collisioncontact_point_y: (a: number, b: number) => void;
+export const __wbg_set_collisioncontact_point_z: (a: number, b: number) => void;
 export const batch_check: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number) => [number, number];
 export const batch_check_all: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number];
 export const batch_check_trs: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number) => [number, number];
 export const capsule_capsule_intersect: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => number;
 export const capsule_obb_intersect: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number) => number;
 export const capsule_sphere_intersect: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number) => number;
+export const collisioncontact_get_normal: (a: number) => [number, number];
+export const collisioncontact_get_point: (a: number) => [number, number];
+export const collisioncontact_new: () => number;
 export const collisionworld_check_collisions: (a: number) => [number, number];
+export const collisionworld_clear: (a: number) => void;
 export const collisionworld_clear_occlusion_buffer: (a: number) => void;
 export const collisionworld_get_positions_ptr: (a: number) => number;
 export const collisionworld_get_rotations_ptr: (a: number) => number;
@@ -21,6 +42,8 @@ export const collisionworld_raycast_world: (a: number, b: number, c: number, d: 
 export const collisionworld_resize: (a: number, b: number) => void;
 export const compute_scene_bounds: (a: number, b: number, c: number, d: number) => [number, number];
 export const obb_intersect: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number) => number;
+export const obb_intersect_with_contact: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number, k: number, l: number) => number;
+export const ray_capsule_intersect: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => number;
 export const ray_obb_intersect: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number, j: number) => number;
 export const ray_sphere_intersect: (a: number, b: number, c: number, d: number, e: number, f: number, g: number) => number;
 export const sphere_obb_intersect: (a: number, b: number, c: number, d: number, e: number, f: number, g: number, h: number, i: number) => number;

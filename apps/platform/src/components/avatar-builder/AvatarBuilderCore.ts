@@ -3,7 +3,7 @@
  * Handles Scene, Renderer (WebGPU), OrbitControls, and AvatarInstance
  */
 
-import { Scene, Entity, EnvironmentComponent } from '@engine/world';
+import { Scene, Entity, EnvironmentComponent, MeshComponent } from '@engine/world';
 import { initRenderer, type Renderer } from '@engine/gfx-webgpu';
 import { LightManager } from '@engine/gfx-webgpu/lighting/LightManager';
 import { createOrbitControls, type OrbitControls } from '@engine/camera';
@@ -257,8 +257,8 @@ export class AvatarBuilderCore {
           }
         },
         enableShadows: true,
-        shadowQuality: 'med',
-        enableSSGI: true,
+        shadowQuality: 'low', // Low for avatar preview - faster
+        enableSSGI: false, // Disabled - too expensive for avatar preview
       });
 
       // If disposed while initializing, clean up immediately
@@ -286,6 +286,28 @@ export class AvatarBuilderCore {
       } catch (e) {
         // Non-fatal: keep going with default camera if framing fails
         console.warn('AvatarBuilderCore: frameAvatar failed, using default camera', e);
+      }
+
+      // Debug: Log avatar hierarchy and mesh status
+      if (this.avatar) {
+        const root = this.avatar.getRootEntity();
+        console.log('[AvatarBuilderCore] Avatar root entity:', root.name, 'active:', root.active);
+        console.log('[AvatarBuilderCore] Avatar children count:', root.children.length);
+        
+        let meshCount = 0;
+        let meshWithDataCount = 0;
+        root.traverse((entity) => {
+          const meshComp = entity.getComponent?.(MeshComponent);
+          if (meshComp) {
+            meshCount++;
+            if (meshComp.meshData?.vertices && meshComp.meshData?.indices) {
+              meshWithDataCount++;
+            } else {
+              console.warn('[AvatarBuilderCore] Entity without meshData:', entity.name, 'meshType:', meshComp.meshType);
+            }
+          }
+        });
+        console.log(`[AvatarBuilderCore] Mesh entities: ${meshCount}, with valid meshData: ${meshWithDataCount}`);
       }
     } catch (error) {
       // Provide more specific error messages with better formatting

@@ -1,5 +1,6 @@
-import { Link } from 'react-router-dom';
+import { useState, useEffect } from 'react';
 import { useWebSocket, type WebSocketMessage } from '../../hooks/useWebSocket';
+import { ForumCategoryCard } from '../community-hub/ForumCategoryCard';
 import type { ForumCategory } from '../../api/forum';
 
 interface ForumCategoryListProps {
@@ -8,43 +9,56 @@ interface ForumCategoryListProps {
 }
 
 export function ForumCategoryList({ categories, onCategoryUpdate }: ForumCategoryListProps) {
+  // Track categories with recent activity (new posts in last 5 minutes)
+  const [activeCategories, setActiveCategories] = useState<Set<string>>(new Set());
+
   const handleWebSocketMessage = (message: WebSocketMessage) => {
-    // Listen for new threads in any category to refresh counts
-    if (message.type === 'forum:thread:new' || message.type === 'forum:thread:deleted') {
+    // Listen for new threads/posts to show activity indicators
+    if (message.type === 'forum:thread:new' || message.type === 'forum:post:new') {
+      const categoryId = (message.payload as { categoryId?: string })?.categoryId;
+      if (categoryId) {
+        setActiveCategories(prev => new Set([...prev, categoryId]));
+        // Clear activity indicator after 5 minutes
+        setTimeout(() => {
+          setActiveCategories(prev => {
+            const next = new Set(prev);
+            next.delete(categoryId);
+            return next;
+          });
+        }, 5 * 60 * 1000);
+      }
+      onCategoryUpdate?.();
+    }
+    
+    if (message.type === 'forum:thread:deleted') {
       onCategoryUpdate?.();
     }
   };
 
   useWebSocket(handleWebSocketMessage, true);
+
+  // Initial active state based on recent activity
+  useEffect(() => {
+    // Categories with posts in the last hour are considered active
+    const now = Date.now();
+    const oneHourAgo = now - 60 * 60 * 1000;
+    // This would need backend support to check lastPostAt
+    // For now, we'll just show the animation on hover
+  }, [categories]);
   
   return (
-    <div className="forum-category-grid">
-      {categories.map(category => (
-        <Link
+    <div className="forum-gaming-grid">
+      {categories.map((category, index) => (
+        <div 
           key={category.id}
-          to={`/community/category/${category.id}`}
-          className="forum-category-card"
-          aria-label={`Category: ${category.name}`}
+          className="forum-gaming-grid__item"
+          style={{ '--item-index': index } as React.CSSProperties}
         >
-          <span 
-            className="forum-category-card__icon"
-            style={{ color: category.color || 'var(--text-1)' }}
-          >
-            {category.icon || '📁'}
-          </span>
-          <div className="forum-category-card__content">
-            <h3 className="forum-category-card__title">
-              {category.name}
-            </h3>
-            <p className="forum-category-card__description">
-              {category.description}
-            </p>
-            <div className="forum-category-card__stats">
-              <span>{category.threadCount} {category.threadCount === 1 ? 'thread' : 'threads'}</span>
-              <span>{category.postCount} {category.postCount === 1 ? 'post' : 'posts'}</span>
-            </div>
-          </div>
-        </Link>
+          <ForumCategoryCard 
+            category={category}
+            hasRecentActivity={activeCategories.has(category.id)}
+          />
+        </div>
       ))}
     </div>
   );

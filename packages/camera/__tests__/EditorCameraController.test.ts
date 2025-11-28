@@ -363,6 +363,13 @@ describe('EditorCameraController', () => {
   describe('movement - Q/E vertical', () => {
     beforeEach(() => {
       camera.enable();
+      // Q/E vertical keys are gated to RMB-look mode to avoid conflicts with editor shortcuts
+      const mouseDownEvent = new MouseEvent('mousedown', {
+        button: 2,
+        clientX: 100,
+        clientY: 100,
+      });
+      canvas.dispatchEvent(mouseDownEvent);
     });
 
     it('should move up with E key', () => {

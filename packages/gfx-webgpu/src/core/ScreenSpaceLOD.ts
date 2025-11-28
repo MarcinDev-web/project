@@ -90,6 +90,9 @@ export class ScreenSpaceLOD {
     const shader = this.device.createShaderModule({
       label: 'screen-lod-shader',
       code: `
+        // Interleaved instance buffer stride (24 floats per instance)
+        const INSTANCE_STRIDE: u32 = 24u;
+        
         struct LODParams {
           viewProjection: mat4x4<f32>,
           cameraPos: vec3<f32>,
@@ -110,11 +113,28 @@ export class ScreenSpaceLOD {
         }
 
         @group(0) @binding(0) var<uniform> params: LODParams;
-        @group(0) @binding(1) var<storage, read> instancePositions: array<vec3<f32>>;
+        // Interleaved buffer: [offset(3), colorScale(4), secondaryColor(4), emissiveColor(4), materialParams(4), rotation(4), materialId(1)]
+        @group(0) @binding(1) var<storage, read> instanceInterleaved: array<f32>;
         @group(0) @binding(2) var<storage, read> instanceScales: array<f32>;
         @group(0) @binding(3) var<storage, read_write> screenSizes: array<f32>;
         @group(0) @binding(4) var<storage, read_write> lodSelections: array<u32>;
         @group(0) @binding(5) var<storage, read> previousLOD: array<u32>;
+        
+        // Read position from interleaved buffer (offset 0-2)
+        fn getInstancePosition(index: u32) -> vec3<f32> {
+          let base = index * INSTANCE_STRIDE;
+          return vec3<f32>(
+            instanceInterleaved[base + 0u],
+            instanceInterleaved[base + 1u],
+            instanceInterleaved[base + 2u]
+          );
+        }
+        
+        // Read scale from interleaved buffer (colorScale.w at offset 6)
+        fn getInstanceScale(index: u32) -> f32 {
+          let base = index * INSTANCE_STRIDE;
+          return instanceInterleaved[base + 6u];
+        }
 
         fn computeScreenSize(worldPos: vec3<f32>, scale: f32) -> f32 {
           // Transform to clip space
@@ -199,8 +219,9 @@ export class ScreenSpaceLOD {
             return;
           }
           
-          let position = instancePositions[instanceIndex];
-          let scale = instanceScales[instanceIndex];
+          // Read position and scale from interleaved buffer
+          let position = getInstancePosition(instanceIndex);
+          let scale = getInstanceScale(instanceIndex);
           let screenSize = computeScreenSize(position, scale);
           screenSizes[instanceIndex] = screenSize;
           
@@ -234,8 +255,7 @@ export class ScreenSpaceLOD {
    * @param cameraPos - Camera position
    * @param screenWidth - Screen width in pixels
    * @param screenHeight - Screen height in pixels
-   * @param instancePositions - Buffer containing instance positions (vec3)
-   * @param instanceScales - Buffer containing instance scales (f32), or null to use default (1.0)
+   * @param instanceInterleavedBuffer - Interleaved buffer containing instance data (positions at offset 0, scale at offset 6)
    * @param instanceCount - Number of instances
    * @param nearPlane - Near plane distance
    * @returns Buffer containing LOD selections (array of u32)
@@ -246,8 +266,7 @@ export class ScreenSpaceLOD {
     cameraPos: Vec3,
     screenWidth: number,
     screenHeight: number,
-    instancePositions: GPUBuffer,
-    instanceScales: GPUBuffer | null,
+    instanceInterleavedBuffer: GPUBuffer,
     instanceCount: number,
     nearPlane = 0.1
   ): GPUBuffer {
@@ -324,27 +343,22 @@ export class ScreenSpaceLOD {
     });
     this.device.queue.writeBuffer(uniformBuffer, 0, uniformData);
 
-    // Create scale buffer if needed (extract from instance data)
-    // For now, assume instanceScales buffer exists or create a default one
-    let scaleBuffer = instanceScales;
-    if (!scaleBuffer) {
-      // Create default scale buffer (all 1.0)
-      const defaultScales = new Float32Array(instanceCount).fill(1.0);
-      scaleBuffer = this.device.createBuffer({
-        label: 'screen-lod-default-scales',
-        size: defaultScales.byteLength,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-      });
-      this.device.queue.writeBuffer(scaleBuffer, 0, defaultScales);
-    }
+    // Create a dummy scale buffer for binding 2 (no longer used, scale is read from interleaved buffer)
+    const dummyScales = new Float32Array(1).fill(1.0);
+    const dummyScaleBuffer = this.device.createBuffer({
+      label: 'screen-lod-dummy-scales',
+      size: dummyScales.byteLength,
+      usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
+    });
+    this.device.queue.writeBuffer(dummyScaleBuffer, 0, dummyScales);
 
     const bindGroup = this.device.createBindGroup({
       label: 'screen-lod-bg',
       layout: this.bindGroupLayout,
       entries: [
         { binding: 0, resource: { buffer: uniformBuffer } },
-        { binding: 1, resource: { buffer: instancePositions } },
-        { binding: 2, resource: { buffer: scaleBuffer } },
+        { binding: 1, resource: { buffer: instanceInterleavedBuffer } },
+        { binding: 2, resource: { buffer: dummyScaleBuffer } }, // Not used, shader reads from interleaved
         { binding: 3, resource: { buffer: this.screenSizeBuffer } },
         { binding: 4, resource: { buffer: this.lodBuffer } },
         { binding: 5, resource: { buffer: this.previousLODBuffer } },

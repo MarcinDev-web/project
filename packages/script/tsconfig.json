@@ -17,6 +17,8 @@
       "@engine/core/*": ["../core/dist/*"],
       "@engine/world": ["../world/dist"],
       "@engine/world/*": ["../world/dist/*"],
+      "@engine/economy": ["../economy/dist"],
+      "@engine/economy/*": ["../economy/dist/*"],
       "@engine/stdlib/Animation": ["../stdlib/dist/stdlib/src/Animation"],
       "@engine/stdlib": ["../stdlib/dist/stdlib/src"],
       "@engine/stdlib/*": ["../stdlib/dist/stdlib/src/*"]
@@ -32,7 +34,8 @@
     "../stdlib/src"
   ],
   "references": [
-    { "path": "../core/tsconfig.build.json" }
+    { "path": "../core/tsconfig.build.json" },
+    { "path": "../economy" }
   ]
 }
 

@@ -66,12 +66,21 @@ export const NavBar = memo(function NavBar() {
             <NavLink to="/studio" isActive={isActive('/studio')}>
               Studio
             </NavLink>
-            <NavLink to="/blocks-models-studio" isActive={isActive('/blocks-models-studio')}>
-              Model Builder
+            <NavLink to="/avatar-forge" isActive={isActive('/avatar-forge')}>
+              Avatar Forge
             </NavLink>
-            <NavLink to="/avatar-builder" isActive={isActive('/avatar-builder')}>
-              Avatar Builder
-            </NavLink>
+
+            {/* Admin/Moderator Links */}
+            {isModerator && (
+              <NavLink to="/moderator" isActive={isActive('/moderator')}>
+                Moderator
+              </NavLink>
+            )}
+            {isAdmin && (
+              <NavLink to="/admin" isActive={isActive('/admin')}>
+                Admin
+              </NavLink>
+            )}
 
             {/* Divider */}
             <div className="navbar-divider" />

@@ -25,6 +25,8 @@ export interface TrsArray {
 export interface CollisionWorld {
   free(): void;
   resize(count: number): void;
+  /** Clears all data and releases memory by shrinking internal vectors. */
+  clear(): void;
   get_positions_ptr(): number;
   get_rotations_ptr(): number;
   get_scales_ptr(): number;
@@ -35,8 +37,37 @@ export interface CollisionWorld {
   rasterize_occluders(indices: Uint32Array, view_proj: Float32Array): void;
 }
 
+/**
+ * Contact information from collision detection.
+ * Used for physics resolution (penetration depth, normal, contact point).
+ */
+export interface CollisionContact {
+  /** Whether collision occurred */
+  has_collision: boolean;
+  /** Penetration depth (positive when colliding) */
+  depth: number;
+  /** Collision normal X component (pointing from A to B) */
+  normal_x: number;
+  /** Collision normal Y component */
+  normal_y: number;
+  /** Collision normal Z component */
+  normal_z: number;
+  /** Contact point X coordinate */
+  point_x: number;
+  /** Contact point Y coordinate */
+  point_y: number;
+  /** Contact point Z coordinate */
+  point_z: number;
+  /** Get normal as array */
+  get_normal(): Float32Array;
+  /** Get contact point as array */
+  get_point(): Float32Array;
+}
+
 export interface WasmCollision {
   obbIntersect(a: ObbFlat, b: ObbFlat): boolean;
+  /** OBB-OBB collision with contact information for physics resolution */
+  obbIntersectWithContact(a: ObbFlat, b: ObbFlat): CollisionContact;
   sphereSphereIntersect(aCenter: Float32Array, aRadius: number, bCenter: Float32Array, bRadius: number): boolean;
   sphereObbIntersect(sCenter: Float32Array, sRadius: number, bCenter: Float32Array, bAxes: Float32Array, bHalf: Float32Array): boolean;
   capsuleSphereIntersect(cBase: Float32Array, cTip: Float32Array, cRadius: number, sCenter: Float32Array, sRadius: number): boolean;
@@ -44,6 +75,8 @@ export interface WasmCollision {
   capsuleCapsuleIntersect(aBase: Float32Array, aTip: Float32Array, aRadius: number, bBase: Float32Array, bTip: Float32Array, bRadius: number): boolean;
   raySphereIntersect(rayOrigin: Float32Array, rayDir: Float32Array, sCenter: Float32Array, sRadius: number): number;
   rayObbIntersect(rayOrigin: Float32Array, rayDir: Float32Array, bCenter: Float32Array, bAxes: Float32Array, bHalf: Float32Array): number;
+  /** Ray-capsule intersection. Returns distance to hit or -1 if no intersection. */
+  rayCapsuleIntersect(rayOrigin: Float32Array, rayDir: Float32Array, cBase: Float32Array, cTip: Float32Array, cRadius: number): number;
   batchCheck(preview: ObbFlat, others: ObbFlatArray): Uint32Array;
   batchCheckTrs(preview: Trs, others: TrsArray): Uint32Array;
   batchCheckAll(others: TrsArray): Uint32Array;
@@ -113,6 +146,16 @@ export async function init(): Promise<WasmCollision> {
   ) => boolean;
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+  const obb_intersect_with_contact = mod.obb_intersect_with_contact as (
+    a_center: Float32Array,
+    a_axes: Float32Array,
+    a_half: Float32Array,
+    b_center: Float32Array,
+    b_axes: Float32Array,
+    b_half: Float32Array
+  ) => CollisionContact;
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   const sphere_sphere_intersect = mod.sphere_sphere_intersect as (
     a_center: Float32Array,
     a_radius: number,
@@ -176,6 +219,15 @@ export async function init(): Promise<WasmCollision> {
   ) => number;
 
   // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+  const ray_capsule_intersect = mod.ray_capsule_intersect as (
+    ray_origin: Float32Array,
+    ray_dir: Float32Array,
+    c_base: Float32Array,
+    c_tip: Float32Array,
+    c_radius: number
+  ) => number;
+
+  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   const batch_check = mod.batch_check as (
     pre_center: Float32Array,
     pre_axes: Float32Array,
@@ -231,6 +283,9 @@ export async function init(): Promise<WasmCollision> {
     obbIntersect: (a, b) => {
       return obb_intersect(a.center, a.axes, a.half, b.center, b.axes, b.half);
     },
+    obbIntersectWithContact: (a, b) => {
+      return obb_intersect_with_contact(a.center, a.axes, a.half, b.center, b.axes, b.half);
+    },
     sphereSphereIntersect: (aCenter, aRadius, bCenter, bRadius) => {
       return sphere_sphere_intersect(aCenter, aRadius, bCenter, bRadius);
     },
@@ -251,6 +306,9 @@ export async function init(): Promise<WasmCollision> {
     },
     rayObbIntersect: (rayOrigin, rayDir, bCenter, bAxes, bHalf) => {
       return ray_obb_intersect(rayOrigin, rayDir, bCenter, bAxes, bHalf);
+    },
+    rayCapsuleIntersect: (rayOrigin, rayDir, cBase, cTip, cRadius) => {
+      return ray_capsule_intersect(rayOrigin, rayDir, cBase, cTip, cRadius);
     },
     computeSceneBounds: (worldMatrices, halfExtents) => {
       try {
@@ -313,4 +371,4 @@ export async function init(): Promise<WasmCollision> {
   return api;
 }
 
-export { getTrsBuffers, releaseTrsBuffers, type TrsBuffers } from './pool';
+export { getTrsBuffers, releaseTrsBuffers, getPoolMetrics, type TrsBuffers, type PoolMetrics } from './pool';

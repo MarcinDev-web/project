@@ -11,7 +11,7 @@ const DEFAULT_HISTORY_LIMIT = 100;
 
 import type { PlacementToolType } from '../placement/PlacementMode';
 
-export type EditorMode = 'edit' | 'play';
+export type EditorMode = 'edit' | 'play' | 'model-forge';
 export type BuildMode = 'free' | 'limited';
 export type EasyPlacePattern = 'single' | 'line' | 'grid' | 'circle' | 'wall';
 export type RotationSnapMode = 'free' | '15deg' | '45deg' | '90deg';
@@ -137,6 +137,14 @@ export class EditorState {
   // Share/view-only mode
   isSharedView: Signal<boolean>;
 
+  // Model Forge mode
+  modelForgeActive: Signal<boolean>;
+  modelForgeBounds: Signal<{
+    min: [number, number, number];
+    max: [number, number, number];
+    position: [number, number, number];
+  }>;
+
   // Optional Adaptive UI integration point (set by UI layer)
   adaptiveUI?: {
     trackPlacement?: () => void;
@@ -224,6 +232,14 @@ export class EditorState {
 
     // Share/view-only mode - disabled by default
     this.isSharedView = signal<boolean>(false);
+
+    // Model Forge mode - disabled by default
+    this.modelForgeActive = signal<boolean>(false);
+    this.modelForgeBounds = signal({
+      min: [-8, 0, -8] as [number, number, number],
+      max: [8, 16, 8] as [number, number, number],
+      position: [0, 0, 0] as [number, number, number],
+    });
   }
 
   /** Temporarily disables history recording (used during undo/redo). */

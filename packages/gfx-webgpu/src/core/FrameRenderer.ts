@@ -12,13 +12,14 @@
  */
 
 import type { Scene, Entity } from '@engine/world';
-import { EnvironmentComponent, Transform } from '@engine/world';
+import { EnvironmentComponent, Transform, CameraComponent } from '@engine/world';
 import type { FrameResources, GeometryData } from '../resources/resources';
 import { FrustumCuller } from './FrustumCuller';
 import { InstanceDataBuilder, type CustomGeometryEntity } from './InstanceManager';
 import { GeometryCache } from './GeometryCache';
 import type { CollisionWorld, WasmCollision } from '@engine/wasm-collision';
 import { GpuInstancePipeline } from './GpuInstancePipeline';
+import { AsyncComputeManager, type CullingFrame, type AsyncComputeMetrics } from './AsyncComputeManager';
 import type { EnvironmentRenderer } from '../renderers/EnvironmentRenderer';
 import type { WaterRenderer } from '../renderers/WaterRenderer';
 import type { LogicConnectionRenderer } from '../LogicConnectionRenderer';
@@ -67,6 +68,7 @@ interface ResolvedFeatureFlags extends PostProcessFeatureFlags {
   enableForwardPlus: boolean;
   enableScreenLOD: boolean;
   enableSSGI?: boolean;
+  enableAsyncCompute?: boolean;
 }
 
 interface SceneUpdateResult {
@@ -123,6 +125,7 @@ export interface FrameRenderContext {
     enableOutlines?: boolean;
     enableForwardPlus?: boolean;
     enableScreenLOD?: boolean;
+    enableAsyncCompute?: boolean;
   };
   shadowQuality?: 'low' | 'med' | 'high' | 'ultra';
   outlineQuality?: 'low' | 'med';
@@ -167,8 +170,6 @@ export class FrameRenderer {
   private forwardPlus: ForwardPlus | null = null;
   private screenSpaceLOD: ScreenSpaceLOD | null = null;
   private shadowPass: ShadowPass | null = null;
-  private instanceScaleScratch = new Float32Array(0);
-  private ownedLodScaleBuffer: GPUBuffer | null = null;
   private errorMetrics: ErrorMetrics = {
     totalErrors: 0,
     lastError: null,
@@ -186,6 +187,12 @@ export class FrameRenderer {
   private depthResolveLayout: GPUBindGroupLayout | null = null;
   private depthResolveUniformBuffer: GPUBuffer | null = null;
   private depthResolveDevice: GPUDevice | null = null;
+  
+  // Async compute resources for frame overlap
+  private asyncComputeManager: AsyncComputeManager | null = null;
+  private asyncComputeDevice: GPUDevice | null = null;
+  private pendingCullingSlot: CullingFrame | null = null;
+  private lastAsyncCullingFrameId = -1;
 
   constructor(initialCapacity = 1000) {
     this.frustumCuller = new FrustumCuller();
@@ -205,6 +212,141 @@ export class FrameRenderer {
   setCollisionWorld(wasm: WasmCollision, world: CollisionWorld): void {
     this.wasmCollision = wasm;
     this.collisionWorld = world;
+  }
+
+  /**
+   * Ensures the async compute manager is initialized for the given device.
+   * @param device - GPU device to create the manager for
+   * @returns The AsyncComputeManager instance
+   */
+  private ensureAsyncComputeManager(device: GPUDevice): AsyncComputeManager {
+    if (!this.asyncComputeManager || this.asyncComputeDevice !== device) {
+      try {
+        this.asyncComputeManager?.dispose();
+      } catch {
+        // ignore
+      }
+      this.asyncComputeManager = new AsyncComputeManager(device, {
+        slotCount: 3,
+        initialCapacity: 1024,
+        labelPrefix: 'frame-async-cull',
+      });
+      this.asyncComputeDevice = device;
+    }
+    return this.asyncComputeManager;
+  }
+
+  /**
+   * Prepares and submits async culling for the next frame.
+   * This should be called at the start of frame rendering to overlap
+   * with the previous frame's GPU work.
+   * 
+   * @param ctx - Frame render context
+   * @param viewProjectionMatrix - View-projection matrix for culling
+   * @param geometry - Current geometry data
+   */
+  prepareAsyncCulling(
+    ctx: FrameRenderContext,
+    viewProjectionMatrix: Mat4,
+    geometry: GeometryData
+  ): void {
+    if (!ctx.featureFlags?.enableAsyncCompute) {
+      return;
+    }
+
+    const configuredDevice = ctx.configuredDevice ?? ctx.device;
+    const asyncManager = this.ensureAsyncComputeManager(configuredDevice);
+
+    // Prepare culling work for this frame
+    const cullingResult = asyncManager.prepareCulling({
+      viewProjectionMatrix,
+      geometry,
+      frameResources: ctx.frameResources,
+    });
+
+    if (cullingResult) {
+      // Submit culling work immediately (runs async on GPU)
+      asyncManager.submitCulling(cullingResult);
+    }
+  }
+
+  /**
+   * Tries to use async culling results for rendering.
+   * Returns true if async culling was used, false if fallback to sync is needed.
+   * 
+   * @param ctx - Frame render context
+   * @param encoder - Command encoder for the current frame
+   * @param frameResources - Frame resources
+   * @param geometry - Current geometry data
+   * @returns The CullingFrame to use for rendering, or null if sync fallback needed
+   */
+  private tryUseAsyncCulling(
+    ctx: FrameRenderContext,
+    encoder: GPUCommandEncoder,
+    frameResources: FrameResources,
+    geometry: GeometryData
+  ): CullingFrame | null {
+    if (!this.asyncComputeManager?.isEnabled()) {
+      return null;
+    }
+
+    // Try to acquire ready culling results
+    const readySlot = this.asyncComputeManager.acquireReadyCulling();
+    
+    if (readySlot) {
+      // Copy async culling results to frame resources for rendering
+      // The compacted buffer and indirect args are in the slot
+      encoder.copyBufferToBuffer(
+        readySlot.compactedInterleavedBuffer,
+        0,
+        frameResources.instanceInterleavedBuffer,
+        0,
+        Math.min(
+          readySlot.compactedInterleavedBuffer.size,
+          frameResources.instanceInterleavedBuffer.size
+        )
+      );
+      encoder.copyBufferToBuffer(
+        readySlot.indirectArgsBuffer,
+        0,
+        frameResources.instanceIndirectArgsBuffer,
+        0,
+        Math.min(
+          readySlot.indirectArgsBuffer.size,
+          frameResources.instanceIndirectArgsBuffer.size
+        )
+      );
+      
+      this.pendingCullingSlot = readySlot;
+      return readySlot;
+    }
+
+    return null;
+  }
+
+  /**
+   * Releases the current async culling slot after rendering is submitted.
+   */
+  private releaseAsyncCullingSlot(): void {
+    if (this.pendingCullingSlot && this.asyncComputeManager) {
+      this.asyncComputeManager.releaseRendering(this.pendingCullingSlot);
+      this.pendingCullingSlot = null;
+    }
+  }
+
+  /**
+   * Gets async compute performance metrics.
+   * @returns Metrics or null if async compute is not enabled
+   */
+  getAsyncComputeMetrics(): AsyncComputeMetrics | null {
+    return this.asyncComputeManager?.getMetrics() ?? null;
+  }
+
+  /**
+   * Checks if async compute is currently enabled and active.
+   */
+  isAsyncComputeEnabled(): boolean {
+    return this.asyncComputeManager?.isEnabled() ?? false;
   }
 
   /**
@@ -432,6 +574,9 @@ export class FrameRenderer {
     this.frameTargets.flush(configuredDevice.queue);
     this.postProcess.flush(configuredDevice.queue);
 
+    // Release async culling slot after submit (frees it for next frame's culling)
+    this.releaseAsyncCullingSlot();
+
     this.handleTimestampRead(ctx, ctx.device, frameResources);
 
     if (sceneUpdate.timings && ctx.onCpuTimings) {
@@ -475,12 +620,6 @@ export class FrameRenderer {
     this.frameTargets.dispose();
     this.invalidateBundle();
     this.pendingTimestampRead = false;
-    try {
-      this.ownedLodScaleBuffer?.destroy();
-    } catch {
-      // ignore
-    }
-    this.ownedLodScaleBuffer = null;
     
     // Cleanup depth resolve resources for volumetric clouds
     try {
@@ -492,6 +631,17 @@ export class FrameRenderer {
     this.depthResolvePipeline = null;
     this.depthResolveLayout = null;
     this.depthResolveDevice = null;
+    
+    // Cleanup async compute resources
+    try {
+      this.asyncComputeManager?.dispose();
+    } catch {
+      // ignore
+    }
+    this.asyncComputeManager = null;
+    this.asyncComputeDevice = null;
+    this.pendingCullingSlot = null;
+    this.lastAsyncCullingFrameId = -1;
     
     // Cleanup WASM resources
     this.collisionWorld = null;
@@ -664,14 +814,6 @@ export class FrameRenderer {
       // Reset with a new array to release memory of the oversized one
       // We don't need to preserve content as it is regenerated every frame
       this.visibleEntitiesCache = [];
-    }
-
-    // Trim scratch buffer if it's significantly larger than needed
-    // Minimum size of 64k elements (256KB) to prevent thrashing for small counts
-    const minSize = 65536;
-    if (this.instanceScaleScratch.length > Math.max(currentInstanceCount * 4, minSize)) {
-      const newSize = Math.max(currentInstanceCount * 2, minSize);
-      this.instanceScaleScratch = new Float32Array(newSize);
     }
   }
   
@@ -928,13 +1070,7 @@ export class FrameRenderer {
       this.cleanupCaches(sceneData.instanceCount);
 
       const instanceData: InstanceBufferData = {
-        instanceOffsetData: sceneData.instanceOffsetData,
-        instanceColorScaleData: sceneData.instanceColorScaleData,
-        instanceSecondaryColorData: sceneData.instanceSecondaryColorData,
-        instanceEmissiveColorData: sceneData.instanceEmissiveColorData,
-        instanceMaterialParamsData: sceneData.instanceMaterialParamsData,
-        instanceRotationData: sceneData.instanceRotationData,
-        instanceMaterialIdData: sceneData.instanceMaterialIdData,
+        instanceInterleavedData: sceneData.instanceInterleavedData,
         instanceBoundsData: sceneData.instanceBoundsData,
       };
 
@@ -985,15 +1121,13 @@ export class FrameRenderer {
       if (!this.screenSpaceLOD) {
         this.screenSpaceLOD = new ScreenSpaceLOD(configuredDevice);
       }
-      const scaleBuffer = this.extractInstanceScales(configuredDevice, frameResources, geometry);
       this.screenSpaceLOD.selectLOD(
         encoder,
         viewProjectionMatrix,
         eyePosition,
         ctx.canvas.width,
         ctx.canvas.height,
-        frameResources.instanceOffsetBuffer,
-        scaleBuffer,
+        frameResources.instanceInterleavedBuffer,
         geometry.instanceCount
       );
     } catch (err) {
@@ -1112,6 +1246,18 @@ export class FrameRenderer {
       this.instancePipelineDevice = null;
       return false;
     }
+
+    // Try to use async culling results if enabled
+    if (featureFlags.enableAsyncCompute) {
+      const asyncSlot = this.tryUseAsyncCulling(ctx, encoder, frameResources, geometry);
+      if (asyncSlot) {
+        // Async culling was used, prepare next frame's culling
+        this.prepareAsyncCulling(ctx, viewProjectionMatrix, geometry);
+        return true;
+      }
+      // Fall through to sync path if async not ready
+    }
+
     try {
       const configuredDevice = ctx.configuredDevice ?? ctx.device;
       const pipeline = this.ensureInstancePipeline(configuredDevice);
@@ -1340,6 +1486,18 @@ export class FrameRenderer {
         // No depth attachment - clouds don't write depth and we're sampling it
       });
 
+      // Get camera near/far planes from primary camera for correct depth linearization
+      let nearPlane = 0.1;
+      let farPlane = 10000;
+      const primaryCamera = scene.primaryCamera;
+      if (primaryCamera) {
+        const cameraComponent = primaryCamera.getComponent(CameraComponent);
+        if (cameraComponent) {
+          nearPlane = cameraComponent.near;
+          farPlane = cameraComponent.far;
+        }
+      }
+
       // Render volumetric clouds
       const vpMatrix = viewProjectionMatrix instanceof Float32Array 
         ? viewProjectionMatrix 
@@ -1349,7 +1507,9 @@ export class FrameRenderer {
         envComponent, 
         vpMatrix,
         canvas?.width ?? 1920,
-        canvas?.height ?? 1080
+        canvas?.height ?? 1080,
+        nearPlane,
+        farPlane
       );
 
       cloudPass.end();
@@ -1672,74 +1832,13 @@ fn fs_main(@location(0) v_uv: vec2<f32>) -> @builtin(frag_depth) f32 {
     };
   }
 
-  private extractInstanceScales(
-    device: GPUDevice,
-    frameResources: FrameResources,
-    geometry: GeometryData
-  ): GPUBuffer | null {
-    const { instanceCount } = geometry;
-    if (instanceCount === 0) {
-      return null;
-    }
-    const source = geometry.instanceColorScaleData;
-    if (!source || source.length < instanceCount * 4) {
-      return null;
-    }
-    if (this.instanceScaleScratch.length < instanceCount) {
-      this.instanceScaleScratch = new Float32Array(
-        Math.max(instanceCount, this.instanceScaleScratch.length * 2 || 128)
-      );
-    }
-    const scratch = this.instanceScaleScratch;
-    for (let i = 0; i < instanceCount; i++) {
-      scratch[i] = source[i * 4 + 3] ?? 1;
-    }
-    const byteLength = instanceCount * Float32Array.BYTES_PER_ELEMENT;
-    const pool = (frameResources as unknown as { bufferPool?: GPUBufferPool }).bufferPool;
-
-    if (pool) {
-      const buffer = pool.getOrCreate(
-        'lod-instance-scale',
-        byteLength,
-        GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-        'lod-instance-scale-buffer'
-      );
-      device.queue.writeBuffer(buffer, 0, scratch.buffer, 0, byteLength);
-      return buffer;
-    }
-
-    if (!this.ownedLodScaleBuffer || this.ownedLodScaleBuffer.size < byteLength) {
-      try {
-        this.ownedLodScaleBuffer?.destroy();
-      } catch {
-        // ignore
-      }
-      this.ownedLodScaleBuffer = device.createBuffer({
-        label: 'lod-instance-scale-buffer',
-        size: byteLength,
-        usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST,
-      });
-    }
-    const buffer = this.ownedLodScaleBuffer;
-    if (buffer) {
-      device.queue.writeBuffer(buffer, 0, scratch.buffer, 0, byteLength);
-    }
-    return buffer ?? null;
-  }
-
   private drawStaticGeometry(
     encoder: GPURenderPassEncoder | GPURenderBundleEncoder,
     frameResources: FrameResources,
     geometry: GeometryData
   ): void {
     encoder.setVertexBuffer(0, frameResources.vertexBuffer);
-    encoder.setVertexBuffer(1, frameResources.instanceOffsetBuffer);
-    encoder.setVertexBuffer(2, frameResources.instanceColorScaleBuffer);
-    encoder.setVertexBuffer(3, frameResources.instanceSecondaryColorBuffer);
-    encoder.setVertexBuffer(4, frameResources.instanceEmissiveColorBuffer);
-    encoder.setVertexBuffer(5, frameResources.instanceMaterialParamsBuffer);
-    encoder.setVertexBuffer(6, frameResources.instanceRotationBuffer);
-    encoder.setVertexBuffer(7, frameResources.instanceMaterialIdBuffer);
+    encoder.setVertexBuffer(1, frameResources.instanceInterleavedBuffer);
     encoder.setIndexBuffer(frameResources.indexBuffer, 'uint16');
 
     encoder.setPipeline(frameResources.renderPipeline);

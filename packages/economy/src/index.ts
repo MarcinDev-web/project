@@ -1,5 +1,19 @@
 // @engine/economy - Currency and economy system
 
+// Errors and Result utilities
+export { EconomyError, type EconomyErrorCode } from './errors.js';
+export {
+  depositResult,
+  withdrawResult,
+  transferResult,
+  exchangeResult,
+  batchWithdrawResult,
+  batchTransferResult,
+  checkBalance,
+  type EconomyResult,
+  type TransactionResult,
+} from './result.js';
+
 // Types
 export type {
   Currency,

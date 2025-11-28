@@ -47,7 +47,8 @@
                 },
     "dependencies":  {
                          "@engine/core":  "workspace:*",
-                         "@engine/world":  "workspace:*"
+                         "@engine/world":  "workspace:*",
+                         "@engine/economy":  "workspace:*"
                      },
     "devDependencies":  {
                             "typescript":  "^5.9.3",

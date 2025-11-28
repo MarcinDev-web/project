@@ -30,8 +30,11 @@ export default defineWorkspace([
         ...engineAliases(__dirname),
         '@shared': sharedRoot,
         '@shared/types': resolve(sharedRoot, 'types'),
-        // Mock WASM package to avoid loading issues in tests
+        // Mock WASM packages to avoid loading issues in tests
         '@engine/wasm-animation': resolve(__dirname, 'packages/test-utils/src/mocks/wasm-animation.ts'),
+        '@engine/wasm-ecs-core': resolve(__dirname, 'packages/test-utils/src/mocks/wasm-ecs-core.ts'),
+        // Explicit asset-pipeline alias to ensure it's resolved from source
+        '@engine/asset-pipeline': resolve(__dirname, 'packages/asset-pipeline/src/index.ts'),
       },
     },
     test: {
@@ -65,6 +68,7 @@ export default defineWorkspace([
           '@engine/script',
           '@engine/economy',
           '@engine/wasm-collision',
+          '@engine/asset-pipeline',
         ],
         exclude: [],
       },
@@ -185,7 +189,7 @@ export default defineWorkspace([
           // Inline dependencies to avoid external module resolution overhead
           inline: [/@engine\/.*/],
           // Explicitly include wasm-collision, economy, and script to force source file resolution
-          include: ['@engine/wasm-collision', '@engine/economy', '@engine/script', '@engine/core', '@engine/world', '@engine/animation', '@engine/avatar', '@engine/camera', '@engine/stdlib', '@engine/editor-utils', '@engine/test-utils'],
+          include: ['@engine/wasm-collision', '@engine/economy', '@engine/script', '@engine/core', '@engine/world', '@engine/animation', '@engine/avatar', '@engine/camera', '@engine/stdlib', '@engine/editor-utils', '@engine/test-utils', '@engine/asset-pipeline'],
         },
         fs: {
           // Allow access to packages directory
@@ -225,6 +229,19 @@ export default defineWorkspace([
     plugins: [wasm()],
     // Set root to normalized path to prevent Windows path aliasing issues
     root: __dirname,
+    resolve: {
+      alias: {
+        ...engineAliases(__dirname),
+        '@shared': resolve(__dirname, 'shared'),
+        '@shared/types': resolve(__dirname, 'shared/types'),
+        // Mock WASM package to avoid loading issues in tests
+        '@engine/wasm-animation': resolve(__dirname, 'packages/test-utils/src/mocks/wasm-animation.ts'),
+        // Explicit aliases to ensure packages are resolved from source
+        '@engine/asset-pipeline': resolve(__dirname, 'packages/asset-pipeline/src/index.ts'),
+        // Mock wasm-ecs-core to avoid WASM loading issues in tests
+        '@engine/wasm-ecs-core': resolve(__dirname, 'packages/test-utils/src/mocks/wasm-ecs-core.ts'),
+      },
+    },
     test: {
       name: 'integration',
       // Use normalized root to prevent duplicate test discovery on Windows
@@ -246,17 +263,11 @@ export default defineWorkspace([
           '@engine/editor-utils',
           '@engine/script',
           '@engine/economy',
+          '@engine/asset-pipeline',
         ],
         exclude: [],
       },
       resolve: {
-        alias: {
-          ...engineAliases(__dirname),
-          '@shared': resolve(__dirname, 'shared'),
-          '@shared/*': resolve(__dirname, 'shared/*'),
-          // Mock WASM package to avoid loading issues in tests
-          '@engine/wasm-animation': resolve(__dirname, 'packages/test-utils/src/mocks/wasm-animation.ts'),
-        },
         conditions: ['development', 'test', 'import', 'module'],
         dedupe: ['@engine/core', '@engine/world', '@engine/animation', '@engine/avatar', '@engine/camera'],
         preserveSymlinks: false,
@@ -279,6 +290,7 @@ export default defineWorkspace([
             '@engine/stdlib',
             '@engine/editor-utils',
             '@engine/script',
+            '@engine/asset-pipeline',
           ],
         },
         fs: {

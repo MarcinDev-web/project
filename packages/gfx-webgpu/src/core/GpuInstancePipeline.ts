@@ -3,13 +3,28 @@ import { Logger } from '@engine/core/utils';
 import type { GeometryData, FrameResources } from '../resources/resources';
 import { buildIndirectDrawArgs } from './InstancePipelineTypes';
 import { MaterialComponent } from '@engine/world';
+import { INSTANCE_STRIDE, INSTANCE_MATERIAL_PARAMS_OFFSET } from './InstanceManager';
 
 const WORKGROUP_SIZE = 64;
 const FRUSTUM_UNIFORM_SIZE = 128; // bytes (6 planes + misc vec4)
-const COMPACT_UNIFORM_SIZE = 16; // components + padding
 const COUNTS_BUFFER_SIZE = 16; // opaque + transparent with padding
 
+/**
+ * GPU compute shader for instance culling and compaction.
+ * 
+ * Uses interleaved buffer layout (24 floats = 96 bytes per instance):
+ * - offset: vec3 (3 floats) at offset 0
+ * - colorScale: vec4 (4 floats) at offset 3
+ * - secondaryColor: vec4 (4 floats) at offset 7
+ * - emissiveColor: vec4 (4 floats) at offset 11
+ * - materialParams: vec4 (4 floats) at offset 15
+ * - rotation: vec4 (4 floats) at offset 19
+ * - materialId: f32 (1 float) at offset 23
+ */
 const INSTANCE_PIPELINE_SHADER = /* wgsl */ `
+const INSTANCE_STRIDE: u32 = ${INSTANCE_STRIDE}u;
+const MATERIAL_PARAMS_OFFSET: u32 = ${INSTANCE_MATERIAL_PARAMS_OFFSET}u;
+
 struct InstanceUniforms {
   planes: array<vec4<f32>, 6>,
   misc: vec4<f32>,
@@ -20,16 +35,9 @@ struct VisibilityCounters {
   transparent: atomic<u32>,
 };
 
-struct CompactParams {
-  components: u32,
-  _pad0: u32,
-  _pad1: u32,
-  _pad2: u32,
-};
-
 @group(0) @binding(0) var<uniform> classifyUniforms: InstanceUniforms;
 @group(0) @binding(1) var<storage, read> instanceBounds: array<vec4<f32>>;
-@group(0) @binding(2) var<storage, read> instanceMaterialParams: array<f32>;
+@group(0) @binding(2) var<storage, read> instanceInterleaved: array<f32>;
 @group(0) @binding(3) var<storage, read_write> visibleOpaqueIndices: array<u32>;
 @group(0) @binding(4) var<storage, read_write> visibleTransparentIndices: array<u32>;
 @group(0) @binding(5) var<storage, read_write> classifyCounts: VisibilityCounters;
@@ -62,9 +70,10 @@ fn classify(@builtin(global_invocation_id) global_id: vec3<u32>) {
     return;
   }
 
-  let paramsBase = instanceIndex * 4u;
-  let alpha = instanceMaterialParams[paramsBase + 0u];
-  let flags = u32(instanceMaterialParams[paramsBase + 3u]);
+  // Read materialParams from interleaved buffer at offset 15
+  let paramsBase = instanceIndex * INSTANCE_STRIDE + MATERIAL_PARAMS_OFFSET;
+  let alpha = instanceInterleaved[paramsBase + 0u];
+  let flags = u32(instanceInterleaved[paramsBase + 3u]);
   let transparentFlag = u32(classifyUniforms.misc.z);
   let isTransparent =
     ((flags & transparentFlag) != 0u) || (alpha < 0.999);
@@ -83,15 +92,12 @@ fn classify(@builtin(global_invocation_id) global_id: vec3<u32>) {
 @group(1) @binding(2) var<storage, read> compactTransparentIndices: array<u32>;
 @group(1) @binding(3) var<storage, read> compactSource: array<f32>;
 @group(1) @binding(4) var<storage, read_write> compactDestination: array<f32>;
-@group(1) @binding(5) var<uniform> compactUniforms: CompactParams;
 
-fn copyComponents(srcIndex: u32, dstIndex: u32, componentCount: u32) {
-  if (componentCount == 0u) {
-    return;
-  }
-  let srcBase = srcIndex * componentCount;
-  let dstBase = dstIndex * componentCount;
-  for (var c: u32 = 0u; c < componentCount; c = c + 1u) {
+// Copy entire instance (24 floats) from source to destination
+fn copyInstance(srcIndex: u32, dstIndex: u32) {
+  let srcBase = srcIndex * INSTANCE_STRIDE;
+  let dstBase = dstIndex * INSTANCE_STRIDE;
+  for (var c: u32 = 0u; c < INSTANCE_STRIDE; c = c + 1u) {
     compactDestination[dstBase + c] = compactSource[srcBase + c];
   }
 }
@@ -99,22 +105,18 @@ fn copyComponents(srcIndex: u32, dstIndex: u32, componentCount: u32) {
 @compute @workgroup_size(${WORKGROUP_SIZE})
 fn compact(@builtin(global_invocation_id) global_id: vec3<u32>) {
   let lane = global_id.x;
-  let components = compactUniforms.components;
-  if (components == 0u) {
-    return;
-  }
 
   let opaqueCount = atomicLoad(&compactCounts.opaque);
   if (lane < opaqueCount) {
     let srcIndex = compactOpaqueIndices[lane];
-    copyComponents(srcIndex, lane, components);
+    copyInstance(srcIndex, lane);
   }
 
   let transparentCount = atomicLoad(&compactCounts.transparent);
   if (lane < transparentCount) {
     let srcIndex = compactTransparentIndices[lane];
     let dstIndex = opaqueCount + lane;
-    copyComponents(srcIndex, dstIndex, components);
+    copyInstance(srcIndex, dstIndex);
   }
 }
 
@@ -156,10 +158,37 @@ export interface InstancePipelineExecuteParams {
   viewProjectionMatrix: Mat4;
 }
 
+/**
+ * Parameters for async culling with external buffers
+ */
+export interface AsyncCullingParams {
+  /** Command encoder to record compute passes */
+  encoder: GPUCommandEncoder;
+  /** View-projection matrix for frustum planes */
+  viewProjectionMatrix: Mat4;
+  /** Instance count to process */
+  instanceCount: number;
+  /** Index count for draw arguments */
+  indexCount: number;
+  /** Input bounds buffer */
+  boundsBuffer: GPUBuffer;
+  /** Input interleaved instance buffer */
+  interleavedStagingBuffer: GPUBuffer;
+  /** Output opaque indices buffer */
+  opaqueIndicesBuffer: GPUBuffer;
+  /** Output transparent indices buffer */
+  transparentIndicesBuffer: GPUBuffer;
+  /** Output counts buffer */
+  countsBuffer: GPUBuffer;
+  /** Output compacted interleaved buffer */
+  compactedInterleavedBuffer: GPUBuffer;
+  /** Output indirect args buffer */
+  indirectArgsBuffer: GPUBuffer;
+}
+
 export class GpuInstancePipeline {
   private readonly device: GPUDevice;
   private readonly uniformBuffer: GPUBuffer;
-  private readonly compactParamBuffer: GPUBuffer;
   private readonly frustumPlanes: FrustumPlane[] = new Array(6);
   private classifyPipeline!: GPUComputePipeline;
   private compactPipeline!: GPUComputePipeline;
@@ -180,11 +209,6 @@ export class GpuInstancePipeline {
       size: FRUSTUM_UNIFORM_SIZE,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
     });
-    this.compactParamBuffer = device.createBuffer({
-      label: 'gpu-instance-compact-params',
-      size: COMPACT_UNIFORM_SIZE,
-      usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
-    });
     this.emptyBindGroupLayout = device.createBindGroupLayout({
       label: 'gpu-instance-empty-bind-group',
       entries: [],
@@ -198,7 +222,6 @@ export class GpuInstancePipeline {
       this.opaqueIndicesBuffer?.destroy();
       this.transparentIndicesBuffer?.destroy();
       this.uniformBuffer.destroy();
-      this.compactParamBuffer.destroy();
     } catch {
       // ignore
     }
@@ -225,7 +248,7 @@ export class GpuInstancePipeline {
 
     try {
       this.runClassifyPass(params, instanceCount);
-      this.runCompactionPasses(params, instanceCount);
+      this.runCompactionPass(params, instanceCount);
       this.runFinalizePass(params.encoder, params.frameResources);
       return true;
     } catch (error) {
@@ -233,6 +256,140 @@ export class GpuInstancePipeline {
       this.writeZeroDrawArgs(params.frameResources);
       return false;
     }
+  }
+
+  /**
+   * Records culling passes to external buffers for async compute.
+   * This allows culling to be submitted separately from rendering.
+   * 
+   * @param params - Async culling parameters with external buffers
+   * @returns true if recording succeeded
+   */
+  recordAsyncCulling(params: AsyncCullingParams): boolean {
+    const { 
+      encoder, 
+      viewProjectionMatrix, 
+      instanceCount, 
+      indexCount,
+      boundsBuffer,
+      interleavedStagingBuffer,
+      opaqueIndicesBuffer,
+      transparentIndicesBuffer,
+      countsBuffer,
+      compactedInterleavedBuffer,
+      indirectArgsBuffer,
+    } = params;
+
+    if (instanceCount === 0) {
+      return false;
+    }
+
+    // Update uniforms with the provided matrix and counts
+    this.updateUniforms(viewProjectionMatrix, instanceCount, indexCount);
+
+    try {
+      // Record classify pass with external buffers
+      const classifyBindGroup = this.device.createBindGroup({
+        layout: this.classifyBindGroupLayout,
+        entries: [
+          { binding: 0, resource: { buffer: this.uniformBuffer } },
+          { binding: 1, resource: { buffer: boundsBuffer } },
+          { binding: 2, resource: { buffer: interleavedStagingBuffer } },
+          { binding: 3, resource: { buffer: opaqueIndicesBuffer } },
+          { binding: 4, resource: { buffer: transparentIndicesBuffer } },
+          { binding: 5, resource: { buffer: countsBuffer } },
+        ],
+      });
+
+      const classifyPass = encoder.beginComputePass({ label: 'async-gpu-instance-classify-pass' });
+      classifyPass.setPipeline(this.classifyPipeline);
+      classifyPass.setBindGroup(0, classifyBindGroup);
+      classifyPass.dispatchWorkgroups(Math.ceil(instanceCount / WORKGROUP_SIZE));
+      classifyPass.end();
+
+      // Record compact pass with external buffers
+      const compactBindGroup = this.device.createBindGroup({
+        layout: this.compactBindGroupLayout,
+        entries: [
+          { binding: 0, resource: { buffer: countsBuffer } },
+          { binding: 1, resource: { buffer: opaqueIndicesBuffer } },
+          { binding: 2, resource: { buffer: transparentIndicesBuffer } },
+          { binding: 3, resource: { buffer: interleavedStagingBuffer } },
+          { binding: 4, resource: { buffer: compactedInterleavedBuffer } },
+        ],
+      });
+
+      const compactPass = encoder.beginComputePass({ label: 'async-gpu-instance-compact-pass' });
+      compactPass.setPipeline(this.compactPipeline);
+      compactPass.setBindGroup(1, compactBindGroup);
+      compactPass.dispatchWorkgroups(Math.ceil(instanceCount / WORKGROUP_SIZE));
+      compactPass.end();
+
+      // Record finalize pass with external buffers
+      const finalizeBindGroup = this.device.createBindGroup({
+        layout: this.finalizeBindGroupLayout,
+        entries: [
+          { binding: 0, resource: { buffer: countsBuffer } },
+          { binding: 1, resource: { buffer: indirectArgsBuffer } },
+          { binding: 2, resource: { buffer: this.uniformBuffer } },
+        ],
+      });
+
+      const finalizePass = encoder.beginComputePass({ label: 'async-gpu-instance-finalize-pass' });
+      finalizePass.setPipeline(this.finalizePipeline);
+      finalizePass.setBindGroup(2, finalizeBindGroup);
+      finalizePass.dispatchWorkgroups(1);
+      finalizePass.end();
+
+      return true;
+    } catch (error) {
+      Logger.warn('[GpuInstancePipeline] async culling record failed:', error);
+      return false;
+    }
+  }
+
+  /**
+   * Gets the bind group layouts for external use (e.g., async compute manager)
+   */
+  getBindGroupLayouts(): {
+    classify: GPUBindGroupLayout;
+    compact: GPUBindGroupLayout;
+    finalize: GPUBindGroupLayout;
+  } {
+    return {
+      classify: this.classifyBindGroupLayout,
+      compact: this.compactBindGroupLayout,
+      finalize: this.finalizeBindGroupLayout,
+    };
+  }
+
+  /**
+   * Gets the compute pipelines for external use
+   */
+  getPipelines(): {
+    classify: GPUComputePipeline;
+    compact: GPUComputePipeline;
+    finalize: GPUComputePipeline;
+  } {
+    return {
+      classify: this.classifyPipeline,
+      compact: this.compactPipeline,
+      finalize: this.finalizePipeline,
+    };
+  }
+
+  /**
+   * Gets the uniform buffer for frustum planes
+   */
+  getUniformBuffer(): GPUBuffer {
+    return this.uniformBuffer;
+  }
+
+  /**
+   * Public method to update uniforms for external async culling
+   */
+  prepareUniforms(viewProjection: Mat4, instanceCount: number, indexCount: number): void {
+    this.updateUniforms(viewProjection, instanceCount, indexCount);
   }
 
   private initializePipelines(): void {
@@ -253,6 +410,7 @@ export class GpuInstancePipeline {
       ],
     });
 
+    // Simplified compact bind group - no longer needs uniform for component count
     this.compactBindGroupLayout = this.device.createBindGroupLayout({
       label: 'gpu-instance-compact-layout',
       entries: [
@@ -261,7 +419,6 @@ export class GpuInstancePipeline {
         { binding: 2, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
         { binding: 3, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'read-only-storage' } },
         { binding: 4, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'storage' } },
-        { binding: 5, visibility: GPUShaderStage.COMPUTE, buffer: { type: 'uniform' } },
       ],
     });
 
@@ -378,7 +535,7 @@ export class GpuInstancePipeline {
       entries: [
         { binding: 0, resource: { buffer: this.uniformBuffer } },
         { binding: 1, resource: { buffer: frameResources.instanceBoundsBuffer } },
-        { binding: 2, resource: { buffer: frameResources.instanceMaterialParamsStagingBuffer } },
+        { binding: 2, resource: { buffer: frameResources.instanceInterleavedStagingBuffer } },
         { binding: 3, resource: { buffer: this.opaqueIndicesBuffer } },
         { binding: 4, resource: { buffer: this.transparentIndicesBuffer } },
         { binding: 5, resource: { buffer: this.countsBuffer } },
@@ -392,32 +549,15 @@ export class GpuInstancePipeline {
     pass.end();
   }
 
-  private runCompactionPasses(params: InstancePipelineExecuteParams, instanceCount: number): void {
-    const { frameResources } = params;
-    this.compactAttribute(params.encoder, frameResources.instanceOffsetStagingBuffer, frameResources.instanceOffsetBuffer, 3, instanceCount);
-    this.compactAttribute(params.encoder, frameResources.instanceColorScaleStagingBuffer, frameResources.instanceColorScaleBuffer, 4, instanceCount);
-    this.compactAttribute(params.encoder, frameResources.instanceSecondaryColorStagingBuffer, frameResources.instanceSecondaryColorBuffer, 4, instanceCount);
-    this.compactAttribute(params.encoder, frameResources.instanceEmissiveColorStagingBuffer, frameResources.instanceEmissiveColorBuffer, 4, instanceCount);
-    this.compactAttribute(params.encoder, frameResources.instanceMaterialParamsStagingBuffer, frameResources.instanceMaterialParamsBuffer, 4, instanceCount);
-    this.compactAttribute(params.encoder, frameResources.instanceRotationStagingBuffer, frameResources.instanceRotationBuffer, 4, instanceCount);
-    this.compactAttribute(params.encoder, frameResources.instanceMaterialIdStagingBuffer, frameResources.instanceMaterialIdBuffer, 1, instanceCount);
-  }
-
-  private compactAttribute(
-    encoder: GPUCommandEncoder,
-    source: GPUBuffer,
-    destination: GPUBuffer,
-    components: number,
-    instanceCount: number
-  ): void {
+  /**
+   * Single compaction pass that copies all 24 floats per instance.
+   * This replaces the previous 7 separate passes (one per attribute).
+   */
+  private runCompactionPass(params: InstancePipelineExecuteParams, instanceCount: number): void {
     if (!this.countsBuffer || !this.opaqueIndicesBuffer || !this.transparentIndicesBuffer) {
       throw new Error('GPU instance buffers not ready');
     }
-    if (components <= 0) {
-      return;
-    }
-    const paramsArray = new Uint32Array([components, 0, 0, 0]);
-    this.device.queue.writeBuffer(this.compactParamBuffer, 0, paramsArray);
+    const { frameResources } = params;
 
     const bindGroup = this.device.createBindGroup({
       layout: this.compactBindGroupLayout,
@@ -425,13 +565,12 @@ export class GpuInstancePipeline {
         { binding: 0, resource: { buffer: this.countsBuffer } },
         { binding: 1, resource: { buffer: this.opaqueIndicesBuffer } },
         { binding: 2, resource: { buffer: this.transparentIndicesBuffer } },
-        { binding: 3, resource: { buffer: source } },
-        { binding: 4, resource: { buffer: destination } },
-        { binding: 5, resource: { buffer: this.compactParamBuffer } },
+        { binding: 3, resource: { buffer: frameResources.instanceInterleavedStagingBuffer } },
+        { binding: 4, resource: { buffer: frameResources.instanceInterleavedBuffer } },
       ],
     });
 
-    const pass = encoder.beginComputePass({ label: 'gpu-instance-compact-pass' });
+    const pass = params.encoder.beginComputePass({ label: 'gpu-instance-compact-pass' });
     pass.setPipeline(this.compactPipeline);
     pass.setBindGroup(1, bindGroup);
     pass.dispatchWorkgroups(Math.ceil(instanceCount / WORKGROUP_SIZE));
@@ -469,4 +608,3 @@ export class GpuInstancePipeline {
     );
   }
 }
-

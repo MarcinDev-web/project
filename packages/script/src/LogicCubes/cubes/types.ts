@@ -2,7 +2,7 @@
  * Types and interfaces for the Logic Cube system.
  */
 
-import type { EntityId } from '@engine/world';
+import type { EntityId, Entity } from '@engine/world';
 
 /**
  * Port direction: input receives signals, output sends signals
@@ -92,6 +92,8 @@ export interface LogicExecutionContext {
   gameTime: number;
   /** Signal that triggered execution (if any) */
   signal?: LogicSignal;
+  /** Player entity that triggered this execution (if applicable) */
+  triggeringPlayer?: Entity;
 }
 
 /**

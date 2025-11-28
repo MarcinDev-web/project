@@ -1,6 +1,8 @@
 import type { Mat4, Vec3 } from '@engine/core/math';
 import { mat4Invert } from '@engine/core/math';
 
+import { createBlueNoiseTexture } from '../textures/BlueNoiseTexture';
+
 /**
  * Cloud parameters interface for external configuration
  */
@@ -21,6 +23,17 @@ export interface VolumetricCloudParams {
   skyColor: Vec3;
   /** Time for animation */
   time: number;
+  /** Camera near plane distance (must match projection) */
+  nearPlane: number;
+  /** Camera far plane distance (must match projection) */
+  farPlane: number;
+  /** 
+   * Use detailed light marching with Beer's Law and multi-scattering.
+   * More accurate but slower (adds LIGHT_STEPS iterations per sample).
+   * When false, uses fast height-based lighting approximation.
+   * (default: false)
+   */
+  useDetailedLighting?: boolean;
 }
 
 /**
@@ -33,7 +46,7 @@ export interface VolumetricCloudParams {
  * - Proper alpha blending with sky
  */
 const VOLUMETRIC_CLOUD_SHADER = /* wgsl */ `
-// SHADER VERSION v9 - BALANCED: good quality with optimized FBM, dual noise layers
+// SHADER VERSION v20 - Use skyColor for ambient lighting
 // === Uniforms ===
 struct CloudUniforms {
   viewProjectionInverse: mat4x4<f32>,
@@ -49,398 +62,268 @@ struct CloudUniforms {
   cloudSpeed: f32,
   screenWidth: f32,
   screenHeight: f32,
-  _pad0: f32,
+  nearPlane: f32,
+  farPlane: f32,
+  useDetailedLighting: f32, // 1.0 = use lightMarch with Beer's Law, 0.0 = fast height-based
+  _pad1: f32,
+  _pad2: f32,
 };
 
 @group(0) @binding(0) var<uniform> u: CloudUniforms;
-
 // Depth texture for scene occlusion (resolved/single-sampled for separate pass rendering)
 @group(0) @binding(1) var depthTexture: texture_depth_2d;
+// Blue Noise Texture for Dithering
+@group(0) @binding(2) var blueNoiseTex: texture_2d<f32>;
+@group(0) @binding(3) var blueNoiseSampler: sampler;
 
 struct VertexOutput {
   @builtin(position) position: vec4<f32>,
   @location(0) uv: vec2<f32>,
 };
 
-// === Constants (Balanced Quality/Performance) ===
-const MAX_STEPS: i32 = 40;       // Good balance of quality and speed
-const LIGHT_STEPS: i32 = 5;      // Good lighting quality
-const MAX_DIST: f32 = 5000.0;    // Reasonable draw distance
-const NEAR_PLANE: f32 = 0.1;
-const FAR_PLANE: f32 = 10000.0;
-const MIN_TRANSMITTANCE: f32 = 0.01; // Early exit threshold
+// === Constants (Optimized for lower, fluffier clouds) ===
+const MAX_STEPS: i32 = 48;       // More steps for better quality at closer range
+const LIGHT_STEPS: i32 = 5;      // Slightly more for better shadows
+const MAX_DIST: f32 = 12000.0;   // Reduced - clouds are closer now
+const MIN_TRANSMITTANCE: f32 = 0.01;
 
-// === Depth Functions ===
+// === Utility Functions ===
 
 // Linearize depth from depth buffer (0-1 range) to view-space distance
 fn linearizeDepth(depth: f32) -> f32 {
   // Standard-Z perspective depth linearization
-  // For standard-Z: depth=0 is near, depth=1 is far
+  // Uses camera near/far plane values from uniforms for correct depth reconstruction
   let z = depth;
-  return NEAR_PLANE * FAR_PLANE / (FAR_PLANE - z * (FAR_PLANE - NEAR_PLANE));
+  return u.nearPlane * u.farPlane / (u.farPlane - z * (u.farPlane - u.nearPlane));
 }
 
 // Sample scene depth at given UV coordinates using textureLoad (single-sampled/resolved)
 fn sampleSceneDepth(uv: vec2<f32>) -> f32 {
   let texSize = textureDimensions(depthTexture);
   let pixelCoord = vec2<i32>(uv * vec2<f32>(texSize));
-  // For non-multisampled textures, use mip level 0
   let depthSample = textureLoad(depthTexture, pixelCoord, 0);
   return linearizeDepth(depthSample);
 }
 
 // === Noise Functions ===
 
+// Improved hash function with better distribution
 fn hash3(p: vec3<f32>) -> f32 {
-  var p3 = fract(p * 0.1031);
-  p3 = p3 + dot(p3, p3.zyx + 31.32);
+  var p3 = fract(p * vec3<f32>(0.1031, 0.1030, 0.0973));
+  p3 += dot(p3, p3.yxz + 33.33);
   return fract((p3.x + p3.y) * p3.z);
 }
 
+// 3D Value noise with quintic interpolation for smoother gradients
 fn noise3D(p: vec3<f32>) -> f32 {
   let i = floor(p);
   let f = fract(p);
-  let u = f * f * (3.0 - 2.0 * f);
   
+  // Quintic interpolation for C2 continuity (smoother than cubic)
+  let u = f * f * f * (f * (f * 6.0 - 15.0) + 10.0);
+  
+  // Sample 8 corners of the cube
+  let c000 = hash3(i + vec3<f32>(0.0, 0.0, 0.0));
+  let c100 = hash3(i + vec3<f32>(1.0, 0.0, 0.0));
+  let c010 = hash3(i + vec3<f32>(0.0, 1.0, 0.0));
+  let c110 = hash3(i + vec3<f32>(1.0, 1.0, 0.0));
+  let c001 = hash3(i + vec3<f32>(0.0, 0.0, 1.0));
+  let c101 = hash3(i + vec3<f32>(1.0, 0.0, 1.0));
+  let c011 = hash3(i + vec3<f32>(0.0, 1.0, 1.0));
+  let c111 = hash3(i + vec3<f32>(1.0, 1.0, 1.0));
+  
+  // Trilinear interpolation
   return mix(
-    mix(
-      mix(hash3(i + vec3(0.0, 0.0, 0.0)), hash3(i + vec3(1.0, 0.0, 0.0)), u.x),
-      mix(hash3(i + vec3(0.0, 1.0, 0.0)), hash3(i + vec3(1.0, 1.0, 0.0)), u.x),
-      u.y
-    ),
-    mix(
-      mix(hash3(i + vec3(0.0, 0.0, 1.0)), hash3(i + vec3(1.0, 0.0, 1.0)), u.x),
-      mix(hash3(i + vec3(0.0, 1.0, 1.0)), hash3(i + vec3(1.0, 1.0, 1.0)), u.x),
-      u.y
-    ),
+    mix(mix(c000, c100, u.x), mix(c010, c110, u.x), u.y),
+    mix(mix(c001, c101, u.x), mix(c011, c111, u.x), u.y),
     u.z
   );
 }
 
-// Fractal Brownian Motion for cloud shapes (Optimized: unrolled, 4 octaves)
+// Fractal Brownian Motion (5 octaves for smoother clouds)
 fn fbm(p: vec3<f32>) -> f32 {
   var value = 0.0;
   var amplitude = 0.5;
   var pos = p;
+  var totalAmplitude = 0.0;
   
-  // Unrolled loop - better GPU performance than dynamic loop
-  value += amplitude * noise3D(pos);
-  pos *= 2.0; amplitude *= 0.5;
-  value += amplitude * noise3D(pos);
-  pos *= 2.0; amplitude *= 0.5;
-  value += amplitude * noise3D(pos);
-  pos *= 2.0; amplitude *= 0.5;
-  value += amplitude * noise3D(pos);
-  // Removed 5th octave for performance
+  // 5 octaves for richer detail
+  for (var i = 0; i < 5; i++) {
+    value += amplitude * noise3D(pos);
+    totalAmplitude += amplitude;
+    pos *= 2.0;
+    amplitude *= 0.5;
+  }
   
-  return value;
+  // Normalize to 0-1 range
+  return value / totalAmplitude;
 }
 
-// === Cloud Density (Balanced Quality/Performance) ===
+// === Cloud Density (Working version) ===
 
 fn cloudDensity(p: vec3<f32>) -> f32 {
   // Height within cloud layer (0 at bottom, 1 at top)
   let heightFraction = saturate((p.y - u.cloudAltitude) / u.cloudThickness);
   
-  // Height-based density falloff (thicker in middle, thinner at edges)
-  let heightDensity = heightFraction * (1.0 - heightFraction) * 4.0;
+  // Height gradient: rounded profile
+  let heightGradient = smoothstep(0.0, 0.2, heightFraction) * smoothstep(1.0, 0.7, heightFraction);
+  if (heightGradient < 0.01) { return 0.0; }
   
-  // Early exit for very thin areas
-  if (heightDensity < 0.01) {
-    return 0.0;
-  }
+  // Wind animation
+  let wind = vec3<f32>(u.time * u.cloudSpeed * 50.0, 0.0, u.time * u.cloudSpeed * 20.0);
   
-  // Animate cloud position
-  let animOffset = vec3<f32>(u.time * u.cloudSpeed * 50.0, 0.0, u.time * u.cloudSpeed * 20.0);
-  let samplePos = p + animOffset;
+  // Sample position normalized for noise (world coords / 1000)
+  let np = (p + wind) * 0.001;
   
-  // Base cloud shape from FBM (large scale fluffy shapes)
-  let baseNoise = fbm(samplePos * 0.002);
+  // Multi-octave FBM
+  var n = fbm(np * 1.0) * 0.5;       // Large shapes
+  n += fbm(np * 2.5) * 0.25;          // Medium detail
+  n += fbm(np * 6.0) * 0.125;         // Fine detail
   
-  // Detail noise at higher frequency (adds definition and texture)
-  let detailNoise = fbm(samplePos * 0.007) * 0.4;
+  // Apply height gradient
+  var density = n * heightGradient;
   
-  // Combine noises
-  var density = baseNoise + detailNoise;
-  density = density * heightDensity;
-  
-  // Apply coverage threshold (controlled by cloudDensity parameter)
+  // Coverage threshold - cloudDensity parameter controls cloud amount
   let coverage = u.cloudDensity;
-  density = smoothstep(1.0 - coverage, 1.0 - coverage + 0.25, density);
+  let threshold = 0.3 * (1.0 - coverage);
+  density = smoothstep(threshold, threshold + 0.25, density);
   
-  return max(0.0, density);
+  return density;
 }
 
 // === Ray-Plane Intersection ===
 
 fn rayPlaneIntersect(ro: vec3<f32>, rd: vec3<f32>, planeY: f32) -> f32 {
-  if (abs(rd.y) < 0.0001) {
-    return -1.0; // Ray parallel to plane
-  }
-  let t = (planeY - ro.y) / rd.y;
-  return t;
+  if (abs(rd.y) < 0.0001) { return -1.0; }
+  return (planeY - ro.y) / rd.y;
 }
 
-// === Light Marching (Beer-Lambert) ===
+// === Light Marching (Beer-Lambert + Multi-scattering approximation) ===
 
 fn lightMarch(p: vec3<f32>) -> f32 {
   let sunDir = normalize(u.sunDirection);
   let cloudTop = u.cloudAltitude + u.cloudThickness;
   
-  // Distance to exit cloud layer toward sun
   let tExit = rayPlaneIntersect(p, sunDir, cloudTop);
-  if (tExit < 0.0) {
-    return 1.0; // Already outside or sun below
-  }
+  if (tExit < 0.0) { return 1.0; }
   
-  let stepSize = min(tExit, u.cloudThickness) / f32(LIGHT_STEPS);
+  let stepSize = min(tExit, u.cloudThickness * 0.5) / f32(LIGHT_STEPS);
   var totalDensity = 0.0;
   var pos = p;
+  
+  // Offset start slightly to avoid self-shadowing artifacts
+  pos += sunDir * stepSize * 0.3;
   
   for (var i = 0; i < LIGHT_STEPS; i++) {
     pos += sunDir * stepSize;
     totalDensity += cloudDensity(pos) * stepSize;
   }
   
-  // Beer-Lambert absorption
-  let absorption = exp(-totalDensity * 0.5);
-  return absorption;
-}
-
-// === Main Raymarching ===
-
-fn raymarchClouds(ro: vec3<f32>, rd: vec3<f32>) -> vec4<f32> {
-  let cloudBottom = u.cloudAltitude;
-  let cloudTop = u.cloudAltitude + u.cloudThickness;
+  // Beer's Law with adjusted extinction coefficient
+  let beer = exp(-totalDensity * 0.6);
   
-  // Find entry and exit points for cloud layer
-  var tEnter = rayPlaneIntersect(ro, rd, cloudBottom);
-  var tExit = rayPlaneIntersect(ro, rd, cloudTop);
+  // Multi-scattering approximation (Schneider/Hillaire method)
+  // Light penetrates deeper into clouds than simple Beer's law suggests
+  let multiScatter = exp(-totalDensity * 0.15) * 0.7;
   
-  // Handle camera inside cloud layer
-  if (ro.y > cloudBottom && ro.y < cloudTop) {
-    if (rd.y > 0.0) {
-      tEnter = 0.0;
-    } else {
-      tExit = tEnter;
-      tEnter = 0.0;
-    }
-  }
-  
-  // Swap if needed (ray going down)
-  if (tEnter > tExit) {
-    let temp = tEnter;
-    tEnter = tExit;
-    tExit = temp;
-  }
-  
-  // Skip if cloud layer is behind camera or too far
-  if (tExit < 0.0 || tEnter > MAX_DIST) {
-    return vec4<f32>(0.0, 0.0, 0.0, 0.0);
-  }
-  
-  tEnter = max(tEnter, 0.0);
-  tExit = min(tExit, MAX_DIST);
-  
-  // Raymarching
-  let rayLength = tExit - tEnter;
-  let stepSize = rayLength / f32(MAX_STEPS);
-  
-  var transmittance = 1.0;
-  var lightEnergy = 0.0;
-  var depth = 0.0;
-  var t = tEnter;
-  
-  let sunDir = normalize(u.sunDirection);
-  
-  for (var i = 0; i < MAX_STEPS; i++) {
-    if (transmittance < MIN_TRANSMITTANCE) {
-      break;
-    }
-    
-    let pos = ro + rd * t;
-    let density = cloudDensity(pos);
-    
-    if (density > 0.001) {
-      // Light contribution at this point
-      let lightTransmittance = lightMarch(pos);
-      
-      // Silver lining: enhanced brightness at cloud edges when backlit
-      let viewDotSun = dot(-rd, sunDir);
-      let silverLining = pow(max(viewDotSun, 0.0), 4.0) * 0.6;
-      
-      // Phase function (Henyey-Greenstein approximation)
-      let phase = 0.5 + 0.5 * viewDotSun;
-      
-      // Accumulate light
-      let sampleLight = lightTransmittance * (1.0 + silverLining) * phase;
-      lightEnergy += density * transmittance * sampleLight * stepSize;
-      
-      // Update transmittance (Beer-Lambert)
-      transmittance *= exp(-density * stepSize * 2.0);
-      
-      if (depth == 0.0) {
-        depth = t;
-      }
-    }
-    
-    t += stepSize;
-  }
-  
-  // Final cloud color
-  let cloudAlpha = 1.0 - transmittance;
-  
-  // Base cloud color (white with slight sky tint)
-  let baseCloudColor = vec3<f32>(1.0, 1.0, 1.0);
-  
-  // Lit cloud color
-  let litColor = u.sunColor * lightEnergy * 2.5 + u.skyColor * 0.15;
-  
-  // Ambient from sky (darker in shadow)
-  let ambientColor = u.skyColor * 0.25 * (1.0 - lightEnergy * 0.5);
-  
-  var cloudColor = litColor + ambientColor;
-  cloudColor = mix(baseCloudColor * 0.8, cloudColor, 0.7);
-  
-  // Clamp to avoid excessive brightness
-  cloudColor = min(cloudColor, vec3<f32>(1.5));
-  
-  return vec4<f32>(cloudColor, cloudAlpha);
+  // Combine: primary transmission + multi-scattered light
+  return beer * 0.8 + multiScatter * 0.2;
 }
 
 // === Main Raymarching with Depth Occlusion ===
 
-fn raymarchCloudsWithDepth(ro: vec3<f32>, rd: vec3<f32>, sceneDepth: f32) -> vec4<f32> {
+fn raymarchCloudsWithDepth(ro: vec3<f32>, rd: vec3<f32>, sceneDepth: f32, dither: f32) -> vec4<f32> {
   let cloudBottom = u.cloudAltitude;
   let cloudTop = u.cloudAltitude + u.cloudThickness;
   
-  // CRITICAL FIX: Camera below clouds looking down = no clouds possible
-  // If camera is below cloud layer (ro.y < cloudBottom) and ray points down (rd.y < 0),
-  // the ray will NEVER intersect the cloud layer which is ABOVE the camera
-  if (ro.y < cloudBottom && rd.y <= 0.0) {
-    return vec4<f32>(0.0, 0.0, 0.0, 0.0);
-  }
+  // Calculate ray intersection with cloud layer planes
+  var tEnter: f32;
+  var tExit: f32;
   
-  // Camera above clouds looking up = no clouds possible
-  if (ro.y > cloudTop && rd.y >= 0.0) {
-    return vec4<f32>(0.0, 0.0, 0.0, 0.0);
-  }
-  
-  // Find entry and exit points for cloud layer
-  var tEnter = rayPlaneIntersect(ro, rd, cloudBottom);
-  var tExit = rayPlaneIntersect(ro, rd, cloudTop);
-  
-  // Handle camera inside cloud layer
-  if (ro.y > cloudBottom && ro.y < cloudTop) {
+  if (ro.y < cloudBottom) {
+    // Camera below clouds
+    if (rd.y <= 0.0) { return vec4<f32>(0.0); } // Looking down, no clouds
+    tEnter = rayPlaneIntersect(ro, rd, cloudBottom);
+    tExit = rayPlaneIntersect(ro, rd, cloudTop);
+  } else if (ro.y > cloudTop) {
+    // Camera above clouds
+    if (rd.y >= 0.0) { return vec4<f32>(0.0); } // Looking up, no clouds
+    tEnter = rayPlaneIntersect(ro, rd, cloudTop);
+    tExit = rayPlaneIntersect(ro, rd, cloudBottom);
+  } else {
+    // Camera inside cloud layer
+    tEnter = 0.0;
     if (rd.y > 0.0) {
-      tEnter = 0.0;
+      tExit = rayPlaneIntersect(ro, rd, cloudTop);
+    } else if (rd.y < 0.0) {
+      tExit = rayPlaneIntersect(ro, rd, cloudBottom);
     } else {
-      tExit = tEnter;
-      tEnter = 0.0;
+      tExit = MAX_DIST; // Looking horizontally inside clouds
     }
   }
   
-  // Swap if needed (ray going down)
-  if (tEnter > tExit) {
-    let temp = tEnter;
-    tEnter = tExit;
-    tExit = temp;
-  }
-  
-  // Skip if cloud layer is behind camera or too far
-  if (tExit < 0.0 || tEnter > MAX_DIST) {
-    return vec4<f32>(0.0, 0.0, 0.0, 0.0);
-  }
-  
-  // Additional safety: both intersection points must be positive (in front of camera)
-  if (tEnter < 0.0 && tExit < 0.0) {
-    return vec4<f32>(0.0, 0.0, 0.0, 0.0);
-  }
+  // Validate intersection distances
+  if (tExit < 0.0 || tEnter > MAX_DIST) { return vec4<f32>(0.0); }
   
   tEnter = max(tEnter, 0.0);
   tExit = min(tExit, MAX_DIST);
   
-  // Depth occlusion: if scene geometry is closer than cloud entry, skip clouds entirely
-  if (sceneDepth < tEnter && sceneDepth < FAR_PLANE * 0.99) {
-    return vec4<f32>(0.0, 0.0, 0.0, 0.0);
-  }
+  if (sceneDepth < tEnter && sceneDepth < u.farPlane * 0.99) { return vec4<f32>(0.0); }
+  if (sceneDepth < tExit && sceneDepth < u.farPlane * 0.99) { tExit = sceneDepth; }
   
-  // Clamp exit point to scene depth (clouds behind geometry are occluded)
-  if (sceneDepth < tExit && sceneDepth < FAR_PLANE * 0.99) {
-    tExit = sceneDepth;
-  }
-  
-  // Raymarching
   let rayLength = tExit - tEnter;
-  if (rayLength <= 0.0) {
-    return vec4<f32>(0.0, 0.0, 0.0, 0.0);
-  }
+  if (rayLength <= 0.0) { return vec4<f32>(0.0); }
   
   let stepSize = rayLength / f32(MAX_STEPS);
   
   var transmittance = 1.0;
-  var lightEnergy = 0.0;
-  var depth = 0.0;
-  var t = tEnter;
+  var lightAccum = vec3<f32>(0.0);
   
+  // Jitter start position with dither
+  var t = tEnter + stepSize * dither;
+  
+  // Simple lighting setup
   let sunDir = normalize(u.sunDirection);
-  
+
   for (var i = 0; i < MAX_STEPS; i++) {
-    if (transmittance < MIN_TRANSMITTANCE) {
-      break;
-    }
-    
-    // Stop if we've reached scene geometry
-    if (t >= sceneDepth && sceneDepth < FAR_PLANE * 0.99) {
-      break;
-    }
+    if (transmittance < MIN_TRANSMITTANCE) { break; }
     
     let pos = ro + rd * t;
     let density = cloudDensity(pos);
     
-    if (density > 0.001) {
-      // Light contribution at this point
-      let lightTransmittance = lightMarch(pos);
+    if (density > 0.0) {
+      var lightAmount: f32;
       
-      // Silver lining: enhanced brightness at cloud edges when backlit
-      let viewDotSun = dot(-rd, sunDir);
-      let silverLining = pow(max(viewDotSun, 0.0), 4.0) * 0.6;
-      
-      // Phase function (Henyey-Greenstein approximation)
-      let phase = 0.5 + 0.5 * viewDotSun;
-      
-      // Accumulate light
-      let sampleLight = lightTransmittance * (1.0 + silverLining) * phase;
-      lightEnergy += density * transmittance * sampleLight * stepSize;
-      
-      // Update transmittance (Beer-Lambert)
-      transmittance *= exp(-density * stepSize * 2.0);
-      
-      if (depth == 0.0) {
-        depth = t;
+      if (u.useDetailedLighting > 0.5) {
+        // Detailed lighting: Beer's Law with multi-scattering via light marching
+        lightAmount = lightMarch(pos);
+      } else {
+        // Fast approximation: height-based lighting
+        let heightFrac = saturate((pos.y - cloudBottom) / (cloudTop - cloudBottom));
+        lightAmount = 0.4 + heightFrac * 0.6; // Brighter at top
       }
+      
+      // Direct sunlight contribution
+      let directLight = vec3<f32>(lightAmount) * u.sunColor;
+      // Ambient sky light (scattered light from atmosphere)
+      let ambientLight = u.skyColor * (0.15 + 0.1 * (1.0 - lightAmount));
+      // Combined sample color
+      let sampleColor = directLight + ambientLight;
+      lightAccum += sampleColor * density * transmittance * stepSize * 2.0;
+      
+      // Beer-Lambert absorption
+      transmittance *= exp(-density * stepSize * 1.0);
     }
     
     t += stepSize;
   }
   
-  // Final cloud color
   let cloudAlpha = 1.0 - transmittance;
   
-  // Base cloud color (white with slight sky tint)
-  let baseCloudColor = vec3<f32>(1.0, 1.0, 1.0);
-  
-  // Lit cloud color
-  let litColor = u.sunColor * lightEnergy * 2.5 + u.skyColor * 0.15;
-  
-  // Ambient from sky (darker in shadow)
-  let ambientColor = u.skyColor * 0.25 * (1.0 - lightEnergy * 0.5);
-  
-  var cloudColor = litColor + ambientColor;
-  cloudColor = mix(baseCloudColor * 0.8, cloudColor, 0.7);
-  
-  // Clamp to avoid excessive brightness
-  cloudColor = min(cloudColor, vec3<f32>(1.5));
+  // Final cloud color - white tinted by accumulated light
+  // Use skyColor for base ambient to match atmospheric conditions
+  var cloudColor = vec3<f32>(0.9, 0.92, 0.95) * (lightAccum + u.skyColor * 0.25);
+  cloudColor = clamp(cloudColor, vec3<f32>(0.1), vec3<f32>(1.0));
   
   return vec4<f32>(cloudColor, cloudAlpha);
 }
@@ -450,14 +333,10 @@ fn raymarchCloudsWithDepth(ro: vec3<f32>, rd: vec3<f32>, sceneDepth: f32) -> vec
 @vertex
 fn vs_main(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
   var output: VertexOutput;
-  
-  // Full-screen triangle
   let x = f32((vertexIndex << 1u) & 2u);
   let y = f32(vertexIndex & 2u);
-  
   output.position = vec4<f32>(x * 2.0 - 1.0, y * -2.0 + 1.0, 0.0, 1.0);
   output.uv = vec2<f32>(x, 1.0 - y);
-  
   return output;
 }
 
@@ -465,31 +344,38 @@ fn vs_main(@builtin(vertex_index) vertexIndex: u32) -> VertexOutput {
 
 @fragment
 fn fs_main(input: VertexOutput) -> @location(0) vec4<f32> {
-  // Convert UV to NDC - NOTE: WebGPU Y is flipped compared to OpenGL
-  // UV.y=0 is top of screen, NDC.y=+1 should be top
-  // But the inverse VP might expect different convention
   let ndc = vec2<f32>(input.uv.x * 2.0 - 1.0, input.uv.y * 2.0 - 1.0);
-  
-  // Unproject to world space to get ray direction
   let clipPos = vec4<f32>(ndc, 1.0, 1.0);
   let worldPos4 = u.viewProjectionInverse * clipPos;
   let worldTarget = worldPos4.xyz / worldPos4.w;
   let rayDir = normalize(worldTarget - u.cameraPosition);
   
-  // CRITICAL: Only render clouds when looking UP (positive world Y direction)
-  // This is the definitive check - if ray points down, no clouds possible
-  if (rayDir.y < 0.05) {
-    return vec4<f32>(0.0, 0.0, 0.0, 0.0);
-  }
+  // Generate blue noise / dither value from texture BEFORE any non-uniform control flow
+  // textureSample requires uniform control flow due to implicit derivative calculations
+  // Scale UV by screen size and divide by texture size (64) to tile pixel-perfectly
+  let noiseUV = (input.uv * vec2<f32>(u.screenWidth, u.screenHeight)) / 64.0;
   
-  // Sample scene depth for occlusion
+  // Temporal offset to animate noise (Golden Ratio based)
+  // This helps TAA accumulate better or just makes noise less static
+  let timeFrame = floor(u.time * 60.0);
+  let goldenOffset = vec2<f32>(
+    fract(timeFrame * 0.7548776662466927), 
+    fract(timeFrame * 0.5698402909980532)
+  );
+  
+  let dither = textureSample(blueNoiseTex, blueNoiseSampler, noiseUV + goldenOffset).r;
+  
+  // Smooth horizon fade - clouds gradually fade out near horizon instead of sharp cutoff
+  let horizonFade = smoothstep(-0.05, 0.15, rayDir.y);
+  if (horizonFade <= 0.0) { return vec4<f32>(0.0); }
+  
   let sceneDepth = sampleSceneDepth(input.uv);
   
-  // Raymarch clouds with depth occlusion
-  let cloudResult = raymarchCloudsWithDepth(u.cameraPosition, rayDir, sceneDepth);
+  let cloudResult = raymarchCloudsWithDepth(u.cameraPosition, rayDir, sceneDepth, dither);
   
-  // Output with premultiplied alpha for proper blending
-  return vec4<f32>(cloudResult.rgb * cloudResult.a, cloudResult.a);
+  // Apply horizon fade to smoothly blend clouds at the horizon
+  let fadedAlpha = cloudResult.a * horizonFade;
+  return vec4<f32>(cloudResult.rgb * fadedAlpha, fadedAlpha);
 }
 `;
 
@@ -505,6 +391,8 @@ export class VolumetricCloudPass {
   private uniformBuffer!: GPUBuffer;
   private bindGroup!: GPUBindGroup;
   private bindGroupLayout!: GPUBindGroupLayout;
+  private blueNoiseTexture!: GPUTexture;
+  private blueNoiseSampler!: GPUSampler;
   private currentDepthTextureView: GPUTextureView | null = null;
   private initialized = false;
   
@@ -512,6 +400,52 @@ export class VolumetricCloudPass {
   private invViewProj = new Float32Array(16);
   private viewProj = new Float32Array(16);
   private uniformData = new Float32Array(64); // 256 bytes (mat4 + mat4 + params)
+  
+  // Reusable validated sun direction (avoid allocations)
+  private validatedSunDir: [number, number, number] = [0, 1, 0];
+
+  /**
+   * Validates and normalizes sun direction.
+   * Handles zero-length vectors (which would cause NaN after normalization).
+   */
+  private validateSunDirection(direction: Vec3): [number, number, number] {
+    const x = Number.isFinite(direction[0]) ? direction[0] : 0;
+    const y = Number.isFinite(direction[1]) ? direction[1] : 1;
+    const z = Number.isFinite(direction[2]) ? direction[2] : 0;
+    
+    const len = Math.sqrt(x * x + y * y + z * z);
+    if (len < 0.0001) {
+      // Zero-length vector - use default upward direction
+      this.validatedSunDir[0] = 0;
+      this.validatedSunDir[1] = 1;
+      this.validatedSunDir[2] = 0;
+    } else {
+      this.validatedSunDir[0] = x / len;
+      this.validatedSunDir[1] = y / len;
+      this.validatedSunDir[2] = z / len;
+    }
+    return this.validatedSunDir;
+  }
+
+  /**
+   * Validates cloud thickness (must be positive).
+   */
+  private validateCloudThickness(thickness: number): number {
+    if (!Number.isFinite(thickness) || thickness <= 0) {
+      return 400; // Default thickness
+    }
+    return thickness;
+  }
+
+  /**
+   * Validates cloud density (clamps to 0-1 range).
+   */
+  private validateCloudDensity(density: number): number {
+    if (!Number.isFinite(density)) {
+      return 0.5; // Default density
+    }
+    return Math.max(0, Math.min(1, density));
+  }
 
   /**
    * Initialize the cloud pass with GPU device and output format.
@@ -533,14 +467,27 @@ export class VolumetricCloudPass {
     // vec3 sunDirection + f32 cloudAltitude: 16 bytes (144-159)
     // vec3 sunColor + f32 cloudThickness: 16 bytes (160-175)
     // vec3 skyColor + f32 cloudDensity: 16 bytes (176-191)
-    // f32 cloudSpeed + f32 screenWidth + f32 screenHeight + padding: 16 bytes (192-207)
-    // Total: 208 bytes -> align to 256 for safety
+    // f32 cloudSpeed + f32 screenWidth + f32 screenHeight + f32 nearPlane: 16 bytes (192-207)
+    // f32 farPlane + f32 useDetailedLighting + padding: 16 bytes (208-223)
+    // Total: 224 bytes -> align to 256 for safety
     const uniformBufferSize = 256;
     
     this.uniformBuffer = device.createBuffer({
       size: uniformBufferSize,
       usage: GPUBufferUsage.UNIFORM | GPUBufferUsage.COPY_DST,
       label: 'Volumetric Cloud Uniforms',
+    });
+
+    // Create Blue Noise Texture
+    this.blueNoiseTexture = createBlueNoiseTexture(device);
+    
+    // Create Sampler for noise (repeat wrapping)
+    this.blueNoiseSampler = device.createSampler({
+      label: 'Blue Noise Sampler',
+      magFilter: 'nearest',
+      minFilter: 'nearest',
+      addressModeU: 'repeat',
+      addressModeV: 'repeat',
     });
 
     // Create bind group layout with single-sampled/resolved depth texture (no sampler - using textureLoad)
@@ -556,6 +503,16 @@ export class VolumetricCloudPass {
           binding: 1,
           visibility: GPUShaderStage.FRAGMENT,
           texture: { sampleType: 'depth', multisampled: false },
+        },
+        {
+          binding: 2,
+          visibility: GPUShaderStage.FRAGMENT,
+          texture: { sampleType: 'float' },
+        },
+        {
+          binding: 3,
+          visibility: GPUShaderStage.FRAGMENT,
+          sampler: { type: 'filtering' },
         },
       ],
     });
@@ -629,6 +586,8 @@ export class VolumetricCloudPass {
       entries: [
         { binding: 0, resource: { buffer: this.uniformBuffer } },
         { binding: 1, resource: depthTextureView },
+        { binding: 2, resource: this.blueNoiseTexture.createView() },
+        { binding: 3, resource: this.blueNoiseSampler },
       ],
     });
   }
@@ -660,9 +619,13 @@ export class VolumetricCloudPass {
     if (!this.initialized) return;
     if (!this.bindGroup) return; // Need depth texture to be set first
     
-    // Safety check: only render clouds if camera is below cloud layer
-    const camY = cameraPosition[1] ?? 0;
-    if (camY >= params.cloudAltitude) return;
+    // Note: Clouds render from any camera position
+    // The shader handles camera inside/above cloud layer correctly
+
+    // Validate parameters to prevent NaN/invalid values in shader
+    const validatedSunDir = this.validateSunDirection(params.sunDirection);
+    const validatedThickness = this.validateCloudThickness(params.cloudThickness);
+    const validatedDensity = this.validateCloudDensity(params.cloudDensity);
 
     // Copy VP matrix and compute inverse
     if (viewProjectionMatrix instanceof Float32Array) {
@@ -693,29 +656,35 @@ export class VolumetricCloudPass {
     this.uniformData[offset++] = cameraPosition[2];
     this.uniformData[offset++] = params.time;
     
-    // vec3 sunDirection + f32 cloudAltitude
-    this.uniformData[offset++] = params.sunDirection[0];
-    this.uniformData[offset++] = params.sunDirection[1];
-    this.uniformData[offset++] = params.sunDirection[2];
+    // vec3 sunDirection + f32 cloudAltitude (using validated values)
+    this.uniformData[offset++] = validatedSunDir[0];
+    this.uniformData[offset++] = validatedSunDir[1];
+    this.uniformData[offset++] = validatedSunDir[2];
     this.uniformData[offset++] = params.cloudAltitude;
     
-    // vec3 sunColor + f32 cloudThickness
+    // vec3 sunColor + f32 cloudThickness (using validated value)
     this.uniformData[offset++] = params.sunColor[0];
     this.uniformData[offset++] = params.sunColor[1];
     this.uniformData[offset++] = params.sunColor[2];
-    this.uniformData[offset++] = params.cloudThickness;
+    this.uniformData[offset++] = validatedThickness;
     
-    // vec3 skyColor + f32 cloudDensity
+    // vec3 skyColor + f32 cloudDensity (using validated value)
     this.uniformData[offset++] = params.skyColor[0];
     this.uniformData[offset++] = params.skyColor[1];
     this.uniformData[offset++] = params.skyColor[2];
-    this.uniformData[offset++] = params.cloudDensity;
+    this.uniformData[offset++] = validatedDensity;
     
-    // f32 cloudSpeed + f32 screenWidth + f32 screenHeight + padding
+    // f32 cloudSpeed + f32 screenWidth + f32 screenHeight + f32 nearPlane
     this.uniformData[offset++] = params.cloudSpeed;
     this.uniformData[offset++] = screenWidth;
     this.uniformData[offset++] = screenHeight;
-    this.uniformData[offset++] = 0; // _pad0
+    this.uniformData[offset++] = params.nearPlane;
+    
+    // f32 farPlane + f32 useDetailedLighting + padding
+    this.uniformData[offset++] = params.farPlane;
+    this.uniformData[offset++] = params.useDetailedLighting ? 1.0 : 0.0;
+    this.uniformData[offset++] = 0; // _pad1
+    this.uniformData[offset++] = 0; // _pad2
 
     // Upload uniforms
     this.device.queue.writeBuffer(
@@ -738,6 +707,9 @@ export class VolumetricCloudPass {
   dispose(): void {
     if (this.uniformBuffer) {
       this.uniformBuffer.destroy();
+    }
+    if (this.blueNoiseTexture) {
+      this.blueNoiseTexture.destroy();
     }
     this.initialized = false;
   }

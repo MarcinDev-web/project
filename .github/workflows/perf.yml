@@ -3,6 +3,11 @@ name: perf
 on:
   pull_request:
     branches: [ main ]
+  push:
+    branches: [ main ]
+    paths:
+      - 'crates/collision/**'
+      - 'packages/wasm-collision/**'
   workflow_dispatch: {}
 
 jobs:
@@ -10,17 +15,48 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      
       - name: Install Rust
         uses: dtolnay/rust-toolchain@stable
+      
+      - name: Cache Rust dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/bin/
+            ~/.cargo/registry/index/
+            ~/.cargo/registry/cache/
+            ~/.cargo/git/db/
+            crates/collision/target/
+          key: ${{ runner.os }}-rust-bench-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-rust-bench-
+      
       - name: Run benches (collision)
         working-directory: crates/collision
-        run: cargo bench --bench collision -- --measurement-time 3 --warm-up-time 1 || true
+        run: cargo bench --bench collision -- --measurement-time 3 --warm-up-time 1 2>&1 | tee benchmark-output.txt || true
+      
+      - name: Check for performance regression
+        working-directory: crates/collision
+        run: |
+          # Check for significant regression (> 10% slower)
+          if grep -q "Performance has regressed" target/criterion/*/new/estimates.json 2>/dev/null; then
+            echo "::warning::Potential performance regression detected in collision benchmarks"
+          fi
+          # Parse benchmark output for threshold check
+          if grep -E "change: \+[1-9][0-9]\." benchmark-output.txt; then
+            echo "::warning::Benchmark shows >10% regression. Please review."
+          fi
+      
       - name: Upload criterion reports
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: criterion-report
-          path: crates/collision/target/criterion
+          path: |
+            crates/collision/target/criterion
+            crates/collision/benchmark-output.txt
+          retention-days: 30
 
   typescript-bench:
     runs-on: ubuntu-latest

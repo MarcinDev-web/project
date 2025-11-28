@@ -86,16 +86,8 @@ export async function init(): Promise<WasmVoxelEngine> {
     lod: number
   ) => MeshResult;
 
-  // Capture memory buffer
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-  const wasmMemory = mod.initSync 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    ? mod.wasm.memory 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    : (await (window as any).wasm_bindgen).memory;
-
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-  const memory = mod.memory || wasmMemory;
+  // Note: wasm.memory is internal to the generated module and not exported.
+  // The memory property is kept for interface compatibility but not used.
 
   return {
     generateHeightmap: (width, depth, seed, scale, offsetX, offsetZ, octaves, persistence, lacunarity) => {
@@ -104,7 +96,8 @@ export async function init(): Promise<WasmVoxelEngine> {
     meshChunk: (voxels, size, lod = 1) => {
       return mesh_chunk(voxels, size, lod);
     },
-    memory: memory as WebAssembly.Memory,
+    // Memory is not directly accessible from wasm-bindgen generated modules
+    memory: null as unknown as WebAssembly.Memory,
     dispose: () => {
       isReady = false;
       initPromise = null;

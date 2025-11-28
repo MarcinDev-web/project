@@ -31,6 +31,7 @@ export default defineConfig(({ command }) => {
         '@engine/editor-utils': '../../packages/editor-utils/src',
         '@engine/wasm-collision': '../../packages/wasm-collision/src',
         '@engine/avatar': '../../packages/avatar/src',
+        '@engine/net': '../../packages/net/src',
       };
 
   return {

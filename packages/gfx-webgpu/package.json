@@ -88,6 +88,7 @@
         "@engine/editor-utils": "workspace:*",
         "@engine/wasm-collision": "workspace:*",
         "@engine/wasm-render-logic": "workspace:*",
+        "@engine/wasm-texture-processor": "workspace:*",
         "@engine/world": "workspace:*",
         "gl-matrix": "^3.4.4"
     },

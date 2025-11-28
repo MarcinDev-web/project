@@ -54,6 +54,13 @@
     "dev:all": "powershell -ExecutionPolicy Bypass -File scripts/dev-orchestration.ps1",
     "verify:wasm": "node ./scripts/verify-wasm-build.js",
     "test:e2e": "playwright test",
+    "test:perf": "vitest run packages/test-utils/__tests__/performance.example.test.ts",
+    "test:visual": "playwright test packages/gfx-webgpu/tests/visual/",
+    "test:webgpu": "playwright test packages/gfx-webgpu/tests/",
+    "test:infra": "tsx scripts/test-infrastructure.ts",
+    "test:infra:all": "tsx scripts/test-infrastructure.ts all --ci",
+    "update:baselines": "tsx scripts/test-infrastructure.ts perf --update-baselines",
+    "update:goldens": "tsx scripts/test-infrastructure.ts visual --update-goldens",
     "typecheck": "tsc -b tsconfig.json --noEmit",
     "prepare": "powershell -ExecutionPolicy Bypass -File scripts/install-git-hooks.ps1"
   },

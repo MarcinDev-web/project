@@ -4,6 +4,31 @@ import { CameraComponent } from '../components/CameraComponent.js';
 import { Logger } from '@engine/core/utils';
 import { EventBus } from '@engine/core/event';
 import type { ScriptRuntime } from '@engine/core/script';
+import { CameraManager } from '../systems/CameraManager.js';
+
+/**
+ * Scene lifecycle event names.
+ */
+export const SCENE_EVENTS = {
+  /** Emitted when an entity is added to the scene. */
+  ENTITY_ADDED: 'entity:added',
+  /** Emitted when an entity is removed from the scene. */
+  ENTITY_REMOVED: 'entity:removed',
+} as const;
+
+/**
+ * Event data for entity added event.
+ */
+export interface EntityAddedEvent {
+  entity: Entity;
+}
+
+/**
+ * Event data for entity removed event.
+ */
+export interface EntityRemovedEvent {
+  entity: Entity;
+}
 
 /**
  * Scene manages a hierarchy of entities.
@@ -18,10 +43,8 @@ export class Scene {
   private _entityMap = new Map<EntityId, Entity>();
   /** Index of entities by component type for fast queries */
   private _componentIndex = new Map<ComponentClass, Set<Entity>>();
-  /** Scene cameras indexed by entity id */
-  private _cameraMap = new Map<EntityId, Entity>();
-  /** Cached primary camera entity id */
-  private _primaryCameraId: EntityId | null = null;
+  /** Camera management system */
+  readonly cameraManager: CameraManager;
   /** Scene-wide event bus for messaging between entities/scripts */
   readonly events: EventBus;
   /** Optional scripting runtime context injected when ScriptSystem is active */
@@ -36,6 +59,7 @@ export class Scene {
   constructor(name = 'Scene') {
     this.name = name;
     this.events = new EventBus();
+    this.cameraManager = new CameraManager();
   }
 
   /**
@@ -47,40 +71,17 @@ export class Scene {
 
   /** Returns the primary camera entity if present. */
   get primaryCamera(): Entity | null {
-    if (this._primaryCameraId) {
-      const entity = this._cameraMap.get(this._primaryCameraId);
-      if (entity) {
-        return entity;
-      }
-      this._primaryCameraId = null;
-    }
-    return null;
+    return this.cameraManager.primaryCamera;
   }
 
   /** Returns all entities that have a camera component. */
   get cameras(): Entity[] {
-    return Array.from(this._cameraMap.values());
+    return this.cameraManager.cameras;
   }
 
   /** Sets the primary camera entity. */
   setPrimaryCamera(entity: Entity | null): void {
-    if (entity === null) {
-      this._primaryCameraId = null;
-      for (const cameraEntity of this._cameraMap.values()) {
-        const cameraComponent = cameraEntity.getComponent(CameraComponent);
-        if (cameraComponent) {
-          cameraComponent.primary = false;
-        }
-      }
-      this._ensurePrimaryCamera();
-      return;
-    }
-
-    if (!this._cameraMap.has(entity.id)) {
-      throw new Error('Primary camera must belong to the scene and have a CameraComponent');
-    }
-
-    this._setPrimaryCamera(entity);
+    this.cameraManager.setPrimaryCamera(entity);
   }
 
   /**
@@ -92,6 +93,7 @@ export class Scene {
 
   /**
    * Adds a root entity to the scene.
+   * Emits SCENE_EVENTS.ENTITY_ADDED event after the entity is attached.
    */
   addEntity(entity: Entity): void {
     if (this._entityMap.has(entity.id)) {
@@ -102,6 +104,8 @@ export class Scene {
     this._rootEntities.push(entity);
     // Bind subtree to this scene and register in entity map
     this.attachSubtree(entity);
+    // Emit lifecycle event
+    this.events.emit(SCENE_EVENTS.ENTITY_ADDED, { entity } as EntityAddedEvent);
   }
 
   createEntity(name: string): Entity {
@@ -112,6 +116,7 @@ export class Scene {
 
   /**
    * Removes a root entity from the scene.
+   * Emits SCENE_EVENTS.ENTITY_REMOVED event after the entity is detached.
    */
   removeEntity(entity: Entity): boolean {
     const index = this._rootEntities.indexOf(entity);
@@ -122,11 +127,14 @@ export class Scene {
     this._rootEntities.splice(index, 1);
     // Detach subtree first so entityMap stays in sync
     this.detachSubtree(entity);
+    // Emit lifecycle event
+    this.events.emit(SCENE_EVENTS.ENTITY_REMOVED, { entity } as EntityRemovedEvent);
     return true;
   }
 
   /**
    * Removes an entity by ID.
+   * Emits SCENE_EVENTS.ENTITY_REMOVED event after the entity is detached.
    */
   removeEntityById(id: EntityId): boolean {
     const entity = this._entityMap.get(id);
@@ -143,10 +151,12 @@ export class Scene {
       if (this._entityMap.has(entity.id)) {
         this.detachSubtree(entity);
       }
+      // Emit lifecycle event
+      this.events.emit(SCENE_EVENTS.ENTITY_REMOVED, { entity } as EntityRemovedEvent);
       return true;
     }
 
-    // Otherwise remove as root entity
+    // Otherwise remove as root entity (removeEntity emits the event)
     return this.removeEntity(entity);
   }
 
@@ -255,8 +265,7 @@ export class Scene {
     this._rootEntities = [];
     this._entityMap.clear();
     this._componentIndex.clear();
-    this._cameraMap.clear();
-    this._primaryCameraId = null;
+    this.cameraManager.clear();
     this.events.clear();
     this.scriptRuntime = null;
     this.invalidateQueryCache();
@@ -275,14 +284,14 @@ export class Scene {
       }
       const cameraComponent = e.getComponent(CameraComponent);
       if (cameraComponent) {
-        this._registerCamera(e, cameraComponent);
+        this.cameraManager.registerCamera(e, cameraComponent);
       }
     };
     bind(entity);
     for (const child of entity.children) {
       this.attachSubtree(child);
     }
-    this._ensurePrimaryCamera();
+    this.cameraManager.ensurePrimaryCamera();
     this.invalidateQueryCache();
   }
 
@@ -297,10 +306,7 @@ export class Scene {
       for (const componentType of e.getComponentTypes()) {
         this._unindexComponent(e, componentType);
         if (componentType === CameraComponent) {
-          this._cameraMap.delete(e.id);
-          if (this._primaryCameraId === e.id) {
-            this._primaryCameraId = null;
-          }
+          this.cameraManager.unregisterCamera(e);
         }
       }
     };
@@ -308,7 +314,7 @@ export class Scene {
     for (const child of entity.children) {
       this.detachSubtree(child);
     }
-    this._ensurePrimaryCamera();
+    this.cameraManager.ensurePrimaryCamera();
     this.invalidateQueryCache();
   }
 
@@ -318,8 +324,8 @@ export class Scene {
     if (componentType === CameraComponent) {
       const cameraComponent = entity.getComponent(CameraComponent);
       if (cameraComponent) {
-        this._registerCamera(entity, cameraComponent);
-        this._ensurePrimaryCamera();
+        this.cameraManager.registerCamera(entity, cameraComponent);
+        this.cameraManager.ensurePrimaryCamera();
       }
     }
     this.invalidateQueryCache();
@@ -329,8 +335,8 @@ export class Scene {
   _onComponentRemoved(entity: Entity, componentType: ComponentClass): void {
     this._unindexComponent(entity, componentType);
     if (componentType === CameraComponent) {
-      this._unregisterCamera(entity);
-      this._ensurePrimaryCamera();
+      this.cameraManager.unregisterCamera(entity);
+      this.cameraManager.ensurePrimaryCamera();
     }
     this.invalidateQueryCache();
   }
@@ -369,50 +375,6 @@ export class Scene {
     bucket.delete(entity);
     if (bucket.size === 0) {
       this._componentIndex.delete(componentType);
-    }
-  }
-
-  private _registerCamera(entity: Entity, camera: CameraComponent): void {
-    this._cameraMap.set(entity.id, entity);
-    if (camera.primary) {
-      this._setPrimaryCamera(entity);
-    }
-  }
-
-  private _unregisterCamera(entity: Entity): void {
-    if (!this._cameraMap.has(entity.id)) return;
-    this._cameraMap.delete(entity.id);
-    if (this._primaryCameraId === entity.id) {
-      this._primaryCameraId = null;
-    }
-  }
-
-  private _setPrimaryCamera(entity: Entity): void {
-    for (const cameraEntity of this._cameraMap.values()) {
-      const component = cameraEntity.getComponent(CameraComponent);
-      if (component) {
-        component.primary = cameraEntity === entity;
-      }
-    }
-    this._primaryCameraId = entity.id;
-  }
-
-  private _ensurePrimaryCamera(): void {
-    if (this._primaryCameraId && this._cameraMap.has(this._primaryCameraId)) {
-      return;
-    }
-
-    const cameras = Array.from(this._cameraMap.values());
-    const fallback =
-      cameras.find((entity) => {
-        const camera = entity.getComponent(CameraComponent);
-        return camera?.primary;
-      }) ??
-      cameras[0] ??
-      null;
-
-    if (fallback) {
-      this._setPrimaryCamera(fallback);
     }
   }
 
@@ -468,6 +430,16 @@ export class Scene {
    */
   export(): string {
     return JSON.stringify(this.toJSON(), null, 2);
+  }
+
+  /**
+   * Disposes of the scene and releases all resources.
+   * After calling dispose(), the scene should not be used.
+   */
+  dispose(): void {
+    // Clear all entities, events, and script runtime
+    this.clear();
+    // Additional cleanup can be added here in the future
   }
 
   /**

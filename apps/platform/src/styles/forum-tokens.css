@@ -1,78 +1,151 @@
 /**
- * Forum Design Tokens - Reddit/Discourse-inspired
+ * Forum Design Tokens - Gaming-Inspired
  * 
- * Dedicated color palette and design system for Community OS forum
+ * Bold neon aesthetic with glowing effects for Community OS forum
  */
 
 :root {
   /* ============================================
-     FORUM COLOR PALETTE
+     GAMING COLOR PALETTE
      ============================================ */
   
-  /* Backgrounds */
-  --forum-bg-primary: #0f1419;        /* Główne tło */
-  --forum-bg-secondary: #16181d;      /* Karty, elevated surfaces */
-  --forum-bg-card: #1a1d23;           /* Thread cards */
-  --forum-bg-card-hover: #21242b;     /* Hover state */
-  --forum-bg-sidebar: #15191f;        /* Sidebar background */
-  --forum-bg-input: #1c2128;          /* Input fields */
-  --forum-bg-input-focus: #252c35;    /* Input focus state */
+  /* Neon Accent Colors */
+  --forum-neon-cyan: #00f0ff;
+  --forum-neon-magenta: #ff00e5;
+  --forum-neon-gold: #ffd700;
+  --forum-neon-lime: #39ff14;
+  --forum-neon-orange: #ff6b00;
+  --forum-neon-purple: #b026ff;
+  --forum-neon-red: #ff073a;
+  --forum-neon-blue: #0066ff;
 
-  /* Reddit-style voting colors */
-  --forum-upvote: #ff4500;            /* Orange upvote */
-  --forum-upvote-hover: #ff5722;
-  --forum-upvote-active: #ff4500;
-  --forum-downvote: #7193ff;          /* Blue downvote */
-  --forum-downvote-hover: #5a75ff;
-  --forum-downvote-active: #7193ff;
-  --forum-vote-neutral: var(--text-3); /* Neutral vote color */
+  /* Backgrounds - Deep dark with subtle gradients */
+  --forum-bg-primary: #0a0c10;
+  --forum-bg-secondary: #0f1218;
+  --forum-bg-card: #12151c;
+  --forum-bg-card-hover: #181c25;
+  --forum-bg-sidebar: #0d1015;
+  --forum-bg-input: #151922;
+  --forum-bg-input-focus: #1a1f2a;
+  --forum-bg-glass: rgba(18, 21, 28, 0.85);
 
-  /* Category colors (8 predefined) */
-  --forum-cat-discussion: #3b82f6;
-  --forum-cat-help: #10b981;
-  --forum-cat-showcase: #f59e0b;
-  --forum-cat-feedback: #8b5cf6;
-  --forum-cat-announcements: #ef4444;
-  --forum-cat-bugs: #f43f5e;
-  --forum-cat-docs: #06b6d4;
-  --forum-cat-general: #6b7280;
+  /* Gaming gradients */
+  --forum-gradient-hero: linear-gradient(135deg, #0f1218 0%, #1a0a20 50%, #0a1520 100%);
+  --forum-gradient-card: linear-gradient(180deg, rgba(255,255,255,0.03) 0%, transparent 100%);
+  --forum-gradient-gold: linear-gradient(135deg, #ffd700 0%, #ff8c00 50%, #ffd700 100%);
+  --forum-gradient-fire: linear-gradient(135deg, #ff4500 0%, #ff6b00 50%, #ffd700 100%);
+  
+  /* Voting colors - Enhanced */
+  --forum-upvote: #ff6b00;
+  --forum-upvote-hover: #ff8533;
+  --forum-upvote-active: #ff9500;
+  --forum-upvote-glow: rgba(255, 107, 0, 0.4);
+  --forum-downvote: #00b4d8;
+  --forum-downvote-hover: #00c8f0;
+  --forum-downvote-active: #48cae4;
+  --forum-downvote-glow: rgba(0, 180, 216, 0.4);
+  --forum-vote-neutral: #4a5568;
 
-  /* User reputation/karma */
+  /* Category colors - Neon enhanced */
+  --forum-cat-discussion: #00b4ff;
+  --forum-cat-help: #00ff88;
+  --forum-cat-showcase: #ffaa00;
+  --forum-cat-feedback: #b026ff;
+  --forum-cat-announcements: #ff073a;
+  --forum-cat-bugs: #ff3366;
+  --forum-cat-docs: #00e5ff;
+  --forum-cat-general: #8b95a5;
+
+  /* ============================================
+     RANK SYSTEM - Gaming Tiers
+     ============================================ */
+
+  /* Rank Colors */
+  --forum-rank-bronze: #cd7f32;
+  --forum-rank-silver: #c0c0c0;
+  --forum-rank-gold: #ffd700;
+  --forum-rank-platinum: #e5e4e2;
+  --forum-rank-diamond: #b9f2ff;
+  --forum-rank-master: #ff00e5;
+  --forum-rank-legend: linear-gradient(90deg, #ff6b00, #ffd700, #ff00e5, #00f0ff);
+
+  /* Rank Gradients */
+  --forum-rank-bronze-gradient: linear-gradient(135deg, #cd7f32 0%, #8b4513 50%, #cd7f32 100%);
+  --forum-rank-silver-gradient: linear-gradient(135deg, #e8e8e8 0%, #a8a8a8 50%, #e8e8e8 100%);
+  --forum-rank-gold-gradient: linear-gradient(135deg, #ffd700 0%, #daa520 50%, #ffd700 100%);
+  --forum-rank-platinum-gradient: linear-gradient(135deg, #f0f0f0 0%, #c0c0c0 50%, #f0f0f0 100%);
+  --forum-rank-diamond-gradient: linear-gradient(135deg, #b9f2ff 0%, #7dd3fc 50%, #b9f2ff 100%);
+  --forum-rank-master-gradient: linear-gradient(135deg, #ff00e5 0%, #9d00ff 50%, #ff00e5 100%);
+
+  /* XP Bar */
+  --forum-xp-bg: rgba(255, 255, 255, 0.1);
+  --forum-xp-fill: linear-gradient(90deg, #ff6b00 0%, #ffd700 100%);
+  --forum-xp-glow: 0 0 10px rgba(255, 107, 0, 0.5);
+
+  /* User reputation/karma - Enhanced */
   --forum-karma-low: #6b7280;
-  --forum-karma-medium: #3b82f6;
-  --forum-karma-high: #f59e0b;
-  --forum-karma-expert: #8b5cf6;
-  --forum-karma-legend: #f43f5e;
+  --forum-karma-medium: #00b4ff;
+  --forum-karma-high: #ffaa00;
+  --forum-karma-expert: #b026ff;
+  --forum-karma-legend: #ff00e5;
 
-  /* Badges & Tags */
-  --forum-badge-admin: #ef4444;
-  --forum-badge-mod: #10b981;
-  --forum-badge-contributor: #f59e0b;
-  --forum-badge-verified: #3b82f6;
-  --forum-badge-op: #8b5cf6;         /* Original Poster */
-  --forum-badge-solved: #10b981;      /* Solved thread */
+  /* Badges & Tags - Neon style */
+  --forum-badge-admin: #ff073a;
+  --forum-badge-mod: #00ff88;
+  --forum-badge-contributor: #ffaa00;
+  --forum-badge-verified: #00b4ff;
+  --forum-badge-op: #b026ff;
+  --forum-badge-solved: #00ff88;
+  --forum-badge-hot: #ff6b00;
+  --forum-badge-new: #00f0ff;
+  --forum-badge-pinned: #ffd700;
 
-  /* Borders */
-  --forum-border-default: rgba(70, 80, 95, 0.3);
-  --forum-border-hover: rgba(70, 80, 95, 0.5);
-  --forum-border-active: rgba(70, 80, 95, 0.8);
-  --forum-border-category: rgba(70, 80, 95, 0.2);
+  /* ============================================
+     GLOW EFFECTS
+     ============================================ */
 
-  /* Shadows */
-  --forum-shadow-card: 0 2px 8px rgba(0, 0, 0, 0.3);
-  --forum-shadow-card-hover: 0 4px 12px rgba(0, 0, 0, 0.4);
-  --forum-shadow-sidebar: 2px 0 8px rgba(0, 0, 0, 0.2);
+  /* Glow shadows */
+  --forum-glow-cyan: 0 0 20px rgba(0, 240, 255, 0.3), 0 0 40px rgba(0, 240, 255, 0.1);
+  --forum-glow-magenta: 0 0 20px rgba(255, 0, 229, 0.3), 0 0 40px rgba(255, 0, 229, 0.1);
+  --forum-glow-gold: 0 0 20px rgba(255, 215, 0, 0.3), 0 0 40px rgba(255, 215, 0, 0.1);
+  --forum-glow-orange: 0 0 20px rgba(255, 107, 0, 0.3), 0 0 40px rgba(255, 107, 0, 0.1);
+  --forum-glow-lime: 0 0 20px rgba(57, 255, 20, 0.3), 0 0 40px rgba(57, 255, 20, 0.1);
+  --forum-glow-purple: 0 0 20px rgba(176, 38, 255, 0.3), 0 0 40px rgba(176, 38, 255, 0.1);
+  --forum-glow-red: 0 0 20px rgba(255, 7, 58, 0.3), 0 0 40px rgba(255, 7, 58, 0.1);
+
+  /* Card glow on hover */
+  --forum-glow-card: 0 0 30px rgba(255, 107, 0, 0.15), 0 4px 20px rgba(0, 0, 0, 0.4);
+  --forum-glow-card-intense: 0 0 40px rgba(255, 107, 0, 0.25), 0 8px 30px rgba(0, 0, 0, 0.5);
+
+  /* Border glows */
+  --forum-border-glow: 1px solid rgba(255, 107, 0, 0.3);
+  --forum-border-glow-hover: 1px solid rgba(255, 107, 0, 0.6);
+
+  /* Borders - Enhanced */
+  --forum-border-default: rgba(255, 255, 255, 0.06);
+  --forum-border-hover: rgba(255, 255, 255, 0.12);
+  --forum-border-active: rgba(255, 107, 0, 0.5);
+  --forum-border-category: rgba(255, 255, 255, 0.04);
+
+  /* Shadows - Gaming depth */
+  --forum-shadow-card: 0 4px 20px rgba(0, 0, 0, 0.4);
+  --forum-shadow-card-hover: 0 8px 30px rgba(0, 0, 0, 0.5);
+  --forum-shadow-sidebar: 4px 0 20px rgba(0, 0, 0, 0.3);
+  --forum-shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.05);
 
   /* ============================================
      FORUM TYPOGRAPHY
      ============================================ */
   
-  --forum-title-xl: 1.875rem;      /* Thread titles (30px) */
-  --forum-title-lg: 1.5rem;        /* Category headers (24px) */
-  --forum-title-md: 1.25rem;       /* Card titles (20px) */
-  --forum-body: 0.9375rem;         /* Post content (15px) */
-  --forum-meta: 0.8125rem;         /* Timestamps, stats (13px) */
-  --forum-small: 0.75rem;          /* Small text (12px) */
+  --forum-font-display: 'Orbitron', 'Rajdhani', sans-serif;
+  --forum-font-body: 'Chakra Petch', 'Rajdhani', sans-serif;
+  
+  --forum-title-xl: 2rem;
+  --forum-title-lg: 1.5rem;
+  --forum-title-md: 1.25rem;
+  --forum-body: 0.9375rem;
+  --forum-meta: 0.8125rem;
+  --forum-small: 0.75rem;
 
   /* Line heights */
   --forum-line-tight: 1.3;
@@ -83,29 +156,39 @@
      FORUM SPACING
      ============================================ */
   
-  --forum-spacing-card: var(--spacing-4);      /* Card padding */
-  --forum-spacing-card-gap: var(--spacing-3); /* Gap between cards */
-  --forum-spacing-sidebar: var(--spacing-4);   /* Sidebar padding */
-  --forum-spacing-post: var(--spacing-4);       /* Post padding */
-  --forum-spacing-vote: var(--spacing-2);      /* Voting section width */
+  --forum-spacing-card: var(--spacing-4);
+  --forum-spacing-card-gap: var(--spacing-4);
+  --forum-spacing-sidebar: var(--spacing-4);
+  --forum-spacing-post: var(--spacing-4);
+  --forum-spacing-vote: var(--spacing-2);
 
   /* ============================================
      FORUM LAYOUT
      ============================================ */
   
-  --forum-sidebar-width: 240px;
+  --forum-sidebar-width: 260px;
   --forum-sidebar-width-collapsed: 60px;
-  --forum-right-sidebar-width: 280px;
-  --forum-content-max-width: 1200px;
-  --forum-card-border-radius: var(--radius-md);
+  --forum-right-sidebar-width: 300px;
+  --forum-content-max-width: 1400px;
+  --forum-card-border-radius: 12px;
 
   /* ============================================
      FORUM ANIMATIONS
      ============================================ */
   
-  --forum-transition-fast: 0.15s ease;
-  --forum-transition-base: 0.2s ease;
-  --forum-transition-slow: 0.3s ease;
+  --forum-transition-fast: 0.15s cubic-bezier(0.4, 0, 0.2, 1);
+  --forum-transition-base: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --forum-transition-slow: 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+  --forum-transition-bounce: 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+
+  /* ============================================
+     ACTIVITY INDICATORS
+     ============================================ */
+
+  --forum-online-color: #00ff88;
+  --forum-online-glow: 0 0 8px rgba(0, 255, 136, 0.6);
+  --forum-activity-pulse: #ff6b00;
+  --forum-new-indicator: #00f0ff;
 }
 
 /* ============================================
@@ -117,13 +200,185 @@
   --forum-category-color-default: var(--forum-cat-general);
 }
 
-/* Helper function to get category color */
-.forum-category-discussion { --forum-category-color: var(--forum-cat-discussion); }
-.forum-category-help { --forum-category-color: var(--forum-cat-help); }
-.forum-category-showcase { --forum-category-color: var(--forum-cat-showcase); }
-.forum-category-feedback { --forum-category-color: var(--forum-cat-feedback); }
-.forum-category-announcements { --forum-category-color: var(--forum-cat-announcements); }
-.forum-category-bugs { --forum-category-color: var(--forum-cat-bugs); }
-.forum-category-docs { --forum-category-color: var(--forum-cat-docs); }
-.forum-category-general { --forum-category-color: var(--forum-cat-general); }
+/* Helper classes for category colors with glow */
+.forum-category-discussion { 
+  --forum-category-color: var(--forum-cat-discussion);
+  --forum-category-glow: 0 0 15px rgba(0, 180, 255, 0.3);
+}
+.forum-category-help { 
+  --forum-category-color: var(--forum-cat-help);
+  --forum-category-glow: 0 0 15px rgba(0, 255, 136, 0.3);
+}
+.forum-category-showcase { 
+  --forum-category-color: var(--forum-cat-showcase);
+  --forum-category-glow: 0 0 15px rgba(255, 170, 0, 0.3);
+}
+.forum-category-feedback { 
+  --forum-category-color: var(--forum-cat-feedback);
+  --forum-category-glow: 0 0 15px rgba(176, 38, 255, 0.3);
+}
+.forum-category-announcements { 
+  --forum-category-color: var(--forum-cat-announcements);
+  --forum-category-glow: 0 0 15px rgba(255, 7, 58, 0.3);
+}
+.forum-category-bugs { 
+  --forum-category-color: var(--forum-cat-bugs);
+  --forum-category-glow: 0 0 15px rgba(255, 51, 102, 0.3);
+}
+.forum-category-docs { 
+  --forum-category-color: var(--forum-cat-docs);
+  --forum-category-glow: 0 0 15px rgba(0, 229, 255, 0.3);
+}
+.forum-category-general { 
+  --forum-category-color: var(--forum-cat-general);
+  --forum-category-glow: 0 0 15px rgba(139, 149, 165, 0.3);
+}
 
+/* ============================================
+   GAMING ANIMATIONS KEYFRAMES
+   ============================================ */
+
+@keyframes forum-pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+
+@keyframes forum-glow-pulse {
+  0%, 100% { 
+    box-shadow: 0 0 5px currentColor;
+    opacity: 1;
+  }
+  50% { 
+    box-shadow: 0 0 20px currentColor, 0 0 30px currentColor;
+    opacity: 0.8;
+  }
+}
+
+@keyframes forum-slide-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes forum-slide-in-right {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes forum-scale-in {
+  from {
+    opacity: 0;
+    transform: scale(0.95);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+@keyframes forum-shimmer {
+  0% { background-position: -200% center; }
+  100% { background-position: 200% center; }
+}
+
+@keyframes forum-fire-flicker {
+  0%, 100% { 
+    filter: brightness(1) drop-shadow(0 0 2px #ff6b00);
+  }
+  25% { 
+    filter: brightness(1.2) drop-shadow(0 0 4px #ff8c00);
+  }
+  50% { 
+    filter: brightness(1.1) drop-shadow(0 0 6px #ffa500);
+  }
+  75% { 
+    filter: brightness(1.15) drop-shadow(0 0 3px #ff7f00);
+  }
+}
+
+@keyframes forum-online-pulse {
+  0%, 100% {
+    box-shadow: 0 0 0 0 rgba(0, 255, 136, 0.4);
+  }
+  50% {
+    box-shadow: 0 0 0 6px rgba(0, 255, 136, 0);
+  }
+}
+
+@keyframes forum-rainbow-border {
+  0% { border-color: #ff6b00; }
+  16% { border-color: #ffd700; }
+  33% { border-color: #00ff88; }
+  50% { border-color: #00f0ff; }
+  66% { border-color: #b026ff; }
+  83% { border-color: #ff00e5; }
+  100% { border-color: #ff6b00; }
+}
+
+@keyframes forum-xp-fill {
+  from { width: 0; }
+}
+
+@keyframes forum-badge-shine {
+  0% { 
+    background-position: -100% center;
+  }
+  100% { 
+    background-position: 200% center;
+  }
+}
+
+/* ============================================
+   UTILITY CLASSES
+   ============================================ */
+
+.forum-glow-text {
+  text-shadow: 0 0 10px currentColor, 0 0 20px currentColor;
+}
+
+.forum-gradient-text {
+  background: var(--forum-gradient-fire);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.forum-glass {
+  background: var(--forum-bg-glass);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+.forum-neon-border {
+  position: relative;
+}
+
+.forum-neon-border::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: inherit;
+  padding: 1px;
+  background: linear-gradient(135deg, var(--forum-neon-orange), var(--forum-neon-magenta));
+  -webkit-mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  opacity: 0.5;
+  transition: opacity var(--forum-transition-base);
+}
+
+.forum-neon-border:hover::before {
+  opacity: 1;
+}

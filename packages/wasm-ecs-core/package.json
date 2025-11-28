@@ -1,0 +1,33 @@
+{
+  "name": "@engine/wasm-ecs-core",
+  "version": "0.1.0",
+  "description": "WASM-accelerated ECS hot paths: queries, transform hierarchy, frustum culling",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "pkg"
+  ],
+  "scripts": {
+    "build:wasm": "cd ../../crates/ecs-core && wasm-pack build --target web --out-dir ../../packages/wasm-ecs-core/pkg",
+    "build:ts": "tsc",
+    "build": "npm run build:wasm && npm run build:ts",
+    "clean": "rimraf dist pkg"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "rimraf": "^5.0.0",
+    "typescript": "~5.5.4"
+  },
+  "peerDependencies": {
+    "@engine/core": "workspace:*"
+  }
+}
+

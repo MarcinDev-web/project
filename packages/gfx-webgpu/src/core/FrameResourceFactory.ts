@@ -38,11 +38,16 @@ import type { TextureAtlas } from '../textures/TextureAtlas';
 
 // Vertex buffer layout constants
 const VERTEX_STRIDE = 24;
-const INSTANCE_OFFSET_STRIDE = 12;
+
+/**
+ * Interleaved instance buffer stride (96 bytes = 24 floats per instance).
+ * Layout: [offset(3), colorScale(4), secondaryColor(4), emissiveColor(4), materialParams(4), rotation(4), materialId(1)]
+ */
+const INSTANCE_INTERLEAVED_STRIDE = 96;
 
 /**
  * Creates vertex buffer layouts for the render pipeline.
- * These define the structure of vertex and instance data.
+ * Uses interleaved instance buffer for optimal GPU compaction.
  */
 export function createVertexBufferLayouts(): GPUVertexBufferLayout[] {
   return [
@@ -57,47 +62,20 @@ export function createVertexBufferLayouts(): GPUVertexBufferLayout[] {
         { shaderLocation: 3, offset: 20, format: 'unorm8x4' },  // AO (x), rest unused
       ],
     },
-    // Instance offset buffer
+    // Single interleaved instance buffer (96 bytes per instance)
+    // Combines all instance attributes for single-pass GPU compaction
     {
-      arrayStride: INSTANCE_OFFSET_STRIDE,
+      arrayStride: INSTANCE_INTERLEAVED_STRIDE,
       stepMode: 'instance',
-      attributes: [{ shaderLocation: 4, offset: 0, format: 'float32x3' }],
-    },
-    // Instance color scale buffer
-    {
-      arrayStride: 16,
-      stepMode: 'instance',
-      attributes: [{ shaderLocation: 5, offset: 0, format: 'float32x4' }],
-    },
-    // Instance secondary color buffer
-    {
-      arrayStride: 16,
-      stepMode: 'instance',
-      attributes: [{ shaderLocation: 6, offset: 0, format: 'float32x4' }],
-    },
-    // Instance emissive color buffer
-    {
-      arrayStride: 16,
-      stepMode: 'instance',
-      attributes: [{ shaderLocation: 7, offset: 0, format: 'float32x4' }],
-    },
-    // Instance material params buffer
-    {
-      arrayStride: 16,
-      stepMode: 'instance',
-      attributes: [{ shaderLocation: 8, offset: 0, format: 'float32x4' }],
-    },
-    // Instance rotation buffer
-    {
-      arrayStride: 16,
-      stepMode: 'instance',
-      attributes: [{ shaderLocation: 9, offset: 0, format: 'float32x4' }],
-    },
-    // Instance material ID buffer
-    {
-      arrayStride: 4,
-      stepMode: 'instance',
-      attributes: [{ shaderLocation: 10, offset: 0, format: 'float32' }],
+      attributes: [
+        { shaderLocation: 4, offset: 0, format: 'float32x3' },   // offset (12 bytes)
+        { shaderLocation: 5, offset: 12, format: 'float32x4' },  // colorScale (16 bytes)
+        { shaderLocation: 6, offset: 28, format: 'float32x4' },  // secondaryColor (16 bytes)
+        { shaderLocation: 7, offset: 44, format: 'float32x4' },  // emissiveColor (16 bytes)
+        { shaderLocation: 8, offset: 60, format: 'float32x4' },  // materialParams (16 bytes)
+        { shaderLocation: 9, offset: 76, format: 'float32x4' },  // rotation (16 bytes)
+        { shaderLocation: 10, offset: 92, format: 'float32' },   // materialId (4 bytes)
+      ],
     },
   ];
 }
@@ -326,21 +304,9 @@ export class FrameResourceFactory {
       safeDestroy(resources.vertexBuffer);
       safeDestroy(resources.indexBuffer);
 
-      // Dispose instance buffers
-      safeDestroy(resources.instanceOffsetBuffer);
-      safeDestroy(resources.instanceOffsetStagingBuffer);
-      safeDestroy(resources.instanceColorScaleBuffer);
-      safeDestroy(resources.instanceColorScaleStagingBuffer);
-      safeDestroy(resources.instanceSecondaryColorBuffer);
-      safeDestroy(resources.instanceSecondaryColorStagingBuffer);
-      safeDestroy(resources.instanceEmissiveColorBuffer);
-      safeDestroy(resources.instanceEmissiveColorStagingBuffer);
-      safeDestroy(resources.instanceMaterialParamsBuffer);
-      safeDestroy(resources.instanceMaterialParamsStagingBuffer);
-      safeDestroy(resources.instanceRotationBuffer);
-      safeDestroy(resources.instanceRotationStagingBuffer);
-      safeDestroy(resources.instanceMaterialIdBuffer);
-      safeDestroy(resources.instanceMaterialIdStagingBuffer);
+      // Dispose instance buffers (interleaved)
+      safeDestroy(resources.instanceInterleavedBuffer);
+      safeDestroy(resources.instanceInterleavedStagingBuffer);
       safeDestroy(resources.instanceBoundsBuffer);
       safeDestroy(resources.instanceIndirectArgsBuffer);
 

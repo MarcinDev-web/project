@@ -99,23 +99,61 @@ export class ForwardPlus {
 
         @group(0) @binding(0) var<uniform> uniforms: Uniforms;
         @group(0) @binding(1) var<storage, read> lights: array<Light>;
-        @group(0) @binding(2) var<storage, read_write> lightIndices: array<atomic<u32>>;
+        @group(0) @binding(2) var<storage, read_write> lightIndices: array<u32>;
         @group(0) @binding(3) var<storage, read_write> lightGrid: array<vec2<u32>>; // offset, count
 
-        // Creates a plane passing through origin and two points (in View Space)
-        // Normal points "inward" relative to the winding order of p1 -> p2
+        // ============================================================================
+        // Workgroup Shared Memory - Cooperative Light Culling
+        // ============================================================================
+        
+        const TILE_SIZE: u32 = 16u;
+        const WORKGROUP_SIZE: u32 = 256u;  // 16 x 16 threads per tile
+        const MAX_LIGHTS_PER_TILE: u32 = 256u;
+        
+        // Shared light list for the tile
+        var<workgroup> sharedLightList: array<u32, MAX_LIGHTS_PER_TILE>;
+        var<workgroup> sharedLightCount: atomic<u32>;
+        
+        // Shared frustum planes (computed once, used by all threads)
+        var<workgroup> sharedPlanes: array<vec3<f32>, 4>;  // left, right, bottom, top
+        
+        // ============================================================================
+        // Helper Functions
+        // ============================================================================
+        
         fn createPlane(p1: vec3<f32>, p2: vec3<f32>) -> vec3<f32> {
           return normalize(cross(p1, p2));
         }
-
-        @compute @workgroup_size(16, 16, 1)
-        fn main(@builtin(global_invocation_id) globalId: vec3<u32>) {
-          let tileX = globalId.x;
-          let tileY = globalId.y;
-          let tileSize = 16u;
+        
+        fn testLightAgainstFrustum(viewPos: vec3<f32>, radius: f32) -> bool {
+          // Near plane check
+          if (viewPos.z - radius > -0.1) { return false; }
           
-          let tilesX = u32(ceil(uniforms.screenWidth / f32(tileSize)));
-          let tilesY = u32(ceil(uniforms.screenHeight / f32(tileSize)));
+          // Test against 4 tile frustum planes
+          if (dot(sharedPlanes[0], viewPos) < -radius) { return false; }  // left
+          if (dot(sharedPlanes[1], viewPos) < -radius) { return false; }  // right
+          if (dot(sharedPlanes[2], viewPos) < -radius) { return false; }  // bottom
+          if (dot(sharedPlanes[3], viewPos) < -radius) { return false; }  // top
+          
+          return true;
+        }
+
+        // ============================================================================
+        // Main Kernel - Cooperative Tile Light Culling
+        // ============================================================================
+        
+        @compute @workgroup_size(16, 16, 1)
+        fn main(
+          @builtin(global_invocation_id) globalId: vec3<u32>,
+          @builtin(local_invocation_id) localId: vec3<u32>,
+          @builtin(workgroup_id) workgroupId: vec3<u32>
+        ) {
+          let tileX = workgroupId.x;
+          let tileY = workgroupId.y;
+          let localIndex = localId.y * TILE_SIZE + localId.x;
+          
+          let tilesX = u32(ceil(uniforms.screenWidth / f32(TILE_SIZE)));
+          let tilesY = u32(ceil(uniforms.screenHeight / f32(TILE_SIZE)));
           
           if (tileX >= tilesX || tileY >= tilesY) {
             return;
@@ -123,67 +161,80 @@ export class ForwardPlus {
           
           let tileIndex = tileY * tilesX + tileX;
           
-          // 1. Calculate Tile Bounds in NDC [-1, 1]
-          let screenWidth = uniforms.screenWidth;
-          let screenHeight = uniforms.screenHeight;
+          // ========================================
+          // Phase 1: Thread 0 computes shared frustum planes
+          // ========================================
+          if (localIndex == 0u) {
+            atomicStore(&sharedLightCount, 0u);
+            
+            let screenWidth = uniforms.screenWidth;
+            let screenHeight = uniforms.screenHeight;
+            
+            let minX = (f32(tileX * TILE_SIZE) / screenWidth) * 2.0 - 1.0;
+            let maxX = (f32((tileX + 1u) * TILE_SIZE) / screenWidth) * 2.0 - 1.0;
+            let minY = 1.0 - (f32((tileY + 1u) * TILE_SIZE) / screenHeight) * 2.0;
+            let maxY = 1.0 - (f32(tileY * TILE_SIZE) / screenHeight) * 2.0;
+            
+            let p00 = uniforms.projectionMatrix[0][0];
+            let p11 = uniforms.projectionMatrix[1][1];
+            
+            let viewBL = vec3<f32>(minX / p00, minY / p11, -1.0);
+            let viewBR = vec3<f32>(maxX / p00, minY / p11, -1.0);
+            let viewTR = vec3<f32>(maxX / p00, maxY / p11, -1.0);
+            let viewTL = vec3<f32>(minX / p00, maxY / p11, -1.0);
+            
+            sharedPlanes[0] = createPlane(viewTL, viewBL);  // left
+            sharedPlanes[1] = createPlane(viewBR, viewTR);  // right
+            sharedPlanes[2] = createPlane(viewBL, viewBR);  // bottom
+            sharedPlanes[3] = createPlane(viewTR, viewTL);  // top
+          }
+          workgroupBarrier();
           
-          let minX = (f32(tileX * tileSize) / screenWidth) * 2.0 - 1.0;
-          let maxX = (f32((tileX + 1) * tileSize) / screenWidth) * 2.0 - 1.0;
-          // Flip Y for NDC (top is +1 in some systems, but here we map 0..H to +1..-1 usually)
-          // Standard WebGPU NDC: Y is up (+1), down (-1). Screen: Y is down.
-          let minY = 1.0 - (f32((tileY + 1) * tileSize) / screenHeight) * 2.0;
-          let maxY = 1.0 - (f32(tileY * tileSize) / screenHeight) * 2.0;
+          // ========================================
+          // Phase 2: All 256 threads cooperatively test lights
+          // Each thread tests a subset of lights in parallel
+          // ========================================
+          let totalLights = uniforms.lightCount;
+          let lightsPerThread = (totalLights + WORKGROUP_SIZE - 1u) / WORKGROUP_SIZE;
+          let lightStart = localIndex * lightsPerThread;
+          let lightEnd = min(lightStart + lightsPerThread, totalLights);
           
-          // 2. Unproject to View Space (at Z = -1.0)
-          // P00 = 1/(aspect*tan(fov/2)), P11 = 1/tan(fov/2)
-          let p00 = uniforms.projectionMatrix[0][0];
-          let p11 = uniforms.projectionMatrix[1][1];
-          
-          // View space direction vectors (Z = -1.0)
-          let viewBL = vec3<f32>(minX / p00, minY / p11, -1.0);
-          let viewBR = vec3<f32>(maxX / p00, minY / p11, -1.0);
-          let viewTR = vec3<f32>(maxX / p00, maxY / p11, -1.0);
-          let viewTL = vec3<f32>(minX / p00, maxY / p11, -1.0);
-          
-          // 3. Create Frustum Planes (Normals pointing inward)
-          let planeLeft   = createPlane(viewTL, viewBL);
-          let planeRight  = createPlane(viewBR, viewTR);
-          let planeBottom = createPlane(viewBL, viewBR);
-          let planeTop    = createPlane(viewTR, viewTL);
-          
-          var lightCount = 0u;
-          let maxLightsPerTile = 256u;
-          
-          for (var i = 0u; i < uniforms.lightCount && lightCount < maxLightsPerTile; i++) {
+          for (var i = lightStart; i < lightEnd; i++) {
             let light = lights[i];
             
-            // Transform light to View Space
+            // Transform to view space
             let viewPos4 = uniforms.viewMatrix * vec4<f32>(light.position, 1.0);
             let viewPos = viewPos4.xyz;
-            let r = light.range;
             
-            var visible = true;
-            
-            // Near plane check (approximate)
-            if (viewPos.z - r > -0.1) { visible = false; }
-            
-            // Plane checks: dot(N, P) < -r means sphere is fully outside
-            if (visible && dot(planeLeft, viewPos)   < -r) { visible = false; }
-            if (visible && dot(planeRight, viewPos)  < -r) { visible = false; }
-            if (visible && dot(planeTop, viewPos)    < -r) { visible = false; }
-            if (visible && dot(planeBottom, viewPos) < -r) { visible = false; }
-            
-            if (visible) {
-              let index = atomicAdd(&lightIndices[tileIndex * maxLightsPerTile + lightCount], 1u);
-              if (index < maxLightsPerTile - 1u) {
-                lightIndices[tileIndex * maxLightsPerTile + index] = i;
-                lightCount++;
+            if (testLightAgainstFrustum(viewPos, light.range)) {
+              let writeIndex = atomicAdd(&sharedLightCount, 1u);
+              if (writeIndex < MAX_LIGHTS_PER_TILE) {
+                sharedLightList[writeIndex] = i;
               }
             }
           }
+          workgroupBarrier();
           
-          // Store light grid
-          lightGrid[tileIndex] = vec2<u32>(tileIndex * maxLightsPerTile, lightCount);
+          // ========================================
+          // Phase 3: Parallel write to global memory
+          // All threads cooperate to copy from shared to global
+          // ========================================
+          let finalCount = min(atomicLoad(&sharedLightCount), MAX_LIGHTS_PER_TILE);
+          let globalOffset = tileIndex * MAX_LIGHTS_PER_TILE;
+          
+          // Each thread writes a portion of the light list
+          let writesPerThread = (finalCount + WORKGROUP_SIZE - 1u) / WORKGROUP_SIZE;
+          let writeStart = localIndex * writesPerThread;
+          let writeEnd = min(writeStart + writesPerThread, finalCount);
+          
+          for (var i = writeStart; i < writeEnd; i++) {
+            lightIndices[globalOffset + i] = sharedLightList[i];
+          }
+          
+          // Thread 0 writes the grid entry
+          if (localIndex == 0u) {
+            lightGrid[tileIndex] = vec2<u32>(globalOffset, finalCount);
+          }
         }
       `,
     });

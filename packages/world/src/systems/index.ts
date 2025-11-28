@@ -20,3 +20,4 @@ export * from './InteractionSystem.js';
 export * from './CheckpointSystem.js';
 export * from './WasmAnimationSystem.js';
 export * from './PowerUpSystem.js';
+export * from './HazardZoneSystem.js';

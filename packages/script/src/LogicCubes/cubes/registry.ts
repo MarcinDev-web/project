@@ -16,6 +16,10 @@ import {
   SpawnEntityAction,
   DestroyEntityAction,
   LogAction,
+  TeleportPlayerAction,
+  KillPlayerAction,
+  RespawnPlayerAction,
+  ApplyImpulseAction,
 } from './ActionCubes.js';
 
 import {
@@ -26,6 +30,24 @@ import {
   UISetValueAction,
   UIEnableElementAction,
 } from './UICubes.js';
+
+import {
+  GetBalanceData,
+  AddCurrencyAction,
+  SubtractCurrencyAction,
+  HasCurrencyCondition,
+  OnBalanceChangedTrigger,
+  PurchaseAction,
+} from './EconomyCubes.js';
+
+import {
+  AddItemAction,
+  RemoveItemAction,
+  HasItemCondition,
+  GetItemCountData,
+  OnItemAddedTrigger,
+  OnItemRemovedTrigger,
+} from './InventoryCubes.js';
 
 import {
   CompareVariableCondition,
@@ -56,6 +78,12 @@ export function registerBuiltInLogicCubes(): void {
   LogicCubeRegistry.register('destroyEntityAction', DestroyEntityAction);
   LogicCubeRegistry.register('logAction', LogAction);
 
+  // Platformer/Obby Actions
+  LogicCubeRegistry.register('teleportPlayerAction', TeleportPlayerAction);
+  LogicCubeRegistry.register('killPlayerAction', KillPlayerAction);
+  LogicCubeRegistry.register('respawnPlayerAction', RespawnPlayerAction);
+  LogicCubeRegistry.register('applyImpulseAction', ApplyImpulseAction);
+
   // Conditions
   LogicCubeRegistry.register('compareVariableCondition', CompareVariableCondition);
   LogicCubeRegistry.register('isPlayerNearCondition', IsPlayerNearCondition);
@@ -79,4 +107,20 @@ export function registerBuiltInLogicCubes(): void {
   LogicCubeRegistry.register('uiSetImage', UISetImageAction);
   LogicCubeRegistry.register('uiSetValue', UISetValueAction);
   LogicCubeRegistry.register('uiEnableElement', UIEnableElementAction);
+
+  // Economy Cubes (Tycoon/Simulator)
+  LogicCubeRegistry.register('getBalance', GetBalanceData);
+  LogicCubeRegistry.register('addCurrency', AddCurrencyAction);
+  LogicCubeRegistry.register('subtractCurrency', SubtractCurrencyAction);
+  LogicCubeRegistry.register('hasCurrency', HasCurrencyCondition);
+  LogicCubeRegistry.register('onBalanceChanged', OnBalanceChangedTrigger);
+  LogicCubeRegistry.register('purchase', PurchaseAction);
+
+  // Inventory Cubes (Tycoon/Simulator)
+  LogicCubeRegistry.register('addItem', AddItemAction);
+  LogicCubeRegistry.register('removeItem', RemoveItemAction);
+  LogicCubeRegistry.register('hasItem', HasItemCondition);
+  LogicCubeRegistry.register('getItemCount', GetItemCountData);
+  LogicCubeRegistry.register('onItemAdded', OnItemAddedTrigger);
+  LogicCubeRegistry.register('onItemRemoved', OnItemRemovedTrigger);
 }

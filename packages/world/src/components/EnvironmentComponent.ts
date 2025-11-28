@@ -28,10 +28,10 @@ const NEW_DEFAULT_GROUND_COLOR: readonly [number, number, number] = [0.08, 0.1, 
 const NEW_DEFAULT_SUN_COLOR: readonly [number, number, number] = [1.05, 1.0, 0.9];
 const NEW_DEFAULT_SUN_INTENSITY = 1.1;
 const NEW_DEFAULT_AMBIENT_INTENSITY = 0.35;
-const DEFAULT_CLOUD_DENSITY = 0.55;
-const DEFAULT_CLOUD_SPEED = 0.04;
-const DEFAULT_CLOUD_ALTITUDE = 800;
-const DEFAULT_CLOUD_THICKNESS = 400;
+const DEFAULT_CLOUD_DENSITY = 0.7;
+const DEFAULT_CLOUD_SPEED = 0.03;
+const DEFAULT_CLOUD_ALTITUDE = 1200;
+const DEFAULT_CLOUD_THICKNESS = 800;
 
 // Physical sky (Rayleigh/Mie scattering) defaults
 const DEFAULT_RAYLEIGH = 2.0;

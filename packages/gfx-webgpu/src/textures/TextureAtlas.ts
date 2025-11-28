@@ -33,6 +33,25 @@ export interface MaterialTextureData {
   topNormalData?: Uint8Array;
   /** Texture size (assumed square) */
   size: number;
+  
+  // === Extended PBR Maps ===
+  
+  /** Side roughness map data (grayscale, 0=smooth, 1=rough) */
+  sideRoughnessData?: Uint8Array;
+  /** Top roughness map data */
+  topRoughnessData?: Uint8Array;
+  /** Side metallic map data (grayscale, 0=dielectric, 1=metallic) */
+  sideMetallicData?: Uint8Array;
+  /** Top metallic map data */
+  topMetallicData?: Uint8Array;
+  /** Side ambient occlusion map data (grayscale) */
+  sideAOData?: Uint8Array;
+  /** Top ambient occlusion map data */
+  topAOData?: Uint8Array;
+  /** Side emission map data (RGB emission color) */
+  sideEmissionData?: Uint8Array;
+  /** Top emission map data */
+  topEmissionData?: Uint8Array;
 }
 
 export interface AtlasConfig {
@@ -350,6 +369,218 @@ export class TextureAtlas {
     }
 
     return dstData;
+  }
+
+  /**
+   * Builds the roughness atlas texture data.
+   * Missing roughness maps are filled with default roughness value (0.5).
+   * @returns RGBA pixel data for the complete roughness atlas
+   */
+  buildRoughnessAtlasData(): Uint8Array {
+    const atlasSize = this.config.atlasSize;
+    const atlasData = new Uint8Array(atlasSize * atlasSize * 4);
+    atlasData.fill(0);
+
+    const texSize = this.config.materialTextureSize;
+    // Default roughness tile (0.5 = 128)
+    const defaultTile = new Uint8Array(texSize * texSize * 4);
+    for (let i = 0; i < texSize * texSize; i++) {
+      defaultTile[i * 4 + 0] = 128;
+      defaultTile[i * 4 + 1] = 128;
+      defaultTile[i * 4 + 2] = 128;
+      defaultTile[i * 4 + 3] = 255;
+    }
+
+    for (let i = 0; i < this.materials.length; i++) {
+      const material = this.materials[i]!;
+      const regions = this.regions.get(i);
+      if (!regions) continue;
+
+      const sideSrc = material.sideRoughnessData && material.sideRoughnessData.length > 0
+        ? material.sideRoughnessData
+        : defaultTile;
+      this.copyTextureToAtlas(sideSrc, material.sideRoughnessData ? material.size : texSize, atlasData, atlasSize, regions.side);
+
+      const topSrc = material.topRoughnessData && material.topRoughnessData.length > 0
+        ? material.topRoughnessData
+        : defaultTile;
+      this.copyTextureToAtlas(topSrc, material.topRoughnessData ? material.size : texSize, atlasData, atlasSize, regions.top);
+    }
+
+    return atlasData;
+  }
+
+  /**
+   * Builds the metallic atlas texture data.
+   * Missing metallic maps are filled with default metallic value (0 = non-metallic).
+   * @returns RGBA pixel data for the complete metallic atlas
+   */
+  buildMetallicAtlasData(): Uint8Array {
+    const atlasSize = this.config.atlasSize;
+    const atlasData = new Uint8Array(atlasSize * atlasSize * 4);
+    atlasData.fill(0);
+
+    const texSize = this.config.materialTextureSize;
+    // Default metallic tile (0 = non-metallic)
+    const defaultTile = new Uint8Array(texSize * texSize * 4);
+    for (let i = 0; i < texSize * texSize; i++) {
+      defaultTile[i * 4 + 0] = 0;
+      defaultTile[i * 4 + 1] = 0;
+      defaultTile[i * 4 + 2] = 0;
+      defaultTile[i * 4 + 3] = 255;
+    }
+
+    for (let i = 0; i < this.materials.length; i++) {
+      const material = this.materials[i]!;
+      const regions = this.regions.get(i);
+      if (!regions) continue;
+
+      const sideSrc = material.sideMetallicData && material.sideMetallicData.length > 0
+        ? material.sideMetallicData
+        : defaultTile;
+      this.copyTextureToAtlas(sideSrc, material.sideMetallicData ? material.size : texSize, atlasData, atlasSize, regions.side);
+
+      const topSrc = material.topMetallicData && material.topMetallicData.length > 0
+        ? material.topMetallicData
+        : defaultTile;
+      this.copyTextureToAtlas(topSrc, material.topMetallicData ? material.size : texSize, atlasData, atlasSize, regions.top);
+    }
+
+    return atlasData;
+  }
+
+  /**
+   * Builds the ambient occlusion atlas texture data.
+   * Missing AO maps are filled with default value (1.0 = no occlusion).
+   * @returns RGBA pixel data for the complete AO atlas
+   */
+  buildAOAtlasData(): Uint8Array {
+    const atlasSize = this.config.atlasSize;
+    const atlasData = new Uint8Array(atlasSize * atlasSize * 4);
+    atlasData.fill(0);
+
+    const texSize = this.config.materialTextureSize;
+    // Default AO tile (255 = no occlusion)
+    const defaultTile = new Uint8Array(texSize * texSize * 4);
+    for (let i = 0; i < texSize * texSize; i++) {
+      defaultTile[i * 4 + 0] = 255;
+      defaultTile[i * 4 + 1] = 255;
+      defaultTile[i * 4 + 2] = 255;
+      defaultTile[i * 4 + 3] = 255;
+    }
+
+    for (let i = 0; i < this.materials.length; i++) {
+      const material = this.materials[i]!;
+      const regions = this.regions.get(i);
+      if (!regions) continue;
+
+      const sideSrc = material.sideAOData && material.sideAOData.length > 0
+        ? material.sideAOData
+        : defaultTile;
+      this.copyTextureToAtlas(sideSrc, material.sideAOData ? material.size : texSize, atlasData, atlasSize, regions.side);
+
+      const topSrc = material.topAOData && material.topAOData.length > 0
+        ? material.topAOData
+        : defaultTile;
+      this.copyTextureToAtlas(topSrc, material.topAOData ? material.size : texSize, atlasData, atlasSize, regions.top);
+    }
+
+    return atlasData;
+  }
+
+  /**
+   * Builds the emission atlas texture data.
+   * Missing emission maps are filled with black (no emission).
+   * @returns RGBA pixel data for the complete emission atlas
+   */
+  buildEmissionAtlasData(): Uint8Array {
+    const atlasSize = this.config.atlasSize;
+    const atlasData = new Uint8Array(atlasSize * atlasSize * 4);
+    atlasData.fill(0); // Black = no emission by default
+
+    const texSize = this.config.materialTextureSize;
+    // Default emission tile (black = no emission)
+    const defaultTile = new Uint8Array(texSize * texSize * 4);
+    for (let i = 0; i < texSize * texSize; i++) {
+      defaultTile[i * 4 + 0] = 0;
+      defaultTile[i * 4 + 1] = 0;
+      defaultTile[i * 4 + 2] = 0;
+      defaultTile[i * 4 + 3] = 255;
+    }
+
+    for (let i = 0; i < this.materials.length; i++) {
+      const material = this.materials[i]!;
+      const regions = this.regions.get(i);
+      if (!regions) continue;
+
+      const sideSrc = material.sideEmissionData && material.sideEmissionData.length > 0
+        ? material.sideEmissionData
+        : defaultTile;
+      this.copyTextureToAtlas(sideSrc, material.sideEmissionData ? material.size : texSize, atlasData, atlasSize, regions.side);
+
+      const topSrc = material.topEmissionData && material.topEmissionData.length > 0
+        ? material.topEmissionData
+        : defaultTile;
+      this.copyTextureToAtlas(topSrc, material.topEmissionData ? material.size : texSize, atlasData, atlasSize, regions.top);
+    }
+
+    return atlasData;
+  }
+
+  /**
+   * Build roughness atlas with all mipmap levels
+   */
+  public buildRoughnessAtlasDataWithMipmaps(): { baseLevel: Uint8Array; mipmaps: Uint8Array[] } {
+    const baseLevel = this.buildRoughnessAtlasData();
+    
+    if (!this.config.generateMipmaps) {
+      return { baseLevel, mipmaps: [baseLevel] };
+    }
+
+    const mipmaps = this.generateMipmaps(baseLevel, this.config.atlasSize, this.config.atlasSize);
+    return { baseLevel, mipmaps };
+  }
+
+  /**
+   * Build metallic atlas with all mipmap levels
+   */
+  public buildMetallicAtlasDataWithMipmaps(): { baseLevel: Uint8Array; mipmaps: Uint8Array[] } {
+    const baseLevel = this.buildMetallicAtlasData();
+    
+    if (!this.config.generateMipmaps) {
+      return { baseLevel, mipmaps: [baseLevel] };
+    }
+
+    const mipmaps = this.generateMipmaps(baseLevel, this.config.atlasSize, this.config.atlasSize);
+    return { baseLevel, mipmaps };
+  }
+
+  /**
+   * Build AO atlas with all mipmap levels
+   */
+  public buildAOAtlasDataWithMipmaps(): { baseLevel: Uint8Array; mipmaps: Uint8Array[] } {
+    const baseLevel = this.buildAOAtlasData();
+    
+    if (!this.config.generateMipmaps) {
+      return { baseLevel, mipmaps: [baseLevel] };
+    }
+
+    const mipmaps = this.generateMipmaps(baseLevel, this.config.atlasSize, this.config.atlasSize);
+    return { baseLevel, mipmaps };
+  }
+
+  /**
+   * Build emission atlas with all mipmap levels
+   */
+  public buildEmissionAtlasDataWithMipmaps(): { baseLevel: Uint8Array; mipmaps: Uint8Array[] } {
+    const baseLevel = this.buildEmissionAtlasData();
+    
+    if (!this.config.generateMipmaps) {
+      return { baseLevel, mipmaps: [baseLevel] };
+    }
+
+    const mipmaps = this.generateMipmaps(baseLevel, this.config.atlasSize, this.config.atlasSize);
+    return { baseLevel, mipmaps };
   }
 
   /**

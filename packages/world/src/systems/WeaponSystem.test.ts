@@ -168,7 +168,7 @@ describe('WeaponSystem', () => {
   describe('fire - projectile', () => {
     beforeEach(() => {
       const weapon = weaponEntity.getComponent(WeaponComponent)!;
-      weapon.type = 'projectile';
+      weapon.weaponType = 'projectile';
       weapon.projectileSpeed = 50;
       weapon.projectileLifetime = 3.0;
     });

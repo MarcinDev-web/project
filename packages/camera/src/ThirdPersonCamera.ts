@@ -9,6 +9,7 @@ import {
 import type { PhysicsWorld, Entity } from '@engine/world';
 import { damp } from './utils/Damper';
 import type { IDisposable } from '@engine/core';
+import { clamp } from './types';
 
 /**
  * Configuration for ThirdPersonCamera
@@ -34,13 +35,6 @@ export interface ThirdPersonCameraConfig {
   enableAutoRotation?: boolean;
   /** Rotation smoothing time constant in seconds (default: 0.04). Lower = more responsive, higher = smoother. */
   rotationSmoothing?: number;
-}
-
-/**
- * Clamp a value between min and max
- */
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
 }
 
 /**

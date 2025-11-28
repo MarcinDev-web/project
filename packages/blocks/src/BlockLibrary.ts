@@ -34,6 +34,12 @@ export interface BlockFaceTexture {
   metallicMapUrl?: string;
   /** Ambient occlusion map URL */
   aoMapUrl?: string;
+  /** Emission map URL */
+  emissionMapUrl?: string;
+  /** Emission color RGB (0-1 range) */
+  emissionColor?: [number, number, number];
+  /** Emission intensity multiplier */
+  emissionIntensity?: number;
   /** Use procedural generation even if texture URL exists */
   forceProcedural?: boolean;
 }

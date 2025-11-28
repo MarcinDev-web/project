@@ -23,6 +23,10 @@ export const Footer = memo(function Footer() {
           <Link to="/support" className="footer-link">Support</Link>
           <span className="footer-divider">•</span>
           <a href="#" className="footer-link">Docs</a>
+          <span className="footer-divider">•</span>
+          <Link to="/privacy-policy" className="footer-link">Privacy Policy</Link>
+          <span className="footer-divider">•</span>
+          <Link to="/terms" className="footer-link">Terms of Service</Link>
         </div>
 
         {/* Right - Status */}

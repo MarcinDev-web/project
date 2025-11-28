@@ -6,21 +6,12 @@ import { MeshComponent, type MeshKind } from '../components/MeshComponent.js';
 import { MaterialComponent } from '../components/MaterialComponent.js';
 import type { RgbaColor } from '../utils/colors.js';
 import type { MeshBounds } from '../systems/Raycaster.js';
-import { Logger } from '@engine/core/utils';
+import { Logger, generateUUID } from '@engine/core/utils';
 
 /**
- * Unique identifier for entities.
+ * Unique identifier for entities (UUID format).
  */
 export type EntityId = string;
-
-let nextEntityId = 0;
-
-/**
- * Generates a unique entity ID.
- */
-function generateEntityId(): EntityId {
-  return `entity_${nextEntityId++}`;
-}
 
 /**
  * Entity represents a game object in the scene.
@@ -49,21 +40,8 @@ export class Entity {
   meshBounds: MeshBounds | null = null;
 
   constructor(name = 'Entity', transform?: Transform, id?: EntityId) {
-    // If ID is provided (e.g., during deserialization), use it; otherwise generate new one
-    if (id) {
-      this.id = id;
-      // Update global counter to avoid ID conflicts
-      const idMatch = id.match(/^entity_(\d+)$/);
-      if (idMatch && idMatch[1]) {
-        const idNum = parseInt(idMatch[1], 10);
-        if (!isNaN(idNum) && idNum >= nextEntityId) {
-          nextEntityId = idNum + 1;
-        }
-      }
-    } else {
-      this.id = generateEntityId();
-    }
-
+    // Use provided ID (e.g., during deserialization) or generate new UUID
+    this.id = id ?? generateUUID();
     this.name = name;
     const transformComponent = transform ?? new Transform();
     this.transform = transformComponent;

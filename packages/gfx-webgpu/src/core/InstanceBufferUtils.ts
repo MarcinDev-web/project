@@ -1,14 +1,22 @@
 import type { FrameResources } from '../resources/resources';
 import type { GPUBufferPool } from './bufferPool';
 
+/**
+ * Instance buffer data interface using interleaved layout.
+ * 
+ * Interleaved layout (24 floats = 96 bytes per instance):
+ * - offset: vec3 (3 floats) at offset 0
+ * - colorScale: vec4 (4 floats) at offset 3
+ * - secondaryColor: vec4 (4 floats) at offset 7
+ * - emissiveColor: vec4 (4 floats) at offset 11
+ * - materialParams: vec4 (4 floats) at offset 15
+ * - rotation: vec4 (4 floats) at offset 19
+ * - materialId: f32 (1 float) at offset 23
+ */
 export interface InstanceBufferData {
-  instanceOffsetData: Float32Array;
-  instanceColorScaleData: Float32Array;
-  instanceSecondaryColorData: Float32Array;
-  instanceEmissiveColorData: Float32Array;
-  instanceMaterialParamsData: Float32Array;
-  instanceRotationData: Float32Array;
-  instanceMaterialIdData: Float32Array;
+  /** Interleaved instance data (24 floats per instance) */
+  instanceInterleavedData: Float32Array;
+  /** Bounds data for frustum culling (4 floats per instance) */
   instanceBoundsData: Float32Array;
 }
 
@@ -26,102 +34,18 @@ const STAGING_INSTANCE_USAGE = GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST 
 
 const INSTANCE_BUFFER_CONFIGS: BufferConfig[] = [
   {
-    frameKey: 'instanceOffsetBuffer',
-    dataKey: 'instanceOffsetData',
-    poolKey: 'instance-offset',
+    frameKey: 'instanceInterleavedBuffer',
+    dataKey: 'instanceInterleavedData',
+    poolKey: 'instance-interleaved',
     usage: RENDER_INSTANCE_USAGE,
-    label: 'instance-offset-buffer',
+    label: 'instance-interleaved-buffer',
   },
   {
-    frameKey: 'instanceOffsetStagingBuffer',
-    dataKey: 'instanceOffsetData',
-    poolKey: 'instance-offset-staging',
+    frameKey: 'instanceInterleavedStagingBuffer',
+    dataKey: 'instanceInterleavedData',
+    poolKey: 'instance-interleaved-staging',
     usage: STAGING_INSTANCE_USAGE,
-    label: 'instance-offset-staging-buffer',
-  },
-  {
-    frameKey: 'instanceColorScaleBuffer',
-    dataKey: 'instanceColorScaleData',
-    poolKey: 'instance-color-scale',
-    usage: RENDER_INSTANCE_USAGE,
-    label: 'instance-color-scale-buffer',
-  },
-  {
-    frameKey: 'instanceColorScaleStagingBuffer',
-    dataKey: 'instanceColorScaleData',
-    poolKey: 'instance-color-scale-staging',
-    usage: STAGING_INSTANCE_USAGE,
-    label: 'instance-color-scale-staging-buffer',
-  },
-  {
-    frameKey: 'instanceSecondaryColorBuffer',
-    dataKey: 'instanceSecondaryColorData',
-    poolKey: 'instance-secondary-color',
-    usage: RENDER_INSTANCE_USAGE,
-    label: 'instance-secondary-color-buffer',
-  },
-  {
-    frameKey: 'instanceSecondaryColorStagingBuffer',
-    dataKey: 'instanceSecondaryColorData',
-    poolKey: 'instance-secondary-color-staging',
-    usage: STAGING_INSTANCE_USAGE,
-    label: 'instance-secondary-color-staging-buffer',
-  },
-  {
-    frameKey: 'instanceEmissiveColorBuffer',
-    dataKey: 'instanceEmissiveColorData',
-    poolKey: 'instance-emissive-color',
-    usage: RENDER_INSTANCE_USAGE,
-    label: 'instance-emissive-color-buffer',
-  },
-  {
-    frameKey: 'instanceEmissiveColorStagingBuffer',
-    dataKey: 'instanceEmissiveColorData',
-    poolKey: 'instance-emissive-color-staging',
-    usage: STAGING_INSTANCE_USAGE,
-    label: 'instance-emissive-color-staging-buffer',
-  },
-  {
-    frameKey: 'instanceMaterialParamsBuffer',
-    dataKey: 'instanceMaterialParamsData',
-    poolKey: 'instance-material-params',
-    usage: RENDER_INSTANCE_USAGE,
-    label: 'instance-material-params-buffer',
-  },
-  {
-    frameKey: 'instanceMaterialParamsStagingBuffer',
-    dataKey: 'instanceMaterialParamsData',
-    poolKey: 'instance-material-params-staging',
-    usage: STAGING_INSTANCE_USAGE,
-    label: 'instance-material-params-staging-buffer',
-  },
-  {
-    frameKey: 'instanceRotationBuffer',
-    dataKey: 'instanceRotationData',
-    poolKey: 'instance-rotation',
-    usage: RENDER_INSTANCE_USAGE,
-    label: 'instance-rotation-buffer',
-  },
-  {
-    frameKey: 'instanceRotationStagingBuffer',
-    dataKey: 'instanceRotationData',
-    poolKey: 'instance-rotation-staging',
-    usage: STAGING_INSTANCE_USAGE,
-    label: 'instance-rotation-staging-buffer',
-  },
-  {
-    frameKey: 'instanceMaterialIdBuffer',
-    dataKey: 'instanceMaterialIdData',
-    poolKey: 'instance-material-id',
-    usage: RENDER_INSTANCE_USAGE,
-    label: 'instance-material-id-buffer',
-  },
-  {
-    frameKey: 'instanceMaterialIdStagingBuffer',
-    dataKey: 'instanceMaterialIdData',
-    poolKey: 'instance-material-id-staging',
-    usage: STAGING_INSTANCE_USAGE,
-    label: 'instance-material-id-staging-buffer',
+    label: 'instance-interleaved-staging-buffer',
   },
   {
     frameKey: 'instanceBoundsBuffer',

@@ -11,6 +11,17 @@ export type MaterialPresetName =
   | 'emissive_neon'
   | 'water_default';
 
+export interface MaterialPreset {
+  metallic: number;
+  roughness: number;
+  color: [number, number, number, number];
+  opacity?: number;
+  alphaMode?: 'OPAQUE' | 'BLEND' | 'MASK';
+  doubleSided?: boolean;
+  emissive?: [number, number, number];
+  emissiveIntensity?: number;
+}
+
 export function createPreset(name: MaterialPresetName): Material {
   const m = new Material();
   switch (name) {
@@ -71,4 +82,20 @@ export function createPreset(name: MaterialPresetName): Material {
   return m;
 }
 
-
+/**
+ * MaterialPresets namespace providing preset creation utilities
+ */
+export const MaterialPresets = {
+  create: createPreset,
+  names: [
+    'metal_polished',
+    'metal_brushed',
+    'plastic_matte',
+    'plastic_glossy',
+    'wood_oak',
+    'stone_granite',
+    'glass_clear',
+    'emissive_neon',
+    'water_default',
+  ] as const satisfies readonly MaterialPresetName[],
+};

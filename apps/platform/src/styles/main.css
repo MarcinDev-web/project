@@ -4,6 +4,9 @@
  * Reuses design system from editor for consistency
  */
 
+/* Google Fonts - Gaming typography */
+@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@400;500;600;700&display=swap');
+
 /* Design System - Reference editor styles */
 @import '../../../../apps/editor/styles/design-tokens.css';
 
@@ -30,9 +33,11 @@
 
 /* Platform-specific styles */
 @import './platform.css';
-@import './blocks-models-studio.css';
+@import './profile.css';
+/* blocks-models-studio.css removed - feature deleted */
 @import './homepage.css';
 @import './auth.css';
+@import './support.css';
 
 /* Forum styles */
 @import './forum-tokens.css';

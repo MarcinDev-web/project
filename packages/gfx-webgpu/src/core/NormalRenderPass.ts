@@ -137,15 +137,9 @@ fn fs_normal(
     }
 
     try {
-      // Set up vertex buffers (same as main pass)
+      // Set up vertex buffers (same as main pass, using interleaved instance buffer)
       passEncoder.setVertexBuffer(0, frameResources.vertexBuffer);
-      passEncoder.setVertexBuffer(1, frameResources.instanceOffsetBuffer);
-      passEncoder.setVertexBuffer(2, frameResources.instanceColorScaleBuffer);
-      passEncoder.setVertexBuffer(3, frameResources.instanceSecondaryColorBuffer);
-      passEncoder.setVertexBuffer(4, frameResources.instanceEmissiveColorBuffer);
-      passEncoder.setVertexBuffer(5, frameResources.instanceMaterialParamsBuffer);
-      passEncoder.setVertexBuffer(6, frameResources.instanceRotationBuffer);
-      passEncoder.setVertexBuffer(7, frameResources.instanceMaterialIdBuffer);
+      passEncoder.setVertexBuffer(1, frameResources.instanceInterleavedBuffer);
       passEncoder.setIndexBuffer(frameResources.indexBuffer, 'uint16');
 
       // Set bind groups (same uniforms and textures as main pass)

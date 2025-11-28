@@ -49,23 +49,30 @@ export function createMinimalTemplate(): TemplateProvider {
       ambient.addComponent(ambLight);
       scene.addEntity(ambient);
 
-      // Starter platform (3x3x0.5)
-      const platform = new Entity('StarterPlatform');
-      platform.transform.position = [0, -0.25, 0]; // Slightly below origin so top is at y=0
+      // Starter platform: 3x3 grid of grass blocks
+      // Center y is -0.3 (top surface at -0.05) to avoid z-fighting with grid
+      // This replaces the previous single 'StarterPlatform' entity
+      const platformY = -0.3;
       
-      const platformMesh = new MeshComponent();
-      platformMesh.meshType = 'box';
-      platformMesh.options = { size: [3, 0.5, 3] };
-      platform.addComponent(platformMesh);
-      
-      // Add material with a neutral gray color and no reflections
-      const platformMaterial = new MaterialComponent();
-      platformMaterial.color = [0.6, 0.6, 0.65, 1]; // Light gray-blue
-      platformMaterial.roughness = 1.0; // Fully rough (no specular reflections)
-      platformMaterial.metallic = 0; // Non-metallic
-      platform.addComponent(platformMaterial);
-      
-      scene.addEntity(platform);
+      for (let x = -1; x <= 1; x++) {
+        for (let z = -1; z <= 1; z++) {
+          const block = new Entity(`StarterBlock_${x}_${z}`);
+          block.transform.position = [x, platformY, z];
+          
+          const blockMesh = new MeshComponent();
+          blockMesh.meshType = 'box';
+          blockMesh.options = { size: [1, 0.5, 1] }; // Half-height blocks
+          block.addComponent(blockMesh);
+          
+          const blockMaterial = new MaterialComponent();
+          blockMaterial.materialRef = 'grass'; // Use grass texture from atlas
+          blockMaterial.roughness = 1.0; // High roughness for organic material
+          blockMaterial.metallic = 0;
+          block.addComponent(blockMaterial);
+          
+          scene.addEntity(block);
+        }
+      }
 
       return scene;
     },

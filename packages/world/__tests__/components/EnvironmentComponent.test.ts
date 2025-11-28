@@ -32,8 +32,8 @@ describe('EnvironmentComponent', () => {
       expect(component.exposure).toBe(1.0);
       expect(component.enabled).toBe(true);
       expect(component.cloudsEnabled).toBe(true);
-      expect(component.cloudDensity).toBe(0.55);
-      expect(component.cloudSpeed).toBe(0.04);
+      expect(component.cloudDensity).toBe(0.7);
+      expect(component.cloudSpeed).toBe(0.03);
       expect(component.visualPreset).toBeUndefined();
     });
   });
@@ -540,8 +540,8 @@ describe('EnvironmentComponent', () => {
   describe('Cloud Properties', () => {
     it('should initialize with default cloud values', () => {
       expect(component.cloudsEnabled).toBe(true);
-      expect(component.cloudDensity).toBe(0.55);
-      expect(component.cloudSpeed).toBe(0.04);
+      expect(component.cloudDensity).toBe(0.7);
+      expect(component.cloudSpeed).toBe(0.03);
     });
 
     it('should allow enabling clouds', () => {

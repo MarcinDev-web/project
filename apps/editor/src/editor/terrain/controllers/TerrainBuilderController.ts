@@ -73,12 +73,11 @@ export class TerrainBuilderController {
    * Activates terrain editing mode
    */
   activate(entity?: Entity): void {
-    this.isActive = true;
-
     if (entity) {
       if (!entity.hasComponent(TerrainComponent)) {
         Logger.warn('[TerrainBuilderController] Entity does not have TerrainComponent');
         this.config.onStatusMessage?.('Invalid terrain entity', 2000);
+        this.isActive = false;
         return;
       }
       this.sculptTool.setTerrainEntity(entity);
@@ -94,10 +93,12 @@ export class TerrainBuilderController {
       } else {
         Logger.warn('[TerrainBuilderController] No terrain entity found in scene');
         this.config.onStatusMessage?.('No terrain found in scene', 2000);
+        this.isActive = false;
         return;
       }
     }
 
+    this.isActive = true;
     this.config.onStatusMessage?.('Terrain editing mode active', 2000);
   }
 

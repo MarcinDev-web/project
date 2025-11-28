@@ -14,6 +14,7 @@ import type { TextureCompressionManager, CompressionFormat } from '../textures/T
 import type { GPUBufferPool } from './bufferPool';
 import type { TextureAtlas } from '../textures/TextureAtlas';
 import type { FrameRenderer } from './FrameRenderer';
+import type { ResourceManager } from '../resources/ResourceManager';
 
 // ========== Handler Types ==========
 
@@ -73,6 +74,8 @@ export interface RenderSettings {
   enableScreenLOD: boolean;
   shadowQuality: ShadowQuality;
   enableComputePrepass: boolean;
+  /** Enable async compute for frame overlap (culling overlaps with rendering) */
+  enableAsyncCompute: boolean;
   msaaSampleCount: MsaaSampleCount;
   enableOutlines: boolean;
   outlineQuality: OutlineQuality;
@@ -179,7 +182,14 @@ export interface RendererOptions {
   enableOutlines?: boolean;
   outlineQuality?: OutlineQuality;
   enableComputePrepass?: boolean;
+  /** Enable async compute for frame overlap (culling overlaps with rendering) */
+  enableAsyncCompute?: boolean;
   msaaSampleCount?: MsaaSampleCount;
+  /** 
+   * Optional ResourceManager instance for centralized texture/material management.
+   * If not provided, a default instance will be created and initialized.
+   */
+  resourceManager?: ResourceManager;
 }
 
 // ========== Main Renderer Interface ==========
@@ -341,9 +351,10 @@ export interface Renderer {
   getCollisionWorld(): CollisionWorld | null;
 
   /**
-   * Toggles the SDF demo visualization.
+   * Gets the ResourceManager for centralized texture/material management.
+   * Use this for material validation, diagnostics, and streaming control.
    */
-  toggleSDFDemo(): void;
+  getResourceManager(): ResourceManager;
 
   /**
    * Allow additional properties for extensibility.

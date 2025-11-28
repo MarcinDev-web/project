@@ -1,0 +1,483 @@
+/**
+ * Ticket List Styles - Enhanced Gaming Theme
+ */
+
+/* Variables */
+.ticket-list {
+  --list-accent: #e67e22;
+  --list-accent-secondary: #f39c12;
+  --list-accent-glow: rgba(230, 126, 34, 0.5);
+  --list-success: #22c55e;
+  --list-warning: #eab308;
+  --list-error: #ef4444;
+  --list-info: #3b82f6;
+  --list-glass-bg: rgba(18, 21, 28, 0.85);
+  --list-glass-border: rgba(255, 255, 255, 0.08);
+  --list-card-bg: linear-gradient(145deg, rgba(26, 29, 36, 0.95) 0%, rgba(18, 21, 28, 0.98) 100%);
+}
+
+.ticket-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-4);
+}
+
+.ticket-list__header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding-bottom: var(--spacing-3);
+  border-bottom: 1px solid var(--list-glass-border);
+}
+
+.ticket-list__count {
+  font-family: var(--font-heading, 'Chakra Petch', sans-serif);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ticket-list__items {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-3);
+}
+
+/* Ticket Item */
+.ticket-list__item {
+  position: relative;
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: var(--spacing-4);
+  padding: var(--spacing-5);
+  background: var(--list-card-bg);
+  border: 1px solid var(--list-glass-border);
+  border-radius: 16px;
+  text-decoration: none;
+  overflow: hidden;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  animation: ticketListItemFadeIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) backwards;
+}
+
+@keyframes ticketListItemFadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(20px) scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
+.ticket-list__item::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 4px;
+  background: var(--list-accent);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+
+.ticket-list__item::after {
+  content: '';
+  position: absolute;
+  top: -100%;
+  right: -100%;
+  width: 200%;
+  height: 200%;
+  background: radial-gradient(circle, var(--list-accent-glow) 0%, transparent 50%);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+}
+
+.ticket-list__item:hover {
+  border-color: var(--list-accent);
+  transform: translateY(-4px) scale(1.01);
+  box-shadow: 
+    0 20px 40px rgba(0, 0, 0, 0.4),
+    0 0 40px rgba(230, 126, 34, 0.1);
+}
+
+.ticket-list__item:hover::before {
+  opacity: 1;
+}
+
+.ticket-list__item:hover::after {
+  opacity: 0.08;
+}
+
+.ticket-list__item-main {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.ticket-list__item-header {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-3);
+  margin-bottom: var(--spacing-2);
+}
+
+.ticket-list__item-type {
+  font-size: 1.5rem;
+  flex-shrink: 0;
+  filter: drop-shadow(0 2px 4px rgba(0, 0, 0, 0.3));
+  transition: transform 0.3s ease;
+}
+
+.ticket-list__item:hover .ticket-list__item-type {
+  transform: scale(1.15) rotate(5deg);
+}
+
+.ticket-list__item-title {
+  margin: 0;
+  font-family: var(--font-heading, 'Chakra Petch', sans-serif);
+  font-size: var(--text-lg);
+  font-weight: 700;
+  color: var(--color-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  letter-spacing: 0.02em;
+  transition: color 0.2s ease;
+}
+
+.ticket-list__item:hover .ticket-list__item-title {
+  color: var(--list-accent-secondary);
+}
+
+.ticket-list__item-urgent-badge {
+  flex-shrink: 0;
+  padding: 4px 10px;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  color: white;
+  font-family: var(--font-heading, 'Chakra Petch', sans-serif);
+  font-size: var(--text-xs);
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  border-radius: 6px;
+  box-shadow: 
+    0 4px 12px rgba(239, 68, 68, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+  animation: urgentPulseBadge 2s ease-in-out infinite;
+}
+
+@keyframes urgentPulseBadge {
+  0%, 100% { 
+    opacity: 1; 
+    transform: scale(1);
+    box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+  }
+  50% { 
+    opacity: 0.9; 
+    transform: scale(1.05);
+    box-shadow: 0 6px 20px rgba(239, 68, 68, 0.6);
+  }
+}
+
+.ticket-list__item-description {
+  margin: 0 0 var(--spacing-3) 0;
+  color: var(--color-text-secondary);
+  font-size: var(--text-sm);
+  line-height: 1.6;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.ticket-list__item-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-2);
+  align-items: center;
+}
+
+.ticket-list__item-status,
+.ticket-list__item-priority {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-family: var(--font-heading, 'Chakra Petch', sans-serif);
+  font-size: var(--text-xs);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: transform 0.2s ease;
+}
+
+.ticket-list__item-status:hover,
+.ticket-list__item-priority:hover {
+  transform: translateY(-1px);
+}
+
+.ticket-list__item-status-icon,
+.ticket-list__item-priority-icon {
+  font-size: 0.85em;
+}
+
+.ticket-list__item-id {
+  font-family: var(--font-mono, monospace);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  opacity: 0.6;
+  background: rgba(255, 255, 255, 0.03);
+  padding: 4px 8px;
+  border-radius: 4px;
+}
+
+.ticket-list__item-side {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: var(--spacing-3);
+  flex-shrink: 0;
+  position: relative;
+  z-index: 1;
+}
+
+.ticket-list__item-time {
+  font-family: var(--font-heading, 'Chakra Petch', sans-serif);
+  font-size: var(--text-xs);
+  color: var(--color-text-secondary);
+  white-space: nowrap;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ticket-list__item-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  background: rgba(230, 126, 34, 0.1);
+  border: 1px solid rgba(230, 126, 34, 0.3);
+  border-radius: 10px;
+  font-size: var(--text-lg);
+  color: var(--list-accent);
+  opacity: 0;
+  transform: translateX(-10px);
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+.ticket-list__item:hover .ticket-list__item-arrow {
+  opacity: 1;
+  transform: translateX(0);
+}
+
+/* Loading State */
+.ticket-list__loading {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-10);
+  text-align: center;
+  background: var(--list-card-bg);
+  border: 1px solid var(--list-glass-border);
+  border-radius: 16px;
+}
+
+.ticket-list__loading-spinner {
+  font-size: 3.5rem;
+  animation: ticketListSpinnerBounce 1.2s cubic-bezier(0.36, 0, 0.66, -0.56) infinite;
+  margin-bottom: var(--spacing-4);
+  filter: drop-shadow(0 4px 12px var(--list-accent-glow));
+}
+
+@keyframes ticketListSpinnerBounce {
+  0%, 100% { transform: translateY(0) scale(1); }
+  50% { transform: translateY(-15px) scale(1.1); }
+}
+
+.ticket-list__loading-text {
+  font-family: var(--font-heading, 'Chakra Petch', sans-serif);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin: 0;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  animation: ticketListLoadingPulse 1.5s ease-in-out infinite;
+}
+
+@keyframes ticketListLoadingPulse {
+  0%, 100% { opacity: 0.5; }
+  50% { opacity: 1; }
+}
+
+/* Error State */
+.ticket-list__error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-10);
+  text-align: center;
+  background: linear-gradient(145deg, rgba(239, 68, 68, 0.1) 0%, rgba(239, 68, 68, 0.05) 100%);
+  border: 1px solid rgba(239, 68, 68, 0.3);
+  border-radius: 16px;
+}
+
+.ticket-list__error-icon {
+  font-size: 3.5rem;
+  margin-bottom: var(--spacing-4);
+  animation: ticketListErrorShake 0.5s ease;
+}
+
+@keyframes ticketListErrorShake {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-10deg); }
+  75% { transform: rotate(10deg); }
+}
+
+.ticket-list__error-text {
+  font-family: var(--font-heading, 'Chakra Petch', sans-serif);
+  font-size: var(--text-sm);
+  color: #fca5a5;
+  margin: 0 0 var(--spacing-4) 0;
+}
+
+.ticket-list__error-retry {
+  padding: var(--spacing-3) var(--spacing-6);
+  font-family: var(--font-heading, 'Chakra Petch', sans-serif);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  color: white;
+  background: linear-gradient(135deg, #ef4444 0%, #dc2626 100%);
+  border: none;
+  border-radius: 10px;
+  cursor: pointer;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  transition: all 0.25s ease;
+  box-shadow: 0 4px 15px rgba(239, 68, 68, 0.3);
+}
+
+.ticket-list__error-retry:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 25px rgba(239, 68, 68, 0.4);
+}
+
+/* Empty State */
+.ticket-list__empty {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-10);
+  text-align: center;
+  background: var(--list-card-bg);
+  border: 2px dashed var(--list-glass-border);
+  border-radius: 20px;
+  position: relative;
+  overflow: hidden;
+}
+
+.ticket-list__empty::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: 
+    radial-gradient(ellipse 80% 80% at 50% 0%, rgba(230, 126, 34, 0.08) 0%, transparent 60%);
+  pointer-events: none;
+}
+
+.ticket-list__empty-icon {
+  font-size: 5rem;
+  margin-bottom: var(--spacing-4);
+  opacity: 0.4;
+  animation: ticketListEmptyFloat 4s ease-in-out infinite;
+}
+
+@keyframes ticketListEmptyFloat {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-10px); }
+}
+
+.ticket-list__empty-title {
+  font-family: var(--font-display, 'Orbitron', sans-serif);
+  font-size: var(--text-xl);
+  font-weight: 700;
+  color: var(--color-text);
+  margin: 0 0 var(--spacing-2) 0;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.ticket-list__empty-text {
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
+  margin: 0 0 var(--spacing-6) 0;
+  max-width: 300px;
+  line-height: 1.6;
+}
+
+.ticket-list__empty-cta {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--spacing-2);
+  padding: var(--spacing-4) var(--spacing-6);
+  background: linear-gradient(135deg, var(--list-accent) 0%, var(--list-accent-secondary) 100%);
+  color: white;
+  font-family: var(--font-heading, 'Chakra Petch', sans-serif);
+  font-size: var(--text-sm);
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  text-decoration: none;
+  border-radius: 12px;
+  transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+  box-shadow: 
+    0 8px 25px rgba(230, 126, 34, 0.35),
+    inset 0 1px 0 rgba(255, 255, 255, 0.2);
+}
+
+.ticket-list__empty-cta:hover {
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 
+    0 12px 35px rgba(230, 126, 34, 0.45),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+/* Mobile Responsive */
+@media (max-width: 600px) {
+  .ticket-list__item {
+    flex-direction: column;
+    gap: var(--spacing-3);
+    padding: var(--spacing-4);
+  }
+
+  .ticket-list__item-side {
+    flex-direction: row;
+    justify-content: space-between;
+    width: 100%;
+    padding-top: var(--spacing-3);
+    border-top: 1px solid var(--list-glass-border);
+  }
+
+  .ticket-list__item-arrow {
+    opacity: 1;
+    transform: translateX(0);
+  }
+
+  .ticket-list__item-title {
+    font-size: var(--text-base);
+  }
+
+  .ticket-list__item-type {
+    font-size: 1.25rem;
+  }
+}

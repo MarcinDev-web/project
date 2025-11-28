@@ -206,5 +206,24 @@ export const marketplaceApi = {
   async downloadFreeItem(id: string): Promise<{ fileUrl: string; itemId: string; title: string }> {
     return apiClient.get<{ fileUrl: string; itemId: string; title: string }>(`/marketplace/${id}/download`);
   },
+
+  /**
+   * Purchase a paid marketplace item
+   */
+  async purchaseItem(id: string): Promise<{
+    success: boolean;
+    itemId: string;
+    title: string;
+    fileUrl: string;
+    newBalance?: number;
+  }> {
+    return apiClient.post<{
+      success: boolean;
+      itemId: string;
+      title: string;
+      fileUrl: string;
+      newBalance?: number;
+    }>(`/marketplace/${id}/purchase`);
+  },
 };
 

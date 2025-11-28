@@ -1041,13 +1041,17 @@ export class EnvironmentRenderer {
    * @param viewProjectionMatrix The VP matrix (NOT inverted - will be inverted internally)
    * @param screenWidth Screen width in pixels (for depth sampling)
    * @param screenHeight Screen height in pixels (for depth sampling)
+   * @param nearPlane Camera near plane distance for depth linearization (default: 0.1)
+   * @param farPlane Camera far plane distance for depth linearization (default: 10000)
    */
   renderVolumetricClouds(
     passEncoder: GPURenderPassEncoder,
     environment: EnvironmentComponent,
     viewProjectionMatrix: Float32Array | Mat4,
     screenWidth?: number,
-    screenHeight?: number
+    screenHeight?: number,
+    nearPlane = 0.1,
+    farPlane = 10000
   ): void {
     if (!this.initialized || !this.volumetricCloudPass) return;
     if (!environment.enabled || !environment.cloudsEnabled) return;
@@ -1062,14 +1066,16 @@ export class EnvironmentRenderer {
     const env = environment as EnvironmentComponent & { cloudAltitude?: number; cloudThickness?: number };
     
     const params: VolumetricCloudParams = {
-      cloudAltitude: env.cloudAltitude ?? 800,
-      cloudThickness: env.cloudThickness ?? 400,
+      cloudAltitude: env.cloudAltitude ?? 1200,
+      cloudThickness: env.cloudThickness ?? 800,
       cloudDensity: environment.cloudDensity,
       cloudSpeed: environment.cloudSpeed,
       sunDirection: environment.sunDirection,
       sunColor: environment.sunColor,
       skyColor: environment.skyColor,
       time: cloudTime,
+      nearPlane,
+      farPlane,
     };
 
     this.volumetricCloudPass.render(

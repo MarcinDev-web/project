@@ -12,39 +12,23 @@ vi.spyOn(Logger, 'warn').mockImplementation(() => {});
 vi.spyOn(Logger, 'error').mockImplementation(() => {});
 vi.spyOn(Logger, 'debug').mockImplementation(() => {});
 
-// Mock the resources module
+// Mock the resources module (using interleaved buffer layout)
 vi.mock('../../resources/resources', () => ({
+  INSTANCE_STRIDE: 24,
+  INSTANCE_STRIDE_BYTES: 96,
   DEFAULT_GEOMETRY: {
     vertices: new Uint8Array(24),
     indices: new Uint16Array([0, 1, 2]),
     instanceCount: 1,
     opaqueCount: 1,
-    instanceOffsetData: new Float32Array(3),
-    instanceColorScaleData: new Float32Array(4),
-    instanceSecondaryColorData: new Float32Array(4),
-    instanceEmissiveColorData: new Float32Array(4),
-    instanceMaterialParamsData: new Float32Array(4),
-    instanceRotationData: new Float32Array(4),
-    instanceMaterialIdData: new Float32Array(1),
+    instanceInterleavedData: new Float32Array(24), // 24 floats per instance
     instanceBoundsData: new Float32Array(4),
   },
   createGeometryBuffers: vi.fn(() => ({
     vertexBuffer: { destroy: vi.fn() },
     indexBuffer: { destroy: vi.fn() },
-    instanceOffsetBuffer: { destroy: vi.fn() },
-    instanceOffsetStagingBuffer: { destroy: vi.fn() },
-    instanceColorScaleBuffer: { destroy: vi.fn() },
-    instanceColorScaleStagingBuffer: { destroy: vi.fn() },
-    instanceSecondaryColorBuffer: { destroy: vi.fn() },
-    instanceSecondaryColorStagingBuffer: { destroy: vi.fn() },
-    instanceEmissiveColorBuffer: { destroy: vi.fn() },
-    instanceEmissiveColorStagingBuffer: { destroy: vi.fn() },
-    instanceMaterialParamsBuffer: { destroy: vi.fn() },
-    instanceMaterialParamsStagingBuffer: { destroy: vi.fn() },
-    instanceRotationBuffer: { destroy: vi.fn() },
-    instanceRotationStagingBuffer: { destroy: vi.fn() },
-    instanceMaterialIdBuffer: { destroy: vi.fn() },
-    instanceMaterialIdStagingBuffer: { destroy: vi.fn() },
+    instanceInterleavedBuffer: { destroy: vi.fn() },
+    instanceInterleavedStagingBuffer: { destroy: vi.fn() },
     instanceBoundsBuffer: { destroy: vi.fn() },
     instanceIndirectArgsBuffer: { destroy: vi.fn() },
   })),
@@ -108,13 +92,7 @@ describe('FrameResourceFactory', () => {
       indices: new Uint16Array([0, 1, 2]),
       instanceCount: 1,
       opaqueCount: 1,
-      instanceOffsetData: new Float32Array(3),
-      instanceColorScaleData: new Float32Array(4),
-      instanceSecondaryColorData: new Float32Array(4),
-      instanceEmissiveColorData: new Float32Array(4),
-      instanceMaterialParamsData: new Float32Array(4),
-      instanceRotationData: new Float32Array(4),
-      instanceMaterialIdData: new Float32Array(1),
+      instanceInterleavedData: new Float32Array(24), // 24 floats per instance
       instanceBoundsData: new Float32Array(4),
     };
   }

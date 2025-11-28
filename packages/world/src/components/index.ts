@@ -41,3 +41,4 @@ export * from './UIElementComponent.js';
 export * from './NpcComponent.js';
 export * from './StatusEffectComponent.js';
 export * from './InteractableComponent.js';
+export * from './ItemInventoryComponent.js';

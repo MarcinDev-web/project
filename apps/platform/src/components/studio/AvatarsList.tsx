@@ -26,7 +26,7 @@ export function AvatarsList({ presets, onDelete, onPublish, loading }: AvatarsLi
       <div className="avatars-empty">
         <p>Brak avatar presets.</p>
         <p style={{ fontSize: 'var(--text-sm)', color: 'var(--text-2)', marginTop: 'var(--spacing-2)' }}>
-          Stwórz avatar preset w <a href="/avatar-builder" style={{ color: 'var(--color-accent-400)' }}>Avatar Builder</a> aby móc go opublikować.
+          Avatar Builder jest w trakcie przebudowy. Wkrótce będzie dostępny!
         </p>
       </div>
     );

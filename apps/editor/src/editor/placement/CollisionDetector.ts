@@ -9,7 +9,7 @@ import { CameraComponent } from '@engine/world';
 import { normalizeVec3Out, quatNormalize, dotVec3, type Quat, type Vec3 } from '@engine/core/math';
 import { ensureWasmCollisionInit, getWasmCollisionSync } from '../../wasm/collision';
 import type { Trs, TrsArray } from '@engine/wasm-collision';
-import { getTrsBuffers, releaseTrsBuffers } from '@engine/wasm-collision';
+import { getTrsBuffers, releaseTrsBuffers, getPoolMetrics } from '@engine/wasm-collision';
 import { requestCheckTrs } from '../../wasm/collisionWorkerClient';
 
 /**
@@ -51,10 +51,111 @@ type Mat3 = [[number, number, number], [number, number, number], [number, number
 const dot = dotVec3;
 
 /**
+ * Collision detection metrics for monitoring and debugging.
+ */
+export interface CollisionMetrics {
+  /** Number of checks using TypeScript path */
+  tsPathCount: number;
+  /** Number of checks using direct WASM path */
+  wasmPathCount: number;
+  /** Number of checks using Worker path */
+  workerPathCount: number;
+  /** Number of fallback uses */
+  fallbackCount: number;
+  /** Total collision checks performed */
+  totalChecks: number;
+  /** Average candidates per check */
+  avgCandidates: number;
+  /** Average time per check in ms */
+  avgTimeMs: number;
+}
+
+/**
+ * Collision detection execution path.
+ */
+export type CollisionPath = 'ts' | 'wasm' | 'worker';
+
+/**
+ * Configuration for collision path selection strategy.
+ */
+export interface CollisionPathConfig {
+  /** Threshold below which TypeScript path is preferred (lower FFI overhead) */
+  tsThreshold: number;
+  /** Threshold above which Worker path is preferred (offload main thread) */
+  workerThreshold: number;
+  /** Whether WASM is available */
+  wasmAvailable: boolean;
+}
+
+/**
+ * Strategy for selecting collision detection execution path.
+ * Determines whether to use TypeScript, direct WASM, or Worker based on candidate count.
+ */
+export class CollisionPathStrategy {
+  private config: CollisionPathConfig;
+
+  constructor(config?: Partial<CollisionPathConfig>) {
+    this.config = {
+      tsThreshold: config?.tsThreshold ?? 64,
+      workerThreshold: config?.workerThreshold ?? 500,
+      wasmAvailable: config?.wasmAvailable ?? false,
+    };
+  }
+
+  /**
+   * Update strategy configuration.
+   */
+  setConfig(config: Partial<CollisionPathConfig>): void {
+    this.config = { ...this.config, ...config };
+  }
+
+  /**
+   * Get current configuration.
+   */
+  getConfig(): Readonly<CollisionPathConfig> {
+    return { ...this.config };
+  }
+
+  /**
+   * Select the optimal execution path based on candidate count.
+   * @param candidateCount - Number of collision candidates to check
+   * @returns The recommended execution path
+   */
+  selectPath(candidateCount: number): CollisionPath {
+    // No WASM available - always use TypeScript
+    if (!this.config.wasmAvailable) {
+      return 'ts';
+    }
+
+    // Dynamic threshold strategy:
+    // - Below tsThreshold: TypeScript (lower FFI overhead for small batches)
+    // - tsThreshold to workerThreshold: Direct WASM (good balance)
+    // - Above workerThreshold: Worker (offload main thread for large scenes)
+    if (candidateCount < this.config.tsThreshold) {
+      return 'ts';
+    }
+    if (candidateCount > this.config.workerThreshold) {
+      return 'worker';
+    }
+    return 'wasm';
+  }
+
+  /**
+   * Check if WASM should be used at all (for early rejection filter).
+   */
+  shouldUseWasm(): boolean {
+    return this.config.wasmAvailable;
+  }
+}
+
+/**
  * CollisionDetector handles AABB collision detection between entities.
  */
 export class CollisionDetector {
   private scene: Scene;
+
+  /** Strategy for selecting collision detection execution path */
+  private readonly pathStrategy: CollisionPathStrategy;
 
   /** Reusable buffers for collision detection (cleared before each use) */
   private readonly candidateBuffer: Entity[] = [];
@@ -68,8 +169,27 @@ export class CollisionDetector {
   /** Epsilon for floating-point comparisons */
   private static readonly EPSILON = 0.0001;
 
-  constructor(scene: Scene) {
+  /** Metrics tracking for collision detection paths */
+  private static pathMetrics = {
+    ts: 0,
+    wasm: 0,
+    worker: 0,
+    fallback: 0,
+    totalCandidates: 0,
+    totalTimeMs: 0,
+    totalChecks: 0,
+  };
+
+  constructor(scene: Scene, pathConfig?: Partial<CollisionPathConfig>) {
     this.scene = scene;
+    this.pathStrategy = new CollisionPathStrategy(pathConfig);
+  }
+
+  /**
+   * Get the path strategy for configuration.
+   */
+  getPathStrategy(): CollisionPathStrategy {
+    return this.pathStrategy;
   }
 
   /**
@@ -309,14 +429,67 @@ export class CollisionDetector {
    * @param startTime - Performance timestamp at start
    */
   private logCollisionPerformance(path: string, candidateCount: number, startTime: number): void {
+    const t1 = typeof performance !== 'undefined' ? performance.now() : 0;
+    const elapsedMs = t1 - startTime;
+    
+    // Update metrics
+    CollisionDetector.pathMetrics.totalChecks++;
+    CollisionDetector.pathMetrics.totalCandidates += candidateCount;
+    CollisionDetector.pathMetrics.totalTimeMs += elapsedMs;
+    
+    if (path === 'ts') {
+      CollisionDetector.pathMetrics.ts++;
+    } else if (path === 'wasm') {
+      CollisionDetector.pathMetrics.wasm++;
+    } else if (path === 'worker') {
+      CollisionDetector.pathMetrics.worker++;
+    } else if (path.includes('fallback')) {
+      CollisionDetector.pathMetrics.fallback++;
+    }
+
     // Debug flag injected at runtime for performance profiling
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const debug = (globalThis as any).__COLLISION_DEBUG__ === true;
     if (debug && typeof performance !== 'undefined') {
-      const t1 = performance.now();
+      const poolMetrics = getPoolMetrics();
       // eslint-disable-next-line no-console
-      console.log(`[collision][${path}] candidates:`, candidateCount, 'ms:', (t1 - startTime).toFixed(2));
+      console.log(
+        `[collision][${path}] candidates: ${candidateCount}, ms: ${elapsedMs.toFixed(2)}, ` +
+        `pool hit rate: ${(poolMetrics.hitRate * 100).toFixed(1)}%`
+      );
     }
+  }
+
+  /**
+   * Get collision detection metrics for monitoring and debugging.
+   * @returns Current collision metrics
+   */
+  static getMetrics(): CollisionMetrics {
+    const m = CollisionDetector.pathMetrics;
+    return {
+      tsPathCount: m.ts,
+      wasmPathCount: m.wasm,
+      workerPathCount: m.worker,
+      fallbackCount: m.fallback,
+      totalChecks: m.totalChecks,
+      avgCandidates: m.totalChecks > 0 ? m.totalCandidates / m.totalChecks : 0,
+      avgTimeMs: m.totalChecks > 0 ? m.totalTimeMs / m.totalChecks : 0,
+    };
+  }
+
+  /**
+   * Reset collision detection metrics.
+   */
+  static resetMetrics(): void {
+    CollisionDetector.pathMetrics = {
+      ts: 0,
+      wasm: 0,
+      worker: 0,
+      fallback: 0,
+      totalCandidates: 0,
+      totalTimeMs: 0,
+      totalChecks: 0,
+    };
   }
 
   /**
@@ -515,6 +688,16 @@ export class CollisionDetector {
    * High-precision collision check using OBB vs OBB (SAT).
    * Uses worker for large scenes (>500 objects) to offload main thread.
    */
+  /**
+   * High-precision collision check using OBB vs OBB (SAT).
+   * Uses strategy pattern to select optimal execution path (TS/WASM/Worker).
+   * @param entity - Entity to check
+   * @param position - Optional position override
+   * @param rotation - Optional rotation override  
+   * @param scale - Optional scale override
+   * @param excludeEntities - Entities to exclude from collision check
+   * @returns Collision result with list of colliding entities
+   */
   async checkCollisionOBB(
     entity: Entity,
     position?: Vec3,
@@ -533,110 +716,104 @@ export class CollisionDetector {
     // Broad-phase: use AABB enclosing the OBB of the tested entity
     const entityAabb = CollisionDetector.obbToAABB(obb);
     const wasm = getWasmCollisionSync();
+    
+    // Update strategy with WASM availability
+    this.pathStrategy.setConfig({ wasmAvailable: !!wasm });
+    
     // Debug flag injected at runtime for performance profiling (not available in TypeScript types)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const debug = (globalThis as any).__COLLISION_DEBUG__ === true;
     const t0 = debug && typeof performance !== 'undefined' ? performance.now() : 0;
-    if (wasm) {
-      // Collect candidates passing broad-phase and build TRS SoA for batch check
-      this.collectCandidates(entity, entityAabb, excludeEntities);
+    
+    // Collect candidates passing broad-phase
+    this.collectCandidates(entity, entityAabb, excludeEntities);
 
-      if (this.candidateBuffer.length === 0) {
-        return { hasCollision: false, collidingEntities: [] };
-      }
+    if (this.candidateBuffer.length === 0) {
+      return { hasCollision: false, collidingEntities: [] };
+    }
 
-      const previewTrs: Trs = {
-        pos: new Float32Array(previewPos),
-        rot: new Float32Array(previewRot),
-        scl: new Float32Array(previewScale),
-      };
-      
-      // Dynamic threshold strategy:
-      // - < 64: TypeScript (lower overhead for small batches)
-      // - 64-500: Direct WASM (good balance)
-      // - > 500: Worker (offload main thread for large scenes)
-      const useWorker = this.candidateBuffer.length > 500;
-      const useWasm = this.candidateBuffer.length >= 64;
-      
-      if (!useWasm) {
-        // TypeScript path for small batches
-        const collidingEntities = this.executeTypeScriptCollisionCheck(obb, this.candidateBuffer);
-        this.logCollisionPerformance('ts', this.candidateBuffer.length, t0);
-        return { hasCollision: collidingEntities.length > 0, collidingEntities };
-      }
+    // Select execution path using strategy
+    const selectedPath = this.pathStrategy.selectPath(this.candidateBuffer.length);
+    
+    // TypeScript path
+    if (selectedPath === 'ts' || !wasm) {
+      const collidingEntities = this.executeTypeScriptCollisionCheck(obb, this.candidateBuffer);
+      this.logCollisionPerformance('ts', this.candidateBuffer.length, t0);
+      return { hasCollision: collidingEntities.length > 0, collidingEntities };
+    }
 
-      if (useWorker) {
-        // Worker path for very large batches (>500 objects)
-        try {
-          const othersTrs: TrsArray = {
-            positions: new Float32Array(this.positionBuffer),
-            rotations: new Float32Array(this.rotationBuffer),
-            scales: new Float32Array(this.scaleBuffer),
-          };
-          
-          const idx = await requestCheckTrs(previewTrs, othersTrs, 1000);
-          
-          const collidingEntities: Entity[] = [];
-          for (let i = 0; i < idx.length; i++) {
-            const j = idx[i]!;
-            const ent = this.candidateBuffer[j];
-            if (ent) collidingEntities.push(ent);
-          }
-          this.logCollisionPerformance('worker', this.candidateBuffer.length, t0);
-          return { hasCollision: collidingEntities.length > 0, collidingEntities };
-        } catch (error) {
-          // Fallback on worker error
-          if (debug) {
-            // eslint-disable-next-line no-console
-            console.warn('[collision] Worker error, falling back to direct WASM:', error);
-          }
-          // Fall through to direct WASM path below
-        }
-      }
+    const previewTrs: Trs = {
+      pos: new Float32Array(previewPos),
+      rot: new Float32Array(previewRot),
+      scl: new Float32Array(previewScale),
+    };
 
-      // Direct WASM path (64-500 objects, or fallback from worker)
-      const buffers = getTrsBuffers(this.candidateBuffer.length);
+    // Worker path for large batches
+    if (selectedPath === 'worker') {
       try {
-        // Copy data into pooled buffers (positions is candidates.length * 3, etc.)
-        buffers.positions.set(this.positionBuffer, 0);
-        buffers.rotations.set(this.rotationBuffer, 0);
-        buffers.scales.set(this.scaleBuffer, 0);
-
-        const idx = wasm.batchCheckTrs(previewTrs, {
-          positions: buffers.positions.subarray(0, this.positionBuffer.length),
-          rotations: buffers.rotations.subarray(0, this.rotationBuffer.length),
-          scales: buffers.scales.subarray(0, this.scaleBuffer.length),
-        } satisfies TrsArray);
-
+        const othersTrs: TrsArray = {
+          positions: new Float32Array(this.positionBuffer),
+          rotations: new Float32Array(this.rotationBuffer),
+          scales: new Float32Array(this.scaleBuffer),
+        };
+        
+        const idx = await requestCheckTrs(previewTrs, othersTrs, 1000);
+        
         const collidingEntities: Entity[] = [];
         for (let i = 0; i < idx.length; i++) {
           const j = idx[i]!;
           const ent = this.candidateBuffer[j];
           if (ent) collidingEntities.push(ent);
         }
-        this.logCollisionPerformance('wasm', this.candidateBuffer.length, t0);
+        this.logCollisionPerformance('worker', this.candidateBuffer.length, t0);
         return { hasCollision: collidingEntities.length > 0, collidingEntities };
       } catch (error) {
-        // Fallback to TypeScript implementation on WASM error
+        // Fallback on worker error
         if (debug) {
           // eslint-disable-next-line no-console
-          console.warn('[collision] WASM error, falling back to TypeScript:', error);
+          console.warn('[collision] Worker error, falling back to direct WASM:', error);
         }
-        // Fall through to TypeScript path below
-      } finally {
-        releaseTrsBuffers(buffers);
+        // Fall through to direct WASM path below
       }
-      // Fallback: TypeScript path (also reached if WASM fails)
-      const collidingEntities = this.executeTypeScriptCollisionCheck(obb, this.candidateBuffer);
-      this.logCollisionPerformance('fallback-ts', this.candidateBuffer.length, t0);
-      return { hasCollision: collidingEntities.length > 0, collidingEntities };
-    } else {
-      // Fallback: original TypeScript path (WASM not available)
-      this.collectCandidates(entity, entityAabb, excludeEntities);
-      const collidingEntities = this.executeTypeScriptCollisionCheck(obb, this.candidateBuffer);
-      this.logCollisionPerformance('fallback-ts', this.candidateBuffer.length, t0);
-      return { hasCollision: collidingEntities.length > 0, collidingEntities };
     }
+
+    // Direct WASM path (64-500 objects, or fallback from worker)
+    const buffers = getTrsBuffers(this.candidateBuffer.length);
+    try {
+      // Copy data into pooled buffers (positions is candidates.length * 3, etc.)
+      buffers.positions.set(this.positionBuffer, 0);
+      buffers.rotations.set(this.rotationBuffer, 0);
+      buffers.scales.set(this.scaleBuffer, 0);
+
+      const idx = wasm.batchCheckTrs(previewTrs, {
+        positions: buffers.positions.subarray(0, this.positionBuffer.length),
+        rotations: buffers.rotations.subarray(0, this.rotationBuffer.length),
+        scales: buffers.scales.subarray(0, this.scaleBuffer.length),
+      } satisfies TrsArray);
+
+      const collidingEntities: Entity[] = [];
+      for (let i = 0; i < idx.length; i++) {
+        const j = idx[i]!;
+        const ent = this.candidateBuffer[j];
+        if (ent) collidingEntities.push(ent);
+      }
+      this.logCollisionPerformance('wasm', this.candidateBuffer.length, t0);
+      return { hasCollision: collidingEntities.length > 0, collidingEntities };
+    } catch (error) {
+      // Fallback to TypeScript implementation on WASM error
+      if (debug) {
+        // eslint-disable-next-line no-console
+        console.warn('[collision] WASM error, falling back to TypeScript:', error);
+      }
+      // Fall through to TypeScript path below
+    } finally {
+      releaseTrsBuffers(buffers);
+    }
+
+    // Fallback: TypeScript path (also reached if WASM fails)
+    const collidingEntities = this.executeTypeScriptCollisionCheck(obb, this.candidateBuffer);
+    this.logCollisionPerformance('fallback-ts', this.candidateBuffer.length, t0);
+    return { hasCollision: collidingEntities.length > 0, collidingEntities };
   }
 
   /**

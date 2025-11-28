@@ -1,5 +1,6 @@
 /**
  * Shopping Cart Component
+ * Enhanced with better visual hierarchy and animations
  */
 
 import { Card } from '../shared/Card';
@@ -23,6 +24,29 @@ export interface ShoppingCartProps {
   loading?: boolean;
 }
 
+// Get type icon for cart items
+function getTypeIcon(type: CartItem['type']): string {
+  switch (type) {
+    case 'shop-item':
+      return '🛍️';
+    case 'asset':
+      return '📦';
+    case 'marketplace-item':
+      return '🏪';
+    default:
+      return '📁';
+  }
+}
+
+// Get currency icon
+function getCurrencyIcon(currency: string): string {
+  const lower = currency.toLowerCase();
+  if (lower === 'coins' || lower === 'coin') return '🪙';
+  if (lower === 'gems' || lower === 'gem') return '💎';
+  if (lower === 'credits' || lower === 'credit' || lower === 'crd') return '⚡';
+  return '💵';
+}
+
 export function ShoppingCart({
   items,
   total,
@@ -36,6 +60,7 @@ export function ShoppingCart({
     return (
       <Card className="shopping-cart">
         <div className="cart-empty">
+          <span className="cart-empty__icon">🛒</span>
           <p>Your cart is empty</p>
         </div>
       </Card>
@@ -60,15 +85,24 @@ export function ShoppingCart({
       </div>
       <div className="cart-items" aria-busy={loading}>
         {items.map((item, index) => (
-          <div key={`${item.itemId}-${item.type}-${index}`} className="cart-item">
+          <div 
+            key={`${item.itemId}-${item.type}-${index}`} 
+            className="cart-item"
+            style={{ 
+              animationDelay: `${index * 0.05}s`,
+            }}
+          >
+            <div className="cart-item-icon">
+              {getTypeIcon(item.type)}
+            </div>
             <div className="cart-item-info">
               <div className="cart-item-name">{item.name || item.itemId}</div>
               <div className="cart-item-meta">
                 <span className="cart-item-type">{item.type}</span>
-                <span className="cart-item-quantity">x{item.quantity}</span>
+                <span className="cart-item-quantity">×{item.quantity}</span>
                 {item.price && (
                   <span className="cart-item-price">
-                    {item.price.amount * item.quantity} {item.price.currency}
+                    {getCurrencyIcon(item.price.currency)} {item.price.amount * item.quantity}
                   </span>
                 )}
               </div>
@@ -79,7 +113,7 @@ export function ShoppingCart({
                 size="small"
                 onClick={() => onRemove(item.itemId, item.type)}
               >
-                Remove
+                ✕
               </Button>
             )}
           </div>
@@ -90,16 +124,18 @@ export function ShoppingCart({
           <div className="cart-total">
             {fallbackTotals.map((entry) => (
               <div key={entry.currency} className="cart-total-row">
-                <span className="cart-total-label">{entry.currency}</span>
+                <span className="cart-total-label">
+                  {getCurrencyIcon(entry.currency)} {entry.currency}
+                </span>
                 <span className="cart-total-value">
-                  {entry.amount} {entry.currency}
+                  {entry.amount.toLocaleString()}
                 </span>
               </div>
             ))}
           </div>
           {onCheckout && (
             <Button onClick={onCheckout} disabled={loading || items.length === 0}>
-              {loading ? 'Processing...' : 'Checkout'}
+              {loading ? '⏳ Processing...' : '🛒 Checkout'}
             </Button>
           )}
         </div>

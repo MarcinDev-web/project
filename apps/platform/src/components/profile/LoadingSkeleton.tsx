@@ -1,102 +1,126 @@
-import { Card } from '../shared/Card';
-
+/**
+ * ProfileLoadingSkeleton - Modern loading skeleton for profile page
+ * Matches the new two-column layout design
+ */
 export function ProfileLoadingSkeleton() {
-  const skeletonStyle: React.CSSProperties = {
-    background: 'var(--bg-elevated)',
-    borderRadius: 'var(--radius-md)',
-    animation: 'pulse 1.5s ease-in-out infinite',
-  };
-
   return (
     <div className="page-container">
-      <Card style={{ marginBottom: 'var(--spacing-6)' }} hoverable={false}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--spacing-4)' }}>
-          {/* Avatar skeleton */}
-          <div
-            style={{
-              ...skeletonStyle,
-              width: '80px',
-              height: '80px',
-              borderRadius: 'var(--radius-full)',
-            }}
+      <div className="profile-layout">
+        {/* Hero Skeleton */}
+        <div className="profile-hero" style={{ gridColumn: '1 / -1' }}>
+          <div 
+            className="profile-skeleton" 
+            style={{ height: '180px', borderRadius: 0 }} 
           />
-          <div style={{ flex: 1 }}>
-            {/* Name skeleton */}
+          <div style={{ 
+            display: 'flex', 
+            alignItems: 'flex-end',
+            gap: 'var(--spacing-5)', 
+            padding: 'var(--spacing-5)',
+            marginTop: '-80px',
+          }}>
+            {/* Avatar skeleton */}
             <div
+              className="profile-skeleton"
               style={{
-                ...skeletonStyle,
-                height: '32px',
-                width: '200px',
-                marginBottom: 'var(--spacing-2)',
+                width: '120px',
+                height: '120px',
+                borderRadius: 'var(--radius-xl)',
+                flexShrink: 0,
               }}
             />
-            {/* Bio skeleton */}
-            <div
-              style={{
-                ...skeletonStyle,
-                height: '20px',
-                width: '300px',
-                marginBottom: 'var(--spacing-2)',
-              }}
-            />
-            {/* Date skeleton */}
-            <div
-              style={{
-                ...skeletonStyle,
-                height: '16px',
-                width: '150px',
-              }}
-            />
+            <div style={{ flex: 1, paddingBottom: 'var(--spacing-2)' }}>
+              {/* Name skeleton */}
+              <div
+                className="profile-skeleton"
+                style={{
+                  height: '32px',
+                  width: '220px',
+                  marginBottom: 'var(--spacing-3)',
+                }}
+              />
+              {/* Bio skeleton */}
+              <div
+                className="profile-skeleton"
+                style={{
+                  height: '20px',
+                  width: '340px',
+                  marginBottom: 'var(--spacing-3)',
+                }}
+              />
+              {/* Meta skeleton */}
+              <div style={{ display: 'flex', gap: 'var(--spacing-4)' }}>
+                <div className="profile-skeleton" style={{ height: '16px', width: '100px' }} />
+                <div className="profile-skeleton" style={{ height: '16px', width: '80px' }} />
+              </div>
+            </div>
           </div>
         </div>
-      </Card>
 
-      {/* Builds section skeleton */}
-      <div
-        style={{
-          ...skeletonStyle,
-          height: '32px',
-          width: '180px',
-          marginBottom: 'var(--spacing-4)',
-        }}
-      />
-      
-      <div
-        style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))',
-          gap: 'var(--spacing-4)',
-        }}
-      >
-        {[1, 2, 3].map(i => (
-          <Card key={i} hoverable={false}>
-            <div
-              style={{
-                ...skeletonStyle,
-                height: '24px',
-                width: '80%',
-                marginBottom: 'var(--spacing-2)',
-              }}
-            />
-            <div
-              style={{
-                ...skeletonStyle,
-                height: '16px',
-                width: '100%',
-                marginBottom: 'var(--spacing-1)',
-              }}
-            />
-            <div
-              style={{
-                ...skeletonStyle,
-                height: '16px',
-                width: '60%',
-              }}
-            />
-          </Card>
-        ))}
+        {/* Sidebar Skeleton */}
+        <div className="profile-sidebar">
+          <div className="profile-sidebar__card">
+            <div className="profile-skeleton" style={{ height: '20px', width: '100px', marginBottom: 'var(--spacing-4)' }} />
+            <div className="profile-quick-stats">
+              {[1, 2, 3, 4].map(i => (
+                <div 
+                  key={i} 
+                  className="profile-skeleton" 
+                  style={{ height: '80px' }} 
+                />
+              ))}
+            </div>
+          </div>
+        </div>
+
+        {/* Main Content Skeleton */}
+        <div className="profile-main">
+          {/* Stats Grid Skeleton */}
+          <div className="profile-stats-grid">
+            {[1, 2, 3, 4, 5, 6].map(i => (
+              <div 
+                key={i} 
+                className="profile-skeleton" 
+                style={{ height: '140px' }} 
+              />
+            ))}
+          </div>
+
+          {/* Activity Section Skeleton */}
+          <div className="profile-section">
+            <div className="profile-section__header">
+              <div className="profile-skeleton" style={{ height: '24px', width: '180px' }} />
+            </div>
+            <div className="profile-section__content">
+              {[1, 2, 3].map(i => (
+                <div 
+                  key={i} 
+                  className="profile-skeleton" 
+                  style={{ height: '72px', marginBottom: 'var(--spacing-3)' }} 
+                />
+              ))}
+            </div>
+          </div>
+
+          {/* Builds Section Skeleton */}
+          <div className="profile-section">
+            <div className="profile-section__header">
+              <div className="profile-skeleton" style={{ height: '24px', width: '200px' }} />
+            </div>
+            <div className="profile-section__content">
+              <div className="profile-builds-grid">
+                {[1, 2, 3].map(i => (
+                  <div 
+                    key={i} 
+                    className="profile-skeleton" 
+                    style={{ height: '280px' }} 
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
 }
-

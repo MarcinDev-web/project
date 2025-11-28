@@ -1,6 +1,7 @@
 import { MaterialComponent, type Entity, type RgbaColor } from '@engine/world';
 import { Logger } from '@engine/core/utils';
 import type { CustomGeometryEntity } from './InstanceManager';
+import { INSTANCE_STRIDE } from './InstanceManager';
 import type { FrameResources } from '../resources/resources';
 import type { GeometryCache } from './GeometryCache';
 
@@ -12,13 +13,17 @@ interface CustomGeometryParams {
 }
 
 export class CustomGeometryRenderer {
-  private readonly positionScratch = new Float32Array(3);
-  private readonly colorScaleScratch = new Float32Array(4);
-  private readonly secondaryColorScratch = new Float32Array(4);
-  private readonly emissiveScratch = new Float32Array(4);
-  private readonly materialParamsScratch = new Float32Array(4);
-  private readonly rotationScratch = new Float32Array(4);
-  private readonly materialIdScratch = new Uint32Array(1);
+  /**
+   * Interleaved scratch buffer (24 floats per instance):
+   * - offset: vec3 (3 floats) at offset 0
+   * - colorScale: vec4 (4 floats) at offset 3
+   * - secondaryColor: vec4 (4 floats) at offset 7
+   * - emissiveColor: vec4 (4 floats) at offset 11
+   * - materialParams: vec4 (4 floats) at offset 15
+   * - rotation: vec4 (4 floats) at offset 19
+   * - materialId: f32 (1 float) at offset 23
+   */
+  private readonly interleavedScratch = new Float32Array(INSTANCE_STRIDE);
 
   constructor(private readonly geometryCache: GeometryCache) {}
 
@@ -107,55 +112,48 @@ export class CustomGeometryRenderer {
     const roughness = material?.roughness ?? 1;
     const flags = material?.flags ?? 0;
 
-    this.positionScratch[0] = position[0];
-    this.positionScratch[1] = position[1];
-    this.positionScratch[2] = position[2];
-    this.colorScaleScratch[0] = primary[0] ?? 1;
-    this.colorScaleScratch[1] = primary[1] ?? 1;
-    this.colorScaleScratch[2] = primary[2] ?? 1;
-    this.colorScaleScratch[3] = maxScale;
+    const buf = this.interleavedScratch;
 
-    this.secondaryColorScratch[0] = secondaryColor[0] ?? 1;
-    this.secondaryColorScratch[1] = secondaryColor[1] ?? 1;
-    this.secondaryColorScratch[2] = secondaryColor[2] ?? 1;
-    this.secondaryColorScratch[3] = secondaryColor[3] ?? 1;
+    // offset (3 floats at offset 0)
+    buf[0] = position[0];
+    buf[1] = position[1];
+    buf[2] = position[2];
 
-    this.emissiveScratch[0] = emissive[0] ?? 0;
-    this.emissiveScratch[1] = emissive[1] ?? 0;
-    this.emissiveScratch[2] = emissive[2] ?? 0;
-    this.emissiveScratch[3] = emissiveIntensity;
+    // colorScale (4 floats at offset 3)
+    buf[3] = primary[0] ?? 1;
+    buf[4] = primary[1] ?? 1;
+    buf[5] = primary[2] ?? 1;
+    buf[6] = maxScale;
 
-    this.materialParamsScratch[0] = alpha;
-    this.materialParamsScratch[1] = metallic;
-    this.materialParamsScratch[2] = roughness;
-    this.materialParamsScratch[3] = flags;
+    // secondaryColor (4 floats at offset 7)
+    buf[7] = secondaryColor[0] ?? 1;
+    buf[8] = secondaryColor[1] ?? 1;
+    buf[9] = secondaryColor[2] ?? 1;
+    buf[10] = secondaryColor[3] ?? 1;
 
-    this.rotationScratch[0] = rotation[0];
-    this.rotationScratch[1] = rotation[1];
-    this.rotationScratch[2] = rotation[2];
-    this.rotationScratch[3] = rotation[3];
+    // emissiveColor (4 floats at offset 11)
+    buf[11] = emissive[0] ?? 0;
+    buf[12] = emissive[1] ?? 0;
+    buf[13] = emissive[2] ?? 0;
+    buf[14] = emissiveIntensity;
 
-    this.materialIdScratch[0] = material?.materialId ?? 0;
+    // materialParams (4 floats at offset 15)
+    buf[15] = alpha;
+    buf[16] = metallic;
+    buf[17] = roughness;
+    buf[18] = flags;
 
-    device.queue.writeBuffer(geometryBuffers.instanceOffsetBuffer, 0, this.positionScratch);
-    device.queue.writeBuffer(geometryBuffers.instanceColorScaleBuffer, 0, this.colorScaleScratch);
-    device.queue.writeBuffer(
-      geometryBuffers.instanceSecondaryColorBuffer,
-      0,
-      this.secondaryColorScratch
-    );
-    device.queue.writeBuffer(
-      geometryBuffers.instanceEmissiveColorBuffer,
-      0,
-      this.emissiveScratch
-    );
-    device.queue.writeBuffer(
-      geometryBuffers.instanceMaterialParamsBuffer,
-      0,
-      this.materialParamsScratch
-    );
-    device.queue.writeBuffer(geometryBuffers.instanceRotationBuffer, 0, this.rotationScratch);
-    device.queue.writeBuffer(geometryBuffers.instanceMaterialIdBuffer, 0, this.materialIdScratch);
+    // rotation (4 floats at offset 19)
+    buf[19] = rotation[0];
+    buf[20] = rotation[1];
+    buf[21] = rotation[2];
+    buf[22] = rotation[3];
+
+    // materialId (1 float at offset 23)
+    buf[23] = material?.materialId ?? 0;
+
+    // Write entire interleaved buffer in one call
+    device.queue.writeBuffer(geometryBuffers.instanceInterleavedBuffer, 0, buf);
   }
 
   private bindGeometry(
@@ -166,13 +164,7 @@ export class CustomGeometryRenderer {
       return;
     }
     encoder.setVertexBuffer(0, geometryBuffers.vertexBuffer);
-    encoder.setVertexBuffer(1, geometryBuffers.instanceOffsetBuffer);
-    encoder.setVertexBuffer(2, geometryBuffers.instanceColorScaleBuffer);
-    encoder.setVertexBuffer(3, geometryBuffers.instanceSecondaryColorBuffer);
-    encoder.setVertexBuffer(4, geometryBuffers.instanceEmissiveColorBuffer);
-    encoder.setVertexBuffer(5, geometryBuffers.instanceMaterialParamsBuffer);
-    encoder.setVertexBuffer(6, geometryBuffers.instanceRotationBuffer);
-    encoder.setVertexBuffer(7, geometryBuffers.instanceMaterialIdBuffer);
+    encoder.setVertexBuffer(1, geometryBuffers.instanceInterleavedBuffer);
     encoder.setIndexBuffer(geometryBuffers.indexBuffer, 'uint16');
   }
 

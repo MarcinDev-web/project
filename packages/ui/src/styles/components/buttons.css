@@ -195,41 +195,204 @@
 }
 
 /* ============================================
-   FORGE WORLD BUTTON VARIANTS
+   FORGE WORLD BUTTON VARIANTS - Premium Gaming Style
    ============================================ */
 
 .btn-forge {
-  background: var(--fw-gradient-steel);
+  position: relative;
+  background: 
+    linear-gradient(180deg, 
+      rgba(255,255,255,0.08) 0%, 
+      transparent 40%,
+      transparent 60%,
+      rgba(0,0,0,0.15) 100%
+    ),
+    var(--fw-gradient-steel);
   border: 2px solid var(--fw-metal-steel-dark);
   color: var(--fw-metal-steel-light);
-  box-shadow: var(--fw-shadow-medium);
+  box-shadow: 
+    var(--fw-shadow-medium),
+    inset 0 1px 0 rgba(255,255,255,0.1);
+  text-shadow: 0 1px 2px rgba(0,0,0,0.5);
+  overflow: hidden;
+  letter-spacing: 0.02em;
+}
+
+/* Shine sweep effect */
+.btn-forge::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0.15) 50%,
+    transparent 100%
+  );
+  transition: left 0.5s ease;
+  pointer-events: none;
+}
+
+.btn-forge:hover:not(:disabled)::before {
+  left: 100%;
 }
 
 .btn-forge:hover:not(:disabled) {
-  background: var(--fw-gradient-bronze);
+  background: 
+    linear-gradient(180deg, 
+      rgba(255,255,255,0.12) 0%, 
+      transparent 40%,
+      transparent 60%,
+      rgba(0,0,0,0.1) 100%
+    ),
+    var(--fw-gradient-bronze);
   border-color: var(--fw-metal-bronze-dark);
   color: var(--fw-metal-bronze-light);
-  transform: translateY(-2px);
-  box-shadow: var(--fw-shadow-deep);
+  transform: translateY(-3px);
+  box-shadow: 
+    var(--fw-shadow-deep),
+    inset 0 1px 0 rgba(255,255,255,0.15),
+    0 0 20px rgba(212, 137, 61, 0.2);
 }
 
 .btn-forge:active:not(:disabled) {
   transform: translateY(0);
-  box-shadow: var(--fw-shadow-medium);
+  box-shadow: 
+    var(--fw-shadow-light),
+    inset 0 2px 4px rgba(0,0,0,0.3);
+  transition: all 0.05s ease;
 }
 
+/* Primary - Forge Fire Orange */
 .btn-forge.primary {
-  background: var(--fw-gradient-accent);
-  border-color: var(--fw-accent-primary);
+  background: 
+    linear-gradient(180deg, 
+      rgba(255,255,255,0.2) 0%, 
+      rgba(255,255,255,0.05) 30%,
+      transparent 50%,
+      rgba(0,0,0,0.1) 100%
+    ),
+    linear-gradient(135deg, #f5923e 0%, #e67e22 40%, #d35400 100%);
+  border: 2px solid #c0501f;
+  border-top-color: #f5923e;
   color: white;
-  box-shadow: var(--fw-shadow-deep), var(--fw-shadow-glow);
+  font-weight: 700;
+  text-shadow: 0 1px 3px rgba(0,0,0,0.4), 0 0 10px rgba(255,150,50,0.3);
+  box-shadow: 
+    0 4px 0 #a04018,
+    0 6px 20px rgba(230, 126, 34, 0.4),
+    inset 0 1px 0 rgba(255,255,255,0.25);
+  letter-spacing: 0.03em;
+}
+
+/* Primary shine sweep - more dramatic */
+.btn-forge.primary::before {
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255,255,255,0.25) 45%,
+    rgba(255,255,255,0.35) 50%,
+    rgba(255,255,255,0.25) 55%,
+    transparent 100%
+  );
+}
+
+/* Primary glow pulse animation */
+.btn-forge.primary::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: inherit;
+  background: transparent;
+  box-shadow: 0 0 15px rgba(245, 146, 62, 0.5);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+  pointer-events: none;
+  z-index: -1;
 }
 
 .btn-forge.primary:hover:not(:disabled) {
-  filter: brightness(1.1);
-  box-shadow: var(--fw-shadow-deep), 0 0 20px rgba(225, 123, 58, 0.5);
+  background: 
+    linear-gradient(180deg, 
+      rgba(255,255,255,0.25) 0%, 
+      rgba(255,255,255,0.1) 30%,
+      transparent 50%,
+      rgba(0,0,0,0.05) 100%
+    ),
+    linear-gradient(135deg, #ffa54f 0%, #f5923e 40%, #e67e22 100%);
+  border-color: #d35400;
+  border-top-color: #ffa54f;
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 
+    0 6px 0 #a04018,
+    0 10px 30px rgba(230, 126, 34, 0.5),
+    0 0 40px rgba(245, 146, 62, 0.35),
+    inset 0 1px 0 rgba(255,255,255,0.3);
+}
+
+.btn-forge.primary:hover:not(:disabled)::after {
+  opacity: 1;
 }
 
 .btn-forge.primary:active:not(:disabled) {
-  box-shadow: var(--fw-shadow-medium), var(--fw-shadow-glow);
+  transform: translateY(1px) scale(0.98);
+  background: 
+    linear-gradient(180deg, 
+      rgba(0,0,0,0.05) 0%, 
+      transparent 30%,
+      transparent 70%,
+      rgba(0,0,0,0.15) 100%
+    ),
+    linear-gradient(135deg, #e67e22 0%, #d35400 50%, #c0501f 100%);
+  box-shadow: 
+    0 2px 0 #a04018,
+    0 4px 15px rgba(230, 126, 34, 0.3),
+    inset 0 2px 6px rgba(0,0,0,0.25);
+  transition: all 0.08s ease;
+}
+
+.btn-forge.primary:active:not(:disabled)::after {
+  opacity: 0;
+}
+
+/* Size-specific shadow adjustments for forge buttons */
+.btn-forge.btn-sm {
+  box-shadow: 
+    0 3px 0 rgba(10, 12, 16, 1), 
+    0 5px 12px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255,255,255,0.1);
+}
+
+.btn-forge.primary.btn-sm {
+  box-shadow: 
+    0 3px 0 #a04018,
+    0 5px 15px rgba(230, 126, 34, 0.35),
+    inset 0 1px 0 rgba(255,255,255,0.2);
+}
+
+.btn-forge.btn-lg {
+  box-shadow: 
+    0 5px 0 rgba(10, 12, 16, 1), 
+    0 8px 20px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255,255,255,0.1);
+}
+
+.btn-forge.primary.btn-lg {
+  box-shadow: 
+    0 5px 0 #a04018,
+    0 10px 25px rgba(230, 126, 34, 0.45),
+    inset 0 2px 0 rgba(255,255,255,0.25);
+}
+
+/* Focus state for accessibility */
+.btn-forge:focus-visible {
+  outline: 3px solid var(--fw-accent-glow);
+  outline-offset: 3px;
+}
+
+.btn-forge.primary:focus-visible {
+  outline-color: #ffd093;
 }

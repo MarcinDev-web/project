@@ -784,30 +784,97 @@ const renderSystem = new RenderSystem(renderer, camera);
 
 ### 2. Plugin System
 
+**When to use:** Extending engine functionality in a modular, reusable way
+
 ```typescript
-// ✅ PATTERN: Extensible plugin architecture
-export interface Plugin {
-  name: string;
-  install(engine: Engine): void;
-  uninstall(engine: Engine): void;
+// ✅ PATTERN: Plugin interface with metadata, lifecycle, and API
+import type { Plugin, PluginMetadata } from '@engine/core/plugin';
+import { Engine } from '@engine/world';
+
+// Define plugin API interface for type safety
+export interface PhysicsPluginAPI {
+  raycast(from: Vec3, to: Vec3): RaycastHit | null;
+  setGravity(gravity: Vec3): void;
 }
 
-export class PhysicsPlugin implements Plugin {
-  name = 'physics';
+export class PhysicsPlugin implements Plugin<Engine> {
+  // Metadata with version and dependencies
+  readonly metadata: PluginMetadata = {
+    name: 'physics',
+    version: '1.0.0',
+    description: 'Physics simulation with Rapier',
+    dependencies: [], // Can specify: [{ name: 'core', versionRange: '^1.0.0' }]
+  };
   
-  install(engine: Engine): void {
-    engine.registerSystem(new PhysicsSystem());
+  private physicsSystem?: PhysicsSystem;
+  
+  // Async install supported
+  async install(engine: Engine): Promise<void> {
+    this.physicsSystem = new PhysicsSystem(engine.scene);
+    engine.registerSystem('physics', this.physicsSystem);
   }
   
-  uninstall(engine: Engine): void {
+  async uninstall(engine: Engine): Promise<void> {
     engine.unregisterSystem('physics');
+    this.physicsSystem?.dispose();
+    this.physicsSystem = undefined;
+  }
+  
+  // Optional lifecycle hooks
+  onStart(engine: Engine): void {
+    this.physicsSystem?.start();
+  }
+  
+  onStop(engine: Engine): void {
+    this.physicsSystem?.stop();
+  }
+  
+  // Expose API for inter-plugin communication
+  getAPI(): PhysicsPluginAPI {
+    return {
+      raycast: (from, to) => this.physicsSystem!.raycast(from, to),
+      setGravity: (g) => this.physicsSystem!.setGravity(g),
+    };
   }
 }
 
-// Usage
-const engine = new Engine();
-engine.use(new PhysicsPlugin());
+// ✅ PATTERN: Engine as central runtime container
+const engine = new Engine({ name: 'My Game' });
+
+// Install plugins (async, validates dependencies)
+await engine.use(new PhysicsPlugin());
+await engine.use(new RenderPlugin());
+
+// Start all plugins
+await engine.start();
+
+// Game loop
+function gameLoop(dt: number) {
+  engine.update(dt);        // Variable timestep
+  engine.fixedUpdate(1/60); // Fixed timestep for physics
+}
+
+// Access plugin API
+const physics = engine.plugins.getAPI<PhysicsPluginAPI>('physics');
+physics?.setGravity(new Vec3(0, -9.81, 0));
+
+// Cleanup
+await engine.stop();
+engine.dispose();
 ```
+
+**Key points:**
+- Plugins have `metadata` with name, version, and optional dependencies
+- Lifecycle: `install()` → `onStart()` → `onStop()` → `uninstall()`
+- All lifecycle methods support async
+- Dependencies are validated with semver ranges
+- Plugins can expose typed APIs via `getAPI()`
+- Use `PluginManager` for dependency resolution and ordering
+- Engine combines Scene, PluginManager, and Systems
+
+**Files:**
+- `@engine/core/plugin` - Plugin, PluginMetadata, PluginManager
+- `@engine/world/engine` - Engine class
 
 ---
 

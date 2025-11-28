@@ -97,6 +97,25 @@ export interface TextureCompressionSupport {
 
 export type FeatureTier = 0 | 1 | 2;
 
+/**
+ * Subgroup (wave) operation capabilities for GPU compute optimization.
+ * Enables efficient parallel primitives like ballot, reduction, and prefix sum.
+ */
+export interface SubgroupCapabilities {
+  /** Whether basic subgroup operations are supported (subgroupBallot, subgroupAdd, etc.) */
+  supported: boolean;
+  /** Minimum subgroup size (typically 32 on NVIDIA/AMD, 4-32 on Intel, 32 on Apple) */
+  minSubgroupSize?: number;
+  /** Maximum subgroup size */
+  maxSubgroupSize?: number;
+  /** Whether subgroup arithmetic operations are supported (subgroupAdd, subgroupMul, etc.) */
+  arithmetic?: boolean;
+  /** Whether subgroup ballot operations are supported (subgroupBallot, subgroupBroadcast) */
+  ballot?: boolean;
+  /** Whether subgroup shuffle operations are supported (subgroupShuffle, subgroupShuffleXor) */
+  shuffle?: boolean;
+}
+
 export interface RendererCapabilities {
   /** Feature tier: 0=baseline, 1=preferred, 2=enhanced */
   tier: FeatureTier;
@@ -114,6 +133,8 @@ export interface RendererCapabilities {
     textureCompression: TextureCompressionSupport;
     /** Shader F16 support (Tier 2) */
     shaderF16?: boolean;
+    /** Subgroup (wave) operations for efficient parallel reduction and prefix sum */
+    subgroup?: SubgroupCapabilities;
   };
   limits: {
     maxTextureDimension2D: number;
@@ -124,6 +145,9 @@ export interface RendererCapabilities {
     maxComputeWorkgroupSizeX?: number;
     maxComputeWorkgroupSizeY?: number;
     maxComputeWorkgroupSizeZ?: number;
+    /** Subgroup size range */
+    minSubgroupSize?: number;
+    maxSubgroupSize?: number;
   };
   /** Selected texture compression format (or 'none') */
   textureCompression?: 'bc' | 'etc2' | 'astc' | 'none';

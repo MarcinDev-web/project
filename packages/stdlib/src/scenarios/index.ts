@@ -1,1 +1,3 @@
-export * from './SDFDemo';
+// Scenarios module - placeholder for future scenario implementations
+export {};
+

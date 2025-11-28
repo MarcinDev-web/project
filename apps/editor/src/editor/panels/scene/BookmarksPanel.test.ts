@@ -8,7 +8,7 @@ import { Scene } from '@engine/world';
 import { Entity } from '@engine/world';
 import * as storage from '../../../utils/storage';
 
-vi.mock('../../utils/storage', () => ({
+vi.mock('../../../utils/storage', () => ({
   storageSave: vi.fn(),
   storageLoad: vi.fn(),
 }));

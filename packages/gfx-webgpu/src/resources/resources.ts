@@ -4,6 +4,14 @@ import { DEFAULT_INSTANCE_GRID } from '../config';
 import { Logger } from '@engine/core/utils';
 import { TextureAtlas } from '../textures/TextureAtlas';
 import { buildDefaultAtlasMaterials } from './defaultAtlasMaterials';
+import { 
+  buildGPUAtlasMaterialsSync, 
+  buildWasmAtlasMaterials,
+  isWasmTextureProcessorAvailable,
+  type BuiltAtlasMaterial 
+} from './GPUAtlasMaterialBuilder';
+import { GPU_MATERIAL_DEFINITIONS } from './GPUMaterialDefinitions';
+import { ProceduralTextureGenerator } from '../textures/ProceduralTextureGenerator';
 import {
   INDIRECT_COMMAND_BYTE_LENGTH,
   INDIRECT_COMMAND_COUNT,
@@ -13,38 +21,37 @@ import {
 // Warn-once flag for mock environments lacking copyBufferToTexture
 let warnedNoCopyBufferToTexture = false;
 
+/**
+ * Interleaved instance data layout (24 floats = 96 bytes per instance):
+ * - offset: vec3 (3 floats) at offset 0
+ * - colorScale: vec4 (4 floats) at offset 3
+ * - secondaryColor: vec4 (4 floats) at offset 7
+ * - emissiveColor: vec4 (4 floats) at offset 11
+ * - materialParams: vec4 (4 floats) at offset 15
+ * - rotation: vec4 (4 floats) at offset 19
+ * - materialId: f32 (1 float) at offset 23
+ */
+export const INSTANCE_STRIDE = 24; // floats per instance
+export const INSTANCE_STRIDE_BYTES = INSTANCE_STRIDE * 4; // 96 bytes
+
 export interface GeometryData {
   vertices: Uint8Array;
   indices: Uint16Array;
   instanceCount: number;
   opaqueCount: number;
-  instanceOffsetData: Float32Array;
-  instanceColorScaleData: Float32Array;
-  instanceSecondaryColorData: Float32Array;
-  instanceEmissiveColorData: Float32Array;
-  instanceMaterialParamsData: Float32Array;
-  instanceRotationData: Float32Array;
-  instanceMaterialIdData?: Float32Array; // NEW: For texture atlas (optional)
+  /** Interleaved instance data: [offset(3), colorScale(4), secondaryColor(4), emissiveColor(4), materialParams(4), rotation(4), materialId(1)] per instance */
+  instanceInterleavedData: Float32Array;
+  /** Bounds data for frustum culling: [centerX, centerY, centerZ, radius] per instance */
   instanceBoundsData: Float32Array;
 }
 
 export interface FrameResources {
   vertexBuffer: GPUBuffer;
   indexBuffer: GPUBuffer;
-  instanceOffsetBuffer: GPUBuffer;
-  instanceOffsetStagingBuffer: GPUBuffer;
-  instanceColorScaleBuffer: GPUBuffer;
-  instanceColorScaleStagingBuffer: GPUBuffer;
-  instanceSecondaryColorBuffer: GPUBuffer;
-  instanceSecondaryColorStagingBuffer: GPUBuffer;
-  instanceEmissiveColorBuffer: GPUBuffer;
-  instanceEmissiveColorStagingBuffer: GPUBuffer;
-  instanceMaterialParamsBuffer: GPUBuffer;
-  instanceMaterialParamsStagingBuffer: GPUBuffer;
-  instanceRotationBuffer: GPUBuffer;
-  instanceRotationStagingBuffer: GPUBuffer;
-  instanceMaterialIdBuffer: GPUBuffer; // NEW: For texture atlas
-  instanceMaterialIdStagingBuffer: GPUBuffer;
+  /** Interleaved instance buffer for rendering (compacted output) */
+  instanceInterleavedBuffer: GPUBuffer;
+  /** Interleaved instance staging buffer (input for compaction) */
+  instanceInterleavedStagingBuffer: GPUBuffer;
   /** Bounds used by compute passes (center.xyz + radius). */
   instanceBoundsBuffer: GPUBuffer;
   /** Draw arguments for opaque/transparent/overlay instanced draws. */
@@ -60,7 +67,7 @@ export interface FrameResources {
   textureBindGroup: GPUBindGroup;
   /** Normal atlas texture handle for re-binding when regrouping materials */
   normalAtlasTexture: GPUTexture;
-  atlasMetaBuffer?: GPUBuffer; // NEW: metadata buffer for atlas sampling and material params
+  atlasMetaBuffer?: GPUBuffer; // metadata buffer for atlas sampling and material params
   timestampQuerySet: GPUQuerySet | null;
   timestampResolveBuffer: GPUBuffer | null;
   timestampReadBuffer: GPUBuffer | null;
@@ -345,91 +352,60 @@ export const DEFAULT_GEOMETRY: GeometryData = {
   // dimensions x dimensions grid
   instanceCount: DEFAULT_INSTANCE_GRID.dimensions * DEFAULT_INSTANCE_GRID.dimensions,
   opaqueCount: DEFAULT_INSTANCE_GRID.dimensions * DEFAULT_INSTANCE_GRID.dimensions,
-  instanceOffsetData: (() => {
+  // Interleaved instance data: [offset(3), colorScale(4), secondaryColor(4), emissiveColor(4), materialParams(4), rotation(4), materialId(1)] per instance
+  instanceInterleavedData: (() => {
     const dim = DEFAULT_INSTANCE_GRID.dimensions;
+    const count = dim * dim;
     const spacing = DEFAULT_INSTANCE_GRID.spacing;
-    const data = new Float32Array(dim * dim * 3);
-    let i = 0;
     const half = (dim - 1) * 0.5 * spacing;
+    const data = new Float32Array(count * INSTANCE_STRIDE);
+    
     for (let y = 0; y < dim; y++) {
       for (let x = 0; x < dim; x++) {
-        data[i++] = x * spacing - half;
-        data[i++] = 0;
-        data[i++] = y * spacing - half;
-      }
-    }
-    return data;
-  })(),
-  instanceColorScaleData: (() => {
-    const dim = DEFAULT_INSTANCE_GRID.dimensions;
-    const data = new Float32Array(dim * dim * 4);
-    let i = 0;
-    for (let y = 0; y < dim; y++) {
-      for (let x = 0; x < dim; x++) {
+        const idx = y * dim + x;
+        const base = idx * INSTANCE_STRIDE;
         const fx = x / (dim - 1);
         const fy = y / (dim - 1);
-        // simple color ramp; scale (w) stays 1
-        data[i++] = 0.3 + 0.7 * fx;
-        data[i++] = 0.3 + 0.7 * fy;
-        data[i++] = 0.35 + 0.6 * (1 - fx * fy);
-        data[i++] = 1.0;
+        
+        // offset (3 floats at offset 0)
+        data[base + 0] = x * spacing - half;
+        data[base + 1] = 0;
+        data[base + 2] = y * spacing - half;
+        
+        // colorScale (4 floats at offset 3)
+        data[base + 3] = 0.3 + 0.7 * fx;
+        data[base + 4] = 0.3 + 0.7 * fy;
+        data[base + 5] = 0.35 + 0.6 * (1 - fx * fy);
+        data[base + 6] = 1.0; // scale
+        
+        // secondaryColor (4 floats at offset 7)
+        data[base + 7] = 0.5;
+        data[base + 8] = 0.5;
+        data[base + 9] = 0.5;
+        data[base + 10] = 1.0;
+        
+        // emissiveColor (4 floats at offset 11)
+        data[base + 11] = 0;
+        data[base + 12] = 0;
+        data[base + 13] = 0;
+        data[base + 14] = 0;
+        
+        // materialParams (4 floats at offset 15)
+        data[base + 15] = 1.0; // alpha
+        data[base + 16] = 0.0; // metallic
+        data[base + 17] = 1.0; // roughness
+        data[base + 18] = 0.0; // flags
+        
+        // rotation (4 floats at offset 19) - identity quaternion
+        data[base + 19] = 0;
+        data[base + 20] = 0;
+        data[base + 21] = 0;
+        data[base + 22] = 1;
+        
+        // materialId (1 float at offset 23)
+        data[base + 23] = 0;
       }
     }
-    return data;
-  })(),
-  instanceSecondaryColorData: (() => {
-    const dim = DEFAULT_INSTANCE_GRID.dimensions;
-    const data = new Float32Array(dim * dim * 4);
-    let i = 0;
-    for (let y = 0; y < dim; y++) {
-      for (let x = 0; x < dim; x++) {
-        data[i++] = 0.5;
-        data[i++] = 0.5;
-        data[i++] = 0.5;
-        data[i++] = 1.0;
-      }
-    }
-    return data;
-  })(),
-  instanceEmissiveColorData: (() => {
-    const dim = DEFAULT_INSTANCE_GRID.dimensions;
-    const data = new Float32Array(dim * dim * 4);
-    // defaults to no emissive contribution
-    return data;
-  })(),
-  instanceMaterialParamsData: (() => {
-    const dim = DEFAULT_INSTANCE_GRID.dimensions;
-    const data = new Float32Array(dim * dim * 4);
-    let i = 0;
-    for (let y = 0; y < dim; y++) {
-      for (let x = 0; x < dim; x++) {
-        data[i++] = 1.0; // alpha
-        data[i++] = 0.0; // metallic
-        data[i++] = 1.0; // roughness
-        data[i++] = 0.0; // flags
-      }
-    }
-    return data;
-  })(),
-  instanceRotationData: (() => {
-    const dim = DEFAULT_INSTANCE_GRID.dimensions;
-    const count = dim * dim;
-    const data = new Float32Array(count * 4);
-    for (let i = 0; i < count; i++) {
-      // identity quaternion
-      data[i * 4 + 0] = 0;
-      data[i * 4 + 1] = 0;
-      data[i * 4 + 2] = 0;
-      data[i * 4 + 3] = 1;
-    }
-    return data;
-  })(),
-  // NEW: Material IDs for texture atlas (all instances use material 0 by default)
-  instanceMaterialIdData: (() => {
-    const dim = DEFAULT_INSTANCE_GRID.dimensions;
-    const count = dim * dim;
-    const data = new Float32Array(count);
-    data.fill(0); // All instances use default material (ID 0)
     return data;
   })(),
   instanceBoundsData: (() => {
@@ -510,20 +486,8 @@ export function createGeometryBuffers(
 ): {
   vertexBuffer: GPUBuffer;
   indexBuffer: GPUBuffer;
-  instanceOffsetBuffer: GPUBuffer;
-  instanceOffsetStagingBuffer: GPUBuffer;
-  instanceColorScaleBuffer: GPUBuffer;
-  instanceColorScaleStagingBuffer: GPUBuffer;
-  instanceSecondaryColorBuffer: GPUBuffer;
-  instanceSecondaryColorStagingBuffer: GPUBuffer;
-  instanceEmissiveColorBuffer: GPUBuffer;
-  instanceEmissiveColorStagingBuffer: GPUBuffer;
-  instanceMaterialParamsBuffer: GPUBuffer;
-  instanceMaterialParamsStagingBuffer: GPUBuffer;
-  instanceRotationBuffer: GPUBuffer;
-  instanceRotationStagingBuffer: GPUBuffer;
-  instanceMaterialIdBuffer: GPUBuffer; // NEW
-  instanceMaterialIdStagingBuffer: GPUBuffer;
+  instanceInterleavedBuffer: GPUBuffer;
+  instanceInterleavedStagingBuffer: GPUBuffer;
   instanceBoundsBuffer: GPUBuffer;
   instanceIndirectArgsBuffer: GPUBuffer;
 } {
@@ -580,91 +544,16 @@ export function createGeometryBuffers(
   const stagingInstanceUsage =
     GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST | GPUBufferUsage.COPY_SRC;
 
-  const instanceOffsetBuffer = createBufferWithData(
-    'instance-offset-buffer',
+  // Interleaved instance buffer (96 bytes per instance)
+  const instanceInterleavedBuffer = createBufferWithData(
+    'instance-interleaved-buffer',
     renderInstanceUsage,
-    geometry.instanceOffsetData
+    geometry.instanceInterleavedData
   );
-  const instanceOffsetStagingBuffer = createBufferWithData(
-    'instance-offset-staging-buffer',
+  const instanceInterleavedStagingBuffer = createBufferWithData(
+    'instance-interleaved-staging-buffer',
     stagingInstanceUsage,
-    geometry.instanceOffsetData
-  );
-
-  const instanceColorScaleBuffer = createBufferWithData(
-    'instance-color-scale-buffer',
-    renderInstanceUsage,
-    geometry.instanceColorScaleData
-  );
-  const instanceColorScaleStagingBuffer = createBufferWithData(
-    'instance-color-scale-staging-buffer',
-    stagingInstanceUsage,
-    geometry.instanceColorScaleData
-  );
-
-  const instanceSecondaryColorBuffer = createBufferWithData(
-    'instance-secondary-color-buffer',
-    renderInstanceUsage,
-    geometry.instanceSecondaryColorData
-  );
-  const instanceSecondaryColorStagingBuffer = createBufferWithData(
-    'instance-secondary-color-staging-buffer',
-    stagingInstanceUsage,
-    geometry.instanceSecondaryColorData
-  );
-
-  const instanceEmissiveColorBuffer = createBufferWithData(
-    'instance-emissive-color-buffer',
-    renderInstanceUsage,
-    geometry.instanceEmissiveColorData
-  );
-  const instanceEmissiveColorStagingBuffer = createBufferWithData(
-    'instance-emissive-color-staging-buffer',
-    stagingInstanceUsage,
-    geometry.instanceEmissiveColorData
-  );
-
-  const instanceMaterialParamsBuffer = createBufferWithData(
-    'instance-material-params-buffer',
-    renderInstanceUsage,
-    geometry.instanceMaterialParamsData
-  );
-  const instanceMaterialParamsStagingBuffer = createBufferWithData(
-    'instance-material-params-staging-buffer',
-    stagingInstanceUsage,
-    geometry.instanceMaterialParamsData
-  );
-
-  const instanceRotationBuffer = createBufferWithData(
-    'instance-rotation-buffer',
-    renderInstanceUsage,
-    geometry.instanceRotationData
-  );
-  const instanceRotationStagingBuffer = createBufferWithData(
-    'instance-rotation-staging-buffer',
-    stagingInstanceUsage,
-    geometry.instanceRotationData
-  );
-
-  // NEW: Material ID buffer for texture atlas
-  const ensureMaterialIdData = (): Float32Array => {
-    const requiredLength = Math.max(geometry.instanceCount, 1);
-    const existing = geometry.instanceMaterialIdData;
-    if (!existing || existing.length < requiredLength) {
-      return new Float32Array(requiredLength);
-    }
-    return existing;
-  };
-  const instanceMaterialIdData = ensureMaterialIdData();
-  const instanceMaterialIdBuffer = createBufferWithData(
-    'instance-material-id-buffer',
-    renderInstanceUsage,
-    instanceMaterialIdData
-  );
-  const instanceMaterialIdStagingBuffer = createBufferWithData(
-    'instance-material-id-staging-buffer',
-    stagingInstanceUsage,
-    instanceMaterialIdData
+    geometry.instanceInterleavedData
   );
 
   const instanceBoundsSource =
@@ -696,20 +585,8 @@ export function createGeometryBuffers(
   return {
     vertexBuffer,
     indexBuffer,
-    instanceOffsetBuffer,
-    instanceOffsetStagingBuffer,
-    instanceColorScaleBuffer,
-    instanceColorScaleStagingBuffer,
-    instanceSecondaryColorBuffer,
-    instanceSecondaryColorStagingBuffer,
-    instanceEmissiveColorBuffer,
-    instanceEmissiveColorStagingBuffer,
-    instanceMaterialParamsBuffer,
-    instanceMaterialParamsStagingBuffer,
-    instanceRotationBuffer,
-    instanceRotationStagingBuffer,
-    instanceMaterialIdBuffer, // NEW
-    instanceMaterialIdStagingBuffer,
+    instanceInterleavedBuffer,
+    instanceInterleavedStagingBuffer,
     instanceBoundsBuffer,
     instanceIndirectArgsBuffer,
   };
@@ -825,6 +702,18 @@ export function createTextureResources(
 // These simple functions are kept for backward compatibility and quick atlas generation
 
 /**
+ * Options for texture atlas creation
+ */
+export interface TextureAtlasOptions {
+  /** Use GPU compute shaders for procedural texture generation (default: true) */
+  useGPU?: boolean;
+  /** Atlas texture size (default: 2048) */
+  atlasSize?: number;
+  /** Individual material texture size (default: 128) */
+  materialTextureSize?: number;
+}
+
+/**
  * Creates a texture atlas with default materials.
  *
  * PERFORMANCE OPTIMIZATION:
@@ -836,13 +725,15 @@ export function createTextureResources(
  * @param textureBindGroupLayout - Optional existing layout to reuse.
  * @param atlasSize - Size of the atlas texture (default 2048x2048).
  * @param materialTextureSize - Size of individual material textures (default 128x128).
+ * @param options - Additional options including useGPU flag.
  * @returns Atlas texture, sampler, layout, bind group, and TextureAtlas instance.
  */
 export function createTextureAtlas(
   device: GPUDevice,
   _textureBindGroupLayout?: GPUBindGroupLayout,
   atlasSize = 2048,
-  materialTextureSize = 128
+  materialTextureSize = 128,
+  options?: TextureAtlasOptions
 ): {
   atlasTexture: GPUTexture;
   normalAtlasTexture: GPUTexture;
@@ -853,23 +744,63 @@ export function createTextureAtlas(
   atlas: TextureAtlas;
 } {
   // Note: override provided layout to include normal atlas binding
+  const useGPU = options?.useGPU ?? true;
+  const finalAtlasSize = options?.atlasSize ?? atlasSize;
+  const finalMaterialSize = options?.materialTextureSize ?? materialTextureSize;
 
   // Create atlas with mipmapping and anisotropic filtering enabled
   const atlas = new TextureAtlas({
-    atlasSize,
-    materialTextureSize,
+    atlasSize: finalAtlasSize,
+    materialTextureSize: finalMaterialSize,
     padding: 2,
     generateMipmaps: true,
     filterMode: 'anisotropic',
     anisotropyLevel: 8,
   });
 
-  const builtMaterials = buildDefaultAtlasMaterials(materialTextureSize);
+  // Build materials using WASM > GPU > ASCII art fallback
+  let builtMaterials: BuiltAtlasMaterial[];
+  
+  if (useGPU) {
+    // Try WASM first (fastest)
+    if (isWasmTextureProcessorAvailable()) {
+      const wasmMaterials = buildWasmAtlasMaterials(GPU_MATERIAL_DEFINITIONS, finalMaterialSize);
+      if (wasmMaterials) {
+        Logger.info('[createTextureAtlas] Using WASM procedural texture generation');
+        builtMaterials = wasmMaterials;
+      } else {
+        // Fall back to GPU/CPU
+        try {
+          Logger.info('[createTextureAtlas] Using GPU/CPU procedural texture generation');
+          const generator = new ProceduralTextureGenerator(finalMaterialSize);
+          builtMaterials = buildGPUAtlasMaterialsSync(generator, GPU_MATERIAL_DEFINITIONS, finalMaterialSize);
+        } catch (error) {
+          Logger.warn('[createTextureAtlas] Procedural generation failed, falling back to ASCII art:', error);
+          builtMaterials = buildDefaultAtlasMaterials(finalMaterialSize);
+        }
+      }
+    } else {
+      // No WASM, try GPU/CPU
+      try {
+        Logger.info('[createTextureAtlas] Using GPU/CPU procedural texture generation');
+        const generator = new ProceduralTextureGenerator(finalMaterialSize);
+        builtMaterials = buildGPUAtlasMaterialsSync(generator, GPU_MATERIAL_DEFINITIONS, finalMaterialSize);
+      } catch (error) {
+        Logger.warn('[createTextureAtlas] Procedural generation failed, falling back to ASCII art:', error);
+        builtMaterials = buildDefaultAtlasMaterials(finalMaterialSize);
+      }
+    }
+  } else {
+    Logger.info('[createTextureAtlas] Using ASCII art texture generation');
+    builtMaterials = buildDefaultAtlasMaterials(finalMaterialSize);
+  }
+
   const materialParams: Array<{
     saturation: number;
     metallic: number;
     roughness: number;
     hasNormals: boolean;
+    hasEmission: boolean;
   }> = [];
 
   for (const entry of builtMaterials) {
@@ -877,13 +808,19 @@ export function createTextureAtlas(
     const hasNormals =
       Boolean(entry.material.sideNormalData && entry.material.sideNormalData.length > 0) ||
       Boolean(entry.material.topNormalData && entry.material.topNormalData.length > 0);
+    const hasEmission =
+      Boolean(entry.material.sideEmissionData && entry.material.sideEmissionData.length > 0) ||
+      Boolean(entry.material.topEmissionData && entry.material.topEmissionData.length > 0);
     materialParams[id] = {
       saturation: entry.params.saturation,
       metallic: entry.params.metallic,
       roughness: entry.params.roughness,
       hasNormals,
+      hasEmission,
     };
   }
+  
+  Logger.info(`[createTextureAtlas] Built atlas with ${builtMaterials.length} materials (GPU: ${useGPU})`);
 
   // Build atlas texture data with mipmaps
   const { baseLevel: atlasData, mipmaps: atlasMipmaps } = atlas.buildAtlasDataWithMipmaps();

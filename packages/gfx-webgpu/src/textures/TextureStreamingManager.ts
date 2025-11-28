@@ -17,6 +17,8 @@ import type { TextureCompressionManager } from './TextureCompressionManager';
 
 export type TextureLOD = 'low' | 'medium' | 'high' | 'ultra';
 
+export type TexturePriorityLevel = 'critical' | 'high' | 'normal' | 'low' | 'background';
+
 export interface TextureStreamingConfig {
   enabled: boolean;
   memoryBudgetMB: number; // Total texture memory budget
@@ -27,8 +29,50 @@ export interface TextureStreamingConfig {
     // Below medium distance = low quality
   };
   maxConcurrentLoads: number; // Max textures loading simultaneously
-  evictionStrategy: 'lru' | 'distance'; // Eviction strategy when over budget
+  evictionStrategy: 'lru' | 'distance' | 'hybrid'; // Eviction strategy when over budget
   preloadDistance: number; // Distance to start preloading higher LOD
+}
+
+/**
+ * Enhanced streaming configuration with memory budgets and priorities.
+ */
+export interface EnhancedStreamingConfig extends TextureStreamingConfig {
+  /** Memory budgets by texture category */
+  memoryBudgets: {
+    /** MB for regular textures */
+    textures: number;
+    /** MB for texture atlases */
+    atlases: number;
+    /** MB for procedurally generated textures */
+    procedural: number;
+  };
+  /** Priority multipliers for different scenarios */
+  priorityRules: {
+    /** Priority multiplier for visible entities */
+    visibleEntities: number;
+    /** Priority multiplier for recently used textures */
+    recentlyUsed: number;
+    /** Priority multiplier for textures near player */
+    nearPlayer: number;
+    /** Priority multiplier for emissive/important materials */
+    importantMaterials: number;
+  };
+  /** Memory pressure thresholds */
+  memoryPressure: {
+    /** Percentage of budget to trigger warning */
+    warningThreshold: number;
+    /** Percentage of budget to trigger aggressive eviction */
+    criticalThreshold: number;
+    /** Percentage of budget to target after eviction */
+    targetAfterEviction: number;
+  };
+  /** Cleanup settings */
+  cleanup: {
+    /** Interval in frames between cleanup runs */
+    intervalFrames: number;
+    /** Maximum age in ms before texture can be evicted */
+    maxAgeMs: number;
+  };
 }
 
 const DEFAULT_CONFIG: TextureStreamingConfig = {
@@ -44,6 +88,32 @@ const DEFAULT_CONFIG: TextureStreamingConfig = {
   preloadDistance: 1.2, // Preload when 20% closer
 };
 
+const DEFAULT_ENHANCED_CONFIG: EnhancedStreamingConfig = {
+  ...DEFAULT_CONFIG,
+  memoryBudgets: {
+    textures: 256,
+    atlases: 128,
+    procedural: 64,
+  },
+  priorityRules: {
+    visibleEntities: 2.0,
+    recentlyUsed: 1.5,
+    nearPlayer: 3.0,
+    importantMaterials: 2.5,
+  },
+  memoryPressure: {
+    warningThreshold: 0.8,
+    criticalThreshold: 0.95,
+    targetAfterEviction: 0.7,
+  },
+  cleanup: {
+    intervalFrames: 60,
+    maxAgeMs: 30000,
+  },
+};
+
+export type TextureCategory = 'texture' | 'atlas' | 'procedural';
+
 export interface TextureEntry {
   id: string;
   url: string;
@@ -54,7 +124,16 @@ export interface TextureEntry {
   lastUsed: number;
   distance: number; // Distance from camera
   priority: number; // Loading priority (higher = more important)
+  priorityLevel: TexturePriorityLevel; // Explicit priority level
   loading: boolean;
+  /** Texture category for budget tracking */
+  category: TextureCategory;
+  /** Whether texture is currently visible */
+  isVisible: boolean;
+  /** Whether texture is marked as important */
+  isImportant: boolean;
+  /** Material reference (for validation) */
+  materialRef?: string;
 }
 
 export interface LoadRequest {
@@ -63,26 +142,53 @@ export interface LoadRequest {
   priority: number;
 }
 
+export interface StreamingStats {
+  textureCount: number;
+  loadedCount: number;
+  memoryUsageMB: number;
+  memoryBudgetMB: number;
+  queuedLoads: number;
+  activeLoads: number;
+  /** Memory usage by category */
+  memoryByCategory: Record<TextureCategory, number>;
+  /** Textures by LOD */
+  texturesByLOD: Record<TextureLOD, number>;
+  /** Memory pressure level (0-1) */
+  memoryPressure: number;
+  /** Whether aggressive eviction is active */
+  aggressiveEviction: boolean;
+}
+
 /**
  * TextureStreamingManager manages texture LOD streaming.
  */
 export class TextureStreamingManager {
-  private config: TextureStreamingConfig;
+  private config: EnhancedStreamingConfig;
   private device: GPUDevice;
   private compressionManager?: TextureCompressionManager;
   private textures = new Map<string, TextureEntry>();
   private loadQueue: LoadRequest[] = [];
   private activeLoads = new Set<string>();
   private currentMemoryUsage = 0;
+  private memoryByCategory: Record<TextureCategory, number> = {
+    texture: 0,
+    atlas: 0,
+    procedural: 0,
+  };
   private frameCount = 0;
+  private aggressiveEviction = false;
+
+  // Event callbacks
+  private onMemoryWarningCallbacks: Array<() => void> = [];
+  private onMemoryCriticalCallbacks: Array<() => void> = [];
 
   constructor(
     device: GPUDevice,
-    config?: Partial<TextureStreamingConfig>,
+    config?: Partial<TextureStreamingConfig> | Partial<EnhancedStreamingConfig>,
     compressionManager?: TextureCompressionManager
   ) {
     this.device = device;
-    this.config = { ...DEFAULT_CONFIG, ...config };
+    this.config = { ...DEFAULT_ENHANCED_CONFIG, ...config } as EnhancedStreamingConfig;
     this.compressionManager = compressionManager;
   }
 
@@ -96,12 +202,24 @@ export class TextureStreamingManager {
   /**
    * Registers a texture for streaming.
    */
-  registerTexture(id: string, url: string, initialDistance = Infinity): void {
+  registerTexture(
+    id: string,
+    url: string,
+    initialDistance = Infinity,
+    options?: {
+      category?: TextureCategory;
+      priorityLevel?: TexturePriorityLevel;
+      isImportant?: boolean;
+      materialRef?: string;
+    }
+  ): void {
     if (this.textures.has(id)) return;
 
     const targetLOD = this.calculateTargetLOD(initialDistance);
+    const category = options?.category ?? 'texture';
+    const priorityLevel = options?.priorityLevel ?? 'normal';
 
-    this.textures.set(id, {
+    const entry: TextureEntry = {
       id,
       url,
       currentLOD: null,
@@ -110,9 +228,86 @@ export class TextureStreamingManager {
       size: 0,
       lastUsed: this.now(),
       distance: initialDistance,
-      priority: this.calculatePriority(initialDistance, targetLOD),
+      priority: this.calculatePriority(initialDistance, targetLOD, priorityLevel),
+      priorityLevel,
       loading: false,
-    });
+      category,
+      isVisible: false,
+      isImportant: options?.isImportant ?? false,
+    };
+    if (options?.materialRef !== undefined) {
+      entry.materialRef = options.materialRef;
+    }
+    this.textures.set(id, entry);
+  }
+
+  /**
+   * Set visibility status for a texture (for frustum culling integration).
+   */
+  setTextureVisible(id: string, isVisible: boolean): void {
+    const entry = this.textures.get(id);
+    if (!entry) return;
+
+    entry.isVisible = isVisible;
+    
+    // Recalculate priority when visibility changes
+    if (isVisible) {
+      entry.priority = this.calculatePriority(
+        entry.distance,
+        entry.targetLOD,
+        entry.priorityLevel,
+        true
+      );
+    }
+  }
+
+  /**
+   * Bulk update visibility for multiple textures.
+   */
+  updateVisibility(visibleIds: Set<string>): void {
+    for (const entry of this.textures.values()) {
+      const wasVisible = entry.isVisible;
+      entry.isVisible = visibleIds.has(entry.id);
+      
+      // Recalculate priority if visibility changed
+      if (entry.isVisible !== wasVisible) {
+        entry.priority = this.calculatePriority(
+          entry.distance,
+          entry.targetLOD,
+          entry.priorityLevel,
+          entry.isVisible
+        );
+      }
+    }
+
+    // Re-sort load queue after visibility changes
+    this.loadQueue.sort((a, b) => b.priority - a.priority);
+  }
+
+  /**
+   * Set priority level for a texture.
+   */
+  setPriorityLevel(id: string, level: TexturePriorityLevel): void {
+    const entry = this.textures.get(id);
+    if (!entry) return;
+
+    entry.priorityLevel = level;
+    entry.priority = this.calculatePriority(
+      entry.distance,
+      entry.targetLOD,
+      level,
+      entry.isVisible
+    );
+  }
+
+  /**
+   * Mark a texture as important (will be prioritized and protected from eviction).
+   */
+  setImportant(id: string, isImportant: boolean): void {
+    const entry = this.textures.get(id);
+    if (entry) {
+      entry.isImportant = isImportant;
+    }
   }
 
   /**
@@ -170,8 +365,8 @@ export class TextureStreamingManager {
       this.evictTextures();
     }
 
-    // Periodic cleanup (every 60 frames)
-    if (this.frameCount % 60 === 0) {
+    // Periodic cleanup
+    if (this.frameCount % this.config.cleanup.intervalFrames === 0) {
       this.cleanup();
     }
   }
@@ -179,18 +374,20 @@ export class TextureStreamingManager {
   /**
    * Gets streaming statistics.
    */
-  getStats(): {
-    textureCount: number;
-    loadedCount: number;
-    memoryUsageMB: number;
-    memoryBudgetMB: number;
-    queuedLoads: number;
-    activeLoads: number;
-  } {
+  getStats(): StreamingStats {
     let loadedCount = 0;
+    const texturesByLOD: Record<TextureLOD, number> = { low: 0, medium: 0, high: 0, ultra: 0 };
+    
     for (const entry of this.textures.values()) {
-      if (entry.texture) loadedCount++;
+      if (entry.texture) {
+        loadedCount++;
+        if (entry.currentLOD) {
+          texturesByLOD[entry.currentLOD]++;
+        }
+      }
     }
+
+    const memoryPressure = this.currentMemoryUsage / (this.config.memoryBudgetMB * 1024 * 1024);
 
     return {
       textureCount: this.textures.size,
@@ -199,7 +396,94 @@ export class TextureStreamingManager {
       memoryBudgetMB: this.config.memoryBudgetMB,
       queuedLoads: this.loadQueue.length,
       activeLoads: this.activeLoads.size,
+      memoryByCategory: { ...this.memoryByCategory },
+      texturesByLOD,
+      memoryPressure,
+      aggressiveEviction: this.aggressiveEviction,
     };
+  }
+
+  /**
+   * Get memory pressure level (0-1).
+   */
+  getMemoryPressure(): number {
+    return this.currentMemoryUsage / (this.config.memoryBudgetMB * 1024 * 1024);
+  }
+
+  /**
+   * Check if memory budget is exceeded.
+   */
+  isOverBudget(): boolean {
+    return this.currentMemoryUsage > this.config.memoryBudgetMB * 1024 * 1024;
+  }
+
+  /**
+   * Subscribe to memory warning events.
+   */
+  onMemoryWarning(callback: () => void): () => void {
+    this.onMemoryWarningCallbacks.push(callback);
+    return () => {
+      const index = this.onMemoryWarningCallbacks.indexOf(callback);
+      if (index >= 0) this.onMemoryWarningCallbacks.splice(index, 1);
+    };
+  }
+
+  /**
+   * Subscribe to memory critical events.
+   */
+  onMemoryCritical(callback: () => void): () => void {
+    this.onMemoryCriticalCallbacks.push(callback);
+    return () => {
+      const index = this.onMemoryCriticalCallbacks.indexOf(callback);
+      if (index >= 0) this.onMemoryCriticalCallbacks.splice(index, 1);
+    };
+  }
+
+  /**
+   * Reduce quality for distant objects to free memory.
+   */
+  reduceQuality(target: 'all' | 'distant' | 'invisible'): number {
+    let reduced = 0;
+    
+    for (const entry of this.textures.values()) {
+      if (!entry.texture || !entry.currentLOD) continue;
+      
+      let shouldReduce = false;
+      
+      switch (target) {
+        case 'all':
+          shouldReduce = entry.currentLOD !== 'low';
+          break;
+        case 'distant':
+          shouldReduce = entry.distance > this.config.lodDistances.high && entry.currentLOD !== 'low';
+          break;
+        case 'invisible':
+          shouldReduce = !entry.isVisible && entry.currentLOD !== 'low';
+          break;
+      }
+      
+      if (shouldReduce && !entry.isImportant) {
+        const lowerLOD = this.getLowerLOD(entry.currentLOD);
+        if (lowerLOD) {
+          this.queueUnload(entry, lowerLOD);
+          reduced++;
+        }
+      }
+    }
+    
+    return reduced;
+  }
+
+  /**
+   * Get next lower LOD level.
+   */
+  private getLowerLOD(lod: TextureLOD): TextureLOD | null {
+    switch (lod) {
+      case 'ultra': return 'high';
+      case 'high': return 'medium';
+      case 'medium': return 'low';
+      case 'low': return null;
+    }
   }
 
   /**
@@ -226,14 +510,42 @@ export class TextureStreamingManager {
   }
 
   /**
-   * Calculates loading priority based on distance and LOD.
+   * Calculates loading priority based on distance, LOD, and other factors.
    */
-  private calculatePriority(distance: number, lod: TextureLOD): number {
-    // Closer = higher priority
-    // Higher LOD = higher priority
+  private calculatePriority(
+    distance: number,
+    lod: TextureLOD,
+    priorityLevel: TexturePriorityLevel = 'normal',
+    isVisible: boolean = false
+  ): number {
+    // Base priority from distance
     const distanceFactor = 1000 / (distance + 1);
+    
+    // LOD factor
     const lodFactor = { low: 1, medium: 2, high: 3, ultra: 4 }[lod];
-    return distanceFactor * lodFactor;
+    
+    // Priority level multiplier
+    const levelMultiplier: Record<TexturePriorityLevel, number> = {
+      critical: 10,
+      high: 5,
+      normal: 1,
+      low: 0.5,
+      background: 0.1,
+    };
+    
+    let priority = distanceFactor * lodFactor * levelMultiplier[priorityLevel];
+    
+    // Apply visibility multiplier
+    if (isVisible) {
+      priority *= this.config.priorityRules.visibleEntities;
+    }
+    
+    // Apply near-player boost for close objects
+    if (distance < this.config.lodDistances.ultra) {
+      priority *= this.config.priorityRules.nearPlayer;
+    }
+    
+    return priority;
   }
 
   /**
@@ -335,6 +647,7 @@ export class TextureStreamingManager {
       entry.currentLOD = lod;
       entry.size = this.estimateTextureSize(texture);
       this.currentMemoryUsage += entry.size;
+      this.memoryByCategory[entry.category] += entry.size;
 
       Logger.debug(`Loaded texture ${entry.id} at ${lod} LOD (${(entry.size / 1024).toFixed(1)} KB)`);
     } catch (err: unknown) {
@@ -419,32 +732,94 @@ export class TextureStreamingManager {
    * Evicts textures to stay within memory budget.
    */
   private evictTextures(): void {
-    const entries = Array.from(this.textures.values()).filter((e) => e.texture !== null);
+    const entries = Array.from(this.textures.values()).filter(
+      (e) => e.texture !== null && !e.isImportant
+    );
+
+    // Check memory pressure level
+    const pressure = this.getMemoryPressure();
+    
+    if (pressure >= this.config.memoryPressure.criticalThreshold) {
+      this.aggressiveEviction = true;
+      for (const cb of this.onMemoryCriticalCallbacks) {
+        try { cb(); } catch {}
+      }
+    } else if (pressure >= this.config.memoryPressure.warningThreshold) {
+      for (const cb of this.onMemoryWarningCallbacks) {
+        try { cb(); } catch {}
+      }
+    }
 
     // Sort by eviction strategy
     if (this.config.evictionStrategy === 'lru') {
       // Least recently used first
       entries.sort((a, b) => a.lastUsed - b.lastUsed);
-    } else {
+    } else if (this.config.evictionStrategy === 'distance') {
       // Furthest distance first
       entries.sort((a, b) => b.distance - a.distance);
+    } else {
+      // Hybrid: combine LRU and distance
+      entries.sort((a, b) => {
+        // Invisible textures first
+        if (a.isVisible !== b.isVisible) {
+          return a.isVisible ? 1 : -1;
+        }
+        // Then by distance (further first)
+        const distanceScore = (b.distance - a.distance) / 100;
+        // Combined with recency (older first)
+        const recencyScore = (a.lastUsed - b.lastUsed) / 10000;
+        return distanceScore + recencyScore;
+      });
     }
 
-    // Evict until under budget
-    const targetMemory = this.config.memoryBudgetMB * 1024 * 1024 * 0.9; // 90% of budget
+    // Target memory level
+    const targetMemory = this.config.memoryBudgetMB * 1024 * 1024 * 
+      this.config.memoryPressure.targetAfterEviction;
     let evicted = 0;
+    let freedBytes = 0;
 
     for (const entry of entries) {
       if (this.currentMemoryUsage <= targetMemory) break;
 
+      const entrySize = entry.size;
       this.destroyTexture(entry);
       entry.currentLOD = null;
       evicted++;
+      freedBytes += entrySize;
     }
 
     if (evicted > 0) {
-      Logger.info(`Evicted ${evicted} textures to free memory`);
+      Logger.info(`Evicted ${evicted} textures, freed ${(freedBytes / 1024 / 1024).toFixed(1)} MB`);
     }
+
+    // Reset aggressive eviction flag if we're under budget
+    if (this.currentMemoryUsage <= targetMemory) {
+      this.aggressiveEviction = false;
+    }
+  }
+
+  /**
+   * Force eviction of unused textures.
+   */
+  evictUnused(): number {
+    const now = this.now();
+    const maxAge = this.config.cleanup.maxAgeMs;
+    let evicted = 0;
+
+    for (const entry of this.textures.values()) {
+      if (!entry.texture) continue;
+      if (entry.isImportant) continue;
+      
+      const age = now - entry.lastUsed;
+      
+      if (age > maxAge && !entry.isVisible) {
+        this.destroyTexture(entry);
+        entry.currentLOD = null;
+        evicted++;
+      }
+    }
+
+    return evicted;
   }
 
   /**
@@ -458,6 +833,7 @@ export class TextureStreamingManager {
     } catch {}
 
     this.currentMemoryUsage -= entry.size;
+    this.memoryByCategory[entry.category] -= entry.size;
     entry.texture = null;
     entry.size = 0;
   }
@@ -467,13 +843,16 @@ export class TextureStreamingManager {
    */
   private cleanup(): void {
     const now = this.now();
-    const maxAge = 30000; // 30 seconds
+    const maxAge = this.config.cleanup.maxAgeMs;
 
     for (const entry of this.textures.values()) {
+      if (!entry.texture) continue;
+      if (entry.isImportant) continue;
+      
       const age = now - entry.lastUsed;
       
-      // Remove very old, unused textures
-      if (age > maxAge && entry.texture) {
+      // Remove very old, unused, invisible textures
+      if (age > maxAge && !entry.isVisible) {
         this.destroyTexture(entry);
         entry.currentLOD = null;
       }

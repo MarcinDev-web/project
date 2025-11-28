@@ -5,6 +5,7 @@ import {
   createTextureAtlas,
   createUniformResources,
   type GeometryData,
+  INSTANCE_STRIDE,
 } from '../resources/resources';
 import { DEFAULT_GEOMETRY } from '../resources/resources';
 import {
@@ -15,6 +16,7 @@ import {
   Z_NEAR,
   TEXTURE_SIZE,
 } from '../config';
+import { createVertexBufferLayouts } from '../core/FrameResourceFactory';
 
 export interface ThumbnailOptions {
   size?: number; // square size in px
@@ -56,43 +58,56 @@ export class ThumbnailRenderer {
     const device = this.device;
     const size = Math.max(64, Math.min(512, options?.size ?? 128));
 
-    // Geometry: single instance of default cube
+    // Geometry: single instance of default cube using interleaved layout
     const maxScale = Math.max(preset.scale[0], preset.scale[1], preset.scale[2]);
     const instanceBoundsData = new Float32Array([0, 0, 0, Math.max(maxScale * 0.5, 0.001)]);
+    
+    // Create interleaved instance data (24 floats per instance)
+    const instanceInterleavedData = new Float32Array(INSTANCE_STRIDE);
+    // offset [0-2]
+    instanceInterleavedData[0] = 0;
+    instanceInterleavedData[1] = 0;
+    instanceInterleavedData[2] = 0;
+    // colorScale [3-6]
+    instanceInterleavedData[3] = preset.color[0];
+    instanceInterleavedData[4] = preset.color[1];
+    instanceInterleavedData[5] = preset.color[2];
+    instanceInterleavedData[6] = maxScale;
+    // secondaryColor [7-10]
+    instanceInterleavedData[7] = preset.color[0];
+    instanceInterleavedData[8] = preset.color[1];
+    instanceInterleavedData[9] = preset.color[2];
+    instanceInterleavedData[10] = 1;
+    // emissiveColor [11-14]
+    instanceInterleavedData[11] = 0;
+    instanceInterleavedData[12] = 0;
+    instanceInterleavedData[13] = 0;
+    instanceInterleavedData[14] = 0;
+    // materialParams [15-18]
+    instanceInterleavedData[15] = preset.color[3] ?? 1;
+    instanceInterleavedData[16] = 0;
+    instanceInterleavedData[17] = 1;
+    instanceInterleavedData[18] = 0;
+    // rotation [19-22] (identity quaternion)
+    instanceInterleavedData[19] = 0;
+    instanceInterleavedData[20] = 0;
+    instanceInterleavedData[21] = 0;
+    instanceInterleavedData[22] = 1;
+    // materialId [23]
+    instanceInterleavedData[23] = 0;
+    
     const geom: GeometryData = {
       vertices: DEFAULT_GEOMETRY.vertices,
       indices: DEFAULT_GEOMETRY.indices,
       instanceCount: 1,
       opaqueCount: 1,
-      instanceOffsetData: new Float32Array([0, 0, 0]),
-      instanceColorScaleData: new Float32Array([preset.color[0], preset.color[1], preset.color[2], maxScale]),
-      instanceSecondaryColorData: new Float32Array([
-        preset.color[0],
-        preset.color[1],
-        preset.color[2],
-        1,
-      ]),
-      instanceEmissiveColorData: new Float32Array([0, 0, 0, 0]),
-      instanceMaterialParamsData: new Float32Array([
-        preset.color[3] ?? 1,
-        0,
-        1,
-        0,
-      ]),
-      instanceRotationData: new Float32Array([0, 0, 0, 1]),
-      instanceMaterialIdData: new Float32Array([0]),
+      instanceInterleavedData,
       instanceBoundsData,
     };
     const {
-    vertexBuffer,
-    indexBuffer,
-    instanceOffsetBuffer,
-    instanceColorScaleBuffer,
-    instanceSecondaryColorBuffer,
-    instanceEmissiveColorBuffer,
-    instanceMaterialParamsBuffer,
-    instanceRotationBuffer,
-      instanceMaterialIdBuffer,
+      vertexBuffer,
+      indexBuffer,
+      instanceInterleavedBuffer,
     } = createGeometryBuffers(device, geom);
 
     // Uniforms and materials (use atlas to match main pipeline)
@@ -107,58 +122,13 @@ export class ThumbnailRenderer {
       128
     );
 
+    // Use the standard interleaved vertex buffer layouts
     const { renderPipeline } = await createPipelines(
       device,
       this.presentationFormat,
       uniformBindGroupLayout,
       textureBindGroupLayout,
-      [
-        {
-          arrayStride: 24,
-          stepMode: 'vertex',
-          attributes: [
-            { shaderLocation: 0, offset: 0, format: 'float32x3' },
-            { shaderLocation: 1, offset: 12, format: 'snorm8x4' },
-            { shaderLocation: 2, offset: 16, format: 'float16x2' },
-            { shaderLocation: 3, offset: 20, format: 'unorm8x4' },
-          ],
-        },
-        {
-          arrayStride: 12,
-          stepMode: 'instance',
-          attributes: [{ shaderLocation: 4, offset: 0, format: 'float32x3' }],
-        },
-        {
-          arrayStride: 16,
-          stepMode: 'instance',
-          attributes: [{ shaderLocation: 5, offset: 0, format: 'float32x4' }],
-        },
-        {
-          arrayStride: 16,
-          stepMode: 'instance',
-          attributes: [{ shaderLocation: 6, offset: 0, format: 'float32x4' }],
-        },
-        {
-          arrayStride: 16,
-          stepMode: 'instance',
-          attributes: [{ shaderLocation: 7, offset: 0, format: 'float32x4' }],
-        },
-        {
-          arrayStride: 16,
-          stepMode: 'instance',
-          attributes: [{ shaderLocation: 8, offset: 0, format: 'float32x4' }],
-        },
-        {
-          arrayStride: 16,
-          stepMode: 'instance',
-          attributes: [{ shaderLocation: 9, offset: 0, format: 'float32x4' }],
-        },
-        {
-          arrayStride: 4,
-          stepMode: 'instance',
-          attributes: [{ shaderLocation: 10, offset: 0, format: 'float32' }],
-        },
-      ],
+      createVertexBufferLayouts(),
       { sampleCount: 1, statusEl: document.createElement('div') }
     );
 
@@ -249,13 +219,7 @@ export class ThumbnailRenderer {
     });
     pass.setPipeline(renderPipeline);
     pass.setVertexBuffer(0, vertexBuffer);
-    pass.setVertexBuffer(1, instanceOffsetBuffer);
-    pass.setVertexBuffer(2, instanceColorScaleBuffer);
-    pass.setVertexBuffer(3, instanceSecondaryColorBuffer);
-    pass.setVertexBuffer(4, instanceEmissiveColorBuffer);
-    pass.setVertexBuffer(5, instanceMaterialParamsBuffer);
-    pass.setVertexBuffer(6, instanceRotationBuffer);
-    pass.setVertexBuffer(7, instanceMaterialIdBuffer);
+    pass.setVertexBuffer(1, instanceInterleavedBuffer);
     pass.setIndexBuffer(indexBuffer, 'uint16');
     pass.setBindGroup(0, uniformBindGroup);
     pass.setBindGroup(1, textureBindGroup);

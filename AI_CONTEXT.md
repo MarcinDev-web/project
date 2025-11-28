@@ -87,8 +87,7 @@ root/
 
 ### 3.3. Dependency Rules
 - **Strict Unidirectional Flow**: Apps depend on Packages. Packages depend on lower-level Packages.
-- **No Cycles**: `core` never imports `world`. `world` never imports `gfx`.
-- **Exception**: `@engine/world` and `@engine/stdlib` have a permitted cyclic relationship for pragmatic reasons, handled carefully.
+- **No Cycles**: `core` never imports `world`. `world` never imports `gfx`. `stdlib` imports from `world` (not vice versa).
 
 ---
 

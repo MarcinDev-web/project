@@ -6,8 +6,15 @@
 
 // Explicit exports for core classes to help TypeScript/bundlers resolve them
 export { Entity, type EntityId, type EntityData } from './core/Entity.js';
-export { Scene, type SceneData } from './core/Scene.js';
+export {
+  Scene,
+  type SceneData,
+  SCENE_EVENTS,
+  type EntityAddedEvent,
+  type EntityRemovedEvent,
+} from './core/Scene.js';
 export { Transform } from './core/Transform.js';
+export { CameraManager } from './systems/CameraManager.js';
 export * from './core/index.js';
 
 // Explicit exports for commonly used types and classes from components
@@ -117,6 +124,13 @@ export { PowerUpSystem } from './systems/PowerUpSystem.js';
 export { MovingPlatformSystem } from './systems/MovingPlatformSystem.js';
 export { ParkourSystem } from './systems/ParkourSystem.js';
 export { NpcBehaviorSystem } from './systems/NpcBehaviorSystem.js';
+export { WeatherSystem, type WeatherState, type WeatherSystemConfig } from './systems/WeatherSystem.js';
+export {
+  HazardZoneSystem,
+  type HazardDamageEvent,
+  type HazardKillEvent,
+  type HazardZoneSystemOptions,
+} from './systems/HazardZoneSystem.js';
 
 // Physics (selective to avoid duplicates with systems)
 export { PhysicsWorld } from './physics/PhysicsWorld.js';
@@ -133,3 +147,13 @@ export * from './physics/inertia.js';
 
 // WASM Animation System
 export { WasmAnimationSystem } from './systems/WasmAnimationSystem.js';
+
+// Engine
+export * from './engine/index.js';
+
+// WASM ECS Acceleration System
+export {
+  WasmEcsSystem,
+  getWasmEcsSystem,
+  initGlobalWasmEcs,
+} from './systems/WasmEcsSystem.js';

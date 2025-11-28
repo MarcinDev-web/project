@@ -7,6 +7,9 @@ import {
   mat4LookAt,
   mat4Invert,
   mat4GetRotation,
+  mat4GetRotationOut,
+  mat4GetScale,
+  mat4GetScaleOut,
   quatInverse,
   type Mat4,
   type Vec3,
@@ -257,6 +260,38 @@ export class Transform extends Component {
   }
 
   /**
+   * Gets the world rotation by extracting it from world matrix.
+   */
+  getWorldRotation(): Quat {
+    const world = this.getWorldMatrix();
+    return mat4GetRotation(world);
+  }
+
+  /**
+   * Writes world rotation into provided quaternion to avoid allocations.
+   */
+  getWorldRotationInto(out: Quat): Quat {
+    const world = this.getWorldMatrix();
+    return mat4GetRotationOut(out, world);
+  }
+
+  /**
+   * Gets the world scale by extracting it from world matrix.
+   */
+  getWorldScale(): Vec3 {
+    const world = this.getWorldMatrix();
+    return mat4GetScale(world);
+  }
+
+  /**
+   * Writes world scale into provided vector to avoid allocations.
+   */
+  getWorldScaleInto(out: Vec3): Vec3 {
+    const world = this.getWorldMatrix();
+    return mat4GetScaleOut(out, world);
+  }
+
+  /**
    * Gets the forward direction vector in world space.
    */
   getForward(out: Vec3 = [0, 0, -1]): Vec3 {
@@ -367,11 +402,10 @@ export class Transform extends Component {
 
   /**
    * Creates a copy of this transform.
+   * Note: The clone is parentless - parent relationship is not copied.
    */
   override clone(): Transform {
-    const clone = new Transform(this._position, this._rotation, this._scale);
-    clone._parent = this._parent;
-    return clone;
+    return new Transform(this._position, this._rotation, this._scale);
   }
 
   /**

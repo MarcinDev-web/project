@@ -1,9 +1,17 @@
-import type { GeometryData } from '../resources/resources';
+import type { GeometryData, INSTANCE_STRIDE } from '../resources/resources';
 import { MaterialComponent } from '@engine/world';
 import type { Mat4, Vec3 } from '@engine/core/math';
 import { ShadowCascadeCalculator } from './ShadowCascades';
 import { TIMESTAMP_INDICES } from '../config';
 import { Z_NEAR, Z_FAR } from '../config';
+import {
+  INSTANCE_STRIDE as STRIDE,
+  INSTANCE_OFFSET_OFFSET,
+  INSTANCE_COLOR_SCALE_OFFSET,
+  INSTANCE_MATERIAL_PARAMS_OFFSET,
+  INSTANCE_ROTATION_OFFSET,
+  INSTANCE_MATERIAL_ID_OFFSET,
+} from '../core/InstanceManager';
 
 export class ShadowPass {
   private device: GPUDevice;
@@ -226,13 +234,8 @@ fn vs_main(
     lightVP: Float32Array,
     geometry: GeometryData
   ): number {
-    const offsets = geometry.instanceOffsetData;
-    const colorScale = geometry.instanceColorScaleData;
-    const rotation = geometry.instanceRotationData;
-    const materialParams = geometry.instanceMaterialParamsData;
-    // Material IDs may be missing in older payloads; default to 0
-    const materialIds = (geometry as any).instanceMaterialIdData as Float32Array | undefined;
-    const matIds = materialIds && materialIds.length === geometry.instanceCount ? materialIds : null;
+    // Read from interleaved buffer using stride offsets
+    const interleaved = geometry.instanceInterleavedData;
 
     const outOffsets = this.culledOffsetF32!;
     const outColorScale = this.culledColorScaleF32!;
@@ -249,14 +252,15 @@ fn vs_main(
     const nz = this.rowNorm(lightVP as Float32Array, 2);
 
     for (let i = 0; i < n; i++) {
-      const flags = materialParams ? materialParams[i * 4 + 3] ?? 0 : 0;
+      const base = i * STRIDE;
+      const flags = interleaved[base + INSTANCE_MATERIAL_PARAMS_OFFSET + 3] ?? 0;
       if (((flags | 0) & MaterialComponent.FLAG_TRANSPARENT) != 0) {
         continue;
       }
-      const ox = offsets[i * 3 + 0]!;
-      const oy = offsets[i * 3 + 1]!;
-      const oz = offsets[i * 3 + 2]!;
-      const scale = colorScale[i * 4 + 3] ?? 1.0;
+      const ox = interleaved[base + INSTANCE_OFFSET_OFFSET + 0]!;
+      const oy = interleaved[base + INSTANCE_OFFSET_OFFSET + 1]!;
+      const oz = interleaved[base + INSTANCE_OFFSET_OFFSET + 2]!;
+      const scale = interleaved[base + INSTANCE_COLOR_SCALE_OFFSET + 3] ?? 1.0;
       const radius = baseRadius * scale;
 
       // Clip-space position p = M * [o,1]
@@ -285,17 +289,17 @@ fn vs_main(
       outOffsets[o3 + 2] = oz;
 
       const c4 = outCount * 4;
-      outColorScale[c4 + 0] = colorScale[i * 4 + 0]!;
-      outColorScale[c4 + 1] = colorScale[i * 4 + 1]!;
-      outColorScale[c4 + 2] = colorScale[i * 4 + 2]!;
+      outColorScale[c4 + 0] = interleaved[base + INSTANCE_COLOR_SCALE_OFFSET + 0]!;
+      outColorScale[c4 + 1] = interleaved[base + INSTANCE_COLOR_SCALE_OFFSET + 1]!;
+      outColorScale[c4 + 2] = interleaved[base + INSTANCE_COLOR_SCALE_OFFSET + 2]!;
       outColorScale[c4 + 3] = scale;
 
-      outRotation[c4 + 0] = rotation[i * 4 + 0]!;
-      outRotation[c4 + 1] = rotation[i * 4 + 1]!;
-      outRotation[c4 + 2] = rotation[i * 4 + 2]!;
-      outRotation[c4 + 3] = rotation[i * 4 + 3]!;
+      outRotation[c4 + 0] = interleaved[base + INSTANCE_ROTATION_OFFSET + 0]!;
+      outRotation[c4 + 1] = interleaved[base + INSTANCE_ROTATION_OFFSET + 1]!;
+      outRotation[c4 + 2] = interleaved[base + INSTANCE_ROTATION_OFFSET + 2]!;
+      outRotation[c4 + 3] = interleaved[base + INSTANCE_ROTATION_OFFSET + 3]!;
 
-      outMatIds[outCount] = matIds ? matIds[i]! : 0;
+      outMatIds[outCount] = interleaved[base + INSTANCE_MATERIAL_ID_OFFSET] ?? 0;
 
       outCount++;
     }
@@ -308,10 +312,6 @@ fn vs_main(
     frameResources: {
       vertexBuffer: GPUBuffer;
       indexBuffer: GPUBuffer;
-      instanceOffsetBuffer: GPUBuffer;
-      instanceColorScaleBuffer: GPUBuffer;
-      instanceRotationBuffer: GPUBuffer;
-      instanceMaterialIdBuffer: GPUBuffer;
       textureBindGroupLayout: GPUBindGroupLayout;
       textureBindGroup: GPUBindGroup;
       uniformBuffer: GPUBuffer;

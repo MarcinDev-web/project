@@ -162,7 +162,7 @@ forge-engine/
 
 **Zależności:** `@engine/core`, `@engine/world`
 
-**Cyclic dependency z world** - dozwolone, oba pakiety się kompilują
+**Uwaga:** Historycznie istniała cykliczność z world, ale została rozwiązana przez przeniesienie `AnimationComponent` do stdlib.
 
 ### @engine/editor-utils
 **Narzędzia edytorskie** - reużywalne utilities dla edytorów (NEW - Oct 2025)
@@ -423,7 +423,7 @@ Level 4: apps (editor, player, platform, net-server, collab-server)
 - Pakiety silnika zależą od core i/lub world (Level 2)
 - Networking i gateway na Level 3
 - Aplikacje zależą od odpowiednich pakietów (Level 4)
-- Brak cyklicznych zależności (oprócz world ↔ stdlib - dozwolone)
+- Brak cyklicznych zależności
 
 ### Module Boundaries
 - Każdy pakiet ma jasno zdefiniowany export przez `index.ts`

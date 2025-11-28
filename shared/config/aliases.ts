@@ -63,6 +63,8 @@ export const engineAliases = (rootDir: string): Record<string, string> => {
 		'@engine/wasm-animation': p('wasm-animation/src'),
 		'@engine/wasm-mesh': p('wasm-mesh/src'),
 		'@engine/wasm-render-logic': p('wasm-render-logic/src'),
+		'@engine/wasm-ecs-core': p('wasm-ecs-core/src'),
+		'@engine/asset-pipeline': p('asset-pipeline/src/index.ts'),
 		'@shared': shared,
 		'@shared/types': path.resolve(shared, 'types'),
 	};

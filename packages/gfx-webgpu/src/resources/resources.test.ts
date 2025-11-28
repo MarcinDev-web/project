@@ -49,17 +49,33 @@ const combineVertices = (verts: Uint8Array[]): Uint8Array => {
   return buffer;
 };
 
+// Interleaved instance data: [offset(3), colorScale(4), secondaryColor(4), emissiveColor(4), materialParams(4), rotation(4), materialId(1)]
+const makeInterleavedData = (): Float32Array => {
+  const data = new Float32Array(24); // 24 floats per instance
+  // offset [0-2]: 0, 0, 0
+  data[0] = 0; data[1] = 0; data[2] = 0;
+  // colorScale [3-6]: 1, 1, 1, 1
+  data[3] = 1; data[4] = 1; data[5] = 1; data[6] = 1;
+  // secondaryColor [7-10]: 1, 1, 1, 1
+  data[7] = 1; data[8] = 1; data[9] = 1; data[10] = 1;
+  // emissiveColor [11-14]: 0, 0, 0, 0
+  data[11] = 0; data[12] = 0; data[13] = 0; data[14] = 0;
+  // materialParams [15-18]: 1, 0, 1, 0 (alpha, metallic, roughness, flags)
+  data[15] = 1; data[16] = 0; data[17] = 1; data[18] = 0;
+  // rotation [19-22]: identity quaternion (0, 0, 0, 1)
+  data[19] = 0; data[20] = 0; data[21] = 0; data[22] = 1;
+  // materialId [23]: 0
+  data[23] = 0;
+  return data;
+};
+
 const baseGeometry: GeometryData = {
   vertices: combineVertices([makeVertex([0, 0, 0]), makeVertex([1, 0, 0]), makeVertex([0, 1, 0])]),
   indices: new Uint16Array([0, 1, 2]),
   instanceCount: 1,
   opaqueCount: 1,
-  instanceOffsetData: new Float32Array([0, 0, 0]),
-  instanceColorScaleData: new Float32Array([1, 1, 1, 1]),
-  instanceSecondaryColorData: new Float32Array([1, 1, 1, 1]),
-  instanceEmissiveColorData: new Float32Array([0, 0, 0, 0]),
-  instanceMaterialParamsData: new Float32Array([1, 0, 1, 0]),
-  instanceRotationData: new Float32Array([0, 0, 0, 1]),
+  instanceInterleavedData: makeInterleavedData(),
+  instanceBoundsData: new Float32Array([0, 0, 0, 1]),
 };
 
 const cloneGeometry = (overrides: Partial<GeometryData>): GeometryData => ({
@@ -67,21 +83,10 @@ const cloneGeometry = (overrides: Partial<GeometryData>): GeometryData => ({
   indices: overrides.indices ?? new Uint16Array(baseGeometry.indices),
   instanceCount: overrides.instanceCount ?? baseGeometry.instanceCount,
   opaqueCount: overrides.opaqueCount ?? baseGeometry.opaqueCount,
-  instanceOffsetData:
-    overrides.instanceOffsetData ?? new Float32Array(baseGeometry.instanceOffsetData),
-  instanceColorScaleData:
-    overrides.instanceColorScaleData ?? new Float32Array(baseGeometry.instanceColorScaleData),
-  instanceSecondaryColorData:
-    overrides.instanceSecondaryColorData ??
-    new Float32Array(baseGeometry.instanceSecondaryColorData),
-  instanceEmissiveColorData:
-    overrides.instanceEmissiveColorData ??
-    new Float32Array(baseGeometry.instanceEmissiveColorData),
-  instanceMaterialParamsData:
-    overrides.instanceMaterialParamsData ??
-    new Float32Array(baseGeometry.instanceMaterialParamsData),
-  instanceRotationData:
-    overrides.instanceRotationData ?? new Float32Array(baseGeometry.instanceRotationData),
+  instanceInterleavedData:
+    overrides.instanceInterleavedData ?? new Float32Array(baseGeometry.instanceInterleavedData),
+  instanceBoundsData:
+    overrides.instanceBoundsData ?? new Float32Array(baseGeometry.instanceBoundsData),
 });
 
 describe('validateGeometryData', () => {

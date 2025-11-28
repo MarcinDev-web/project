@@ -12,6 +12,8 @@ export * from './job';
 export * from './utils';
 export * from './script';
 export * from './memory';
+export * from './result';
+export * from './plugin';
 
 // Explicit re-exports for better bundler compatibility
 export {

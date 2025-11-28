@@ -519,6 +519,46 @@ fn axis_overlap(t_proj: f32, ra_proj: f32, rb_proj: f32) -> bool {
     t_proj.abs() <= ra_proj + rb_proj + EPSILON
 }
 
+/// Contact information from collision detection.
+/// Used for physics resolution (penetration depth, normal, contact point).
+#[wasm_bindgen]
+#[derive(Clone, Copy, Debug)]
+pub struct CollisionContact {
+    pub has_collision: bool,
+    pub depth: f32,
+    pub normal_x: f32,
+    pub normal_y: f32,
+    pub normal_z: f32,
+    pub point_x: f32,
+    pub point_y: f32,
+    pub point_z: f32,
+}
+
+#[wasm_bindgen]
+impl CollisionContact {
+    #[wasm_bindgen(constructor)]
+    pub fn new() -> CollisionContact {
+        CollisionContact {
+            has_collision: false,
+            depth: 0.0,
+            normal_x: 0.0,
+            normal_y: 0.0,
+            normal_z: 0.0,
+            point_x: 0.0,
+            point_y: 0.0,
+            point_z: 0.0,
+        }
+    }
+    
+    pub fn get_normal(&self) -> Vec<f32> {
+        vec![self.normal_x, self.normal_y, self.normal_z]
+    }
+    
+    pub fn get_point(&self) -> Vec<f32> {
+        vec![self.point_x, self.point_y, self.point_z]
+    }
+}
+
 #[inline]
 fn obb_intersect_impl(a: Obb, b: Obb) -> bool {
     let au = a.axes[0];
@@ -623,6 +663,151 @@ fn obb_intersect_impl(a: Obb, b: Obb) -> bool {
     }
 
     true
+}
+
+/// OBB-OBB collision with contact information (penetration depth, normal, contact point).
+/// Returns collision info with the minimum penetration axis.
+#[inline]
+fn obb_intersect_with_contact_impl(a: Obb, b: Obb) -> CollisionContact {
+    let au = a.axes[0];
+    let av = a.axes[1];
+    let aw = a.axes[2];
+    let bu = b.axes[0];
+    let bv = b.axes[1];
+    let bw = b.axes[2];
+
+    // R[i][j] = Ai · Bj
+    let r00 = dot(au, bu);
+    let r01 = dot(au, bv);
+    let r02 = dot(au, bw);
+    let r10 = dot(av, bu);
+    let r11 = dot(av, bv);
+    let r12 = dot(av, bw);
+    let r20 = dot(aw, bu);
+    let r21 = dot(aw, bv);
+    let r22 = dot(aw, bw);
+
+    // |R| + epsilon
+    let a00 = r00.abs() + EPSILON;
+    let a01 = r01.abs() + EPSILON;
+    let a02 = r02.abs() + EPSILON;
+    let a10 = r10.abs() + EPSILON;
+    let a11 = r11.abs() + EPSILON;
+    let a12 = r12.abs() + EPSILON;
+    let a20 = r20.abs() + EPSILON;
+    let a21 = r21.abs() + EPSILON;
+    let a22 = r22.abs() + EPSILON;
+
+    // t in A's frame
+    let t_world = sub(b.center, a.center);
+    let t0 = dot(t_world, au);
+    let t1 = dot(t_world, av);
+    let t2 = dot(t_world, aw);
+
+    let ra0 = a.half[0];
+    let ra1 = a.half[1];
+    let ra2 = a.half[2];
+    let rb0 = b.half[0];
+    let rb1 = b.half[1];
+    let rb2 = b.half[2];
+
+    // Track minimum penetration
+    let mut min_pen = f32::INFINITY;
+    let mut best_axis: [f32; 3] = [0.0, 0.0, 0.0];
+    let mut pen_sign = 1.0f32;
+
+    // Helper to check axis and track minimum
+    let mut check_axis = |t_proj: f32, ra_proj: f32, rb_proj: f32, axis: [f32; 3]| -> bool {
+        let overlap = ra_proj + rb_proj - t_proj.abs();
+        if overlap < -EPSILON {
+            return false;
+        }
+        if overlap < min_pen {
+            min_pen = overlap;
+            best_axis = axis;
+            pen_sign = if t_proj < 0.0 { -1.0 } else { 1.0 };
+        }
+        true
+    };
+
+    // 1) A's axes
+    if !check_axis(t0, ra0, rb0 * a00 + rb1 * a01 + rb2 * a02, au) {
+        return CollisionContact::new();
+    }
+    if !check_axis(t1, ra1, rb0 * a10 + rb1 * a11 + rb2 * a12, av) {
+        return CollisionContact::new();
+    }
+    if !check_axis(t2, ra2, rb0 * a20 + rb1 * a21 + rb2 * a22, aw) {
+        return CollisionContact::new();
+    }
+
+    // helper: dot(t, column j of R)
+    let t_r0 = t0 * r00 + t1 * r10 + t2 * r20;
+    let t_r1 = t0 * r01 + t1 * r11 + t2 * r21;
+    let t_r2 = t0 * r02 + t1 * r12 + t2 * r22;
+
+    // 2) B's axes
+    if !check_axis(t_r0, ra0 * a00 + ra1 * a10 + ra2 * a20, rb0, bu) {
+        return CollisionContact::new();
+    }
+    if !check_axis(t_r1, ra0 * a01 + ra1 * a11 + ra2 * a21, rb1, bv) {
+        return CollisionContact::new();
+    }
+    if !check_axis(t_r2, ra0 * a02 + ra1 * a12 + ra2 * a22, rb2, bw) {
+        return CollisionContact::new();
+    }
+
+    // 3) Cross products (edge-edge cases) - simplified: just check overlap, don't track as min penetration axis
+    // These are less stable for contact normal, so we prefer face normals when close
+    if !axis_overlap(t2 * r10 - t1 * r20, ra1 * a20 + ra2 * a10, rb1 * a02 + rb2 * a01) {
+        return CollisionContact::new();
+    }
+    if !axis_overlap(t2 * r11 - t1 * r21, ra1 * a21 + ra2 * a11, rb0 * a02 + rb2 * a00) {
+        return CollisionContact::new();
+    }
+    if !axis_overlap(t2 * r12 - t1 * r22, ra1 * a22 + ra2 * a12, rb0 * a01 + rb1 * a00) {
+        return CollisionContact::new();
+    }
+    if !axis_overlap(t0 * r20 - t2 * r00, ra0 * a20 + ra2 * a00, rb1 * a12 + rb2 * a11) {
+        return CollisionContact::new();
+    }
+    if !axis_overlap(t0 * r21 - t2 * r01, ra0 * a21 + ra2 * a01, rb0 * a12 + rb2 * a10) {
+        return CollisionContact::new();
+    }
+    if !axis_overlap(t0 * r22 - t2 * r02, ra0 * a22 + ra2 * a02, rb0 * a11 + rb1 * a10) {
+        return CollisionContact::new();
+    }
+    if !axis_overlap(t1 * r00 - t0 * r10, ra0 * a10 + ra1 * a00, rb1 * a22 + rb2 * a21) {
+        return CollisionContact::new();
+    }
+    if !axis_overlap(t1 * r01 - t0 * r11, ra0 * a11 + ra1 * a01, rb0 * a22 + rb2 * a20) {
+        return CollisionContact::new();
+    }
+    if !axis_overlap(t1 * r02 - t0 * r12, ra0 * a12 + ra1 * a02, rb0 * a21 + rb1 * a20) {
+        return CollisionContact::new();
+    }
+
+    // Collision confirmed - compute normal (pointing from A to B)
+    let normal = scale(best_axis, pen_sign);
+    
+    // Contact point: midpoint between closest points on the surfaces
+    // Simplified: use center between boxes offset by penetration
+    let contact_pt = [
+        (a.center[0] + b.center[0]) * 0.5,
+        (a.center[1] + b.center[1]) * 0.5,
+        (a.center[2] + b.center[2]) * 0.5,
+    ];
+
+    CollisionContact {
+        has_collision: true,
+        depth: min_pen.max(0.0),
+        normal_x: normal[0],
+        normal_y: normal[1],
+        normal_z: normal[2],
+        point_x: contact_pt[0],
+        point_y: contact_pt[1],
+        point_z: contact_pt[2],
+    }
 }
 
 // New Primitives
@@ -894,6 +1079,67 @@ fn ray_obb_intersect_impl(ray: Ray, obb: Obb) -> f32 {
     if t_min > 0.0 { t_min } else { t_max }
 }
 
+/// Ray-capsule intersection.
+/// Returns the distance to intersection or -1.0 if no hit.
+/// The capsule is defined by two endpoints (base and tip) and a radius.
+#[inline]
+fn ray_capsule_intersect_impl(ray: Ray, capsule: Capsule) -> f32 {
+    let ba = sub(capsule.tip, capsule.base);
+    let oa = sub(ray.origin, capsule.base);
+    
+    let baba = dot(ba, ba);
+    let bard = dot(ba, ray.dir);
+    let baoa = dot(ba, oa);
+    let rdoa = dot(ray.dir, oa);
+    let oaoa = dot(oa, oa);
+    
+    let a = baba - bard * bard;
+    let b = baba * rdoa - baoa * bard;
+    let c = baba * oaoa - baoa * baoa - capsule.radius * capsule.radius * baba;
+    
+    let h = b * b - a * c;
+    
+    if h >= 0.0 {
+        let t = (-b - h.sqrt()) / a;
+        let y = baoa + t * bard;
+        
+        // Check if hit is on the cylindrical body
+        if y > 0.0 && y < baba && t >= 0.0 {
+            return t;
+        }
+        
+        // Check caps (spheres at each end)
+        // Base cap
+        let sphere_base = Sphere { center: capsule.base, radius: capsule.radius };
+        let t_base = ray_sphere_intersect_impl(ray, sphere_base);
+        
+        // Tip cap
+        let sphere_tip = Sphere { center: capsule.tip, radius: capsule.radius };
+        let t_tip = ray_sphere_intersect_impl(ray, sphere_tip);
+        
+        // Return closest valid hit
+        match (t_base >= 0.0, t_tip >= 0.0) {
+            (true, true) => t_base.min(t_tip),
+            (true, false) => t_base,
+            (false, true) => t_tip,
+            (false, false) => -1.0,
+        }
+    } else {
+        // Check caps only (ray parallel to cylinder axis or misses cylinder)
+        let sphere_base = Sphere { center: capsule.base, radius: capsule.radius };
+        let t_base = ray_sphere_intersect_impl(ray, sphere_base);
+        
+        let sphere_tip = Sphere { center: capsule.tip, radius: capsule.radius };
+        let t_tip = ray_sphere_intersect_impl(ray, sphere_tip);
+        
+        match (t_base >= 0.0, t_tip >= 0.0) {
+            (true, true) => t_base.min(t_tip),
+            (true, false) => t_base,
+            (false, true) => t_tip,
+            (false, false) => -1.0,
+        }
+    }
+}
 
 #[inline]
 fn quat_to_axes(q: [f32; 4]) -> [[f32; 3]; 3] {
@@ -999,6 +1245,42 @@ impl CollisionWorld {
         self.maxs.resize(count, [0.0; 3]);
         self.spatial_indices.resize(count * 27, SpatialEntry { cell_key: 0, index: 0 }); 
         self.spatial_indices.clear(); 
+    }
+
+    /// Clears all data and releases memory by shrinking internal vectors.
+    /// Use this when the collision world is no longer needed or to reset state.
+    pub fn clear(&mut self) {
+        self.positions.clear();
+        self.positions.shrink_to_fit();
+        self.rotations.clear();
+        self.rotations.shrink_to_fit();
+        self.scales.clear();
+        self.scales.shrink_to_fit();
+        
+        self.centers.clear();
+        self.centers.shrink_to_fit();
+        self.axes.clear();
+        self.axes.shrink_to_fit();
+        self.halves.clear();
+        self.halves.shrink_to_fit();
+        self.mins.clear();
+        self.mins.shrink_to_fit();
+        self.maxs.clear();
+        self.maxs.shrink_to_fit();
+        
+        self.spatial_indices.clear();
+        self.spatial_indices.shrink_to_fit();
+        self.results.clear();
+        self.results.shrink_to_fit();
+        self.workspace_pairs.clear();
+        self.workspace_pairs.shrink_to_fit();
+        
+        self.grid_min = [0.0; 3];
+        self.grid_cell_size = 1.0;
+        
+        if let Some(buffer) = &mut self.occlusion_buffer {
+            buffer.clear();
+        }
     }
 
     pub fn get_positions_ptr(&self) -> *const f32 {
@@ -1405,6 +1687,25 @@ pub fn obb_intersect(
     obb_intersect_impl(a, b)
 }
 
+/// OBB-OBB collision with contact information for physics resolution.
+/// Returns a CollisionContact struct with penetration depth, normal, and contact point.
+#[wasm_bindgen]
+pub fn obb_intersect_with_contact(
+    a_center: &[f32],
+    a_axes: &[f32],
+    a_half: &[f32],
+    b_center: &[f32],
+    b_axes: &[f32],
+    b_half: &[f32],
+) -> CollisionContact {
+    if a_center.len() != 3 || b_center.len() != 3 || a_axes.len() != 9 || b_axes.len() != 9 || a_half.len() != 3 || b_half.len() != 3 {
+        return CollisionContact::new();
+    }
+    let a = obb_from_slices(a_center, a_axes, a_half);
+    let b = obb_from_slices(b_center, b_axes, b_half);
+    obb_intersect_with_contact_impl(a, b)
+}
+
 #[wasm_bindgen]
 pub fn sphere_sphere_intersect(
     a_center: &[f32],
@@ -1507,6 +1808,26 @@ pub fn ray_obb_intersect(
     ray_obb_intersect_impl(
         Ray { origin: load_center(ray_origin), dir: load_center(ray_dir) },
         obb_from_slices(b_center, b_axes, b_half)
+    )
+}
+
+/// Ray-capsule intersection test.
+/// Returns distance to intersection or -1.0 if no hit.
+/// @param c_base - Capsule base point [x, y, z]
+/// @param c_tip - Capsule tip point [x, y, z]
+/// @param c_radius - Capsule radius
+#[wasm_bindgen]
+pub fn ray_capsule_intersect(
+    ray_origin: &[f32],
+    ray_dir: &[f32],
+    c_base: &[f32],
+    c_tip: &[f32],
+    c_radius: f32,
+) -> f32 {
+    if ray_origin.len() != 3 || ray_dir.len() != 3 || c_base.len() != 3 || c_tip.len() != 3 { return -1.0; }
+    ray_capsule_intersect_impl(
+        Ray { origin: load_center(ray_origin), dir: load_center(ray_dir) },
+        Capsule { base: load_center(c_base), tip: load_center(c_tip), radius: c_radius }
     )
 }
 

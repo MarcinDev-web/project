@@ -1,6 +1,9 @@
-// Particle Simulation Compute Shader
+// Particle Simulation Compute Shader - SoA Layout
+// Optimized for memory coalescing: adjacent threads access contiguous memory
 
-// NOTE: Prepend math.wgsl and particle_structs.wgsl here in build pipeline
+// ============================================================================
+// Simulation Parameters
+// ============================================================================
 
 struct SimulationParams {
     deltaTime: f32,
@@ -8,13 +11,20 @@ struct SimulationParams {
     seed: f32,
     emitCount: u32,
     maxParticles: u32,
+    _pad0: u32,
+    _pad1: u32,
+    _pad2: u32,
 };
 
 struct Emitter {
     position: vec3<f32>,
+    _pad0: f32,
     range: vec3<f32>,
+    _pad1: f32,
     velocityMin: vec3<f32>,
+    _pad2: f32,
     velocityMax: vec3<f32>,
+    _pad3: f32,
     colorStart: vec4<f32>,
     colorEnd: vec4<f32>,
     sizeMin: f32,
@@ -25,20 +35,52 @@ struct Emitter {
     drag: f32,
 };
 
+// ============================================================================
+// SoA Particle Data Bindings
+// Each binding is a contiguous array of one attribute type
+// This maximizes GPU cache efficiency when all threads access same attribute
+// ============================================================================
+
 @group(0) @binding(0) var<uniform> params : SimulationParams;
 @group(0) @binding(1) var<uniform> emitter : Emitter;
-@group(0) @binding(2) var<storage, read_write> particles : array<Particle>;
-@group(0) @binding(3) var<storage, read_write> deadList : array<u32>; // Stack of dead particle indices
-@group(0) @binding(4) var<storage, read_write> counter : atomic<u32>; // Dead list counter (number of dead particles)
 
-// Helper pseudo-random
+// SoA buffers - each thread in a warp accesses adjacent memory locations
+@group(0) @binding(2) var<storage, read_write> positions : array<vec4<f32>>;      // xyz=position, w=unused
+@group(0) @binding(3) var<storage, read_write> velocities : array<vec4<f32>>;     // xyz=velocity, w=life
+@group(0) @binding(4) var<storage, read_write> colors : array<vec4<f32>>;         // rgba color
+@group(0) @binding(5) var<storage, read_write> sizeRotation : array<vec4<f32>>;   // x=size, y=rotation, z=angularVel, w=flags
+
+// Dead particle stack
+@group(0) @binding(6) var<storage, read_write> deadList : array<u32>;
+@group(0) @binding(7) var<storage, read_write> counter : atomic<u32>;
+
+// ============================================================================
+// Pseudo-random number generation
+// ============================================================================
+
 fn rand(seed: f32) -> f32 {
-    return fract(sin(seed) * 43758.5453);
+    return fract(sin(seed * 12.9898) * 43758.5453);
 }
 
 fn rand3(seed: vec3<f32>) -> f32 {
     return fract(sin(dot(seed, vec3<f32>(12.9898, 78.233, 45.5432))) * 43758.5453);
 }
+
+// PCG hash for better distribution
+fn pcg(v: u32) -> u32 {
+    var state = v * 747796405u + 2891336453u;
+    let word = ((state >> ((state >> 28u) + 4u)) ^ state) * 277803737u;
+    return (word >> 22u) ^ word;
+}
+
+fn pcgFloat(seed: u32) -> f32 {
+    return f32(pcg(seed)) / 4294967295.0;
+}
+
+// ============================================================================
+// Main Simulation Kernel
+// Optimized memory access: all threads read/write same attribute in sequence
+// ============================================================================
 
 @compute @workgroup_size(64)
 fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
@@ -47,42 +89,76 @@ fn main(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
         return;
     }
 
-    var particle = particles[index];
+    // Read life first - most common early-out condition
+    // All 64 threads read adjacent f32 values (velocities[idx].w)
+    let velocityData = velocities[index];
+    var life = velocityData.w;
 
-    // 1. Update existing particles
-    if (particle.life > 0.0) {
-        particle.life -= params.deltaTime;
-        
-        if (particle.life <= 0.0) {
-            // Particle died
-            particle.life = -1.0;
-            // Add to dead list
-            let deadIndex = atomicAdd(&counter, 1u);
-            deadList[deadIndex] = index;
-        } else {
-            // Physics update
-            particle.velocity += emitter.gravity * params.deltaTime;
-            particle.velocity *= (1.0 - emitter.drag * params.deltaTime);
-            particle.position += particle.velocity * params.deltaTime;
-            
-            particle.rotation += particle.angularVelocity * params.deltaTime;
-            
-            // Color/Size interpolation could happen here or in vertex shader
-            // Let's do simple alpha fade here
-            particle.color.a = saturate(particle.life); 
-        }
-        
-        particles[index] = particle;
+    if (life <= 0.0) {
+        return; // Dead particle, skip entirely
     }
+
+    // Decrement life
+    life -= params.deltaTime;
+
+    if (life <= 0.0) {
+        // Particle just died - mark as dead and add to dead list
+        velocities[index] = vec4<f32>(velocityData.xyz, -1.0);
+        let deadIndex = atomicAdd(&counter, 1u);
+        deadList[deadIndex] = index;
+        return;
+    }
+
+    // ========================================
+    // Physics update - coalesced reads
+    // ========================================
+    
+    // Read position (all threads read adjacent vec4s)
+    var pos = positions[index].xyz;
+    
+    // Velocity already read above, extract xyz
+    var vel = velocityData.xyz;
+    
+    // Apply gravity and drag
+    vel += emitter.gravity * params.deltaTime;
+    vel *= (1.0 - emitter.drag * params.deltaTime);
+    
+    // Integrate position
+    pos += vel * params.deltaTime;
+
+    // ========================================
+    // Rotation update
+    // ========================================
+    
+    let sizeRotData = sizeRotation[index];
+    let size = sizeRotData.x;
+    var rotation = sizeRotData.y;
+    let angularVel = sizeRotData.z;
+    let flags = sizeRotData.w;
+    
+    rotation += angularVel * params.deltaTime;
+
+    // ========================================
+    // Color fade based on life
+    // ========================================
+    
+    var color = colors[index];
+    color.a = saturate(life / emitter.lifeMax); // Fade alpha over lifetime
+
+    // ========================================
+    // Coalesced writes - all threads write same attribute type
+    // ========================================
+    
+    positions[index] = vec4<f32>(pos, 0.0);
+    velocities[index] = vec4<f32>(vel, life);
+    colors[index] = color;
+    sizeRotation[index] = vec4<f32>(size, rotation, angularVel, flags);
 }
 
-// Separate kernel for emission? 
-// Usually emission is done by consuming the dead list.
-// For simplicity in this "Expansion", let's handle emission in a separate pass or dispatched thread 
-// that specifically wakes up dead particles.
-// Or, we can just have a single "Simulate" pass and if we need to emit, we grab from dead list.
+// ============================================================================
+// Emission Kernel - Spawns new particles from dead list
+// ============================================================================
 
-// Let's add an Emit kernel.
 @compute @workgroup_size(64)
 fn emit(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
     let emitIndex = GlobalInvocationID.x;
@@ -90,48 +166,97 @@ fn emit(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
         return;
     }
 
-    // Try to pop from dead list
-    // Note: This is a simplistic atomic approach. Robust systems use indirect buffers.
+    // Atomic pop from dead list
     let deadCount = atomicLoad(&counter);
-    if (deadCount > 0u) {
-        let originalVal = atomicSub(&counter, 1u);
-        // Check if we successfully reserved a slot
-        if (originalVal > 0u) {
-            let particleIndex = deadList[originalVal - 1u];
-            
-            // Initialize new particle
-            var p = particles[particleIndex];
-            let seed = params.time + f32(emitIndex) * 1.234;
-            
-            let r1 = rand(seed);
-            let r2 = rand(seed + 1.0);
-            let r3 = rand(seed + 2.0);
-            
-            // Random position in emitter range
-            let offset = (vec3<f32>(r1, r2, r3) - 0.5) * 2.0 * emitter.range;
-            p.position = emitter.position + offset;
-            
-            // Random velocity
-            let rv = vec3<f32>(rand(seed + 3.0), rand(seed + 4.0), rand(seed + 5.0));
-            p.velocity = mix(emitter.velocityMin, emitter.velocityMax, rv);
-            
-            p.life = mix(emitter.lifeMin, emitter.lifeMax, rand(seed + 6.0));
-            p.size = mix(emitter.sizeMin, emitter.sizeMax, rand(seed + 7.0));
-            p.color = emitter.colorStart; // Could mix start/end
-            p.rotation = rand(seed + 8.0) * 6.28;
-            p.angularVelocity = (rand(seed + 9.0) - 0.5) * 2.0;
-            
-            particles[particleIndex] = p;
-        } else {
-            // Restore counter if we went negative (though u32 wraps, so check logic carefully)
-            // With atomicSub on u32 0, it wraps to MAX.
-            // This logic is slightly flawed for wrapping u32. 
-            // Better to atomicCompareExchange or just check load first (racey but acceptable for particles)
-            // Correct atomic stack pop:
-            // 1. atomicSub returns OLD value. If old > 0, we claimed slot (old-1).
-            // But we need to ensure we don't decrement below 0.
-            // For particles, "losing" an emission is fine.
-        }
+    if (deadCount == 0u) {
+        return;
     }
+
+    // Try to claim a dead particle slot
+    let claimed = atomicSub(&counter, 1u);
+    if (claimed == 0u) {
+        // Race condition - restore and exit
+        atomicAdd(&counter, 1u);
+        return;
+    }
+
+    let particleIndex = deadList[claimed - 1u];
+
+    // ========================================
+    // Initialize new particle with random values
+    // ========================================
+    
+    // Generate seeds for randomization
+    let baseSeed = pcg(emitIndex + u32(params.time * 1000.0) + u32(params.seed * 12345.0));
+    
+    let r1 = pcgFloat(baseSeed);
+    let r2 = pcgFloat(baseSeed + 1u);
+    let r3 = pcgFloat(baseSeed + 2u);
+    let r4 = pcgFloat(baseSeed + 3u);
+    let r5 = pcgFloat(baseSeed + 4u);
+    let r6 = pcgFloat(baseSeed + 5u);
+    let r7 = pcgFloat(baseSeed + 6u);
+    let r8 = pcgFloat(baseSeed + 7u);
+    let r9 = pcgFloat(baseSeed + 8u);
+    let r10 = pcgFloat(baseSeed + 9u);
+
+    // Random position within emitter range
+    let offset = (vec3<f32>(r1, r2, r3) - 0.5) * 2.0 * emitter.range;
+    let pos = emitter.position + offset;
+
+    // Random velocity
+    let vel = mix(emitter.velocityMin, emitter.velocityMax, vec3<f32>(r4, r5, r6));
+
+    // Random lifetime
+    let life = mix(emitter.lifeMin, emitter.lifeMax, r7);
+
+    // Random size
+    let size = mix(emitter.sizeMin, emitter.sizeMax, r8);
+
+    // Initial color (start color)
+    let color = emitter.colorStart;
+
+    // Random rotation and angular velocity
+    let rotation = r9 * 6.28318530718; // 0 to 2π
+    let angularVel = (r10 - 0.5) * 4.0; // -2 to +2 radians/sec
+
+    // ========================================
+    // Write all attributes (coalesced within workgroup)
+    // ========================================
+    
+    positions[particleIndex] = vec4<f32>(pos, 0.0);
+    velocities[particleIndex] = vec4<f32>(vel, life);
+    colors[particleIndex] = color;
+    sizeRotation[particleIndex] = vec4<f32>(size, rotation, angularVel, 0.0);
+}
+
+// ============================================================================
+// Reset Kernel - Initialize all particles as dead
+// ============================================================================
+
+@compute @workgroup_size(64)
+fn reset(@builtin(global_invocation_id) GlobalInvocationID : vec3<u32>) {
+    let index = GlobalInvocationID.x;
+    if (index >= params.maxParticles) {
+        return;
+    }
+
+    // Mark as dead (negative life)
+    velocities[index] = vec4<f32>(0.0, 0.0, 0.0, -1.0);
+    positions[index] = vec4<f32>(0.0);
+    colors[index] = vec4<f32>(0.0);
+    sizeRotation[index] = vec4<f32>(0.0);
+
+    // Add to dead list
+    deadList[index] = index;
+}
+
+// ============================================================================
+// Initialize dead list counter
+// ============================================================================
+
+@compute @workgroup_size(1)
+fn initCounter() {
+    atomicStore(&counter, params.maxParticles);
 }
 

@@ -10,6 +10,18 @@ import { Logger } from '@engine/core/utils';
 
 export type FeatureTier = 0 | 1 | 2;
 
+/**
+ * Subgroup feature detection result
+ */
+export interface SubgroupProbeResult {
+  supported: boolean;
+  minSubgroupSize?: number;
+  maxSubgroupSize?: number;
+  arithmetic?: boolean;
+  ballot?: boolean;
+  shuffle?: boolean;
+}
+
 export interface AdapterProbeResult {
   adapter: GPUAdapter;
   tier: FeatureTier;
@@ -18,6 +30,8 @@ export interface AdapterProbeResult {
   textureCompression: 'bc' | 'etc2' | 'astc' | 'none';
   timestampQuery: boolean;
   shaderF16: boolean;
+  /** Subgroup (wave) operation capabilities */
+  subgroup: SubgroupProbeResult;
   adapterInfo?: {
     vendor?: string;
     architecture?: string;
@@ -53,6 +67,42 @@ export async function probeAdapterCapabilities(adapter: GPUAdapter): Promise<Ada
   const hasShaderF16 = features.has('shader-f16');
   const hasDepth24Stencil8 = features.has('depth24unorm-stencil8');
   const hasIndirectFirstInstance = features.has('indirect-first-instance');
+
+  // Check subgroup (wave) operation support
+  // WebGPU subgroup features: 'subgroups', 'subgroups-f16'
+  // Note: As of 2024-2025, subgroup support is experimental in WebGPU
+  const hasSubgroups = features.has('subgroups');
+  const hasSubgroupsF16 = features.has('subgroups-f16');
+  
+  // Probe subgroup limits if available
+  let minSubgroupSize: number | undefined;
+  let maxSubgroupSize: number | undefined;
+  try {
+    // These limits are part of the WebGPU subgroups extension
+    const limitsAny = limits as unknown as Record<string, number>;
+    if (typeof limitsAny.minSubgroupSize === 'number') {
+      minSubgroupSize = limitsAny.minSubgroupSize;
+    }
+    if (typeof limitsAny.maxSubgroupSize === 'number') {
+      maxSubgroupSize = limitsAny.maxSubgroupSize;
+    }
+  } catch {
+    // Subgroup limits not available
+  }
+
+  const subgroup: SubgroupProbeResult = {
+    supported: hasSubgroups,
+    minSubgroupSize,
+    maxSubgroupSize,
+    // When subgroups feature is enabled, all basic operations are available
+    arithmetic: hasSubgroups,
+    ballot: hasSubgroups,
+    shuffle: hasSubgroups,
+  };
+
+  if (hasSubgroups) {
+    Logger.info(`[AdapterProbing] Subgroup operations supported: size ${minSubgroupSize ?? '?'}-${maxSubgroupSize ?? '?'}, f16=${hasSubgroupsF16}`);
+  }
 
   // Determine Tier
   let tier: FeatureTier = 0;
@@ -98,6 +148,7 @@ export async function probeAdapterCapabilities(adapter: GPUAdapter): Promise<Ada
     textureCompression,
     timestampQuery: hasTimestampQuery,
     shaderF16: hasShaderF16,
+    subgroup,
     adapterInfo,
     adapterName,
   };
@@ -208,6 +259,14 @@ export function probeResultToCapabilities(probe: AdapterProbeResult): RendererCa
         etc2: probe.textureCompression === 'etc2',
         astc: probe.textureCompression === 'astc',
       },
+      subgroup: {
+        supported: probe.subgroup.supported,
+        minSubgroupSize: probe.subgroup.minSubgroupSize,
+        maxSubgroupSize: probe.subgroup.maxSubgroupSize,
+        arithmetic: probe.subgroup.arithmetic,
+        ballot: probe.subgroup.ballot,
+        shuffle: probe.subgroup.shuffle,
+      },
     },
     limits: {
       maxTextureDimension2D: probe.limits.maxTextureDimension2D,
@@ -218,6 +277,8 @@ export function probeResultToCapabilities(probe: AdapterProbeResult): RendererCa
       maxComputeWorkgroupSizeX: probe.limits.maxComputeWorkgroupSizeX,
       maxComputeWorkgroupSizeY: probe.limits.maxComputeWorkgroupSizeY,
       maxComputeWorkgroupSizeZ: probe.limits.maxComputeWorkgroupSizeZ,
+      minSubgroupSize: probe.subgroup.minSubgroupSize,
+      maxSubgroupSize: probe.subgroup.maxSubgroupSize,
     },
   };
 }

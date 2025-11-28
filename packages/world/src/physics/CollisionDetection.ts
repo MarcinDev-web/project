@@ -11,7 +11,7 @@ import type {
   CapsuleCollider,
   ContactPoint,
 } from '../components/PhysicsComponent.js';
-import { normalizeVec3Out, quatToMatrix3 } from '@engine/core/math';
+import { normalizeVec3Out, quatToMatrix3, quatToMatrix3Out } from '@engine/core/math';
 import type { WasmCollision, TrsArray } from '@engine/wasm-collision';
 
 /**
@@ -274,13 +274,8 @@ export class CollisionDetection {
   private static fillBoxBuffers(boxA: BoxCollider, tA: ColliderTransform, boxB: BoxCollider, tB: ColliderTransform) {
     // Fill OBB A
     this.scratchObbA.center.set(this.scratchVecA);
-    // We need rotation matrix for axes
-    const matA = quatToMatrix3(tA.rotation);
-    this.scratchObbA.axes.set(matA); // This allocates new array in `quatToMatrix3`. 
-    // Optimization: `quatToMatrix3` returns `[number,...]`. We need to write to `Float32Array`.
-    // Ideally `quatToMatrix3` should support writing to output array.
-    // Looking at `core/math`: `quatToMatrix3(q)` returns `Vec3` (actually array of 9 numbers).
-    // We can manually convert or assume cost is acceptable for now.
+    // Use allocation-free quatToMatrix3Out to write directly to scratch buffer
+    quatToMatrix3Out(this.scratchObbA.axes, tA.rotation);
     
     // half sizes
     this.scratchObbA.half[0] = boxA.size[0] * tA.scale[0] * 0.5;
@@ -289,8 +284,7 @@ export class CollisionDetection {
 
     // Fill OBB B
     this.scratchObbB.center.set(this.scratchVecB);
-    const matB = quatToMatrix3(tB.rotation);
-    this.scratchObbB.axes.set(matB);
+    quatToMatrix3Out(this.scratchObbB.axes, tB.rotation);
     this.scratchObbB.half[0] = boxB.size[0] * tB.scale[0] * 0.5;
     this.scratchObbB.half[1] = boxB.size[1] * tB.scale[1] * 0.5;
     this.scratchObbB.half[2] = boxB.size[2] * tB.scale[2] * 0.5;
@@ -892,7 +886,8 @@ export class CollisionDetection {
   }
 
   /**
-   * OBB intersection test using SAT
+   * OBB intersection test using SAT with full 15 axes.
+   * Tests 3 face normals from A, 3 face normals from B, and 9 edge cross-products.
    */
   private static obbIntersect(a: OBB, b: OBB): { hasCollision: boolean; depth: number } {
     const EPS = this.EPSILON;
@@ -924,45 +919,115 @@ export class CollisionDetection {
 
     let minPenetration = Infinity;
 
-    // Test 15 separating axes
-    const tests = [
-      // A's axes
-      {
-        proj: Math.abs(t[0]),
-        sum: ra[0] + rb[0] * AbsR[0][0] + rb[1] * AbsR[0][1] + rb[2] * AbsR[0][2],
-      },
-      {
-        proj: Math.abs(t[1]),
-        sum: ra[1] + rb[0] * AbsR[1][0] + rb[1] * AbsR[1][1] + rb[2] * AbsR[1][2],
-      },
-      {
-        proj: Math.abs(t[2]),
-        sum: ra[2] + rb[0] * AbsR[2][0] + rb[1] * AbsR[2][1] + rb[2] * AbsR[2][2],
-      },
-      // B's axes
-      {
-        proj: Math.abs(t[0] * R[0][0] + t[1] * R[1][0] + t[2] * R[2][0]),
-        sum: ra[0] * AbsR[0][0] + ra[1] * AbsR[1][0] + ra[2] * AbsR[2][0] + rb[0],
-      },
-      {
-        proj: Math.abs(t[0] * R[0][1] + t[1] * R[1][1] + t[2] * R[2][1]),
-        sum: ra[0] * AbsR[0][1] + ra[1] * AbsR[1][1] + ra[2] * AbsR[2][1] + rb[1],
-      },
-      {
-        proj: Math.abs(t[0] * R[0][2] + t[1] * R[1][2] + t[2] * R[2][2]),
-        sum: ra[0] * AbsR[0][2] + ra[1] * AbsR[1][2] + ra[2] * AbsR[2][2] + rb[2],
-      },
-    ];
-
-    for (const test of tests) {
-      if (test.proj > test.sum + EPS) {
-        return { hasCollision: false, depth: 0 };
+    // Helper to check axis and track minimum penetration
+    const checkAxis = (proj: number, sum: number): boolean => {
+      if (proj > sum + EPS) {
+        return false;
       }
-      const penetration = test.sum - test.proj;
-      minPenetration = Math.min(minPenetration, penetration);
+      const penetration = sum - proj;
+      if (penetration < minPenetration) {
+        minPenetration = penetration;
+      }
+      return true;
+    };
+
+    // Test 6 face axes (A's 3 + B's 3)
+    // A's axes
+    if (!checkAxis(Math.abs(t[0]), ra[0] + rb[0] * AbsR[0][0] + rb[1] * AbsR[0][1] + rb[2] * AbsR[0][2])) {
+      return { hasCollision: false, depth: 0 };
+    }
+    if (!checkAxis(Math.abs(t[1]), ra[1] + rb[0] * AbsR[1][0] + rb[1] * AbsR[1][1] + rb[2] * AbsR[1][2])) {
+      return { hasCollision: false, depth: 0 };
+    }
+    if (!checkAxis(Math.abs(t[2]), ra[2] + rb[0] * AbsR[2][0] + rb[1] * AbsR[2][1] + rb[2] * AbsR[2][2])) {
+      return { hasCollision: false, depth: 0 };
     }
 
-    // Simplified: skip edge-edge tests for performance
+    // B's axes
+    if (!checkAxis(
+      Math.abs(t[0] * R[0][0] + t[1] * R[1][0] + t[2] * R[2][0]),
+      ra[0] * AbsR[0][0] + ra[1] * AbsR[1][0] + ra[2] * AbsR[2][0] + rb[0]
+    )) {
+      return { hasCollision: false, depth: 0 };
+    }
+    if (!checkAxis(
+      Math.abs(t[0] * R[0][1] + t[1] * R[1][1] + t[2] * R[2][1]),
+      ra[0] * AbsR[0][1] + ra[1] * AbsR[1][1] + ra[2] * AbsR[2][1] + rb[1]
+    )) {
+      return { hasCollision: false, depth: 0 };
+    }
+    if (!checkAxis(
+      Math.abs(t[0] * R[0][2] + t[1] * R[1][2] + t[2] * R[2][2]),
+      ra[0] * AbsR[0][2] + ra[1] * AbsR[1][2] + ra[2] * AbsR[2][2] + rb[2]
+    )) {
+      return { hasCollision: false, depth: 0 };
+    }
+
+    // Test 9 edge-edge cross product axes (Ai x Bj)
+    // Au x Bu
+    if (!checkAxis(
+      Math.abs(t[2] * R[1][0] - t[1] * R[2][0]),
+      ra[1] * AbsR[2][0] + ra[2] * AbsR[1][0] + rb[1] * AbsR[0][2] + rb[2] * AbsR[0][1]
+    )) {
+      return { hasCollision: false, depth: 0 };
+    }
+    // Au x Bv
+    if (!checkAxis(
+      Math.abs(t[2] * R[1][1] - t[1] * R[2][1]),
+      ra[1] * AbsR[2][1] + ra[2] * AbsR[1][1] + rb[0] * AbsR[0][2] + rb[2] * AbsR[0][0]
+    )) {
+      return { hasCollision: false, depth: 0 };
+    }
+    // Au x Bw
+    if (!checkAxis(
+      Math.abs(t[2] * R[1][2] - t[1] * R[2][2]),
+      ra[1] * AbsR[2][2] + ra[2] * AbsR[1][2] + rb[0] * AbsR[0][1] + rb[1] * AbsR[0][0]
+    )) {
+      return { hasCollision: false, depth: 0 };
+    }
+    // Av x Bu
+    if (!checkAxis(
+      Math.abs(t[0] * R[2][0] - t[2] * R[0][0]),
+      ra[0] * AbsR[2][0] + ra[2] * AbsR[0][0] + rb[1] * AbsR[1][2] + rb[2] * AbsR[1][1]
+    )) {
+      return { hasCollision: false, depth: 0 };
+    }
+    // Av x Bv
+    if (!checkAxis(
+      Math.abs(t[0] * R[2][1] - t[2] * R[0][1]),
+      ra[0] * AbsR[2][1] + ra[2] * AbsR[0][1] + rb[0] * AbsR[1][2] + rb[2] * AbsR[1][0]
+    )) {
+      return { hasCollision: false, depth: 0 };
+    }
+    // Av x Bw
+    if (!checkAxis(
+      Math.abs(t[0] * R[2][2] - t[2] * R[0][2]),
+      ra[0] * AbsR[2][2] + ra[2] * AbsR[0][2] + rb[0] * AbsR[1][1] + rb[1] * AbsR[1][0]
+    )) {
+      return { hasCollision: false, depth: 0 };
+    }
+    // Aw x Bu
+    if (!checkAxis(
+      Math.abs(t[1] * R[0][0] - t[0] * R[1][0]),
+      ra[0] * AbsR[1][0] + ra[1] * AbsR[0][0] + rb[1] * AbsR[2][2] + rb[2] * AbsR[2][1]
+    )) {
+      return { hasCollision: false, depth: 0 };
+    }
+    // Aw x Bv
+    if (!checkAxis(
+      Math.abs(t[1] * R[0][1] - t[0] * R[1][1]),
+      ra[0] * AbsR[1][1] + ra[1] * AbsR[0][1] + rb[0] * AbsR[2][2] + rb[2] * AbsR[2][0]
+    )) {
+      return { hasCollision: false, depth: 0 };
+    }
+    // Aw x Bw
+    if (!checkAxis(
+      Math.abs(t[1] * R[0][2] - t[0] * R[1][2]),
+      ra[0] * AbsR[1][2] + ra[1] * AbsR[0][2] + rb[0] * AbsR[2][1] + rb[1] * AbsR[2][0]
+    )) {
+      return { hasCollision: false, depth: 0 };
+    }
+
     return { hasCollision: true, depth: minPenetration };
   }
 

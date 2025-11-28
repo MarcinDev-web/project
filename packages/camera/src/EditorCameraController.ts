@@ -1,6 +1,7 @@
 import type { Vec3, Mat4 } from '@engine/core/math';
 import { mat4LookAt } from '@engine/core/math';
 import { damp } from './utils/Damper';
+import { clamp } from './types';
 
 const HORIZONTAL_MOVEMENT_KEYS = new Set(['w', 'a', 's', 'd']);
 const VERTICAL_MOVEMENT_KEYS = new Set(['q', 'e', 'c', 'space']);
@@ -27,13 +28,8 @@ export interface EditorCameraConfig {
   initialPitch?: number;
   /** Rotation smoothing time constant in seconds (default: 0.05). Lower = more responsive, higher = smoother. */
   rotationSmoothing?: number;
-}
-
-/**
- * Clamp a value between min and max
- */
-function clamp(value: number, min: number, max: number): number {
-  return Math.max(min, Math.min(max, value));
+  /** DPI scale for mouse sensitivity (default: window.devicePixelRatio or 1.0). Higher values = less sensitive mouse. */
+  dpiScale?: number;
 }
 
 /**
@@ -70,6 +66,7 @@ export class EditorCameraController {
   private readonly slowMultiplier: number;
   private readonly lookSensitivity: number;
   private readonly pitchLimit: number;
+  private dpiScale: number;
 
   // Input state
   private readonly keysPressed = new Set<string>();
@@ -122,6 +119,13 @@ export class EditorCameraController {
     this.lookSensitivity = config?.lookSensitivity ?? 0.003;
     this.pitchLimit = config?.pitchLimit ?? (Math.PI / 2 - 0.05);
     this.rotationSmoothing = config?.rotationSmoothing ?? 0.05;
+    // Default to devicePixelRatio if available and valid, otherwise 1.0
+    const defaultDpiScale = typeof window !== 'undefined' && 
+      typeof window.devicePixelRatio === 'number' && 
+      window.devicePixelRatio > 0 
+        ? window.devicePixelRatio 
+        : 1.0;
+    this.dpiScale = config?.dpiScale ?? defaultDpiScale;
 
     this.updateDirectionVectors();
   }
@@ -375,6 +379,23 @@ export class EditorCameraController {
   }
 
   /**
+   * Get current DPI scale
+   */
+  getDpiScale(): number {
+    return this.dpiScale;
+  }
+
+  /**
+   * Set DPI scale for mouse sensitivity adjustment
+   * @param scale DPI scale factor (default: window.devicePixelRatio)
+   */
+  setDpiScale(scale: number): void {
+    if (scale > 0 && Number.isFinite(scale)) {
+      this.dpiScale = scale;
+    }
+  }
+
+  /**
    * Check if controller is enabled
    */
   isEnabled(): boolean {
@@ -463,9 +484,13 @@ export class EditorCameraController {
     this.lastMouseX = event.clientX;
     this.lastMouseY = event.clientY;
 
+    // Apply DPI scaling to normalize sensitivity across different display densities
+    // Higher DPI = smaller physical pixels = need to scale down sensitivity
+    const scaledSensitivity = this.lookSensitivity / this.dpiScale;
+
     // Update target rotation (will be smoothed in update())
-    this.targetYaw += deltaX * this.lookSensitivity;
-    this.targetPitch -= deltaY * this.lookSensitivity;
+    this.targetYaw += deltaX * scaledSensitivity;
+    this.targetPitch -= deltaY * scaledSensitivity;
     this.targetPitch = clamp(this.targetPitch, -this.pitchLimit, this.pitchLimit);
     
     // Apply smoothing immediately for responsive feel during mouse movement
@@ -493,9 +518,11 @@ export class EditorCameraController {
 
     // Wheel (without Ctrl): Zoom by moving camera forward/backward
     // Use exponential zoom for more natural and responsive feel
+    // Apply DPI scaling to normalize scroll sensitivity across different display densities
+    const dpiAdjustedDelta = (event.deltaY ?? 0) / this.dpiScale;
     const deltaNormalized = event.deltaMode === 0 /* DOM_DELTA_PIXEL */ 
-      ? (event.deltaY ?? 0) / 50  // Reduced divisor for more sensitivity
-      : (event.deltaY ?? 0);
+      ? dpiAdjustedDelta / 50  // Reduced divisor for more sensitivity
+      : dpiAdjustedDelta;
     
     // Exponential zoom: move camera along forward direction
     // Scale movement based on distance from origin for consistent feel at all distances
@@ -504,7 +531,8 @@ export class EditorCameraController {
     // Base movement amount scales with distance (closer = smaller steps, farther = larger steps)
     const baseMovement = Math.max(0.2, distanceFromOrigin * 0.08);
     const scale = Math.exp(-deltaNormalized * zoomSpeed);
-    const zoomAmount = baseMovement * (1 - scale);
+    // (scale - 1) ensures: scroll up (deltaY < 0) → scale > 1 → positive zoomAmount → move forward
+    const zoomAmount = baseMovement * (scale - 1);
     
     // Move camera along forward direction
     this.position[0] += this.forward[0] * zoomAmount;

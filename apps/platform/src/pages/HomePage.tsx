@@ -292,27 +292,53 @@ export function HomePage() {
 
         <div className="homepage-divider" />
 
-        <div className="homepage-header">
-          <div className="homepage-search">
-            <span className="homepage-search-icon">🔍</span>
+        <div className="search-bar">
+          <div className="search-bar__input-wrapper">
+            <svg className="search-bar__icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+              <circle cx="11" cy="11" r="8"/>
+              <path d="m21 21-4.35-4.35"/>
+            </svg>
             <input
               type="text"
-              placeholder="Search games..."
+              placeholder="Find your next adventure..."
               value={search}
               onChange={(e) => setSearch(e.target.value)}
-              className="homepage-search-input"
+              className="search-bar__input"
             />
+            {search && (
+              <button 
+                className="search-bar__clear" 
+                onClick={() => setSearch('')}
+                type="button"
+                aria-label="Clear search"
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M18 6 6 18M6 6l12 12"/>
+                </svg>
+              </button>
+            )}
           </div>
-          <select
-            value={sortBy}
-            onChange={(e) => setSortBy(e.target.value as SortOption)}
-            className="homepage-sort-select"
-          >
-            <option value="newest">Newest</option>
-            <option value="popular">Popular</option>
-            <option value="trending">Trending</option>
-            <option value="updated">Recently Updated</option>
-          </select>
+          <div className="search-bar__filters">
+            <span className="search-bar__filters-label">Sort:</span>
+            <div className="search-bar__tabs">
+              {[
+                { value: 'newest', label: 'Newest', icon: '✦' },
+                { value: 'popular', label: 'Popular', icon: '🔥' },
+                { value: 'trending', label: 'Trending', icon: '📈' },
+                { value: 'updated', label: 'Updated', icon: '↻' },
+              ].map((option) => (
+                <button
+                  key={option.value}
+                  type="button"
+                  className={`search-bar__tab ${sortBy === option.value ? 'search-bar__tab--active' : ''}`}
+                  onClick={() => setSortBy(option.value as SortOption)}
+                >
+                  <span className="search-bar__tab-icon">{option.icon}</span>
+                  <span className="search-bar__tab-label">{option.label}</span>
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
 
         {activeCategory && (
@@ -328,22 +354,9 @@ export function HomePage() {
           <div className="homepage-loading">Loading games...</div>
         ) : filteredGames.length === 0 ? (
           <div className="homepage-empty">
-            <div className="homepage-empty__icon">⚡</div>
-            <h3 className="homepage-empty__title">
-              {search || activeTags.length > 0
-                ? 'No matches found'
-                : 'Start Your Journey'}
-            </h3>
-            <p className="homepage-empty__text">
-              {search || activeTags.length > 0
-                ? "We couldn't find any games matching your filters. Try adjusting your search or keywords."
-                : 'Be the first to create a world in Forge. Your imagination is the only limit.'}
-            </p>
-            {!(search || activeTags.length > 0) && (
-              <Link to="/editor" className="homepage-empty__cta">
-                <span>🔨</span> Create New Game
-              </Link>
-            )}
+            <span className="homepage-empty__icon">🎮</span>
+            <p className="homepage-empty__title">Brak dostępnych gier</p>
+            <p className="homepage-empty__text">{search ? 'Spróbuj zmienić kryteria wyszukiwania' : 'Wkrótce pojawią się nowe gry'}</p>
           </div>
         ) : (
           <div className="games-grid">

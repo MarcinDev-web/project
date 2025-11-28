@@ -93,156 +93,6 @@ export function capsule_sphere_intersect(c_base, c_tip, c_radius, s_center, s_ra
 }
 
 /**
- * @param {Float32Array} a_center
- * @param {number} a_radius
- * @param {Float32Array} b_center
- * @param {number} b_radius
- * @returns {boolean}
- */
-export function sphere_sphere_intersect(a_center, a_radius, b_center, b_radius) {
-    const ptr0 = passArrayF32ToWasm0(a_center, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArrayF32ToWasm0(b_center, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ret = wasm.sphere_sphere_intersect(ptr0, len0, a_radius, ptr1, len1, b_radius);
-    return ret !== 0;
-}
-
-/**
- * @param {Float32Array} ray_origin
- * @param {Float32Array} ray_dir
- * @param {Float32Array} s_center
- * @param {number} s_radius
- * @returns {number}
- */
-export function ray_sphere_intersect(ray_origin, ray_dir, s_center, s_radius) {
-    const ptr0 = passArrayF32ToWasm0(ray_origin, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArrayF32ToWasm0(ray_dir, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ptr2 = passArrayF32ToWasm0(s_center, wasm.__wbindgen_malloc);
-    const len2 = WASM_VECTOR_LEN;
-    const ret = wasm.ray_sphere_intersect(ptr0, len0, ptr1, len1, ptr2, len2, s_radius);
-    return ret;
-}
-
-/**
- * @param {Float32Array} a_center
- * @param {Float32Array} a_axes
- * @param {Float32Array} a_half
- * @param {Float32Array} b_center
- * @param {Float32Array} b_axes
- * @param {Float32Array} b_half
- * @returns {boolean}
- */
-export function obb_intersect(a_center, a_axes, a_half, b_center, b_axes, b_half) {
-    const ptr0 = passArrayF32ToWasm0(a_center, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArrayF32ToWasm0(a_axes, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ptr2 = passArrayF32ToWasm0(a_half, wasm.__wbindgen_malloc);
-    const len2 = WASM_VECTOR_LEN;
-    const ptr3 = passArrayF32ToWasm0(b_center, wasm.__wbindgen_malloc);
-    const len3 = WASM_VECTOR_LEN;
-    const ptr4 = passArrayF32ToWasm0(b_axes, wasm.__wbindgen_malloc);
-    const len4 = WASM_VECTOR_LEN;
-    const ptr5 = passArrayF32ToWasm0(b_half, wasm.__wbindgen_malloc);
-    const len5 = WASM_VECTOR_LEN;
-    const ret = wasm.obb_intersect(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4, ptr5, len5);
-    return ret !== 0;
-}
-
-/**
- * @param {Float32Array} pre_pos
- * @param {Float32Array} pre_rot
- * @param {Float32Array} pre_scl
- * @param {Float32Array} others_pos
- * @param {Float32Array} others_rot
- * @param {Float32Array} others_scl
- * @returns {Uint32Array}
- */
-export function batch_check_trs(pre_pos, pre_rot, pre_scl, others_pos, others_rot, others_scl) {
-    const ptr0 = passArrayF32ToWasm0(pre_pos, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArrayF32ToWasm0(pre_rot, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ptr2 = passArrayF32ToWasm0(pre_scl, wasm.__wbindgen_malloc);
-    const len2 = WASM_VECTOR_LEN;
-    const ptr3 = passArrayF32ToWasm0(others_pos, wasm.__wbindgen_malloc);
-    const len3 = WASM_VECTOR_LEN;
-    const ptr4 = passArrayF32ToWasm0(others_rot, wasm.__wbindgen_malloc);
-    const len4 = WASM_VECTOR_LEN;
-    const ptr5 = passArrayF32ToWasm0(others_scl, wasm.__wbindgen_malloc);
-    const len5 = WASM_VECTOR_LEN;
-    const ret = wasm.batch_check_trs(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4, ptr5, len5);
-    var v7 = getArrayU32FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
-    return v7;
-}
-
-/**
- * @param {Float32Array} world_mats
- * @param {Float32Array} half_extents
- * @returns {Float32Array | undefined}
- */
-export function compute_scene_bounds(world_mats, half_extents) {
-    const ptr0 = passArrayF32ToWasm0(world_mats, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArrayF32ToWasm0(half_extents, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ret = wasm.compute_scene_bounds(ptr0, len0, ptr1, len1);
-    let v3;
-    if (ret[0] !== 0) {
-        v3 = getArrayF32FromWasm0(ret[0], ret[1]).slice();
-        wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
-    }
-    return v3;
-}
-
-/**
- * @param {Float32Array} s_center
- * @param {number} s_radius
- * @param {Float32Array} b_center
- * @param {Float32Array} b_axes
- * @param {Float32Array} b_half
- * @returns {boolean}
- */
-export function sphere_obb_intersect(s_center, s_radius, b_center, b_axes, b_half) {
-    const ptr0 = passArrayF32ToWasm0(s_center, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArrayF32ToWasm0(b_center, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ptr2 = passArrayF32ToWasm0(b_axes, wasm.__wbindgen_malloc);
-    const len2 = WASM_VECTOR_LEN;
-    const ptr3 = passArrayF32ToWasm0(b_half, wasm.__wbindgen_malloc);
-    const len3 = WASM_VECTOR_LEN;
-    const ret = wasm.sphere_obb_intersect(ptr0, len0, s_radius, ptr1, len1, ptr2, len2, ptr3, len3);
-    return ret !== 0;
-}
-
-/**
- * @param {Float32Array} a_base
- * @param {Float32Array} a_tip
- * @param {number} a_radius
- * @param {Float32Array} b_base
- * @param {Float32Array} b_tip
- * @param {number} b_radius
- * @returns {boolean}
- */
-export function capsule_capsule_intersect(a_base, a_tip, a_radius, b_base, b_tip, b_radius) {
-    const ptr0 = passArrayF32ToWasm0(a_base, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArrayF32ToWasm0(a_tip, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ptr2 = passArrayF32ToWasm0(b_base, wasm.__wbindgen_malloc);
-    const len2 = WASM_VECTOR_LEN;
-    const ptr3 = passArrayF32ToWasm0(b_tip, wasm.__wbindgen_malloc);
-    const len3 = WASM_VECTOR_LEN;
-    const ret = wasm.capsule_capsule_intersect(ptr0, len0, ptr1, len1, a_radius, ptr2, len2, ptr3, len3, b_radius);
-    return ret !== 0;
-}
-
-/**
  * @param {Float32Array} pre_pos
  * @param {Float32Array} pre_rot
  * @param {Float32Array} pre_scl
@@ -299,6 +149,179 @@ export function batch_check(pre_center, pre_axes, pre_half, others_centers, othe
 }
 
 /**
+ * @param {Float32Array} a_center
+ * @param {Float32Array} a_axes
+ * @param {Float32Array} a_half
+ * @param {Float32Array} b_center
+ * @param {Float32Array} b_axes
+ * @param {Float32Array} b_half
+ * @returns {boolean}
+ */
+export function obb_intersect(a_center, a_axes, a_half, b_center, b_axes, b_half) {
+    const ptr0 = passArrayF32ToWasm0(a_center, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArrayF32ToWasm0(a_axes, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ptr2 = passArrayF32ToWasm0(a_half, wasm.__wbindgen_malloc);
+    const len2 = WASM_VECTOR_LEN;
+    const ptr3 = passArrayF32ToWasm0(b_center, wasm.__wbindgen_malloc);
+    const len3 = WASM_VECTOR_LEN;
+    const ptr4 = passArrayF32ToWasm0(b_axes, wasm.__wbindgen_malloc);
+    const len4 = WASM_VECTOR_LEN;
+    const ptr5 = passArrayF32ToWasm0(b_half, wasm.__wbindgen_malloc);
+    const len5 = WASM_VECTOR_LEN;
+    const ret = wasm.obb_intersect(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4, ptr5, len5);
+    return ret !== 0;
+}
+
+/**
+ * @param {Float32Array} world_mats
+ * @param {Float32Array} half_extents
+ * @returns {Float32Array | undefined}
+ */
+export function compute_scene_bounds(world_mats, half_extents) {
+    const ptr0 = passArrayF32ToWasm0(world_mats, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArrayF32ToWasm0(half_extents, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ret = wasm.compute_scene_bounds(ptr0, len0, ptr1, len1);
+    let v3;
+    if (ret[0] !== 0) {
+        v3 = getArrayF32FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+    }
+    return v3;
+}
+
+/**
+ * Ray-capsule intersection test.
+ * Returns distance to intersection or -1.0 if no hit.
+ * @param c_base - Capsule base point [x, y, z]
+ * @param c_tip - Capsule tip point [x, y, z]
+ * @param c_radius - Capsule radius
+ * @param {Float32Array} ray_origin
+ * @param {Float32Array} ray_dir
+ * @param {Float32Array} c_base
+ * @param {Float32Array} c_tip
+ * @param {number} c_radius
+ * @returns {number}
+ */
+export function ray_capsule_intersect(ray_origin, ray_dir, c_base, c_tip, c_radius) {
+    const ptr0 = passArrayF32ToWasm0(ray_origin, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArrayF32ToWasm0(ray_dir, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ptr2 = passArrayF32ToWasm0(c_base, wasm.__wbindgen_malloc);
+    const len2 = WASM_VECTOR_LEN;
+    const ptr3 = passArrayF32ToWasm0(c_tip, wasm.__wbindgen_malloc);
+    const len3 = WASM_VECTOR_LEN;
+    const ret = wasm.ray_capsule_intersect(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, c_radius);
+    return ret;
+}
+
+/**
+ * @param {Float32Array} a_center
+ * @param {number} a_radius
+ * @param {Float32Array} b_center
+ * @param {number} b_radius
+ * @returns {boolean}
+ */
+export function sphere_sphere_intersect(a_center, a_radius, b_center, b_radius) {
+    const ptr0 = passArrayF32ToWasm0(a_center, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArrayF32ToWasm0(b_center, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ret = wasm.sphere_sphere_intersect(ptr0, len0, a_radius, ptr1, len1, b_radius);
+    return ret !== 0;
+}
+
+/**
+ * @param {Float32Array} ray_origin
+ * @param {Float32Array} ray_dir
+ * @param {Float32Array} s_center
+ * @param {number} s_radius
+ * @returns {number}
+ */
+export function ray_sphere_intersect(ray_origin, ray_dir, s_center, s_radius) {
+    const ptr0 = passArrayF32ToWasm0(ray_origin, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArrayF32ToWasm0(ray_dir, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ptr2 = passArrayF32ToWasm0(s_center, wasm.__wbindgen_malloc);
+    const len2 = WASM_VECTOR_LEN;
+    const ret = wasm.ray_sphere_intersect(ptr0, len0, ptr1, len1, ptr2, len2, s_radius);
+    return ret;
+}
+
+/**
+ * @param {Float32Array} s_center
+ * @param {number} s_radius
+ * @param {Float32Array} b_center
+ * @param {Float32Array} b_axes
+ * @param {Float32Array} b_half
+ * @returns {boolean}
+ */
+export function sphere_obb_intersect(s_center, s_radius, b_center, b_axes, b_half) {
+    const ptr0 = passArrayF32ToWasm0(s_center, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArrayF32ToWasm0(b_center, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ptr2 = passArrayF32ToWasm0(b_axes, wasm.__wbindgen_malloc);
+    const len2 = WASM_VECTOR_LEN;
+    const ptr3 = passArrayF32ToWasm0(b_half, wasm.__wbindgen_malloc);
+    const len3 = WASM_VECTOR_LEN;
+    const ret = wasm.sphere_obb_intersect(ptr0, len0, s_radius, ptr1, len1, ptr2, len2, ptr3, len3);
+    return ret !== 0;
+}
+
+/**
+ * @param {Float32Array} pos
+ * @param {Float32Array} rot
+ * @param {Float32Array} scl
+ * @returns {Uint32Array}
+ */
+export function batch_check_all(pos, rot, scl) {
+    const ptr0 = passArrayF32ToWasm0(pos, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArrayF32ToWasm0(rot, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ptr2 = passArrayF32ToWasm0(scl, wasm.__wbindgen_malloc);
+    const len2 = WASM_VECTOR_LEN;
+    const ret = wasm.batch_check_all(ptr0, len0, ptr1, len1, ptr2, len2);
+    var v4 = getArrayU32FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+    return v4;
+}
+
+/**
+ * @param {Float32Array} pre_pos
+ * @param {Float32Array} pre_rot
+ * @param {Float32Array} pre_scl
+ * @param {Float32Array} others_pos
+ * @param {Float32Array} others_rot
+ * @param {Float32Array} others_scl
+ * @returns {Uint32Array}
+ */
+export function batch_check_trs(pre_pos, pre_rot, pre_scl, others_pos, others_rot, others_scl) {
+    const ptr0 = passArrayF32ToWasm0(pre_pos, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArrayF32ToWasm0(pre_rot, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ptr2 = passArrayF32ToWasm0(pre_scl, wasm.__wbindgen_malloc);
+    const len2 = WASM_VECTOR_LEN;
+    const ptr3 = passArrayF32ToWasm0(others_pos, wasm.__wbindgen_malloc);
+    const len3 = WASM_VECTOR_LEN;
+    const ptr4 = passArrayF32ToWasm0(others_rot, wasm.__wbindgen_malloc);
+    const len4 = WASM_VECTOR_LEN;
+    const ptr5 = passArrayF32ToWasm0(others_scl, wasm.__wbindgen_malloc);
+    const len5 = WASM_VECTOR_LEN;
+    const ret = wasm.batch_check_trs(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4, ptr5, len5);
+    var v7 = getArrayU32FromWasm0(ret[0], ret[1]).slice();
+    wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+    return v7;
+}
+
+/**
  * @param {Float32Array} ray_origin
  * @param {Float32Array} ray_dir
  * @param {Float32Array} b_center
@@ -319,25 +342,6 @@ export function ray_obb_intersect(ray_origin, ray_dir, b_center, b_axes, b_half)
     const len4 = WASM_VECTOR_LEN;
     const ret = wasm.ray_obb_intersect(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4);
     return ret;
-}
-
-/**
- * @param {Float32Array} pos
- * @param {Float32Array} rot
- * @param {Float32Array} scl
- * @returns {Uint32Array}
- */
-export function batch_check_all(pos, rot, scl) {
-    const ptr0 = passArrayF32ToWasm0(pos, wasm.__wbindgen_malloc);
-    const len0 = WASM_VECTOR_LEN;
-    const ptr1 = passArrayF32ToWasm0(rot, wasm.__wbindgen_malloc);
-    const len1 = WASM_VECTOR_LEN;
-    const ptr2 = passArrayF32ToWasm0(scl, wasm.__wbindgen_malloc);
-    const len2 = WASM_VECTOR_LEN;
-    const ret = wasm.batch_check_all(ptr0, len0, ptr1, len1, ptr2, len2);
-    var v4 = getArrayU32FromWasm0(ret[0], ret[1]).slice();
-    wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
-    return v4;
 }
 
 /**
@@ -363,6 +367,215 @@ export function capsule_obb_intersect(c_base, c_tip, c_radius, b_center, b_axes,
     const ret = wasm.capsule_obb_intersect(ptr0, len0, ptr1, len1, c_radius, ptr2, len2, ptr3, len3, ptr4, len4);
     return ret !== 0;
 }
+
+/**
+ * @param {Float32Array} a_base
+ * @param {Float32Array} a_tip
+ * @param {number} a_radius
+ * @param {Float32Array} b_base
+ * @param {Float32Array} b_tip
+ * @param {number} b_radius
+ * @returns {boolean}
+ */
+export function capsule_capsule_intersect(a_base, a_tip, a_radius, b_base, b_tip, b_radius) {
+    const ptr0 = passArrayF32ToWasm0(a_base, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArrayF32ToWasm0(a_tip, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ptr2 = passArrayF32ToWasm0(b_base, wasm.__wbindgen_malloc);
+    const len2 = WASM_VECTOR_LEN;
+    const ptr3 = passArrayF32ToWasm0(b_tip, wasm.__wbindgen_malloc);
+    const len3 = WASM_VECTOR_LEN;
+    const ret = wasm.capsule_capsule_intersect(ptr0, len0, ptr1, len1, a_radius, ptr2, len2, ptr3, len3, b_radius);
+    return ret !== 0;
+}
+
+/**
+ * OBB-OBB collision with contact information for physics resolution.
+ * Returns a CollisionContact struct with penetration depth, normal, and contact point.
+ * @param {Float32Array} a_center
+ * @param {Float32Array} a_axes
+ * @param {Float32Array} a_half
+ * @param {Float32Array} b_center
+ * @param {Float32Array} b_axes
+ * @param {Float32Array} b_half
+ * @returns {CollisionContact}
+ */
+export function obb_intersect_with_contact(a_center, a_axes, a_half, b_center, b_axes, b_half) {
+    const ptr0 = passArrayF32ToWasm0(a_center, wasm.__wbindgen_malloc);
+    const len0 = WASM_VECTOR_LEN;
+    const ptr1 = passArrayF32ToWasm0(a_axes, wasm.__wbindgen_malloc);
+    const len1 = WASM_VECTOR_LEN;
+    const ptr2 = passArrayF32ToWasm0(a_half, wasm.__wbindgen_malloc);
+    const len2 = WASM_VECTOR_LEN;
+    const ptr3 = passArrayF32ToWasm0(b_center, wasm.__wbindgen_malloc);
+    const len3 = WASM_VECTOR_LEN;
+    const ptr4 = passArrayF32ToWasm0(b_axes, wasm.__wbindgen_malloc);
+    const len4 = WASM_VECTOR_LEN;
+    const ptr5 = passArrayF32ToWasm0(b_half, wasm.__wbindgen_malloc);
+    const len5 = WASM_VECTOR_LEN;
+    const ret = wasm.obb_intersect_with_contact(ptr0, len0, ptr1, len1, ptr2, len2, ptr3, len3, ptr4, len4, ptr5, len5);
+    return CollisionContact.__wrap(ret);
+}
+
+const CollisionContactFinalization = (typeof FinalizationRegistry === 'undefined')
+    ? { register: () => {}, unregister: () => {} }
+    : new FinalizationRegistry(ptr => wasm.__wbg_collisioncontact_free(ptr >>> 0, 1));
+/**
+ * Contact information from collision detection.
+ * Used for physics resolution (penetration depth, normal, contact point).
+ */
+export class CollisionContact {
+
+    static __wrap(ptr) {
+        ptr = ptr >>> 0;
+        const obj = Object.create(CollisionContact.prototype);
+        obj.__wbg_ptr = ptr;
+        CollisionContactFinalization.register(obj, obj.__wbg_ptr, obj);
+        return obj;
+    }
+
+    __destroy_into_raw() {
+        const ptr = this.__wbg_ptr;
+        this.__wbg_ptr = 0;
+        CollisionContactFinalization.unregister(this);
+        return ptr;
+    }
+
+    free() {
+        const ptr = this.__destroy_into_raw();
+        wasm.__wbg_collisioncontact_free(ptr, 0);
+    }
+    /**
+     * @returns {Float32Array}
+     */
+    get_normal() {
+        const ret = wasm.collisioncontact_get_normal(this.__wbg_ptr);
+        var v1 = getArrayF32FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+        return v1;
+    }
+    constructor() {
+        const ret = wasm.collisioncontact_new();
+        this.__wbg_ptr = ret >>> 0;
+        CollisionContactFinalization.register(this, this.__wbg_ptr, this);
+        return this;
+    }
+    /**
+     * @returns {Float32Array}
+     */
+    get_point() {
+        const ret = wasm.collisioncontact_get_point(this.__wbg_ptr);
+        var v1 = getArrayF32FromWasm0(ret[0], ret[1]).slice();
+        wasm.__wbindgen_free(ret[0], ret[1] * 4, 4);
+        return v1;
+    }
+    /**
+     * @returns {boolean}
+     */
+    get has_collision() {
+        const ret = wasm.__wbg_get_collisioncontact_has_collision(this.__wbg_ptr);
+        return ret !== 0;
+    }
+    /**
+     * @param {boolean} arg0
+     */
+    set has_collision(arg0) {
+        wasm.__wbg_set_collisioncontact_has_collision(this.__wbg_ptr, arg0);
+    }
+    /**
+     * @returns {number}
+     */
+    get depth() {
+        const ret = wasm.__wbg_get_collisioncontact_depth(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * @param {number} arg0
+     */
+    set depth(arg0) {
+        wasm.__wbg_set_collisioncontact_depth(this.__wbg_ptr, arg0);
+    }
+    /**
+     * @returns {number}
+     */
+    get normal_x() {
+        const ret = wasm.__wbg_get_collisioncontact_normal_x(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * @param {number} arg0
+     */
+    set normal_x(arg0) {
+        wasm.__wbg_set_collisioncontact_normal_x(this.__wbg_ptr, arg0);
+    }
+    /**
+     * @returns {number}
+     */
+    get normal_y() {
+        const ret = wasm.__wbg_get_collisioncontact_normal_y(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * @param {number} arg0
+     */
+    set normal_y(arg0) {
+        wasm.__wbg_set_collisioncontact_normal_y(this.__wbg_ptr, arg0);
+    }
+    /**
+     * @returns {number}
+     */
+    get normal_z() {
+        const ret = wasm.__wbg_get_collisioncontact_normal_z(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * @param {number} arg0
+     */
+    set normal_z(arg0) {
+        wasm.__wbg_set_collisioncontact_normal_z(this.__wbg_ptr, arg0);
+    }
+    /**
+     * @returns {number}
+     */
+    get point_x() {
+        const ret = wasm.__wbg_get_collisioncontact_point_x(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * @param {number} arg0
+     */
+    set point_x(arg0) {
+        wasm.__wbg_set_collisioncontact_point_x(this.__wbg_ptr, arg0);
+    }
+    /**
+     * @returns {number}
+     */
+    get point_y() {
+        const ret = wasm.__wbg_get_collisioncontact_point_y(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * @param {number} arg0
+     */
+    set point_y(arg0) {
+        wasm.__wbg_set_collisioncontact_point_y(this.__wbg_ptr, arg0);
+    }
+    /**
+     * @returns {number}
+     */
+    get point_z() {
+        const ret = wasm.__wbg_get_collisioncontact_point_z(this.__wbg_ptr);
+        return ret;
+    }
+    /**
+     * @param {number} arg0
+     */
+    set point_z(arg0) {
+        wasm.__wbg_set_collisioncontact_point_z(this.__wbg_ptr, arg0);
+    }
+}
+if (Symbol.dispose) CollisionContact.prototype[Symbol.dispose] = CollisionContact.prototype.free;
 
 const CollisionWorldFinalization = (typeof FinalizationRegistry === 'undefined')
     ? { register: () => {}, unregister: () => {} }
@@ -473,6 +686,13 @@ export class CollisionWorld {
         this.__wbg_ptr = ret >>> 0;
         CollisionWorldFinalization.register(this, this.__wbg_ptr, this);
         return this;
+    }
+    /**
+     * Clears all data and releases memory by shrinking internal vectors.
+     * Use this when the collision world is no longer needed or to reset state.
+     */
+    clear() {
+        wasm.collisionworld_clear(this.__wbg_ptr);
     }
     /**
      * @param {number} count

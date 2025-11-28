@@ -95,6 +95,7 @@ import * as auth from '../../../utils/auth';
 import type { PublicUser } from '../../../utils/auth';
 import { Logger } from '../../../utils/logger';
 import { EditorInteractionManager } from '../../input/EditorInteractionManager';
+import { ModelForgeManager } from '../features/model-forge';
 
 export interface EditorUIConfig {
   canvas: HTMLCanvasElement;
@@ -219,6 +220,7 @@ export class EditorUI {
   private characterInput: CharacterInputHandler | null = null;
   private editorCamera: EditorCameraController | null = null;
   private fpsCamera: FPSCamera | null = null;
+  private modelForgeManager: ModelForgeManager | null = null;
 
   constructor(private readonly config: EditorUIConfig) {}
 
@@ -650,6 +652,7 @@ export class EditorUI {
       onOpenUIEditor: () => this.openUIEditor(),
       onToggleCollaboration: () => this.toggleCollaborationPanel(),
       isCollaborating: () => this.collaborationManager?.isCollaborating() ?? false,
+      onToggleModelForge: () => this.toggleModelForge(),
       onGizmoModeChange: (mode) => {
         if (!this.state) return;
         this.state.gizmoMode.value = mode;
@@ -1028,6 +1031,22 @@ export class EditorUI {
 
     // Initialize Tutorial Manager
     this.tutorialManager = new TutorialManager(this);
+
+    // Initialize Model Forge Manager
+    this.modelForgeManager = new ModelForgeManager({
+      scene: this.config.scene,
+      state: this.state,
+      canvas: this.config.canvas,
+      container: document.body,
+      onModeChanged: (active) => {
+        Logger.debug(`[EditorUI] Model Forge mode changed: ${active}`);
+        // Disable other interactions when Model Forge is active
+        if (active) {
+          this.config.selection.clearSelection();
+        }
+      },
+    });
+    this.disposables.add(() => this.modelForgeManager?.dispose());
 
     // Initialize Collaboration Manager (optional - requires auth token)
     this.initializeCollaborationManager();
@@ -2171,6 +2190,30 @@ export class EditorUI {
         root.style.display = 'none';
       }
     }
+  }
+
+  /**
+   * Toggle Model Forge mode.
+   */
+  private toggleModelForge(): void {
+    if (!this.state) return;
+    
+    // Toggle the model forge active state
+    this.state.modelForgeActive.value = !this.state.modelForgeActive.value;
+    
+    const isActive = this.state.modelForgeActive.value;
+    if (isActive) {
+      this.setStatusMessage('Model Forge activated - Build microblock models', 2000);
+    } else {
+      this.setStatusMessage('Model Forge deactivated', 1000);
+    }
+  }
+
+  /**
+   * Get Model Forge manager (for external access).
+   */
+  public getModelForgeManager(): ModelForgeManager | null {
+    return this.modelForgeManager;
   }
 
   /**

@@ -1,12 +1,46 @@
-import { useState, useEffect } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
+import { useState, useEffect, useRef } from 'react';
+import { useParams, useNavigate, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 import { Layout } from '../layout/Layout';
 import type { SupportTicketWithMessages } from '../../api/support';
 import { supportApi } from '../../api/support';
-import { Card } from '../shared/Card';
 import { Button } from '../shared/Button';
 import { TicketMessage } from './TicketMessage';
+import './TicketDetail.css';
+
+// Status configuration
+const STATUS_CONFIG: Record<string, { label: string; icon: string; color: string }> = {
+  open: { label: 'Open', icon: '🟢', color: '#22c55e' },
+  in_progress: { label: 'In Progress', icon: '🔄', color: '#3b82f6' },
+  resolved: { label: 'Resolved', icon: '✅', color: '#8b5cf6' },
+  closed: { label: 'Closed', icon: '🔒', color: '#6b7280' },
+};
+
+// Priority configuration
+const PRIORITY_CONFIG: Record<string, { label: string; icon: string; color: string }> = {
+  low: { label: 'Low', icon: '🟢', color: '#22c55e' },
+  medium: { label: 'Medium', icon: '🟡', color: '#eab308' },
+  high: { label: 'High', icon: '🟠', color: '#f97316' },
+  urgent: { label: 'Urgent', icon: '🔴', color: '#ef4444' },
+};
+
+// Type configuration  
+const TYPE_CONFIG: Record<string, { label: string; icon: string }> = {
+  question: { label: 'Question', icon: '❓' },
+  bug: { label: 'Bug Report', icon: '🐛' },
+  feature: { label: 'Feature Request', icon: '💡' },
+  other: { label: 'Other', icon: '📝' },
+};
+
+function formatDate(timestamp: number): string {
+  return new Date(timestamp).toLocaleDateString('en-US', {
+    year: 'numeric',
+    month: 'long',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+}
 
 export function TicketDetail() {
   const { id } = useParams<{ id: string }>();
@@ -17,12 +51,19 @@ export function TicketDetail() {
   const [error, setError] = useState<string | null>(null);
   const [newMessage, setNewMessage] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [showCloseConfirm, setShowCloseConfirm] = useState(false);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (id) {
       loadTicket();
     }
   }, [id]);
+
+  useEffect(() => {
+    // Scroll to bottom when messages change
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, [ticket?.messages]);
 
   const loadTicket = async () => {
     if (!id) return;
@@ -51,7 +92,7 @@ export function TicketDetail() {
       await loadTicket();
     } catch (err) {
       console.error('Failed to add message:', err);
-      alert(err instanceof Error ? err.message : 'Failed to add message');
+      setError(err instanceof Error ? err.message : 'Failed to add message');
     } finally {
       setSubmitting(false);
     }
@@ -59,104 +100,225 @@ export function TicketDetail() {
 
   const handleCloseTicket = async () => {
     if (!id || !ticket) return;
-    if (!confirm('Are you sure you want to close this ticket?')) return;
 
     try {
       await supportApi.updateTicket(id, { status: 'closed' });
       await loadTicket();
+      setShowCloseConfirm(false);
     } catch (err) {
       console.error('Failed to close ticket:', err);
-      alert(err instanceof Error ? err.message : 'Failed to close ticket');
+      setError(err instanceof Error ? err.message : 'Failed to close ticket');
     }
   };
 
   if (loading) {
     return (
-      <div>
-        <p>Loading ticket...</p>
-      </div>
+      <Layout>
+        <div className="page-container">
+          <div className="ticket-detail__loading">
+            <div className="ticket-detail__loading-spinner">⏳</div>
+            <p className="ticket-detail__loading-text">Loading ticket...</p>
+          </div>
+        </div>
+      </Layout>
     );
   }
 
   if (error || !ticket) {
     return (
-      <Card>
-        <p style={{ color: 'var(--color-error)' }}>{error || 'Ticket not found'}</p>
-        <Button onClick={() => navigate('/support')}>Back to Support</Button>
-      </Card>
+      <Layout>
+        <div className="page-container">
+          <div className="ticket-detail__error">
+            <div className="ticket-detail__error-icon">⚠️</div>
+            <p className="ticket-detail__error-text">{error || 'Ticket not found'}</p>
+            <Button onClick={() => navigate('/support')}>Back to Support</Button>
+          </div>
+        </div>
+      </Layout>
     );
   }
 
   const isCurrentUser = ticket.userId === user?.id;
   const canClose = isCurrentUser && ticket.status !== 'closed';
+  const status = STATUS_CONFIG[ticket.status];
+  const priority = PRIORITY_CONFIG[ticket.priority];
+  const type = TYPE_CONFIG[ticket.type];
 
   return (
     <Layout>
       <div className="page-container">
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-4)' }}>
-      <Card>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', marginBottom: 'var(--spacing-3)' }}>
-          <div>
-            <h1 style={{ margin: 0, marginBottom: 'var(--spacing-2)' }}>{ticket.title}</h1>
-            <div style={{ display: 'flex', gap: 'var(--spacing-2)', flexWrap: 'wrap' }}>
-              <span style={{ padding: 'var(--spacing-1) var(--spacing-2)', borderRadius: 'var(--radius-sm)', background: 'var(--color-bg-secondary)', fontSize: '0.9em' }}>
-                {ticket.status.replace('_', ' ')}
-              </span>
-              <span style={{ padding: 'var(--spacing-1) var(--spacing-2)', borderRadius: 'var(--radius-sm)', background: 'var(--color-bg-secondary)', fontSize: '0.9em' }}>
-                {ticket.priority}
-              </span>
-              <span style={{ padding: 'var(--spacing-1) var(--spacing-2)', borderRadius: 'var(--radius-sm)', background: 'var(--color-bg-secondary)', fontSize: '0.9em' }}>
-                {ticket.type}
-              </span>
+        <div className="ticket-detail">
+          {/* Breadcrumb */}
+          <nav className="ticket-detail__breadcrumb">
+            <Link to="/support" className="ticket-detail__breadcrumb-link">
+              Support Center
+            </Link>
+            <span className="ticket-detail__breadcrumb-separator">›</span>
+            <Link to="/support?tab=tickets" className="ticket-detail__breadcrumb-link">
+              My Tickets
+            </Link>
+            <span className="ticket-detail__breadcrumb-separator">›</span>
+            <span className="ticket-detail__breadcrumb-current">#{id?.slice(-6)}</span>
+          </nav>
+
+          {/* Main Content */}
+          <div className="ticket-detail__content">
+            {/* Ticket Info Panel */}
+            <div className="ticket-detail__info">
+              <div className="ticket-detail__header">
+                <div className="ticket-detail__header-top">
+                  <span className="ticket-detail__type">{type?.icon}</span>
+                  <h1 className="ticket-detail__title">{ticket.title}</h1>
+                </div>
+                <div className="ticket-detail__badges">
+                  <span 
+                    className="ticket-detail__badge ticket-detail__badge--status"
+                    style={{ 
+                      backgroundColor: `${status?.color}15`,
+                      color: status?.color,
+                      borderColor: `${status?.color}30`,
+                    }}
+                  >
+                    {status?.icon} {status?.label}
+                  </span>
+                  <span 
+                    className="ticket-detail__badge ticket-detail__badge--priority"
+                    style={{ 
+                      backgroundColor: `${priority?.color}15`,
+                      color: priority?.color,
+                      borderColor: `${priority?.color}30`,
+                    }}
+                  >
+                    {priority?.icon} {priority?.label}
+                  </span>
+                  <span className="ticket-detail__badge ticket-detail__badge--type">
+                    {type?.label}
+                  </span>
+                </div>
+                <div className="ticket-detail__meta">
+                  <span className="ticket-detail__meta-item">
+                    <span className="ticket-detail__meta-icon">📅</span>
+                    Created {formatDate(ticket.createdAt)}
+                  </span>
+                  <span className="ticket-detail__meta-item">
+                    <span className="ticket-detail__meta-icon">🔄</span>
+                    Updated {formatDate(ticket.updatedAt)}
+                  </span>
+                </div>
+              </div>
+
+              <div className="ticket-detail__description">
+                <h3 className="ticket-detail__description-title">Description</h3>
+                <div className="ticket-detail__description-content">
+                  {ticket.description}
+                </div>
+              </div>
+
+              {canClose && (
+                <div className="ticket-detail__actions">
+                  {showCloseConfirm ? (
+                    <div className="ticket-detail__close-confirm">
+                      <p>Are you sure you want to close this ticket?</p>
+                      <div className="ticket-detail__close-confirm-buttons">
+                        <Button variant="secondary" onClick={() => setShowCloseConfirm(false)}>
+                          Cancel
+                        </Button>
+                        <Button onClick={handleCloseTicket}>
+                          Yes, Close Ticket
+                        </Button>
+                      </div>
+                    </div>
+                  ) : (
+                    <button 
+                      className="ticket-detail__close-btn"
+                      onClick={() => setShowCloseConfirm(true)}
+                    >
+                      🔒 Close Ticket
+                    </button>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Messages Section */}
+            <div className="ticket-detail__messages">
+              <div className="ticket-detail__messages-header">
+                <h2 className="ticket-detail__messages-title">
+                  <span>💬</span>
+                  Conversation
+                  {ticket.messages.length > 0 && (
+                    <span className="ticket-detail__messages-count">{ticket.messages.length}</span>
+                  )}
+                </h2>
+              </div>
+
+              <div className="ticket-detail__messages-list">
+                {ticket.messages.length === 0 ? (
+                  <div className="ticket-detail__no-messages">
+                    <span className="ticket-detail__no-messages-icon">💬</span>
+                    <p className="ticket-detail__no-messages-text">
+                      No messages yet. Start the conversation below!
+                    </p>
+                  </div>
+                ) : (
+                  <>
+                    {ticket.messages.map((message, index) => (
+                      <TicketMessage
+                        key={message.id}
+                        message={message}
+                        isCurrentUser={message.authorId === user?.id}
+                      />
+                    ))}
+                    <div ref={messagesEndRef} />
+                  </>
+                )}
+              </div>
+
+              {/* Message Input */}
+              {ticket.status !== 'closed' ? (
+                <form onSubmit={handleAddMessage} className="ticket-detail__message-form">
+                  <div className="ticket-detail__message-input-wrapper">
+                    <textarea
+                      value={newMessage}
+                      onChange={(e) => setNewMessage(e.target.value)}
+                      placeholder="Type your message..."
+                      className="ticket-detail__message-input"
+                      rows={3}
+                    />
+                    <div className="ticket-detail__message-form-footer">
+                      <span className="ticket-detail__message-hint">
+                        Press Enter to send, Shift+Enter for new line
+                      </span>
+                      <Button 
+                        type="submit" 
+                        disabled={submitting || !newMessage.trim()}
+                      >
+                        {submitting ? (
+                          <>
+                            <span className="ticket-detail__send-spinner">⏳</span>
+                            Sending...
+                          </>
+                        ) : (
+                          <>Send Message</>
+                        )}
+                      </Button>
+                    </div>
+                  </div>
+                </form>
+              ) : (
+                <div className="ticket-detail__closed-notice">
+                  <span className="ticket-detail__closed-icon">🔒</span>
+                  <p className="ticket-detail__closed-text">
+                    This ticket is closed. Need more help? 
+                    <Link to="/support" className="ticket-detail__closed-link">
+                      Create a new ticket
+                    </Link>
+                  </p>
+                </div>
+              )}
             </div>
           </div>
-          {canClose && (
-            <Button onClick={handleCloseTicket} variant="secondary">
-              Close Ticket
-            </Button>
-          )}
         </div>
-        <div style={{ whiteSpace: 'pre-wrap', marginTop: 'var(--spacing-3)' }}>{ticket.description}</div>
-      </Card>
-
-      <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-3)' }}>
-        <h2>Messages</h2>
-        {ticket.messages.length === 0 ? (
-          <Card>
-            <p style={{ color: 'var(--color-text-secondary)' }}>No messages yet.</p>
-          </Card>
-        ) : (
-          ticket.messages.map((message) => (
-            <TicketMessage
-              key={message.id}
-              message={message}
-              isCurrentUser={message.authorId === user?.id}
-            />
-          ))
-        )}
-      </div>
-
-      {ticket.status !== 'closed' && (
-        <Card>
-          <form onSubmit={handleAddMessage}>
-            <h3 style={{ marginTop: 0 }}>Add Message</h3>
-            <textarea
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              placeholder="Type your message here..."
-              rows={4}
-              required
-              style={{ width: '100%', padding: 'var(--spacing-2)', borderRadius: 'var(--radius-sm)', border: '1px solid var(--color-border)', fontFamily: 'inherit', resize: 'vertical', marginBottom: 'var(--spacing-2)' }}
-            />
-            <div style={{ display: 'flex', justifyContent: 'flex-end' }}>
-              <Button type="submit" disabled={submitting || !newMessage.trim()}>
-                {submitting ? 'Sending...' : 'Send Message'}
-              </Button>
-            </div>
-          </form>
-        </Card>
-      )}
-      </div>
       </div>
     </Layout>
   );

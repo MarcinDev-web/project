@@ -1,29 +1,15 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Layout } from '../components/layout/Layout';
-import { WalletDisplay } from '../components/shop/WalletDisplay';
-import { ShoppingCart } from '../components/shop/ShoppingCart';
 import { shopApi, type Asset, type CartItem, type ShopItem, type WalletBalance } from '../api/shop';
 import { marketplaceApi, type MarketplaceItem } from '../api/marketplace';
 import { useAuth } from '../contexts/AuthContext';
 import { StoreOfferCard, type StoreOffer, type StoreOfferKind, type StorePriceType } from '../components/store/StoreOfferCard';
-import { Card } from '../components/shared/Card';
+import { WalletDropdown } from '../components/store/WalletDropdown';
+import { TopUpModal } from '../components/store/TopUpModal';
+import { CartSlideout } from '../components/store/CartSlideout';
+import { StoreToolbar, type ItemFilter, type PriceFilter, type SortOption } from '../components/store/StoreToolbar';
 import { Button } from '../components/shared/Button';
-
-type ItemFilter =
-  | 'all'
-  | 'build'
-  | 'avatar'
-  | 'material'
-  | 'model'
-  | 'texture'
-  | 'script'
-  | 'consumable'
-  | 'cosmetic'
-  | 'upgrade'
-  | 'collectible';
-
-type PriceFilter = 'all' | 'free' | 'platform';
 
 const PLATFORM_CURRENCIES = ['credits', 'coins', 'gems'];
 const PLATFORM_CURRENCY_LABEL = 'CRD';
@@ -39,10 +25,17 @@ export function StorePage() {
   const [cartLoading, setCartLoading] = useState(false);
   const [actionLoadingId, setActionLoadingId] = useState<string | null>(null);
 
+  // Filter state
   const [searchTerm, setSearchTerm] = useState('');
   const [itemFilter, setItemFilter] = useState<ItemFilter>('all');
   const [priceFilter, setPriceFilter] = useState<PriceFilter>('all');
-  const [sortBy, setSortBy] = useState<'featured' | 'newest'>('featured');
+  const [sortBy, setSortBy] = useState<SortOption>('featured');
+
+  // UI state for modals/slideouts
+  const [showTopUpModal, setShowTopUpModal] = useState(false);
+  const [cartOpen, setCartOpen] = useState(false);
+
+  const isGuest = !user;
 
   useEffect(() => {
     void loadData();
@@ -238,6 +231,7 @@ export function StorePage() {
       const result = await shopApi.checkout();
       if (result.success) {
         await loadData();
+        setCartOpen(false);
         alert('Purchase successful!');
       } else {
         alert(`Checkout failed: ${result.error}`);
@@ -268,13 +262,14 @@ export function StorePage() {
     }
   };
 
-  const platformBalance = useMemo(() => {
-    for (const code of PLATFORM_CURRENCIES) {
-      const balance = wallet.find((entry) => entry.currency.toLowerCase() === code);
-      if (balance) return balance.balance;
+  const handleTopUpPurchase = (amount: number) => {
+    if (!user) {
+      navigate('/login');
+      return;
     }
-    return 0;
-  }, [wallet]);
+    alert(`Connect billing API to process a purchase of ${amount.toLocaleString()} ${PLATFORM_CURRENCY_LABEL}.`);
+    setShowTopUpModal(false);
+  };
 
   const priceFilterMatch = (offer: StoreOffer) => {
     if (priceFilter === 'all') return true;
@@ -305,41 +300,32 @@ export function StorePage() {
     return filtered;
   }, [offers, searchTerm, priceFilter, itemFilter, sortBy]);
 
-  const filters: Array<{ key: ItemFilter; label: string; count: number }> = [
-    { key: 'all', label: 'All', count: offers.length },
-    { key: 'build', label: 'Builds', count: offers.filter((o) => o.kind === 'build').length },
-    { key: 'avatar', label: 'Avatars', count: offers.filter((o) => o.kind === 'avatar').length },
-    { key: 'material', label: 'Materials', count: offers.filter((o) => o.kind === 'material').length },
-    { key: 'model', label: 'Models', count: offers.filter((o) => o.kind === 'model').length },
-    { key: 'texture', label: 'Textures', count: offers.filter((o) => o.kind === 'texture').length },
-    { key: 'script', label: 'Scripts', count: offers.filter((o) => o.kind === 'script').length },
-    { key: 'consumable', label: 'Consumables', count: offers.filter((o) => o.kind === 'consumable').length },
-    { key: 'cosmetic', label: 'Cosmetics', count: offers.filter((o) => o.kind === 'cosmetic').length },
-    { key: 'upgrade', label: 'Upgrades', count: offers.filter((o) => o.kind === 'upgrade').length },
-    { key: 'collectible', label: 'Collectibles', count: offers.filter((o) => o.kind === 'collectible').length },
-  ];
+  // Only show filters that have items (count > 0), always keep "All"
+  const filterOptions = useMemo(() => {
+    const allFilters: Array<{ key: ItemFilter; label: string; count: number }> = [
+      { key: 'all', label: 'All', count: offers.length },
+      { key: 'build', label: 'Builds', count: offers.filter((o) => o.kind === 'build').length },
+      { key: 'avatar', label: 'Avatars', count: offers.filter((o) => o.kind === 'avatar').length },
+      { key: 'material', label: 'Materials', count: offers.filter((o) => o.kind === 'material').length },
+      { key: 'model', label: 'Models', count: offers.filter((o) => o.kind === 'model').length },
+      { key: 'texture', label: 'Textures', count: offers.filter((o) => o.kind === 'texture').length },
+      { key: 'script', label: 'Scripts', count: offers.filter((o) => o.kind === 'script').length },
+      { key: 'consumable', label: 'Consumables', count: offers.filter((o) => o.kind === 'consumable').length },
+      { key: 'cosmetic', label: 'Cosmetics', count: offers.filter((o) => o.kind === 'cosmetic').length },
+      { key: 'upgrade', label: 'Upgrades', count: offers.filter((o) => o.kind === 'upgrade').length },
+      { key: 'collectible', label: 'Collectibles', count: offers.filter((o) => o.kind === 'collectible').length },
+    ];
+    // Filter out empty categories (except "All" which is always visible)
+    return allFilters.filter((f) => f.key === 'all' || f.count > 0);
+  }, [offers]);
 
-  const priceFilters: Array<{ key: PriceFilter; label: string }> = [
-    { key: 'all', label: 'All prices' },
-    { key: 'free', label: 'Free' },
-    { key: 'platform', label: 'Platform currency' },
-  ];
-
-  const topupPacks = [
-    { amount: 500, price: '$4.99' },
-    { amount: 1500, price: '$12.99' },
-    { amount: 5000, price: '$34.99' },
-  ];
-
-  const isGuest = !user;
-
-  const handleTopupClick = (amount: number) => {
-    if (!user) {
-      navigate('/login');
-      return;
+  // Reset filter to 'all' if current selection becomes empty
+  useEffect(() => {
+    const currentFilterExists = filterOptions.some((f) => f.key === itemFilter);
+    if (!currentFilterExists && itemFilter !== 'all') {
+      setItemFilter('all');
     }
-    alert(`Connect billing API to process a purchase of ${amount.toLocaleString()} ${PLATFORM_CURRENCY_LABEL}.`);
-  };
+  }, [filterOptions, itemFilter]);
 
   const cartItemsWithDetails = useMemo(() => {
     return cart.map((item) => {
@@ -370,147 +356,116 @@ export function StorePage() {
 
   return (
     <Layout>
-      <div className="shop-page">
-        <section className="shop-hero">
-          <div className="shop-hero__content">
-            <p className="shop-eyebrow">Unified Store</p>
-            <h1>Assets, builds, avatars, currency</h1>
-            <p className="shop-hero__subtitle">
-              One storefront for marketplace content, shop items, creator assets, and platform currency. Real money is only used for buying platform credits; everything else is free or costs platform currency.
-            </p>
-            {isGuest && (
-              <div className="store-cta-row">
-                <Button onClick={() => navigate('/login')}>Log in to purchase</Button>
-              </div>
+      <div className="store-page">
+        {/* Compact Header */}
+        <header className="store-header">
+          <StoreToolbar
+            searchTerm={searchTerm}
+            onSearchChange={setSearchTerm}
+            itemFilter={itemFilter}
+            onItemFilterChange={setItemFilter}
+            priceFilter={priceFilter}
+            onPriceFilterChange={setPriceFilter}
+            sortBy={sortBy}
+            onSortChange={setSortBy}
+            filterOptions={filterOptions}
+            totalCount={visibleOffers.length}
+          />
+
+          <div className="store-header__actions">
+            {isGuest ? (
+              <Button size="small" onClick={() => navigate('/login')}>
+                Log in
+              </Button>
+            ) : (
+              <>
+                <WalletDropdown
+                  balances={wallet}
+                  loading={loading}
+                  onBuyCredits={() => setShowTopUpModal(true)}
+                />
+                <Button
+                  size="small"
+                  variant="primary"
+                  onClick={() => setShowTopUpModal(true)}
+                  className="store-buy-btn"
+                >
+                  + Buy
+                </Button>
+                <button
+                  className="store-cart-trigger"
+                  onClick={() => setCartOpen(true)}
+                  aria-label={`Shopping cart with ${cart.length} items`}
+                >
+                  <span className="store-cart-trigger__icon">🛒</span>
+                  {cart.length > 0 && (
+                    <span className="store-cart-trigger__badge">{cart.length}</span>
+                  )}
+                </button>
+              </>
             )}
-            <div className="shop-hero__stats">
-              <div className="shop-hero__stat">
-                <span className="shop-hero__stat-value">{offers.length}</span>
-                <span className="shop-hero__stat-label">Total offers</span>
-              </div>
-              <div className="shop-hero__stat">
-                <span className="shop-hero__stat-value">{platformBalance}</span>
-                <span className="shop-hero__stat-label">Platform balance ({PLATFORM_CURRENCY_LABEL})</span>
-              </div>
-              <div className="shop-hero__stat">
-                <span className="shop-hero__stat-value">{cart.length}</span>
-                <span className="shop-hero__stat-label">Cart items</span>
-              </div>
-            </div>
           </div>
-            <div className="shop-hero__panel">
-              <div className="shop-hero__panel-header">
-                <p className="shop-eyebrow">Top up currency</p>
-                <span className="shop-pill">Platform</span>
-              </div>
-            <div className="store-topup-grid">
-              {topupPacks.map((pack) => (
-                <Card key={pack.amount} className="store-topup-card">
-                  <div className="store-topup-amount">{pack.amount.toLocaleString()} {PLATFORM_CURRENCY_LABEL}</div>
-                  <div className="store-topup-price">{pack.price}</div>
-                  <Button size="small" onClick={() => handleTopupClick(pack.amount)}>
-                    Buy credits
-                  </Button>
-                </Card>
+        </header>
+
+        {/* Main Content - Full Width Grid */}
+        <main className="store-content">
+          {loading ? (
+            <div className="store-loading">
+              <span className="store-loading__spinner" />
+              Loading catalog...
+            </div>
+          ) : visibleOffers.length === 0 ? (
+            <div className="store-empty">
+              <span className="store-empty__icon">🔍</span>
+              <p className="store-empty__title">No results found</p>
+              <p className="store-empty__hint">
+                Try adjusting your search or filters
+              </p>
+              {searchTerm && (
+                <Button
+                  variant="secondary"
+                  size="small"
+                  onClick={() => setSearchTerm('')}
+                >
+                  Clear search
+                </Button>
+              )}
+            </div>
+          ) : (
+            <div className="store-grid">
+              {visibleOffers.map((offer) => (
+                <StoreOfferCard
+                  key={offer.id}
+                  offer={offer}
+                  onAddToCart={offer.source === 'marketplace' ? undefined : handleAddToCart}
+                  onOpen={handleOpen}
+                  onDownloadFree={offer.source === 'marketplace' ? handleDownloadFree : undefined}
+                  actionLoading={actionLoadingId === offer.id}
+                />
               ))}
             </div>
-            <div className="shop-hero__hint">
-              Single platform currency for all purchases. Real money is only used to buy these packs.
-            </div>
-          </div>
-        </section>
+          )}
+        </main>
 
-        <div className="shop-toolbar">
-          <div className="shop-search">
-            <input
-              type="search"
-              placeholder="Search everything..."
-              value={searchTerm}
-              onChange={(event) => setSearchTerm(event.target.value)}
-            />
-          </div>
-          <div className="shop-tabs">
-            {priceFilters.map((filter) => (
-              <button
-                key={filter.key}
-                onClick={() => setPriceFilter(filter.key)}
-                className={`shop-tab-button ${priceFilter === filter.key ? 'active' : ''}`}
-              >
-                {filter.label}
-              </button>
-            ))}
-          </div>
-        </div>
+        {/* Top Up Modal */}
+        {showTopUpModal && (
+          <TopUpModal
+            onPurchase={handleTopUpPurchase}
+            onClose={() => setShowTopUpModal(false)}
+          />
+        )}
 
-        <div className="shop-filters">
-          {filters.map((filter) => (
-            <button
-              key={filter.key}
-              onClick={() => setItemFilter(filter.key)}
-              className={`shop-filter-chip ${itemFilter === filter.key ? 'active' : ''}`}
-            >
-              {filter.label} <span className="shop-muted">({filter.count})</span>
-            </button>
-          ))}
-          <div className="store-sort">
-            <span className="shop-muted">Sort:</span>
-            <button
-              className={`shop-filter-chip ${sortBy === 'featured' ? 'active' : ''}`}
-              onClick={() => setSortBy('featured')}
-            >
-              Featured
-            </button>
-            <button
-              className={`shop-filter-chip ${sortBy === 'newest' ? 'active' : ''}`}
-              onClick={() => setSortBy('newest')}
-            >
-              Newest
-            </button>
-          </div>
-        </div>
-
-        <div className="shop-content-wrapper">
-          <div className="shop-main-content">
-            {loading ? (
-              <div className="shop-loading">Loading unified catalog...</div>
-            ) : visibleOffers.length === 0 ? (
-              <div className="shop-empty-state">
-                <p>No results for the current filters.</p>
-                <p className="shop-muted">Try adjusting the search or category.</p>
-              </div>
-            ) : (
-              <div className="shop-items-grid">
-                {visibleOffers.map((offer) => (
-                  <StoreOfferCard
-                    key={offer.id}
-                    offer={offer}
-                    onAddToCart={offer.source === 'marketplace' ? undefined : handleAddToCart}
-                    onOpen={handleOpen}
-                    onDownloadFree={offer.source === 'marketplace' ? handleDownloadFree : undefined}
-                    actionLoading={actionLoadingId === offer.id}
-                    footerSlot={
-                      offer.priceType === 'free' ? <span className="store-tag">Free</span> : null
-                    }
-                  />
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="shop-sidebar">
-            <WalletDisplay balances={wallet} loading={loading} />
-            <div className="shop-sidebar-card">
-              <ShoppingCart
-                items={cartItemsWithDetails}
-                totals={cartTotals}
-                onRemove={handleRemoveFromCart}
-                onClear={handleClearCart}
-                onCheckout={handleCheckout}
-                loading={cartLoading}
-              />
-            </div>
-          </div>
-        </div>
+        {/* Cart Slideout */}
+        <CartSlideout
+          isOpen={cartOpen}
+          items={cartItemsWithDetails}
+          totals={cartTotals}
+          onClose={() => setCartOpen(false)}
+          onRemove={handleRemoveFromCart}
+          onClear={handleClearCart}
+          onCheckout={handleCheckout}
+          loading={cartLoading}
+        />
       </div>
     </Layout>
   );

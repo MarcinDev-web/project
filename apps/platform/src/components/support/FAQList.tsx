@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import type { SupportFAQ } from '../../api/support';
 import { supportApi } from '../../api/support';
 import { FAQItem } from './FAQItem';
-import { Card } from '../shared/Card';
 
 interface FAQListProps {
   category?: SupportFAQ['category'];
@@ -36,34 +35,47 @@ export function FAQList({ category, searchQuery }: FAQListProps) {
 
   if (loading) {
     return (
-      <div>
-        <p>Loading FAQs...</p>
+      <div className="faq-loading">
+        <div className="faq-loading__spinner">⏳</div>
+        <p className="faq-loading__text">Loading FAQs...</p>
       </div>
     );
   }
 
   if (error) {
     return (
-      <Card>
-        <p style={{ color: 'var(--color-error)' }}>{error}</p>
-      </Card>
+      <div className="faq-error">
+        <div className="faq-error__icon">⚠️</div>
+        <p className="faq-error__text">{error}</p>
+        <button className="faq-error__retry" onClick={loadFAQs}>
+          Try Again
+        </button>
+      </div>
     );
   }
 
   if (faqs.length === 0) {
     return (
-      <Card>
-        <p style={{ color: 'var(--color-text-secondary)' }}>
-          {searchQuery ? 'No FAQs found matching your search.' : 'No FAQs available in this category.'}
+      <div className="support-faq-empty">
+        <div className="support-faq-empty__icon">🔍</div>
+        <p>
+          {searchQuery 
+            ? `No FAQs found matching "${searchQuery}". Try different keywords.` 
+            : 'No FAQs available in this category yet.'}
         </p>
-      </Card>
+      </div>
     );
   }
 
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--spacing-3)' }}>
-      {faqs.map((faq) => (
-        <FAQItem key={faq.id} faq={faq} onHelpful={loadFAQs} />
+    <div className="faq-items-list">
+      {faqs.map((faq, index) => (
+        <FAQItem 
+          key={faq.id} 
+          faq={faq} 
+          onHelpful={loadFAQs} 
+          style={{ animationDelay: `${index * 0.05}s` }}
+        />
       ))}
     </div>
   );

@@ -57,16 +57,8 @@ export async function init(): Promise<WasmMeshProcessor> {
   // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
   const compute_uvs_planar = mod.compute_uvs_planar as (positions: Float32Array, normal: Float32Array, scale: number) => Float32Array;
 
-  // Capture memory buffer
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-  const wasmMemory = mod.initSync 
-    // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-    ? mod.wasm.memory 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    : (await (window as any).wasm_bindgen).memory;
-
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
-  const memory = mod.memory || wasmMemory;
+  // Note: wasm.memory is internal to the generated module and not exported.
+  // The memory property is kept for interface compatibility but not used.
 
   return {
     computeNormals: (positions, indices) => {
@@ -81,7 +73,8 @@ export async function init(): Promise<WasmMeshProcessor> {
     computeUvsPlanar: (positions, normal, scale) => {
       return compute_uvs_planar(positions, normal, scale);
     },
-    memory: memory as WebAssembly.Memory,
+    // Memory is not directly accessible from wasm-bindgen generated modules
+    memory: null as unknown as WebAssembly.Memory,
     dispose: () => {
       isReady = false;
       initPromise = null;

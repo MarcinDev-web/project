@@ -2,7 +2,7 @@
  * Instance Data Management System
  *
  * Efficiently builds and manages per-instance GPU data for rendering.
- * Reuses buffers to eliminate per-frame allocations.
+ * Uses interleaved buffer layout for optimal GPU compaction (single pass).
  *
  * Performance: Zero-allocation instance data building for large scenes.
  */
@@ -13,17 +13,30 @@ import type { Frustum } from './FrustumCuller';
 import { Logger } from '@engine/core/utils';
 import { generateCapsuleY, generateHeroicTorsoMesh } from '@engine/avatar';
 import { generateSphereMesh, generateCylinderMesh, generatePlaneMesh, generateCapsuleMesh, generateBoxMesh } from '../utils/geometry';
+import { resolveAtlasIndex as resolveAtlasIndexFromLibrary, DEFAULT_ATLAS_INDEX } from '../materials/MaterialLibrary';
+
+/**
+ * Interleaved buffer layout constants (in floats)
+ * Total stride: 24 floats = 96 bytes per instance
+ */
+export const INSTANCE_STRIDE = 24; // floats per instance
+export const INSTANCE_STRIDE_BYTES = INSTANCE_STRIDE * 4; // 96 bytes
+
+// Offsets within interleaved buffer (in floats)
+export const INSTANCE_OFFSET_OFFSET = 0;      // vec3 (3 floats)
+export const INSTANCE_COLOR_SCALE_OFFSET = 3; // vec4 (4 floats)
+export const INSTANCE_SECONDARY_COLOR_OFFSET = 7;  // vec4 (4 floats)
+export const INSTANCE_EMISSIVE_COLOR_OFFSET = 11;  // vec4 (4 floats)
+export const INSTANCE_MATERIAL_PARAMS_OFFSET = 15; // vec4 (4 floats)
+export const INSTANCE_ROTATION_OFFSET = 19;   // vec4 (4 floats)
+export const INSTANCE_MATERIAL_ID_OFFSET = 23; // f32 (1 float)
 
 export interface InstanceData {
   instanceCount: number;
   opaqueCount: number;
-  instanceOffsetData: Float32Array;
-  instanceColorScaleData: Float32Array;
-  instanceSecondaryColorData: Float32Array;
-  instanceEmissiveColorData: Float32Array;
-  instanceMaterialParamsData: Float32Array;
-  instanceRotationData: Float32Array;
-  instanceMaterialIdData: Float32Array;
+  /** Interleaved instance data: [offset(3), colorScale(4), secondaryColor(4), emissiveColor(4), materialParams(4), rotation(4), materialId(1)] per instance */
+  instanceInterleavedData: Float32Array;
+  /** Bounds data for frustum culling: [centerX, centerY, centerZ, radius] per instance */
   instanceBoundsData: Float32Array;
 }
 
@@ -37,28 +50,19 @@ export interface CustomGeometryEntity {
 
 /**
  * InstanceDataBuilder builds instance data by reusing internal buffers.
+ * Uses interleaved layout for optimal GPU compaction.
  * Avoids per-frame allocations for better performance.
  */
 export class InstanceDataBuilder {
-  private offsetBuffer: Float32Array;
-  private colorScaleBuffer: Float32Array;
-  private secondaryColorBuffer: Float32Array;
-  private emissiveColorBuffer: Float32Array;
-  private materialParamsBuffer: Float32Array;
-  private rotationBuffer: Float32Array;
-  private materialIdBuffer: Float32Array;
+  /** Interleaved buffer: 24 floats per instance */
+  private interleavedBuffer: Float32Array;
+  /** Bounds buffer for frustum culling: 4 floats per instance */
   private boundsBuffer: Float32Array;
   private capacity: number;
 
   constructor(initialCapacity = 1000) {
     this.capacity = initialCapacity;
-    this.offsetBuffer = new Float32Array(initialCapacity * 3);
-    this.colorScaleBuffer = new Float32Array(initialCapacity * 4);
-    this.secondaryColorBuffer = new Float32Array(initialCapacity * 4);
-    this.emissiveColorBuffer = new Float32Array(initialCapacity * 4);
-    this.materialParamsBuffer = new Float32Array(initialCapacity * 4);
-    this.rotationBuffer = new Float32Array(initialCapacity * 4);
-    this.materialIdBuffer = new Float32Array(initialCapacity);
+    this.interleavedBuffer = new Float32Array(initialCapacity * INSTANCE_STRIDE);
     this.boundsBuffer = new Float32Array(initialCapacity * 4);
   }
 
@@ -67,13 +71,7 @@ export class InstanceDataBuilder {
    */
   private grow(newCapacity: number): void {
     this.capacity = newCapacity;
-    this.offsetBuffer = new Float32Array(newCapacity * 3);
-    this.colorScaleBuffer = new Float32Array(newCapacity * 4);
-    this.secondaryColorBuffer = new Float32Array(newCapacity * 4);
-    this.emissiveColorBuffer = new Float32Array(newCapacity * 4);
-    this.materialParamsBuffer = new Float32Array(newCapacity * 4);
-    this.rotationBuffer = new Float32Array(newCapacity * 4);
-    this.materialIdBuffer = new Float32Array(newCapacity);
+    this.interleavedBuffer = new Float32Array(newCapacity * INSTANCE_STRIDE);
     this.boundsBuffer = new Float32Array(newCapacity * 4);
   }
 
@@ -294,7 +292,7 @@ export class InstanceDataBuilder {
       if (!isTransparent) opaqueCount += component.count;
     }
 
-    // 4. Fill Buffers
+    // 4. Fill Buffers (interleaved layout)
     let opaqueCursor = 0;
     let transparentCursor = opaqueCount;
 
@@ -310,49 +308,56 @@ export class InstanceDataBuilder {
       const isTransparent = (flags & MaterialComponent.FLAG_TRANSPARENT) !== 0 || alpha < 0.999;
       
       const index = isTransparent ? transparentCursor++ : opaqueCursor++;
+      const base = index * INSTANCE_STRIDE;
 
-      // Position
-      this.offsetBuffer[index * 3 + 0] = pos[0];
-      this.offsetBuffer[index * 3 + 1] = pos[1];
-      this.offsetBuffer[index * 3 + 2] = pos[2];
+      // Position (offset 0, 3 floats)
+      this.interleavedBuffer[base + INSTANCE_OFFSET_OFFSET + 0] = pos[0];
+      this.interleavedBuffer[base + INSTANCE_OFFSET_OFFSET + 1] = pos[1];
+      this.interleavedBuffer[base + INSTANCE_OFFSET_OFFSET + 2] = pos[2];
 
-      // Primary color + scale
-      this.colorScaleBuffer[index * 4 + 0] = primary[0];
-      this.colorScaleBuffer[index * 4 + 1] = primary[1];
-      this.colorScaleBuffer[index * 4 + 2] = primary[2];
+      // Primary color + scale (offset 3, 4 floats)
+      this.interleavedBuffer[base + INSTANCE_COLOR_SCALE_OFFSET + 0] = primary[0];
+      this.interleavedBuffer[base + INSTANCE_COLOR_SCALE_OFFSET + 1] = primary[1];
+      this.interleavedBuffer[base + INSTANCE_COLOR_SCALE_OFFSET + 2] = primary[2];
       const maxScale = Math.max(scale[0], scale[1], scale[2]);
-      this.colorScaleBuffer[index * 4 + 3] = maxScale;
+      this.interleavedBuffer[base + INSTANCE_COLOR_SCALE_OFFSET + 3] = maxScale;
 
-      // Secondary
+      // Secondary color (offset 7, 4 floats)
       const accent = material?.accentColor;
       const secondary = accent ?? material?.secondaryColor ?? primary;
-      this.secondaryColorBuffer[index * 4 + 0] = secondary[0];
-      this.secondaryColorBuffer[index * 4 + 1] = secondary[1];
-      this.secondaryColorBuffer[index * 4 + 2] = secondary[2];
-      this.secondaryColorBuffer[index * 4 + 3] = secondary[3] ?? 1;
+      this.interleavedBuffer[base + INSTANCE_SECONDARY_COLOR_OFFSET + 0] = secondary[0];
+      this.interleavedBuffer[base + INSTANCE_SECONDARY_COLOR_OFFSET + 1] = secondary[1];
+      this.interleavedBuffer[base + INSTANCE_SECONDARY_COLOR_OFFSET + 2] = secondary[2];
+      this.interleavedBuffer[base + INSTANCE_SECONDARY_COLOR_OFFSET + 3] = secondary[3] ?? 1;
 
+      // Emissive color (offset 11, 4 floats)
       const emissive = material?.emissiveColor ?? [0, 0, 0, 1];
-      this.emissiveColorBuffer[index * 4 + 0] = emissive[0];
-      this.emissiveColorBuffer[index * 4 + 1] = emissive[1];
-      this.emissiveColorBuffer[index * 4 + 2] = emissive[2];
-      this.emissiveColorBuffer[index * 4 + 3] = material?.emissiveIntensity ?? 0;
+      this.interleavedBuffer[base + INSTANCE_EMISSIVE_COLOR_OFFSET + 0] = emissive[0];
+      this.interleavedBuffer[base + INSTANCE_EMISSIVE_COLOR_OFFSET + 1] = emissive[1];
+      this.interleavedBuffer[base + INSTANCE_EMISSIVE_COLOR_OFFSET + 2] = emissive[2];
+      this.interleavedBuffer[base + INSTANCE_EMISSIVE_COLOR_OFFSET + 3] = material?.emissiveIntensity ?? 0;
 
+      // Material params (offset 15, 4 floats)
       const metallic = material?.metallic ?? 0;
       const roughness = material?.roughness ?? 1;
-      this.materialParamsBuffer[index * 4 + 0] = alpha;
-      this.materialParamsBuffer[index * 4 + 1] = metallic;
-      this.materialParamsBuffer[index * 4 + 2] = roughness;
-      this.materialParamsBuffer[index * 4 + 3] = flags;
+      this.interleavedBuffer[base + INSTANCE_MATERIAL_PARAMS_OFFSET + 0] = alpha;
+      this.interleavedBuffer[base + INSTANCE_MATERIAL_PARAMS_OFFSET + 1] = metallic;
+      this.interleavedBuffer[base + INSTANCE_MATERIAL_PARAMS_OFFSET + 2] = roughness;
+      this.interleavedBuffer[base + INSTANCE_MATERIAL_PARAMS_OFFSET + 3] = flags;
 
-      // Rotation
-      this.rotationBuffer[index * 4 + 0] = rot[0];
-      this.rotationBuffer[index * 4 + 1] = rot[1];
-      this.rotationBuffer[index * 4 + 2] = rot[2];
-      this.rotationBuffer[index * 4 + 3] = rot[3];
+      // Rotation (offset 19, 4 floats)
+      this.interleavedBuffer[base + INSTANCE_ROTATION_OFFSET + 0] = rot[0];
+      this.interleavedBuffer[base + INSTANCE_ROTATION_OFFSET + 1] = rot[1];
+      this.interleavedBuffer[base + INSTANCE_ROTATION_OFFSET + 2] = rot[2];
+      this.interleavedBuffer[base + INSTANCE_ROTATION_OFFSET + 3] = rot[3];
 
-      // Material ID
-      this.materialIdBuffer[index] = material?.materialId ?? 0;
+      // Material ID (offset 23, 1 float)
+      const resolvedMaterialId = material?.materialRef 
+        ? resolveAtlasIndexFromLibrary(material.materialRef, material.materialId ?? DEFAULT_ATLAS_INDEX)
+        : (material?.materialId ?? DEFAULT_ATLAS_INDEX);
+      this.interleavedBuffer[base + INSTANCE_MATERIAL_ID_OFFSET] = resolvedMaterialId;
 
+      // Bounds (separate buffer for classify pass)
       const maxExtent = Math.max(scale[0], scale[1], scale[2]);
       const radius = Math.max(maxExtent * 0.5, 0.001);
       this.boundsBuffer[index * 4 + 0] = pos[0];
@@ -373,42 +378,50 @@ export class InstanceDataBuilder {
       
       for (let k = 0; k < count; k++) {
         const i = idx + k;
+        const base = i * INSTANCE_STRIDE;
         
-        this.offsetBuffer[i * 3 + 0] = component.offsetData[k * 3 + 0] ?? 0;
-        this.offsetBuffer[i * 3 + 1] = component.offsetData[k * 3 + 1] ?? 0;
-        this.offsetBuffer[i * 3 + 2] = component.offsetData[k * 3 + 2] ?? 0;
+        // Position (offset 0, 3 floats)
+        this.interleavedBuffer[base + INSTANCE_OFFSET_OFFSET + 0] = component.offsetData[k * 3 + 0] ?? 0;
+        this.interleavedBuffer[base + INSTANCE_OFFSET_OFFSET + 1] = component.offsetData[k * 3 + 1] ?? 0;
+        this.interleavedBuffer[base + INSTANCE_OFFSET_OFFSET + 2] = component.offsetData[k * 3 + 2] ?? 0;
         
-        this.rotationBuffer[i * 4 + 0] = component.rotationData[k * 4 + 0] ?? 0;
-        this.rotationBuffer[i * 4 + 1] = component.rotationData[k * 4 + 1] ?? 0;
-        this.rotationBuffer[i * 4 + 2] = component.rotationData[k * 4 + 2] ?? 0;
-        this.rotationBuffer[i * 4 + 3] = component.rotationData[k * 4 + 3] ?? 0;
-        
-        this.colorScaleBuffer[i * 4 + 0] = component.colorData[k * 4 + 0] ?? 0;
-        this.colorScaleBuffer[i * 4 + 1] = component.colorData[k * 4 + 1] ?? 0;
-        this.colorScaleBuffer[i * 4 + 2] = component.colorData[k * 4 + 2] ?? 0;
-        
+        // Color + scale (offset 3, 4 floats)
+        this.interleavedBuffer[base + INSTANCE_COLOR_SCALE_OFFSET + 0] = component.colorData[k * 4 + 0] ?? 0;
+        this.interleavedBuffer[base + INSTANCE_COLOR_SCALE_OFFSET + 1] = component.colorData[k * 4 + 1] ?? 0;
+        this.interleavedBuffer[base + INSTANCE_COLOR_SCALE_OFFSET + 2] = component.colorData[k * 4 + 2] ?? 0;
         const sx = component.scaleData[k * 3 + 0] ?? 0;
         const sy = component.scaleData[k * 3 + 1] ?? 0;
         const sz = component.scaleData[k * 3 + 2] ?? 0;
-        this.colorScaleBuffer[i * 4 + 3] = Math.max(sx, sy, sz);
+        this.interleavedBuffer[base + INSTANCE_COLOR_SCALE_OFFSET + 3] = Math.max(sx, sy, sz);
         
-        this.secondaryColorBuffer[i * 4 + 0] = component.secondaryColorData[k * 4 + 0] ?? 0;
-        this.secondaryColorBuffer[i * 4 + 1] = component.secondaryColorData[k * 4 + 1] ?? 0;
-        this.secondaryColorBuffer[i * 4 + 2] = component.secondaryColorData[k * 4 + 2] ?? 0;
-        this.secondaryColorBuffer[i * 4 + 3] = component.secondaryColorData[k * 4 + 3] ?? 1;
+        // Secondary color (offset 7, 4 floats)
+        this.interleavedBuffer[base + INSTANCE_SECONDARY_COLOR_OFFSET + 0] = component.secondaryColorData[k * 4 + 0] ?? 0;
+        this.interleavedBuffer[base + INSTANCE_SECONDARY_COLOR_OFFSET + 1] = component.secondaryColorData[k * 4 + 1] ?? 0;
+        this.interleavedBuffer[base + INSTANCE_SECONDARY_COLOR_OFFSET + 2] = component.secondaryColorData[k * 4 + 2] ?? 0;
+        this.interleavedBuffer[base + INSTANCE_SECONDARY_COLOR_OFFSET + 3] = component.secondaryColorData[k * 4 + 3] ?? 1;
 
-        this.emissiveColorBuffer[i * 4 + 0] = component.emissiveColorData[k * 4 + 0] ?? 0;
-        this.emissiveColorBuffer[i * 4 + 1] = component.emissiveColorData[k * 4 + 1] ?? 0;
-        this.emissiveColorBuffer[i * 4 + 2] = component.emissiveColorData[k * 4 + 2] ?? 0;
-        this.emissiveColorBuffer[i * 4 + 3] = component.emissiveColorData[k * 4 + 3] ?? 0;
+        // Emissive color (offset 11, 4 floats)
+        this.interleavedBuffer[base + INSTANCE_EMISSIVE_COLOR_OFFSET + 0] = component.emissiveColorData[k * 4 + 0] ?? 0;
+        this.interleavedBuffer[base + INSTANCE_EMISSIVE_COLOR_OFFSET + 1] = component.emissiveColorData[k * 4 + 1] ?? 0;
+        this.interleavedBuffer[base + INSTANCE_EMISSIVE_COLOR_OFFSET + 2] = component.emissiveColorData[k * 4 + 2] ?? 0;
+        this.interleavedBuffer[base + INSTANCE_EMISSIVE_COLOR_OFFSET + 3] = component.emissiveColorData[k * 4 + 3] ?? 0;
 
-        this.materialParamsBuffer[i * 4 + 0] = component.materialParamsData[k * 4 + 0] ?? 0;
-        this.materialParamsBuffer[i * 4 + 1] = component.materialParamsData[k * 4 + 1] ?? 0;
-        this.materialParamsBuffer[i * 4 + 2] = component.materialParamsData[k * 4 + 2] ?? 0;
-        this.materialParamsBuffer[i * 4 + 3] = component.materialParamsData[k * 4 + 3] ?? 0;
+        // Material params (offset 15, 4 floats)
+        this.interleavedBuffer[base + INSTANCE_MATERIAL_PARAMS_OFFSET + 0] = component.materialParamsData[k * 4 + 0] ?? 0;
+        this.interleavedBuffer[base + INSTANCE_MATERIAL_PARAMS_OFFSET + 1] = component.materialParamsData[k * 4 + 1] ?? 0;
+        this.interleavedBuffer[base + INSTANCE_MATERIAL_PARAMS_OFFSET + 2] = component.materialParamsData[k * 4 + 2] ?? 0;
+        this.interleavedBuffer[base + INSTANCE_MATERIAL_PARAMS_OFFSET + 3] = component.materialParamsData[k * 4 + 3] ?? 0;
 
-        this.materialIdBuffer[i] = component.materialIdData[k] ?? 0;
+        // Rotation (offset 19, 4 floats)
+        this.interleavedBuffer[base + INSTANCE_ROTATION_OFFSET + 0] = component.rotationData[k * 4 + 0] ?? 0;
+        this.interleavedBuffer[base + INSTANCE_ROTATION_OFFSET + 1] = component.rotationData[k * 4 + 1] ?? 0;
+        this.interleavedBuffer[base + INSTANCE_ROTATION_OFFSET + 2] = component.rotationData[k * 4 + 2] ?? 0;
+        this.interleavedBuffer[base + INSTANCE_ROTATION_OFFSET + 3] = component.rotationData[k * 4 + 3] ?? 0;
+
+        // Material ID (offset 23, 1 float)
+        this.interleavedBuffer[base + INSTANCE_MATERIAL_ID_OFFSET] = component.materialIdData[k] ?? 0;
         
+        // Bounds (separate buffer)
         const radius = Math.max(sx, sy, sz) * 0.5;
         this.boundsBuffer[i * 4 + 0] = component.offsetData[k * 3 + 0] ?? 0;
         this.boundsBuffer[i * 4 + 1] = component.offsetData[k * 3 + 1] ?? 0;
@@ -423,13 +436,7 @@ export class InstanceDataBuilder {
     return {
       instanceCount: totalCount,
       opaqueCount,
-      instanceOffsetData: this.offsetBuffer.subarray(0, totalCount * 3),
-      instanceColorScaleData: this.colorScaleBuffer.subarray(0, totalCount * 4),
-      instanceSecondaryColorData: this.secondaryColorBuffer.subarray(0, totalCount * 4),
-      instanceEmissiveColorData: this.emissiveColorBuffer.subarray(0, totalCount * 4),
-      instanceMaterialParamsData: this.materialParamsBuffer.subarray(0, totalCount * 4),
-      instanceRotationData: this.rotationBuffer.subarray(0, totalCount * 4),
-      instanceMaterialIdData: this.materialIdBuffer.subarray(0, totalCount),
+      instanceInterleavedData: this.interleavedBuffer.subarray(0, totalCount * INSTANCE_STRIDE),
       instanceBoundsData: this.boundsBuffer.subarray(0, totalCount * 4),
     };
   }
