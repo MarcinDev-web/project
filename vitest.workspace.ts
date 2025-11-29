@@ -33,6 +33,7 @@ export default defineWorkspace([
         // Mock WASM packages to avoid loading issues in tests
         '@engine/wasm-animation': resolve(__dirname, 'packages/test-utils/src/mocks/wasm-animation.ts'),
         '@engine/wasm-ecs-core': resolve(__dirname, 'packages/test-utils/src/mocks/wasm-ecs-core.ts'),
+        '@engine/wasm-collision': resolve(__dirname, 'packages/test-utils/src/mocks/wasm-collision.ts'),
         // Explicit asset-pipeline alias to ensure it's resolved from source
         '@engine/asset-pipeline': resolve(__dirname, 'packages/asset-pipeline/src/index.ts'),
       },
@@ -122,6 +123,8 @@ export default defineWorkspace([
         'apps/editor/src/**/*Wasm*.test.ts',
         'apps/platform/src/**/*AvatarBuilder*.test.ts',
         'apps/player/src/**/*PlayerMode*.test.ts',
+        // WASM collision tests require actual WASM build - skip in unit tests
+        'packages/wasm-collision/src/__tests__/**/*.test.ts',
         // Playwright E2E tests - these use @playwright/test and must NOT be run by vitest
         'packages/gfx-webgpu/tests/**/*.spec.ts',
         '**/gfx-webgpu/tests/**',
@@ -240,6 +243,7 @@ export default defineWorkspace([
         '@engine/asset-pipeline': resolve(__dirname, 'packages/asset-pipeline/src/index.ts'),
         // Mock wasm-ecs-core to avoid WASM loading issues in tests
         '@engine/wasm-ecs-core': resolve(__dirname, 'packages/test-utils/src/mocks/wasm-ecs-core.ts'),
+        '@engine/wasm-collision': resolve(__dirname, 'packages/test-utils/src/mocks/wasm-collision.ts'),
       },
     },
     test: {

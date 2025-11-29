@@ -1,7 +1,7 @@
 /**
  * @engine/brand - Centralized branding and visual identity
  *
- * This package contains all branding constants used across Forge World.
+ * This package contains all branding constants used across Playverse.
  * Using these constants ensures consistent visual identity in UI, overlays,
  * watermarks, screenshots, and social media content.
  *
@@ -19,144 +19,171 @@
  */
 
 /**
- * Core brand identity - Forge World platform and Forge Engine
+ * Core brand identity - Playverse platform and Playverse Engine
  */
 export const BRAND = {
   /** Company/Studio name */
   STUDIO_NAME: 'Plaza Entertainment Studio',
 
   /** Main product name */
-  NAME: 'FORGE',
+  NAME: 'PLAYVERSE',
 
-  /** Platform name - Forge World */
-  PLATFORM_NAME: 'Forge World',
+  /** Platform name - Playverse */
+  PLATFORM_NAME: 'Playverse',
 
-  /** Engine name - Forge Engine */
-  ENGINE_NAME: 'Forge Engine',
+  /** Engine name - Playverse Engine */
+  ENGINE_NAME: 'Playverse Engine',
 
   /** Full platform name (display) */
-  FULL_NAME: 'Forge World',
+  FULL_NAME: 'Playverse',
 
   /** Short name / acronym */
-  SHORT_NAME: 'FORGE',
+  SHORT_NAME: 'PLAYVERSE',
 
   /** Engine name for technical context */
-  ENGINE_NAME_UPPER: 'FORGE ENGINE',
+  ENGINE_NAME_UPPER: 'PLAYVERSE ENGINE',
 
   /** Tag line for "powered by" badges */
-  ENGINE_TAG: 'POWERED BY FORGE ENGINE',
+  ENGINE_TAG: 'POWERED BY PLAYVERSE ENGINE',
 
   /** Alternative shorter tag */
-  ENGINE_TAG_SHORT: 'FORGE ENGINE',
+  ENGINE_TAG_SHORT: 'PLAYVERSE ENGINE',
 
   /** Current version (synchronized with root package.json) */
   VERSION: '0.1.0',
 
   /** Tagline for marketing/pitch */
-  TAGLINE: 'Open-source 3D game creation platform built by the community, for the community.',
+  TAGLINE: 'Create. Play. Share.',
 
   /** Alternative tagline (technical) */
   TAGLINE_TECH: 'Create and publish your own 3D games directly in the browser.',
 
   /** Full pitch (one sentence) */
   PITCH:
-    'Forge World — Open-source 3D game creation platform built by the community, for the community. POWERED BY FORGE ENGINE.',
+    'Playverse — The friendly 3D game creation platform. Create, play, and share your worlds. POWERED BY PLAYVERSE ENGINE.',
 
   /** Mission statement */
   MISSION: 'Empowering creators worldwide to build, share, and play 3D games without barriers.',
 
   /** Website URL (placeholder - update when domain is registered) */
-  URL: 'https://forge.worlds',
+  URL: 'https://playverse.gg',
 
   /** Community links (placeholders - update with actual URLs when available) */
-  GITHUB: 'https://github.com/forge-worlds',
-  DISCORD: 'https://discord.gg/forge-worlds',
-  TWITTER: 'https://twitter.com/forgeworlds',
+  GITHUB: 'https://github.com/playverse-gg',
+  DISCORD: 'https://discord.gg/playverse',
+  TWITTER: 'https://twitter.com/playverse_gg',
 
   /** Social media handle (placeholder - update with actual handles when available) */
-  SOCIAL_HANDLE: '@ForgeWorlds',
+  SOCIAL_HANDLE: '@playverse_gg',
 } as const;
 
 /**
- * Brand color palette
+ * Brand color palette - Playverse Flat Design
  *
- * Inspired by forge/metalwork aesthetic:
- * - Steel gray background (anvil and fire metaphor)
- * - Hot orange accent (forge energy)
- * - Technical blue for Forge Engine
- * - Clean contrast with light ash and dark graphite
+ * Modern flat design with blue/green accents:
+ * - Slate backgrounds (dark theme)
+ * - Blue primary accent (friendly, trustworthy)
+ * - Green secondary accent (growth, success)
+ * - Cyan highlights (playful, energetic)
  */
 export const COLORS = {
-  /** Primary background - steel gray */
-  PRIMARY_BG: '#1B1B1D',
+  /** Primary background - slate dark */
+  PRIMARY_BG: '#0F172A',
 
-  /** Secondary background - dark graphite */
-  SECONDARY_BG: '#0E0E10',
+  /** Secondary background - slate medium */
+  SECONDARY_BG: '#1E293B',
 
-  /** Accent color - forge orange (glowing metal) */
-  ACCENT_HOT: '#FF6A00',
+  /** Elevated surface */
+  ELEVATED_BG: '#334155',
 
-  /** Accent hover state - brighter forge glow */
-  ACCENT_HOT_HOVER: '#FF8A33',
+  /** Accent color - blue (primary) */
+  ACCENT_PRIMARY: '#3B82F6',
 
-  /** Technical accent - subtle blue for Forge Engine */
-  ACCENT_TECH: '#2E6AFF',
+  /** Accent hover state */
+  ACCENT_PRIMARY_HOVER: '#60A5FA',
 
-  /** Light accent - ash */
-  LIGHT_ASH: '#E1E1E3',
+  /** Accent dark */
+  ACCENT_PRIMARY_DARK: '#2563EB',
 
-  /** Primary text - pure white */
-  TEXT_PRIMARY: '#ffffff',
+  /** Secondary accent - green */
+  ACCENT_SECONDARY: '#10B981',
 
-  /** Secondary text - light ash */
-  TEXT_DIM: '#E1E1E3',
+  /** Secondary accent hover */
+  ACCENT_SECONDARY_HOVER: '#34D399',
+
+  /** Highlight accent - cyan */
+  ACCENT_HIGHLIGHT: '#06B6D4',
+
+  /** Primary text - light gray */
+  TEXT_PRIMARY: '#F1F5F9',
+
+  /** Secondary text - medium gray */
+  TEXT_SECONDARY: '#94A3B8',
 
   /** Tertiary text - dimmed gray */
-  TEXT_MUTED: '#8a8a8a',
+  TEXT_MUTED: '#64748B',
 
   /** Success state - green */
-  SUCCESS: '#00c853',
+  SUCCESS: '#22C55E',
 
   /** Warning state - amber */
-  WARNING: '#ffa726',
+  WARNING: '#F59E0B',
 
   /** Error state - red */
-  ERROR: '#ff1744',
+  ERROR: '#EF4444',
 
-  /** Border color - subtle gray */
-  BORDER: '#2a2a2c',
+  /** Info state - blue */
+  INFO: '#3B82F6',
 
-  /** Overlay background - semi-transparent steel */
-  OVERLAY_BG: 'rgba(27, 27, 29, 0.85)',
+  /** Border color - subtle */
+  BORDER: 'rgba(148, 163, 184, 0.15)',
+
+  /** Border color - medium */
+  BORDER_MEDIUM: 'rgba(148, 163, 184, 0.25)',
+
+  /** Overlay background - semi-transparent */
+  OVERLAY_BG: 'rgba(15, 23, 42, 0.85)',
+
+  // Legacy aliases for compatibility
+  ACCENT_HOT: '#3B82F6',
+  ACCENT_HOT_HOVER: '#60A5FA',
+  ACCENT_TECH: '#06B6D4',
+  LIGHT_ASH: '#F1F5F9',
+  TEXT_DIM: '#94A3B8',
 } as const;
 
 /**
- * Typography settings
+ * Typography settings - Playverse Flat Style
  *
- * Two-tier system:
- * - FORGE WORLD: Geometric, massive fonts (Orbitron, Rajdhani, Exo 2)
- * - PLAZA ENTERTAINMENT: Classic sans-serif (Inter, Satoshi, Neue Haas Grotesk)
+ * Friendly, rounded fonts for cartoon/flat aesthetic:
+ * - Display: Nunito (headlines, branding)
+ * - Body: Inter (content, UI)
+ * - Mono: JetBrains Mono (code)
  */
 export const TYPOGRAPHY = {
-  /** Font family stack - Plaza Entertainment (elegant, classic) */
-  FONT_STACK: 'Inter, "Neue Haas Grotesk", Satoshi, system-ui, -apple-system, sans-serif',
+  /** Font family stack - Display (headlines, branding) */
+  FONT_DISPLAY: 'Nunito, Poppins, system-ui, -apple-system, sans-serif',
 
-  /** Font family stack - Forge World (geometric, massive) */
-  FONT_FORGE: 'Orbitron, Rajdhani, "Exo 2", "Eurostile", "Michroma", sans-serif',
+  /** Font family stack - Body (UI, content) */
+  FONT_STACK: 'Inter, "DM Sans", system-ui, -apple-system, sans-serif',
 
   /** Monospace font stack (for code/debug) */
   FONT_MONO: '"JetBrains Mono", "Fira Code", Consolas, monospace',
 
+  // Legacy alias
+  FONT_PLAY: 'Nunito, Poppins, system-ui, -apple-system, sans-serif',
+
   /** Font sizes */
   SIZE: {
-    XS: '10px',
-    SM: '12px',
+    XS: '11px',
+    SM: '13px',
     BASE: '14px',
-    MD: '16px',
-    LG: '18px',
-    XL: '24px',
-    XXL: '32px',
-    XXXL: '48px',
+    MD: '15px',
+    LG: '16px',
+    XL: '18px',
+    XXL: '24px',
+    XXXL: '32px',
+    DISPLAY: '40px',
   },
 
   /** Font weights */
@@ -179,12 +206,12 @@ export const WATERMARKS = {
     text: `${BRAND.ENGINE_NAME_UPPER} · DEV BUILD`,
     position: 'top-left' as const,
     style: {
-      color: COLORS.TEXT_DIM,
+      color: COLORS.TEXT_SECONDARY,
       fontSize: TYPOGRAPHY.SIZE.SM,
       fontFamily: TYPOGRAPHY.FONT_MONO,
       padding: '8px 12px',
       background: COLORS.OVERLAY_BG,
-      borderRadius: '0 0 4px 0',
+      borderRadius: '0 0 12px 0',
     },
   },
 
@@ -193,9 +220,9 @@ export const WATERMARKS = {
     text: BRAND.ENGINE_TAG,
     position: 'center-bottom' as const,
     style: {
-      color: COLORS.ACCENT_HOT,
+      color: COLORS.ACCENT_PRIMARY,
       fontSize: TYPOGRAPHY.SIZE.LG,
-      fontFamily: TYPOGRAPHY.FONT_STACK,
+      fontFamily: TYPOGRAPHY.FONT_DISPLAY,
       fontWeight: TYPOGRAPHY.WEIGHT.BOLD,
       padding: '16px',
     },
@@ -206,12 +233,12 @@ export const WATERMARKS = {
     format: (fps: number) => `${BRAND.ENGINE_NAME_UPPER} · ${fps} FPS`,
     position: 'top-left' as const,
     style: {
-      color: COLORS.TEXT_DIM,
+      color: COLORS.TEXT_SECONDARY,
       fontSize: TYPOGRAPHY.SIZE.SM,
       fontFamily: TYPOGRAPHY.FONT_MONO,
       padding: '8px 12px',
       background: COLORS.OVERLAY_BG,
-      borderRadius: '0 0 4px 0',
+      borderRadius: '0 0 12px 0',
     },
   },
 
@@ -222,11 +249,11 @@ export const WATERMARKS = {
     style: {
       color: COLORS.TEXT_PRIMARY,
       fontSize: TYPOGRAPHY.SIZE.BASE,
-      fontFamily: TYPOGRAPHY.FONT_STACK,
+      fontFamily: TYPOGRAPHY.FONT_DISPLAY,
       fontWeight: TYPOGRAPHY.WEIGHT.SEMIBOLD,
       padding: '8px 16px',
       background: COLORS.PRIMARY_BG,
-      borderRadius: '4px 0 0 0',
+      borderRadius: '12px 0 0 0',
       opacity: '0.9',
     },
   },
@@ -241,23 +268,25 @@ export const WATERMARKS = {
       fontFamily: TYPOGRAPHY.FONT_MONO,
       padding: '8px 12px',
       background: COLORS.OVERLAY_BG,
-      borderRadius: '0 0 0 4px',
+      borderRadius: '0 0 0 12px',
       opacity: '0.85',
     },
   },
 } as const;
 
 /**
- * UI Component styling utilities
+ * UI Component styling utilities - Flat Design
  */
 export const UI = {
-  /** Border radius values */
+  /** Border radius values - More rounded for flat/cartoon style */
   RADIUS: {
-    SM: '4px',
-    MD: '8px',
-    LG: '12px',
-    XL: '16px',
+    SM: '8px',
+    MD: '12px',
+    LG: '16px',
+    XL: '24px',
+    XXL: '32px',
     ROUND: '50%',
+    FULL: '9999px',
   },
 
   /** Spacing scale (8px base) */
@@ -270,19 +299,24 @@ export const UI = {
     XXL: '48px',
   },
 
-  /** Shadow definitions */
+  /** Shadow definitions - Soft, flat style */
   SHADOW: {
-    SM: '0 2px 4px rgba(0, 0, 0, 0.1)',
-    MD: '0 4px 8px rgba(0, 0, 0, 0.15)',
-    LG: '0 8px 16px rgba(0, 0, 0, 0.2)',
-    XL: '0 16px 32px rgba(0, 0, 0, 0.3)',
+    XS: '0 1px 2px rgba(0, 0, 0, 0.1)',
+    SM: '0 1px 3px rgba(0, 0, 0, 0.12)',
+    MD: '0 4px 6px rgba(0, 0, 0, 0.1)',
+    LG: '0 10px 15px rgba(0, 0, 0, 0.12)',
+    XL: '0 20px 25px rgba(0, 0, 0, 0.15)',
+    GLOW_PRIMARY: '0 0 20px rgba(59, 130, 246, 0.3)',
+    GLOW_SECONDARY: '0 0 20px rgba(16, 185, 129, 0.3)',
   },
 
   /** Transition durations */
   TRANSITION: {
+    FASTEST: '100ms',
     FAST: '150ms',
-    BASE: '250ms',
-    SLOW: '400ms',
+    BASE: '200ms',
+    SLOW: '300ms',
+    SLOWER: '400ms',
   },
 } as const;
 

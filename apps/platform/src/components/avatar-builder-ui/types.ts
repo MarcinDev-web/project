@@ -1,5 +1,5 @@
 /**
- * Avatar Forge - Type Definitions
+ * Avatar Builder - Type Definitions
  */
 
 import type { AvatarSlot, AvatarLoadout, AvatarAnimation } from '@engine/avatar';
@@ -80,9 +80,9 @@ export interface ColorPreset {
 }
 
 /**
- * Avatar Forge state
+ * Avatar Builder state
  */
-export interface AvatarForgeState {
+export interface AvatarBuilderState {
   // Current loadout
   loadout: AvatarLoadout;
   

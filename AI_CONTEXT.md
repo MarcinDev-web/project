@@ -261,7 +261,7 @@ Before you consider a task done:
 
 ## 10. Recent Changes & History (Oct-Nov 2025)
 
-### 10.1. Major Refactoring
+### 10.1. Major Refactoring (Oct 2025)
 - **Created `@engine/editor-utils`**: Decoupled editor logic (History, Snapping) from `apps/editor`.
 - **Removed Duplication**: Eliminated 6 major code duplications (-1823 lines).
 - **Import Consistency**: Enforced 100% usage of `@engine/*` aliases.
@@ -273,5 +273,24 @@ Before you consider a task done:
 ### 10.3. Documentation
 - **AI Context**: Added comprehensive AI documentation (this file, `CODEBASE_PATTERNS.md`).
 - **Package Guidelines**: Clarified decision tree for new code.
+
+### 10.4. New Features (Nov 2025)
+
+#### Physics & Collision
+- **DynamicBVH** (`@engine/world/physics`): Dynamic Bounding Volume Hierarchy with incremental updates. Better than Octree for non-uniform distributions. Uses Surface Area Heuristic (SAH) for insertion.
+- **WASM Collision Mock** (`@engine/test-utils`): Comprehensive mock for `@engine/wasm-collision` - supports OBB, sphere, capsule, ray intersections and batch operations.
+
+#### Animation
+- **AnimatorOptimized** (`@engine/animation`): WASM-accelerated animation sampling with temporal coherence hints. Binary search O(log n) for interval finding vs O(n) linear.
+
+#### Gameplay
+- **WeaponComponent Enhanced** (`@engine/world`): Extended with attachment modifiers, ammo types, effective stat calculations. Supports `StatModifiers` for damage, fire rate, range, spread, etc.
+
+#### UI Package
+- **@engine/ui Components**: Exported shared React components - `Button`, `Card`, `Input`, `Modal`.
+
+### 10.5. Testing Improvements (Nov 2025)
+- Added `mockWasmCollision` and `initWasmCollision` exports from `@engine/test-utils/mocks`.
+- Enhanced mock coverage for WASM modules (animation, ecs-core, collision).
 
 > **Note**: This file is the primary context for AI agents. If you find discrepancies between this file and the code, trust the code but update this file.

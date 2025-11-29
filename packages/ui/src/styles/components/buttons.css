@@ -195,7 +195,7 @@
 }
 
 /* ============================================
-   FORGE WORLD BUTTON VARIANTS - Premium Gaming Style
+   PLAYVERSE BUTTON VARIANTS - Cartoon/Stylized Gaming
    ============================================ */
 
 .btn-forge {
@@ -266,7 +266,7 @@
   transition: all 0.05s ease;
 }
 
-/* Primary - Forge Fire Orange */
+/* Primary - Playverse Blue */
 .btn-forge.primary {
   background: 
     linear-gradient(180deg, 

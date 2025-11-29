@@ -62,8 +62,12 @@ export type FogMode = 'none' | 'linear' | 'exponential' | 'exponential-squared';
 
 /**
  * Visual presets for environment rendering
+ * - 'cartoon': Stylized cartoon/cel-shaded look with vibrant colors and outlines (default)
+ * - 'stylized-balanced': Balanced quality with stylized effects
+ * - 'cinematic': High quality with cinematic effects
+ * - 'low': Performance mode with minimal effects
  */
-export type VisualPreset = 'stylized-balanced' | 'cinematic' | 'low';
+export type VisualPreset = 'cartoon' | 'stylized-balanced' | 'cinematic' | 'low';
 
 export interface EnvironmentComponentJSON {
   skyboxType?: SkyboxType;

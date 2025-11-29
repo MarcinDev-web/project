@@ -1,162 +1,167 @@
 /**
- * Design Tokens - Professional Editor Design System
+ * Design Tokens - Playverse Flat Design System
  * 
- * Inspired by: Figma, VSCode, Linear, Arc Browser
- * Style: Modern, minimal, sophisticated
- * Theme: Dark with subtle depth and glassmorphism
+ * Style: Flat, cartoon, friendly
+ * Theme: Dark with blue/green accents
+ * Inspired by: Modern flat design, playful UGC platforms
  */
 
 :root {
   /* ============================================
-     COLOR PALETTE - Sophisticated Dark Theme
+     PLAYVERSE COLOR PALETTE
+     Flat Design - Blue/Green Theme
      ============================================ */
   
-  /* Base - Deep, rich backgrounds */
-  --color-base-100: #0a0d12;  /* Deepest - canvas background */
-  --color-base-200: #0f1318;  /* Deep - panel background */
-  --color-base-300: #15191f;  /* Medium - elevated surfaces */
-  --color-base-400: #1c2128;  /* Light - hover states */
-  --color-base-500: #252c35;  /* Lighter - active states */
-  --color-base-550: #232a34;  /* Deep surfaces - gradients */
-  --color-base-600: #2d343e;  /* Elevated surfaces */
-  --color-base-650: #373e48;  /* Hovered elevated surfaces */
-  --color-base-700: #14191e;  /* Shadow surfaces */
-  --color-base-750: #191e26;  /* Deep shadow accents */
+  /* Primary Colors - Blue */
+  --color-primary-50: #EFF6FF;
+  --color-primary-100: #DBEAFE;
+  --color-primary-200: #BFDBFE;
+  --color-primary-300: #93C5FD;
+  --color-primary-400: #60A5FA;
+  --color-primary-500: #3B82F6;   /* Main accent */
+  --color-primary-600: #2563EB;
+  --color-primary-700: #1D4ED8;
+  --color-primary-800: #1E40AF;
+  --color-primary-900: #1E3A8A;
+
+  /* Secondary Colors - Green */
+  --color-secondary-50: #ECFDF5;
+  --color-secondary-100: #D1FAE5;
+  --color-secondary-200: #A7F3D0;
+  --color-secondary-300: #6EE7B7;
+  --color-secondary-400: #34D399;
+  --color-secondary-500: #10B981;  /* Secondary accent */
+  --color-secondary-600: #059669;
+  --color-secondary-700: #047857;
+  --color-secondary-800: #065F46;
+  --color-secondary-900: #064E3B;
+
+  /* Background Colors - Slate (Dark Theme) */
+  --color-base-50: #F8FAFC;
+  --color-base-100: #F1F5F9;
+  --color-base-200: #E2E8F0;
+  --color-base-300: #CBD5E1;
+  --color-base-400: #94A3B8;
+  --color-base-500: #64748B;
+  --color-base-600: #475569;
+  --color-base-700: #334155;
+  --color-base-800: #1E293B;
+  --color-base-900: #0F172A;
+  --color-base-950: #020617;
+
+  /* Accent Colors */
+  --color-accent-cyan: #06B6D4;
+  --color-accent-cyan-light: #22D3EE;
+  --color-accent-cyan-dark: #0891B2;
+  --color-accent-teal: #14B8A6;
+  --color-accent-teal-light: #2DD4BF;
+  --color-accent-teal-dark: #0D9488;
+  --color-accent-sky: #0EA5E9;
+  --color-accent-sky-light: #38BDF8;
+  --color-accent-sky-dark: #0284C7;
   
-  /* Surface - Solid layers (gaming style) */
-  --color-surface-solid: rgba(30, 35, 42, 0.98);
-  --color-surface-solid-hover: rgba(45, 52, 62, 1);
-  --color-surface-elevated: rgba(45, 52, 62, 1);
-  --color-surface-glass: rgba(30, 35, 42, 0.98);
-  --color-surface-glass-hover: rgba(45, 52, 62, 1);
-  --color-surface-elevated-50: rgba(45, 52, 62, 0.5);
-  --color-surface-elevated-70: rgba(35, 42, 52, 0.7);
-  --color-surface-deep-50: rgba(20, 25, 32, 0.5);
-  --color-surface-solid-50: rgba(30, 35, 42, 0.5);
-  --color-surface-solid-deep: rgba(22, 27, 34, 0.98);
+  /* Surface Colors - Flat, solid */
+  --color-surface-base: #0F172A;
+  --color-surface-panel: #1E293B;
+  --color-surface-elevated: #334155;
+  --color-surface-hover: #475569;
+  --color-surface-active: #64748B;
   
-  /* Text - High contrast, readable */
-  --color-text-primary: #e6e8eb;    /* Main text */
-  --color-text-secondary: #9ca3af;  /* Secondary text */
-  --color-text-tertiary: #6b7280;   /* Tertiary/hints */
-  --color-text-bright: #dce1eb;     /* Bright UI text */
-  --color-text-muted: #a0aab9;      /* Muted text */
-  --color-text-placeholder: #788291;/* Placeholder text */
-  --color-text-inverse: #0a0d12;    /* On light backgrounds */
+  /* Text Colors */
+  --color-text-primary: #F1F5F9;
+  --color-text-secondary: #94A3B8;
+  --color-text-tertiary: #64748B;
+  --color-text-muted: #475569;
+  --color-text-inverse: #0F172A;
+  --color-text-link: #60A5FA;
+  --color-text-link-hover: #93C5FD;
   
-  /* Accent - Professional blue */
-  --color-accent-50: #e0f2fe;
-  --color-accent-100: #bae6fd;
-  --color-accent-200: #7dd3fc;
-  --color-accent-300: #38bdf8;
-  --color-accent-400: #0ea5e9;  /* Primary accent */
-  --color-accent-500: #0284c7;
-  --color-accent-600: #0369a1;
-  --color-accent-700: #075985;
+  /* Semantic Colors */
+  --color-success: #22C55E;
+  --color-success-light: #4ADE80;
+  --color-success-dark: #16A34A;
+  --color-success-bg: rgba(34, 197, 94, 0.1);
+  --color-success-border: rgba(34, 197, 94, 0.3);
   
-  /* Semantic colors */
-  --color-success: #10b981;
-  --color-success-light: #4ade80;
-  --color-success-strong: #22c55e;
-  --color-success-deep: #16a34a;
-  --color-success-border: #15803d;
-  --color-success-shadow: #14532d;
-  --color-success-bg: rgba(16, 185, 129, 0.1);
-  --color-success-alpha-10: rgba(34, 197, 94, 0.1);
-  --color-warning: #f59e0b;
-  --color-warning-light: #facc15;
-  --color-warning-strong: #eab308;
-  --color-warning-deep: #ca8a04;
-  --color-warning-border: #a16207;
-  --color-warning-shadow: #854d0e;
+  --color-warning: #F59E0B;
+  --color-warning-light: #FBBF24;
+  --color-warning-dark: #D97706;
   --color-warning-bg: rgba(245, 158, 11, 0.1);
-  --color-warning-alpha-15: rgba(234, 179, 8, 0.15);
-  --color-warning-alpha-25: rgba(234, 179, 8, 0.25);
-  --color-error: #ef4444;
-  --color-error-light: #f87171;
-  --color-error-strong: #dc2626;
-  --color-error-deep: #b91c1c;
-  --color-error-border: #991b1b;
-  --color-error-shadow: #7f1d1d;
+  --color-warning-border: rgba(245, 158, 11, 0.3);
+  
+  --color-error: #EF4444;
+  --color-error-light: #F87171;
+  --color-error-dark: #DC2626;
   --color-error-bg: rgba(239, 68, 68, 0.1);
-  --color-error-alpha-08: rgba(244, 63, 94, 0.08);
-  --color-info: #3b82f6;
-  --color-info-light: #60a5fa;
-  --color-info-strong: #2563eb;
-  --color-info-deep: #1d4ed8;
-  --color-info-border: #1d4ed8;
+  --color-error-border: rgba(239, 68, 68, 0.3);
+  
+  --color-info: #3B82F6;
+  --color-info-light: #60A5FA;
+  --color-info-dark: #2563EB;
   --color-info-bg: rgba(59, 130, 246, 0.1);
-  --color-info-alpha-08: rgba(59, 130, 246, 0.08);
-  --color-info-alpha-10: rgba(59, 130, 246, 0.1);
-  --color-info-alpha-15: rgba(37, 99, 235, 0.15);
-  --color-info-alpha-20: rgba(59, 130, 246, 0.2);
-  --color-info-alpha-25: rgba(37, 99, 235, 0.25);
-  --color-info-alpha-35: rgba(37, 99, 235, 0.35);
-  --color-accent-alpha-08: rgba(14, 165, 233, 0.08);
-  --color-accent-alpha-10: rgba(14, 165, 233, 0.1);
-  --color-accent-alpha-30: rgba(14, 165, 233, 0.3);
+  --color-info-border: rgba(59, 130, 246, 0.3);
+
+  /* Alpha variants */
+  --color-primary-alpha-10: rgba(59, 130, 246, 0.1);
+  --color-primary-alpha-15: rgba(59, 130, 246, 0.15);
+  --color-primary-alpha-20: rgba(59, 130, 246, 0.2);
+  --color-primary-alpha-30: rgba(59, 130, 246, 0.3);
+  --color-secondary-alpha-10: rgba(16, 185, 129, 0.1);
+  --color-secondary-alpha-15: rgba(16, 185, 129, 0.15);
+  --color-secondary-alpha-20: rgba(16, 185, 129, 0.2);
+  --color-secondary-alpha-30: rgba(16, 185, 129, 0.3);
   
   /* ============================================
-     FORGE WORLD THEME - Industrial Sci-Fi
-     Inspired by Forge gaming platform aesthetic
+     PLAYVERSE THEME VARIABLES
+     Friendly, cartoon-style UI
      ============================================ */
 
-  /* Base - Deep dark like Forge World */
-  --fw-base-darker: #0a0c10;      /* Deep void - almost black */
-  --fw-base-dark: #1a1d24;        /* Primary background - dark slate */
-  --fw-base-medium: #23262e;      /* Elevated surfaces */
-  --fw-base-light: #2d3139;       /* Hover states */
+  /* Playverse Base */
+  --pv-base-darker: #020617;
+  --pv-base-dark: #0F172A;
+  --pv-base-medium: #1E293B;
+  --pv-base-light: #334155;
 
-  /* Metallic - Cool steel grays (Forge navigation style) */
-  --fw-metal-steel-dark: #3d4148;
-  --fw-metal-steel: #545964;
-  --fw-metal-steel-light: #7a8090;
-  --fw-metal-bronze-dark: #8a5a2d;
-  --fw-metal-bronze: #d4893d;     /* Warmer bronze for accents */
-  --fw-metal-bronze-light: #e9a860;
-  --fw-metal-copper: #d4893d;
+  /* Playverse Accents */
+  --pv-accent-primary: #3B82F6;
+  --pv-accent-secondary: #10B981;
+  --pv-accent-highlight: #06B6D4;
+  --pv-accent-glow: #60A5FA;
 
-  /* Accent - Forge orange/amber (from logo 🔥) */
-  --fw-accent-primary: #e67e22;   /* Forge orange */
-  --fw-accent-secondary: #f39c12; /* Bright amber */
-  --fw-accent-glow: #ff9a3d;      /* Hot glow */
+  /* Playverse Status */
+  --pv-status-active: #3B82F6;
+  --pv-status-success: #22C55E;
+  --pv-status-warning: #F59E0B;
+  --pv-status-danger: #EF4444;
+  --pv-status-info: #06B6D4;
 
-  /* Status colors - Industrial themed */
-  --fw-status-active: #e67e22;
-  --fw-status-success: #27ae60;   /* Modern green */
-  --fw-status-warning: #f39c12;
-  --fw-status-danger: #e74c3c;    /* Modern red */
-  --fw-status-info: #3498db;      /* Modern blue */
+  /* Borders - Clean, flat */
+  --pv-border-subtle: rgba(148, 163, 184, 0.1);
+  --pv-border-medium: rgba(148, 163, 184, 0.2);
+  --pv-border-strong: rgba(148, 163, 184, 0.3);
+  --pv-border-accent: var(--pv-accent-primary);
 
-  /* Borders - Heavy industrial lines */
-  --fw-border-heavy: 2px;
-  --fw-border-medium: 1px;
-  --fw-border-color-dark: rgba(35, 38, 46, 0.9);
-  --fw-border-color-medium: rgba(61, 65, 72, 0.7);
-  --fw-border-color-light: rgba(84, 89, 100, 0.5);
-  --fw-border-accent: var(--fw-accent-primary);
+  /* Shadows - Soft, minimal */
+  --pv-shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.2);
+  --pv-shadow-md: 0 4px 6px rgba(0, 0, 0, 0.15);
+  --pv-shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.2);
+  --pv-shadow-glow: 0 0 20px rgba(59, 130, 246, 0.3);
 
-  /* Shadows - Subtle depth (Forge style) */
-  --fw-shadow-deep: 0 4px 0 rgba(10, 12, 16, 1), 0 8px 24px rgba(0, 0, 0, 0.7);
-  --fw-shadow-medium: 0 3px 0 rgba(10, 12, 16, 1), 0 6px 16px rgba(0, 0, 0, 0.6);
-  --fw-shadow-light: 0 2px 0 rgba(10, 12, 16, 1), 0 4px 10px rgba(0, 0, 0, 0.5);
-  --fw-shadow-inset: inset 0 2px 4px rgba(0, 0, 0, 0.5);
-  --fw-shadow-glow: 0 0 20px rgba(230, 126, 34, 0.4);
-
-  /* Gradients - Metallic effects (cooler tones) */
-  --fw-gradient-steel: linear-gradient(180deg, #545964 0%, #3d4148 100%);
-  --fw-gradient-bronze: linear-gradient(180deg, #e9a860 0%, #d4893d 100%);
-  --fw-gradient-dark: linear-gradient(180deg, #23262e 0%, #1a1d24 100%);
-  --fw-gradient-accent: linear-gradient(135deg, #e67e22 0%, #f39c12 100%);
+  /* Gradients - Subtle, flat-friendly */
+  --pv-gradient-primary: linear-gradient(135deg, #3B82F6 0%, #2563EB 100%);
+  --pv-gradient-secondary: linear-gradient(135deg, #10B981 0%, #059669 100%);
+  --pv-gradient-surface: linear-gradient(180deg, #1E293B 0%, #0F172A 100%);
+  --pv-gradient-accent: linear-gradient(135deg, #06B6D4 0%, #3B82F6 100%);
   
-  /* Borders - Chunky, defined */
-  --color-border-subtle: rgba(70, 80, 95, 0.5);
-  --color-border-medium: rgba(70, 80, 95, 0.8);
-  --color-border-strong: rgba(70, 80, 95, 1);
-  --color-border-highlight: #646e82;
-  --color-border-accent: rgb(59, 130, 246);
+  /* Borders */
+  --color-border-subtle: rgba(148, 163, 184, 0.15);
+  --color-border-medium: rgba(148, 163, 184, 0.25);
+  --color-border-strong: rgba(148, 163, 184, 0.4);
+  --color-border-highlight: #64748B;
+  --color-border-accent: var(--color-primary-500);
   
   /* Overlays */
+  --color-overlay-100: rgba(0, 0, 0, 0.1);
   --color-overlay-200: rgba(0, 0, 0, 0.2);
   --color-overlay-300: rgba(0, 0, 0, 0.3);
   --color-overlay-400: rgba(0, 0, 0, 0.4);
@@ -166,7 +171,7 @@
   --color-overlay-800: rgba(0, 0, 0, 0.8);
   --color-overlay-light: var(--color-overlay-300);
   --color-overlay-medium: var(--color-overlay-500);
-  --color-overlay-heavy: rgba(0, 0, 0, 0.75);
+  --color-overlay-heavy: var(--color-overlay-700);
   
   /* ============================================
      SPACING SCALE - Consistent, harmonious
@@ -191,14 +196,13 @@
   --spacing-16: 4rem;       /* 64px */
   
   /* ============================================
-     TYPOGRAPHY - Clean, professional
+     TYPOGRAPHY - Friendly, Rounded (Flat Style)
      ============================================ */
   
-  /* Font families */
-  --font-sans: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 
-               'Helvetica Neue', Arial, sans-serif;
-  --font-mono: 'SF Mono', 'Monaco', 'Inconsolata', 'Roboto Mono', 
-               'Courier New', monospace;
+  /* Font families - Playverse style */
+  --font-display: 'Nunito', 'Poppins', system-ui, -apple-system, sans-serif;
+  --font-sans: 'Inter', 'DM Sans', system-ui, -apple-system, sans-serif;
+  --font-mono: 'JetBrains Mono', 'Fira Code', Consolas, monospace;
   
   /* Font sizes */
   --text-xs: 0.6875rem;    /* 11px */
@@ -209,60 +213,76 @@
   --text-xl: 1.125rem;     /* 18px */
   --text-2xl: 1.25rem;     /* 20px */
   --text-3xl: 1.5rem;      /* 24px */
+  --text-4xl: 2rem;        /* 32px */
+  --text-5xl: 2.5rem;      /* 40px */
   
   /* Font weights */
+  --font-light: 300;
   --font-normal: 400;
   --font-medium: 500;
   --font-semibold: 600;
   --font-bold: 700;
+  --font-extrabold: 800;
   
   /* Line heights */
+  --leading-none: 1;
   --leading-tight: 1.25;
+  --leading-snug: 1.375;
   --leading-normal: 1.5;
-  --leading-relaxed: 1.75;
+  --leading-relaxed: 1.625;
+  --leading-loose: 2;
   
   /* Letter spacing */
-  --tracking-tight: -0.01em;
+  --tracking-tighter: -0.05em;
+  --tracking-tight: -0.025em;
   --tracking-normal: 0;
   --tracking-wide: 0.025em;
   --tracking-wider: 0.05em;
+  --tracking-widest: 0.1em;
   
   /* ============================================
-     BORDER RADIUS - Modern, soft
+     BORDER RADIUS - More rounded (Flat/Cartoon)
      ============================================ */
   
-  --radius-sm: 0.375rem;   /* 6px */
-  --radius-md: 0.5rem;     /* 8px */
-  --radius-lg: 0.75rem;    /* 12px */
-  --radius-xl: 1rem;       /* 16px */
-  --radius-2xl: 1.5rem;    /* 24px */
-  --radius-full: 9999px;   /* Circle */
+  --radius-none: 0;
+  --radius-sm: 0.5rem;     /* 8px - was 6px */
+  --radius-md: 0.75rem;    /* 12px - was 8px */
+  --radius-lg: 1rem;       /* 16px - was 12px */
+  --radius-xl: 1.5rem;     /* 24px - was 16px */
+  --radius-2xl: 2rem;      /* 32px - was 24px */
+  --radius-full: 9999px;   /* Pill shape */
   
   /* ============================================
-     SHADOWS - Clean depth (no glows)
+     SHADOWS - Soft, flat style
      ============================================ */
   
-  /* Standard drop shadows */
-  --shadow-sm: 0 2px 4px rgba(0, 0, 0, 0.3);
-  --shadow-md: 0 4px 8px rgba(0, 0, 0, 0.4);
-  --shadow-lg: 0 6px 12px rgba(0, 0, 0, 0.5);
-  --shadow-xl: 0 8px 16px rgba(0, 0, 0, 0.6);
-  --shadow-2xl: 0 12px 24px rgba(0, 0, 0, 0.7);
-  --shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.3);
+  /* Standard shadows - soft and minimal */
+  --shadow-xs: 0 1px 2px rgba(0, 0, 0, 0.1);
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.12), 0 1px 2px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 6px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 10px 15px rgba(0, 0, 0, 0.12), 0 4px 6px rgba(0, 0, 0, 0.08);
+  --shadow-xl: 0 20px 25px rgba(0, 0, 0, 0.15), 0 8px 10px rgba(0, 0, 0, 0.1);
+  --shadow-2xl: 0 25px 50px rgba(0, 0, 0, 0.2);
+  --shadow-inner: inset 0 2px 4px rgba(0, 0, 0, 0.1);
   
-  /* Button press shadows */
-  --shadow-button-sm: 0 3px 0 rgba(20, 25, 30, 1);
-  --shadow-button-md: 0 4px 0 rgba(20, 25, 30, 1);
-  --shadow-button-lg: 0 5px 0 rgba(20, 25, 30, 1);
-  --shadow-button-hover: 0 6px 0 rgba(20, 25, 30, 1);
+  /* Colored glow shadows */
+  --shadow-glow-primary: 0 0 20px rgba(59, 130, 246, 0.3);
+  --shadow-glow-secondary: 0 0 20px rgba(16, 185, 129, 0.3);
+  --shadow-glow-cyan: 0 0 20px rgba(6, 182, 212, 0.3);
   
-  /* Combined shadows for depth */
-  --shadow-depth-sm: 0 3px 0 rgba(20, 25, 30, 1), 0 5px 8px rgba(0, 0, 0, 0.3);
-  --shadow-depth-md: 0 4px 0 rgba(20, 25, 30, 1), 0 6px 12px rgba(0, 0, 0, 0.4);
-  --shadow-depth-lg: 0 5px 0 rgba(20, 25, 30, 1), 0 8px 16px rgba(0, 0, 0, 0.5);
+  /* Button shadows - flat style */
+  --shadow-button-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --shadow-button-md: 0 4px 8px rgba(0, 0, 0, 0.12);
+  --shadow-button-lg: 0 6px 12px rgba(0, 0, 0, 0.15);
+  --shadow-button-hover: 0 8px 16px rgba(0, 0, 0, 0.18);
+  
+  /* Depth shadows */
+  --shadow-depth-sm: 0 2px 4px rgba(0, 0, 0, 0.1);
+  --shadow-depth-md: 0 4px 8px rgba(0, 0, 0, 0.12);
+  --shadow-depth-lg: 0 8px 16px rgba(0, 0, 0, 0.15);
   
   /* ============================================
-     Z-INDEX SCALE - Consistent layering
+     Z-INDEX SCALE
      ============================================ */
   
   --z-base: 0;
@@ -275,24 +295,29 @@
   --z-notification: 700;
   
   /* ============================================
-     TRANSITIONS - Fast, clean (gaming style)
+     TRANSITIONS - Smooth, friendly
      ============================================ */
   
-  --transition-fast: 0.1s ease;
-  --transition-base: 0.15s ease;
-  --transition-slow: 0.2s ease;
-  --transition-smooth: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
-  --transition-spring: 0.3s cubic-bezier(0.34, 1.56, 0.64, 1);
+  --transition-fastest: 0.1s ease;
+  --transition-fast: 0.15s ease;
+  --transition-base: 0.2s ease;
+  --transition-slow: 0.3s ease;
+  --transition-slower: 0.4s ease;
+  --transition-smooth: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+  --transition-spring: 0.4s cubic-bezier(0.34, 1.56, 0.64, 1);
+  --transition-bounce: 0.5s cubic-bezier(0.68, -0.55, 0.265, 1.55);
   
-  /* Easing functions - simple and fast */
-  --ease-in: ease-in;
-  --ease-out: ease-out;
-  --ease-in-out: ease-in-out;
+  /* Easing functions */
+  --ease-linear: linear;
+  --ease-in: cubic-bezier(0.4, 0, 1, 1);
+  --ease-out: cubic-bezier(0, 0, 0.2, 1);
+  --ease-in-out: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-smooth: cubic-bezier(0.4, 0, 0.2, 1);
   --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --ease-bounce: cubic-bezier(0.68, -0.55, 0.265, 1.55);
   
   /* ============================================
-     BLUR EFFECTS - Glassmorphism
+     BLUR EFFECTS
      ============================================ */
   
   --blur-sm: blur(4px);
@@ -305,19 +330,19 @@
      COMPONENT-SPECIFIC TOKENS
      ============================================ */
   
-  /* Buttons - Gaming style */
+  /* Buttons */
   --button-height-sm: 2rem;      /* 32px */
   --button-height-md: 2.5rem;    /* 40px */
   --button-height-lg: 3rem;      /* 48px */
-  --button-border-width: 2px;
-  --button-border-width-thick: 3px;
+  --button-border-width: 1px;
+  --button-border-width-thick: 2px;
   
   /* Inputs */
   --input-height-sm: 2rem;       /* 32px */
   --input-height-md: 2.5rem;     /* 40px */
   --input-height-lg: 3rem;       /* 48px */
-  --input-min-width: 80px;       /* Minimum clickable width */
-  --input-number-width: 90px;    /* Number input optimal width */
+  --input-min-width: 80px;
+  --input-number-width: 90px;
   
   /* Panel widths */
   --panel-width-sm: 280px;
@@ -325,7 +350,7 @@
   --panel-width-lg: 380px;
   
   /* Toolbar heights */
-  --toolbar-height: 3.5rem;     /* 56px */
+  --toolbar-height: 3.5rem;
   --toolbar-padding: var(--spacing-4);
   
   /* Grid */
@@ -350,23 +375,57 @@
   --touch-target-comfortable: 48px;
   
   /* Focus ring */
-  --focus-ring-width: 3px;
+  --focus-ring-width: 2px;
   --focus-ring-offset: 2px;
-  --focus-ring-color: var(--color-accent-400);
-  --focus-ring-alpha: var(--color-accent-alpha-30);
-  
-  /* Semantic colors for inspector */
-  --color-success-alpha-15: rgba(16, 185, 129, 0.15);
-  --color-success-alpha-25: rgba(16, 185, 129, 0.25);
-  --color-success-400: #10b981;
+  --focus-ring-color: var(--color-primary-500);
+  --focus-ring-alpha: var(--color-primary-alpha-30);
+
+  /* Legacy variables (mapped for compatibility) */
+  --fw-base-darker: var(--pv-base-darker);
+  --fw-base-dark: var(--pv-base-dark);
+  --fw-base-medium: var(--pv-base-medium);
+  --fw-base-light: var(--pv-base-light);
+  --fw-accent-primary: var(--pv-accent-primary);
+  --fw-accent-secondary: var(--pv-accent-secondary);
+  --fw-accent-glow: var(--pv-accent-glow);
+  --fw-status-active: var(--pv-status-active);
+  --fw-status-success: var(--pv-status-success);
+  --fw-status-warning: var(--pv-status-warning);
+  --fw-status-danger: var(--pv-status-danger);
+  --fw-status-info: var(--pv-status-info);
+  --fw-border-color-dark: var(--pv-border-subtle);
+  --fw-border-color-medium: var(--pv-border-medium);
+  --fw-border-color-light: var(--pv-border-strong);
+  --fw-border-accent: var(--pv-border-accent);
+  --fw-shadow-deep: var(--shadow-xl);
+  --fw-shadow-medium: var(--shadow-lg);
+  --fw-shadow-light: var(--shadow-md);
+  --fw-shadow-inset: var(--shadow-inner);
+  --fw-shadow-glow: var(--shadow-glow-primary);
+  --fw-gradient-steel: var(--pv-gradient-surface);
+  --fw-gradient-bronze: var(--pv-gradient-secondary);
+  --fw-gradient-dark: var(--pv-gradient-surface);
+  --fw-gradient-accent: var(--pv-gradient-primary);
+
+  /* Semantic color aliases */
+  --color-success-alpha-10: rgba(34, 197, 94, 0.1);
+  --color-success-alpha-15: rgba(34, 197, 94, 0.15);
+  --color-success-alpha-25: rgba(34, 197, 94, 0.25);
+  --color-success-400: #4ADE80;
   --color-danger-alpha-15: rgba(239, 68, 68, 0.15);
   --color-danger-alpha-25: rgba(239, 68, 68, 0.25);
-  --color-danger-400: #ef4444;
-  --color-warn-400: #fbbf24;
-  --color-warn-500: #f59e0b;
-  --color-accent-alpha-15: rgba(14, 165, 233, 0.15);
-  --color-accent-alpha-25: rgba(14, 165, 233, 0.25);
-  --color-accent-alpha-35: rgba(14, 165, 233, 0.35);
+  --color-danger-400: #F87171;
+  --color-warn-400: #FBBF24;
+  --color-warn-500: #F59E0B;
+  --color-accent-alpha-08: rgba(59, 130, 246, 0.08);
+  --color-accent-alpha-10: rgba(59, 130, 246, 0.1);
+  --color-accent-alpha-15: rgba(59, 130, 246, 0.15);
+  --color-accent-alpha-25: rgba(59, 130, 246, 0.25);
+  --color-accent-alpha-30: rgba(59, 130, 246, 0.3);
+  --color-accent-alpha-35: rgba(59, 130, 246, 0.35);
+  --color-accent-400: var(--color-primary-400);
+  --color-accent-500: var(--color-primary-500);
+  --color-accent-600: var(--color-primary-600);
 }
 
 /* ============================================
@@ -375,28 +434,33 @@
 
 :root {
   /* Backgrounds */
-  --bg-canvas: var(--color-base-100);
-  --bg-panel: var(--color-surface-glass);
+  --bg-canvas: var(--color-surface-base);
+  --bg-base: var(--color-surface-base);
+  --bg-panel: var(--color-surface-panel);
   --bg-elevated: var(--color-surface-elevated);
-  --bg-hover: var(--color-base-400);
-  --bg-active: var(--color-base-500);
+  --bg-hover: var(--color-surface-hover);
+  --bg-active: var(--color-surface-active);
   
   /* Interactive states */
-  --bg-button: var(--color-base-300);
-  --bg-button-hover: var(--color-base-400);
-  --bg-button-active: var(--color-base-500);
-  --bg-button-primary: var(--color-accent-400);
-  --bg-button-primary-hover: var(--color-accent-500);
+  --bg-button: var(--color-surface-elevated);
+  --bg-button-hover: var(--color-surface-hover);
+  --bg-button-active: var(--color-surface-active);
+  --bg-button-primary: var(--color-primary-500);
+  --bg-button-primary-hover: var(--color-primary-600);
   
   /* Borders */
   --border-default: var(--color-border-subtle);
   --border-hover: var(--color-border-medium);
-  --border-focus: var(--color-accent-400);
+  --border-focus: var(--color-primary-500);
+  --border-light: var(--color-border-medium);
   
   /* Text */
   --text-1: var(--color-text-primary);
   --text-2: var(--color-text-secondary);
   --text-3: var(--color-text-tertiary);
+  
+  /* Accent shortcuts */
+  --color-primary: var(--color-primary-500);
 }
 
 /* ============================================
@@ -430,4 +494,3 @@
   initial-value: 0deg;
   inherits: false;
 }
-

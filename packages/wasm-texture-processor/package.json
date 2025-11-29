@@ -1,7 +1,7 @@
 {
   "name": "@engine/wasm-texture-processor",
   "version": "0.1.0",
-  "description": "High-performance WASM texture processing for Forge Engine",
+  "description": "High-performance WASM texture processing for Play Engine",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

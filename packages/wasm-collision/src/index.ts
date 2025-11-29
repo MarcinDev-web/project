@@ -68,24 +68,72 @@ export interface WasmCollision {
   obbIntersect(a: ObbFlat, b: ObbFlat): boolean;
   /** OBB-OBB collision with contact information for physics resolution */
   obbIntersectWithContact(a: ObbFlat, b: ObbFlat): CollisionContact;
-  sphereSphereIntersect(aCenter: Float32Array, aRadius: number, bCenter: Float32Array, bRadius: number): boolean;
-  sphereObbIntersect(sCenter: Float32Array, sRadius: number, bCenter: Float32Array, bAxes: Float32Array, bHalf: Float32Array): boolean;
-  capsuleSphereIntersect(cBase: Float32Array, cTip: Float32Array, cRadius: number, sCenter: Float32Array, sRadius: number): boolean;
-  capsuleObbIntersect(cBase: Float32Array, cTip: Float32Array, cRadius: number, bCenter: Float32Array, bAxes: Float32Array, bHalf: Float32Array): boolean;
-  capsuleCapsuleIntersect(aBase: Float32Array, aTip: Float32Array, aRadius: number, bBase: Float32Array, bTip: Float32Array, bRadius: number): boolean;
-  raySphereIntersect(rayOrigin: Float32Array, rayDir: Float32Array, sCenter: Float32Array, sRadius: number): number;
-  rayObbIntersect(rayOrigin: Float32Array, rayDir: Float32Array, bCenter: Float32Array, bAxes: Float32Array, bHalf: Float32Array): number;
+  sphereSphereIntersect(
+    aCenter: Float32Array,
+    aRadius: number,
+    bCenter: Float32Array,
+    bRadius: number
+  ): boolean;
+  sphereObbIntersect(
+    sCenter: Float32Array,
+    sRadius: number,
+    bCenter: Float32Array,
+    bAxes: Float32Array,
+    bHalf: Float32Array
+  ): boolean;
+  capsuleSphereIntersect(
+    cBase: Float32Array,
+    cTip: Float32Array,
+    cRadius: number,
+    sCenter: Float32Array,
+    sRadius: number
+  ): boolean;
+  capsuleObbIntersect(
+    cBase: Float32Array,
+    cTip: Float32Array,
+    cRadius: number,
+    bCenter: Float32Array,
+    bAxes: Float32Array,
+    bHalf: Float32Array
+  ): boolean;
+  capsuleCapsuleIntersect(
+    aBase: Float32Array,
+    aTip: Float32Array,
+    aRadius: number,
+    bBase: Float32Array,
+    bTip: Float32Array,
+    bRadius: number
+  ): boolean;
+  raySphereIntersect(
+    rayOrigin: Float32Array,
+    rayDir: Float32Array,
+    sCenter: Float32Array,
+    sRadius: number
+  ): number;
+  rayObbIntersect(
+    rayOrigin: Float32Array,
+    rayDir: Float32Array,
+    bCenter: Float32Array,
+    bAxes: Float32Array,
+    bHalf: Float32Array
+  ): number;
   /** Ray-capsule intersection. Returns distance to hit or -1 if no intersection. */
-  rayCapsuleIntersect(rayOrigin: Float32Array, rayDir: Float32Array, cBase: Float32Array, cTip: Float32Array, cRadius: number): number;
+  rayCapsuleIntersect(
+    rayOrigin: Float32Array,
+    rayDir: Float32Array,
+    cBase: Float32Array,
+    cTip: Float32Array,
+    cRadius: number
+  ): number;
   batchCheck(preview: ObbFlat, others: ObbFlatArray): Uint32Array;
   batchCheckTrs(preview: Trs, others: TrsArray): Uint32Array;
   batchCheckAll(others: TrsArray): Uint32Array;
   computeSceneBounds(worldMatrices: Float32Array, halfExtents: Float32Array): Float32Array | null;
-  
+
   // New API for zero-copy access
   CollisionWorld: new () => CollisionWorld;
   memory: WebAssembly.Memory;
-  
+
   dispose(): void;
 }
 
@@ -254,7 +302,7 @@ export async function init(): Promise<WasmCollision> {
     scl: Float32Array
   ) => Uint32Array;
 
-  // eslint-disable-next-line @typescript-eslint/no-unsafe-member-access
+  /* eslint-disable @typescript-eslint/no-unsafe-member-access */
   const compute_scene_bounds =
     typeof mod.compute_scene_bounds === 'function'
       ? (mod.compute_scene_bounds as (
@@ -262,6 +310,7 @@ export async function init(): Promise<WasmCollision> {
           halfExtents: Float32Array
         ) => Float32Array | undefined)
       : null;
+  /* eslint-enable @typescript-eslint/no-unsafe-member-access */
 
   // Capture memory buffer - after init, initSync() returns the cached wasm instance
   // which includes the memory export
@@ -371,4 +420,10 @@ export async function init(): Promise<WasmCollision> {
   return api;
 }
 
-export { getTrsBuffers, releaseTrsBuffers, getPoolMetrics, type TrsBuffers, type PoolMetrics } from './pool';
+export {
+  getTrsBuffers,
+  releaseTrsBuffers,
+  getPoolMetrics,
+  type TrsBuffers,
+  type PoolMetrics,
+} from './pool';

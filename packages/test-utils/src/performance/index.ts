@@ -163,7 +163,11 @@ export function calculateStats(measurements: number[]): PerformanceStats {
 /**
  * Calculate regression percentage between baseline and current
  */
-export function calculateRegression(baseline: number, current: number, metricType: MetricType): number {
+export function calculateRegression(
+  baseline: number,
+  current: number,
+  metricType: MetricType
+): number {
   if (baseline === 0) return current === 0 ? 0 : 100;
 
   // For FPS and throughput, higher is better (regression = decrease)
@@ -189,7 +193,9 @@ interface BaselineStore {
 /**
  * Load baselines from file
  */
-export function loadBaselines(path: string = DEFAULT_BASELINE_PATH): Record<string, PerformanceBaseline> {
+export function loadBaselines(
+  path: string = DEFAULT_BASELINE_PATH
+): Record<string, PerformanceBaseline> {
   try {
     if (!existsSync(path)) {
       return {};
@@ -603,7 +609,9 @@ export function printPerformanceReport(report: PerformanceReport): void {
   for (const result of report.results) {
     const status = result.passed ? '✓' : '✗';
     const regression =
-      result.regressionPercent !== undefined ? ` (${result.regressionPercent.toFixed(1)}% change)` : '';
+      result.regressionPercent !== undefined
+        ? ` (${result.regressionPercent.toFixed(1)}% change)`
+        : '';
 
     console.log(`${status} ${result.config.name}${regression}`);
     console.log(`    Mean: ${result.stats.mean.toFixed(2)}ms`);
@@ -667,4 +675,3 @@ export const performanceBudgets = {
     maxRegressionPercent: 25,
   } as PerformanceBudget,
 };
-

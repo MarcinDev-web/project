@@ -24,8 +24,8 @@ import { ShopManagementPage } from './pages/admin/ShopManagementPage';
 import { ForumManagementPage } from './pages/admin/ForumManagementPage';
 import { NewsManagementPage } from './pages/admin/NewsManagementPage';
 import { ForumModerationPage } from './pages/moderator/ForumModerationPage';
-// Avatar Forge - New modern avatar builder
-import { AvatarForgePage } from './pages/AvatarForgePage';
+// Avatar Builder - Modern avatar customization
+import { AvatarBuilderPage } from './pages/AvatarBuilderPage';
 import { StudioPage } from './pages/StudioPage';
 import { SupportPage } from './pages/SupportPage';
 import { TicketDetail } from './components/support/TicketDetail';
@@ -254,10 +254,10 @@ export const router: ReturnType<typeof createBrowserRouter> = createBrowserRoute
     ),
   },
   {
-    path: '/avatar-forge',
+    path: '/avatar-builder',
     element: (
       <ProtectedRoute>
-        <AvatarForgePage />
+        <AvatarBuilderPage />
       </ProtectedRoute>
     ),
   },

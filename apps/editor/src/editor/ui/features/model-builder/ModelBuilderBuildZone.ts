@@ -1,5 +1,5 @@
 /**
- * ModelForgeBuildZone - Visual overlay showing build zone boundaries
+ * ModelBuilderBuildZone - Visual overlay showing build zone boundaries
  * 
  * Renders a wireframe box and floor grid to indicate where models can be built
  */
@@ -18,7 +18,7 @@ export interface BuildZoneBounds {
 /**
  * Visualizes the model building zone in the scene
  */
-export class ModelForgeBuildZone {
+export class ModelBuilderBuildZone {
   private readonly scene: Scene;
   private readonly disposables = new DisposableGroup();
   
@@ -66,8 +66,8 @@ export class ModelForgeBuildZone {
     const sizeX = max[0] - min[0];
     const sizeZ = max[2] - min[2];
 
-    this.floorEntity = new Entity('model-forge-floor');
-    this.floorEntity.userData.isModelForgeHelper = true;
+    this.floorEntity = new Entity('model-builder-floor');
+    this.floorEntity.userData.isModelBuilderHelper = true;
 
     // Position at center of bounds, at bottom
     this.floorEntity.transform.position = [
@@ -130,8 +130,8 @@ export class ModelForgeBuildZone {
    * Creates a single edge line
    */
   private createEdgeLine(start: Vec3, end: Vec3, index: number): Entity {
-    const entity = new Entity(`model-forge-edge-${index}`);
-    entity.userData.isModelForgeHelper = true;
+    const entity = new Entity(`model-builder-edge-${index}`);
+    entity.userData.isModelBuilderHelper = true;
 
     // Calculate center position
     const centerX = (start[0] + end[0]) / 2;
@@ -188,8 +188,8 @@ export class ModelForgeBuildZone {
     ];
 
     corners.forEach((corner, index) => {
-      const entity = new Entity(`model-forge-corner-${index}`);
-      entity.userData.isModelForgeHelper = true;
+      const entity = new Entity(`model-builder-corner-${index}`);
+      entity.userData.isModelBuilderHelper = true;
 
       entity.transform.position = [
         corner[0] + position[0],

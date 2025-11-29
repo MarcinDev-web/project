@@ -6,34 +6,38 @@ interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
   children: ReactNode;
 }
 
-export function Button({ 
-  variant = 'primary', 
+export function Button({
+  variant = 'primary',
   size = 'medium',
-  children, 
-  className = '', 
+  children,
+  className = '',
   style: customStyle,
-  ...props 
+  ...props
 }: ButtonProps) {
-  // Use CSS classes for Forge World styling
-  const variantClass = variant === 'forge' ? 'btn-forge' : 
-                       variant === 'primary' ? 'btn-forge primary' :
-                       variant === 'standard' ? 'btn-primary' :
-                       variant === 'secondary' ? 'btn' :
-                       variant === 'success' ? 'btn-success' :
-                       variant === 'ghost' ? 'btn-ghost' :
-                       variant === 'danger' ? 'btn-danger' : 'btn';
-  
-  const sizeClass = size === 'small' ? 'btn-sm' :
-                    size === 'large' ? 'btn-lg' : '';
+  // Use CSS classes for Playverse styling
+  const variantClass =
+    variant === 'forge'
+      ? 'btn-forge'
+      : variant === 'primary'
+        ? 'btn-forge primary'
+        : variant === 'standard'
+          ? 'btn-primary'
+          : variant === 'secondary'
+            ? 'btn'
+            : variant === 'success'
+              ? 'btn-success'
+              : variant === 'ghost'
+                ? 'btn-ghost'
+                : variant === 'danger'
+                  ? 'btn-danger'
+                  : 'btn';
+
+  const sizeClass = size === 'small' ? 'btn-sm' : size === 'large' ? 'btn-lg' : '';
 
   const classes = `${variantClass} ${sizeClass} ${className}`.trim();
 
   return (
-    <button 
-      style={customStyle}
-      className={classes}
-      {...props}
-    >
+    <button style={customStyle} className={classes} {...props}>
       {children}
     </button>
   );

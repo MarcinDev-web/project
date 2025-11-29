@@ -69,8 +69,8 @@ const MOCK_FAQS: SupportFAQ[] = [
   // General
   {
     id: 'faq-1',
-    question: 'What is Forge World?',
-    answer: 'Forge World is a UGC (User Generated Content) 3D games platform that allows creators to build, share, and monetize their own games and experiences. Using our powerful WebGPU-based engine, you can create stunning 3D worlds directly in your browser.',
+    question: 'What is Playverse?',
+    answer: 'Playverse is a UGC (User Generated Content) 3D games platform that allows creators to build, share, and monetize their own games and experiences. Using our powerful WebGPU-based Play Engine, you can create stunning 3D worlds directly in your browser.',
     category: 'general',
     order: 1,
     isPublished: true,
@@ -82,8 +82,8 @@ const MOCK_FAQS: SupportFAQ[] = [
   },
   {
     id: 'faq-2',
-    question: 'Is Forge World free to use?',
-    answer: 'Yes! Forge World is free to play and create. We offer a freemium model where basic features are available to everyone. Premium features, additional storage, and advanced tools are available through our subscription plans. Creators can also earn revenue through the marketplace.',
+    question: 'Is Playverse free to use?',
+    answer: 'Yes! Playverse is free to play and create. We offer a freemium model where basic features are available to everyone. Premium features, additional storage, and advanced tools are available through our subscription plans. Creators can also earn revenue through the marketplace.',
     category: 'general',
     order: 2,
     isPublished: true,
@@ -96,7 +96,7 @@ const MOCK_FAQS: SupportFAQ[] = [
   {
     id: 'faq-3',
     question: 'What browsers are supported?',
-    answer: 'Forge World works best on modern browsers that support WebGPU:\n\n• Chrome 113+ (recommended)\n• Edge 113+\n• Firefox (with WebGPU flag enabled)\n• Safari 17+ (macOS Sonoma)\n\nFor the best experience, we recommend using the latest version of Chrome or Edge.',
+    answer: 'Playverse works best on modern browsers that support WebGPU:\n\n• Chrome 113+ (recommended)\n• Edge 113+\n• Firefox (with WebGPU flag enabled)\n• Safari 17+ (macOS Sonoma)\n\nFor the best experience, we recommend using the latest version of Chrome or Edge.',
     category: 'general',
     order: 3,
     isPublished: true,
@@ -123,7 +123,7 @@ const MOCK_FAQS: SupportFAQ[] = [
   {
     id: 'faq-5',
     question: 'How do I add custom scripts to my game?',
-    answer: 'Forge World supports custom scripting using our visual scripting system and TypeScript:\n\n**Visual Scripting:**\n• Open the Script Editor panel\n• Drag and drop logic blocks\n• Connect triggers and actions\n\n**TypeScript:**\n• Create a new script asset\n• Write code using our API\n• Attach to game objects\n\nVisit our documentation for the full API reference.',
+    answer: 'Playverse supports custom scripting using our visual scripting system and TypeScript:\n\n**Visual Scripting:**\n• Open the Script Editor panel\n• Drag and drop logic blocks\n• Connect triggers and actions\n\n**TypeScript:**\n• Create a new script asset\n• Write code using our API\n• Attach to game objects\n\nVisit our documentation for the full API reference.',
     category: 'editor',
     order: 2,
     isPublished: true,
@@ -163,7 +163,7 @@ const MOCK_FAQS: SupportFAQ[] = [
   {
     id: 'faq-8',
     question: 'What payment methods do you accept?',
-    answer: 'We accept multiple payment methods:\n\n• Credit/Debit Cards (Visa, Mastercard, Amex)\n• PayPal\n• Forge Coins (our virtual currency)\n• Apple Pay / Google Pay\n\nCreators can receive payouts via PayPal or bank transfer once they reach the minimum threshold of $50.',
+    answer: 'We accept multiple payment methods:\n\n• Credit/Debit Cards (Visa, Mastercard, Amex)\n• PayPal\n• Play Coins (our virtual currency)\n• Apple Pay / Google Pay\n\nCreators can receive payouts via PayPal or bank transfer once they reach the minimum threshold of $50.',
     category: 'marketplace',
     order: 2,
     isPublished: true,
@@ -243,7 +243,7 @@ const MOCK_FAQS: SupportFAQ[] = [
   {
     id: 'faq-14',
     question: 'What file formats are supported for imports?',
-    answer: 'Forge World supports various file formats:\n\n**3D Models:**\n• GLTF/GLB (recommended)\n• OBJ\n• FBX\n\n**Images:**\n• PNG, JPG, WebP\n• HDR (for environment maps)\n\n**Audio:**\n• MP3, WAV, OGG\n\n**Other:**\n• JSON (for data)\n• WASM (for custom modules)\n\nMaximum file sizes vary by subscription tier.',
+    answer: 'Playverse supports various file formats:\n\n**3D Models:**\n• GLTF/GLB (recommended)\n• OBJ\n• FBX\n\n**Images:**\n• PNG, JPG, WebP\n• HDR (for environment maps)\n\n**Audio:**\n• MP3, WAV, OGG\n\n**Other:**\n• JSON (for data)\n• WASM (for custom modules)\n\nMaximum file sizes vary by subscription tier.',
     category: 'technical',
     order: 3,
     isPublished: true,

@@ -80,6 +80,10 @@ export interface RenderSettings {
   enableOutlines: boolean;
   outlineQuality: OutlineQuality;
   resolutionScale: number;
+  /** Enable stylized/cartoon shading (shadow ramps, rim lighting) */
+  enableStylizedShading?: boolean;
+  /** Enable stylized color grading post-process */
+  enableStylizedColorGrading?: boolean;
 }
 
 /**
@@ -195,6 +199,10 @@ export interface RendererOptions {
    * If not provided, a default instance will be created and initialized.
    */
   resourceManager?: ResourceManager;
+  /** Enable stylized/cartoon shading (default: true for cartoon look) */
+  enableStylizedShading?: boolean;
+  /** Enable stylized color grading post-process (default: true for cartoon look) */
+  enableStylizedColorGrading?: boolean;
 }
 
 // ========== Main Renderer Interface ==========

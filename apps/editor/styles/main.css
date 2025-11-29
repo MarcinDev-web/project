@@ -1,9 +1,14 @@
 /**
- * Main CSS Entry Point
+ * Main CSS Entry Point - Playverse Editor
  * 
  * Modular CSS architecture for the editor
- * Imports in order: tokens → base → layout → components → editor → utilities
+ * Imports in order: fonts → tokens → base → layout → components → editor → utilities
  */
+
+/* ============================================
+   FONTS - Playverse Typography
+   ============================================ */
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 /* ============================================
    DESIGN SYSTEM

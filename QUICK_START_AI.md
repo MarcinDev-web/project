@@ -81,6 +81,10 @@ afterEach(() => {
   system.dispose();
   vi.clearAllMocks();
 });
+
+// ✅ Use WASM mocks from test-utils
+import { mockWasmCollision } from '@engine/test-utils/mocks';
+vi.mock('@engine/wasm-collision', () => ({ default: mockWasmCollision }));
 ```
 
 ## 🚀 Commands

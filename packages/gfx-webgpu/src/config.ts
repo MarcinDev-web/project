@@ -77,6 +77,38 @@ export const SHADING_AMBIENT = 0.3;
 export const SHADING_TOON_BANDS = 12;
 export const SHADING_SPECULAR_POWER = 24;
 
+// ========== Stylized/Cartoon Rendering Constants ==========
+
+/** Number of toon bands for stylized shading (3-12 recommended) */
+export const STYLIZED_TOON_BANDS = 5;
+
+/** Specular bands for cartoon highlights */
+export const STYLIZED_SPECULAR_BANDS = 3;
+
+/** Rim light power for stylized shading */
+export const STYLIZED_RIM_POWER = 2.5;
+
+/** Default outline thickness for cartoon style */
+export const STYLIZED_OUTLINE_THICKNESS = 1.2;
+
+/** Default outline color (dark purple-ish, softer than pure black) */
+export const STYLIZED_OUTLINE_COLOR: readonly [number, number, number] = [0.1, 0.08, 0.12];
+
+/** Default inner outline color for interior edges */
+export const STYLIZED_INNER_OUTLINE_COLOR: readonly [number, number, number] = [0.2, 0.18, 0.22];
+
+/** Shadow tint color for stylized color grading (cool purple) */
+export const STYLIZED_SHADOW_TINT: readonly [number, number, number] = [0.6, 0.55, 0.75];
+
+/** Highlight tint color for stylized color grading (warm yellow) */
+export const STYLIZED_HIGHLIGHT_TINT: readonly [number, number, number] = [1.0, 0.95, 0.85];
+
+/** Default saturation boost for cartoon colors */
+export const STYLIZED_SATURATION = 1.25;
+
+/** Default vibrance for cartoon colors */
+export const STYLIZED_VIBRANCE = 0.35;
+
 export interface InstanceGridConfig {
   dimensions: number;
   spacing: number;

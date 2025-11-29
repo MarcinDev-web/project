@@ -11,7 +11,7 @@ export function Modal({ isOpen, onClose, children, className = '' }: ModalProps)
   if (!isOpen) return null;
   return (
     <div className="modal-overlay" onClick={onClose}>
-      <div className={`modal ${className}`} onClick={e => e.stopPropagation()}>
+      <div className={`modal ${className}`} onClick={(e) => e.stopPropagation()}>
         {children}
       </div>
     </div>

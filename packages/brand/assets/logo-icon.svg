@@ -1,16 +1,16 @@
 <svg width="64" height="64" viewBox="0 0 64 64" xmlns="http://www.w3.org/2000/svg">
-  <!-- Forge World Icon (simplified, square format) -->
+  <!-- Playverse Icon (simplified, square format) -->
   
-  <!-- Hammer handle -->
-  <path d="M 20 44 L 28 26 L 27 24 L 19 42 Z" fill="#ff3b00" opacity="0.9"/>
-  <!-- Hammer head -->
-  <rect x="27" y="22" width="11" height="8" rx="1" fill="#ff3b00"/>
-  <rect x="29" y="21" width="8" height="3" rx="1" fill="#ff5722"/>
+  <!-- Play button triangle -->
+  <polygon points="24,16 24,48 48,32" fill="#3B82F6" opacity="0.95"/>
+  <polygon points="27,20 27,44 44,32" fill="#60A5FA" opacity="0.8"/>
   
-  <!-- Community circle (top-right) -->
-  <circle cx="50" cy="16" r="5" fill="none" stroke="#00c853" stroke-width="1.5" stroke-dasharray="1 1" opacity="0.8"/>
-  <circle cx="50" cy="16" r="2.5" fill="#00c853" opacity="0.6"/>
+  <!-- Circle around play button -->
+  <circle cx="32" cy="32" r="22" fill="none" stroke="#10B981" stroke-width="2" opacity="0.9"/>
   
-  <!-- Spark (top-left) -->
-  <circle cx="14" cy="16" r="1.5" fill="#ff3b00" opacity="0.8"/>
+  <!-- Decorative spark (top-right) -->
+  <circle cx="54" cy="12" r="3" fill="#10B981" opacity="0.8"/>
+  
+  <!-- Decorative spark (bottom-left) -->
+  <circle cx="10" cy="52" r="2" fill="#8B5CF6" opacity="0.6"/>
 </svg>

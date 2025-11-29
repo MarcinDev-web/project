@@ -1,5 +1,5 @@
 /**
- * Registration Form Component - Forge Gateway Design
+ * Registration Form Component - Playverse Gateway Design
  * 
  * Features:
  * - Password visibility toggles
@@ -113,14 +113,14 @@ export function RegisterForm() {
       {/* Mobile Branding - Only visible on small screens */}
       <div className="auth-mobile-branding">
         <div className="auth-mobile-logo">
-          <div className="auth-mobile-logo-icon">⚡</div>
-          <span className="auth-mobile-logo-text">FORGE</span>
+          <div className="auth-mobile-logo-icon">🎮</div>
+          <span className="auth-mobile-logo-text">PLAYVERSE</span>
         </div>
       </div>
 
       {/* Card Header */}
       <div className="auth-card-header">
-        <h2 className="auth-title">Join the Forge</h2>
+        <h2 className="auth-title">Join Playverse</h2>
         <p className="auth-subtitle">Create your account and start building</p>
       </div>
 
@@ -290,7 +290,7 @@ export function RegisterForm() {
               </>
             ) : (
               <>
-                <span>Forge Your Account</span>
+                <span>Create Account</span>
                 <span>→</span>
               </>
             )}

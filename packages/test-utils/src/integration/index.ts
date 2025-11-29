@@ -100,7 +100,7 @@ export function validatePackageBoundaries(
   targetPackage: PackageName
 ): boolean {
   if (sourcePackage === targetPackage) return true;
-  
+
   const allowedDeps = PACKAGE_DEPENDENCIES[sourcePackage] || [];
   return allowedDeps.includes(targetPackage);
 }
@@ -178,7 +178,10 @@ export interface EventCapture<T = unknown> {
 
 export function createEventCapture<T = unknown>(): EventCapture<T> {
   const events: EventCapture<T>['events'] = [];
-  const waiters = new Map<string, Array<{ resolve: (data: T) => void; reject: (err: Error) => void }>>();
+  const waiters = new Map<
+    string,
+    Array<{ resolve: (data: T) => void; reject: (err: Error) => void }>
+  >();
 
   return {
     events,
@@ -348,7 +351,11 @@ export const packageMocks = {
     id,
     name,
     components: new Map<string, unknown>(),
-    addComponent: vi.fn(function (this: { components: Map<string, unknown> }, type: string, data: unknown) {
+    addComponent: vi.fn(function (
+      this: { components: Map<string, unknown> },
+      type: string,
+      data: unknown
+    ) {
       this.components.set(type, data);
       return this;
     }),
@@ -452,10 +459,7 @@ export function expectPackageInteraction(
 /**
  * Assert that all events were received in order
  */
-export function expectEventsInOrder<T>(
-  capture: EventCapture<T>,
-  expectedTypes: string[]
-): void {
+export function expectEventsInOrder<T>(capture: EventCapture<T>, expectedTypes: string[]): void {
   const capturedTypes = capture.events.map((e) => e.type);
   expect(capturedTypes).toEqual(expectedTypes);
 }
@@ -463,9 +467,7 @@ export function expectEventsInOrder<T>(
 /**
  * Assert that a cross-package operation completed successfully
  */
-export function expectCrossPackageSuccess(
-  result: IntegrationTestResult
-): void {
+export function expectCrossPackageSuccess(result: IntegrationTestResult): void {
   expect(result.passed).toBe(true);
   expect(result.boundaryViolations).toHaveLength(0);
   expect(result.errors).toHaveLength(0);
@@ -555,4 +557,3 @@ export async function testWorldAnimationIntegration(): Promise<IntegrationTestRe
     ],
   });
 }
-

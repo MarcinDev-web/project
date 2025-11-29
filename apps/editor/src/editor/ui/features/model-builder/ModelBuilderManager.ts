@@ -1,9 +1,9 @@
 /**
- * ModelForgeManager - Orchestrates Model Forge mode in the editor
+ * ModelBuilderManager - Orchestrates Model Builder mode in the editor
  * 
  * Integrates:
- * - ModelForgeOverlay (UI)
- * - ModelForgeBuildZone (scene visualization)
+ * - ModelBuilderOverlay (UI)
+ * - ModelBuilderBuildZone (scene visualization)
  * - ModelBuilderMode (building logic)
  * - ModelBuilderController (input handling)
  */
@@ -16,12 +16,12 @@ import type { BuildBounds } from '@engine/blocks';
 import { ModelBuilderMode } from '../../../model-builder/ModelBuilderMode';
 import { ModelBuilderController } from '../../../controllers/ModelBuilderController';
 import { MicroBlockPreview } from '../../../model-builder/MicroBlockPreview';
-import { ModelForgeOverlay } from './ModelForgeOverlay';
-import { ModelForgeBuildZone } from './ModelForgeBuildZone';
+import { ModelBuilderOverlay } from './ModelBuilderOverlay';
+import { ModelBuilderBuildZone } from './ModelBuilderBuildZone';
 import { DisposableGroup } from '@engine/core/utils';
 import { Logger } from '../../../../utils/logger';
 
-export interface ModelForgeManagerConfig {
+export interface ModelBuilderManagerConfig {
   scene: Scene;
   state: EditorState;
   canvas: HTMLCanvasElement;
@@ -30,10 +30,10 @@ export interface ModelForgeManagerConfig {
 }
 
 /**
- * Manages the Model Forge editing mode
+ * Manages the Model Builder editing mode
  */
-export class ModelForgeManager {
-  private readonly config: ModelForgeManagerConfig;
+export class ModelBuilderManager {
+  private readonly config: ModelBuilderManagerConfig;
   private readonly disposables = new DisposableGroup();
   
   // Core components
@@ -43,13 +43,13 @@ export class ModelForgeManager {
   private preview: MicroBlockPreview | null = null;
   
   // UI components
-  private overlay: ModelForgeOverlay | null = null;
-  private buildZone: ModelForgeBuildZone | null = null;
+  private overlay: ModelBuilderOverlay | null = null;
+  private buildZone: ModelBuilderBuildZone | null = null;
   
   private isActive = false;
   private updateInterval: number | null = null;
 
-  constructor(config: ModelForgeManagerConfig) {
+  constructor(config: ModelBuilderManagerConfig) {
     this.config = config;
     this.setupReactivity();
   }
@@ -58,9 +58,9 @@ export class ModelForgeManager {
    * Sets up reactive state listeners
    */
   private setupReactivity(): void {
-    // Listen to modelForgeActive state
+    // Listen to ModelBuilderActive state
     const disposer = effect(() => {
-      const active = this.config.state.modelForgeActive.value;
+      const active = this.config.state.ModelBuilderActive.value;
       if (active && !this.isActive) {
         this.activate();
       } else if (!active && this.isActive) {
@@ -71,15 +71,15 @@ export class ModelForgeManager {
   }
 
   /**
-   * Activates Model Forge mode
+   * Activates Model Builder mode
    */
   activate(): void {
     if (this.isActive) return;
 
-    Logger.info('[ModelForgeManager] Activating Model Forge mode');
+    Logger.info('[ModelBuilderManager] Activating Model Builder mode');
 
     // Get bounds from state
-    const stateBounds = this.config.state.modelForgeBounds.value;
+    const stateBounds = this.config.state.ModelBuilderBounds.value;
     const bounds: BuildBounds = {
       min: stateBounds.min,
       max: stateBounds.max,
@@ -134,7 +134,7 @@ export class ModelForgeManager {
     this.setupKeyboardHandler();
 
     // Create build zone visualization
-    this.buildZone = new ModelForgeBuildZone(this.config.scene, {
+    this.buildZone = new ModelBuilderBuildZone(this.config.scene, {
       min: stateBounds.min,
       max: stateBounds.max,
       position: stateBounds.position,
@@ -142,11 +142,11 @@ export class ModelForgeManager {
     this.buildZone.show();
 
     // Create UI overlay
-    this.overlay = new ModelForgeOverlay({
+    this.overlay = new ModelBuilderOverlay({
       state: this.config.state,
       builderMode: this.builderMode,
       builder: this.builder,
-      onClose: () => this.config.state.modelForgeActive.value = false,
+      onClose: () => this.config.state.ModelBuilderActive.value = false,
       onExport: () => this.exportModel(),
       onImport: () => this.importModel(),
       onClear: () => this.clearModel(),
@@ -159,16 +159,16 @@ export class ModelForgeManager {
     this.isActive = true;
     this.config.onModeChanged?.(true);
 
-    Logger.info('[ModelForgeManager] Model Forge mode activated');
+    Logger.info('[ModelBuilderManager] Model Builder mode activated');
   }
 
   /**
-   * Deactivates Model Forge mode
+   * Deactivates Model Builder mode
    */
   deactivate(): void {
     if (!this.isActive) return;
 
-    Logger.info('[ModelForgeManager] Deactivating Model Forge mode');
+    Logger.info('[ModelBuilderManager] Deactivating Model Builder mode');
 
     // Stop update loop
     this.stopUpdateLoop();
@@ -204,21 +204,21 @@ export class ModelForgeManager {
     this.isActive = false;
     this.config.onModeChanged?.(false);
 
-    Logger.info('[ModelForgeManager] Model Forge mode deactivated');
+    Logger.info('[ModelBuilderManager] Model Builder mode deactivated');
   }
 
   private keydownHandler: ((e: KeyboardEvent) => void) | null = null;
 
   /**
-   * Sets up keyboard handler for Model Forge shortcuts
+   * Sets up keyboard handler for Model Builder shortcuts
    */
   private setupKeyboardHandler(): void {
     this.keydownHandler = (e: KeyboardEvent) => {
       if (!this.isActive || !this.controller) return;
 
-      // ESC to exit Model Forge
+      // ESC to exit Model Builder
       if (e.key === 'Escape') {
-        this.config.state.modelForgeActive.value = false;
+        this.config.state.ModelBuilderActive.value = false;
         return;
       }
 
@@ -302,7 +302,7 @@ export class ModelForgeManager {
     document.body.removeChild(a);
     URL.revokeObjectURL(url);
 
-    Logger.info('[ModelForgeManager] Model exported');
+    Logger.info('[ModelBuilderManager] Model exported');
   }
 
   /**
@@ -323,7 +323,7 @@ export class ModelForgeManager {
           const json = e.target?.result as string;
           const data = JSON.parse(json);
           this.builder?.importModel(data);
-          Logger.info('[ModelForgeManager] Model imported');
+          Logger.info('[ModelBuilderManager] Model imported');
         } catch (err) {
           Logger.error('Failed to import model:', err as Error);
           alert('Failed to import model');
@@ -343,7 +343,7 @@ export class ModelForgeManager {
 
     if (confirm('Clear all blocks? This cannot be undone.')) {
       this.builder.clear();
-      Logger.info('[ModelForgeManager] Model cleared');
+      Logger.info('[ModelBuilderManager] Model cleared');
     }
   }
 
@@ -362,17 +362,17 @@ export class ModelForgeManager {
   }
 
   /**
-   * Checks if Model Forge is active
+   * Checks if Model Builder is active
    */
-  isModelForgeActive(): boolean {
+  isModelBuilderActive(): boolean {
     return this.isActive;
   }
 
   /**
-   * Toggles Model Forge mode
+   * Toggles Model Builder mode
    */
   toggle(): void {
-    this.config.state.modelForgeActive.value = !this.config.state.modelForgeActive.value;
+    this.config.state.ModelBuilderActive.value = !this.config.state.ModelBuilderActive.value;
   }
 
   /**

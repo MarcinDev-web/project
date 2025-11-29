@@ -1,11 +1,11 @@
 /**
- * Platform Main CSS Entry Point
+ * Platform Main CSS Entry Point - Playverse
  * 
  * Reuses design system from editor for consistency
  */
 
-/* Google Fonts - Gaming typography */
-@import url('https://fonts.googleapis.com/css2?family=Chakra+Petch:wght@400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&family=Rajdhani:wght@400;500;600;700&display=swap');
+/* Google Fonts - Playverse Typography (Flat/Cartoon style) */
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
 
 /* Design System - Reference editor styles */
 @import '../../../../apps/editor/styles/design-tokens.css';

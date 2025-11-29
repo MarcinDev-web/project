@@ -356,7 +356,7 @@ export function AvatarBuilderPage() {
               if (DEFAULT_AVATAR_PART_LIBRARY[savedPart.mesh]) {
                 mergedParts[slot] = savedPart;
               } else {
-                console.warn(`[AvatarForge] Saved mesh "${savedPart.mesh}" for slot "${slot}" not found in library, using default`);
+                console.warn(`[AvatarBuilder] Saved mesh "${savedPart.mesh}" for slot "${slot}" not found in library, using default`);
               }
             }
           }
@@ -732,7 +732,7 @@ export function AvatarBuilderPage() {
           {/* Center - Viewport */}
           <div className="avatar-builder__viewport-container">
             {/* Debug: Log what loadout is being passed */}
-            {console.log('[AvatarForgePage] Render - loadout parts:', Object.keys(loadout.parts || {}), 'hoverLoadout:', !!deferredHoverLoadout)}
+            {console.log('[AvatarBuilderPage] Render - loadout parts:', Object.keys(loadout.parts || {}), 'hoverLoadout:', !!deferredHoverLoadout)}
             <AvatarViewport
               loadout={deferredHoverLoadout ?? loadout}
               onLoadoutChange={handleLoadoutChange}

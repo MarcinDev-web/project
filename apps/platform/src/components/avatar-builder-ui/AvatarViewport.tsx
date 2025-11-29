@@ -125,6 +125,11 @@ export const AvatarViewport = memo(function AvatarViewport({
     const lastSerialized = JSON.stringify(lastLoadoutRef.current);
 
     if (currentSerialized !== lastSerialized) {
+      // Debug: Log what's being applied
+      const partCount = Object.keys(loadout.parts || {}).length;
+      console.log(`[AvatarViewport] Applying loadout update: ${partCount} parts`, 
+        Object.keys(loadout.parts || {}));
+      
       coreRef.current.applyLoadout(loadout, true);
       lastLoadoutRef.current = loadout;
     }
@@ -150,8 +155,8 @@ export const AvatarViewport = memo(function AvatarViewport({
   }, []);
 
   return (
-    <div className="avatar-forge__viewport-area">
-      <div className="avatar-forge__viewport">
+    <div className="avatar-builder__viewport-area">
+      <div className="avatar-builder__viewport">
         <canvas
           ref={canvasRef}
           style={{
@@ -164,23 +169,23 @@ export const AvatarViewport = memo(function AvatarViewport({
 
         {/* Camera controls overlay */}
         {!isInitializing && !error && (
-          <div className="avatar-forge__viewport-overlay">
+          <div className="avatar-builder__viewport-overlay">
             <button
-              className="avatar-forge__camera-btn"
+              className="avatar-builder__camera-btn"
               onClick={handleRotateLeft}
               title="Rotate left"
             >
               ◀
             </button>
             <button
-              className="avatar-forge__camera-btn"
+              className="avatar-builder__camera-btn"
               onClick={handleResetCamera}
               title="Reset camera"
             >
               ⟲
             </button>
             <button
-              className="avatar-forge__camera-btn"
+              className="avatar-builder__camera-btn"
               onClick={handleRotateRight}
               title="Rotate right"
             >

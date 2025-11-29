@@ -1,5 +1,5 @@
 /**
- * Login Form Component - Forge Gateway Design
+ * Login Form Component - Playverse Gateway Design
  * 
  * Features:
  * - Password visibility toggle
@@ -13,9 +13,9 @@ import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, Link } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
 
-const SAVED_EMAIL_KEY = 'forge_login_email';
-const SAVED_PASSWORD_KEY = 'forge_login_password';
-const REMEMBER_ME_KEY = 'forge_remember_me';
+const SAVED_EMAIL_KEY = 'playverse_login_email';
+const SAVED_PASSWORD_KEY = 'playverse_login_password';
+const REMEMBER_ME_KEY = 'playverse_remember_me';
 
 export function LoginForm() {
   const [email, setEmail] = useState('');
@@ -76,8 +76,8 @@ export function LoginForm() {
       {/* Mobile Branding - Only visible on small screens */}
       <div className="auth-mobile-branding">
         <div className="auth-mobile-logo">
-          <div className="auth-mobile-logo-icon">⚡</div>
-          <span className="auth-mobile-logo-text">FORGE</span>
+          <div className="auth-mobile-logo-icon">🎮</div>
+          <span className="auth-mobile-logo-text">PLAYVERSE</span>
         </div>
       </div>
 
@@ -174,7 +174,7 @@ export function LoginForm() {
               </>
             ) : (
               <>
-                <span>Enter the Forge</span>
+                <span>Start Playing</span>
                 <span>→</span>
               </>
             )}

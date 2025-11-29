@@ -2,6 +2,59 @@
 
 > **Tracking improvements to AI assistant documentation**
 
+## 2025-11-29 - Feature Documentation Update
+
+### 🎯 Goal
+Document recent codebase additions and improvements for AI assistants.
+
+### ✅ New Features Documented
+
+#### Physics & Collision
+- **DynamicBVH** - Added documentation for new Bounding Volume Hierarchy implementation:
+  - Incremental updates with O(log N) refitting
+  - Surface Area Heuristic (SAH) for optimal insertion
+  - Fat AABB margin for movement tolerance
+  - Better than Octree for non-uniform object distributions
+
+#### Animation
+- **AnimatorOptimized** - Documented WASM-accelerated animator:
+  - Batch sampling via WASM (single call per pose)
+  - Binary search O(log n) interval finding
+  - Temporal coherence hints for O(1) sequential playback
+  - Precompiled clip data to avoid per-frame allocations
+
+#### Gameplay Components
+- **WeaponComponent Enhanced** - Documented extended weapon system:
+  - `StatModifiers` interface for attachment bonuses
+  - Multiple ammo types support (`AmmoType`)
+  - Effective stat calculations (damage, fireRate, range, spread, etc.)
+  - Weapon preset types (`WeaponPresetType`)
+
+#### Testing Infrastructure
+- **WASM Collision Mock** - New comprehensive mock added to `@engine/test-utils`:
+  - OBB, sphere, capsule intersection tests
+  - Ray casting (sphere, OBB, capsule)
+  - Batch collision checking
+  - `CollisionWorld` mock class
+  - Scene bounds computation
+
+#### UI Package
+- **@engine/ui** - Documented shared React components:
+  - `Button`, `Card`, `Input`, `Modal` exports
+
+### 📝 Updated Files
+- `AI_CONTEXT.md` - Added section 10.4 "New Features (Nov 2025)" and 10.5 "Testing Improvements"
+- `CODEBASE_PATTERNS.md` - Added "Spatial Partitioning (BVH)" pattern
+- `AI_DOCUMENTATION_CHANGELOG.md` - This entry
+
+### 📊 Impact
+- AI assistants now aware of new spatial structures (DynamicBVH)
+- Better understanding of WASM optimization patterns
+- Knowledge of weapon system extensibility
+- Comprehensive mock availability for testing
+
+---
+
 ## 2025-11-22 - Documentation Refresh & Correction
 
 ### 🔧 Fixes
@@ -295,5 +348,5 @@ These documentation files follow the same license as the project (ISC).
 
 **Note:** This is a living document. Update it whenever AI documentation changes.
 
-**Last Updated:** 2025-11-22
+**Last Updated:** 2025-11-29
 

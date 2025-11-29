@@ -61,14 +61,12 @@ export class AnimatorOptimized {
   private jsClipHints = new Map<string, ClipHintState>();
 
   private readonly useWasm: boolean;
-  private readonly jointCount: number;
 
   constructor(controller: AnimatorController, jointCount: number) {
     this.controller = controller;
     this.currentStateName = controller.defaultState;
     this.poseA = createPose(jointCount);
     this.poseB = createPose(jointCount);
-    this.jointCount = jointCount;
     this.useWasm = isWasmAvailable();
 
     // Precompile all clips in the controller

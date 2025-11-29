@@ -69,6 +69,7 @@ interface ResolvedFeatureFlags extends PostProcessFeatureFlags {
   enableScreenLOD: boolean;
   enableSSGI?: boolean;
   enableAsyncCompute?: boolean;
+  enableStylizedColorGrading?: boolean;
 }
 
 interface SceneUpdateResult {
@@ -126,6 +127,8 @@ export interface FrameRenderContext {
     enableForwardPlus?: boolean;
     enableScreenLOD?: boolean;
     enableAsyncCompute?: boolean;
+    /** Enable stylized color grading for cartoon look */
+    enableStylizedColorGrading?: boolean;
   };
   shadowQuality?: 'low' | 'med' | 'high' | 'ultra';
   outlineQuality?: 'low' | 'med';
@@ -722,6 +725,7 @@ export class FrameRenderer {
       enableOutlines: flags?.enableOutlines === true,
       enableForwardPlus: flags?.enableForwardPlus !== false,
       enableScreenLOD: flags?.enableScreenLOD !== false,
+      enableStylizedColorGrading: flags?.enableStylizedColorGrading === true,
     };
   }
 
@@ -1833,6 +1837,8 @@ fn fs_main(@location(0) v_uv: vec2<f32>) -> @builtin(frag_depth) f32 {
         enableSSAO: featureFlags.enableSSAO,
         enableSSGI: featureFlags.enableSSGI,
         enableFXAA: featureFlags.enableFXAA,
+        enableOutlines: featureFlags.enableOutlines,
+        enableStylizedColorGrading: featureFlags.enableStylizedColorGrading,
       },
       targets: {
         hdrView: targetState.hdrView,

@@ -45,6 +45,15 @@ export class WeaponComponent extends Component {
   /** Weapon type */
   weaponType: WeaponType = 'hitscan';
 
+  /** Alias for weaponType (for API compatibility with tests/serialization) */
+  get type(): WeaponType {
+    return this.weaponType;
+  }
+
+  set type(value: WeaponType) {
+    this.weaponType = value;
+  }
+
   /** Base damage per shot (before modifiers) */
   private _baseDamage: number = 25;
 

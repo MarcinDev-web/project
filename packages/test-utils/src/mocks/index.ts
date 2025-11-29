@@ -78,7 +78,9 @@ export function createMockGPUDevice() {
       getCompilationInfo: vi.fn(() => Promise.resolve({ messages: [] })),
     })),
     createRenderPipeline: vi.fn(() => ({})),
+    createRenderPipelineAsync: vi.fn(() => Promise.resolve({})),
     createComputePipeline: vi.fn(() => ({})),
+    createComputePipelineAsync: vi.fn(() => Promise.resolve({})),
     createCommandEncoder: vi.fn(() => ({
       beginRenderPass: vi.fn(() => ({
         end: vi.fn(),
@@ -203,3 +205,6 @@ export function createMockEventDispatcher<T extends Event = Event>() {
     },
   };
 }
+
+// Re-export WASM mocks
+export { mockWasmCollision, init as initWasmCollision } from './wasm-collision.js';

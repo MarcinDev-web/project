@@ -1,6 +1,6 @@
 /**
- * Top Bar - Forge World Industrial Aesthetic
- * Heavy metallic, premium sci-fi editor design
+ * Top Bar - Playverse Cartoon/Stylized Aesthetic
+ * Modern, friendly editor design with blue/green accents
  */
 
 /* ============================================
@@ -77,8 +77,8 @@
 
 .top-bar-logo-icon {
   font-size: 1.5rem;
-  color: var(--fw-accent-primary);
-  filter: drop-shadow(0 0 6px rgba(230, 126, 34, 0.5));
+  color: var(--pv-accent-primary, #3B82F6);
+  filter: drop-shadow(0 0 6px rgba(59, 130, 246, 0.5));
   line-height: 1;
 }
 
@@ -272,15 +272,15 @@
 }
 
 .top-bar-transform-button.active {
-  background: rgba(230, 126, 34, 0.2);
-  border-color: var(--fw-accent-primary);
-  color: var(--fw-accent-primary);
-  box-shadow: 0 0 12px rgba(230, 126, 34, 0.3), inset 0 0 8px rgba(230, 126, 34, 0.1);
+  background: rgba(59, 130, 246, 0.2);
+  border-color: var(--pv-accent-primary, #3B82F6);
+  color: var(--pv-accent-primary, #3B82F6);
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.3), inset 0 0 8px rgba(59, 130, 246, 0.1);
 }
 
 .top-bar-transform-button.active:hover {
-  background: rgba(230, 126, 34, 0.25);
-  box-shadow: 0 0 16px rgba(230, 126, 34, 0.4), inset 0 0 10px rgba(230, 126, 34, 0.15);
+  background: rgba(59, 130, 246, 0.25);
+  box-shadow: 0 0 16px rgba(59, 130, 246, 0.4), inset 0 0 10px rgba(59, 130, 246, 0.15);
 }
 
 .top-bar-transform-button svg {
@@ -351,21 +351,21 @@
 }
 
 .top-bar-auth-button.primary {
-  background: var(--fw-gradient-accent);
-  border-color: var(--fw-accent-primary);
+  background: linear-gradient(135deg, #3B82F6, #2563EB);
+  border-color: #3B82F6;
   color: white;
-  box-shadow: 0 2px 8px rgba(230, 126, 34, 0.3);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }
 
 .top-bar-auth-button.primary:hover {
   filter: brightness(1.15);
-  box-shadow: 0 4px 12px rgba(230, 126, 34, 0.4);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
   transform: translateY(-1px);
 }
 
 .top-bar-auth-button.primary:active {
   transform: translateY(0);
-  box-shadow: 0 2px 6px rgba(230, 126, 34, 0.3);
+  box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
 }
 
 /* User Info Container */
@@ -476,15 +476,15 @@
 }
 
 .top-bar-icon-button.active {
-  background: rgba(230, 126, 34, 0.15);
-  border-color: var(--fw-accent-primary);
-  color: var(--fw-accent-primary);
-  box-shadow: 0 0 12px rgba(230, 126, 34, 0.3);
+  background: rgba(59, 130, 246, 0.15);
+  border-color: #3B82F6;
+  color: #3B82F6;
+  box-shadow: 0 0 12px rgba(59, 130, 246, 0.3);
 }
 
 .top-bar-icon-button.active:hover {
-  background: rgba(230, 126, 34, 0.2);
-  box-shadow: 0 0 16px rgba(230, 126, 34, 0.4);
+  background: rgba(59, 130, 246, 0.2);
+  box-shadow: 0 0 16px rgba(59, 130, 246, 0.4);
 }
 
 .top-bar-icon-button:disabled {
@@ -531,27 +531,27 @@
 }
 
 .top-bar-action-button.primary {
-  background: var(--fw-gradient-accent);
-  border-color: var(--fw-accent-primary);
+  background: linear-gradient(135deg, #3B82F6, #2563EB);
+  border-color: #3B82F6;
   color: white;
-  box-shadow: 0 2px 8px rgba(230, 126, 34, 0.3);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
 }
 
 .top-bar-action-button.primary:hover {
   filter: brightness(1.15);
-  box-shadow: 0 4px 12px rgba(230, 126, 34, 0.4);
+  box-shadow: 0 4px 12px rgba(59, 130, 246, 0.4);
   transform: translateY(-1px);
 }
 
 .top-bar-action-button.play-active {
-  background: var(--fw-gradient-accent);
-  border-color: var(--fw-accent-primary);
+  background: linear-gradient(135deg, #10B981, #059669);
+  border-color: #10B981;
   color: white;
-  box-shadow: 0 2px 8px rgba(230, 126, 34, 0.3), 0 0 12px rgba(230, 126, 34, 0.2);
+  box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3), 0 0 12px rgba(16, 185, 129, 0.2);
 }
 
-/* Model Forge Button */
-.top-bar-forge-button {
+/* Model Builder Button */
+.top-bar-builder-button {
   display: flex;
   align-items: center;
   gap: var(--spacing-1-5);
@@ -570,7 +570,7 @@
   letter-spacing: 0.01em;
 }
 
-.top-bar-forge-button:hover {
+.top-bar-builder-button:hover {
   background: rgba(0, 255, 136, 0.15);
   border-color: rgba(0, 255, 136, 0.5);
   color: #00ff88;
@@ -578,24 +578,24 @@
   box-shadow: 0 0 12px rgba(0, 255, 136, 0.2);
 }
 
-.top-bar-forge-button:active {
+.top-bar-builder-button:active {
   transform: translateY(0);
   background: rgba(0, 255, 136, 0.2);
 }
 
-.top-bar-forge-button.active {
+.top-bar-builder-button.active {
   background: rgba(0, 255, 136, 0.25);
   border-color: #00ff88;
   color: #00ff88;
   box-shadow: 0 0 16px rgba(0, 255, 136, 0.4), 0 0 4px rgba(0, 255, 136, 0.3);
 }
 
-.top-bar-forge-button.active:hover {
+.top-bar-builder-button.active:hover {
   background: rgba(0, 255, 136, 0.3);
   box-shadow: 0 0 20px rgba(0, 255, 136, 0.5), 0 0 6px rgba(0, 255, 136, 0.4);
 }
 
-.top-bar-forge-button svg {
+.top-bar-builder-button svg {
   width: 1rem;
   height: 1rem;
   flex-shrink: 0;

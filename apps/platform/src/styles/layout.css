@@ -1,18 +1,17 @@
 /**
- * Platform Layout Styles
+ * Platform Layout Styles - Playverse
+ * Flat design with blue/green accents
  */
 
 body {
   margin: 0;
   padding: 0;
-  background-color: var(--fw-base-darker);
+  background-color: var(--pv-base-darker);
   background-image: 
-    radial-gradient(circle at 50% 0%, rgba(230, 126, 34, 0.08) 0%, transparent 45%),
-    radial-gradient(circle at 0% 0%, rgba(35, 38, 46, 0.5) 0%, transparent 50%),
-    radial-gradient(circle at 100% 0%, rgba(35, 38, 46, 0.5) 0%, transparent 50%),
-    linear-gradient(rgba(255, 255, 255, 0.02) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(255, 255, 255, 0.02) 1px, transparent 1px);
-  background-size: 100% 100%, 100% 100%, 100% 100%, 40px 40px, 40px 40px;
+    radial-gradient(circle at 50% 0%, rgba(59, 130, 246, 0.06) 0%, transparent 45%),
+    radial-gradient(circle at 0% 50%, rgba(16, 185, 129, 0.04) 0%, transparent 50%),
+    radial-gradient(circle at 100% 50%, rgba(6, 182, 212, 0.04) 0%, transparent 50%);
+  background-size: 100% 100%;
   background-attachment: fixed;
   color: var(--text-1);
   font-family: var(--font-sans);
@@ -40,7 +39,7 @@ body {
   position: relative;
 }
 
-/* Industrial Forge Background Enhancement */
+/* Playverse Background - Subtle, clean */
 .main-content::before {
   content: '';
   position: fixed;
@@ -51,24 +50,10 @@ body {
   pointer-events: none;
   z-index: -1;
   background:
-    /* Forge glow from top */
-    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(230, 126, 34, 0.12) 0%, transparent 60%),
-    /* Subtle vignette for depth */
-    radial-gradient(ellipse 120% 80% at 50% 50%, transparent 40%, rgba(0, 0, 0, 0.4) 100%),
-    /* Metallic sheen gradient */
-    linear-gradient(180deg, 
-      rgba(30, 32, 40, 0.3) 0%, 
-      transparent 20%, 
-      transparent 80%, 
-      rgba(15, 17, 22, 0.5) 100%
-    ),
-    /* Sparse ember particles */
-    radial-gradient(1.5px 1.5px at 15% 25%, rgba(230, 126, 34, 0.25), transparent),
-    radial-gradient(1px 1px at 85% 15%, rgba(230, 126, 34, 0.2), transparent),
-    radial-gradient(1.5px 1.5px at 70% 70%, rgba(230, 126, 34, 0.15), transparent),
-    radial-gradient(1px 1px at 25% 80%, rgba(230, 126, 34, 0.2), transparent),
-    radial-gradient(1.5px 1.5px at 50% 45%, rgba(230, 126, 34, 0.1), transparent),
-    radial-gradient(1px 1px at 90% 55%, rgba(230, 126, 34, 0.15), transparent);
+    /* Soft blue glow from top */
+    radial-gradient(ellipse 80% 50% at 50% -10%, rgba(59, 130, 246, 0.08) 0%, transparent 60%),
+    /* Subtle vignette */
+    radial-gradient(ellipse 120% 80% at 50% 50%, transparent 40%, rgba(0, 0, 0, 0.3) 100%);
 }
 
 .page-container {
@@ -78,132 +63,23 @@ body {
   padding: var(--spacing-6);
 }
 
-/* ==================== TOPBAR (Utility Bar - World of Tanks Style) ==================== */
-
-.topbar {
-  background: linear-gradient(180deg, #08090c 0%, #0d0f14 100%);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.04);
-  padding: 0 var(--spacing-8);
-  height: 36px;
-  display: flex;
-  align-items: center;
-  position: sticky;
-  top: 0;
-  z-index: 101;
-}
-
-.topbar-content {
-  width: 100%;
-  max-width: 1600px;
-  margin: 0 auto;
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-}
-
-.topbar-nav {
-  display: flex;
-  gap: var(--spacing-1);
-  align-items: center;
-}
-
-.topbar-right {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-3);
-}
-
-.topbar .nav-link {
-  padding: var(--spacing-1-5) var(--spacing-3);
-  font-size: 0.75rem;
-  font-weight: 500;
-  color: rgba(160, 170, 185, 0.85);
-  text-transform: uppercase;
-  letter-spacing: 0.06em;
-  border-radius: 4px;
-  transition: color 0.2s ease, background 0.2s ease;
-}
-
-.topbar .nav-link:hover {
-  color: #ffffff;
-  background: rgba(255, 255, 255, 0.06);
-}
-
-.topbar .nav-link--active {
-  color: var(--fw-accent-secondary);
-}
-
-.topbar .notification-bell__button {
-  padding: var(--spacing-1) var(--spacing-2);
-  font-size: var(--text-sm);
-  background: transparent;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 6px;
-  color: rgba(180, 190, 205, 0.9);
-  transition: all 0.2s ease;
-}
-
-.topbar .notification-bell__button:hover {
-  background: rgba(255, 255, 255, 0.06);
-  border-color: rgba(255, 255, 255, 0.12);
-  color: #ffffff;
-}
-
-.topbar .notification-bell__badge {
-  min-width: 16px;
-  height: 16px;
-  font-size: 10px;
-  top: -4px;
-  right: -4px;
-  background: var(--fw-accent-primary);
-}
-
-.topbar .coins-display {
-  display: flex;
-  align-items: center;
-  gap: var(--spacing-1-5);
-  padding: var(--spacing-1) var(--spacing-2-5);
-  background: rgba(230, 185, 50, 0.08);
-  border: 1px solid rgba(230, 185, 50, 0.2);
-  border-radius: 6px;
-  font-size: 0.75rem;
-  color: #f0d060;
-  transition: all 0.2s ease;
-}
-
-.topbar .coins-display:hover {
-  background: rgba(230, 185, 50, 0.12);
-  border-color: rgba(230, 185, 50, 0.35);
-}
-
-.topbar .coins-display__icon {
-  font-size: 0.9em;
-  line-height: 1;
-}
-
-.topbar .coins-display__amount {
-  font-weight: 600;
-  font-variant-numeric: tabular-nums;
-  letter-spacing: 0.01em;
-}
-
-/* ==================== NAVBAR (Premium Forge Style) ==================== */
+/* ==================== NAVBAR (Playverse Clean Style) ==================== */
 
 .navbar {
   padding: 0 var(--spacing-8);
   height: 60px;
-  background: linear-gradient(180deg, #13161c 0%, #181c24 100%);
-  border-bottom: 1px solid rgba(230, 126, 34, 0.15);
+  background: linear-gradient(180deg, #0F172A 0%, #1E293B 100%);
+  border-bottom: 1px solid rgba(59, 130, 246, 0.15);
   display: flex;
   justify-content: space-between;
   align-items: center;
-  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03), 0 4px 24px rgba(0, 0, 0, 0.4);
+  box-shadow: 0 1px 0 rgba(255, 255, 255, 0.03), 0 4px 24px rgba(0, 0, 0, 0.3);
   position: sticky;
-  top: 36px;
+  top: 0;
   z-index: 100;
 }
 
-/* Subtle warm gradient accent at bottom */
+/* Subtle blue gradient accent at bottom */
 .navbar::after {
   content: '';
   position: absolute;
@@ -213,12 +89,18 @@ body {
   height: 1px;
   background: linear-gradient(90deg, 
     transparent 0%, 
-    rgba(230, 126, 34, 0.4) 20%,
-    rgba(243, 156, 18, 0.5) 50%,
-    rgba(230, 126, 34, 0.4) 80%,
+    rgba(59, 130, 246, 0.4) 20%,
+    rgba(6, 182, 212, 0.5) 50%,
+    rgba(59, 130, 246, 0.4) 80%,
     transparent 100%
   );
   pointer-events: none;
+}
+
+.navbar-left {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-6);
 }
 
 .navbar-brand {
@@ -234,19 +116,18 @@ body {
   opacity: 0.85;
 }
 
-.navbar-brand__icon {
-  font-size: 1.6rem;
-  color: var(--fw-accent-primary);
-  line-height: 1;
-  filter: drop-shadow(0 2px 4px rgba(230, 126, 34, 0.3));
-}
-
 .navbar-brand__text {
   font-size: 1.125rem;
   font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
+  font-family: var(--font-display);
+  letter-spacing: 0.05em;
   color: #ffffff;
+}
+
+.navbar-static-links {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-1);
 }
 
 .navbar-nav {
@@ -262,34 +143,37 @@ body {
   margin-right: var(--spacing-3);
 }
 
-/* Premium CTA button style */
-.navbar-create-btn.btn-forge {
+/* Premium CTA button style - Blue */
+.navbar-create-btn.btn-forge,
+.navbar-create-btn.btn-playverse {
   color: #ffffff;
   font-weight: 600;
   font-size: 0.8125rem;
   padding: var(--spacing-2) var(--spacing-4);
-  background: linear-gradient(180deg, var(--fw-accent-primary) 0%, #c96a1a 100%);
+  background: linear-gradient(180deg, var(--pv-accent-primary) 0%, #2563EB 100%);
   border: 1px solid rgba(255, 255, 255, 0.15);
-  border-radius: 6px;
-  box-shadow: 0 2px 8px rgba(230, 126, 34, 0.25), inset 0 1px 0 rgba(255, 255, 255, 0.15);
+  border-radius: var(--radius-md);
+  box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3), inset 0 1px 0 rgba(255, 255, 255, 0.15);
   transition: all 0.2s ease;
 }
 
-.navbar-create-btn.btn-forge:hover {
-  background: linear-gradient(180deg, #f08c3a 0%, var(--fw-accent-primary) 100%);
-  box-shadow: 0 4px 16px rgba(230, 126, 34, 0.35), inset 0 1px 0 rgba(255, 255, 255, 0.2);
+.navbar-create-btn.btn-forge:hover,
+.navbar-create-btn.btn-playverse:hover {
+  background: linear-gradient(180deg, #60A5FA 0%, var(--pv-accent-primary) 100%);
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4), inset 0 1px 0 rgba(255, 255, 255, 0.2);
   transform: translateY(-1px);
 }
 
-.navbar-create-btn.btn-forge:active {
+.navbar-create-btn.btn-forge:active,
+.navbar-create-btn.btn-playverse:active {
   transform: translateY(0);
-  box-shadow: 0 1px 4px rgba(230, 126, 34, 0.2);
+  box-shadow: 0 1px 4px rgba(59, 130, 246, 0.2);
 }
 
 .navbar-divider {
   width: 1px;
   height: 28px;
-  background: rgba(255, 255, 255, 0.08);
+  background: rgba(148, 163, 184, 0.15);
   margin: 0 var(--spacing-3);
 }
 
@@ -352,13 +236,17 @@ body {
     display: flex;
   }
 
+  .navbar-static-links {
+    display: none;
+  }
+
   .navbar-nav {
     position: fixed;
-    top: 96px; /* TopBar (36px) + Navbar (60px) */
+    top: 60px;
     left: 0;
     right: 0;
-    background: #181c24;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+    background: #1E293B;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.1);
     flex-direction: column;
     align-items: stretch;
     padding: var(--spacing-4) var(--spacing-6);
@@ -375,7 +263,7 @@ body {
   .navbar-divider {
     width: 100%;
     height: 1px;
-    background: rgba(255, 255, 255, 0.06);
+    background: rgba(148, 163, 184, 0.1);
     margin: var(--spacing-2) 0;
   }
 
@@ -400,28 +288,24 @@ body {
 }
 
 @media (max-width: 768px) {
-  .topbar {
-    padding: 0 var(--spacing-4);
-  }
-  
   .navbar {
     padding: 0 var(--spacing-4);
   }
 }
 
-/* ==================== NAV LINK (Premium Clean Style) ==================== */
+/* ==================== NAV LINK (Playverse Clean Style) ==================== */
 
 .nav-link {
   display: flex;
   align-items: center;
   gap: var(--spacing-2);
   padding: var(--spacing-2) var(--spacing-3);
-  color: rgba(200, 210, 225, 0.75);
+  color: rgba(148, 163, 184, 0.9);
   text-decoration: none;
   font-size: 0.875rem;
   font-weight: 500;
   background: transparent;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   transition: color 0.15s ease, background 0.15s ease;
   position: relative;
   white-space: nowrap;
@@ -435,7 +319,7 @@ body {
 .nav-link--active {
   color: #ffffff;
   font-weight: 600;
-  background: rgba(230, 126, 34, 0.12);
+  background: rgba(59, 130, 246, 0.15);
 }
 
 /* Subtle bottom indicator for active state */
@@ -447,11 +331,11 @@ body {
   transform: translateX(-50%);
   width: 16px;
   height: 2px;
-  background: var(--fw-accent-primary);
+  background: var(--pv-accent-primary);
   border-radius: 1px;
 }
 
-/* ==================== USER MENU (Premium Clean Style) ==================== */
+/* ==================== USER MENU (Playverse Clean Style) ==================== */
 
 .user-menu {
   position: relative;
@@ -465,8 +349,8 @@ body {
   padding: var(--spacing-1-5) var(--spacing-2-5);
   background: transparent;
   border: none;
-  border-radius: 8px;
-  color: rgba(220, 230, 240, 0.9);
+  border-radius: var(--radius-md);
+  color: rgba(241, 245, 249, 0.9);
   cursor: pointer;
   font-size: 0.875rem;
   font-weight: 500;
@@ -484,8 +368,8 @@ body {
 .user-menu__avatar {
   width: 32px;
   height: 32px;
-  border-radius: 8px;
-  background: linear-gradient(135deg, var(--fw-accent-primary) 0%, #d4893d 100%);
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--pv-accent-primary) 0%, var(--pv-accent-highlight) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -515,13 +399,13 @@ body {
   height: 14px;
   flex-shrink: 0;
   transition: transform 0.2s ease;
-  color: rgba(200, 210, 220, 0.5);
+  color: rgba(148, 163, 184, 0.6);
   margin-left: var(--spacing-0-5);
 }
 
 .user-menu__button--open .user-menu__button-arrow {
   transform: rotate(180deg);
-  color: rgba(200, 210, 220, 0.7);
+  color: rgba(148, 163, 184, 0.8);
 }
 
 .user-menu__backdrop {
@@ -538,10 +422,10 @@ body {
   top: calc(100% + var(--spacing-2));
   right: 0;
   min-width: 240px;
-  background: #1e2229;
-  border: 1px solid rgba(255, 255, 255, 0.08);
-  border-radius: 12px;
-  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5), 0 0 0 1px rgba(0, 0, 0, 0.2);
+  background: #1E293B;
+  border: 1px solid rgba(148, 163, 184, 0.15);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 0 1px rgba(0, 0, 0, 0.2);
   z-index: 10000;
   overflow: hidden;
   animation: dropdownSlide 0.15s ease-out;
@@ -561,7 +445,7 @@ body {
 
 .user-menu__header {
   padding: var(--spacing-4);
-  border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+  border-bottom: 1px solid rgba(148, 163, 184, 0.1);
   display: flex;
   align-items: center;
   gap: var(--spacing-3);
@@ -571,8 +455,8 @@ body {
 .user-menu__header-avatar {
   width: 44px;
   height: 44px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, var(--fw-accent-primary) 0%, #d4893d 100%);
+  border-radius: var(--radius-md);
+  background: linear-gradient(135deg, var(--pv-accent-primary) 0%, var(--pv-accent-highlight) 100%);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -599,7 +483,7 @@ body {
 
 .user-menu__header-email {
   font-size: 0.75rem;
-  color: rgba(160, 170, 185, 0.7);
+  color: rgba(148, 163, 184, 0.8);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -611,7 +495,7 @@ body {
 
 .user-menu__divider {
   height: 1px;
-  background: rgba(255, 255, 255, 0.06);
+  background: rgba(148, 163, 184, 0.1);
   margin: var(--spacing-2) 0;
 }
 
@@ -620,9 +504,9 @@ body {
   align-items: center;
   gap: var(--spacing-3);
   padding: var(--spacing-2-5) var(--spacing-3);
-  color: rgba(200, 210, 220, 0.85);
+  color: rgba(241, 245, 249, 0.85);
   text-decoration: none;
-  border-radius: 8px;
+  border-radius: var(--radius-md);
   font-size: 0.875rem;
   font-weight: 500;
   transition: background 0.15s ease, color 0.15s ease;
@@ -664,17 +548,17 @@ body {
 
 .user-menu__footer {
   padding: var(--spacing-2);
-  border-top: 1px solid rgba(255, 255, 255, 0.06);
+  border-top: 1px solid rgba(148, 163, 184, 0.1);
   background: rgba(0, 0, 0, 0.15);
 }
 
-/* ==================== FOOTER (Premium Clean Style) ==================== */
+/* ==================== FOOTER (Playverse Clean Style) ==================== */
 
 .footer {
   padding: var(--spacing-4) var(--spacing-8);
-  background: linear-gradient(180deg, #0d0f14 0%, #0a0c10 100%);
-  border-top: 1px solid rgba(255, 255, 255, 0.04);
-  color: rgba(140, 150, 165, 0.8);
+  background: linear-gradient(180deg, #0F172A 0%, #020617 100%);
+  border-top: 1px solid rgba(148, 163, 184, 0.08);
+  color: rgba(148, 163, 184, 0.8);
   font-size: 0.75rem;
   font-weight: 500;
   position: relative;
@@ -718,25 +602,25 @@ body {
 
 .footer-brand__icon {
   font-size: 0.9rem;
-  color: var(--fw-accent-primary);
+  color: var(--pv-accent-primary);
 }
 
 .footer-brand__text {
   font-size: 0.8125rem;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  font-family: var(--font-display);
+  letter-spacing: 0.03em;
   color: rgba(255, 255, 255, 0.9);
-  text-transform: uppercase;
 }
 
 .footer-copyright {
   margin: 0;
   font-size: var(--text-xs);
-  color: rgba(130, 140, 155, 0.7);
+  color: rgba(100, 116, 139, 0.8);
 }
 
 .footer-link {
-  color: rgba(160, 170, 185, 0.8);
+  color: rgba(148, 163, 184, 0.8);
   text-decoration: none;
   font-size: 0.75rem;
   font-weight: 500;
@@ -745,11 +629,11 @@ body {
 }
 
 .footer-link:hover {
-  color: rgba(230, 240, 255, 0.9);
+  color: rgba(241, 245, 249, 0.9);
 }
 
 .footer-divider {
-  color: rgba(100, 110, 125, 0.4);
+  color: rgba(100, 116, 139, 0.4);
   font-size: 0.75rem;
 }
 
@@ -758,16 +642,16 @@ body {
   align-items: center;
   gap: var(--spacing-1-5);
   padding: var(--spacing-1) var(--spacing-2);
-  background: rgba(39, 174, 96, 0.08);
-  border: 1px solid rgba(39, 174, 96, 0.2);
-  border-radius: 6px;
+  background: rgba(34, 197, 94, 0.1);
+  border: 1px solid rgba(34, 197, 94, 0.25);
+  border-radius: var(--radius-sm);
 }
 
 .footer-status__dot {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: #34d399;
+  background: #22C55E;
   animation: pulse-dot 2.5s ease-in-out infinite;
 }
 
@@ -782,7 +666,7 @@ body {
 
 .footer-status__text {
   font-size: 0.6875rem;
-  color: #34d399;
+  color: #22C55E;
   font-weight: 500;
 }
 
@@ -808,13 +692,13 @@ body {
   }
 }
 
-/* ==================== AUTH LINKS (Premium Clean Style) ==================== */
+/* ==================== AUTH LINKS (Playverse Clean Style) ==================== */
 
 .auth-link {
   padding: var(--spacing-2) var(--spacing-4);
-  color: rgba(200, 210, 225, 0.85);
+  color: rgba(148, 163, 184, 0.9);
   text-decoration: none;
-  border-radius: 6px;
+  border-radius: var(--radius-md);
   font-size: 0.875rem;
   font-weight: 500;
   transition: color 0.15s ease, background 0.15s ease;
@@ -824,4 +708,3 @@ body {
   color: #ffffff;
   background: rgba(255, 255, 255, 0.06);
 }
-

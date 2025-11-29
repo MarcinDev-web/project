@@ -1,4 +1,4 @@
-# 🚀 Jak uruchomić pełną platformę FORGE
+# 🚀 Jak uruchomić pełną platformę PLAYVERSE
 
 **Platforma składa się z 3 głównych części:**
 1. **Backend API** (net-server) - port 3000

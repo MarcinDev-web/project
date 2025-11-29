@@ -1,11 +1,11 @@
 /**
- * Avatar Forge Randomize Functionality Tests
+ * Avatar Builder Randomize Functionality Tests
  */
 
 import { describe, it, expect } from 'vitest';
 import { DEFAULT_AVATAR_PART_LIBRARY, AVATAR_SLOTS, type AvatarSlot, type AvatarPartLibrary } from '@engine/avatar';
 
-// Re-implement the helper functions from AvatarForgePage for testing
+// Re-implement the helper functions from AvatarBuilderPage for testing
 function getAvailableMeshesForSlot(slot: AvatarSlot, library: AvatarPartLibrary): string[] {
   const meshes: string[] = [];
   for (const [partId, definition] of Object.entries(library)) {

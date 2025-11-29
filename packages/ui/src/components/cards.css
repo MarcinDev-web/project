@@ -1,37 +1,37 @@
 /**
- * Cards
- * Card components for various content types - Gaming style
+ * Cards - Playverse Flat Design
+ * Card components for various content types
  */
 
 /* ============================================
-   CARDS - Gaming Style
+   CARDS - Flat Style
    ============================================ */
 
 .card {
-  background: linear-gradient(180deg, rgba(45, 52, 62, 1) 0%, rgba(35, 42, 52, 1) 100%);
-  border: 2px solid rgba(70, 80, 95, 1);
-  border-radius: 8px;
-  padding: var(--spacing-3);
-  transition: transform var(--transition-fast), box-shadow var(--transition-fast);
+  background: var(--color-surface-panel);
+  border: 1px solid var(--color-border-subtle);
+  border-radius: var(--radius-lg);
+  padding: var(--spacing-4);
+  transition: all var(--transition-fast);
   cursor: pointer;
-  box-shadow: 0 3px 0 rgba(25, 30, 38, 1), 0 5px 8px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-sm);
 }
 
 .card:hover:not(.card-disabled) {
-  background: linear-gradient(180deg, rgba(55, 62, 72, 1) 0%, rgba(45, 52, 62, 1) 100%);
-  border-color: rgb(59, 130, 246);
+  background: var(--color-surface-elevated);
+  border-color: var(--color-primary-500);
   transform: translateY(-2px);
-  box-shadow: 0 5px 0 rgba(25, 30, 38, 1), 0 7px 12px rgba(0, 0, 0, 0.4);
+  box-shadow: var(--shadow-md);
 }
 
 .card:active:not(.card-disabled) {
   transform: translateY(0);
-  box-shadow: 0 2px 0 rgba(25, 30, 38, 1), 0 4px 6px rgba(0, 0, 0, 0.3);
+  box-shadow: var(--shadow-xs);
 }
 
 .card.card-selected {
-  border-color: rgb(59, 130, 246);
-  box-shadow: 0 3px 0 rgb(29, 78, 216), 0 5px 8px rgba(0, 0, 0, 0.3);
+  border-color: var(--color-primary-500);
+  box-shadow: 0 0 0 1px var(--color-primary-500), var(--shadow-sm);
 }
 
 .card-disabled {
@@ -42,28 +42,43 @@
 .card-image {
   width: 100%;
   aspect-ratio: 16/9;
-  border-radius: 6px;
-  background: rgba(20, 25, 32, 0.5);
-  margin-bottom: var(--spacing-2);
+  border-radius: var(--radius-md);
+  background: var(--color-surface-base);
+  margin-bottom: var(--spacing-3);
   overflow: hidden;
   display: flex;
   align-items: center;
   justify-content: center;
-  border: 2px solid rgba(60, 70, 85, 0.5);
+  border: 1px solid var(--color-border-subtle);
 }
 
 .card-title {
-  font-size: var(--text-sm);
+  font-size: var(--text-base);
   font-weight: 600;
-  color: rgba(220, 225, 235, 1);
+  font-family: var(--font-display);
+  color: var(--color-text-primary);
   margin: 0 0 var(--spacing-1) 0;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
 }
 
 .card-subtitle {
-  font-size: var(--text-xs);
-  color: rgba(160, 170, 185, 1);
+  font-size: var(--text-sm);
+  color: var(--color-text-secondary);
   margin: 0;
-  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
 }
 
+/* Card variants */
+.card-elevated {
+  background: var(--color-surface-elevated);
+  box-shadow: var(--shadow-md);
+}
+
+.card-flat {
+  box-shadow: none;
+  border: 1px solid var(--color-border-medium);
+}
+
+.card-glass {
+  background: rgba(30, 41, 59, 0.8);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}

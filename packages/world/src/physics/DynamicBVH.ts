@@ -359,14 +359,14 @@ export class DynamicBVH {
     // Extend in velocity direction if provided
     if (velocity) {
       const mult = this.config.velocityMultiplier;
-      for (let i = 0; i < 3; i++) {
-        const v = velocity[i] * mult;
-        if (v < 0) {
-          fatAABB.min[i] += v;
-        } else {
-          fatAABB.max[i] += v;
-        }
-      }
+      // Unrolled loop for TypeScript tuple type safety
+      const vx = velocity[0] * mult;
+      const vy = velocity[1] * mult;
+      const vz = velocity[2] * mult;
+      
+      if (vx < 0) fatAABB.min[0] += vx; else fatAABB.max[0] += vx;
+      if (vy < 0) fatAABB.min[1] += vy; else fatAABB.max[1] += vy;
+      if (vz < 0) fatAABB.min[2] += vz; else fatAABB.max[2] += vz;
     }
     
     return fatAABB;

@@ -1,6 +1,6 @@
 /**
  * Profile Page Styles - Modern Gaming Dashboard
- * Forge World Platform - User Profile Redesign
+ * Playverse Platform - User Profile Redesign
  */
 
 /* ============================================
@@ -57,10 +57,10 @@
   position: relative;
   height: 180px;
   background: 
-    linear-gradient(135deg, rgba(230, 126, 34, 0.15) 0%, rgba(78, 205, 196, 0.1) 50%, rgba(139, 92, 246, 0.1) 100%),
-    radial-gradient(ellipse 80% 50% at 20% 40%, rgba(230, 126, 34, 0.2), transparent 50%),
+    linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(78, 205, 196, 0.1) 50%, rgba(139, 92, 246, 0.1) 100%),
+    radial-gradient(ellipse 80% 50% at 20% 40%, rgba(59, 130, 246, 0.2), transparent 50%),
     radial-gradient(ellipse 60% 40% at 80% 60%, rgba(78, 205, 196, 0.15), transparent 50%),
-    var(--fw-base-medium);
+    var(--pv-base-medium, var(--bg-elevated));
   overflow: hidden;
 }
 
@@ -105,7 +105,7 @@
   border: 4px solid var(--bg-elevated);
   box-shadow: 
     0 8px 24px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(230, 126, 34, 0.2);
+    0 0 0 1px rgba(59, 130, 246, 0.2);
   background: var(--fw-base-medium);
   transition: transform var(--transition-base), box-shadow var(--transition-base);
 }
@@ -114,14 +114,14 @@
   transform: scale(1.02);
   box-shadow: 
     0 12px 32px rgba(0, 0, 0, 0.5),
-    0 0 20px rgba(230, 126, 34, 0.3);
+    0 0 20px rgba(59, 130, 246, 0.3);
 }
 
 .profile-hero__avatar-placeholder {
   width: 120px;
   height: 120px;
   border-radius: var(--radius-xl, 16px);
-  background: linear-gradient(135deg, var(--fw-accent-primary) 0%, var(--fw-accent-secondary) 100%);
+  background: linear-gradient(135deg, var(--pv-accent-primary, #3B82F6) 0%, var(--pv-accent-secondary, #10B981) 100%);
   border: 4px solid var(--bg-elevated);
   display: flex;
   align-items: center;
@@ -242,7 +242,7 @@
 }
 
 .profile-sidebar__card:hover {
-  border-color: rgba(230, 126, 34, 0.3);
+  border-color: rgba(59, 130, 246, 0.3);
 }
 
 .profile-sidebar__card-header {
@@ -287,8 +287,8 @@
 }
 
 .profile-quick-stat:hover {
-  background: rgba(230, 126, 34, 0.08);
-  border-color: rgba(230, 126, 34, 0.2);
+  background: rgba(59, 130, 246, 0.08);
+  border-color: rgba(59, 130, 246, 0.2);
   transform: translateY(-2px);
 }
 
@@ -318,7 +318,7 @@
 }
 
 .profile-quick-stat--link:hover .profile-quick-stat__value {
-  color: var(--fw-accent-primary);
+  color: var(--pv-accent-primary, #3B82F6);
 }
 
 /* ============================================
@@ -361,17 +361,17 @@
   left: 0;
   right: 0;
   height: 3px;
-  background: linear-gradient(90deg, var(--stat-color, var(--fw-accent-primary)), transparent);
+  background: linear-gradient(90deg, var(--stat-color, var(--pv-accent-primary, #3B82F6)), transparent);
   opacity: 0;
   transition: opacity var(--transition-base);
 }
 
 .profile-stat-card:hover {
-  border-color: var(--stat-color, var(--fw-accent-primary));
+  border-color: var(--stat-color, var(--pv-accent-primary, #3B82F6));
   transform: translateY(-2px);
   box-shadow: 
     0 10px 30px rgba(0, 0, 0, 0.3),
-    0 0 0 1px var(--stat-color, var(--fw-accent-primary));
+    0 0 0 1px var(--stat-color, var(--pv-accent-primary, #3B82F6));
 }
 
 .profile-stat-card:hover::before {
@@ -392,7 +392,7 @@
   align-items: center;
   justify-content: center;
   font-size: 1.5rem;
-  background: var(--stat-bg, rgba(230, 126, 34, 0.1));
+  background: var(--stat-bg, rgba(59, 130, 246, 0.1));
   border-radius: var(--radius-md);
   transition: transform var(--transition-base);
 }
@@ -453,9 +453,9 @@
   gap: var(--spacing-5);
   padding: var(--spacing-6);
   background: 
-    linear-gradient(135deg, rgba(230, 126, 34, 0.12) 0%, rgba(243, 156, 18, 0.08) 100%),
+    linear-gradient(135deg, rgba(59, 130, 246, 0.12) 0%, rgba(243, 156, 18, 0.08) 100%),
     var(--bg-elevated);
-  border: 1px solid rgba(230, 126, 34, 0.3);
+  border: 1px solid rgba(59, 130, 246, 0.3);
   border-radius: var(--radius-xl, 16px);
   overflow: hidden;
 }
@@ -467,7 +467,7 @@
   left: 0;
   right: 0;
   height: 2px;
-  background: linear-gradient(90deg, var(--fw-accent-primary), var(--fw-accent-secondary), var(--fw-accent-primary));
+  background: linear-gradient(90deg, var(--pv-accent-primary, #3B82F6), var(--pv-accent-secondary, #10B981), var(--pv-accent-primary, #3B82F6));
   background-size: 200% 100%;
   animation: studioShimmer 3s linear infinite;
 }
@@ -490,9 +490,9 @@
   align-items: center;
   justify-content: center;
   font-size: 2rem;
-  background: linear-gradient(135deg, var(--fw-accent-primary), var(--fw-accent-secondary));
+  background: linear-gradient(135deg, var(--pv-accent-primary, #3B82F6), var(--pv-accent-secondary, #10B981));
   border-radius: var(--radius-lg);
-  box-shadow: 0 4px 16px rgba(230, 126, 34, 0.3);
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.3);
 }
 
 .profile-studio-card__text {
@@ -635,8 +635,8 @@
 }
 
 .profile-activity-item:hover {
-  background: rgba(230, 126, 34, 0.05);
-  border-color: rgba(230, 126, 34, 0.2);
+  background: rgba(59, 130, 246, 0.05);
+  border-color: rgba(59, 130, 246, 0.2);
   transform: translateX(4px);
 }
 
@@ -712,11 +712,11 @@
 }
 
 .profile-build-card:hover {
-  border-color: rgba(230, 126, 34, 0.5);
+  border-color: rgba(59, 130, 246, 0.5);
   transform: translateY(-4px);
   box-shadow: 
     0 20px 40px rgba(0, 0, 0, 0.4),
-    0 0 0 1px rgba(230, 126, 34, 0.3);
+    0 0 0 1px rgba(59, 130, 246, 0.3);
 }
 
 .profile-build-card__thumbnail {
@@ -826,7 +826,7 @@
   justify-content: center;
   font-size: 3.5rem;
   background: 
-    radial-gradient(circle at 50% 50%, rgba(230, 126, 34, 0.1) 0%, transparent 70%);
+    radial-gradient(circle at 50% 50%, rgba(59, 130, 246, 0.1) 0%, transparent 70%);
   border-radius: 50%;
   animation: emptyPulse 3s ease-in-out infinite;
 }
@@ -883,13 +883,13 @@
 }
 
 .profile-link-btn:hover {
-  background: rgba(230, 126, 34, 0.1);
-  border-color: var(--fw-accent-primary);
-  color: var(--fw-accent-primary);
+  background: rgba(59, 130, 246, 0.1);
+  border-color: var(--pv-accent-primary, #3B82F6);
+  color: var(--pv-accent-primary, #3B82F6);
 }
 
 .profile-link-btn--primary {
-  background: linear-gradient(135deg, var(--fw-accent-primary), var(--fw-accent-secondary));
+  background: linear-gradient(135deg, var(--pv-accent-primary, #3B82F6), var(--pv-accent-secondary, #10B981));
   border: none;
   color: white;
   font-weight: 600;
@@ -897,7 +897,7 @@
 
 .profile-link-btn--primary:hover {
   transform: translateY(-1px);
-  box-shadow: 0 4px 16px rgba(230, 126, 34, 0.4);
+  box-shadow: 0 4px 16px rgba(59, 130, 246, 0.4);
 }
 
 /* ============================================

@@ -77,7 +77,9 @@ function createBasicDeviceMock() {
   const createPipelineLayout = vi.fn(() => ({}));
   const createShaderModule = vi.fn(() => ({}));
   const createRenderPipeline = vi.fn(() => ({ getBindGroupLayout: vi.fn(() => ({})) }));
+  const createRenderPipelineAsync = vi.fn(() => Promise.resolve({ getBindGroupLayout: vi.fn(() => ({})) }));
   const createComputePipeline = vi.fn(() => ({}));
+  const createComputePipelineAsync = vi.fn(() => Promise.resolve({}));
   const createBindGroup = vi.fn(() => ({}));
 
   const renderPassMock = {
@@ -116,7 +118,9 @@ function createBasicDeviceMock() {
     createPipelineLayout,
     createShaderModule,
     createRenderPipeline,
+    createRenderPipelineAsync,
     createComputePipeline,
+    createComputePipelineAsync,
     createBindGroup,
     createCommandEncoder: vi.fn(() => commandEncoderMock),
     queue,
@@ -160,14 +164,26 @@ describe('Shadows and IBL', () => {
       const { deviceMock, commandEncoderMock, renderPassMock, spies } = createBasicDeviceMock();
       const pass = new ShadowPass(deviceMock);
 
+      // Create proper interleaved instance data (24 floats per instance: offset(3), colorScale(4), secondaryColor(4), emissiveColor(4), materialParams(4), rotation(4), materialId(1))
+      const INSTANCE_STRIDE = 24;
+      const instanceInterleavedData = new Float32Array(2 * INSTANCE_STRIDE);
+      // Instance 0 at origin with identity rotation
+      instanceInterleavedData[0] = 0; instanceInterleavedData[1] = 0; instanceInterleavedData[2] = 0; // offset
+      instanceInterleavedData[3] = 1; instanceInterleavedData[4] = 1; instanceInterleavedData[5] = 1; instanceInterleavedData[6] = 1; // colorScale
+      instanceInterleavedData[19] = 0; instanceInterleavedData[20] = 0; instanceInterleavedData[21] = 0; instanceInterleavedData[22] = 1; // rotation (identity quat)
+      // Instance 1 at (5,0,0)
+      const base1 = INSTANCE_STRIDE;
+      instanceInterleavedData[base1 + 0] = 5; instanceInterleavedData[base1 + 1] = 0; instanceInterleavedData[base1 + 2] = 0;
+      instanceInterleavedData[base1 + 3] = 1; instanceInterleavedData[base1 + 4] = 1; instanceInterleavedData[base1 + 5] = 1; instanceInterleavedData[base1 + 6] = 1;
+      instanceInterleavedData[base1 + 19] = 0; instanceInterleavedData[base1 + 20] = 0; instanceInterleavedData[base1 + 21] = 0; instanceInterleavedData[base1 + 22] = 1;
+
       const geometry = {
         vertices: new Uint8Array(24),
         indices: new Uint16Array([0, 1, 2, 0, 2, 3]),
         instanceCount: 2,
-        instanceOffsetData: new Float32Array(6),
-        instanceColorScaleData: new Float32Array(8),
-        instanceRotationData: new Float32Array(8),
-        instanceMaterialIdData: new Float32Array(2),
+        opaqueCount: 2,
+        instanceInterleavedData,
+        instanceBoundsData: new Float32Array(8), // 4 floats per instance (center + radius)
       } as unknown as GeometryData;
 
       const frameResources: any = {

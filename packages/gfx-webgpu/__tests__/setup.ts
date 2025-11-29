@@ -56,6 +56,8 @@ if (typeof navigator !== 'undefined') {
           finish: () => {},
         }),
         createRenderPipeline: () => ({}),
+        createRenderPipelineAsync: async () => ({}),
+        createComputePipelineAsync: async () => ({}),
         createBindGroup: () => ({}),
         createBuffer: () => ({
           destroy: () => {},

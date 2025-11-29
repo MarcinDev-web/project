@@ -95,7 +95,7 @@ import * as auth from '../../../utils/auth';
 import type { PublicUser } from '../../../utils/auth';
 import { Logger } from '../../../utils/logger';
 import { EditorInteractionManager } from '../../input/EditorInteractionManager';
-import { ModelForgeManager } from '../features/model-forge';
+import { modelBuilderManager } from '../features/model-builder';
 
 export interface EditorUIConfig {
   canvas: HTMLCanvasElement;
@@ -220,7 +220,7 @@ export class EditorUI {
   private characterInput: CharacterInputHandler | null = null;
   private editorCamera: EditorCameraController | null = null;
   private fpsCamera: FPSCamera | null = null;
-  private modelForgeManager: ModelForgeManager | null = null;
+  private modelBuilderManager: modelBuilderManager | null = null;
 
   constructor(private readonly config: EditorUIConfig) {}
 
@@ -574,7 +574,7 @@ export class EditorUI {
       this.updateControlEnabledState();
     });
 
-    // Initialize brand watermark (FORGE ENGINE branding)
+    // Initialize brand watermark (PLAY ENGINE branding)
     this.brandWatermark = new BrandWatermark({
       container: document.body,
       showFPS: true, // Show FPS counter in dev mode
@@ -652,7 +652,7 @@ export class EditorUI {
       onOpenUIEditor: () => this.openUIEditor(),
       onToggleCollaboration: () => this.toggleCollaborationPanel(),
       isCollaborating: () => this.collaborationManager?.isCollaborating() ?? false,
-      onToggleModelForge: () => this.toggleModelForge(),
+      onTogglemodelBuilder: () => this.togglemodelBuilder(),
       onGizmoModeChange: (mode) => {
         if (!this.state) return;
         this.state.gizmoMode.value = mode;
@@ -1032,21 +1032,21 @@ export class EditorUI {
     // Initialize Tutorial Manager
     this.tutorialManager = new TutorialManager(this);
 
-    // Initialize Model Forge Manager
-    this.modelForgeManager = new ModelForgeManager({
+    // Initialize Model Builder Manager
+    this.modelBuilderManager = new modelBuilderManager({
       scene: this.config.scene,
       state: this.state,
       canvas: this.config.canvas,
       container: document.body,
       onModeChanged: (active) => {
-        Logger.debug(`[EditorUI] Model Forge mode changed: ${active}`);
-        // Disable other interactions when Model Forge is active
+        Logger.debug(`[EditorUI] Model Builder mode changed: ${active}`);
+        // Disable other interactions when Model Builder is active
         if (active) {
           this.config.selection.clearSelection();
         }
       },
     });
-    this.disposables.add(() => this.modelForgeManager?.dispose());
+    this.disposables.add(() => this.modelBuilderManager?.dispose());
 
     // Initialize Collaboration Manager (optional - requires auth token)
     this.initializeCollaborationManager();
@@ -2193,27 +2193,27 @@ export class EditorUI {
   }
 
   /**
-   * Toggle Model Forge mode.
+   * Toggle Model Builder mode.
    */
-  private toggleModelForge(): void {
+  private togglemodelBuilder(): void {
     if (!this.state) return;
     
-    // Toggle the model forge active state
-    this.state.modelForgeActive.value = !this.state.modelForgeActive.value;
+    // Toggle the Model Builder active state
+    this.state.modelBuilderActive.value = !this.state.modelBuilderActive.value;
     
-    const isActive = this.state.modelForgeActive.value;
+    const isActive = this.state.modelBuilderActive.value;
     if (isActive) {
-      this.setStatusMessage('Model Forge activated - Build microblock models', 2000);
+      this.setStatusMessage('Model Builder activated - Build microblock models', 2000);
     } else {
-      this.setStatusMessage('Model Forge deactivated', 1000);
+      this.setStatusMessage('Model Builder deactivated', 1000);
     }
   }
 
   /**
-   * Get Model Forge manager (for external access).
+   * Get Model Builder manager (for external access).
    */
-  public getModelForgeManager(): ModelForgeManager | null {
-    return this.modelForgeManager;
+  public getmodelBuilderManager(): modelBuilderManager | null {
+    return this.modelBuilderManager;
   }
 
   /**

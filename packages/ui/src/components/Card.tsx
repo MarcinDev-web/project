@@ -7,13 +7,13 @@ interface CardProps extends HTMLAttributes<HTMLDivElement> {
   variant?: 'default' | 'forge' | 'gaming' | 'thread' | 'post' | 'category';
 }
 
-export function Card({ 
-  children, 
-  className = '', 
-  hoverable = true, 
+export function Card({
+  children,
+  className = '',
+  hoverable = true,
   variant = 'default',
-  style, 
-  ...props 
+  style,
+  ...props
 }: CardProps) {
   // Determine base class based on variant
   let baseClasses = '';
@@ -29,7 +29,7 @@ export function Card({
   // Add hoverable class if needed (only for forge-card currently, gaming card has hover built-in or needs logic)
   // .card in cards.css has :hover logic built-in but checked against .card-disabled
   // .forge-card has .forge-card--hoverable
-  
+
   let hoverClass = '';
   if (hoverable) {
     if (variant === 'default' || variant === 'forge') {
@@ -41,14 +41,16 @@ export function Card({
   const classes = `${baseClasses} ${hoverClass} ${className}`.trim();
 
   // Validate children - if it's an object that's not a valid ReactNode, log error and show message
-  if (children !== null && children !== undefined && typeof children === 'object' && !Array.isArray(children) && !('$$typeof' in children)) {
+  if (
+    children !== null &&
+    children !== undefined &&
+    typeof children === 'object' &&
+    !Array.isArray(children) &&
+    !('$$typeof' in children)
+  ) {
     console.error('Card received invalid children (object instead of ReactNode):', children);
     return (
-      <div 
-        style={style}
-        className={classes}
-        {...props}
-      >
+      <div style={style} className={classes} {...props}>
         <div style={{ padding: 'var(--spacing-4)', color: 'var(--color-error)' }}>
           Error: Invalid card content
         </div>
@@ -57,11 +59,7 @@ export function Card({
   }
 
   return (
-    <div 
-      style={style}
-      className={classes}
-      {...props}
-    >
+    <div style={style} className={classes} {...props}>
       {children}
     </div>
   );

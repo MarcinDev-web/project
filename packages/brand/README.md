@@ -1,8 +1,8 @@
 # @engine/brand
 
-**Centralized branding and visual identity for Forge World**
+**Centralized branding and visual identity for Playverse**
 
-This package contains all branding constants, color schemes, typography settings, watermark configurations, and logo assets used across Forge World.
+This package contains all branding constants, color schemes, typography settings, watermark configurations, and logo assets used across Playverse.
 
 ## 🎯 Purpose
 
@@ -30,9 +30,9 @@ element.style.color = COLORS.TEXT_PRIMARY;
 element.style.fontFamily = TYPOGRAPHY.FONT_STACK;
 
 // Display branding
-title.textContent = BRAND.PLATFORM_NAME; // "Forge World"
-subtitle.textContent = BRAND.TAGLINE; // "Open-source 3D game creation platform..."
-badge.textContent = BRAND.ENGINE_TAG; // "POWERED BY FORGE ENGINE"
+title.textContent = BRAND.PLATFORM_NAME; // "Playverse"
+subtitle.textContent = BRAND.TAGLINE; // "Create. Play. Share."
+badge.textContent = BRAND.ENGINE_TAG; // "POWERED BY PLAY ENGINE"
 ```
 
 ### Watermarks
@@ -42,15 +42,15 @@ import { WATERMARKS } from '@engine/brand';
 
 // Editor watermark
 const watermark = document.createElement('div');
-watermark.textContent = WATERMARKS.EDITOR.text; // "FORGE ENGINE · DEV BUILD"
+watermark.textContent = WATERMARKS.EDITOR.text; // "PLAY ENGINE · DEV BUILD"
 Object.assign(watermark.style, WATERMARKS.EDITOR.style);
 
 // FPS counter with branding
-const fpsText = WATERMARKS.FPS_COUNTER.format(60); // "FORGE ENGINE · 60 FPS"
+const fpsText = WATERMARKS.FPS_COUNTER.format(60); // "PLAY ENGINE · 60 FPS"
 
 // Community badge (open-source emphasis)
 const badge = document.createElement('div');
-badge.textContent = WATERMARKS.COMMUNITY.text; // "FORGE · OPEN SOURCE"
+badge.textContent = WATERMARKS.COMMUNITY.text; // "PLAYVERSE · OPEN SOURCE"
 Object.assign(badge.style, WATERMARKS.COMMUNITY.style);
 ```
 
@@ -69,18 +69,19 @@ button.style.boxShadow = UI.SHADOW.MD;
 
 | Color | Hex | Usage |
 |-------|-----|-------|
-| PRIMARY_BG | `#1B1B1D` | Main background (steel gray) |
-| ACCENT_HOT | `#FF6A00` | Forge orange - energy, creation |
-| ACCENT_TECH | `#2E6AFF` | Technical blue - Forge Engine |
-| TEXT_PRIMARY | `#ffffff` | Main text |
-| TEXT_DIM | `#E1E1E3` | Secondary text (light ash) |
+| PRIMARY_BG | `#0F172A` | Main background (slate dark) |
+| ACCENT_PRIMARY | `#3B82F6` | Primary blue - action, interaction |
+| ACCENT_SECONDARY | `#10B981` | Secondary green - success, growth |
+| ACCENT_TERTIARY | `#8B5CF6` | Tertiary purple - special, highlights |
+| TEXT_PRIMARY | `#F1F5F9` | Main text |
+| TEXT_DIM | `#94A3B8` | Secondary text |
 
-**Theme:** Anvil and fire as creation metaphor - steel gray with forge orange accents.
+**Theme:** Cartoon/stylized aesthetic with vibrant blue, green, and purple accents.
 
 ## 📐 Typography
 
-- **Plaza Entertainment (Classic):** Inter, Neue Haas Grotesk, Satoshi
-- **Forge World (Geometric):** Orbitron, Rajdhani, Exo 2
+- **Display:** Nunito, Poppins (friendly, rounded)
+- **Body:** Inter, DM Sans (clean, readable)
 - **Monospace:** JetBrains Mono, Fira Code, Consolas
 - **Base Size:** 14px
 - **Weights:** 300, 400, 500, 600, 700, 800
@@ -90,31 +91,31 @@ button.style.boxShadow = UI.SHADOW.MD;
 ### EDITOR
 Top-left corner for editor/dev builds:
 ```
-FORGE ENGINE · DEV BUILD
+PLAY ENGINE · DEV BUILD
 ```
 
 ### LOADING
 Center-bottom for loading screens:
 ```
-POWERED BY FORGE ENGINE
+POWERED BY PLAY ENGINE
 ```
 
 ### FPS_COUNTER
 Top-left corner with dynamic FPS:
 ```
-FORGE ENGINE · 142 FPS
+PLAY ENGINE · 142 FPS
 ```
 
 ### SOCIAL
 Bottom-right for screenshots/social media:
 ```
-POWERED BY FORGE ENGINE
+POWERED BY PLAY ENGINE
 ```
 
 ### COMMUNITY
 Top-right corner for open-source emphasis:
 ```
-FORGE · OPEN SOURCE
+PLAYVERSE · OPEN SOURCE
 ```
 
 ## 🎯 Best Practices
@@ -128,21 +129,21 @@ FORGE · OPEN SOURCE
 
 **One-liner (everywhere):**
 ```
-Forge World — Open-source 3D game creation platform built by the community, for the community. POWERED BY FORGE ENGINE.
+Playverse — Open-source 3D game creation platform built by the community, for the community. POWERED BY PLAY ENGINE.
 ```
 
 **README:**
 ```markdown
-# Forge World
+# Playverse
 
-Open-source 3D game creation platform built by the community, for the community.
+Open-source 3D game creation platform. Create. Play. Share.
 
-POWERED BY FORGE ENGINE.
+POWERED BY PLAY ENGINE.
 ```
 
 **Social Media Bio:**
 ```
-Forge World — Open-source 3D game creation platform. Built by the community, for the community. POWERED BY FORGE ENGINE #WebGPU #GameDev #OpenSource #FORGE
+Playverse — Open-source 3D game creation platform. Create. Play. Share. POWERED BY PLAY ENGINE #WebGPU #GameDev #OpenSource
 ```
 
 ## 🔄 Updating Branding
@@ -206,7 +207,7 @@ function createButton(text: string): HTMLButtonElement {
   const button = document.createElement('button');
   button.textContent = text;
   Object.assign(button.style, {
-    backgroundColor: COLORS.ACCENT_HOT,
+    backgroundColor: COLORS.ACCENT_PRIMARY,
     color: COLORS.TEXT_PRIMARY,
     fontFamily: TYPOGRAPHY.FONT_STACK,
     fontSize: TYPOGRAPHY.SIZE.BASE,
@@ -219,11 +220,11 @@ function createButton(text: string): HTMLButtonElement {
   });
   
   button.addEventListener('mouseenter', () => {
-    button.style.backgroundColor = COLORS.ACCENT_HOT_HOVER;
+    button.style.backgroundColor = COLORS.ACCENT_PRIMARY_HOVER;
   });
   
   button.addEventListener('mouseleave', () => {
-    button.style.backgroundColor = COLORS.ACCENT_HOT;
+    button.style.backgroundColor = COLORS.ACCENT_PRIMARY;
   });
   
   return button;
@@ -232,7 +233,6 @@ function createButton(text: string): HTMLButtonElement {
 
 ---
 
-**Built with ❤️ by Plaza Entertainment Studio for Forge World**
+**Built with ❤️ for Playverse**
 
-**POWERED BY FORGE ENGINE**
-
+**POWERED BY PLAY ENGINE**

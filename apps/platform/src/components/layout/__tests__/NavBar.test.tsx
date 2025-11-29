@@ -65,7 +65,7 @@ describe('NavBar', () => {
         </RouterWrapper>
       );
 
-      const brandLink = screen.getByText('FORGE').closest('a');
+      const brandLink = screen.getByText('PLAYVERSE').closest('a');
       expect(brandLink).toBeInTheDocument();
       expect(brandLink).toHaveAttribute('href', '/');
     });
@@ -128,7 +128,7 @@ describe('NavBar', () => {
       expect(screen.getByText('Games')).toBeInTheDocument();
       expect(screen.getByText('Community')).toBeInTheDocument();
       expect(screen.getByText('Studio')).toBeInTheDocument();
-      expect(screen.getByText('Avatar Forge')).toBeInTheDocument();
+      expect(screen.getByText('Avatar Builder')).toBeInTheDocument();
     });
 
     it('should not display admin or moderator links', () => {
@@ -311,31 +311,7 @@ describe('NavBar', () => {
   });
 
   describe('brand logo', () => {
-    it('should display lightning emoji icon', () => {
-      vi.mocked(useAuth).mockReturnValue({
-        user: null,
-        isAuthenticated: false,
-        isLoading: false,
-        isAdmin: false,
-        isModerator: false,
-        login: vi.fn(),
-        register: vi.fn(),
-        logout: vi.fn(),
-        refreshUser: vi.fn(),
-      });
-
-      const { container } = render(
-        <RouterWrapper>
-          <NavBar />
-        </RouterWrapper>
-      );
-
-      const icon = container.querySelector('.navbar-brand__icon');
-      expect(icon).toBeInTheDocument();
-      expect(icon).toHaveTextContent('⚡');
-    });
-
-    it('should display FORGE text with gradient class', () => {
+    it('should display PLAYVERSE text', () => {
       vi.mocked(useAuth).mockReturnValue({
         user: null,
         isAuthenticated: false,
@@ -356,7 +332,7 @@ describe('NavBar', () => {
 
       const text = container.querySelector('.navbar-brand__text');
       expect(text).toBeInTheDocument();
-      expect(text).toHaveTextContent('FORGE');
+      expect(text).toHaveTextContent('PLAYVERSE');
     });
   });
 });

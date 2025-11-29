@@ -70,8 +70,8 @@ function GuestSupportPage() {
               <p className="support-contact-card__description">
                 Send us a detailed message and our team will get back to you as soon as possible.
               </p>
-              <a href="mailto:support@forge.world" className="support-contact-card__link">
-                support@forge.world
+              <a href="mailto:support@playverse.gg" className="support-contact-card__link">
+                support@playverse.gg
                 <span className="support-contact-card__link-arrow">→</span>
               </a>
               <div className="support-contact-card__response">
@@ -87,7 +87,7 @@ function GuestSupportPage() {
                 Join our Discord server to chat with the community and get help from fellow creators.
               </p>
               <a 
-                href="https://discord.gg/forgeworld" 
+                href="https://discord.gg/playverse" 
                 target="_blank" 
                 rel="noopener noreferrer" 
                 className="support-contact-card__link"
@@ -196,7 +196,7 @@ function GuestSupportPage() {
                 <span className="support-resource-link__arrow">›</span>
               </Link>
               <a 
-                href="https://docs.forge.world" 
+                href="https://docs.playverse.gg" 
                 target="_blank" 
                 rel="noopener noreferrer" 
                 className="support-resource-link"
@@ -206,7 +206,7 @@ function GuestSupportPage() {
                 <span className="support-resource-link__arrow">›</span>
               </a>
               <a 
-                href="https://status.forge.world" 
+                href="https://status.playverse.gg" 
                 target="_blank" 
                 rel="noopener noreferrer" 
                 className="support-resource-link"
@@ -434,13 +434,13 @@ export function SupportPage() {
             <div className="support-auth__quick-help">
               <h3 className="support-auth__quick-help-title">Need more help?</h3>
               <div className="support-auth__quick-help-links">
-                <a href="https://discord.gg/forgeworld" target="_blank" rel="noopener noreferrer" className="support-auth__quick-help-link">
+                <a href="https://discord.gg/playverse" target="_blank" rel="noopener noreferrer" className="support-auth__quick-help-link">
                   <span>💬</span> Join Discord
                 </a>
-                <a href="https://docs.forge.world" target="_blank" rel="noopener noreferrer" className="support-auth__quick-help-link">
+                <a href="https://docs.playverse.gg" target="_blank" rel="noopener noreferrer" className="support-auth__quick-help-link">
                   <span>📚</span> Documentation
                 </a>
-                <a href="mailto:support@forge.world" className="support-auth__quick-help-link">
+                <a href="mailto:support@playverse.gg" className="support-auth__quick-help-link">
                   <span>📧</span> Email Support
                 </a>
               </div>

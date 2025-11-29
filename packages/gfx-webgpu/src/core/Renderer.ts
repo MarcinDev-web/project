@@ -91,6 +91,20 @@ export type { Renderer, GridRenderer, RendererOptions } from './RendererTypes';
  */
 function applyVisualPreset(preset: VisualPreset | undefined): Partial<RenderSettings> {
   switch (preset) {
+    case 'cartoon':
+      // Cartoon/cel-shaded style - vibrant colors, strong outlines, clean look
+      return {
+        enableHDR: true,
+        enableBloom: true,
+        enableSSAO: false, // Disabled for cleaner cartoon look
+        enableSSGI: false,
+        enableFXAA: true,
+        enableOutlines: true,
+        outlineQuality: 'med',
+        shadowQuality: 'med',
+        enableStylizedShading: true,
+        enableStylizedColorGrading: true,
+      };
     case 'stylized-balanced':
       return {
         enableHDR: true,
@@ -100,6 +114,8 @@ function applyVisualPreset(preset: VisualPreset | undefined): Partial<RenderSett
         enableOutlines: true,
         outlineQuality: 'med',
         shadowQuality: 'med',
+        enableStylizedShading: false,
+        enableStylizedColorGrading: false,
       };
     case 'cinematic':
       return {
@@ -110,6 +126,8 @@ function applyVisualPreset(preset: VisualPreset | undefined): Partial<RenderSett
         enableOutlines: true,
         outlineQuality: 'med',
         shadowQuality: 'high',
+        enableStylizedShading: false,
+        enableStylizedColorGrading: false,
       };
     case 'low':
       return {
@@ -119,9 +137,22 @@ function applyVisualPreset(preset: VisualPreset | undefined): Partial<RenderSett
         enableFXAA: false,
         enableOutlines: false,
         shadowQuality: 'low',
+        enableStylizedShading: false,
+        enableStylizedColorGrading: false,
       };
     default:
-      return {};
+      // Default to cartoon style if no preset specified
+      return {
+        enableHDR: true,
+        enableBloom: true,
+        enableSSAO: false,
+        enableFXAA: true,
+        enableOutlines: true,
+        outlineQuality: 'med',
+        shadowQuality: 'med',
+        enableStylizedShading: true,
+        enableStylizedColorGrading: true,
+      };
   }
 }
 

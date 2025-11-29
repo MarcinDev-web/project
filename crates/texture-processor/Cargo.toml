@@ -3,7 +3,7 @@ name = "texture-processor"
 version = "0.1.0"
 edition = "2021"
 description = "High-performance procedural texture generation with SIMD support"
-authors = ["Forge Engine Team"]
+authors = ["Play Engine Team"]
 
 [lib]
 crate-type = ["cdylib", "rlib"]

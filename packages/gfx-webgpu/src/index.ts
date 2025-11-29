@@ -110,8 +110,12 @@ export { BrdfLutPass } from './postprocess/BrdfLut';
 export { PrefilterEnvPass } from './postprocess/PrefilterEnv';
 export { BloomPass } from './postprocess/BloomPass';
 export { FXAAPass } from './postprocess/FXAAPass';
-export { OutlinePass } from './postprocess/OutlinePass';
+export { OutlinePass, type OutlineConfig } from './postprocess/OutlinePass';
+export { StylizedColorGradingPass, type StylizedColorGradingConfig } from './postprocess/StylizedColorGrading';
 export { EnvironmentRenderer } from './renderers/EnvironmentRenderer';
+
+// Stylized/Cartoon Shaders
+export { createStylizedShaderCode, createStylizedSimpleShaderCode, WGSL_STYLIZED_HELPERS } from './shaders/stylized';
 export { VolumetricCloudPass, type VolumetricCloudParams } from './renderers/VolumetricCloudPass';
 export {
   HybridVolumetricCloudPass,

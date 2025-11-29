@@ -741,21 +741,97 @@ class AssetManager {
 }
 ```
 
-### 3. Spatial Partitioning
+### 3. Spatial Partitioning (BVH)
 
 ```typescript
-// ✅ Use spatial structures for queries
-class Octree {
-  query(bounds: AABB): Entity[] {
-    // Only check entities in relevant cells
-    const results: Entity[] = [];
-    this.queryNode(this.root, bounds, results);
-    return results;
-  }
-}
+// ✅ PATTERN: Dynamic BVH for efficient spatial queries
+import { DynamicBVH } from '@engine/world/physics';
+
+// Create BVH with configuration
+const bvh = new DynamicBVH({
+  fatMargin: 0.1,           // 10cm margin for movement tolerance
+  velocityMultiplier: 2.0,  // Predict 2x velocity for fat AABB
+  minDisplacement: 0.01,    // 1cm minimum movement before refit
+});
+
+// Insert entities with AABB
+bvh.insert(entity, aabb);
+
+// Update when entity moves (incremental O(log N) refit)
+bvh.update(entity, newAABB);
+
+// Query entities in frustum or AABB
+const visible = bvh.queryFrustum(frustumPlanes);
+const nearby = bvh.queryAABB(searchBounds);
+
+// Raycast for picking
+const hit = bvh.raycast(origin, direction, maxDistance);
+
+// ✅ Why BVH over Octree?
+// - Better adapts to non-uniform object distributions
+// - Incremental refitting is O(log N) vs O(N) rebuild
+// - More cache-friendly traversal
+// - Tighter bounds for frustum culling
+// - Used by: Box2D, Bullet, Rapier, Unreal Engine
 
 // Don't iterate all entities every frame
 ```
+
+### 4. WASM Acceleration
+
+```typescript
+// ✅ PATTERN: WASM with JS fallback
+import { 
+  isWasmAvailable, 
+  compileClip, 
+  sampleClipWasm,
+  type CompiledClip 
+} from '@engine/animation/sampling/WasmSampler';
+
+class AnimatorOptimized {
+  private readonly useWasm: boolean;
+  private compiledClips = new Map<string, CompiledClip>();
+  
+  constructor() {
+    // Check WASM availability once
+    this.useWasm = isWasmAvailable();
+    
+    // Precompile data for WASM
+    if (this.useWasm) {
+      this.precompileClips();
+    }
+  }
+  
+  private sampleClip(clip: AnimationClip, time: number): Pose {
+    if (this.useWasm) {
+      // ✅ WASM path: single call for entire pose
+      const compiled = this.compiledClips.get(clip.name)!;
+      return sampleClipWasm(compiled, time);
+    } else {
+      // ✅ JS fallback with same interface
+      return this.sampleClipJS(clip, time);
+    }
+  }
+}
+
+// ✅ Testing: Mock WASM modules
+import { mockWasmCollision, initWasmCollision } from '@engine/test-utils/mocks';
+
+beforeAll(async () => {
+  // Use mock instead of real WASM
+  vi.mock('@engine/wasm-collision', () => ({
+    default: mockWasmCollision,
+    init: initWasmCollision,
+  }));
+});
+```
+
+**Key points:**
+- Check WASM availability once at startup
+- Precompile data structures for WASM
+- Always provide JS fallback
+- Use `@engine/test-utils` mocks for testing
+- Batch operations to minimize WASM boundary crossings
 
 ---
 

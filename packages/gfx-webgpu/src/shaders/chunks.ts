@@ -68,6 +68,48 @@ fn lambert(diffuseColor: vec3<f32>) -> vec3<f32> {
 }
 `;
 
+export const WGSL_STYLIZED_HELPERS = `
+// Quantize value into discrete bands for toon shading
+fn quantize_toon(value: f32, bands: f32) -> f32 {
+  return floor(value * bands) / bands;
+}
+
+// Sample shadow ramp color based on lighting intensity
+// Uses 4 colors: deep shadow, shadow, midtone, highlight
+fn sample_shadow_ramp(intensity: f32, ramp: array<vec3<f32>, 4>) -> vec3<f32> {
+  let t = clamp(intensity, 0.0, 1.0);
+  if (t < 0.25) {
+    return mix(ramp[0], ramp[1], t * 4.0);
+  } else if (t < 0.5) {
+    return mix(ramp[1], ramp[2], (t - 0.25) * 4.0);
+  } else if (t < 0.75) {
+    return mix(ramp[2], ramp[3], (t - 0.5) * 4.0);
+  }
+  return ramp[3];
+}
+
+// Calculate rim lighting for edge glow effect
+fn calculate_rim(normal: vec3<f32>, viewDir: vec3<f32>, rimPower: f32, rimIntensity: f32) -> f32 {
+  let NdotV = max(dot(normal, viewDir), 0.0);
+  let rim = pow(1.0 - NdotV, rimPower);
+  return rim * rimIntensity;
+}
+
+// Calculate specular highlight with band quantization
+fn calculate_specular_banded(
+  normal: vec3<f32>,
+  viewDir: vec3<f32>,
+  lightDir: vec3<f32>,
+  specPower: f32,
+  bands: f32
+) -> f32 {
+  let halfVec = normalize(lightDir + viewDir);
+  let NdotH = max(dot(normal, halfVec), 0.0);
+  let spec = pow(NdotH, specPower);
+  return floor(spec * bands) / bands;
+}
+`;
+
 export const WGSL_WATER_HELPERS = `
 // Gerstner wave function for realistic water waves
 // Returns (displaced position, normal offset)

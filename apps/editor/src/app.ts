@@ -118,7 +118,7 @@ export class EditorApp {
         shouldSimulate: () => this.editor?.isPlayMode() === true,
         onFrameUpdate: (deltaTime: number) => {
           this.predictionBridge.captureLocalState(this.predictionTick++);
-          // Update brand watermark (FORGE ENGINE branding with FPS)
+          // Update brand watermark (PLAY ENGINE branding with FPS)
           this.editor?.updateBrandWatermark();
 
           // Update play mode systems (physics, character controller, FPS camera, UI, interaction)

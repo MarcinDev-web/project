@@ -59,7 +59,9 @@ function createBasicDeviceMock() {
   const createPipelineLayout = vi.fn(() => ({}));
   const createShaderModule = vi.fn(() => ({}));
   const createRenderPipeline = vi.fn(() => ({ getBindGroupLayout: vi.fn(() => ({})) }));
+  const createRenderPipelineAsync = vi.fn(() => Promise.resolve({ getBindGroupLayout: vi.fn(() => ({})) }));
   const createComputePipeline = vi.fn(() => ({}));
+  const createComputePipelineAsync = vi.fn(() => Promise.resolve({}));
   const createBindGroup = vi.fn(() => ({}));
 
   const renderPassMock = {
@@ -98,7 +100,9 @@ function createBasicDeviceMock() {
     createPipelineLayout,
     createShaderModule,
     createRenderPipeline,
+    createRenderPipelineAsync,
     createComputePipeline,
+    createComputePipelineAsync,
     createBindGroup,
     createCommandEncoder: vi.fn(() => commandEncoderMock),
     queue,

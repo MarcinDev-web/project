@@ -8,10 +8,10 @@ export const Footer = memo(function Footer() {
         {/* Left - Brand & Copyright */}
         <div className="footer-section footer-section--left">
           <div className="footer-brand">
-            <span className="footer-brand__icon">⚡</span>
-            <span className="footer-brand__text">FORGE</span>
+            <span className="footer-brand__icon">🎮</span>
+            <span className="footer-brand__text">PLAYVERSE</span>
           </div>
-          <p className="footer-copyright">&copy; 2025 Forge World. Powered by Forge Engine.</p>
+          <p className="footer-copyright">&copy; 2025 Playverse. Powered by Play Engine.</p>
         </div>
 
         {/* Center - Quick Links */}

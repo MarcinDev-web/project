@@ -174,9 +174,14 @@ export function isAntialiased(
   let hasSimilar = false;
 
   const neighbors: [number, number][] = [
-    [-1, -1], [0, -1], [1, -1],
-    [-1, 0],          [1, 0],
-    [-1, 1],  [0, 1],  [1, 1],
+    [-1, -1],
+    [0, -1],
+    [1, -1],
+    [-1, 0],
+    [1, 0],
+    [-1, 1],
+    [0, 1],
+    [1, 1],
   ];
 
   for (const [dx, dy] of neighbors) {
@@ -566,7 +571,10 @@ export function loadRawImage(path: string): ImageData | null {
 
     const width = view.getUint32(0, true);
     const height = view.getUint32(4, true);
-    const data = new Uint8Array(buffer.buffer, buffer.byteOffset + 8);
+    // Create a copy of the data, not a view, to avoid buffer issues
+    const expectedLength = width * height * 4;
+    const data = new Uint8Array(expectedLength);
+    data.set(new Uint8Array(buffer.buffer, buffer.byteOffset + 8, expectedLength));
 
     return { width, height, data };
   } catch {
@@ -714,10 +722,7 @@ export interface TextureCaptureConfig {
  * Capture WebGPU texture to ImageData (for Playwright tests)
  * This is a helper that generates the code to run in page.evaluate
  */
-export function generateTextureCaptureCode(
-  width: number,
-  height: number
-): string {
+export function generateTextureCaptureCode(width: number, height: number): string {
   return `
     async function captureTexture(device, texture) {
       const bytesPerPixel = 4;
@@ -798,4 +803,3 @@ export const visualPresets = {
     ignoreAntialiasing: true,
   } as VisualCompareOptions,
 };
-

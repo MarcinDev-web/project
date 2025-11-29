@@ -265,10 +265,7 @@ export function batchFrustumCull(
   return new Uint32Array(0);
 }
 
-export function batchEcsQuery(
-  _componentMasks: BigUint64Array,
-  _requiredMask: bigint
-): Uint32Array {
+export function batchEcsQuery(_componentMasks: BigUint64Array, _requiredMask: bigint): Uint32Array {
   return new Uint32Array(0);
 }
 
@@ -330,4 +327,3 @@ export class ComponentRegistry {
 }
 
 export const globalComponentRegistry = new ComponentRegistry();
-

@@ -66,6 +66,8 @@
 
 **Contains:**
 - 8 major design patterns (detailed)
+- WASM acceleration pattern (new)
+- Spatial partitioning (BVH) pattern (new)
 - Common idioms
 - Naming conventions
 - File organization
@@ -286,13 +288,17 @@ All reference:
 | Package boundaries | AI_CONTEXT.md | "Package Boundaries" |
 | Code style | AI_CONTEXT.md | "Code Style & Conventions" |
 | Testing approach | AI_CONTEXT.md | "Testing Philosophy" |
+| Recent changes | AI_CONTEXT.md | "Recent Changes & History" |
 | ECS pattern | CODEBASE_PATTERNS.md | "Component Pattern" |
 | Disposal pattern | CODEBASE_PATTERNS.md | "Disposable Pattern" |
 | Event handling | CODEBASE_PATTERNS.md | "Event Bus Pattern" |
+| Spatial queries (BVH) | CODEBASE_PATTERNS.md | "Spatial Partitioning (BVH)" |
+| WASM optimization | CODEBASE_PATTERNS.md | "WASM Acceleration" |
 | Performance tips | CODEBASE_PATTERNS.md | "Performance Patterns" |
 | Creating component | AI_PROMPTS.md | "Creating a New Component" |
 | Debugging tests | AI_PROMPTS.md | "Debugging Test Failure" |
 | Code review | AI_PROMPTS.md | "Self-Review" |
+| WASM mocks | QUICK_START_AI.md | "Testing" |
 | Critical rules | QUICK_START_AI.md | "Critical Rules" |
 | Commands | QUICK_START_AI.md | "Commands" |
 
@@ -370,7 +376,8 @@ A: Yes! Follow patterns in existing docs and update this index.
 ---
 
 **Generated:** 2025-11-12  
-**Version:** 1.0.0  
+**Last Updated:** 2025-11-29  
+**Version:** 1.1.0  
 **Maintained by:** Tech Team
 
 **For questions or improvements, see [AI_DOCUMENTATION_CHANGELOG.md](AI_DOCUMENTATION_CHANGELOG.md)**

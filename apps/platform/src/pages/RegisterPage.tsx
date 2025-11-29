@@ -1,10 +1,10 @@
 /**
- * Register Page - Forge Gateway Design
+ * Register Page - Playverse Gateway Design
  * 
  * Split-screen immersive registration experience with:
  * - Animated visual branding side
  * - Glassmorphism form card
- * - Floating ember particles
+ * - Floating particles
  */
 
 import { Navigate } from 'react-router-dom';
@@ -32,11 +32,11 @@ export function RegisterPage() {
         {/* Branding Content */}
         <div className="auth-branding">
           <div className="auth-logo">
-            <div className="auth-logo-icon">⚡</div>
-            <span className="auth-logo-text">FORGE</span>
+            <div className="auth-logo-icon">🎮</div>
+            <span className="auth-logo-text">PLAYVERSE</span>
           </div>
           
-          <p className="auth-tagline">Build • Play • Create</p>
+          <p className="auth-tagline">Create • Play • Share</p>
 
           <div className="auth-features">
             <div className="auth-feature">

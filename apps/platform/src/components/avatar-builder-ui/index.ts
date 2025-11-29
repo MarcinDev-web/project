@@ -1,5 +1,5 @@
 /**
- * Avatar Forge - Component Exports
+ * Avatar Builder - Component Exports
  */
 
 export { CategoryNav } from './CategoryNav';

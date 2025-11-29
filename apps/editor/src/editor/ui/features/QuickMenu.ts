@@ -26,7 +26,7 @@ export interface QuickMenuConfig {
   onOpenUIEditor?: () => void;
   onToggleCollaboration?: () => void;
   isCollaborating?: () => boolean;
-  onToggleModelForge?: () => void;
+  onToggleModelBuilder?: () => void;
   onGizmoModeChange: (mode: 'translate' | 'rotate' | 'scale') => void;
   onRotationSnapChange: (mode: 'free' | '15deg' | '45deg' | '90deg') => void;
   onCameraChange?: (type: CameraType) => void;
@@ -111,17 +111,17 @@ export class QuickMenu {
     const left = document.createElement('div');
     left.className = 'top-bar-left';
 
-    // Brand (Forge style)
+    // Brand (Playverse style)
     const brand = document.createElement('a');
     brand.className = 'top-bar-logo';
     brand.href = '#';
-    // Icon with fire emoji style
+    // Icon with game controller emoji
     const icon = document.createElement('span');
     icon.className = 'top-bar-logo-icon';
-    icon.textContent = '⚡'; // Lightning bolt like Forge
+    icon.textContent = '🎮'; // Game controller for Playverse
     const text = document.createElement('span');
     text.className = 'top-bar-logo-text';
-    text.textContent = 'FORGE';
+    text.textContent = 'PLAYVERSE';
     brand.appendChild(icon);
     brand.appendChild(text);
     left.appendChild(brand);
@@ -155,29 +155,29 @@ export class QuickMenu {
     this.updateModeButton();
     section.appendChild(modeBtn);
 
-    // Model Forge Button
-    const forgeBtn = document.createElement('button');
-    forgeBtn.className = 'top-bar-forge-button';
-    forgeBtn.title = 'Model Forge - Build microblock models';
+    // Model Builder Button
+    const builderBtn = document.createElement('button');
+    builderBtn.className = 'top-bar-builder-button';
+    builderBtn.title = 'Model Builder - Build microblock models';
     
-    const forgeIcon = createIcon('cube', 14);
-    const forgeText = document.createElement('span');
-    forgeText.textContent = 'Model Forge';
-    forgeBtn.appendChild(forgeIcon);
-    forgeBtn.appendChild(forgeText);
+    const builderIcon = createIcon('cube', 14);
+    const builderText = document.createElement('span');
+    builderText.textContent = 'Model Builder';
+    builderBtn.appendChild(builderIcon);
+    builderBtn.appendChild(builderText);
 
-    forgeBtn.addEventListener('click', () => {
-      this.config.onToggleModelForge?.();
+    builderBtn.addEventListener('click', () => {
+      this.config.onToggleModelBuilder?.();
     });
 
-    // React to model forge state
+    // React to model builder state
     effect(() => {
-      const isActive = this.config.state.modelForgeActive.value;
-      forgeBtn.classList.toggle('active', isActive);
-      forgeText.textContent = isActive ? 'Exit Forge' : 'Model Forge';
+      const isActive = this.config.state.modelBuilderActive.value;
+      builderBtn.classList.toggle('active', isActive);
+      builderText.textContent = isActive ? 'Exit Builder' : 'Model Builder';
     });
 
-    section.appendChild(forgeBtn);
+    section.appendChild(builderBtn);
 
     return section;
   }

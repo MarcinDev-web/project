@@ -9,6 +9,7 @@ import { FXAAPass } from '../postprocess/FXAAPass';
 import { SSAOPass } from '../postprocess/SSAO';
 import { SSGIPass } from '../postprocess/SSGIPass';
 import { OutlinePass } from '../postprocess/OutlinePass';
+import { StylizedColorGradingPass } from '../postprocess/StylizedColorGrading';
 import { NormalRenderPass } from './NormalRenderPass';
 import { TIMESTAMP_INDICES } from '../config';
 
@@ -19,6 +20,8 @@ export interface PostProcessFeatureFlags {
   enableSSGI?: boolean;
   enableFXAA: boolean;
   enableOutlines?: boolean;
+  /** Enable stylized color grading for cartoon look */
+  enableStylizedColorGrading?: boolean;
 }
 
 export interface PostProcessInputs {
@@ -50,12 +53,17 @@ export class PostProcessPipeline {
   private ssaoPass: SSAOPass | null = null;
   private ssgiPass: SSGIPass | null = null;
   private outlinePass: OutlinePass | null = null;
+  private stylizedColorGradingPass: StylizedColorGradingPass | null = null;
   private normalRenderPass: NormalRenderPass | null = null;
   private depthResolvePipeline: GPURenderPipeline | null = null;
   private depthResolveLayout: GPUBindGroupLayout | null = null;
   private depthResolveUniformBuffer: GPUBuffer | null = null;
   private projectionInverseScratch = new Float32Array(16);
   private normalVertexLayouts: GPUVertexBufferLayout[] | null = null;
+  private stylizedIntermediateTexture: GPUTexture | null = null;
+  private stylizedIntermediateView: GPUTextureView | null = null;
+  private stylizedIntermediateWidth = 0;
+  private stylizedIntermediateHeight = 0;
 
   run(inputs: PostProcessInputs): void {
     const {
@@ -78,6 +86,7 @@ export class PostProcessPipeline {
     const enableSSGI = featureFlags.enableSSGI;
     const enableFXAA = featureFlags.enableFXAA && enableHDR;
     const enableOutlines = featureFlags.enableOutlines === true;
+    const enableStylizedColorGrading = featureFlags.enableStylizedColorGrading === true;
 
     const hdrView = targets.hdrView;
     const bloomView = targets.bloomView;
@@ -175,8 +184,25 @@ export class PostProcessPipeline {
       );
     }
 
-    // Determine target for tonemap (before outlines)
-    const tonemapTarget = enableOutlines || enableFXAA ? tonemapIntermediateView ?? swapChainView : swapChainView;
+    // Determine if we need intermediate textures for the post-process chain
+    const needsStylizedIntermediate = enableStylizedColorGrading && (enableOutlines || enableFXAA);
+    
+    // Ensure stylized intermediate texture if needed
+    if (needsStylizedIntermediate) {
+      this.ensureStylizedIntermediateTexture(device, ctx.canvas.width, ctx.canvas.height, ctx.presentationFormat);
+    }
+
+    // Determine target for tonemap
+    // Chain: Tonemap -> [StylizedColorGrading] -> [Outlines] -> [FXAA] -> Swapchain
+    let tonemapTarget: GPUTextureView;
+    if (enableStylizedColorGrading) {
+      // Tonemap writes to stylized intermediate (or tonemap intermediate if we need more passes)
+      tonemapTarget = this.stylizedIntermediateView ?? tonemapIntermediateView ?? swapChainView;
+    } else if (enableOutlines || enableFXAA) {
+      tonemapTarget = tonemapIntermediateView ?? swapChainView;
+    } else {
+      tonemapTarget = swapChainView;
+    }
 
     if (enableHDR && hdrView) {
       this.ensureTonemapPass(device, ctx.presentationFormat);
@@ -196,13 +222,33 @@ export class PostProcessPipeline {
       );
     }
 
-    // Apply outlines after tonemap, before FXAA
-    if (enableOutlines && tonemapTarget && normalView && depthView) {
+    // Apply stylized color grading after tonemap
+    let colorGradingOutput = tonemapTarget;
+    if (enableStylizedColorGrading && this.stylizedIntermediateView) {
+      this.ensureStylizedColorGradingPass(device, ctx.presentationFormat);
+      // Color grading reads from tonemap output, writes to intermediate for next pass
+      const gradingTarget = enableOutlines || enableFXAA 
+        ? tonemapIntermediateView ?? swapChainView 
+        : swapChainView;
+      this.stylizedColorGradingPass?.render(
+        encoder,
+        tonemapTarget,
+        gradingTarget
+      );
+      colorGradingOutput = gradingTarget;
+    }
+
+    // Apply outlines after color grading, before FXAA
+    if (enableOutlines && colorGradingOutput && normalView && depthView) {
       this.ensureOutlinePass(device);
-      // Outline reads from tonemap output and writes to intermediate (or swapchain if no FXAA)
+      // Outline reads from color grading output and writes to intermediate (or swapchain if no FXAA)
       const outlineTarget = enableFXAA ? tonemapIntermediateView ?? swapChainView : swapChainView;
-      if (outlineTarget) {
-        this.outlinePass?.apply(encoder, tonemapTarget, outlineTarget, normalView, depthView, ctx.canvas.width, ctx.canvas.height);
+      if (outlineTarget && colorGradingOutput !== outlineTarget) {
+        this.outlinePass?.apply(encoder, colorGradingOutput, outlineTarget, normalView, depthView, ctx.canvas.width, ctx.canvas.height);
+      } else if (outlineTarget) {
+        // If source and target are the same, we need to handle differently
+        // For now, apply in-place (outline pass handles this via loadOp: 'load')
+        this.outlinePass?.apply(encoder, colorGradingOutput, outlineTarget, normalView, depthView, ctx.canvas.width, ctx.canvas.height);
       }
     }
 
@@ -222,11 +268,12 @@ export class PostProcessPipeline {
     this.fxaaPass = null;
     this.ssaoPass?.dispose?.();
     this.ssaoPass = null;
-    this.ssgiPass?.dispose?.(); // Assuming SSGIPass has dispose (it doesn't have ? because I implemented it, but safe to check)
-    // Wait, my implementation has dispose.
+    this.ssgiPass?.dispose?.();
     this.ssgiPass = null;
     this.outlinePass?.dispose?.();
     this.outlinePass = null;
+    this.stylizedColorGradingPass?.dispose?.();
+    this.stylizedColorGradingPass = null;
     this.normalRenderPass?.dispose();
     this.normalRenderPass = null;
     try {
@@ -237,6 +284,9 @@ export class PostProcessPipeline {
     this.depthResolveUniformBuffer = null;
     this.depthResolvePipeline = null;
     this.depthResolveLayout = null;
+    this.stylizedIntermediateTexture?.destroy();
+    this.stylizedIntermediateTexture = null;
+    this.stylizedIntermediateView = null;
   }
 
   flush(queue: GPUQueue): void {
@@ -280,6 +330,37 @@ export class PostProcessPipeline {
   private ensureOutlinePass(device: GPUDevice): void {
     if (!this.outlinePass) {
       this.outlinePass = new OutlinePass(device);
+    }
+  }
+
+  private ensureStylizedColorGradingPass(device: GPUDevice, presentationFormat: GPUTextureFormat): void {
+    if (!this.stylizedColorGradingPass) {
+      this.stylizedColorGradingPass = new StylizedColorGradingPass(device);
+      this.stylizedColorGradingPass.initialize(presentationFormat);
+    }
+  }
+
+  private ensureStylizedIntermediateTexture(
+    device: GPUDevice,
+    width: number,
+    height: number,
+    format: GPUTextureFormat
+  ): void {
+    if (
+      !this.stylizedIntermediateTexture ||
+      this.stylizedIntermediateWidth !== width ||
+      this.stylizedIntermediateHeight !== height
+    ) {
+      this.stylizedIntermediateTexture?.destroy();
+      this.stylizedIntermediateTexture = device.createTexture({
+        label: 'stylized-intermediate',
+        size: [width, height, 1],
+        format,
+        usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.TEXTURE_BINDING,
+      });
+      this.stylizedIntermediateView = this.stylizedIntermediateTexture.createView();
+      this.stylizedIntermediateWidth = width;
+      this.stylizedIntermediateHeight = height;
     }
   }
 

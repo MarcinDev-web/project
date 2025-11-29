@@ -1,5 +1,5 @@
 /**
- * ModelForgeOverlay - Main UI overlay for Model Forge mode
+ * ModelBuilderOverlay - Main UI overlay for Model Builder mode
  * 
  * Provides tools panel, palette, and status bar for microblock model building
  */
@@ -12,7 +12,7 @@ import { DisposableGroup } from '@engine/core/utils';
 import { createIcon } from '../../../utils/icons';
 import { getAllCategories, getBlocksByCategory } from '@engine/blocks';
 
-export interface ModelForgeOverlayConfig {
+export interface ModelBuilderOverlayConfig {
   state: EditorState;
   builderMode: ModelBuilderMode | null;
   builder: ModelBuilder | null;
@@ -23,10 +23,10 @@ export interface ModelForgeOverlayConfig {
 }
 
 /**
- * Model Forge UI Overlay
+ * Model Builder UI Overlay
  */
-export class ModelForgeOverlay {
-  private readonly config: ModelForgeOverlayConfig;
+export class ModelBuilderOverlay {
+  private readonly config: ModelBuilderOverlayConfig;
   private readonly disposables = new DisposableGroup();
   
   private root: HTMLElement | null = null;
@@ -40,7 +40,7 @@ export class ModelForgeOverlay {
   private currentShape: ToolState['shape'] = 'cube';
   private currentRotation: number = 0;
 
-  constructor(config: ModelForgeOverlayConfig) {
+  constructor(config: ModelBuilderOverlayConfig) {
     this.config = config;
   }
 
@@ -52,7 +52,7 @@ export class ModelForgeOverlay {
 
     // Create root overlay
     this.root = document.createElement('div');
-    this.root.className = 'model-forge-overlay';
+    this.root.className = 'model-builder-overlay';
     this.root.innerHTML = this.getStyles();
 
     // Create main container
@@ -105,13 +105,13 @@ export class ModelForgeOverlay {
 
     const backBtn = document.createElement('button');
     backBtn.className = 'mf-btn mf-btn-icon';
-    backBtn.title = 'Exit Model Forge';
+    backBtn.title = 'Exit Model Builder';
     backBtn.appendChild(createIcon('back', 18));
     backBtn.addEventListener('click', () => this.config.onClose());
 
     const title = document.createElement('h2');
     title.className = 'mf-title';
-    title.textContent = 'MODEL FORGE';
+    title.textContent = 'Model Builder';
 
     left.appendChild(backBtn);
     left.appendChild(title);
@@ -384,7 +384,7 @@ export class ModelForgeOverlay {
 
     // Build zone info
     const zoneInfo = document.createElement('span');
-    const bounds = this.config.state.modelForgeBounds.value;
+    const bounds = this.config.state.ModelBuilderBounds.value;
     const sizeX = bounds.max[0] - bounds.min[0];
     const sizeY = bounds.max[1] - bounds.min[1];
     const sizeZ = bounds.max[2] - bounds.min[2];
@@ -467,9 +467,9 @@ export class ModelForgeOverlay {
    * Sets up reactive updates
    */
   private setupReactivity(): void {
-    // React to model forge state changes
+    // React to Model Builder state changes
     const disposer = effect(() => {
-      const active = this.config.state.modelForgeActive.value;
+      const active = this.config.state.ModelBuilderActive.value;
       if (this.root) {
         this.root.style.display = active ? 'block' : 'none';
       }
@@ -483,7 +483,7 @@ export class ModelForgeOverlay {
   private getStyles(): string {
     return `
       <style>
-        .model-forge-overlay {
+        .model-builder-overlay {
           position: fixed;
           top: 0;
           left: 0;

@@ -4,6 +4,8 @@ import { useAuth } from '../../contexts/AuthContext';
 import { Button } from '../../components/shared/Button';
 import { NavLink } from './NavLink';
 import { UserMenu } from './UserMenu';
+import { CoinsDisplay } from './CoinsDisplay';
+import { NotificationBell } from '../notifications/NotificationBell';
 
 export const NavBar = memo(function NavBar() {
   const { isAuthenticated, isAdmin, isModerator } = useAuth();
@@ -21,11 +23,23 @@ export const NavBar = memo(function NavBar() {
 
   return (
     <nav className="navbar">
-      {/* Logo / Brand */}
-      <Link to="/" className="navbar-brand">
-        <span className="navbar-brand__icon">⚡</span>
-        <span className="navbar-brand__text">FORGE</span>
-      </Link>
+      {/* Left section: Logo + Static Links */}
+      <div className="navbar-left">
+        <Link to="/" className="navbar-brand">
+          <span className="navbar-brand__text">PLAYVERSE</span>
+        </Link>
+        <div className="navbar-static-links">
+          <NavLink to="/marketplace" isActive={isActive('/marketplace')}>
+            Marketplace
+          </NavLink>
+          <NavLink to="/news" isActive={isActive('/news')}>
+            News
+          </NavLink>
+          <NavLink to="/support" isActive={isActive('/support')}>
+            Support
+          </NavLink>
+        </div>
+      </div>
 
       {/* Mobile Menu Toggle */}
       <button 
@@ -66,8 +80,8 @@ export const NavBar = memo(function NavBar() {
             <NavLink to="/studio" isActive={isActive('/studio')}>
               Studio
             </NavLink>
-            <NavLink to="/avatar-forge" isActive={isActive('/avatar-forge')}>
-              Avatar Forge
+            <NavLink to="/avatar-builder" isActive={isActive('/avatar-builder')}>
+              Avatar Builder
             </NavLink>
 
             {/* Admin/Moderator Links */}
@@ -85,6 +99,8 @@ export const NavBar = memo(function NavBar() {
             {/* Divider */}
             <div className="navbar-divider" />
 
+            <CoinsDisplay />
+            <NotificationBell />
             <UserMenu />
           </>
         ) : (

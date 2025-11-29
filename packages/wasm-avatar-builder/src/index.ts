@@ -1,26 +1,26 @@
 /**
  * @engine/wasm-avatar-builder
- * 
+ *
  * High-performance avatar mesh generation and skeleton system using Rust/WASM.
- * 
+ *
  * ## Features
  * - Procedural mesh generation (sphere, capsule, torso) - 5-10x faster than JS
  * - Skeleton joint hierarchy with world matrix computation
  * - GPU skinning matrix computation
  * - Pose blending with SLERP for rotations
- * 
+ *
  * ## Usage
  * ```ts
  * import { initWasm, generateSphere, AvatarSkeleton } from '@engine/wasm-avatar-builder';
- * 
+ *
  * // Initialize WASM module (once at startup)
  * await initWasm();
- * 
+ *
  * // Generate sphere mesh
  * const sphereMesh = generateSphere(16);
  * const vertices = new Float32Array(wasmMemory, sphereMesh.vertices_ptr(), sphereMesh.vertices_len());
  * const indices = new Uint16Array(wasmMemory, sphereMesh.indices_ptr(), sphereMesh.indices_len());
- * 
+ *
  * // Create skeleton
  * const skeleton = new AvatarSkeleton(10);
  * skeleton.set_parent(1, 0);
@@ -85,16 +85,16 @@ let initPromise: Promise<void> | null = null;
  */
 export async function initWasm(): Promise<void> {
   if (wasmModule) return;
-  
+
   if (initPromise) {
     await initPromise;
     return;
   }
-  
+
   initPromise = (async () => {
     wasmModule = await init();
   })();
-  
+
   await initPromise;
 }
 
@@ -125,7 +125,7 @@ export interface MeshResult {
 
 /**
  * Generate a sphere mesh and return typed arrays.
- * 
+ *
  * @param segments - Number of horizontal/vertical segments (default: 16, min: 3)
  * @returns MeshResult with vertices and indices as typed arrays
  */
@@ -136,7 +136,7 @@ export function createSphereMesh(segments = 16): MeshResult {
 
 /**
  * Generate a capsule mesh and return typed arrays.
- * 
+ *
  * @param radius - Capsule radius (default: 0.5)
  * @param cylinderHeight - Cylinder section height (default: 1.0)
  * @param radialSegments - Radial segments (default: 16)
@@ -147,7 +147,7 @@ export function createCapsuleMesh(
   radius = 0.5,
   cylinderHeight = 1.0,
   radialSegments = 16,
-  hemisphereSegments = 8,
+  hemisphereSegments = 8
 ): MeshResult {
   const params = new CapsuleParams(radius, cylinderHeight, radialSegments, hemisphereSegments);
   const mesh = generate_capsule_y(params);
@@ -156,7 +156,7 @@ export function createCapsuleMesh(
 
 /**
  * Generate a heroic torso mesh and return typed arrays.
- * 
+ *
  * @returns MeshResult with vertices and indices as typed arrays
  */
 export function createTorsoMesh(): MeshResult {
@@ -177,4 +177,3 @@ function extractMeshData(mesh: MeshData): MeshResult {
     triangleCount: mesh.triangle_count(),
   };
 }
-

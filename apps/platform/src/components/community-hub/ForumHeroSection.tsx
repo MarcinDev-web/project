@@ -37,7 +37,7 @@ const mockFeatured: FeaturedContent[] = [
     id: '2',
     type: 'announcement',
     title: 'New Scripting API Released',
-    subtitle: 'Check out the powerful new scripting features in FORGE 2.5',
+    subtitle: 'Check out the powerful new scripting features in PLAYVERSE 2.5',
     gradientColors: ['#ff6b00', '#ffd700'],
     link: '/community/thread/scripting-api-2-5',
     badge: '📢 NEW',

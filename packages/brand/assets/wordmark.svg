@@ -1,19 +1,22 @@
 <svg width="400" height="80" viewBox="0 0 400 80" xmlns="http://www.w3.org/2000/svg">
-  <!-- Forge World Wordmark -->
+  <!-- Playverse Wordmark -->
   
-  <!-- FORGE text -->
-  <text x="20" y="50" font-family="Inter, Roboto, sans-serif" font-size="48" font-weight="700" fill="#ffffff" letter-spacing="-1">
-    FORGE
+  <!-- PLAY text -->
+  <text x="20" y="50" font-family="Nunito, Inter, Roboto, sans-serif" font-size="48" font-weight="700" fill="#F1F5F9" letter-spacing="-1">
+    PLAY
   </text>
   
-  <!-- WORLD text (smaller, lighter) -->
-  <text x="180" y="50" font-family="Inter, Roboto, sans-serif" font-size="32" font-weight="500" fill="#8a8a8a" letter-spacing="0">
-    WORLD
+  <!-- VERSE text (smaller, in green) -->
+  <text x="155" y="50" font-family="Nunito, Inter, Roboto, sans-serif" font-size="32" font-weight="500" fill="#10B981" letter-spacing="0">
+    VERSE
   </text>
   
-  <!-- Accent line (hot orange) -->
-  <line x1="20" y1="58" x2="370" y2="58" stroke="#ff3b00" stroke-width="3" opacity="0.8"/>
+  <!-- Accent line (blue gradient) -->
+  <line x1="20" y1="58" x2="300" y2="58" stroke="#3B82F6" stroke-width="3" opacity="0.8"/>
   
-  <!-- Community badge indicator (small circle) -->
-  <circle cx="365" cy="40" r="4" fill="#00c853" opacity="0.8"/>
+  <!-- Play button indicator -->
+  <polygon points="340,30 340,50 360,40" fill="#3B82F6" opacity="0.9"/>
+  
+  <!-- Community badge indicator (green circle) -->
+  <circle cx="380" cy="40" r="4" fill="#10B981" opacity="0.8"/>
 </svg>

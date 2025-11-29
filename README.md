@@ -1,4 +1,4 @@
-# Forge Engine
+# Play Engine
 
 **Production-grade WebGPU/TypeScript game engine with modular architecture**
 
@@ -6,7 +6,7 @@
 
 ## 🎯 Overview
 
-Forge Engine is a modern, open-source 3D game engine built from the ground up with WebGPU and TypeScript. It features a complete modular monorepo architecture, comprehensive testing, and a professional 3D scene editor - all running directly in your browser.
+Play Engine is a modern, open-source 3D game engine built from the ground up with WebGPU and TypeScript. It features a complete modular monorepo architecture, comprehensive testing, and a professional 3D scene editor - all running directly in your browser.
 
 **Key Features:**
 - ⚡ WebGPU-powered rendering with PBR materials and shadows
@@ -54,7 +54,7 @@ pnpm lint             # Run linter
 ## 📦 Project Structure
 
 ```
-forge-engine/
+play-engine/
 ├── packages/          # Engine packages (@engine/*)
 │   ├── core/         # Foundation (math, ECS, events)
 │   ├── world/        # ECS runtime, physics
@@ -383,10 +383,10 @@ ISC
 
 ---
 
-## 🔥 Why Forge Engine?
+## 🎮 Why Play Engine?
 
-- **⚡ Forged for performance** - WebGPU-powered, browser-native
-- **🏗️ Built to scale** - From prototypes to production-ready games
+- **⚡ Built for performance** - WebGPU-powered, browser-native
+- **🏗️ Ready to scale** - From prototypes to production-ready games
 - **🌐 No barriers** - Create anywhere, share instantly, play everywhere
 
 ---

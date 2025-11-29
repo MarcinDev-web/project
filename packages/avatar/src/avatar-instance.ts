@@ -172,19 +172,10 @@ export class AvatarInstance {
   }
 
   update(_deltaTime: number): void {
-    // WARNING: This update must run BEFORE AnimationSystem in the frame cycle.
-    // AnimationComponent is updated by AnimationSystem.
-    // This method syncs the result of AnimationComponent to the AvatarSkeleton and visual entities.
-    // If this runs before AnimationSystem, we are rendering the previous frame's pose.
-    
-    // AnimationComponent is updated by AnimationSystem, so we don't need to call animator.update()
-    // But we keep it for backward compatibility if someone is using the old animator directly
-    // this.animator.update(deltaTime); // Removed - AnimationSystem handles this
-    
-    // Sync pose from AnimationComponent to AvatarSkeleton
+    // Sync pose from AnimationComponent to AvatarSkeleton (rotations only)
     this.syncPoseFromAnimatorComponent();
     
-    // Sync joint entities from skeleton (which is updated by AnimationSystem)
+    // Sync joint entities from skeleton
     this.syncJointEntities();
   }
 
@@ -200,45 +191,32 @@ export class AvatarInstance {
 
     const pose = component.pose;
     const jointNames = this.skeleton.getJointNames();
-    const pool = getVec3Pool();
+    
+    // IMPORTANT: We only sync ROTATIONS from the animation pose.
+    // We do NOT sync translations because:
+    // 1. Avatar skeleton already has correct bind pose positions from DEFAULT_AVATAR_JOINTS
+    // 2. Avatar animations only define rotations (no translation tracks)
+    // 3. The Pose's localTranslations are initialized to zeros by createPose()
+    // 4. Syncing zeros would collapse all joints to origin
+    //
+    // If translation animation (e.g., root motion) is needed in the future,
+    // it should be handled separately with explicit opt-in.
     
     for (let i = 0; i < jointNames.length; i++) {
       const jointName = jointNames[i];
       if (!jointName) continue;
       
-      // In AnimationComponent's Skeleton (created from AvatarSkeleton), 
-      // the bone index directly corresponds to the index in getJointNames().
-      const boneIndex = i;
+      const ro = i * 4;
       
-      const to = boneIndex * 3;
-      const ro = boneIndex * 4;
-      
-      // Read from Float32Arrays
-      const tX = pose.localTranslations[to + 0] || 0;
-      const tY = pose.localTranslations[to + 1] || 0;
-      const tZ = pose.localTranslations[to + 2] || 0;
-      
+      // Read rotation from pose (identity quat if not set)
       const rX = pose.localRotations[ro + 0] || 0;
       const rY = pose.localRotations[ro + 1] || 0;
       const rZ = pose.localRotations[ro + 2] || 0;
       const rW = pose.localRotations[ro + 3] || 1;
       
-      const sX = pose.localScales[to + 0] || 1;
-      const sY = pose.localScales[to + 1] || 1;
-      const sZ = pose.localScales[to + 2] || 1;
-
-      // Update AvatarSkeleton
-      const tmpV = pool.acquire();
-      
-      tmpV[0] = tX; tmpV[1] = tY; tmpV[2] = tZ;
-      this.skeleton.setLocalPosition(jointName, tmpV);
-      
+      // Only sync rotation to skeleton
+      // Skip translation and scale - skeleton bind pose already has correct values
       this.skeleton.setLocalRotation(jointName, [rX, rY, rZ, rW] as any); 
-      
-      tmpV[0] = sX; tmpV[1] = sY; tmpV[2] = sZ;
-      this.skeleton.setLocalScale(jointName, tmpV);
-      
-      pool.release(tmpV);
     }
   }
 
@@ -310,10 +288,26 @@ export class AvatarInstance {
       // Continue applying valid parts, but log errors
     }
 
+    // Debug: Log what we're applying
+    const partsInLoadout = Object.entries(loadout.parts || {})
+      .filter(([_, part]) => part !== null && part !== undefined)
+      .map(([slot, part]) => `${slot}:${part?.mesh}`);
+    console.log(`[AvatarInstance] applyLoadout: ${partsInLoadout.length} parts`, partsInLoadout);
+
+    let mountedCount = 0;
+    let unmountedCount = 0;
+    
     for (const slot of AVATAR_SLOTS) {
       const part = loadout.parts?.[slot] ?? null;
+      if (part) {
+        mountedCount++;
+      } else {
+        unmountedCount++;
+      }
       this.setSlot(slot, part);
     }
+    
+    console.log(`[AvatarInstance] Result: ${mountedCount} mounted, ${unmountedCount} unmounted`);
     this.syncJointEntities();
   }
 

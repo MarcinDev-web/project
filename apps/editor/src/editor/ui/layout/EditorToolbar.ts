@@ -49,7 +49,7 @@ export interface EditorToolbarConfig {
   isCollaborating?: () => boolean;
   onEntityCreated?: (entity: Entity) => void;
   onEntityDeleted?: (entityId: string) => void;
-  onToggleModelForge?: () => void;
+  onTogglemodelBuilder?: () => void;
 }
 
 interface DropdownMenuItem {
@@ -596,27 +596,27 @@ export class EditorToolbar {
       this.config.state.buildMode.value = current === 'free' ? 'limited' : 'free';
     });
 
-    // Model Forge button
-    const modelForgeBtn = document.createElement('button');
-    modelForgeBtn.type = 'button';
-    modelForgeBtn.className = 'toolbar-v2-model-forge-btn';
-    modelForgeBtn.title = 'Model Forge - Build microblock models';
+    // Model Builder button
+    const modelBuilderBtn = document.createElement('button');
+    modelBuilderBtn.type = 'button';
+    modelBuilderBtn.className = 'toolbar-v2-model-builder-btn';
+    modelBuilderBtn.title = 'Model Builder - Build microblock models';
     
     const forgeIcon = createIcon('cube', 16);
     const forgeText = document.createElement('span');
-    forgeText.textContent = 'Model Forge';
-    modelForgeBtn.appendChild(forgeIcon);
-    modelForgeBtn.appendChild(forgeText);
+    forgeText.textContent = 'Model Builder';
+    modelBuilderBtn.appendChild(forgeIcon);
+    modelBuilderBtn.appendChild(forgeText);
 
     effect(() => {
-      const isActive = this.config.state.modelForgeActive.value;
-      modelForgeBtn.classList.toggle('active', isActive);
-      forgeText.textContent = isActive ? 'Exit Forge' : 'Model Forge';
+      const isActive = this.config.state.modelBuilderActive.value;
+      modelBuilderBtn.classList.toggle('active', isActive);
+      forgeText.textContent = isActive ? 'Exit Forge' : 'Model Builder';
     });
 
-    modelForgeBtn.addEventListener('click', () => {
+    modelBuilderBtn.addEventListener('click', () => {
       if (this.config.state.isSharedView.value) return;
-      this.config.onToggleModelForge?.();
+      this.config.onTogglemodelBuilder?.();
     });
 
     const cameraMenu = this.createCameraMenu();
@@ -647,7 +647,7 @@ export class EditorToolbar {
 
     section.appendChild(modeBtn);
     section.appendChild(buildBtn);
-    section.appendChild(modelForgeBtn);
+    section.appendChild(modelBuilderBtn);
     section.appendChild(cameraMenu);
     section.appendChild(collaborationBtn);
     section.appendChild(settingsBtn);

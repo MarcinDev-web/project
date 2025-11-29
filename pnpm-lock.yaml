@@ -54,6 +54,9 @@ importers:
       '@webgpu/types':
         specifier: ^0.1.65
         version: 0.1.66
+      eslint:
+        specifier: ^9.17.0
+        version: 9.38.0(jiti@2.6.1)
       eslint-config-prettier:
         specifier: ^10.1.8
         version: 10.1.8(eslint@9.38.0(jiti@2.6.1))
@@ -552,6 +555,9 @@ importers:
       '@engine/core':
         specifier: workspace:*
         version: link:../core
+      '@engine/wasm-animation':
+        specifier: workspace:*
+        version: link:../wasm-animation
     devDependencies:
       typescript:
         specifier: ^5.9.3

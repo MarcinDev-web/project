@@ -1,4 +1,4 @@
-# Forge World Platform - Uruchomienie
+# Playverse Platform - Uruchomienie
 
 ## Struktura Projektu
 
