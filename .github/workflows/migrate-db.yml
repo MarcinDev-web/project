@@ -51,7 +51,7 @@ jobs:
       collab_server_changed: ${{ steps.check.outputs.collab_server_changed }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 2
 
@@ -100,7 +100,7 @@ jobs:
       collab_server_status: ${{ steps.migrate-collab-server.outputs.status }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -248,7 +248,7 @@ jobs:
       collab_server_status: ${{ steps.migrate-collab-server.outputs.status }}
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
