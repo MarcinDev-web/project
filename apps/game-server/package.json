@@ -15,9 +15,9 @@
     "@engine/world": "workspace:*",
     "@engine/world-server": "workspace:*",
     "@engine/net-protocol": "workspace:*",
-    "@fastify/cors": "^11.0.0",
+    "@fastify/cors": "^11.2.0",
     "@fastify/websocket": "^11.2.0",
-    "fastify": "^5.0.0",
+    "fastify": "^5.6.2",
     "ioredis": "^5.4.1",
     "ws": "^8.18.0"
   },
