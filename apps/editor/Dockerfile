@@ -20,7 +20,7 @@ RUN corepack prepare pnpm@10.19.0 --activate && \
 
 
 # Runtime stage
-FROM nginx:1.27-alpine AS runtime
+FROM nginx:1.29-alpine AS runtime
 
 ENV NODE_ENV=production
 
